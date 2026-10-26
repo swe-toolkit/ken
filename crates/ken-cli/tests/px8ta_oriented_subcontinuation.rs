@@ -509,7 +509,7 @@ fn observe_px8ds_p1_parity(
     .unwrap_or_else(|error| panic!("{case}: interpreter execution: {error:?}"));
     assert_eq!(
         native.exit_status, interpreted.exit_status,
-        "{case}: exit parity"
+        "{case}: exit parity; native={native:?} interpreted={interpreted:?}"
     );
     assert_eq!(
         native.terminal_error, interpreted.terminal_error,
