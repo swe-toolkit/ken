@@ -21,9 +21,12 @@
 > and two merge-empty unit laws. Architect's D0 on `98970bde7`
 > checked all three generic proofs, owned Transparent exports and
 > scratch trusted identities 114 → 114 without a new `Axiom`.
-> Section 5 is spec and seed only on this base: its catalog exports
-> are absent, and D0 is not execution of the authored seed against
-> shipped exports, official conformance, CI or landed trust.
+> Section 5's three generic proofs are now checked catalog exports on
+> this candidate. A targeted package test runs the authored accepted
+> client and paired refused union-bounds claim against those exports;
+> the exact package-local trusted identity set stays 114 → 114.
+> This does not establish official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
 
 ## 1. Finite event traces over natural times
 
@@ -534,9 +537,12 @@ window over events at times 1, 4 and 7, yielding only the time-4
 event on both sides, and both merge-unit instances. They rejected
 the union-bounds proposition over that same trace while accepting
 closed exact-value controls. That is **scratch D0** evidence, not
-execution of the authored §5 seed or of shipped §5 catalog exports.
-The §5 catalog delivery must separately promote
-`trace_merge_nil_right` without leaving a privacy-pin consumer
-expecting its import to fail. No shipped-seed or official conformance
-execution, CI, publication, landing or landed trust follows from
-this spec-and-seed candidate.
+execution of the authored §5 seed or of checked catalog exports.
+This candidate promotes the original `trace_merge_nil_right` proof and
+updates its privacy-pin consumer. Its package test root-loads all three
+owner-local Transparent exports, checks their quantified types, and runs
+the authored accepted client and same-input union-bounds refusal. The
+exact trusted-identity set is equal before and after loading EventTrace
+(114 → 114); its imported providers retain their inherited trust.
+The package test is not official conformance-runner execution, CI,
+publication, landing or a landed trust measurement.

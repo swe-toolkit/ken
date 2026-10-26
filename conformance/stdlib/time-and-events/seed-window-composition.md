@@ -5,9 +5,10 @@ Spec: `spec/50-stdlib/69-time-and-events.md` §5.
 
 These closed clients pin the three checked public law interfaces and
 independent exact-list controls. A closed instance does not establish a
-generic law. At the candidate base, §5's catalog exports have not
-landed; scratch D0 results do not establish execution against shipped
-exports or by the official conformance runner.
+generic law. The §5 catalog candidate has a targeted package test that
+runs the complete accepted client and appends this seed's single refusal
+to a fresh accepted prefix. Scratch D0 is not that package test, and the
+test is not official conformance-runner execution, CI or landing.
 
 ## Accepted client
 
@@ -172,6 +173,13 @@ with only the union-bounds refusal appended returned rc 1/E0038
 byte 2229. The same accepted prefix checks `Refl` on both true
 closed nested/intersection list equalities, so the refusal is tied
 to the false union result rather than an import or a broken form.
-These D0-overlay checks establish neither shipped §5 exports nor
-official conformance execution, CI, publication, landing or landed
-trust.
+Those historical D0-overlay checks did not establish checked §5 catalog
+exports. The targeted package test now roots-loads the three checked
+owner-local Transparent exports, checks the accepted eight-theorem client,
+and appends the union-bounds refusal to a fresh accepted prefix. The
+positive controls establish nested and intersected windows equal `[e4]`
+while the same-input union window equals the three-event trace. The
+refusal TypeMismatch-rejects at its own `Refl`, and the exact package-local
+trusted identity set is unchanged 114 → 114. These package-test checks
+are not official conformance-runner execution, CI, publication, landing
+or a landed trust measurement.
