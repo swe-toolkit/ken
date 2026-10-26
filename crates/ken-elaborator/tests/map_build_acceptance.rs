@@ -272,8 +272,26 @@ fn mk_map_dependency_env() -> ElabEnv {
 
 fn mk_env_with_provider_owned() -> (ElabEnv, MapDependenciesOwned) {
     let (mut env, dependencies) = mk_map_dependency_env_with_provider_owned();
-    env.elaborate_ken_md_file(MAP_KEN_MD)
+    env.elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(MAP_KEN_MD))
         .expect("catalog/packages/Data/Collections/Map.ken.md must elaborate");
+    let canonical = env.globals["Data.Collections.Derived.is_sorted"];
+    let law = env.globals["to_list_ordered"];
+    let ty = match env.env.lookup(law) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("Map.to_list_ordered must have a checked type: {other:?}"),
+    };
+    let mut terms = vec![ty];
+    let mut mentions_canonical = false;
+    while let Some(term) = terms.pop() {
+        if matches!(term, Term::Const { id, .. } if *id == canonical) {
+            mentions_canonical = true;
+        }
+        terms.extend(term.children());
+    }
+    assert!(
+        mentions_canonical,
+        "Map's sortedness law must state the real Derived.is_sorted identity"
+    );
     catalog_or::assert_transparent_result_uses_core_logic_or(
         &env, &dependencies.core_or, "bool_dichotomy",
     );
@@ -308,7 +326,7 @@ fn cat_bool_reuse_d2_resolves_exact_is_some_provider_without_equivalent_local() 
     ));
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let map_ids: BTreeSet<_> = env
-        .elaborate_ken_md_file(MAP_KEN_MD)
+        .elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(MAP_KEN_MD))
         .expect("Map must elaborate through its own selective is_some import")
         .into_iter()
         .collect();
@@ -398,7 +416,7 @@ fn cat_map_retires_leq_nat_family_and_totality_name() {
     );
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let map_ids: BTreeSet<_> = env
-        .elaborate_ken_md_file(MAP_KEN_MD)
+        .elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(MAP_KEN_MD))
         .expect("Map must elaborate without a Nat comparator import")
         .into_iter()
         .collect();
@@ -456,7 +474,7 @@ fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
 
 fn assert_map_import_mutation_fails_at_is_some(source: &str, label: &str) {
     let mut env = mk_map_dependency_env();
-    match env.elaborate_ken_md_file(source) {
+    match env.elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(source)) {
         Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
             name, "is_some",
             "{label} must fail at Map's unqualified is_some use"

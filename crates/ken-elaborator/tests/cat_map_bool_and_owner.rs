@@ -79,7 +79,15 @@ fn module_transparent_kernel_equivalents(
 fn map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     catalog_or::load_core_logic_compare(&mut env);
-    let (lawful_owned, _) = catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    let (lawful_owned, derived_owned) =
+        catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append", "is_sorted"]);
+    catalog_or::provider_owned_id(
+        &env,
+        &derived_owned,
+        "Data.Collections.Derived",
+        "is_sorted",
+    )
+    .expect("Map's sortedness dependency must be the checked Derived provider");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Map's canonical Nat addition provider must roots-load");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.Membership")
@@ -133,7 +141,7 @@ fn map_resolves_exact_lawfulclasses_bool_and_family_without_local_identity() {
 
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     let map_ids = env
-        .elaborate_ken_md_file(MAP_KEN_MD)
+        .elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(MAP_KEN_MD))
         .expect("Map must elaborate through its canonical LC bool_and import")
         .into_iter()
         .collect::<BTreeSet<_>>();
@@ -244,7 +252,7 @@ fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
 
 fn assert_import_mutation_fails(source: &str, label: &str) {
     let mut env = map_dependency_env();
-    match env.elaborate_ken_md_file(source) {
+    match env.elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(source)) {
         Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
             name, "bool_and",
             "{label} must fail at Map's unqualified bool_and use"

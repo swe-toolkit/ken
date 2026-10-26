@@ -12,7 +12,8 @@
 //! exported; their proof helpers and the `List Bool` sort carrier remain private.
 //! Generic Ω-list membership and its nine checked lift/transport laws are
 //! public beside their Derived-owned providers, including filter soundness
-//! and completeness. List concatenation and Ω-valued
+//! and completeness. Structural `is_sorted` is Derived-owned and public.
+//! List concatenation and Ω-valued
 //! all-elements membership are public for finite-word language evidence.
 
 use std::collections::BTreeSet;
@@ -81,6 +82,7 @@ fn derived_exports_all_authorized_operation_identities() {
         ("map::fusion", "cat_derived_pub_map_fusion"),
         ("map::append", "cat_derived_pub_map_append"),
         ("filter", "cat_derived_pub_filter"),
+        ("is_sorted", "cat_derived_pub_is_sorted"),
         ("list_append", "cat_derived_pub_list_append"),
         ("list_concat", "cat_derived_pub_list_concat"),
         ("list_all", "cat_derived_pub_list_all"),
@@ -109,9 +111,14 @@ fn derived_exports_all_authorized_operation_identities() {
         (id, wrapper)
     });
 
+    let prelude_sorted = env.globals["is_sorted"];
+    assert_ne!(
+        prelude_sorted,
+        env.globals["Data.Collections.Derived.is_sorted"]
+    );
     env.elaborate_file(
         "import Data.Collections.Derived \
-           (map, filter, list_append, list_concat, list_all, nth, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
+           (map, filter, is_sorted as catalog_is_sorted, list_append, list_concat, list_all, nth, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
          import Core.Function.Combinators (comp, idf)\n\
          fn cat_derived_pub_map (xs : List Bool) : List Bool = \
            map Bool Bool (\\x. x) xs\n\
@@ -129,6 +136,8 @@ fn derived_exports_all_authorized_operation_identities() {
            map::append a b f xs ys\n\
          fn cat_derived_pub_filter (xs : List Bool) : List Bool = \
            filter Bool (\\x. x) xs\n\
+         fn cat_derived_pub_is_sorted (xs : List Bool) : Omega = \
+           catalog_is_sorted Bool (\\x y. True) xs\n\
          fn cat_derived_pub_list_append (xs : List Bool) (ys : List Bool) : List Bool = \
            list_append Bool xs ys\n\
          fn cat_derived_pub_list_concat (xs : List (List Bool)) : List Bool = \
@@ -207,7 +216,11 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
         if let Some(name) = direct_name {
             queries.push(PublicationQuery {
                 surface: name.to_owned(),
-                source: format!("import {DERIVED} ({name})"),
+                source: if name == "is_sorted" {
+                    format!("import {DERIVED} (is_sorted as catalog_is_sorted)")
+                } else {
+                    format!("import {DERIVED} ({name})")
+                },
                 unpublished_names: BTreeSet::from([format!("{DERIVED}.{name}")]),
             });
             continue;
@@ -242,6 +255,23 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
         let theorem = theorem_and_separator[..separator].trim_end();
         let probe = format!("cat_derived_export_probe_{}", queries.len());
         let attached = format!("{subject}::{proof_name}");
+        let theorem = if matches!(attached.as_str(), "insert::sorted" | "sort::sorted")
+            || subject == "is_sorted"
+        {
+            catalog_or::rename_sorted_token(theorem, false)
+        } else {
+            theorem.to_owned()
+        };
+        let subject_import = if subject == "is_sorted" {
+            "is_sorted as catalog_is_sorted"
+        } else {
+            subject.as_str()
+        };
+        let proof_reference = if subject == "is_sorted" {
+            catalog_or::rename_sorted_token(&attached, false)
+        } else {
+            attached.clone()
+        };
         let signature_imports = match attached.as_str() {
             "list_append::length" => {
                 "import Data.Collections.Derived (length)\n\
@@ -249,14 +279,17 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
             }
             "insert::count" => "import Data.Collections.Derived (count)\n",
             "sort::perm" => "import Data.Collections.Derived (Perm)\n",
-            "insert::sorted" | "sort::sorted" => "import Core.Classes.LawfulClasses (bool_or)\n",
+            "insert::sorted" | "sort::sorted" => {
+                "import Data.Collections.Derived (is_sorted as catalog_is_sorted)\n\
+                 import Core.Classes.LawfulClasses (bool_or)\n"
+            }
             _ => "",
         };
         queries.push(PublicationQuery {
             surface: attached.clone(),
             source: format!(
-                "import {DERIVED} ({subject})\n\
-                 {signature_imports}theorem {probe} {binders} : {theorem} = {attached} {arguments}"
+                "import {DERIVED} ({subject_import})\n\
+                 {signature_imports}theorem {probe} {binders} : {theorem} = {proof_reference} {arguments}"
             ),
             unpublished_names: BTreeSet::from([
                 format!("{DERIVED}.{subject}"),
@@ -278,7 +311,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// bound proofs, four `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
 /// operations (`Perm`, `insert`, `sort`), their four attached sort proofs,
-/// and generic Ω-list membership with nine public checked lemmas.
+/// structural `is_sorted`, and generic Ω-list membership with nine public
+/// checked lemmas.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
@@ -355,6 +389,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "insert".to_owned(),
             "insert::count".to_owned(),
             "insert::sorted".to_owned(),
+            "is_sorted".to_owned(),
             "sort".to_owned(),
             "sort::perm".to_owned(),
             "sort::sorted".to_owned(),

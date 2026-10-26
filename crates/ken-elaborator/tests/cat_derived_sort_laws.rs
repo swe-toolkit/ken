@@ -21,7 +21,7 @@ fn load() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Derived")
         .expect("roots-load real Derived and its providers");
-    env.elaborate_file("import Data.Collections.Derived (count, Perm, insert, sort)")
+    env.elaborate_file("import Data.Collections.Derived (count, Perm, insert, sort, is_sorted as catalog_is_sorted)")
         .expect("all four generic sort proofs must be importable with their owners");
     for name in ["bool_or", "leq_nat"] {
         assert!(
@@ -76,12 +76,12 @@ fn generic_sort_laws_are_attached_to_the_derived_owners() {
          (a : Type) (le : a → a → Bool) \
          (total : (x : a) → (y : a) → sort_is_true (bool_or (le x y) (le y x))) \
          (x : a) (xs : List a) : \
-         is_sorted a le xs → is_sorted a le (insert a le x xs) = \
+         catalog_is_sorted a le xs → catalog_is_sorted a le (insert a le x xs) = \
          insert::sorted a le total x xs",
         "theorem sorted_sort_consumer \
          (a : Type) (le : a → a → Bool) \
          (total : (x : a) → (y : a) → sort_is_true (bool_or (le x y) (le y x))) \
-         (xs : List a) : is_sorted a le (sort a le xs) = \
+         (xs : List a) : catalog_is_sorted a le (sort a le xs) = \
          sort::sorted a le total xs",
     ] {
         env.elaborate_decl(consumer)
@@ -114,12 +114,12 @@ fn a_non_total_comparator_sorts_the_fixture_but_not_its_proof() {
     }
     let closed_sorted_proof = "and_intro Top Top Proved Proved";
     env.elaborate_decl(&format!(
-        "theorem good_sorted : is_sorted Nat leq_nat cat_sort_result = {closed_sorted_proof}"
+        "theorem good_sorted : catalog_is_sorted Nat leq_nat cat_sort_result = {closed_sorted_proof}"
     ))
     .expect("the sorted Nat instance must accept the shared closed proof term");
     let rejected = env
         .elaborate_decl(&format!(
-            "theorem bad_sorted : is_sorted Nat le_none (sort Nat le_none cat_sort_xs) = {closed_sorted_proof}"
+            "theorem bad_sorted : catalog_is_sorted Nat le_none (sort Nat le_none cat_sort_xs) = {closed_sorted_proof}"
         ))
         .expect_err("False on both elements must not prove sortedness");
     assert!(

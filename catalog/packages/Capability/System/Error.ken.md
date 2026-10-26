@@ -41,6 +41,8 @@ retry rule and both laws are the entry's first operations.
 ### Data families
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro)
+
 export Transience, Transient, Permanent
 
 data Transience = Transient | Permanent

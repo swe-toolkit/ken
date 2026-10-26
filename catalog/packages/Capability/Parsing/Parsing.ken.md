@@ -37,6 +37,8 @@ the total `List UInt8` view. `String` is deliberately not the offset basis;
 they must.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Capability.Diagnostics.Core
   (ByteRange,
     MkByteRange,

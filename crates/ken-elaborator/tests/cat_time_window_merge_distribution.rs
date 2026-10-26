@@ -11,7 +11,7 @@ use ken_elaborator::{
     extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, ExportForm, ImportKind, KenMdFenceRole,
     Type as SourceType,
 };
-use ken_kernel::{Decl, KernelError};
+use ken_kernel::{Decl, KernelError, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
 const TRACE: &str = "Data.Time.EventTrace";
@@ -38,7 +38,7 @@ fn loaded_trace() -> ElabEnv {
 // with both independent ordering premises. It also imports the one newly
 // public generic Derived proof without preloading a facaded alias.
 const GENERIC_CLIENT: &str = r#"
-import Data.Collections.Derived (filter, filter_starts_after, starts_after)
+import Data.Collections.Derived (filter, filter_starts_after, starts_after, is_sorted as catalog_is_sorted)
 import Data.Time.EventTrace
   (Event, time_ordered, trace_merge, trace_window, trace_window_merge)
 
@@ -48,7 +48,7 @@ theorem generic_filter_starts_after
     Equal Bool (le x y) True → Equal Bool (le y z) True →
     Equal Bool (le x z) True)
   (keep : a → Bool) (x : a) (xs : List a) :
-  is_sorted a le (Cons a x xs) →
+  catalog_is_sorted a le (Cons a x xs) →
   starts_after a le x (filter a keep xs) =
   filter_starts_after a le le_trans keep x xs
 
@@ -217,6 +217,22 @@ fn production_computations() -> String {
                 imports += 1;
                 continue;
             }
+            SourceDecl::ImportDecl {
+                module,
+                kind: ImportKind::Selective(items),
+                ..
+            } if module == "Data.Collections.Derived"
+                && items.iter().any(|item| item.name == "is_sorted") =>
+            {
+                // The production module resolves this selective import in
+                // its own package scope. In the loose projection the prelude
+                // alias would conflict, so rename only this imported binding.
+                assert_eq!(items.len(), 1, "one sortedness import to alias");
+                projection
+                    .push_str("import Data.Collections.Derived (is_sorted as catalog_is_sorted)\n");
+                imports += 1;
+                continue;
+            }
             SourceDecl::ImportDecl { .. } => {
                 imports += 1;
                 true
@@ -242,7 +258,16 @@ fn production_computations() -> String {
         };
         if selected {
             let span = declaration.span();
-            projection.push_str(&extracted.source[span.start..span.end]);
+            let source = &extracted.source[span.start..span.end];
+            if matches!(declaration.unwrap_pub(), SourceDecl::ViewDecl { name, .. } if name == "time_ordered")
+            {
+                // Rename the reference to the same checked provider, not the
+                // operation or its body. All other computations are verbatim.
+                assert_eq!(source.matches("is_sorted ").count(), 1);
+                projection.push_str(&source.replace("is_sorted ", "catalog_is_sorted "));
+            } else {
+                projection.push_str(source);
+            }
             projection.push('\n');
         }
     }
@@ -301,10 +326,11 @@ fn seed_tie_outputs() -> (String, Vec<(&'static str, String)>) {
 /// distribution seed's two exact tie-output theorems.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: the AST-selected *production* carrier, constructor, eight
-/// computation declarations and imports elaborate without the unrelated
-/// private proof obligations; the verbatim shipped fixtures and two exact
-/// value theorems then each check independently. The full roots-loaded module
-/// and checked generic proof are tested separately above.
+/// computations and their imports elaborate without unrelated private proof
+/// obligations. The loose projection aliases one provider binding and checks
+/// that its `time_ordered` body cites the exact Derived sortedness ID. The
+/// shipped fixtures and two exact value theorems then check independently.
+/// The full roots-loaded module and generic proof are tested above.
 /// CLAIMED: a tie-specific wrong-head computation reaches the exact shipped
 /// seed-output assertion even if the full package rejects its proof earlier.
 /// THE GAP: this projection deliberately checks operation behavior rather
@@ -315,8 +341,26 @@ fn shipped_exact_tie_outputs_reach_production_computations_without_proof_masking
     let mut env = ElabEnv::new().expect("compiler base");
     env.elaborate_module_from_roots(&[root()], DERIVED)
         .expect("operation-only projection imports its real list provider");
+    let catalog_sorted = env.globals["Data.Collections.Derived.is_sorted"];
+    assert_ne!(catalog_sorted, env.globals["is_sorted"]);
     env.elaborate_file(&production_computations())
         .expect("all selected real EventTrace computations check");
+    let (_, ordered_body) = env
+        .env
+        .transparent_body(env.globals["time_ordered"])
+        .expect("projected production time_ordered is transparent");
+    let mut terms = vec![&ordered_body];
+    let mut reaches_catalog = false;
+    while let Some(term) = terms.pop() {
+        if matches!(term, Term::Const { id, .. } if *id == catalog_sorted) {
+            reaches_catalog = true;
+        }
+        terms.extend(term.children());
+    }
+    assert!(
+        reaches_catalog,
+        "projection must use the real Derived.is_sorted ID"
+    );
     let (fixtures, outputs) = seed_tie_outputs();
     env.elaborate_file(&fixtures)
         .expect("shipped closed tie inputs and expected output check");

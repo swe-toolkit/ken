@@ -7,6 +7,8 @@ class instances so each consumer reuses the same checked provider identities.
 ## Definition
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro)
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)

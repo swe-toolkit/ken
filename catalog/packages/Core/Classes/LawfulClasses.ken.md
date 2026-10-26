@@ -39,6 +39,8 @@ A class is a record (`33 §5.2`, right-nested Σ over `13 §3`); a law is an
 ES2; `Prop` is the prelude's surface-nameable alias for `Omega_0`).
 
 ```ken
+import Core.Logic.Conjunction (and_fst, and_snd)
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.OrdResult

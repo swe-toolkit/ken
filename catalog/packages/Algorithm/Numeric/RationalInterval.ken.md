@@ -38,6 +38,8 @@ further checked laws establish distributivity and factoring by endpoint-value
 inclusion on both sides of multiplication.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro)
+
 import Core.Classes.LawfulClasses (IsTrue, bool_and)
 
 import Core.Logic.Transport (sym, trans)
