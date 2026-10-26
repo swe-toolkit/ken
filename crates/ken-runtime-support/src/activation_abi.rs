@@ -309,18 +309,24 @@ pub unsafe extern "C" fn ken_activation_v1_record_region_capacity(
         };
     }
     let (scope, region) = match BoundaryTag::from_bits(tag).map(BoundaryTag::referent_owner) {
-        Some(BoundaryReferentOwner::InvocationArena) => {
-            (ken_host::CapacityScopeV1::Invocation, service.boundary_arena.cast_const())
-        }
+        Some(BoundaryReferentOwner::InvocationArena) => (
+            ken_host::CapacityScopeV1::Invocation,
+            service.boundary_arena.cast_const(),
+        ),
         Some(BoundaryReferentOwner::PersistentStore) => {
             let base = service.boundary_arena;
             let persistent = unsafe {
-                *base.add(RegionHeaderField::Persistent.offset() as usize / std::mem::size_of::<u64>())
+                *base.add(
+                    RegionHeaderField::Persistent.offset() as usize / std::mem::size_of::<u64>(),
+                )
             };
             if persistent == 0 {
                 return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE;
             }
-            (ken_host::CapacityScopeV1::Persistent, persistent as usize as *const u64)
+            (
+                ken_host::CapacityScopeV1::Persistent,
+                persistent as usize as *const u64,
+            )
         }
         Some(BoundaryReferentOwner::NoReferent) | None => {
             return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE;
@@ -341,35 +347,46 @@ pub unsafe extern "C" fn ken_activation_v1_record_region_capacity(
                 let words = read(RegionHeaderField::WordCount);
                 let word_limit = read(RegionHeaderField::WordCapacity);
                 let requested = words + u128::from(need);
-                (u128::from(need) > word_limit || requested > word_limit)
-                    .then_some((ken_host::CapacityResourceV1::Words, word_limit, requested))
+                (u128::from(need) > word_limit || requested > word_limit).then_some((
+                    ken_host::CapacityResourceV1::Words,
+                    word_limit,
+                    requested,
+                ))
             }
         }
         KEN_REGION_CAPACITY_LIMBS => {
             let live = read(RegionHeaderField::LimbCount);
             let limit = read(RegionHeaderField::LimbCapacity);
             let requested = live + u128::from(need);
-            (u128::from(need) > limit || requested > limit)
-                .then_some((ken_host::CapacityResourceV1::NativeIntLimbs, limit, requested))
+            (u128::from(need) > limit || requested > limit).then_some((
+                ken_host::CapacityResourceV1::NativeIntLimbs,
+                limit,
+                requested,
+            ))
         }
         KEN_REGION_CAPACITY_BYTES => {
             let live = read(RegionHeaderField::DataCount);
             let limit = read(RegionHeaderField::DataCapacity);
             let requested = live + u128::from(need);
-            (u128::from(need) > limit || requested > limit)
-                .then_some((ken_host::CapacityResourceV1::DataBytes, limit, requested))
+            (u128::from(need) > limit || requested > limit).then_some((
+                ken_host::CapacityResourceV1::DataBytes,
+                limit,
+                requested,
+            ))
         }
         _ => return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE,
     };
     let Some((resource, limit, requested)) = failed else {
         return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE;
     };
-    issuer.record_terminal_fault(IssuerTerminalFaultV1::Capacity(ken_host::CapacityExhaustedV1 {
-        scope,
-        resource,
-        limit,
-        requested,
-    }));
+    issuer.record_terminal_fault(IssuerTerminalFaultV1::Capacity(
+        ken_host::CapacityExhaustedV1 {
+            scope,
+            resource,
+            limit,
+            requested,
+        },
+    ));
     ken_host::CAPACITY_EXHAUSTED_STATUS_V1
 }
 
@@ -918,38 +935,130 @@ mod tests {
     fn region_capacity_recorder_attributes_each_resource_in_allocator_order() {
         use ken_host::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
         let rows = [
-            (BoundaryTag::InvocationAggregate, KEN_REGION_CAPACITY_ALLOC, RegionHeaderField::NodeCount, 12, 0, Scope::Invocation, Resource::Nodes, 12, 13),
-            (BoundaryTag::InvocationAggregate, KEN_REGION_CAPACITY_ALLOC, RegionHeaderField::WordCount, 24, 1, Scope::Invocation, Resource::Words, 24, 25),
-            (BoundaryTag::PersistentGround, KEN_REGION_CAPACITY_ALLOC, RegionHeaderField::NodeCount, 60, 0, Scope::Persistent, Resource::Nodes, 60, 61),
-            (BoundaryTag::PersistentGround, KEN_REGION_CAPACITY_ALLOC, RegionHeaderField::WordCount, 72, 1, Scope::Persistent, Resource::Words, 72, 73),
-            (BoundaryTag::PersistentGround, KEN_REGION_CAPACITY_BYTES, RegionHeaderField::DataCount, 84, 1, Scope::Persistent, Resource::DataBytes, 84, 85),
-            (BoundaryTag::PersistentGround, KEN_REGION_CAPACITY_LIMBS, RegionHeaderField::LimbCount, 96, 1, Scope::Persistent, Resource::NativeIntLimbs, 96, 97),
+            (
+                BoundaryTag::InvocationAggregate,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::NodeCount,
+                12,
+                0,
+                Scope::Invocation,
+                Resource::Nodes,
+                12,
+                13,
+            ),
+            (
+                BoundaryTag::InvocationAggregate,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::WordCount,
+                24,
+                1,
+                Scope::Invocation,
+                Resource::Words,
+                24,
+                25,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::NodeCount,
+                60,
+                0,
+                Scope::Persistent,
+                Resource::Nodes,
+                60,
+                61,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::WordCount,
+                72,
+                1,
+                Scope::Persistent,
+                Resource::Words,
+                72,
+                73,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_BYTES,
+                RegionHeaderField::DataCount,
+                84,
+                1,
+                Scope::Persistent,
+                Resource::DataBytes,
+                84,
+                85,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_LIMBS,
+                RegionHeaderField::LimbCount,
+                96,
+                1,
+                Scope::Persistent,
+                Resource::NativeIntLimbs,
+                96,
+                97,
+            ),
         ];
         for (tag, table, field, live, need, scope, resource, limit, requested) in rows {
             with_region_capacity_services(|services, invocation, persistent| {
-                let header = if scope == Scope::Invocation { invocation } else { persistent };
+                let header = if scope == Scope::Invocation {
+                    invocation
+                } else {
+                    persistent
+                };
                 header[field as usize] = live;
                 let result = unsafe {
                     ken_activation_v1_record_region_capacity(services, tag as u64, table, need)
                 };
-                assert_eq!(result, ken_host::CAPACITY_EXHAUSTED_STATUS_V1, "{resource:?}");
-                let issuer = unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
-                assert_eq!(issuer.take_terminal_fault(), Some(IssuerTerminalFaultV1::Capacity(
-                    ken_host::CapacityExhaustedV1 { scope, resource, limit, requested }
-                )));
+                assert_eq!(
+                    result,
+                    ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+                    "{resource:?}"
+                );
+                let issuer =
+                    unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
+                assert_eq!(
+                    issuer.take_terminal_fault(),
+                    Some(IssuerTerminalFaultV1::Capacity(
+                        ken_host::CapacityExhaustedV1 {
+                            scope,
+                            resource,
+                            limit,
+                            requested
+                        }
+                    ))
+                );
             });
         }
         // Both counters exhausted: an alloc names Nodes rather than Words.
         with_region_capacity_services(|services, invocation, _| {
             invocation[RegionHeaderField::NodeCount as usize] = 12;
             invocation[RegionHeaderField::WordCount as usize] = 24;
-            assert_eq!(unsafe { ken_activation_v1_record_region_capacity(
-                services, BoundaryTag::InvocationAggregate as u64, KEN_REGION_CAPACITY_ALLOC, 1
-            ) }, ken_host::CAPACITY_EXHAUSTED_STATUS_V1);
-            let issuer = unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
-            assert!(matches!(issuer.take_terminal_fault(), Some(IssuerTerminalFaultV1::Capacity(
-                ken_host::CapacityExhaustedV1 { resource: Resource::Nodes, .. }
-            ))));
+            assert_eq!(
+                unsafe {
+                    ken_activation_v1_record_region_capacity(
+                        services,
+                        BoundaryTag::InvocationAggregate as u64,
+                        KEN_REGION_CAPACITY_ALLOC,
+                        1,
+                    )
+                },
+                ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+            );
+            let issuer =
+                unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
+            assert!(matches!(
+                issuer.take_terminal_fault(),
+                Some(IssuerTerminalFaultV1::Capacity(
+                    ken_host::CapacityExhaustedV1 {
+                        resource: Resource::Nodes,
+                        ..
+                    }
+                ))
+            ));
         });
     }
 
@@ -960,33 +1069,66 @@ mod tests {
     /// THE GAP: this is direct recorder invocation, not linked executable ABI.
     #[test]
     fn region_capacity_recorder_refuses_spurious_or_unauthorized_calls() {
-        assert_eq!(unsafe { ken_activation_v1_record_region_capacity(
-            std::ptr::null(), 9, KEN_REGION_CAPACITY_ALLOC, 1
-        ) }, KEN_ACTIVATION_ERR_NULL);
+        assert_eq!(
+            unsafe {
+                ken_activation_v1_record_region_capacity(
+                    std::ptr::null(),
+                    9,
+                    KEN_REGION_CAPACITY_ALLOC,
+                    1,
+                )
+            },
+            KEN_ACTIVATION_ERR_NULL
+        );
         let empty = GeneratedActivationServicesV1::default();
-        assert_eq!(unsafe { ken_activation_v1_record_region_capacity(
-            &empty, 9, KEN_REGION_CAPACITY_ALLOC, 1
-        ) }, KEN_ACTIVATION_ERR_NULL);
+        assert_eq!(
+            unsafe {
+                ken_activation_v1_record_region_capacity(&empty, 9, KEN_REGION_CAPACITY_ALLOC, 1)
+            },
+            KEN_ACTIVATION_ERR_NULL
+        );
         with_region_capacity_services(|services, _, _| {
             for (tag, table, need) in [
-                (BoundaryTag::ImmediateInt as u64, KEN_REGION_CAPACITY_ALLOC, 1),
+                (
+                    BoundaryTag::ImmediateInt as u64,
+                    KEN_REGION_CAPACITY_ALLOC,
+                    1,
+                ),
                 (u64::MAX, KEN_REGION_CAPACITY_ALLOC, 1),
                 (BoundaryTag::InvocationAggregate as u64, u64::MAX, 1),
-                (BoundaryTag::InvocationAggregate as u64, KEN_REGION_CAPACITY_ALLOC, 0),
-                (BoundaryTag::PersistentGround as u64, KEN_REGION_CAPACITY_LIMBS, 1),
+                (
+                    BoundaryTag::InvocationAggregate as u64,
+                    KEN_REGION_CAPACITY_ALLOC,
+                    0,
+                ),
+                (
+                    BoundaryTag::PersistentGround as u64,
+                    KEN_REGION_CAPACITY_LIMBS,
+                    1,
+                ),
             ] {
-                assert_eq!(unsafe { ken_activation_v1_record_region_capacity(
-                    services, tag, table, need
-                ) }, KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE);
+                assert_eq!(
+                    unsafe { ken_activation_v1_record_region_capacity(services, tag, table, need) },
+                    KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE
+                );
             }
-            let issuer = unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
+            let issuer =
+                unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
             assert_eq!(issuer.take_terminal_fault(), None);
             issuer.record_terminal_fault(IssuerTerminalFaultV1::Integrity(
-                ken_host::SelectedCallIntegrityFaultV1::Spent
+                ken_host::SelectedCallIntegrityFaultV1::Spent,
             ));
-            assert_eq!(unsafe { ken_activation_v1_record_region_capacity(
-                services, BoundaryTag::InvocationAggregate as u64, KEN_REGION_CAPACITY_ALLOC, 1
-            ) }, ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1);
+            assert_eq!(
+                unsafe {
+                    ken_activation_v1_record_region_capacity(
+                        services,
+                        BoundaryTag::InvocationAggregate as u64,
+                        KEN_REGION_CAPACITY_ALLOC,
+                        1,
+                    )
+                },
+                ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1
+            );
         });
     }
 

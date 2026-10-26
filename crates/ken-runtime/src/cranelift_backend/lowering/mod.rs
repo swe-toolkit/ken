@@ -1129,8 +1129,12 @@ impl ArtifactHelpers<'_> {
                 .host_dispatch
                 .map(|id| module.declare_func_in_func(id, func)),
             selected_call_issue: Some(module.declare_func_in_func(self.selected_call_issue, func)),
-            record_region_capacity: Some(module.declare_func_in_func(self.record_region_capacity, func)),
-            selected_call_consume: Some(module.declare_func_in_func(self.selected_call_consume, func)),
+            record_region_capacity: Some(
+                module.declare_func_in_func(self.record_region_capacity, func),
+            ),
+            selected_call_consume: Some(
+                module.declare_func_in_func(self.selected_call_consume, func),
+            ),
             // ⛔ Dataflow results, not identities: `None` here is correct, and
             // each function derives its own from its entry block.
             host_dispatch_context: None,
@@ -14331,18 +14335,24 @@ impl<'a> Lowering<'a> {
         builder.ins().brif(capacity, record, &[], invalid, &[]);
         builder.switch_to_block(record);
         let services = self.function_local.services_pointer.ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
-                "boundary capacity status has no published activation services".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "boundary capacity status has no published activation services".to_string(),
+            )
         })?;
         let recorder = self.function_local.record_region_capacity.ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
-                "boundary capacity status has no owner-side recorder import".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "boundary capacity status has no owner-side recorder import".to_string(),
+            )
         })?;
         let table = builder.ins().iconst(types::I64, table as i64);
         let call = builder.ins().call(recorder, &[services, tag, table, need]);
         let [recorded] = builder.inst_results(call) else {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
-                "boundary capacity recorder returned no status".to_string()));
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                "boundary capacity recorder returned no status".to_string(),
+            ));
         };
         let recorded = *recorded;
         let authentic = builder.ins().icmp_imm(

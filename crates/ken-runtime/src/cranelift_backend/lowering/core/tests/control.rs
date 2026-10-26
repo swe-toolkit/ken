@@ -3155,7 +3155,11 @@ fn compiled_module_declarations_account_for_every_fixture_emitter() {
             "unaccounted definable linkage in the module: {definitions:?}"
         );
         let expected_imports = [
-            "free", "ken_activation_v1_record_region_capacity", "ken_selected_call_v1_consume", "ken_selected_call_v1_issue", "malloc",
+            "free",
+            "ken_activation_v1_record_region_capacity",
+            "ken_selected_call_v1_consume",
+            "ken_selected_call_v1_issue",
+            "malloc",
         ]
         .into_iter()
         .map(|name| (name.to_owned(), Linkage::Import))

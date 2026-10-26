@@ -4070,7 +4070,9 @@ fn compile_wrong_resource_tag_order_probe() -> (JITModule, *const u8) {
         builder.append_block_params_for_function_params(entry);
         builder.switch_to_block(entry);
         let parameters = builder.block_params(entry).to_vec();
-        compiler.function_local.bind_ownerless_boundary_arena_for_tests(parameters[0]);
+        compiler
+            .function_local
+            .bind_ownerless_boundary_arena_for_tests(parameters[0]);
         super::constructors::bind_bare_test_trap_lane(&mut compiler, &mut builder);
         let result = compiler
             .lower_resource_token_seat(

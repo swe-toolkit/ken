@@ -321,7 +321,9 @@ fn capacity_failure_matches_profile(
         }
         _ => return false,
     };
-    (fault.requested == declared && fault.limit <= physical_maximum && fault.limit < fault.requested)
+    (fault.requested == declared
+        && fault.limit <= physical_maximum
+        && fault.limit < fault.requested)
         || (fault.limit == declared && fault.requested > declared)
 }
 
@@ -2765,30 +2767,78 @@ mod tests {
         use ken_host::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
         let profile = crate::boundary_resource_profile::starter_smoke_profile();
         for (scope, resource, declared) in [
-            (Scope::Invocation, Resource::Nodes, profile.invocation.nodes as u128),
-            (Scope::Invocation, Resource::Words, profile.invocation.words as u128),
-            (Scope::Persistent, Resource::Nodes, profile.persistent.nodes as u128),
-            (Scope::Persistent, Resource::Words, profile.persistent.words as u128),
-            (Scope::Persistent, Resource::DataBytes, profile.persistent.data_bytes as u128),
-            (Scope::Persistent, Resource::NativeIntLimbs, profile.persistent.native_int_limbs as u128),
+            (
+                Scope::Invocation,
+                Resource::Nodes,
+                profile.invocation.nodes as u128,
+            ),
+            (
+                Scope::Invocation,
+                Resource::Words,
+                profile.invocation.words as u128,
+            ),
+            (
+                Scope::Persistent,
+                Resource::Nodes,
+                profile.persistent.nodes as u128,
+            ),
+            (
+                Scope::Persistent,
+                Resource::Words,
+                profile.persistent.words as u128,
+            ),
+            (
+                Scope::Persistent,
+                Resource::DataBytes,
+                profile.persistent.data_bytes as u128,
+            ),
+            (
+                Scope::Persistent,
+                Resource::NativeIntLimbs,
+                profile.persistent.native_int_limbs as u128,
+            ),
         ] {
             let runtime = ken_host::CapacityExhaustedV1 {
-                scope, resource, limit: declared, requested: declared + 1,
+                scope,
+                resource,
+                limit: declared,
+                requested: declared + 1,
             };
-            assert!(capacity_failure_matches_profile(runtime, profile), "{scope:?}/{resource:?}");
-            assert!(!capacity_failure_matches_profile(ken_host::CapacityExhaustedV1 {
-                limit: declared - 1, ..runtime
-            }, profile), "wrong effective limit on {scope:?}/{resource:?}");
-            assert!(!capacity_failure_matches_profile(ken_host::CapacityExhaustedV1 {
-                requested: declared, ..runtime
-            }, profile), "no exhaustion on {scope:?}/{resource:?}");
+            assert!(
+                capacity_failure_matches_profile(runtime, profile),
+                "{scope:?}/{resource:?}"
+            );
+            assert!(
+                !capacity_failure_matches_profile(
+                    ken_host::CapacityExhaustedV1 {
+                        limit: declared - 1,
+                        ..runtime
+                    },
+                    profile
+                ),
+                "wrong effective limit on {scope:?}/{resource:?}"
+            );
+            assert!(
+                !capacity_failure_matches_profile(
+                    ken_host::CapacityExhaustedV1 {
+                        requested: declared,
+                        ..runtime
+                    },
+                    profile
+                ),
+                "no exhaustion on {scope:?}/{resource:?}"
+            );
         }
         let physical = ken_host::CapacityExhaustedV1 {
-            scope: Scope::Persistent, resource: Resource::Words,
-            limit: 4, requested: profile.persistent.words as u128,
+            scope: Scope::Persistent,
+            resource: Resource::Words,
+            limit: 4,
+            requested: profile.persistent.words as u128,
         };
-        assert!(capacity_failure_matches_profile(physical, profile),
-            "store-open physical reservation shape must remain admitted");
+        assert!(
+            capacity_failure_matches_profile(physical, profile),
+            "store-open physical reservation shape must remain admitted"
+        );
     }
 
     /// Durable invariant. A native/evaluator disagreement remains a backend

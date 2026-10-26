@@ -627,9 +627,11 @@ fn escape_file_then_two_reads() -> String {
     let end = "(ResourceBodyOk Unit Unit MkUnit))";
     assert_eq!(ESCAPE_FILE_THEN_READAT.matches(first).count(), 1);
     assert_eq!(ESCAPE_FILE_THEN_READAT.matches(end).count(), 1);
-    let source = ESCAPE_FILE_THEN_READAT
-        .replacen(first, second, 1)
-        .replacen(end, "(ResourceBodyOk Unit Unit MkUnit)))", 1);
+    let source = ESCAPE_FILE_THEN_READAT.replacen(first, second, 1).replacen(
+        end,
+        "(ResourceBodyOk Unit Unit MkUnit)))",
+        1,
+    );
     assert_eq!(source.matches("(readAt AFull file_closed").count(), 2);
     source
 }
@@ -649,17 +651,25 @@ fn region_capacity_escape_second_read_reports_typed_invocation_nodes() {
         assert_eq!(profile.invocation.nodes, 64);
         let at_limit = differential_with_profile("region-node-64", &source, profile);
         assert_eq!(at_limit.interpreted.exit_status, 0);
-        assert_eq!(at_limit.native.terminal_error, Some(
-            ken_runtime::TerminalErrorV1::CapacityExhausted(ken_runtime::CapacityExhaustedV1 {
-                scope: ken_runtime::CapacityScopeV1::Invocation,
-                resource: ken_runtime::CapacityResourceV1::Nodes,
-                limit: 64,
-                requested: 65,
-            })
-        ));
+        assert_eq!(
+            at_limit.native.terminal_error,
+            Some(ken_runtime::TerminalErrorV1::CapacityExhausted(
+                ken_runtime::CapacityExhaustedV1 {
+                    scope: ken_runtime::CapacityScopeV1::Invocation,
+                    resource: ken_runtime::CapacityResourceV1::Nodes,
+                    limit: 64,
+                    requested: 65,
+                }
+            ))
+        );
         assert!(!at_limit.native.effect_trace.is_empty());
-        assert!(at_limit.interpreted.effect_trace.starts_with(&at_limit.native.effect_trace),
-            "native effects up to the refusal must be the interpreter prefix");
+        assert!(
+            at_limit
+                .interpreted
+                .effect_trace
+                .starts_with(&at_limit.native.effect_trace),
+            "native effects up to the refusal must be the interpreter prefix"
+        );
 
         let mut roomy = profile;
         roomy.invocation.nodes = 65;
@@ -687,7 +697,10 @@ fn assert_linked_region_capacity(
     limit: u128,
 ) {
     let diff = differential_with_profile(case, source, profile);
-    assert_eq!(diff.interpreted.exit_status, 0, "{case}: interpreter control");
+    assert_eq!(
+        diff.interpreted.exit_status, 0,
+        "{case}: interpreter control"
+    );
     match diff.native.terminal_error {
         Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) => {
             assert_eq!(fault.scope, scope, "{case}: capacity scope");
@@ -695,7 +708,9 @@ fn assert_linked_region_capacity(
             assert_eq!(fault.limit, limit, "{case}: declared limit");
             assert!(fault.requested > fault.limit, "{case}: actual exhaustion");
         }
-        other => panic!("{case}: expected emitted {scope:?}/{resource:?} exhaustion, got {other:?}"),
+        other => {
+            panic!("{case}: expected emitted {scope:?}/{resource:?} exhaustion, got {other:?}")
+        }
     }
 }
 
@@ -713,9 +728,12 @@ fn region_capacity_invocation_words_remains_distinct_from_nodes() {
         profile.invocation.nodes = 128;
         profile.invocation.words = 1;
         assert_linked_region_capacity(
-            "region-words-1", &escape_file_then_two_reads(), profile,
+            "region-words-1",
+            &escape_file_then_two_reads(),
+            profile,
             ken_runtime::CapacityScopeV1::Invocation,
-            ken_runtime::CapacityResourceV1::Words, 1,
+            ken_runtime::CapacityResourceV1::Words,
+            1,
         );
     });
 }
@@ -733,9 +751,12 @@ fn region_capacity_persistent_nodes_are_owner_attributed() {
         profile.invocation.nodes = 128;
         profile.persistent.nodes = 1;
         assert_linked_region_capacity(
-            "region-persistent-nodes-1", &escape_file_then_two_reads(), profile,
+            "region-persistent-nodes-1",
+            &escape_file_then_two_reads(),
+            profile,
             ken_runtime::CapacityScopeV1::Persistent,
-            ken_runtime::CapacityResourceV1::Nodes, 1,
+            ken_runtime::CapacityResourceV1::Nodes,
+            1,
         );
     });
 }
@@ -754,9 +775,12 @@ fn region_capacity_persistent_words_are_not_nodes() {
         profile.persistent.nodes = 128;
         profile.persistent.words = 1;
         assert_linked_region_capacity(
-            "region-persistent-words-1", &region_capacity_string_lookalike(), profile,
+            "region-persistent-words-1",
+            &region_capacity_string_lookalike(),
+            profile,
             ken_runtime::CapacityScopeV1::Persistent,
-            ken_runtime::CapacityResourceV1::Words, 1,
+            ken_runtime::CapacityResourceV1::Words,
+            1,
         );
     });
 }
@@ -776,9 +800,12 @@ fn region_capacity_persistent_bytes_reach_typed_terminal() {
         profile.persistent.words = 512;
         profile.persistent.data_bytes = 1;
         assert_linked_region_capacity(
-            "region-persistent-bytes-1", &region_capacity_string_lookalike(), profile,
+            "region-persistent-bytes-1",
+            &region_capacity_string_lookalike(),
+            profile,
             ken_runtime::CapacityScopeV1::Persistent,
-            ken_runtime::CapacityResourceV1::DataBytes, 1,
+            ken_runtime::CapacityResourceV1::DataBytes,
+            1,
         );
     });
 }
