@@ -110,14 +110,31 @@ fn generic_composition_and_units_are_public_checked_and_zero_trust() {
     }
 }
 
-fn seed_fences() -> Vec<&'static str> {
-    extract_ken_md(SEED)
+// Select the accepted and refused *programs* by their Ken theorem identities,
+// not by their positions or by how many source fences the seed later gains.
+fn seed_case(theorem_name: &str) -> &'static str {
+    let mut selected = None;
+    for fence in extract_ken_md(SEED)
         .expect("§5 seed Ken fences extract")
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| &SEED[fence.body_range])
-        .collect()
+    {
+        let source = &SEED[fence.body_range];
+        let named = parse_decls(source)
+            .expect("seed source program parses")
+            .into_iter()
+            .any(
+                |decl| matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == theorem_name),
+            );
+        if named {
+            assert!(
+                selected.replace(source).is_none(),
+                "{theorem_name} must identify one source program"
+            );
+        }
+    }
+    selected.unwrap_or_else(|| panic!("seed source program for {theorem_name} is absent"))
 }
 
 /// SOURCE: conformance/stdlib/time-and-events/seed-window-composition.md.
@@ -131,10 +148,7 @@ fn seed_fences() -> Vec<&'static str> {
 /// the arbitrary-argument checked body/client are measured above.
 #[test]
 fn shipped_window_and_merge_unit_client_checks() {
-    let fences = seed_fences();
-    let [positive, _] = fences.as_slice() else {
-        panic!("§5 seed has one accepted and one isolated refused Ken fence");
-    };
+    let positive = seed_case("nested_window_law_instance");
     trace_env()
         .elaborate_file(positive)
         .expect("all shipped §5 law instances and exact-value controls check");
@@ -257,22 +271,27 @@ fn assert_union_is_the_wrong_bounds(
 /// possible incorrect composition. The checked generic proof is above.
 #[test]
 fn shipped_union_bounds_refusal_matches_its_checked_value_controls() {
-    let fences = seed_fences();
-    let [positive, negative] = fences.as_slice() else {
-        panic!("§5 seed has one accepted and one isolated refused Ken fence");
-    };
+    let positive = seed_case("nested_window_law_instance");
+    let negative = seed_case("refuse_union_bounds");
     let positives = parse_decls(positive).expect("accepted §5 client parses");
     let negatives = parse_decls(negative).expect("refused §5 client parses");
-    let [SourceDecl::TheoremDecl {
+    let mut matching = negatives.iter().filter(|decl| {
+        matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == "refuse_union_bounds")
+    });
+    let Some(SourceDecl::TheoremDecl {
         params,
         theorem,
         body,
         span: theorem_span,
         ..
-    }] = negatives.as_slice()
+    }) = matching.next()
     else {
-        panic!("refused §5 fence has exactly one theorem");
+        panic!("refused §5 theorem must be present");
     };
+    assert!(
+        matching.next().is_none(),
+        "refusal theorem name must be unique"
+    );
     assert!(params.is_empty(), "refusal must be closed");
     assert!(
         matches!(body, SourceExpr::ECon(name, _) if name == "Refl"),
