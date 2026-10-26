@@ -110,7 +110,7 @@ enum AmbientNameRoute {
     DeriveDataToGlobals,
     InstanceClassToClassEnv,
     InstanceConstraintClassToClassEnv,
-    ViewConstraintClassToClassEnv,
+    ViewConstraintRejectsUnselectedModuleClass,
 }
 
 const COMPLETE_AMBIENT_NAME_ROUTES: [AmbientNameRoute; 12] = [
@@ -125,7 +125,7 @@ const COMPLETE_AMBIENT_NAME_ROUTES: [AmbientNameRoute; 12] = [
     AmbientNameRoute::DeriveDataToGlobals,
     AmbientNameRoute::InstanceClassToClassEnv,
     AmbientNameRoute::InstanceConstraintClassToClassEnv,
-    AmbientNameRoute::ViewConstraintClassToClassEnv,
+    AmbientNameRoute::ViewConstraintRejectsUnselectedModuleClass,
 ];
 
 /// D1 transition sentinel inventory of every resolved surface representation
@@ -250,9 +250,14 @@ fn every_ambient_name_representation_reaches_its_current_route() {
     let mut view = ElabEnv::new().expect("base environment");
     view.elaborate_module_from_roots(&[view_root.0.clone()], "Provider")
         .expect("load the ambient class/dictionary without importing it into Entry");
-    view.elaborate_module_from_roots(&[view_root.0.clone()], "Entry")
-        .expect("view constraint class retains direct class route in D0");
-    observed.insert(AmbientNameRoute::ViewConstraintClassToClassEnv);
+    let error = view
+        .elaborate_module_from_roots(&[view_root.0.clone()], "Entry")
+        .expect_err("Rule A must not borrow an unselected module class");
+    assert!(
+        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "AmbientView"),
+        "unselected class must refuse as UnresolvedCon: {error:?}"
+    );
+    observed.insert(AmbientNameRoute::ViewConstraintRejectsUnselectedModuleClass);
 
     assert_eq!(
         observed,

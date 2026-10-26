@@ -23493,6 +23493,8 @@ theorem relation_chain_completion_is_transitive
 ```
 
 ```ken example
+import Core.Classes.LawfulClasses (Ord_instance_Nat)
+
 theorem relation_compose_has_two_step
     : Equal Bool
         (set_member

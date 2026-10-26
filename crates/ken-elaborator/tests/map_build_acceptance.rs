@@ -228,8 +228,8 @@ fn mk_map_dependency_env_with_provider_owned() -> (ElabEnv, MapDependenciesOwned
         "Map must take Not from its selective import, not the prelude alias"
     );
     assert!(
-        env.globals.remove("Membership").is_some(),
-        "the dependency fixture must withhold the flat Membership alias"
+        !env.globals.contains_key("Membership"),
+        "module-qualified Membership must never install a flat alias"
     );
     for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(

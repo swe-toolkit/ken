@@ -328,7 +328,8 @@ fn raw_tree_is_refused_while_the_ordered_key_view_is_admitted() {
 fn overlap_and_unadmitted_provider_are_ordinary_instance_errors() {
     let mut overlap = catalog_env();
     let duplicate = overlap.elaborate_file(
-        "data DoubleProvider = MkDoubleProvider \
+        "import Core.Classes.Membership (Membership) \
+         data DoubleProvider = MkDoubleProvider \
          instance Membership DoubleProvider { \
            Query = Nat; member = λq.λx.True \
          } \
@@ -340,7 +341,7 @@ fn overlap_and_unadmitted_provider_are_ordinary_instance_errors() {
         Err(ElabError::OverlappingInstances {
             class, head_type, ..
         }) => {
-            assert_eq!(class, "Membership");
+            assert_eq!(class, "Core.Classes.Membership.Membership");
             assert_eq!(head_type, "DoubleProvider");
         }
         other => panic!("two canonical providers must be an overlap: {other:?}"),
@@ -427,7 +428,7 @@ fn membership_surface_adds_no_trusted_declaration() {
     );
 
     for name in [
-        "Membership",
+        "Core.Classes.Membership.Membership",
         "Core.Classes.Membership.membership_member_at",
         "Core.Classes.Membership.member_holds",
         "Core.Classes.Membership.same_members",
@@ -435,21 +436,22 @@ fn membership_surface_adds_no_trusted_declaration() {
         "Algorithm.Searching.OrderedSearch.MkListMembership",
         "Algorithm.Searching.OrderedSearch.list_membership_member",
         "Algorithm.Searching.OrderedSearch.list_membership_adapter_fidelity",
-        "Membership_instance_Algorithm.Searching.OrderedSearch.ListMembership",
+        "Core.Classes.Membership.Membership_instance_Algorithm.Searching.OrderedSearch.ListMembership",
         "Data.Collections.Map.ordered_by",
         "Data.Collections.Map.OrderedKeyMembership",
         "Data.Collections.Map.MkOrderedKeyMembership",
         "Data.Collections.Map.ordered_key_membership_member",
         "Data.Collections.Map.ordered_key_membership_adapter_fidelity",
-        "Membership_instance_Data.Collections.Map.OrderedKeyMembership",
+        "Core.Classes.Membership.Membership_instance_Data.Collections.Map.OrderedKeyMembership",
         "Data.Collections.Map.successors_ordered",
         "Data.Collections.Map.RelationEdgeMembership",
         "Data.Collections.Map.MkRelationEdgeMembership",
         "Data.Collections.Map.relation_edge_membership_member",
         "Data.Collections.Map.relation_edge_membership_adapter_fidelity",
-        "Membership_instance_Data.Collections.Map.RelationEdgeMembership",
+        "Core.Classes.Membership.Membership_instance_Data.Collections.Map.RelationEdgeMembership",
     ] {
-        let id = env.globals[name];
+        let id = *env.globals.get(name)
+            .unwrap_or_else(|| panic!("checked consumer must register {name}"));
         assert!(
             !trusted.contains(&id),
             "new checked declaration `{name}` must not enter trusted_base()"

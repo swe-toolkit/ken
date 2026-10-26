@@ -92,7 +92,7 @@ fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
     match surface {
         "Functor" | "Foldable" | "Monoid" | "Semigroup" => {
             env.class_env
-                .class(surface)
+                .class_by_id(env.globals[&format!("{LAWFUL_FUNCTORS}.{surface}")])
                 .unwrap_or_else(|| panic!("published class {surface} must be registered"))
                 .projection
                 .type_id
@@ -378,7 +378,7 @@ fn lawful_functors_list_instance_selects_derived_map_and_both_laws() {
     let list_instance = env
         .class_env
         .instances
-        .get(&("Functor".to_owned(), "List".to_owned()))
+        .get(&(format!("{LAWFUL_FUNCTORS}.Functor"), "List".to_owned()))
         .expect("Functor List instance must remain registered")
         .instance_id;
     let (_, body) = env
@@ -460,7 +460,7 @@ fn lawful_functors_bool_algebra_uses_only_lawfulclasses_canonical_family() {
         ("Semigroup", [true, true, false, false]),
         ("Monoid", [true, true, true, true]),
     ] {
-        let key = (class.to_owned(), "Bool".to_owned());
+        let key = (format!("{LAWFUL_FUNCTORS}.{class}"), "Bool".to_owned());
         let instance = env
             .class_env
             .instances
@@ -516,8 +516,9 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
     let mut env = load_lawful_functors();
     let semigroup_provider = provider_identity(&env, "Semigroup");
     let semigroup = env
-        .class_env
-        .class("Semigroup")
+        .globals
+        .get("Core.Classes.LawfulFunctors.Semigroup")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("Semigroup must remain the registered class owner");
     assert_eq!(
         semigroup.projection.field_names,
@@ -528,7 +529,7 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
         .class_env
         .instances
         .iter()
-        .filter(|((class, _), _)| class == "Semigroup")
+        .filter(|((class, _), _)| class == "Core.Classes.LawfulFunctors.Semigroup")
         .map(|((_, head), instance)| (head.clone(), instance.instance_id))
         .collect::<BTreeSet<_>>();
     assert_eq!(

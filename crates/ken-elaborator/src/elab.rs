@@ -16396,12 +16396,9 @@ fn resolve_instance_dictionary(
     span: &Span,
     owner_label: &str,
 ) -> Result<(Term, Term), ElabError> {
-    let class_id = checked_class_id(class_env, class_name, selected_class_id, span)
-        .map_err(|_| ElabError::NoInstance {
-            class: class_name.to_string(),
-            ty: rtype_head_name(requested),
-            span: span.clone(),
-        })?;
+    // An unselected class is an unresolved name, not a missing dictionary
+    // for a selected class. Keep that distinction in the legacy/direct paths.
+    let class_id = checked_class_id(class_env, globals, class_name, selected_class_id, span)?;
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, owner_label)
         .with_preconditions(preconditions, PremiseHoles::Refused);
     for ty in &ctx.types {
@@ -16945,13 +16942,32 @@ fn rtype_is_app_headed_by(ty: &RType, head: &RTypeHead) -> bool {
             .is_some_and(|candidate| rtype_heads_match(candidate, head))
 }
 
-fn type_is_applicative_dict_for_head(ty: &RType, head: &RTypeHead) -> bool {
+/// A dictionary head names the `Applicative` contract (`56 §5.2`) when it
+/// resolves to a checked class whose declared name is `Applicative`. The
+/// class key is owner-qualified, so the declared name is its last segment; a
+/// global that is not a registered class never earns the contract.
+fn names_applicative_class(
+    head: &RType,
+    globals: &HashMap<String, GlobalId>,
+    class_env: &ClassEnv,
+) -> bool {
+    let (name, id) = match head {
+        RType::RCheckedGlobal { name, id, .. } => (name, Some(*id)),
+        RType::RCon(name, _) => (name, globals.get(name).copied()),
+        _ => return false,
+    };
+    name.rsplit('.').next() == Some("Applicative")
+        && id.is_some_and(|id| class_env.class_by_id(id).is_some())
+}
+
+fn type_is_applicative_dict_for_head(
+    ty: &RType,
+    head: &RTypeHead,
+    is_applicative: &dyn Fn(&RType) -> bool,
+) -> bool {
     match ty {
         RType::RApp(f, arg, _) => {
-            matches!(&**f,
-                RType::RCon(name, _) | RType::RCheckedGlobal { name, .. }
-                    if name == "Applicative"
-            )
+            is_applicative(f)
                 && rtype_app_head(arg)
                     .as_ref()
                     .is_some_and(|candidate| rtype_heads_match(candidate, head))
@@ -16984,7 +17000,10 @@ fn collect_field_arrow_chain<'a>(ty: &'a RType, args: &mut Vec<&'a RType>) -> &'
     }
 }
 
-fn type_has_applicative_row_polymorphic_contract(ty: &RType) -> bool {
+fn type_has_applicative_row_polymorphic_contract(
+    ty: &RType,
+    is_applicative: &dyn Fn(&RType) -> bool,
+) -> bool {
     let mut args = Vec::new();
     let result = collect_field_arrow_chain(ty, &mut args);
     for arg in &args {
@@ -16992,9 +17011,9 @@ fn type_has_applicative_row_polymorphic_contract(ty: &RType) -> bool {
             continue;
         };
         if rtype_is_app_headed_by(result, &head)
-            && args
-                .iter()
-                .any(|candidate| type_is_applicative_dict_for_head(candidate, &head))
+            && args.iter().any(|candidate| {
+                type_is_applicative_dict_for_head(candidate, &head, is_applicative)
+            })
         {
             return true;
         }
@@ -17002,8 +17021,9 @@ fn type_has_applicative_row_polymorphic_contract(ty: &RType) -> bool {
     false
 }
 
-fn field_type_earns_proc(ty: &RType) -> bool {
-    type_contains_effect_row(ty) || type_has_applicative_row_polymorphic_contract(ty)
+fn field_type_earns_proc(ty: &RType, is_applicative: &dyn Fn(&RType) -> bool) -> bool {
+    type_contains_effect_row(ty)
+        || type_has_applicative_row_polymorphic_contract(ty, is_applicative)
 }
 
 fn class_field_declared_row(keyword: DefKeyword, field_name: &str) -> crate::effects::RowType {
@@ -17020,9 +17040,10 @@ fn check_class_field_marker(
     field_name: &str,
     ty: &RType,
     span: &Span,
+    is_applicative: &dyn Fn(&RType) -> bool,
 ) -> Result<(), ElabError> {
     let explicit_value_params = explicit_value_param_count_from_field_type(ty);
-    let earns_proc = field_type_earns_proc(ty);
+    let earns_proc = field_type_earns_proc(ty, is_applicative);
     match keyword {
         DefKeyword::Const | DefKeyword::Fn if earns_proc => Err(ElabError::TypeMismatch {
             span: span.clone(),
@@ -17097,7 +17118,9 @@ struct ProjectionPurityCtx<'a> {
     globals: &'a HashMap<String, GlobalId>,
     class_env: &'a ClassEnv,
     local_constraints: &'a [RInstanceConstraint],
-    bound_dict_classes: &'a [(String, GlobalId)],
+    // None means an unresolved RCon in a dictionary domain: projecting it
+    // must be treated as unknown, never as an empty effect row.
+    bound_dict_classes: &'a [(String, Option<GlobalId>)],
 }
 
 fn instance_class_for_global(
@@ -17126,9 +17149,8 @@ fn constraint_instance_id(
     constraint: &RInstanceConstraint,
     ctx: &ProjectionPurityCtx<'_>,
 ) -> Option<GlobalId> {
-    let class_id = constraint.class_id.or_else(|| {
-        ctx.class_env.class(&constraint.class_name).map(|info| info.projection.type_id)
-    })?;
+    // A constraint's class is pinned by its scope selection, not its spelling.
+    let class_id = constraint.class_id?;
     let head_key = match &constraint.head_type {
         RType::RVarTy(_, name, _) => InstanceHeadKey::Parameter(name.clone()),
         RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(
@@ -17180,7 +17202,10 @@ fn projected_field_row_type(
     };
     if let RExpr::RVar(_, name, _) = base {
         if let Some((_, class_id)) = ctx.bound_dict_classes.iter().find(|(n, _)| n == name) {
-            return projected_class_field_row_type(ctx.class_env, *class_id, field);
+            return class_id.map_or_else(
+                || crate::effects::RowType::singleton("unknown checked class owner"),
+                |id| projected_class_field_row_type(ctx.class_env, id, field),
+            );
         }
     }
     let Some(instance_id) = projected_instance_id(base, ctx) else {
@@ -17245,28 +17270,46 @@ fn projected_class_field_row_type(
     }
 }
 
-fn class_id_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<GlobalId> {
-    let head = match ty { RType::RApp(f, _, _) => f.as_ref(), _ => ty };
-    match head {
-        RType::RCheckedGlobal { id, .. } => {
-            // A known record is not a class. An unknown selected owner must
-            // not disappear from a purity check as an empty effect row.
-            (class_env.class_by_id(*id).is_some()
-                || class_env.projection_by_type_id(*id).is_none()).then_some(*id)
-        }
-        RType::RCon(name, _) => class_env.class(name).map(|info| info.projection.type_id),
-        _ => None,
+fn class_id_for_dictionary_type(
+    env: &GlobalEnv,
+    class_env: &ClassEnv,
+    globals: &HashMap<String, GlobalId>,
+    ty: &RType,
+) -> Option<Option<GlobalId>> {
+    let mut head = ty;
+    while let RType::RApp(f, _, _) = head {
+        head = f.as_ref();
+    }
+    let id = match head {
+        RType::RCheckedGlobal { id, .. } => *id,
+        RType::RCon(name, _) => match globals.get(name).copied() {
+            Some(id) => id,
+            None => return Some(None), // unknown owner must not become an empty row
+        },
+        _ => return None,
+    };
+    if class_env.class_by_id(id).is_some() {
+        Some(Some(id))
+    } else if env.lookup(id).is_some() {
+        // A checked non-class declaration (record, data, alias) binds no
+        // dictionary; projecting it takes the ordinary record path.
+        None
+    } else {
+        // An id with no checked declaration stays an unknown owner.
+        Some(Some(id))
     }
 }
 
 fn collect_bound_dictionary_params(
     ty: Option<&RType>,
+    env: &GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
-) -> Vec<(String, GlobalId)> {
+) -> Vec<(String, Option<GlobalId>)> {
     let mut dicts = Vec::new();
     let mut cur = ty;
     while let Some(RType::RPi(name, domain, codomain, _)) = cur {
-        if let Some(class_id) = class_id_for_dictionary_type(class_env, domain) {
+        if let Some(class_id) = class_id_for_dictionary_type(env, class_env, globals, domain) {
             dicts.push((name.clone(), class_id));
         }
         cur = Some(codomain);
@@ -17435,7 +17478,8 @@ pub(crate) fn check_surface_purity(
     };
 
     let declared = surface_declared_row_type(rdecl)?.unwrap_or_else(crate::effects::RowType::empty);
-    let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), class_env);
+    let bound_dict_classes =
+        collect_bound_dictionary_params(rdecl.ty.as_ref(), env, globals, class_env);
     let projection_ctx = ProjectionPurityCtx {
         env,
         globals,
@@ -19570,7 +19614,9 @@ fn elab_class_decl(
         let mut tys = Vec::new();
         for field in fields {
             if let Some(keyword) = field.purity {
-                check_class_field_marker(keyword, &field.name, &field.ty, span)?;
+                let is_applicative =
+                    |head: &RType| names_applicative_class(head, &*globals, &*class_env);
+                check_class_field_marker(keyword, &field.name, &field.ty, span, &is_applicative)?;
             }
             let t = elab_type(&mut cx, &field.ty)?;
             let t = cx.metas.zonk_term(&t);
@@ -19683,11 +19729,20 @@ fn compute_ordered_field_values(
             ci.projection.head_param.is_some(),
         )
     };
-    let mut bound_dict_classes: Vec<(String, GlobalId)> = constraints.iter().map(|constraint| {
-        let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+    let mut bound_dict_classes: Vec<(String, Option<GlobalId>)> = constraints
+        .iter()
+        .map(|constraint| {
+            let id = checked_class_id(
+                class_env,
+                cx.globals,
+                &constraint.class_name,
+                constraint.class_id,
+                span,
+            )
             .expect("prerequisite checked before instance fields");
-        (constraint.binder.clone(), id)
-    }).collect();
+            (constraint.binder.clone(), Some(id))
+        })
+        .collect();
     if constraints.len() == 1 && constraints[0].binder != "d" {
         bound_dict_classes.push(("d".to_string(), bound_dict_classes[0].1));
     }
@@ -19750,7 +19805,7 @@ fn check_instance_field_purity(
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
     constraints: &[RInstanceConstraint],
-    bound_dict_classes: &[(String, GlobalId)],
+    bound_dict_classes: &[(String, Option<GlobalId>)],
     span: &Span,
 ) -> Result<(), ElabError> {
     let projection_ctx = ProjectionPurityCtx {
@@ -19812,16 +19867,17 @@ fn close_type0_lams(mut body: Term, count: usize) -> Term {
     body
 }
 
-/// Class references selected by imports are never resolved through the
-/// mutable current-name index. A local/legacy reference without a selected ID
-/// uses that index only after its declaration has been checked.
+/// An imported class carries its checked ID. A local class not yet selected
+/// resolves through the same canonical globals key as type elaboration;
+/// class membership is then checked by ID, never a spelling-only index.
 fn checked_class_id(
     class_env: &ClassEnv,
+    globals: &HashMap<String, GlobalId>,
     name: &str,
     selected: Option<GlobalId>,
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    let id = selected.or_else(|| class_env.class(name).map(|view| view.projection.type_id));
+    let id = selected.or_else(|| globals.get(name).copied());
     id.filter(|id| class_env.class_by_id(*id).is_some())
         .ok_or_else(|| ElabError::UnresolvedCon {
             name: name.to_string(),
@@ -19934,7 +19990,7 @@ fn elab_instance_decl(
     fields: &[(String, RExpr)],
 ) -> Result<ElabResult, ElabError> {
     let span = &rdecl.span;
-    let class_type_id = checked_class_id(class_env, class_name, selected_class_id, span)?;
+    let class_type_id = checked_class_id(class_env, globals, class_name, selected_class_id, span)?;
     let (class_module, class_kind) = {
         let ci = class_env.class_by_id(class_type_id).expect("selected class was checked");
         (ci.module_id, ci.kind.clone())
@@ -20016,8 +20072,16 @@ fn elab_instance_decl(
         constraints
             .iter()
             .map(|constraint| {
-                let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)?;
-                let class = class_env.class_by_id(id).expect("selected constraint was checked");
+                let id = checked_class_id(
+                    class_env,
+                    globals,
+                    &constraint.class_name,
+                    constraint.class_id,
+                    span,
+                )?;
+                let class = class_env
+                    .class_by_id(id)
+                    .expect("selected constraint was checked");
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 let core_type = if class.projection.head_param.is_some() {
                     Term::app(Term::const_(class.projection.type_id, vec![]), head.clone())
@@ -20052,8 +20116,14 @@ fn elab_instance_decl(
     // There is NO search-side backstop (no resolution-depth bound or occurs-check);
     // faithful reification is the sole net for mutual-cycle termination.
     let has_self_ref = constraints.iter().any(|constraint| {
-        checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
-            .is_ok_and(|id| id == class_type_id)
+        checked_class_id(
+            class_env,
+            globals,
+            &constraint.class_name,
+            constraint.class_id,
+            span,
+        )
+        .is_ok_and(|id| id == class_type_id)
             && rtypes_match(&constraint.head_type, head_type, globals)
     });
 
@@ -20206,9 +20276,16 @@ fn elab_instance_decl(
         constraints: constraints
             .iter()
             .zip(constraint_core_types.iter().zip(&constraint_head_cores))
-            .map(|(constraint, (core_type, head_core))| InstanceConstraintInfo {
-                class_name: constraint.class_name.clone(),
-                class_id: checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+            .map(
+                |(constraint, (core_type, head_core))| InstanceConstraintInfo {
+                    class_name: constraint.class_name.clone(),
+                    class_id: checked_class_id(
+                        class_env,
+                        globals,
+                        &constraint.class_name,
+                        constraint.class_id,
+                        span,
+                    )
                     .expect("constraint checked before instance admission"),
                 head_type: freeze_instance_pattern(&constraint.head_type, globals),
                 core_type: core_type.clone(),
@@ -20260,7 +20337,7 @@ fn elab_derive(
 ) -> Result<ElabResult, ElabError> {
     let span = &rdecl.span;
 
-    let class_type_id = checked_class_id(class_env, class_name, selected_class_id, span)?;
+    let class_type_id = checked_class_id(class_env, globals, class_name, selected_class_id, span)?;
     let has_param = class_env.class_by_id(class_type_id)
         .expect("selected class was checked").projection.head_param.is_some();
 
@@ -30040,5 +30117,212 @@ mod surf1_visits_row_production_path {
             format!("{err:?}").contains("unknown row variable `e` in visits row"),
             "unexpected error for unbound row variable: {err:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod class_identity_resolution_tests {
+    use super::*;
+
+    /// Promise class: durable invariant (spec 33 §3.3).
+    /// MEASURED: a registered module class cannot be selected by its bare
+    /// spelling, but the same checked ID is admitted when scope supplies it.
+    /// CLAIMED: an ambient class registry is not a scope import. THE GAP:
+    /// three-mode acceptance covers the ordinary resolved declaration path.
+    #[test]
+    fn dictionary_checked_class_id_requires_scope_selection() {
+        let mut elab = crate::ElabEnv::new().expect("prelude");
+        elab.elaborate_file("module A { pub class C a {} }")
+            .expect("checked module class fixture");
+        let owner = elab.globals["A.C"];
+        assert!(elab.class_env.class_by_id(owner).is_some());
+        assert!(!elab.globals.contains_key("C"));
+        let span = Span::zero();
+        assert!(matches!(
+            checked_class_id(&elab.class_env, &elab.globals, "C", None, &span),
+            Err(ElabError::UnresolvedCon { ref name, .. }) if name == "C"
+        ));
+        assert_eq!(
+            checked_class_id(&elab.class_env, &elab.globals, "C", Some(owner), &span)
+                .expect("the selected checked class must be usable"),
+            owner,
+        );
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3).
+    /// MEASURED: the purity-only constraint lookup ignores an omitted checked
+    /// class ID even when the exact same class spelling has a checked global
+    /// and a registered instance. CLAIMED: a missing scope selection cannot
+    /// be replaced by an ambient class. THE GAP: normal scoped elaboration
+    /// supplies Some for selected classes; this targets the fail-closed helper.
+    #[test]
+    fn constraint_without_checked_class_id_cannot_borrow_registry_instance() {
+        let mut elab = crate::ElabEnv::new().expect("prelude");
+        elab.elaborate_file("class C a {} instance C Nat {}")
+            .expect("checked class and dictionary fixture");
+        let class_id = elab.globals["C"];
+        let instance_id = elab.globals["C_instance_Nat"];
+        let span = Span::zero();
+        let mut constraint = RInstanceConstraint {
+            class_name: "C".to_owned(),
+            class_id: None,
+            head_type: RType::RCon("Nat".to_owned(), span),
+            binder: "d".to_owned(),
+        };
+        let ctx = ProjectionPurityCtx {
+            env: &elab.env,
+            globals: &elab.globals,
+            class_env: &elab.class_env,
+            local_constraints: &[],
+            bound_dict_classes: &[],
+        };
+        assert_eq!(constraint_instance_id(&constraint, &ctx), None);
+        constraint.class_id = Some(class_id);
+        assert_eq!(constraint_instance_id(&constraint, &ctx), Some(instance_id));
+    }
+
+    /// Promise class: durable invariant (spec 36 §1.6).
+    /// MEASURED: an unresolved RCon dictionary domain retains an unknown
+    /// owner and its projection contributes a nonempty unknown-effect row.
+    /// CLAIMED: a missing class selection cannot silently become pure.
+    /// THE GAP: unknown is a conservative row, not a proof of actual effects.
+    #[test]
+    fn unresolved_dictionary_rcon_never_defaults_to_an_empty_effect_row() {
+        let elab = crate::ElabEnv::new().expect("prelude");
+        let span = Span::zero();
+        let ty = RType::RPi(
+            "d".to_owned(),
+            Box::new(RType::RCon("UnselectedClass".to_owned(), span.clone())),
+            Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+            span.clone(),
+        );
+        let dictionaries =
+            collect_bound_dictionary_params(Some(&ty), &elab.env, &elab.globals, &elab.class_env);
+        assert_eq!(dictionaries, vec![("d".to_owned(), None)]);
+        let ctx = ProjectionPurityCtx {
+            env: &elab.env,
+            globals: &elab.globals,
+            class_env: &elab.class_env,
+            local_constraints: &[],
+            bound_dict_classes: &dictionaries,
+        };
+        let projected =
+            projected_field_row_type(&RExpr::RVar(0, "d".to_owned(), span), "step", Some(&ctx));
+        assert_eq!(
+            projected,
+            crate::effects::RowType::singleton("unknown checked class owner")
+        );
+    }
+
+    /// Promise class: durable invariant (spec 36 §1.6).
+    /// MEASURED: a checked non-class binds no dictionary in either reference
+    /// form, while a two-argument class head and an unchecked id stay bound.
+    /// CLAIMED: purity classification uses checked identity, not a negative
+    /// record test or the depth of the application spine. THE GAP: the unit
+    /// test checks the classifier; the refinement fixture checks its caller.
+    #[test]
+    fn checked_non_class_domain_binds_no_dictionary() {
+        let mut elab = crate::ElabEnv::new().expect("prelude");
+        elab.elaborate_file("class C a {}")
+            .expect("checked class fixture");
+        let span = Span::zero();
+        let pi = |domain: RType| {
+            RType::RPi(
+                "b".to_owned(),
+                Box::new(domain),
+                Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+                span.clone(),
+            )
+        };
+        let dictionaries = |domain| {
+            collect_bound_dictionary_params(
+                Some(&pi(domain)),
+                &elab.env,
+                &elab.globals,
+                &elab.class_env,
+            )
+        };
+        assert!(dictionaries(RType::RCon("Nat".to_owned(), span.clone())).is_empty());
+        let nat_id = elab.globals["Nat"];
+        assert!(dictionaries(RType::RCheckedGlobal {
+            name: "Nat".to_owned(),
+            id: nat_id,
+            span: span.clone(),
+        })
+        .is_empty());
+
+        let class_id = elab.globals["C"];
+        assert!(elab.class_env.class_by_id(class_id).is_some());
+        let class_head = RType::RApp(
+            Box::new(RType::RApp(
+                Box::new(RType::RCon("C".to_owned(), span.clone())),
+                Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+                span.clone(),
+            )),
+            Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+            span.clone(),
+        );
+        assert_eq!(
+            dictionaries(class_head),
+            vec![("b".to_owned(), Some(class_id))]
+        );
+        assert_eq!(
+            dictionaries(RType::RCheckedGlobal {
+                name: "selected class".to_owned(),
+                id: class_id,
+                span: span.clone(),
+            }),
+            vec![("b".to_owned(), Some(class_id))]
+        );
+        let unchecked_id = GlobalId(u32::MAX);
+        assert!(elab.env.lookup(unchecked_id).is_none());
+        assert_eq!(
+            dictionaries(RType::RCheckedGlobal {
+                name: "unknown selected owner".to_owned(),
+                id: unchecked_id,
+                span: span.clone(),
+            }),
+            vec![("b".to_owned(), Some(unchecked_id))]
+        );
+    }
+
+    /// Promise class: durable invariant (spec 36 §1.6).
+    /// MEASURED: an actual Applicative class is recognized while a checked
+    /// non-class with that same spelling is not. CLAIMED: the row-polymorphic
+    /// field contract requires checked class identity, not a name suffix.
+    /// THE GAP: the field-marker integration test exercises the caller path.
+    #[test]
+    fn dictionary_applicative_marker_requires_checked_class() {
+        let mut class_env = crate::ElabEnv::new().expect("prelude");
+        class_env
+            .elaborate_file("class Applicative a {}")
+            .expect("checked Applicative class");
+        let span = Span::zero();
+        let head = RType::RCon("Applicative".to_owned(), span.clone());
+        assert!(names_applicative_class(
+            &head,
+            &class_env.globals,
+            &class_env.class_env,
+        ));
+
+        let mut data_env = crate::ElabEnv::new().expect("prelude");
+        data_env
+            .elaborate_file("data Applicative = MkApplicative")
+            .expect("ordinary data named Applicative");
+        assert!(!names_applicative_class(
+            &head,
+            &data_env.globals,
+            &data_env.class_env,
+        ));
+        let same_spelling_wrong_id = RType::RCheckedGlobal {
+            name: "Applicative".to_owned(),
+            id: class_env.globals["Nat"],
+            span,
+        };
+        assert!(!names_applicative_class(
+            &same_spelling_wrong_id,
+            &class_env.globals,
+            &class_env.class_env,
+        ));
     }
 }

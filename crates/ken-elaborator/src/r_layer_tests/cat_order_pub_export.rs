@@ -273,7 +273,7 @@ fn selective_consumer_preserves_local_and_reexported_provider_identities() {
     let mut env = load_order();
     let order_sub = env.globals[&format!("{ORDER}.sub")];
     let lawful_leq = env.globals[&format!("{LAWFUL}.leq_nat")];
-    let ord = env.globals["Ord"];
+    let ord = env.globals[&format!("{LAWFUL}.Ord")];
     let nat = env.globals["Nat"];
     let mut dictionaries = env
         .class_env
@@ -319,7 +319,10 @@ fn selective_consumer_preserves_local_and_reexported_provider_identities() {
         .resolution_provenance
         .iter()
         .rev()
-        .find(|resolution| resolution.class_name == "Ord" && resolution.head_type == "Nat")
+        .find(|resolution| {
+            resolution.class_name == "Core.Classes.LawfulClasses.Ord"
+                && resolution.head_type == "Nat"
+        })
         .expect("Order-only consumer must record Ord Nat resolution provenance");
     assert_eq!(resolution.instance_id, dictionary_id);
     assert_eq!(resolution.defining_package, LAWFUL);

@@ -1,7 +1,7 @@
 ---
 id: RT-C6-FUNCTION-INDEX-CONVERTIBLE-ENDPOINTS
 title: "A closed, checked refl cast between data-family endpoints whose function index differs only by convertibility, such as CFn (λn.n) to CFn (λn. idN n), evaluates to Unknown, while the kernel reduces it. The Spec leader reads spec 42 C6 and §16.3.2's indexed-family case as requiring it to compute. Make the evaluator compute it without comparing closures by representation"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

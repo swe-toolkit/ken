@@ -62,7 +62,7 @@ fn expect_unbound(result: Result<Vec<GlobalId>, ElabError>, expected: &str) {
 }
 
 fn canonical_ord_nat_id(env: &ElabEnv) -> GlobalId {
-    let ord = env.globals["Ord"];
+    let ord = env.globals[&format!("{LAWFUL}.Ord")];
     let nat = env.globals["Nat"];
     let mut matches = env
         .class_env
@@ -221,7 +221,7 @@ fn runtime_ord_dictionary(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) ->
 
 fn install_test_values(env: &mut ElabEnv, store: &mut EvalStore) -> Values {
     env.elaborate_file(
-        "import Core.Classes.LawfulClasses (Ord, leq_nat)\n\
+        "import Core.Classes.LawfulClasses (Ord, Ord_instance_Nat, leq_nat)\n\
          data Tag = A | B | C | D | E | F\n\
          const cat_pq_up2 : Ord Nat = {\n\
            leq = leq_nat,\n\
@@ -2222,7 +2222,7 @@ fn two_lawful_orders_equal_function_interop_and_opposite_type_refusal() {
     );
 
     env.elaborate_file(
-        "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
+        "import Core.Classes.LawfulClasses (Ord, Ord_instance_Nat, ord_leq_at)\n\
          import Data.Collections.PriorityQueue (PriorityQueue, empty, insert, merge)\n\
          const cat_pq_eq_q_up : PriorityQueue Nat Tag\n\
            (ord_leq_at Nat Ord_instance_Nat) =\n\
@@ -2299,7 +2299,8 @@ fn two_lawful_orders_equal_function_interop_and_opposite_type_refusal() {
     );
 
     let mismatch = env.elaborate_file(
-        "const cat_pq_q_down : PriorityQueue Nat Tag\n\
+        "import Core.Classes.LawfulClasses (Ord_instance_Nat)\n\
+         const cat_pq_q_down : PriorityQueue Nat Tag\n\
            (ord_leq_at Nat cat_pq_down) =\n\
            insert Nat Tag cat_pq_down (Suc (Suc (Suc Zero))) C\n\
              (empty Nat Tag cat_pq_down)\n\

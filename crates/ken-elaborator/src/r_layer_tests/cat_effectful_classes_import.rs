@@ -155,18 +155,29 @@ fn local_global(env: &ElabEnv, name: &str) -> GlobalId {
 }
 
 fn class_id(env: &ElabEnv, name: &str) -> GlobalId {
+    let provider = match name {
+        "Functor" | "Foldable" => "Core.Classes.LawfulFunctors",
+        "Applicative" | "Traversable" => EFFECTFUL_CLASSES,
+        other => panic!("unexpected class `{other}`"),
+    };
+    let id = global(env, &format!("{provider}.{name}"));
     env.class_env
-        .class(name)
-        .unwrap_or_else(|| panic!("missing class `{name}`"))
+        .class_by_id(id)
+        .unwrap_or_else(|| panic!("missing checked class `{provider}.{name}`"))
         .projection
         .type_id
 }
 
 fn instance_id(env: &ElabEnv, class: &str, head: &str) -> GlobalId {
+    let owner = match class {
+        "Functor" | "Foldable" => "Core.Classes.LawfulFunctors",
+        "Applicative" | "Monad" | "Traversable" => EFFECTFUL_CLASSES,
+        other => panic!("unexpected class `{other}`"),
+    };
     env.class_env
         .instances
-        .get(&(class.to_owned(), head.to_owned()))
-        .unwrap_or_else(|| panic!("missing instance `{class}/{head}`"))
+        .get(&(format!("{owner}.{class}"), head.to_owned()))
+        .unwrap_or_else(|| panic!("missing instance `{owner}.{class}/{head}`"))
         .instance_id
 }
 
@@ -212,7 +223,7 @@ fn effectful_classes_import_closure_is_exact_and_identity_preserving() {
     for (class, head, alias) in provider_instances {
         let provider = instance_id(&env, class, head);
         assert_eq!(
-            global(&env, alias),
+            global(&env, &format!("Core.Classes.LawfulFunctors.{alias}")),
             provider,
             "the imported dictionary alias must retain LF's canonical identity"
         );
@@ -333,20 +344,32 @@ fn effectful_classes_local_dictionary_inventory_is_exact() {
         })
         .collect::<BTreeSet<_>>();
     let expected = BTreeSet::from([
-        ("Applicative".to_owned(), "List".to_owned()),
-        ("Applicative".to_owned(), "Option".to_owned()),
         (
-            "Applicative".to_owned(),
+            format!("{EFFECTFUL_CLASSES}.Applicative"),
+            "List".to_owned(),
+        ),
+        (
+            format!("{EFFECTFUL_CLASSES}.Applicative"),
+            "Option".to_owned(),
+        ),
+        (
+            format!("{EFFECTFUL_CLASSES}.Applicative"),
             format!("{EFFECTFUL_CLASSES}.Identity"),
         ),
         (
-            "Functor".to_owned(),
+            "Core.Classes.LawfulFunctors.Functor".to_owned(),
             format!("{EFFECTFUL_CLASSES}.Identity"),
         ),
-        ("Monad".to_owned(), "List".to_owned()),
-        ("Monad".to_owned(), "Option".to_owned()),
-        ("Traversable".to_owned(), "List".to_owned()),
-        ("Traversable".to_owned(), "Option".to_owned()),
+        (format!("{EFFECTFUL_CLASSES}.Monad"), "List".to_owned()),
+        (format!("{EFFECTFUL_CLASSES}.Monad"), "Option".to_owned()),
+        (
+            format!("{EFFECTFUL_CLASSES}.Traversable"),
+            "List".to_owned(),
+        ),
+        (
+            format!("{EFFECTFUL_CLASSES}.Traversable"),
+            "Option".to_owned(),
+        ),
     ]);
     assert_eq!(
         actual, expected,

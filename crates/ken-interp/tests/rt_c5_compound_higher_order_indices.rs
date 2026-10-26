@@ -161,14 +161,15 @@ fn identical_endpoint_function_inside_pair_returns_value() {
     f.observe_identity_index(result, "MkCPairFn", true);
 }
 
-/// Promise class: durable fail-closed invariant. MEASURED: the kernel rejects
-/// a forged refl between different function-indexed types, and direct
-/// evaluation of that deliberately *unchecked* cast stays Unknown. CLAIMED:
-/// the identical-endpoint rule does not admit unequal endpoints. THE GAP:
-/// this negative is not a well-typed term and claims no checked inequality
-/// proof; function difference is observed by application, not closure shape.
+/// Promise class: durable invariant. MEASURED: the kernel rejects a forged
+/// refl between different function-parameter types, and direct evaluation of
+/// that deliberately *unchecked* cast takes C6's parameters-only push
+/// (`16 §3.2`): the constructor is re-headed at the target's parameter, read
+/// from the target type and never compared with the source. CLAIMED: no
+/// closure is compared. THE GAP: this row is not a well-typed term; function
+/// difference is observed by application, not closure shape.
 #[test]
-fn differing_function_endpoints_are_refused() {
+fn differing_function_parameters_push_to_target() {
     let mut f = Fixture::new();
     let nat = Term::indformer(f.id("Nat"), vec![]);
     let identity = f.identity();
@@ -181,7 +182,7 @@ fn differing_function_endpoints_are_refused() {
     let from_function = f.eval(&identity);
     let to_function = f.eval(&successor);
     let from_at_zero = apply(from_function, zero_value.clone(), &f.elab.env, &mut f.store);
-    let to_at_zero = apply(to_function, zero_value, &f.elab.env, &mut f.store);
+    let to_at_zero = apply(to_function, zero_value.clone(), &f.elab.env, &mut f.store);
     assert_ne!(
         from_at_zero, to_at_zero,
         "functions differ on a ground Nat input"
@@ -191,7 +192,12 @@ fn differing_function_endpoints_are_refused() {
     let value = f.intro("MkCFn", identity);
     let invalid_cast = f.cast(from, to.clone(), value);
     assert!(check(&f.elab.env, &Context::new(), &invalid_cast, &to).is_err());
-    assert_eq!(f.eval(&invalid_cast), EvalVal::Unknown);
+    let EvalVal::Ctor { id, args, .. } = f.eval(&invalid_cast) else {
+        panic!("the parameters-only push re-heads the constructor");
+    };
+    assert_eq!(id, f.id("MkCFn"));
+    let pushed_at_zero = apply(args[0].clone(), zero_value, &f.elab.env, &mut f.store);
+    assert_eq!(pushed_at_zero, to_at_zero, "the parameter is the target's");
 }
 
 // The new Unknown-operand guard has no naturally closed checked fixture here:

@@ -34,8 +34,9 @@ fn assert_bool_reduces(env: &mut ElabEnv, name: &str, expression: &str, expected
 fn structural_instances_are_checked_transparent_and_zero_delta() {
     let (env, lawful_owned) = mk_env();
     let dec_eq_class = env
-        .class_env
-        .class("DecEq")
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
@@ -43,7 +44,7 @@ fn structural_instances_are_checked_transparent_and_zero_delta() {
     for head in ["Pair", "List"] {
         let id = env
             .class_env
-            .instance_search("DecEq", head)
+            .instance_search("Core.Classes.LawfulClasses.DecEq", head)
             .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
         assert!(lawful_owned.contains(&id), "DecEq {head} must be owner-checked");
         assert!(
@@ -65,8 +66,9 @@ fn structural_instances_are_checked_transparent_and_zero_delta() {
 fn structural_instances_compute_positive_and_negative_bool_examples() {
     let (mut env, lawful_owned) = mk_env();
     let dec_eq_class = env
-        .class_env
-        .class("DecEq")
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
@@ -74,7 +76,7 @@ fn structural_instances_compute_positive_and_negative_bool_examples() {
     for head in ["Bool", "Pair", "List"] {
         let id = env
             .class_env
-            .instance_search("DecEq", head)
+            .instance_search("Core.Classes.LawfulClasses.DecEq", head)
             .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
         assert!(lawful_owned.contains(&id), "DecEq {head} must be owner-checked");
     }
@@ -102,7 +104,10 @@ fn structural_instances_compute_positive_and_negative_bool_examples() {
         ("list_same", "List"),
         ("list_distinct", "List"),
     ] {
-        let instance = env.class_env.instance_search("DecEq", head).unwrap();
+        let instance = env
+            .class_env
+            .instance_search("Core.Classes.LawfulClasses.DecEq", head)
+            .unwrap();
         let wrapper = env.globals[if head == "Pair" {
             "structural_pair_eq"
         } else {

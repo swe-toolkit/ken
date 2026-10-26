@@ -237,7 +237,7 @@ fn seven_regex_seed_cases_match_the_independent_evidence() {
            import Data.Collections.Derived (list_append, list_concat, list_all)
            import Core.Logic.And (And, Both)
            import Core.Logic.Or (Or, Inl, Inr)
-           import Core.Classes.LawfulClasses (DecEq)
+           import Core.Classes.LawfulClasses (DecEq, DecEq_instance_Bool)
 
            const z : List Bool = Nil Bool
            const t : List Bool = Cons Bool True z

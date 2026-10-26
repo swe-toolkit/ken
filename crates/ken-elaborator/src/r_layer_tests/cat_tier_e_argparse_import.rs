@@ -617,7 +617,7 @@ fn argparse_checked_provider_and_schema_closure_is_exact() {
         "Data.Sums.Validation.Validation",
         "Data.Sums.Validation.validation_ap",
         "Data.Sums.Validation.validation_map",
-        "Semigroup_instance_Data.Collections.NonEmpty.NonEmpty",
+        "Core.Classes.LawfulFunctors.Semigroup_instance_Data.Collections.NonEmpty.NonEmpty",
     ]);
     let expected_ids = expected_names
         .iter()
