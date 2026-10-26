@@ -20,8 +20,10 @@
 > five new generic laws for transitivity and swapped-operand endpoint
 > inclusion. Architect checked their bodies in isolated D0 with no new
 > `Axiom`, Transparent ownership and unchanged scratch trusted identities
-> (114 → 114). The §5 catalog exports are absent at this base; the authored
-> seed and D0 checks are not shipped-seed execution, CI or landed trust.
+> (114 → 114). The §5 catalog exports and package test now check the generic
+> types, shipped seed's accepted client and two refused clients, with an exact
+> package-local trusted-identity delta of 114 → 114. This does not establish
+> official conformance-runner execution, CI, landing or a landed trust delta.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -650,7 +652,10 @@ five generic proof bodies, their ownership and Transparent status,
 and a public-only client at `trusted_base()` identities 114 → 114;
 no new `Axiom` was present. The separate closed chain and operand
 pair tested in that D0 illustrate the obligations but do not prove
-the generic quantifiers. The §5 catalog exports are **not** on this
-base; the authored conformance seed cannot run against shipped §5
-exports yet. D0 is not official conformance execution, CI,
-publication, landing, or a landed trust measurement.
+the generic quantifiers. The §5 catalog exports and a targeted package test
+now check the
+five generic public types and run the seed's accepted and two isolated
+refused Ken clients against the roots-loaded package. The package test
+observes unchanged exact trusted-base identities (114 → 114), not a
+landed trust measurement. Neither the historical D0 nor the package
+test is official conformance-runner execution, CI or landing.
