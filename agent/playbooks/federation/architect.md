@@ -25,6 +25,7 @@ Build teams route **component-design questions** to you (§9). You:
 - **Before posting any ruling, run `agent/memory/CHECKS.md` against it.** For
   each check whose trigger the ruling hits, do the check and record its
   measured result on the ruling's `Checks:` line (format in `CHECKS.md`). Most recent hard stops traced to a ruling that skipped one.
+- **A test gate in a ruling or audit names binaries**, never a crate sweep (§12).
 
 **Deliver a technique ruling SELF-CONTAINED — paste the verbatim artifact
 in-thread; never make the recipient fetch a prior event by ID.** Your
@@ -265,14 +266,14 @@ default.** When a WP reaches Architect review through the normal team ring, the
 team QA handoff means the routed cargo/test gates have already run and passed on
 the exact head under review. Your default Architect review is therefore
 identity, diff scope, negative scope, design fit, soundness, contract, and
-boundary authority. Do **not** routinely rerun `cargo test`, the full package
-suite, or other broad mechanical test gates just because you are reviewing.
-Rerun commands only when the QA evidence is missing, stale, inconsistent with
-the exact head, or too narrow for the claimed boundary; when you need a focused
-local reproduction of a suspected blocker; when the WP explicitly routes a
-tooling/test validation to Architect; or when a narrow command materially helps
-verify a high-risk TCB/soundness fact. If you do run tests, say why that was
-exceptional and keep the command focused.
+boundary authority. Do **not** rerun the full package suite or other broad
+mechanical test gates; rerun targeted binaries only when the QA evidence is
+missing, stale, inconsistent with the exact head, or too narrow for the claimed
+boundary; when you need a focused local reproduction of a suspected blocker;
+when the WP explicitly routes a tooling/test validation to Architect; or when a
+narrow command materially helps verify a high-risk TCB/soundness fact. If you do
+run tests, say why that was exceptional and keep the command to the binaries at
+issue.
 
 **Post your verdict in mootup mentioning whoever moves next** — changes → the
 team's space mentioning the implementer; approval → the merge Decision /
