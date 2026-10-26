@@ -85,14 +85,10 @@ name defined in a *different* package file:
 | `Core/Classes/EffectfulClasses.ken.md` | `Functor` |
 | `Data/Numeric/Nat/Arithmetic.ken.md` | `cong` |
 
-This is not those four entries being broken, and it is a corpus-coverage gap,
-not a loader capability one. The loader itself resolves cross-file `import`
-(`spec/30-surface/33-declarations.md#32-importing-and-exporting`), and what's
-still true is
-narrower — no landed catalog entry yet exercises the cross-file case, so "a
-catalog entry that needs another package's helper today still inlines
-it… not imports it." These four entries were written assuming (or awaiting)
-that usage and are not currently self-check-able in isolation.
+The failures above were measured at the SHA stated for the table. They do
+not establish the current `ken check` status or a loader limitation. The
+catalog has a live cross-file import: `EmptyDec.ken.md` imports `sym` and
+`trans` from `Transport.ken.md` and uses them in `dec_eq_decides`.
 
 A fifth file, `Data/Numeric/Nat/Order.ken.md`, also fails `ken check`, but
 **not** the same way: `KernelRejected(TypeMismatch)`, naming no missing

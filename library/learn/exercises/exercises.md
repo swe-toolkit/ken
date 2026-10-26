@@ -68,10 +68,10 @@ fragment's wording as fact.
    Checked against the taxonomy's own closed lists, which of those names
    is actually **prelude**, which is actually **built-in**, and which does
    the cited taxonomy section simply not pin at all?
-2. `catalog/packages/Core/Logic/EmptyDec.ken.md` inlines two lemmas from
-   `Transport.ken.md` rather than `import`-ing them. Is that because
-   cross-file `import` doesn't work? If not, what does the fragment's own
-   word for what it's doing actually claim?
+2. `EmptyDec.ken.md` imports and uses `sym` and `trans` from
+   `Transport.ken.md` in `dec_eq_decides`. Which proof steps use each
+   imported lemma, and what does this show about cross-file imports in the
+   catalog?
 
 ## 06 — Execution
 

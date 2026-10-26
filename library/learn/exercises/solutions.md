@@ -44,7 +44,7 @@ the answer yourself rather than take it on this page's authority.
    axiom, so EmptyDec's zero covers only the *admission* of its own two
    inductives, not every instantiation a caller might choose
    (`catalog/packages/Core/Logic/EmptyDec.ken.md`, and
-   `crates/ken-elaborator/tests/ds1_empty_dec_acceptance.rs`,
+   `crates/ken-elaborator/src/r_layer_tests/ds1_empty_dec_acceptance.rs`,
    `ac3_trusted_base_delta_is_ordinary_inductive_admission_only`).
 2. Something else: concrete executable witnesses are computations, while
    private checked runner laws state what successful and failing runs imply
@@ -85,16 +85,12 @@ the answer yourself rather than take it on this page's authority.
    `spec/30-surface/30-taxonomy.md`
    [§3](../../../spec/30-surface/30-taxonomy.md#3-the-built-in-set--the-surface-tcb-irreducible),
    [§4](../../../spec/30-surface/30-taxonomy.md#4-the-prelude-tier--ken-defined-always-present-closed)).
-2. Not because `import` doesn't work — cross-file `import` is real and
-   tested: a real acceptance test writes two separate files and resolves
-   one's reference to the other's declaration through the roots-based
-   loader
-   (`crates/ken-elaborator/tests/n2_in_repo_loader.rs`,
-   `cross_file_import_resolves_lazily_through_plural_root_api_and_caches`).
-   The fragment's own word for what it is doing is "self-containment" — a
-   style choice, the same idiom a proof-techniques guide entry uses
-   elsewhere — not a claim that `import` failed or could not deliver
-   `Transport`'s lemmas
+2. `EmptyDec.ken.md` imports `sym` and `trans` from `Transport.ken.md`.
+   In the `No` branch of `dec_eq_decides`, `sym` reverses the branch
+   equation and `trans` composes it with `d.complete`, producing
+   `Equal Bool False True`, which reduces to `Bottom`. This is a catalog
+   use of cross-file imports, not a local re-declaration or a loader
+   limitation
    (`catalog/packages/Core/Logic/EmptyDec.ken.md`, and
    `catalog/packages/Core/Logic/Transport.ken.md`).
 
