@@ -6105,6 +6105,96 @@ mod tests {
             "a forwarding callee must not count as direct-answering"
         );
     }
+
+    /// Promise class: durable invariant. MEASURED: a declaration tail that
+    /// projects a field from its input is refused by the production planner's
+    /// direct-answer walk. CLAIMED: a projected ITree word cannot be admitted
+    /// as an answer constructed by the callee. THE GAP: this RuntimeExpr
+    /// fixture is not a checked source occurrence, and the conservative
+    /// refusal also includes projections of direct-style answers.
+    #[test]
+    fn rt_p1_tail_walk_projected_callee_is_not_direct() {
+        let k_body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: "decl:fixture::project_tree".to_string(),
+            }),
+            args: vec![RuntimeExpr::Var(0)],
+        };
+        let project_tree = RuntimeDeclaration {
+            symbol: "decl:fixture::project_tree".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["record".to_string()],
+                    body: Box::new(RuntimeExpr::Project {
+                        record: Box::new(RuntimeExpr::Var(0)),
+                        field: "tree".to_string(),
+                    }),
+                },
+            },
+            metadata: RuntimeSymbolMetadata::empty(),
+        };
+        let declarations = BTreeMap::from([(project_tree.symbol.as_str(), &project_tree)]);
+        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            .expect("the projected-callee fixture plans");
+        let k_origin = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::Call { .. }))
+            .expect("K has a call occurrence")
+            .static_origin;
+        assert!(
+            !deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                .expect("the K's static call target resolves"),
+            "a callee projecting an input field must not count as direct-answering"
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: a declaration tail with
+    /// a literal ITree::Ret RuntimeValue is refused by the production planner's
+    /// direct-answer walk. CLAIMED: an ITree-form value, whether held as a
+    /// Value or built as a Construct, is not a direct answer. THE GAP: this
+    /// RuntimeExpr fixture is not px8ds's checked ITree-form occurrence;
+    /// the identity convention here still keys on the constructor's suffix.
+    #[test]
+    fn rt_p1_tail_walk_itree_value_callee_is_not_direct() {
+        let k_body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: "decl:fixture::value_tree".to_string(),
+            }),
+            args: vec![RuntimeExpr::Var(0)],
+        };
+        let value_tree = RuntimeDeclaration {
+            symbol: "decl:fixture::value_tree".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["answer".to_string()],
+                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Constructor {
+                        constructor: "ctor:fixture::ITree::Ret".to_string(),
+                        args: vec![RuntimeValue::Bool(true)],
+                    })),
+                },
+            },
+            metadata: RuntimeSymbolMetadata::empty(),
+        };
+        let declarations = BTreeMap::from([(value_tree.symbol.as_str(), &value_tree)]);
+        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            .expect("the ITree-value callee fixture plans");
+        let k_origin = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::Call { .. }))
+            .expect("K has a call occurrence")
+            .static_origin;
+        assert!(
+            !deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                .expect("the K's static call target resolves"),
+            "an ITree Value callee must not count as direct-answering"
+        );
+    }
 }
 
 
