@@ -793,7 +793,9 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
     ] {
         let canonical = format!("{DERIVED}.{class_name}");
         let checked_id = env.globals[&canonical];
-        let class = env.class_env.class_by_id(checked_id)
+        let class = env
+            .class_env
+            .class_by_id(checked_id)
             .unwrap_or_else(|| panic!("{canonical} must be a checked class"));
         assert_eq!(class.projection.owner_name, canonical);
         let id = class.projection.type_id;
@@ -804,7 +806,9 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
         );
     }
     assert!(
-        env.globals.get("Data.Collections.Derived.SetoidMorphism").and_then(|id| env.class_env.class_by_id(*id))
+        env.globals
+            .get("Data.Collections.Derived.SetoidMorphism")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .unwrap()
             .projection
             .field_names

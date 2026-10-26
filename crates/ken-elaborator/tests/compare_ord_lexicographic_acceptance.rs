@@ -63,7 +63,10 @@ fn lawful_id(env: &ElabEnv, owned: &[GlobalId], name: &str) -> GlobalId {
 }
 
 fn owned_ord_instance(env: &ElabEnv, owned: &[GlobalId], head: &str) -> GlobalId {
-    let class = env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
+    let class = env
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("the canonical Ord registry entry must exist")
         .projection
         .type_id;
@@ -360,7 +363,10 @@ fn pair_and_list_instances_compute_lexicographically() {
         "False",
     );
 
-    let ord_class = env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
+    let ord_class = env
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("checked Ord class")
         .projection
         .type_id;

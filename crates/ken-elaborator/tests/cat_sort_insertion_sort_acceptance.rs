@@ -287,7 +287,10 @@ fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
     )
     .expect("public imports and `where Ord Bool` must resolve both laws and order vectors");
 
-    let ord_class = env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
+    let ord_class = env
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("Ord must remain a checked class")
         .projection
         .type_id;

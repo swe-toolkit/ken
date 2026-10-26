@@ -226,8 +226,10 @@ fn strict_class_choke_covers_every_d0_direct_class_representation() {
             let error = legacy
                 .elaborate_module_from_roots(&[root.0.clone()], entry)
                 .expect_err("legacy roots must also refuse an unselected module class");
-            assert!(matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "AmbientView"),
-                "legacy view constraint must refuse at the missing selection: {error:?}");
+            assert!(
+                matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "AmbientView"),
+                "legacy view constraint must refuse at the missing selection: {error:?}"
+            );
         } else {
             legacy
                 .elaborate_module_from_roots(&[root.0.clone()], entry)

@@ -23,16 +23,28 @@ impl Mode {
     }
 
     fn checked_key(self, client: &str, name: &str) -> String {
-        if self.is_direct() { name.to_owned() } else { format!("{client}.{name}") }
+        if self.is_direct() {
+            name.to_owned()
+        } else {
+            format!("{client}.{name}")
+        }
     }
 
-    fn check(self, env: &mut ElabEnv, root: &Path, client: &str, source: &str) -> Result<(), ElabError> {
+    fn check(
+        self,
+        env: &mut ElabEnv,
+        root: &Path,
+        client: &str,
+        source: &str,
+    ) -> Result<(), ElabError> {
         let ids = if self.is_direct() {
             env.elaborate_file(source)?
         } else {
             fs::write(root.join(format!("{client}.ken")), source).expect("write client fixture");
             match self {
-                Self::Strict => env.elaborate_module_from_roots_strict(&[root.to_path_buf()], client)?,
+                Self::Strict => {
+                    env.elaborate_module_from_roots_strict(&[root.to_path_buf()], client)?
+                }
                 Self::Legacy => env.elaborate_module_from_roots(&[root.to_path_buf()], client)?,
                 Self::Direct => unreachable!(),
             }
@@ -66,7 +78,11 @@ fn mentions(term: &Term, id: GlobalId) -> bool {
     match term {
         Term::Const { id: found, .. }
         | Term::IndFormer { id: found, .. }
-        | Term::Constructor { id: found, .. } if *found == id => true,
+        | Term::Constructor { id: found, .. }
+            if *found == id =>
+        {
+            true
+        }
         Term::Elim { fam, .. } if *fam == id => true,
         _ => term.children().into_iter().any(|child| mentions(child, id)),
     }
@@ -74,20 +90,30 @@ fn mentions(term: &Term, id: GlobalId) -> bool {
 
 fn checked_type_mentions(env: &ElabEnv, id: GlobalId, owner: GlobalId) {
     let (_, ty) = env.env.const_type(id).expect("checked type");
-    assert!(mentions(&ty, owner), "checked type {ty:?} must mention {owner:?}");
+    assert!(
+        mentions(&ty, owner),
+        "checked type {ty:?} must mention {owner:?}"
+    );
 }
 
 fn checked_body_mentions(env: &ElabEnv, id: GlobalId, dictionary: GlobalId) {
     let (_, body) = env.env.transparent_body(id).expect("checked body");
-    assert!(mentions(&body, dictionary), "checked body {body:?} must mention {dictionary:?}");
+    assert!(
+        mentions(&body, dictionary),
+        "checked body {body:?} must mention {dictionary:?}"
+    );
 }
 
 fn assert_unselected(error: ElabError, mode: Mode, spelling: &str) {
     match mode {
-        Mode::Strict => assert!(matches!(error, ElabError::UnboundName { ref name, .. } if name == spelling),
-            "{mode:?} unselected {spelling} must refuse at scope: {error:?}"),
-        Mode::Legacy | Mode::Direct => assert!(matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == spelling),
-            "{mode:?} unselected {spelling} must refuse like data: {error:?}"),
+        Mode::Strict => assert!(
+            matches!(error, ElabError::UnboundName { ref name, .. } if name == spelling),
+            "{mode:?} unselected {spelling} must refuse at scope: {error:?}"
+        ),
+        Mode::Legacy | Mode::Direct => assert!(
+            matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == spelling),
+            "{mode:?} unselected {spelling} must refuse like data: {error:?}"
+        ),
     }
 }
 
@@ -103,8 +129,14 @@ fn imported_view_selects_its_checked_owner_in_all_three_modes() {
             let (root, mut env) = fixture(mode, A, B);
             let a = env.globals["A.View"];
             let b = env.globals["B.View"];
-            assert_ne!(a, b, "{mode:?} distinct class declarations need distinct IDs");
-            assert!(!env.globals.contains_key("View"), "module classes cannot mint a bare global");
+            assert_ne!(
+                a, b,
+                "{mode:?} distinct class declarations need distinct IDs"
+            );
+            assert!(
+                !env.globals.contains_key("View"),
+                "module classes cannot mint a bare global"
+            );
             let source = format!(
                 "import {provider} (View)\n\
                  data Local = MkLocal\n\
@@ -115,11 +147,22 @@ fn imported_view_selects_its_checked_owner_in_all_three_modes() {
             mode.check(&mut env, root.path(), client, &source)
                 .unwrap_or_else(|error| panic!("{mode:?}/{client}: {error:?}"));
             let owner = if provider == "A" { a } else { b };
-            let dictionary_key = format!("{provider}.View_instance_{}", mode.checked_key(client, "Local"));
+            let dictionary_key = format!(
+                "{provider}.View_instance_{}",
+                mode.checked_key(client, "Local")
+            );
             let dictionary = env.globals[&dictionary_key];
             checked_type_mentions(&env, dictionary, owner);
-            checked_type_mentions(&env, env.globals[&mode.checked_key(client, "type_probe")], owner);
-            checked_body_mentions(&env, env.globals[&mode.checked_key(client, "constraint_probe")], dictionary);
+            checked_type_mentions(
+                &env,
+                env.globals[&mode.checked_key(client, "type_probe")],
+                owner,
+            );
+            checked_body_mentions(
+                &env,
+                env.globals[&mode.checked_key(client, "constraint_probe")],
+                dictionary,
+            );
         }
     }
 }
@@ -133,9 +176,13 @@ fn imported_view_selects_its_checked_owner_in_all_three_modes() {
 fn unselected_class_type_and_where_refuse_like_unselected_data() {
     for mode in Mode::ALL {
         let (root, mut env) = fixture(mode, A, B);
-        mode.check(&mut env, root.path(), "SelectedType",
-            "import A (View as AView)\nfn selected (d : AView Nat) : AView Nat = d")
-            .expect("selected class type checks");
+        mode.check(
+            &mut env,
+            root.path(),
+            "SelectedType",
+            "import A (View as AView)\nfn selected (d : AView Nat) : AView Nat = d",
+        )
+        .expect("selected class type checks");
         let (root, mut env) = fixture(mode, A, B);
         mode.check(&mut env, root.path(), "SelectedWhere",
             "import A (View as AView)\ndata Local = MkLocal\ninstance AView Local { get = λx. x }\nconst selected : Local where AView Local = d.get MkLocal")
@@ -162,10 +209,18 @@ fn unselected_class_type_and_where_refuse_like_unselected_data() {
 fn qualified_import_and_two_aliases_select_distinct_dictionaries() {
     for mode in Mode::ALL {
         let (root, mut env) = fixture(mode, A, B);
-        mode.check(&mut env, root.path(), "Qualified",
-            "import A\nfn qualified (d : A.View Nat) : A.View Nat = d")
-            .expect("qualified A.View under import A checks");
-        checked_type_mentions(&env, env.globals[&mode.checked_key("Qualified", "qualified")], env.globals["A.View"]);
+        mode.check(
+            &mut env,
+            root.path(),
+            "Qualified",
+            "import A\nfn qualified (d : A.View Nat) : A.View Nat = d",
+        )
+        .expect("qualified A.View under import A checks");
+        checked_type_mentions(
+            &env,
+            env.globals[&mode.checked_key("Qualified", "qualified")],
+            env.globals["A.View"],
+        );
 
         let (root, mut env) = fixture(mode, A, B);
         let client = "Both";
@@ -181,21 +236,60 @@ fn qualified_import_and_two_aliases_select_distinct_dictionaries() {
             const b_dictionary : BView Local = BView_instance_Local";
         mode.check(&mut env, root.path(), client, source)
             .unwrap_or_else(|error| panic!("{mode:?} same-client aliased providers: {error:?}"));
-        let local = if mode.is_direct() { "Local" } else { "Both.Local" };
+        let local = if mode.is_direct() {
+            "Local"
+        } else {
+            "Both.Local"
+        };
         let a_dict = env.globals[&format!("A.View_instance_{local}")];
         let b_dict = env.globals[&format!("B.View_instance_{local}")];
-        assert_ne!(a_dict, b_dict, "two checked class IDs must mint distinct dictionaries");
+        assert_ne!(
+            a_dict, b_dict,
+            "two checked class IDs must mint distinct dictionaries"
+        );
         checked_type_mentions(&env, a_dict, env.globals["A.View"]);
         checked_type_mentions(&env, b_dict, env.globals["B.View"]);
-        checked_type_mentions(&env, env.globals[&mode.checked_key(client, "a_type")], env.globals["A.View"]);
-        checked_type_mentions(&env, env.globals[&mode.checked_key(client, "b_type")], env.globals["B.View"]);
-        checked_body_mentions(&env, env.globals[&mode.checked_key(client, "a_selected")], a_dict);
-        checked_body_mentions(&env, env.globals[&mode.checked_key(client, "b_selected")], b_dict);
-        checked_body_mentions(&env, env.globals[&mode.checked_key(client, "a_dictionary")], a_dict);
-        checked_body_mentions(&env, env.globals[&mode.checked_key(client, "b_dictionary")], b_dict);
-        let (_, a_body) = env.env.transparent_body(env.globals[&mode.checked_key(client, "a_selected")]).unwrap();
-        let (_, b_body) = env.env.transparent_body(env.globals[&mode.checked_key(client, "b_selected")]).unwrap();
-        assert!(!mentions(&a_body, b_dict) && !mentions(&b_body, a_dict),
-            "each where clause selects only its imported class's dictionary");
+        checked_type_mentions(
+            &env,
+            env.globals[&mode.checked_key(client, "a_type")],
+            env.globals["A.View"],
+        );
+        checked_type_mentions(
+            &env,
+            env.globals[&mode.checked_key(client, "b_type")],
+            env.globals["B.View"],
+        );
+        checked_body_mentions(
+            &env,
+            env.globals[&mode.checked_key(client, "a_selected")],
+            a_dict,
+        );
+        checked_body_mentions(
+            &env,
+            env.globals[&mode.checked_key(client, "b_selected")],
+            b_dict,
+        );
+        checked_body_mentions(
+            &env,
+            env.globals[&mode.checked_key(client, "a_dictionary")],
+            a_dict,
+        );
+        checked_body_mentions(
+            &env,
+            env.globals[&mode.checked_key(client, "b_dictionary")],
+            b_dict,
+        );
+        let (_, a_body) = env
+            .env
+            .transparent_body(env.globals[&mode.checked_key(client, "a_selected")])
+            .unwrap();
+        let (_, b_body) = env
+            .env
+            .transparent_body(env.globals[&mode.checked_key(client, "b_selected")])
+            .unwrap();
+        assert!(
+            !mentions(&a_body, b_dict) && !mentions(&b_body, a_dict),
+            "each where clause selects only its imported class's dictionary"
+        );
     }
 }

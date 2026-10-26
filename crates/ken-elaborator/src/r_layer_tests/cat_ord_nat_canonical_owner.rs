@@ -283,7 +283,10 @@ fn compatibility_roots_still_build_lawful_classes_and_order() {
 fn registry_has_one_lawful_classes_owned_ord_nat_dictionary() {
     let env = load_order();
     let (ord, _nat, dictionary) = canonical_ord_nat(&env);
-    let class = env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
+    let class = env
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("canonical Ord class metadata");
     assert_eq!(class.projection.type_id, ord);
 
@@ -335,7 +338,10 @@ fn order_facade_carries_relation_and_dictionary_identities() {
         .resolution_provenance
         .iter()
         .rev()
-        .find(|resolution| resolution.class_name == "Core.Classes.LawfulClasses.Ord" && resolution.head_type == "Nat")
+        .find(|resolution| {
+            resolution.class_name == "Core.Classes.LawfulClasses.Ord"
+                && resolution.head_type == "Nat"
+        })
         .expect("Order-only consumer must record Ord Nat resolution provenance");
     assert_eq!(resolution.instance_id, dictionary);
     assert_eq!(resolution.defining_package, LAWFUL);
@@ -380,7 +386,10 @@ fn named_axiom_trust_id(env: &ElabEnv, named: GlobalId) -> GlobalId {
 }
 
 fn owned_ord_int_law_ids(env: &ElabEnv, lawful_owned: &[GlobalId]) -> BTreeSet<GlobalId> {
-    let ord = env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
+    let ord = env
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("registered Ord class")
         .projection
         .type_id;

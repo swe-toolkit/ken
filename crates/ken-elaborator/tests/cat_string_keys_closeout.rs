@@ -306,8 +306,10 @@ fn string_keys_direct_lawfulclasses_consumption_is_exact() {
     for class in ["DecEq", "Ord"] {
         let canonical = format!("Core.Classes.LawfulClasses.{class}");
         let class_id = env.globals[&canonical];
-        assert!(env.class_env.class_by_id(class_id).is_some(),
-            "{canonical} must be checked by LawfulClasses");
+        assert!(
+            env.class_env.class_by_id(class_id).is_some(),
+            "{canonical} must be checked by LawfulClasses"
+        );
         assert!(
             checked_bodies
                 .iter()

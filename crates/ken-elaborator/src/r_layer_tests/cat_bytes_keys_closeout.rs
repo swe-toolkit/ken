@@ -136,11 +136,17 @@ fn bytes_keys_owned_inventory_is_empty_and_standalone() {
 fn bytes_keys_direct_lawfulclasses_provider_is_exact() {
     let (via_bytes_keys, _) = load(BYTES_KEYS);
     let (direct_lawful, _) = load(LAWFUL);
-    let via_class = via_bytes_keys.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| via_bytes_keys.class_env.class_by_id(*id))
+    let via_class = via_bytes_keys
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| via_bytes_keys.class_env.class_by_id(*id))
         .expect("BytesKeys must register LC's DecEq class")
         .projection
         .type_id;
-    let direct_class = direct_lawful.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| direct_lawful.class_env.class_by_id(*id))
+    let direct_class = direct_lawful
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| direct_lawful.class_env.class_by_id(*id))
         .expect("LawfulClasses must register DecEq")
         .projection
         .type_id;

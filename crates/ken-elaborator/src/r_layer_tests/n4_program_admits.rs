@@ -319,7 +319,10 @@ fn admission_does_not_replace_overlap_or_orphan_gates() {
     match orphan_env.elaborate_module_from_roots(&[orphan.path().to_path_buf()], "Entry") {
         Err(ElabError::OrphanInstance {
             class, head_type, ..
-        }) => assert_eq!((class.as_str(), head_type.as_str()), ("Class.Render", "Head.RItem")),
+        }) => assert_eq!(
+            (class.as_str(), head_type.as_str()),
+            ("Class.Render", "Head.RItem")
+        ),
         other => panic!("admitted orphan must still reject at declaration, got {other:?}"),
     }
 }

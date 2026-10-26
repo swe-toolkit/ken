@@ -17011,9 +17011,9 @@ fn type_has_applicative_row_polymorphic_contract(
             continue;
         };
         if rtype_is_app_headed_by(result, &head)
-            && args
-                .iter()
-                .any(|candidate| type_is_applicative_dict_for_head(candidate, &head, is_applicative))
+            && args.iter().any(|candidate| {
+                type_is_applicative_dict_for_head(candidate, &head, is_applicative)
+            })
         {
             return true;
         }
@@ -17022,7 +17022,8 @@ fn type_has_applicative_row_polymorphic_contract(
 }
 
 fn field_type_earns_proc(ty: &RType, is_applicative: &dyn Fn(&RType) -> bool) -> bool {
-    type_contains_effect_row(ty) || type_has_applicative_row_polymorphic_contract(ty, is_applicative)
+    type_contains_effect_row(ty)
+        || type_has_applicative_row_polymorphic_contract(ty, is_applicative)
 }
 
 fn class_field_declared_row(keyword: DefKeyword, field_name: &str) -> crate::effects::RowType {
@@ -19728,11 +19729,20 @@ fn compute_ordered_field_values(
             ci.projection.head_param.is_some(),
         )
     };
-    let mut bound_dict_classes: Vec<(String, Option<GlobalId>)> = constraints.iter().map(|constraint| {
-        let id = checked_class_id(class_env, cx.globals, &constraint.class_name, constraint.class_id, span)
+    let mut bound_dict_classes: Vec<(String, Option<GlobalId>)> = constraints
+        .iter()
+        .map(|constraint| {
+            let id = checked_class_id(
+                class_env,
+                cx.globals,
+                &constraint.class_name,
+                constraint.class_id,
+                span,
+            )
             .expect("prerequisite checked before instance fields");
-        (constraint.binder.clone(), Some(id))
-    }).collect();
+            (constraint.binder.clone(), Some(id))
+        })
+        .collect();
     if constraints.len() == 1 && constraints[0].binder != "d" {
         bound_dict_classes.push(("d".to_string(), bound_dict_classes[0].1));
     }
@@ -20062,8 +20072,16 @@ fn elab_instance_decl(
         constraints
             .iter()
             .map(|constraint| {
-                let id = checked_class_id(class_env, globals, &constraint.class_name, constraint.class_id, span)?;
-                let class = class_env.class_by_id(id).expect("selected constraint was checked");
+                let id = checked_class_id(
+                    class_env,
+                    globals,
+                    &constraint.class_name,
+                    constraint.class_id,
+                    span,
+                )?;
+                let class = class_env
+                    .class_by_id(id)
+                    .expect("selected constraint was checked");
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 let core_type = if class.projection.head_param.is_some() {
                     Term::app(Term::const_(class.projection.type_id, vec![]), head.clone())
@@ -20098,8 +20116,14 @@ fn elab_instance_decl(
     // There is NO search-side backstop (no resolution-depth bound or occurs-check);
     // faithful reification is the sole net for mutual-cycle termination.
     let has_self_ref = constraints.iter().any(|constraint| {
-        checked_class_id(class_env, globals, &constraint.class_name, constraint.class_id, span)
-            .is_ok_and(|id| id == class_type_id)
+        checked_class_id(
+            class_env,
+            globals,
+            &constraint.class_name,
+            constraint.class_id,
+            span,
+        )
+        .is_ok_and(|id| id == class_type_id)
             && rtypes_match(&constraint.head_type, head_type, globals)
     });
 
@@ -20252,9 +20276,16 @@ fn elab_instance_decl(
         constraints: constraints
             .iter()
             .zip(constraint_core_types.iter().zip(&constraint_head_cores))
-            .map(|(constraint, (core_type, head_core))| InstanceConstraintInfo {
-                class_name: constraint.class_name.clone(),
-                class_id: checked_class_id(class_env, globals, &constraint.class_name, constraint.class_id, span)
+            .map(
+                |(constraint, (core_type, head_core))| InstanceConstraintInfo {
+                    class_name: constraint.class_name.clone(),
+                    class_id: checked_class_id(
+                        class_env,
+                        globals,
+                        &constraint.class_name,
+                        constraint.class_id,
+                        span,
+                    )
                     .expect("constraint checked before instance admission"),
                 head_type: freeze_instance_pattern(&constraint.head_type, globals),
                 core_type: core_type.clone(),
@@ -30175,10 +30206,12 @@ mod class_identity_resolution_tests {
             local_constraints: &[],
             bound_dict_classes: &dictionaries,
         };
-        let projected = projected_field_row_type(
-            &RExpr::RVar(0, "d".to_owned(), span), "step", Some(&ctx),
+        let projected =
+            projected_field_row_type(&RExpr::RVar(0, "d".to_owned(), span), "step", Some(&ctx));
+        assert_eq!(
+            projected,
+            crate::effects::RowType::singleton("unknown checked class owner")
         );
-        assert_eq!(projected, crate::effects::RowType::singleton("unknown checked class owner"));
     }
 
     /// Promise class: durable invariant (spec 36 §1.6).

@@ -53,7 +53,8 @@ fn entry_elaborates_with_every_checked_fence() {
         &env, &or_owned, "Core.Classes.LawfulClasses.total_leq_nat",
     );
     assert!(
-        env.globals.contains_key("Core.Classes.LawfulClasses.Ord_instance_Nat"),
+        env.globals
+            .contains_key("Core.Classes.LawfulClasses.Ord_instance_Nat"),
         "Ord_instance_Nat must be a real registered global"
     );
 }

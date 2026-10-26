@@ -319,7 +319,10 @@ fn selective_consumer_preserves_local_and_reexported_provider_identities() {
         .resolution_provenance
         .iter()
         .rev()
-        .find(|resolution| resolution.class_name == "Core.Classes.LawfulClasses.Ord" && resolution.head_type == "Nat")
+        .find(|resolution| {
+            resolution.class_name == "Core.Classes.LawfulClasses.Ord"
+                && resolution.head_type == "Nat"
+        })
         .expect("Order-only consumer must record Ord Nat resolution provenance");
     assert_eq!(resolution.instance_id, dictionary_id);
     assert_eq!(resolution.defining_package, LAWFUL);

@@ -33,7 +33,10 @@ fn assert_bool_reduces(env: &mut ElabEnv, name: &str, expression: &str, expected
 #[test]
 fn structural_instances_are_checked_transparent_and_zero_delta() {
     let (env, lawful_owned) = mk_env();
-    let dec_eq_class = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
+    let dec_eq_class = env
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
@@ -62,7 +65,10 @@ fn structural_instances_are_checked_transparent_and_zero_delta() {
 #[test]
 fn structural_instances_compute_positive_and_negative_bool_examples() {
     let (mut env, lawful_owned) = mk_env();
-    let dec_eq_class = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
+    let dec_eq_class = env
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
@@ -98,7 +104,10 @@ fn structural_instances_compute_positive_and_negative_bool_examples() {
         ("list_same", "List"),
         ("list_distinct", "List"),
     ] {
-        let instance = env.class_env.instance_search("Core.Classes.LawfulClasses.DecEq", head).unwrap();
+        let instance = env
+            .class_env
+            .instance_search("Core.Classes.LawfulClasses.DecEq", head)
+            .unwrap();
         let wrapper = env.globals[if head == "Pair" {
             "structural_pair_eq"
         } else {

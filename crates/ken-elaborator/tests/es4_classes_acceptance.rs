@@ -102,7 +102,9 @@ fn es4_owner_comparator_obligations() -> (ElabEnv, GlobalId, GlobalId, GlobalId,
     let ord_id = lawful_class_id(&env, &lawful_owned, "Ord");
     let ord_int_id = lawful_instance_id(&env, &lawful_owned, "Ord", "Int");
     assert_eq!(
-        env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
+        env.globals
+            .get("Core.Classes.LawfulClasses.Ord")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .expect("Ord must be a checked class")
             .projection
             .type_id,
@@ -192,7 +194,9 @@ fn lawful_class_id(
 ) -> ken_kernel::GlobalId {
     let canonical = format!("Core.Classes.LawfulClasses.{class}");
     let id = env.globals[&canonical];
-    let view = env.class_env.class_by_id(id)
+    let view = env
+        .class_env
+        .class_by_id(id)
         .unwrap_or_else(|| panic!("{canonical} must be a checked class"));
     assert!(owned.contains(&id), "LawfulClasses must own {class}");
     assert_eq!(view.projection.owner_name, canonical);

@@ -60,7 +60,8 @@ fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
         env.class_env
             .class_by_id(env.globals[&format!("{EFFECTFUL_CLASSES}.{surface}")])
             .expect("Applicative must remain a registered checked class")
-            .projection.type_id
+            .projection
+            .type_id
     } else {
         env.globals[&format!("{EFFECTFUL_CLASSES}.{surface}")]
     }
@@ -423,10 +424,16 @@ fn effectful_classes_publication_preserves_class_and_instance_owners() {
             .map(|(class, head, _)| (class.as_str(), head.as_str()))
             .collect::<BTreeSet<_>>(),
         BTreeSet::from([
-            ("Core.Classes.EffectfulClasses.Applicative", "Core.Classes.EffectfulClasses.Identity"),
+            (
+                "Core.Classes.EffectfulClasses.Applicative",
+                "Core.Classes.EffectfulClasses.Identity"
+            ),
             ("Core.Classes.EffectfulClasses.Applicative", "List"),
             ("Core.Classes.EffectfulClasses.Applicative", "Option"),
-            ("Core.Classes.LawfulFunctors.Functor", "Core.Classes.EffectfulClasses.Identity"),
+            (
+                "Core.Classes.LawfulFunctors.Functor",
+                "Core.Classes.EffectfulClasses.Identity"
+            ),
             ("Core.Classes.EffectfulClasses.Monad", "List"),
             ("Core.Classes.EffectfulClasses.Monad", "Option"),
             ("Core.Classes.EffectfulClasses.Traversable", "List"),

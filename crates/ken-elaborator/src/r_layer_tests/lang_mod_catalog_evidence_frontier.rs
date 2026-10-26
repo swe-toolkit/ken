@@ -422,7 +422,8 @@ fn pinned_interior_evidence(
     const ARGPARSE: &str = "Application.CommandLine.ArgParse";
     const NONEMPTY: &str = "Data.Collections.NonEmpty";
     const SEMIGROUP_SURFACE: &str = "Semigroup_instance_NonEmpty";
-    const SEMIGROUP_IDENTITY: &str = "Core.Classes.LawfulFunctors.Semigroup_instance_Data.Collections.NonEmpty.NonEmpty";
+    const SEMIGROUP_IDENTITY: &str =
+        "Core.Classes.LawfulFunctors.Semigroup_instance_Data.Collections.NonEmpty.NonEmpty";
 
     if module == ARGPARSE {
         assert_eq!(

@@ -250,10 +250,13 @@ fn every_ambient_name_representation_reaches_its_current_route() {
     let mut view = ElabEnv::new().expect("base environment");
     view.elaborate_module_from_roots(&[view_root.0.clone()], "Provider")
         .expect("load the ambient class/dictionary without importing it into Entry");
-    let error = view.elaborate_module_from_roots(&[view_root.0.clone()], "Entry")
+    let error = view
+        .elaborate_module_from_roots(&[view_root.0.clone()], "Entry")
         .expect_err("Rule A must not borrow an unselected module class");
-    assert!(matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "AmbientView"),
-        "unselected class must refuse as UnresolvedCon: {error:?}");
+    assert!(
+        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "AmbientView"),
+        "unselected class must refuse as UnresolvedCon: {error:?}"
+    );
     observed.insert(AmbientNameRoute::ViewConstraintRejectsUnselectedModuleClass);
 
     assert_eq!(

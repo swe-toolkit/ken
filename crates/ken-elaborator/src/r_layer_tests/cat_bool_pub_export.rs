@@ -321,7 +321,10 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
     let mut env = load_module(LAWFUL);
     env.elaborate_module_from_roots(&[catalog_root()], SUMS)
         .expect("Sums provider must roots-load beside LawfulClasses");
-    let dec_eq = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
+    let dec_eq = env
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq class must be registered")
         .projection
         .type_id;
@@ -349,7 +352,9 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
         );
     }
     assert_eq!(
-        env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
+        env.globals
+            .get("Core.Classes.LawfulClasses.DecEq")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .expect("DecEq class must be registered")
             .projection
             .type_id,
@@ -357,7 +362,8 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
         "the loaded class registry must retain LawfulClasses' canonical DecEq identity"
     );
     assert_eq!(
-        env.class_env.instance_search("Core.Classes.LawfulClasses.DecEq", "Bool"),
+        env.class_env
+            .instance_search("Core.Classes.LawfulClasses.DecEq", "Bool"),
         Some(dec_eq_bool),
         "the roots loader must register LawfulClasses' canonical DecEq Bool dictionary"
     );
@@ -386,7 +392,10 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
         .resolution_provenance
         .iter()
         .rev()
-        .find(|resolution| resolution.class_name == "Core.Classes.LawfulClasses.DecEq" && resolution.head_type == "Bool")
+        .find(|resolution| {
+            resolution.class_name == "Core.Classes.LawfulClasses.DecEq"
+                && resolution.head_type == "Bool"
+        })
         .expect("the selective consumer must record DecEq Bool resolution provenance");
     assert_eq!(resolution.instance_id, dec_eq_bool);
     assert_eq!(resolution.defining_package, LAWFUL);

@@ -204,7 +204,11 @@ instance QaProvider Int { evidence = Axiom }"#,
         .global_modules
         .get(&class_id)
         .expect("the stable class has a module owner");
-    assert!(env.globals.get("QaProvider").and_then(|id| env.class_env.class_by_id(*id)).is_some());
+    assert!(env
+        .globals
+        .get("QaProvider")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_some());
     assert!(env.class_env.class_by_id(class_id).is_some());
     assert_eq!(
         env.class_env.instance_search("QaProvider", "Int"),
@@ -251,7 +255,11 @@ instance QaProvider Int { evidence = Axiom }"#,
             env.class_env.global_modules.get(&instance_id),
             Some(&module_id)
         );
-        assert!(env.globals.get("QaRollbackClass").and_then(|id| env.class_env.class_by_id(*id)).is_some());
+        assert!(env
+            .globals
+            .get("QaRollbackClass")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .is_some());
         assert!(env.class_env.class_by_id(transient_class_id).is_some());
         removed_head = Some(head_id);
         removed_class = Some(transient_class_id);
@@ -299,9 +307,17 @@ instance QaProvider Int { evidence = Axiom }"#,
         env.class_env.global_modules.get(&class_id),
         Some(&stable_class_module)
     );
-    assert!(env.globals.get("QaProvider").and_then(|id| env.class_env.class_by_id(*id)).is_some());
+    assert!(env
+        .globals
+        .get("QaProvider")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_some());
     assert!(env.class_env.class_by_id(class_id).is_some());
-    assert!(env.globals.get("QaRollbackClass").and_then(|id| env.class_env.class_by_id(*id)).is_none());
+    assert!(env
+        .globals
+        .get("QaRollbackClass")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_none());
     assert!(env.class_env.class_by_id(transient_class_id).is_none());
     assert!(!env.globals.contains_key("QaProviderType"));
     assert!(env.env.lookup(instance_id).is_none());
@@ -343,9 +359,17 @@ instance QaProvider Int { evidence = Axiom }"#,
         .expect("rolled-back class and data IDs are reusable");
     assert_eq!(replacements[0].def_id, transient_class_id);
     assert_eq!(replacements[1].def_id, head_id);
-    assert!(env.globals.get("QaReplacementClass").and_then(|id| env.class_env.class_by_id(*id)).is_some());
+    assert!(env
+        .globals
+        .get("QaReplacementClass")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_some());
     assert!(env.class_env.class_by_id(transient_class_id).is_some());
-    assert!(env.globals.get("QaRollbackClass").and_then(|id| env.class_env.class_by_id(*id)).is_none());
+    assert!(env
+        .globals
+        .get("QaRollbackClass")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_none());
     assert_eq!(
         env.class_env.global_modules.get(&transient_class_id),
         Some(&stable_class_module)

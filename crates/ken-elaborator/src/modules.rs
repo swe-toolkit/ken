@@ -2340,7 +2340,13 @@ fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
             ty: ty.clone(),
             span: span.clone(),
         },
-        Decl::ClassDecl { name, param, param_kind, fields, span } => Decl::ClassDecl {
+        Decl::ClassDecl {
+            name,
+            param,
+            param_kind,
+            fields,
+            span,
+        } => Decl::ClassDecl {
             name: qualify(prefix, name),
             param: param.clone(),
             param_kind: param_kind.clone(),
@@ -8358,7 +8364,13 @@ mod namespace_effect_tests {
             "file-selected proc prerequisite cannot inhabit a marked fn field: {refused:?}");
         env.elaborate_module_from_roots_strict(&roots, "BP")
             .expect("file proc prerequisite builds a proc instance field");
-        let file_sink = env.globals.get("BP.SinkP").and_then(|id| env.class_env.class_by_id(*id)).expect("file SinkP checked").projection.type_id;
+        let file_sink = env
+            .globals
+            .get("BP.SinkP")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .expect("file SinkP checked")
+            .projection
+            .type_id;
         let local_head = env.globals["BP.LocalP"];
         let info = &env.class_env.instances_by_id[&(
             file_sink, crate::classes::InstanceHeadKey::Global(local_head)
@@ -8392,7 +8404,11 @@ mod namespace_effect_tests {
             let error = env.elaborate_decl(later).expect_err("package duplicate must refuse");
             assert!(matches!(error, ElabError::DuplicateDefinition { name, .. } if name == "Shared"));
             assert_eq!(env.globals["Shared"], record_id);
-            assert!(env.globals.get("Shared").and_then(|id| env.class_env.class_by_id(*id)).is_none());
+            assert!(env
+                .globals
+                .get("Shared")
+                .and_then(|id| env.class_env.class_by_id(*id))
+                .is_none());
             assert!(env.class_env.class_by_id(record_id).is_none());
             assert_eq!(
                 env.class_env.projection_by_type_id(record_id).unwrap().field_names,

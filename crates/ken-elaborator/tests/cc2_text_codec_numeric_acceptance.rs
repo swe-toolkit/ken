@@ -179,8 +179,10 @@ fn ordered_dependency_closure_elaborates_codec_then_numeric() {
     for class in ["DecEq", "Ord"] {
         let canonical = format!("Core.Classes.LawfulClasses.{class}");
         let class_id = env.globals[&canonical];
-        assert!(env.class_env.class_by_id(class_id).is_some(),
-            "{canonical} must remain a checked class");
+        assert!(
+            env.class_env.class_by_id(class_id).is_some(),
+            "{canonical} must remain a checked class"
+        );
         assert!(
             lawful_owned.contains(&class_id),
             "{class} must be the class checked by LawfulClasses"

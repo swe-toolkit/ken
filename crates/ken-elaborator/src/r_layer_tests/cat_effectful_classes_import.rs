@@ -161,9 +161,11 @@ fn class_id(env: &ElabEnv, name: &str) -> GlobalId {
         other => panic!("unexpected class `{other}`"),
     };
     let id = global(env, &format!("{provider}.{name}"));
-    env.class_env.class_by_id(id)
+    env.class_env
+        .class_by_id(id)
         .unwrap_or_else(|| panic!("missing checked class `{provider}.{name}`"))
-        .projection.type_id
+        .projection
+        .type_id
 }
 
 fn instance_id(env: &ElabEnv, class: &str, head: &str) -> GlobalId {
@@ -172,7 +174,8 @@ fn instance_id(env: &ElabEnv, class: &str, head: &str) -> GlobalId {
         "Applicative" | "Monad" | "Traversable" => EFFECTFUL_CLASSES,
         other => panic!("unexpected class `{other}`"),
     };
-    env.class_env.instances
+    env.class_env
+        .instances
         .get(&(format!("{owner}.{class}"), head.to_owned()))
         .unwrap_or_else(|| panic!("missing instance `{owner}.{class}/{head}`"))
         .instance_id
@@ -341,8 +344,14 @@ fn effectful_classes_local_dictionary_inventory_is_exact() {
         })
         .collect::<BTreeSet<_>>();
     let expected = BTreeSet::from([
-        (format!("{EFFECTFUL_CLASSES}.Applicative"), "List".to_owned()),
-        (format!("{EFFECTFUL_CLASSES}.Applicative"), "Option".to_owned()),
+        (
+            format!("{EFFECTFUL_CLASSES}.Applicative"),
+            "List".to_owned(),
+        ),
+        (
+            format!("{EFFECTFUL_CLASSES}.Applicative"),
+            "Option".to_owned(),
+        ),
         (
             format!("{EFFECTFUL_CLASSES}.Applicative"),
             format!("{EFFECTFUL_CLASSES}.Identity"),
@@ -353,8 +362,14 @@ fn effectful_classes_local_dictionary_inventory_is_exact() {
         ),
         (format!("{EFFECTFUL_CLASSES}.Monad"), "List".to_owned()),
         (format!("{EFFECTFUL_CLASSES}.Monad"), "Option".to_owned()),
-        (format!("{EFFECTFUL_CLASSES}.Traversable"), "List".to_owned()),
-        (format!("{EFFECTFUL_CLASSES}.Traversable"), "Option".to_owned()),
+        (
+            format!("{EFFECTFUL_CLASSES}.Traversable"),
+            "List".to_owned(),
+        ),
+        (
+            format!("{EFFECTFUL_CLASSES}.Traversable"),
+            "Option".to_owned(),
+        ),
     ]);
     assert_eq!(
         actual, expected,

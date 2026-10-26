@@ -288,7 +288,12 @@ fn filesystem_path_posix_imports_are_exact_canonical_and_internals_private() {
             (COMPARE.to_owned(), names(&["list_eq"])),
             (
                 LAWFUL.to_owned(),
-                names(&["DecEq", "DecEq_instance_UInt8", "bool_and", "uint8_deceq_eq"]),
+                names(&[
+                    "DecEq",
+                    "DecEq_instance_UInt8",
+                    "bool_and",
+                    "uint8_deceq_eq"
+                ]),
             ),
             (DERIVED.to_owned(), names(&["list_append", "map"])),
             (TRANSPORT.to_owned(), names(&["cong", "sym", "trans"])),

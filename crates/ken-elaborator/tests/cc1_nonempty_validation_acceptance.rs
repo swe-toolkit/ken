@@ -624,7 +624,8 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
         .expect("Data.Sums.Validation must roots-load");
     env.execute_loaded_entry_checked_fences(VALIDATION_MODULE)
         .expect("Data.Sums.Validation and every checked fence must elaborate");
-    let canonical_dictionary = env.globals["Core.Classes.LawfulFunctors.Semigroup_instance_Data.Collections.NonEmpty.NonEmpty"];
+    let canonical_dictionary = env.globals
+        ["Core.Classes.LawfulFunctors.Semigroup_instance_Data.Collections.NonEmpty.NonEmpty"];
     let (_, checked_record) = env
         .env
         .transparent_body(env.globals["checked_record"])
@@ -707,13 +708,17 @@ fn validation_registry_has_applicative_but_no_monad_instance() {
     .expect("the live resolver must discharge Validation's Applicative constraint");
 
     let monad_id = env.globals["Core.Classes.EffectfulClasses.Monad"];
-    assert!(env.class_env.class_by_id(monad_id).is_some(),
-        "the actual private Monad class must have a checked identity");
     assert!(
-        env.class_env.instance_search(
-            "Core.Classes.EffectfulClasses.Monad",
-            "Data.Sums.Validation.Validation",
-        ).is_none(),
+        env.class_env.class_by_id(monad_id).is_some(),
+        "the actual private Monad class must have a checked identity"
+    );
+    assert!(
+        env.class_env
+            .instance_search(
+                "Core.Classes.EffectfulClasses.Monad",
+                "Data.Sums.Validation.Validation",
+            )
+            .is_none(),
         "the real Monad class must not register a Validation instance"
     );
 }

@@ -462,11 +462,16 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         "Syntax",
     ] {
         let id = if name == "Source" {
-            let matches = parsing_owned.iter().copied().filter(|id| {
-                env.class_env.class_by_id(*id).is_some_and(|class| {
-                    class.projection.owner_name == format!("Capability.Parsing.Parsing.{name}") && class.projection.type_id == *id
+            let matches = parsing_owned
+                .iter()
+                .copied()
+                .filter(|id| {
+                    env.class_env.class_by_id(*id).is_some_and(|class| {
+                        class.projection.owner_name == format!("Capability.Parsing.Parsing.{name}")
+                            && class.projection.type_id == *id
+                    })
                 })
-            }).collect::<Vec<_>>();
+                .collect::<Vec<_>>();
             let [id] = matches.as_slice() else {
                 panic!("Parsing must own exactly one checked class `{name}`, got {matches:?}")
             };
