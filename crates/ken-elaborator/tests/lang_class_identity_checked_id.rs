@@ -293,3 +293,39 @@ fn qualified_import_and_two_aliases_select_distinct_dictionaries() {
         );
     }
 }
+
+/// Promise class: durable invariant (spec 33 §3.3).
+/// MEASURED: a module-local class is prebound with its scope's other local
+/// declarations, so it collides with a same-spelled imported class, and it is
+/// usable as a type after its declaration in every mode.
+/// CLAIMED: a local class takes part in scope collision exactly as local data
+/// does. THE GAP: a reference to a class before its ordered barrier stays
+/// refused and is not pinned here.
+#[test]
+fn local_class_is_prebound_for_collision_and_type_use() {
+    for mode in [Mode::Strict, Mode::Legacy] {
+        let (root, mut env) = fixture(mode, A, B);
+        let error = mode
+            .check(
+                &mut env,
+                root.path(),
+                "LocalCollides",
+                "import A (View)\nclass View a { get : a -> a }",
+            )
+            .expect_err("a local class must collide with a same-spelled import");
+        assert!(
+            matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "View"),
+            "{mode:?}: {error:?}"
+        );
+    }
+    for mode in Mode::ALL {
+        let (root, mut env) = fixture(mode, A, B);
+        mode.check(
+            &mut env,
+            root.path(),
+            "LocalTypeUse",
+            "class View a { get : a -> a }\nfn f (d : View Nat) : View Nat = d",
+        )
+        .expect("a local class is usable as a type after its declaration");
+    }
+}
