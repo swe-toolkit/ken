@@ -59,5 +59,5 @@ generation removes transcription error, not generator error** — where a
 generated fact is load-bearing, it needs an anchor the generator does not
 itself produce.
 
-Targeted checks only — `scripts/ken-cargo -p <crate>`, never `--workspace`
-(`COORDINATION §12`).
+Targeted checks only — `scripts/ken-cargo -p <crate>` for builds and a named
+target for tests, never `--tests` or `--workspace` (`COORDINATION §12`).

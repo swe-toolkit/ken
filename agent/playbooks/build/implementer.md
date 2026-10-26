@@ -379,6 +379,10 @@ The two steps most often skipped, both of which have blocked candidates here:
   and commit the lock (promoted L6-build)** — CI runs `--locked` and rejects lock
   drift; local builds auto-update the lock *without committing it*, so the gap is
   invisible locally and fatal on CI.
+- **Test by named target only** (COORDINATION §12). You will be tempted to run
+  the whole crate before handoff "for safety"; CI is that safety net, and the
+  sweep stalls every seat on the build lock. If a kickoff or ruling asks for a
+  whole-crate run, run the targeted rows and flag the ask to your leader.
 - **When you add a new kernel `Term`/AST variant, grep exhaustive matches over
   that type WORKSPACE-WIDE — not just the crate that owns it (promoted K5;
   caused a CI-red, surfaced by both implementer AND QA).** Letting the Rust
