@@ -325,11 +325,12 @@ CI, publication, landing or landed trust for §5. No rational or
 `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–5 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–6 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
-SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE). The §1
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE;
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -356,12 +357,22 @@ specifies structural `deriv` and two generic checked laws: universal
 evaluation equality preserves derivative evaluation, and a `True`
 `poly_eq` result remains `True` after differentiation. The Architect's
 §5 D0 checked the Taylor-bump and remainder-extraction proof route
-with no new `Axiom` and trust identities 114→114. The §5 seed is
-authored as a separate source candidate at
+with no new `Axiom` and trust identities 114→114. The §5 seed is at
 `conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md`;
-§5 catalog exports remain undelivered. D0 and seed authorship do not
-establish shipped-seed execution, CI or landed trust. A sorted-list
-normal form and signed/field arithmetic remain deferred.
+§5 catalog exports and authored seed are now present on main;
+earlier D0 and seed authorship alone do not establish their official
+conformance execution, CI or landed trust. Section 6 specifies one
+public Transparent checked law, `deriv_commute v w e env`, relating
+the **evaluations** of the two derivative orders at every total
+environment, not their `Expr` structure. `poly_eq_complete` gives a
+`True` decision as a client consequence without a new exported
+corollary. The only new proof helper remains private. Architect D0
+checked the generic proof with no new `Axiom` and unchanged scratch
+trusted identities 114 → 114; the §6 export is absent on this base.
+The authored §6 seed and D0 do not establish shipped-seed execution,
+official conformance, CI, publication, landing or landed trust for
+§6. A sorted-list normal form and signed/field arithmetic remain
+deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–5 (SPEC-GEOMETRY-EXACT-CONTRACT;
