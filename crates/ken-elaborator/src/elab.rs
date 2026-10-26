@@ -30258,7 +30258,7 @@ mod class_identity_resolution_tests {
         ));
         let same_spelling_wrong_id = RType::RCheckedGlobal {
             name: "Applicative".to_owned(),
-            id: data_env.globals["Applicative"],
+            id: class_env.globals["Nat"],
             span,
         };
         assert!(!names_applicative_class(
