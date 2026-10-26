@@ -344,9 +344,9 @@ fn class_session(warm: bool) -> (tempfile::TempDir, ElabEnv) {
 }
 
 /// Promise class: durable invariant (spec 33 §§1, 3.3).
-/// MEASURED: type, where, own-field, superclass and early-instance references
-/// to an unadmitted local class all refuse with its canonical name, whether
-/// another unit already loaded that name or this is a fresh session.
+/// MEASURED: type, where, own-field and superclass references to an
+/// unadmitted local class all refuse with its canonical name, whether another
+/// unit already loaded that name or this is a fresh session.
 /// CLAIMED: a pending local class cannot borrow an older checked global ID.
 /// THE GAP: nested inline-module classes are not exercised here.
 #[test]
@@ -368,21 +368,36 @@ fn forward_local_class_refuses_stale_warm_identity() {
             "SUPER-FWD",
             "module A { pub class Sub a { base : View a }\npub class View a { other : Nat } }",
         ),
-        (
-            "INST-BEFORE",
-            "module A { instance View Nat { other = Zero }\npub class View a { other : Nat } }",
-        ),
     ] {
-        for warm in [false, true] {
-            let (_root, mut env) = class_session(warm);
-            let error = env.elaborate_file(source)
-                .expect_err("class reference before its barrier must refuse");
-            assert!(
-                matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "A.View"),
-                "{row}/warm={warm}: expected canonical unresolved class, got {error:?}"
-            );
-        }
+        assert_pending_class_refuses(row, source);
     }
+}
+
+fn assert_pending_class_refuses(row: &str, source: &str) {
+    for warm in [false, true] {
+        let (_root, mut env) = class_session(warm);
+        let error = env
+            .elaborate_file(source)
+            .expect_err("class reference before its barrier must refuse");
+        assert!(
+            matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "A.View"),
+            "{row}/warm={warm}: expected canonical unresolved class, got {error:?}"
+        );
+    }
+}
+
+/// Promise class: durable invariant (spec 33 §§1, 3.3).
+/// MEASURED: a class instance preceding the class barrier cannot use a prior
+/// file-loaded class at the same canonical key; its result equals fresh-env
+/// refusal, not a conflict with the prior provider's instance.
+/// CLAIMED: instance registration cannot borrow an older class identity.
+/// THE GAP: other instance-head shapes are covered by class registry tests.
+#[test]
+fn instance_before_local_class_refuses_stale_warm_identity() {
+    assert_pending_class_refuses(
+        "INST-BEFORE",
+        "module A { instance View Nat { other = Zero }\npub class View a { other : Nat } }",
+    );
 }
 
 /// Promise class: durable invariant (spec 33 §§1, 3.3).
