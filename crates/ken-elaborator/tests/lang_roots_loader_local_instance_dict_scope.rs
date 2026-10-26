@@ -101,8 +101,8 @@ fn strict_same_unit_instance_and_derive_names_select_the_synthesized_canonicals(
     let derived = env.globals["Classes.Derived_instance_Entry.Local"];
     assert_is_exact_const(&transparent_body(&env, "Entry.selected_instance"), instance);
     assert_is_exact_const(&transparent_body(&env, "Entry.selected_derive"), derived);
-    assert!(!env.globals.contains_key("C_instance_Local"));
-    assert!(!env.globals.contains_key("Derived_instance_Local"));
+    assert!(!env.globals.contains_key("Entry.C_instance_Local"));
+    assert!(!env.globals.contains_key("Entry.Derived_instance_Local"));
     assert_eq!(env.env.trusted_base(), trust_before);
 }
 
@@ -181,7 +181,7 @@ fn later_inline_class_import_refuses_an_external_file_provider() {
             other => panic!("preload={preload}: expected import refusal, got {other:?}"),
         }
         assert!(!env.globals.contains_key("Entry.selected"));
-        assert!(!env.globals.contains_key("C_instance_Nat"));
+        assert!(!env.globals.contains_key("Entry.Classes.C_instance_Nat"));
         assert_eq!(env.env.trusted_base(), trust_before);
     }
 }
@@ -244,7 +244,7 @@ fn imported_head_uses_its_qualified_synthesis_identity_and_exports_that_identity
         &transparent_body(&env, "Consumer.imported_derived"),
         derived,
     );
-    assert!(!env.globals.contains_key("C_instance_Remote"));
+    assert!(!env.globals.contains_key("Owner.C_instance_Remote"));
 }
 
 #[test]
@@ -382,7 +382,7 @@ fn distinct_local_collision_rejects_before_allocating_or_trusting_either_name() 
         "collision must be attributed to the dictionary surface name, found {error:?}"
     );
     assert!(!env.globals.contains_key("Entry.C_instance_Local"));
-    assert!(!env.globals.contains_key("C_instance_Entry.Local"));
+    assert!(!env.globals.contains_key("Classes.C_instance_Entry.Local"));
     assert_eq!(env.env.trusted_base(), trust_before);
 }
 

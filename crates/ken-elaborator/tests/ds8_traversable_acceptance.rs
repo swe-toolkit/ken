@@ -45,9 +45,9 @@ fn entry_elaborates_with_every_checked_fence() {
     let mut env = base_env();
     env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
         .expect("catalog/packages/Core/Classes/EffectfulClasses.ken.md must elaborate (Definition + every checked fence)");
-    assert!(env.globals.contains_key("Core.Classes.EffectfulClasses.Traversable_instance_List"));
-    assert!(env.globals.contains_key("Core.Classes.EffectfulClasses.Traversable_instance_Option"));
-    assert!(env.globals.contains_key("Core.Classes.EffectfulClasses.Applicative_instance_Identity"));
+    assert!(env.globals.contains_key("Traversable_instance_List"));
+    assert!(env.globals.contains_key("Traversable_instance_Option"));
+    assert!(env.globals.contains_key("Applicative_instance_Identity"));
     assert!(env.globals.contains_key("Core.Classes.LawfulFunctors.Functor_instance_Identity"));
 }
 

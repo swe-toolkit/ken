@@ -310,7 +310,7 @@ fn loader_projects_both_readers_and_admits_clause_changes_real_dispatch() {
             class,
             head_type,
             ..
-        }) if defining_package == "P" && class == "Mark" && head_type == "Int"
+        }) if defining_package == "P" && class == "P.Mark" && head_type == "Int"
     ));
 }
 

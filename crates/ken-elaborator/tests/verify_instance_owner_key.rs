@@ -170,7 +170,8 @@ fn derive_and_explicit_instance_results_use_their_dictionary_identities() {
 /// unqualified declaration kinds across different modules. MEASURED: these
 /// remaining same-spelling pairs hit `DuplicateDefinition` before `with_owner`.
 /// CLAIMED: these four kinds cannot produce an admitted shared owner; classes
-/// now qualify their owner and are tested by class-identity acceptance.
+/// now qualify their owner; the two-provider selection is pinned by
+/// `lang_class_identity_checked_id::qualified_import_and_two_aliases_select_distinct_dictionaries`.
 /// THE GAP: when module scoping starts admitting such a pair, retire this
 /// refusal and give each admitted declaration its own qualified owner.
 #[test]

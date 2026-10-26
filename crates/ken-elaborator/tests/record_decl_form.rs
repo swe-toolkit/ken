@@ -100,10 +100,9 @@ fn shared_field_labels_keep_class_and_record_owners_distinct() {
     assert_eq!(record_projection.field_names, ["value"]);
     assert_eq!(class_projection.field_names, ["value"]);
     assert_ne!(record_projection.type_id, class_projection.type_id);
-    assert_eq!(
-        env.class_env.instance_search("Selected", "Bool"),
-        env.globals.get("Selected_instance_Bool").copied()
-    );
+    let selected = env.class_env.instance_search("Selected", "Bool")
+        .expect("the top-level Selected Bool instance must be registered");
+    assert_eq!(selected, env.globals["Selected_instance_Bool"]);
 
     let class_owners = env
         .class_env

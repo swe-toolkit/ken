@@ -390,7 +390,7 @@ fn overlap_and_unadmitted_provider_are_ordinary_instance_errors() {
             ..
         }) => {
             assert_eq!(defining_package, "Provider");
-            assert_eq!(class, "Core.Classes.Membership.Membership");
+            assert_eq!(class, "Membership");
             assert_eq!(head_type, "Provider.HiddenMembership");
         }
         other => panic!("an unadmitted provider must refuse at the occurrence: {other:?}"),
@@ -428,7 +428,7 @@ fn membership_surface_adds_no_trusted_declaration() {
     );
 
     for name in [
-        "Membership",
+        "Core.Classes.Membership.Membership",
         "Core.Classes.Membership.membership_member_at",
         "Core.Classes.Membership.member_holds",
         "Core.Classes.Membership.same_members",
@@ -450,7 +450,8 @@ fn membership_surface_adds_no_trusted_declaration() {
         "Data.Collections.Map.relation_edge_membership_adapter_fidelity",
         "Core.Classes.Membership.Membership_instance_Data.Collections.Map.RelationEdgeMembership",
     ] {
-        let id = env.globals[name];
+        let id = *env.globals.get(name)
+            .unwrap_or_else(|| panic!("checked consumer must register {name}"));
         assert!(
             !trusted.contains(&id),
             "new checked declaration `{name}` must not enter trusted_base()"
