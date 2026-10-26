@@ -30221,7 +30221,7 @@ mod class_identity_resolution_tests {
             dictionaries(RType::RCheckedGlobal {
                 name: "unknown selected owner".to_owned(),
                 id: unchecked_id,
-                span,
+                span: span.clone(),
             }),
             vec![("b".to_owned(), Some(unchecked_id))]
         );
