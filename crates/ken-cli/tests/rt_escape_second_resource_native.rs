@@ -53,6 +53,19 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 /// both canonical observations. A `held.bin` seed file is present in the root.
 #[cfg(target_os = "linux")]
 fn differential(case: &str, source: &str) -> Differential {
+    differential_with_profile(
+        case,
+        source,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn differential_with_profile(
+    case: &str,
+    source: &str,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
 
@@ -67,7 +80,7 @@ fn differential(case: &str, source: &str) -> Differential {
                             ken_cli::SourceFormat::Ken,
                             &format!("rt_escape_{}", case.replace('-', "_")),
                             root.path(),
-                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                            profile,
                         )
                     })
                 })
@@ -600,6 +613,55 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
             diff.native.effect_trace, diff.interpreted.effect_trace,
             "FsHandle full effect events"
         );
+    });
+}
+
+/// Promise class: normative compatibility vector for the declared invocation
+/// node limit. MEASURED: this checked, effect-bearing escape/read source with
+/// one extra read has a typed native Nodes(64→65) terminal and an interpreter
+/// effect prefix; changing only the node limit to 65 restores full parity.
+/// CLAIMED: generated allocation status reaches the owner-backed terminal.
+/// THE GAP: one witness does not cover other resources or every generated edge.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_escape_second_read_reports_typed_invocation_nodes() {
+    in_large_stack_thread("rt-region-capacity-fshandle", || {
+        let first = "    (\\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)";
+        let second = r"    (\outcome. bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\again. Ret (Coproduct (FSOp AFull) AmbientOp)";
+        let end = "(ResourceBodyOk Unit Unit MkUnit))";
+        assert_eq!(ESCAPE_FILE_THEN_READAT.matches(first).count(), 1);
+        assert_eq!(ESCAPE_FILE_THEN_READAT.matches(end).count(), 1);
+        let source = ESCAPE_FILE_THEN_READAT
+            .replacen(first, second, 1)
+            .replacen(end, "(ResourceBodyOk Unit Unit MkUnit)))", 1);
+        assert_eq!(source.matches("(readAt AFull file_closed").count(), 2);
+
+        let profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        assert_eq!(profile.invocation.nodes, 64);
+        let at_limit = differential_with_profile("region-node-64", &source, profile);
+        assert_eq!(at_limit.interpreted.exit_status, 0);
+        assert_eq!(at_limit.native.terminal_error, Some(
+            ken_runtime::TerminalErrorV1::CapacityExhausted(ken_runtime::CapacityExhaustedV1 {
+                scope: ken_runtime::CapacityScopeV1::Invocation,
+                resource: ken_runtime::CapacityResourceV1::Nodes,
+                limit: 64,
+                requested: 65,
+            })
+        ));
+        assert!(!at_limit.native.effect_trace.is_empty());
+        assert!(at_limit.interpreted.effect_trace.starts_with(&at_limit.native.effect_trace),
+            "native effects up to the refusal must be the interpreter prefix");
+
+        let mut roomy = profile;
+        roomy.invocation.nodes = 65;
+        let at_65 = differential_with_profile("region-node-65", &source, roomy);
+        assert_native_matches_interpreter("region-node-65", &at_65);
+        assert_eq!(at_65.native.stdout, at_65.interpreted.stdout);
+        assert_eq!(at_65.native.effect_trace, at_65.interpreted.effect_trace);
     });
 }
 

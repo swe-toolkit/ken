@@ -1101,6 +1101,7 @@ struct ArtifactHelpers<'h> {
     seed_material: &'h seed_material::SeedMaterial,
     host_dispatch: Option<FuncId>,
     selected_call_issue: FuncId,
+    record_region_capacity: FuncId,
     selected_call_consume: FuncId,
     native_int: &'h crate::native_int_clif::NativeIntLocalFuncs,
     boundary_value_abi: &'h crate::boundary_value_clif::BoundaryLocalFuncs,
@@ -1128,6 +1129,7 @@ impl ArtifactHelpers<'_> {
                 .host_dispatch
                 .map(|id| module.declare_func_in_func(id, func)),
             selected_call_issue: Some(module.declare_func_in_func(self.selected_call_issue, func)),
+            record_region_capacity: Some(module.declare_func_in_func(self.record_region_capacity, func)),
             selected_call_consume: Some(module.declare_func_in_func(self.selected_call_consume, func)),
             // ⛔ Dataflow results, not identities: `None` here is correct, and
             // each function derives its own from its entry block.
@@ -1323,6 +1325,7 @@ struct FunctionLocalRefs {
     host_dispatch: Option<FuncRef>,
     /// Checked imported FFI helpers, resolved per generated function.
     selected_call_issue: Option<FuncRef>,
+    record_region_capacity: Option<FuncRef>,
     selected_call_consume: Option<FuncRef>,
     host_dispatch_context: Option<cranelift_codegen::ir::Value>,
     services_pointer: Option<cranelift_codegen::ir::Value>,
@@ -14265,6 +14268,72 @@ impl<'a> Lowering<'a> {
         let failure = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[failure]);
         builder.switch_to_block(valid);
+    }
+
+    /// Propagate a boundary helper's capacity status only after the activation
+    /// owner records its typed fault. Other mismatches keep the existing -1
+    /// trap; a naked -7 is never authority to forge a capacity terminal.
+    fn require_boundary_ok_or_capacity(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        status: cranelift_codegen::ir::Value,
+        tag: cranelift_codegen::ir::Value,
+        table: u64,
+        need: cranelift_codegen::ir::Value,
+    ) -> Result<(), CraneliftBackendError> {
+        let ok = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            status,
+            BOUNDARY_OK,
+        );
+        let valid = builder.create_block();
+        let failed = builder.create_block();
+        builder.ins().brif(ok, valid, &[], failed, &[]);
+        builder.switch_to_block(failed);
+        let capacity = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            status,
+            crate::boundary_value::BOUNDARY_ERR_CAPACITY,
+        );
+        let record = builder.create_block();
+        let invalid = builder.create_block();
+        builder.ins().brif(capacity, record, &[], invalid, &[]);
+        builder.switch_to_block(record);
+        let services = self.function_local.services_pointer.ok_or_else(|| {
+            backend_module(LoweringCause::PlannerInvariant,
+                "boundary capacity status has no published activation services".to_string())
+        })?;
+        let recorder = self.function_local.record_region_capacity.ok_or_else(|| {
+            backend_module(LoweringCause::PlannerInvariant,
+                "boundary capacity status has no owner-side recorder import".to_string())
+        })?;
+        let table = builder.ins().iconst(types::I64, table as i64);
+        let call = builder.ins().call(recorder, &[services, tag, table, need]);
+        let [recorded] = builder.inst_results(call) else {
+            return Err(backend_module(LoweringCause::PlannerInvariant,
+                "boundary capacity recorder returned no status".to_string()));
+        };
+        let recorded = *recorded;
+        let authentic = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            recorded,
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+        );
+        let typed = builder.create_block();
+        builder.ins().brif(authentic, typed, &[], invalid, &[]);
+        builder.switch_to_block(typed);
+        builder.ins().return_(&[recorded]);
+        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+        builder.seal_block(typed);
+        builder.switch_to_block(invalid);
+        let trap = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[trap]);
+        builder.seal_block(invalid);
+        builder.seal_block(record);
+        builder.seal_block(failed);
+        builder.switch_to_block(valid);
+        builder.seal_block(valid);
+        Ok(())
     }
 
     fn require_one_of_i64(

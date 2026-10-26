@@ -494,6 +494,7 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
+            record_region_capacity: None,
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -688,6 +689,7 @@ fn run_px8j_malformed_recursor_consumer(
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
+            record_region_capacity: None,
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -2745,6 +2747,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
+            record_region_capacity: None,
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -3149,7 +3152,7 @@ fn compiled_module_declarations_account_for_every_fixture_emitter() {
             "unaccounted definable linkage in the module: {definitions:?}"
         );
         let expected_imports = [
-            "free", "ken_selected_call_v1_consume", "ken_selected_call_v1_issue", "malloc",
+            "free", "ken_activation_v1_record_region_capacity", "ken_selected_call_v1_consume", "ken_selected_call_v1_issue", "malloc",
         ]
         .into_iter()
         .map(|name| (name.to_owned(), Linkage::Import))

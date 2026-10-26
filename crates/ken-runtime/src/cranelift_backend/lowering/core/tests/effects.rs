@@ -131,6 +131,7 @@ fn run_checked_bounded_nat_fixture(
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
+            record_region_capacity: None,
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,

@@ -2630,7 +2630,13 @@ impl<'a> Lowering<'a> {
             let call = builder
                 .ins()
                 .call(refs.alloc, &[arena, tag, class, count, out]);
-            Self::require_i64(builder, builder.inst_results(call)[0], BOUNDARY_OK);
+            self.require_boundary_ok_or_capacity(
+                builder,
+                builder.inst_results(call)[0],
+                tag,
+                crate::activation_abi::KEN_REGION_CAPACITY_ALLOC,
+                count,
+            )?;
             let word = CarriedBoundaryWord {
                 word: builder.ins().stack_load(types::I64, slot, 0),
             };
@@ -2967,7 +2973,17 @@ impl<'a> Lowering<'a> {
                 refs.store_int_limbs,
                 &[arena, word.word, sign, length, span],
             );
-            Self::require_i64(builder, builder.inst_results(claim)[0], BOUNDARY_OK);
+            let tag = builder.ins().band_imm(
+                word.word,
+                crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+            );
+            self.require_boundary_ok_or_capacity(
+                builder,
+                builder.inst_results(claim)[0],
+                tag,
+                crate::activation_abi::KEN_REGION_CAPACITY_LIMBS,
+                length,
+            )?;
 
             let head = builder.create_block();
             builder.append_block_param(head, types::I64);
@@ -3066,7 +3082,17 @@ impl<'a> Lowering<'a> {
             let claim = builder
                 .ins()
                 .call(refs.store_bytes_len, &[arena, word.word, length, span]);
-            Self::require_i64(builder, builder.inst_results(claim)[0], BOUNDARY_OK);
+            let tag = builder.ins().band_imm(
+                word.word,
+                crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+            );
+            self.require_boundary_ok_or_capacity(
+                builder,
+                builder.inst_results(claim)[0],
+                tag,
+                crate::activation_abi::KEN_REGION_CAPACITY_BYTES,
+                length,
+            )?;
             for (index, byte) in content.iter().enumerate() {
                 let position = Self::carrier_position_immediate(builder, index)?;
                 let byte = builder.ins().iconst(types::I64, i64::from(*byte));
@@ -3136,7 +3162,17 @@ impl<'a> Lowering<'a> {
             let claim = builder
                 .ins()
                 .call(refs.store_bytes_len, &[arena, word.word, len, span]);
-            Self::require_i64(builder, builder.inst_results(claim)[0], BOUNDARY_OK);
+            let tag = builder.ins().band_imm(
+                word.word,
+                crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+            );
+            self.require_boundary_ok_or_capacity(
+                builder,
+                builder.inst_results(claim)[0],
+                tag,
+                crate::activation_abi::KEN_REGION_CAPACITY_BYTES,
+                len,
+            )?;
 
             let head = builder.create_block();
             builder.append_block_param(head, types::I64);
