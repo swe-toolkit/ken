@@ -125,6 +125,8 @@ fn dec_eq_decides (a : Type) (d : DecEq a) (x : a) (y : a) : Dec (Equal a x y) =
 `Core.Classes.LawfulClasses`.
 
 ```ken example
+import Core.Classes.LawfulClasses (DecEq_instance_Bool)
+
 const true_is_true : Dec (Equal Bool True True) =
   dec_eq_decides Bool DecEq_instance_Bool True True
 

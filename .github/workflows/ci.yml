@@ -5,12 +5,17 @@ name: CI
 # branch can't merge until they're green (docs/ops/github-setup.md, WP F1). This
 # is the compute offload: the heavy jobs run on GitHub runners, not the laptop.
 # No merge_group — one publisher serialises merges, so there's no queue.
+#
+# No push trigger: there is no post-merge run on main (operator, 2026-10-26).
+# The publisher merges only a PR whose latest green run tested a merge commit
+# whose first parent is the current main tip and whose second parent is the
+# routed head, so a push run would repeat that run's work on the same tree.
+# The `ci-tested-tree` artifact below is how the publisher learns that base.
 
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
+    types: [opened, synchronize, reopened]
 
 # Cancel superseded runs on the same PR/ref so rapid pushes don't pile up CI
 # (matters even though public-repo Actions minutes are free — it shortens queues).
@@ -19,11 +24,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Every run records the merge commit it tested, with both parents, in the
+  # `ci-tested-tree` artifact (scripts/ci-tested-merge.py). The publisher reads
+  # it before merging and refuses unless the first parent is the current main
+  # tip and the second is the routed head (scripts/scripted-pr-automerge.sh).
+  #
+  # `z3_relevant` gates the z3-process-adapter job within `full` mode. It is
+  # `false` only when scripts/ci-z3-relevant.py finds that no changed path is
+  # an input of that job (ken-elaborator's build closure from `cargo metadata`,
+  # the repository files its tests read, Cargo and CI inputs); any failure here
+  # leaves it `true`. This runs inside classify-paths so the first wave gains
+  # no job.
   classify-paths:
     name: classify changed paths
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
+      z3_relevant: ${{ steps.classify.outputs.z3_relevant }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,16 +51,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base='${{ github.event.pull_request.base.sha || github.event.before }}'
+          base='${{ github.event.pull_request.base.sha }}'
           if ! git diff --name-only --no-renames "$base" HEAD | python3 -c 'import json,sys; print(json.dumps([x.rstrip("\\n") for x in sys.stdin if x.rstrip("\\n")]))' > paths.json; then
             echo 'mode=full' >> "$GITHUB_OUTPUT"
+            echo 'z3_relevant=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          z3_relevant=true
+          if cargo metadata --format-version 1 --no-deps --offline > cargo-metadata.json \
+            && z3_verdict=$(python3 scripts/ci-z3-relevant.py paths.json cargo-metadata.json) \
+            && [ "$z3_verdict" = false ]; then
+            z3_relevant=false
+          fi
+          echo "z3_relevant=$z3_relevant" >> "$GITHUB_OUTPUT"
           mode=full
           if classified=$(python3 scripts/ci-doc-only.py paths.json) && [ "$classified" = doc-only ]; then
             mode=doc-only
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      # Required, not best effort: the publisher will not merge on a run that
+      # has no record of its tested base, so a recording failure fails the run.
+      - name: Record tested merge tree
+        env:
+          CI_MODE: ${{ steps.classify.outputs.mode }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python3 scripts/ci-tested-merge.py record "$CI_MODE" ci-tested-tree/record.json
+      - name: Upload tested merge tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-tested-tree
+          path: ci-tested-tree/record.json
+          if-no-files-found: error
       # TODO(F2/Team Spec): run the black-box conformance corpus once it exists.
       # TODO(F1/Team Foundation): scan for AGPL/license markers with the
       # denylist/manual-review boundary described in CLEAN-ROOM.md.
@@ -310,6 +351,10 @@ jobs:
           name: workspace-test-build-timings-${{ matrix.shard }}
           path: target/cargo-timings/
           if-no-files-found: error
+      # .config/nextest.toml gives the multi-minute catalog census tests top
+      # priority, so whichever shard draws them starts them first rather than
+      # partway through. It reorders the selection only; it never adds to or
+      # removes from it, so the shard union is unchanged.
       - name: Test
         run: >-
           scripts/run-ci-shard.sh
@@ -506,9 +551,14 @@ jobs:
           echo '--- free -m ---'
           free -m
 
+  # Runs in `full` mode unless classify-paths reported `z3_relevant=false`:
+  # no changed path is an input of this job (scripts/ci-z3-relevant.py). The
+  # test is `!= 'false'`, so a missing or garbled output still runs it. The
+  # `--lib` step is the only feature-on run of the whole elaborator lib suite
+  # (prover.rs routes Route-D fallthrough to z3); keep it whole.
   z3-process-adapter:
     needs: classify-paths
-    if: needs.classify-paths.outputs.mode == 'full'
+    if: needs.classify-paths.outputs.mode == 'full' && needs.classify-paths.outputs.z3_relevant != 'false'
     name: optional z3 process adapter
     runs-on: ubuntu-latest
     container: ghcr.io/swe-toolkit/ken/ci-z3@sha256:4043afa445489c19fa9b6628258134225953354e2bf1766d996558cdf73e38da
@@ -585,6 +635,20 @@ jobs:
           z3_adapter='${{ needs.z3-process-adapter.result }}'
           issue_tracker='${{ needs.issue-tracker.result }}'
           shard_union='${{ needs.verify-realized-shard-union.result }}'
+          mode='${{ needs.classify-paths.outputs.mode }}'
+          z3_relevant='${{ needs.classify-paths.outputs.z3_relevant }}'
+          # doc-only skips the heavy jobs by design; only in that mode is a
+          # skipped job accepted as passing.
+          skip_ok=0
+          case "$mode" in doc-only) skip_ok=1 ;; esac
+          # In full mode the z3 job alone may also skip, and only when
+          # classify-paths reported that no changed path is its input.
+          z3_skip_ok=$skip_ok
+          if [ "$mode" = full ] && [ "$z3_relevant" = false ]; then
+            z3_skip_ok=1
+          fi
+          echo "classified mode:        $mode"
+          echo "z3 inputs changed:      $z3_relevant"
           echo "path classification:    $classify"
           echo "test-shard matrix:      $shards"
           echo "native auxiliary tests: $write"
@@ -607,7 +671,9 @@ jobs:
                       "issue tracker and ignored-row sweep:$issue_tracker" \
                       "realized-shard-union:$shard_union"; do
             name="${pair%:*}"; result="${pair##*:}"
-            if [ "$result" != "success" ] && ! { [ '${{ needs.classify-paths.outputs.mode }}' = doc-only ] && [ "$result" = skipped ]; }; then
+            ok=$skip_ok
+            if [ "$name" = "z3 checks" ]; then ok=$z3_skip_ok; fi
+            if [ "$result" != "success" ] && ! { [ "$ok" = 1 ] && [ "$result" = skipped ]; }; then
               echo "::error::$name did not pass ($result)." >&2
               failed=1
             fi

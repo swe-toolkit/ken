@@ -97,12 +97,12 @@ fn strict_same_unit_instance_and_derive_names_select_the_synthesized_canonicals(
     env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
         .expect("strict roots bind both generated dictionary names in their own unit");
 
-    let instance = env.globals["C_instance_Entry.Local"];
-    let derived = env.globals["Derived_instance_Entry.Local"];
+    let instance = env.globals["Classes.C_instance_Entry.Local"];
+    let derived = env.globals["Classes.Derived_instance_Entry.Local"];
     assert_is_exact_const(&transparent_body(&env, "Entry.selected_instance"), instance);
     assert_is_exact_const(&transparent_body(&env, "Entry.selected_derive"), derived);
-    assert!(!env.globals.contains_key("C_instance_Local"));
-    assert!(!env.globals.contains_key("Derived_instance_Local"));
+    assert!(!env.globals.contains_key("Entry.C_instance_Local"));
+    assert!(!env.globals.contains_key("Entry.Derived_instance_Local"));
     assert_eq!(env.env.trusted_base(), trust_before);
 }
 
@@ -131,10 +131,9 @@ fn earlier_inline_class_import_replay_binds_the_exact_instance_dictionary() {
     let trust_before = env.env.trusted_base();
     env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
         .expect("earlier inline owner and replayed import must bind its dictionary alias");
-    // The inline owner is Entry.Classes; classes themselves currently retain
-    // their unqualified compiler identity C (as in the file-backed controls).
-    let class = env.globals["C"];
-    let canonical = env.globals["C_instance_Nat"];
+    // Both the checked class and its dictionary keep the inline owner path.
+    let class = env.globals["Entry.Classes.C"];
+    let canonical = env.globals["Entry.Classes.C_instance_Nat"];
     let (_, dictionary_type) = env
         .env
         .const_type(canonical)
@@ -182,7 +181,7 @@ fn later_inline_class_import_refuses_an_external_file_provider() {
             other => panic!("preload={preload}: expected import refusal, got {other:?}"),
         }
         assert!(!env.globals.contains_key("Entry.selected"));
-        assert!(!env.globals.contains_key("C_instance_Nat"));
+        assert!(!env.globals.contains_key("Entry.Classes.C_instance_Nat"));
         assert_eq!(env.env.trusted_base(), trust_before);
     }
 }
@@ -202,7 +201,7 @@ fn legacy_roots_same_unit_alias_selects_the_same_synthesis_identity() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("legacy roots receives the same explicit local alias binding");
-    let canonical = env.globals["C_instance_Entry.Local"];
+    let canonical = env.globals["Classes.C_instance_Entry.Local"];
     assert_is_exact_const(&transparent_body(&env, "Entry.selected"), canonical);
 }
 
@@ -233,8 +232,8 @@ fn imported_head_uses_its_qualified_synthesis_identity_and_exports_that_identity
     env.elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
         .expect("qualified generated identity is locally bound, exported, and imported");
 
-    let canonical = env.globals["C_instance_Types.Remote"];
-    let derived = env.globals["Derived_instance_Bool"];
+    let canonical = env.globals["Owner.C_instance_Types.Remote"];
+    let derived = env.globals["Owner.Derived_instance_Bool"];
     assert_is_exact_const(&transparent_body(&env, "Owner.local_selected"), canonical);
     assert_is_exact_const(&transparent_body(&env, "Owner.local_derived"), derived);
     assert_is_exact_const(
@@ -245,7 +244,7 @@ fn imported_head_uses_its_qualified_synthesis_identity_and_exports_that_identity
         &transparent_body(&env, "Consumer.imported_derived"),
         derived,
     );
-    assert!(!env.globals.contains_key("C_instance_Remote"));
+    assert!(!env.globals.contains_key("Owner.C_instance_Remote"));
 }
 
 #[test]
@@ -269,13 +268,13 @@ fn selective_import_supports_explicit_argument_and_superclass_wiring() {
     let strict_ids = strict
         .elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
         .expect("both cross-module dictionary use shapes resolve under strict roots");
-    let dictionary = strict.globals["C_instance_Option"];
+    let dictionary = strict.globals["Provider.C_instance_Option"];
     assert!(term_mentions_global(
         &transparent_body(&strict, "Consumer.explicit"),
         dictionary
     ));
     assert!(term_mentions_global(
-        &transparent_body(&strict, "Child_instance_Option"),
+        &transparent_body(&strict, "Consumer.Child_instance_Option"),
         dictionary
     ));
     assert_eq!(strict.env.trusted_base(), strict_trust);
@@ -291,8 +290,8 @@ fn selective_import_supports_explicit_argument_and_superclass_wiring() {
         transparent_body(&strict, "Consumer.explicit")
     );
     assert_eq!(
-        transparent_body(&legacy, "Child_instance_Option"),
-        transparent_body(&strict, "Child_instance_Option")
+        transparent_body(&legacy, "Consumer.Child_instance_Option"),
+        transparent_body(&strict, "Consumer.Child_instance_Option")
     );
     assert_eq!(legacy.env.trusted_base(), legacy_trust);
 }
@@ -383,7 +382,7 @@ fn distinct_local_collision_rejects_before_allocating_or_trusting_either_name() 
         "collision must be attributed to the dictionary surface name, found {error:?}"
     );
     assert!(!env.globals.contains_key("Entry.C_instance_Local"));
-    assert!(!env.globals.contains_key("C_instance_Entry.Local"));
+    assert!(!env.globals.contains_key("Classes.C_instance_Entry.Local"));
     assert_eq!(env.env.trusted_base(), trust_before);
 }
 
@@ -411,7 +410,7 @@ fn duplicate_structure_dictionary_is_rejected_by_exact_class_head() {
                 ref class,
                 ref head_type,
                 ..
-            } if class == "C" && head_type == "Entry.Local"
+            } if class == "Classes.C" && head_type == "Entry.Local"
         ),
         "duplicate must be rejected at its exact class/head identity, found {error:?}"
     );

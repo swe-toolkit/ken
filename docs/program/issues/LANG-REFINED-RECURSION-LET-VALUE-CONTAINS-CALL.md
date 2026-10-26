@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-RECURSION-LET-VALUE-CONTAINS-CALL
 title: "Dependent-result structural recursion on a refined parameter is still refused with K0014 when an un-ascribed let binds a value that returns the recursive call through an inner let or match, rather than the call itself. The let-scope authority keys on the value's head being the call. Extend it to a value that returns the call"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1

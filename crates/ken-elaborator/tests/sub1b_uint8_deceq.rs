@@ -19,7 +19,6 @@ fn dependency_env() -> (ElabEnv, Vec<GlobalId>) {
     let lawful_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("LawfulClasses provider must roots-load");
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     (env, lawful_owned)
 }
 
@@ -37,8 +36,9 @@ fn lawful_id(env: &ElabEnv, lawful_owned: &[GlobalId], name: &str) -> GlobalId {
 
 fn assert_transparent_globals(env: &ElabEnv, lawful_owned: &[GlobalId], names: &[&str]) {
     let dec_eq_class = env
-        .class_env
-        .class("DecEq")
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
@@ -50,7 +50,7 @@ fn assert_transparent_globals(env: &ElabEnv, lawful_owned: &[GlobalId], names: &
         let id = if let Some(head) = name.strip_prefix("DecEq_instance_") {
             let instance = env
                 .class_env
-                .instance_search("DecEq", head)
+                .instance_search("Core.Classes.LawfulClasses.DecEq", head)
                 .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
             assert!(
                 lawful_owned.contains(&instance),

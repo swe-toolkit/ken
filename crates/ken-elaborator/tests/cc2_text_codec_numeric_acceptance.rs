@@ -29,16 +29,10 @@ fn dependency_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
     let lawful_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "LC must not provide a flat test alias"
+    );
     (env, lawful_owned)
 }
 
@@ -51,7 +45,6 @@ fn load_derived_dependencies(env: &mut ElabEnv) -> Vec<GlobalId> {
     let diagnostic_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load after Derived");
-    catalog_or::expose_module(env, "Capability.Diagnostics.Core");
     diagnostic_owned
 }
 
@@ -184,19 +177,19 @@ fn ordered_dependency_closure_elaborates_codec_then_numeric() {
         );
     }
     for class in ["DecEq", "Ord"] {
-        let class_id = env
-            .class_env
-            .class(class)
-            .unwrap_or_else(|| panic!("{class} must remain a checked class"))
-            .projection
-            .type_id;
+        let canonical = format!("Core.Classes.LawfulClasses.{class}");
+        let class_id = env.globals[&canonical];
+        assert!(
+            env.class_env.class_by_id(class_id).is_some(),
+            "{canonical} must remain a checked class"
+        );
         assert!(
             lawful_owned.contains(&class_id),
             "{class} must be the class checked by LawfulClasses"
         );
         let instance = env
             .class_env
-            .instance_search(class, "String")
+            .instance_search(&canonical, "String")
             .unwrap_or_else(|| panic!("{class} String must be a registered dictionary"));
         assert!(
             lawful_owned.contains(&instance),

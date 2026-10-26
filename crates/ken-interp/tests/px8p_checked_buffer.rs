@@ -11,16 +11,21 @@ fn repo_root() -> PathBuf {
 
 fn env() -> ken_elaborator::ElabEnv {
     let mut env = ken_elaborator::ElabEnv::empty().expect("PX8-P prelude");
+    let trusted_before_clients = env.env.trusted_base();
     // The escape discriminator reaches the same private checked release node
     // used by `withBuffer`'s finalizer without publishing a raw release name.
-    env.globals.insert(
-        "Px8pPrivateResourceRelease".to_string(),
-        env.prelude_env.private_resource_release_id,
-    );
-    env.globals.insert(
-        "Px8pBufferHandleResource".to_string(),
-        env.prelude_env.buffer_handle_resource_id,
-    );
+    let release = env.prelude_env.private_resource_release_id;
+    assert!(!env.globals.contains_key("Px8pPrivateResourceRelease"));
+    assert!(!env.globals.values().any(|id| *id == release));
+    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
+    env.globals
+        .insert("Px8pPrivateResourceRelease".to_string(), release);
+    let handle = env.prelude_env.buffer_handle_resource_id;
+    assert!(!env.globals.contains_key("Px8pBufferHandleResource"));
+    assert!(!env.globals.values().any(|id| *id == handle));
+    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
+    env.globals
+        .insert("Px8pBufferHandleResource".to_string(), handle);
     env.elaborate_file(
         r#"
 fn px8p_ok_body (_resource : BufferHandle)
@@ -96,6 +101,11 @@ proc px8p_escape_then_release (capacity : Int)
 "#,
     )
     .expect("checked PX8-P interpreter fixtures elaborate");
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted_before_clients,
+        "PX8-P client fixtures must not extend trust"
+    );
     env.globals.remove("Px8pPrivateResourceRelease");
     env.globals.remove("Px8pBufferHandleResource");
     env

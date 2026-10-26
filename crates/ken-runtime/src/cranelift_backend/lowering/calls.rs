@@ -1079,6 +1079,8 @@ impl<'a> Lowering<'a> {
                     body_origin,
                     inputs,
                     carried_base,
+                    None,
+                    None,
                 )?,
                 None => self.call_declared_unit(
                     builder,
@@ -1102,14 +1104,39 @@ impl<'a> Lowering<'a> {
         /// same causal ancestry; its source edge, its predecessor and its
         /// provenance are untouched. That is what makes this a retarget rather than
         /// a deletion.
-        fn call_declared_context(
+        pub(super) fn call_declared_context(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             context: ContinuationContextId,
             body_origin: StaticOriginId,
             inputs: &[LoweringOperand],
             carried_base: Option<CarriedResidualWord>,
+            caller_claims: Option<&[ContinuationEnvironmentClaim]>,
+            resumption: Option<&crate::cranelift_backend::planning::PlannedHandlerResumptionCall>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
+            if let Some(record) = resumption {
+                let members = self.static_transition_plan
+                    .continuation_context_parameter_members(context)?;
+                let parameter_members_agree = record.parameters.iter().enumerate().all(
+                    |(position, parameter)| match parameter {
+                        crate::cranelift_backend::planning::PlannedResumptionParameter::Response {
+                            effect_origin,
+                        } => position == 0 && *effect_origin == record.row.2,
+                        crate::cranelift_backend::planning::PlannedResumptionParameter::KCapture {
+                            member, ..
+                        } => position > 0 && members.get(position) == Some(member),
+                    },
+                );
+                if record.route.context != context || record.route.worker_body_origin != body_origin
+                    || !parameter_members_agree || members.len() != record.parameters.len()
+                    || caller_claims != Some(record.route.capture_claims.as_slice())
+                    || inputs.len() != record.parameters.len()
+                    || self.defining_emission_owner != Some(record.emission_owner)
+                {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "StaticResponseDeferred", "a planned resumption's response or K-capture parameters disagree with the declared context call"));
+                }
+            }
             let target = self
                 .function_local
                 .context_calls
@@ -1157,39 +1184,64 @@ impl<'a> Lowering<'a> {
             // can decode it; no call-scoped side slot can identify W2 vs W7.
             let claims = view.captures()?;
             let header = view.header();
-            let disposition = self.static_transition_plan
-                .recursive_residual_for_bound_context(context)?.cloned();
-            let gather_cannot_serve = inputs.len() != header.parameters as usize
-                || claims.iter().any(|claim| claim.availability.context_capture.is_none());
-            if gather_cannot_serve != disposition.as_ref().is_some_and(|entry| entry.wrapped()) {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "RecursiveResidual",
-                    "the bound context needs a residual capture suffix but has no matching issued disposition",
-                ));
-            }
             let mut carried_context = None;
-            if let Some(disposition) = disposition.filter(|entry| entry.wrapped()) {
-                let base = carried_base.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
-                    "RecursiveResidual",
-                    "a bound generated context needs its carried recursive-position residual",
-                ))?;
-                let (_forwarded, worker, context) =
-                    self.decode_recursive_residual(builder, base, &disposition)?;
-                // Both complete runs have independent cardinalities. A wrapped
-                // value reads every Capture from the word, never from a frame.
-                if worker.len() != disposition.worker_captures as usize
-                    || context.len() != disposition.context_captures as usize
-                    || claims.len() != context.len()
-                    || header.captures as usize != claims.len()
-                    || inputs.len().checked_add(worker.len()) != Some(header.parameters as usize)
-                {
+            if let Some(caller_claims) = caller_claims {
+                // The drive holds the real K closure and supplies the complete
+                // Parameter run. The bound residual disposition describes only
+                // the other, carried caller's word; it does not constrain the
+                // callee's plain Parameter followed by Capture ABI.
+                if carried_base.is_some() {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
-                        "RecursiveResidual",
-                        "the bound context's worker Parameter and Capture runs disagree with the residual schema",
+                        "ContinuationSpecialization",
+                        "a recorded drive route was handed a carried recursive-position residual",
                     ));
                 }
-                inputs.extend(worker);
-                carried_context = Some(context);
+                if inputs.len() != header.parameters as usize {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ContinuationSpecialization",
+                        "a recorded drive route must supply the context's complete Parameter run",
+                    ));
+                }
+                if caller_claims.len() != header.captures as usize {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ContinuationSpecialization",
+                        "a recorded drive route's claim count disagrees with the context Capture run",
+                    ));
+                }
+            } else {
+                let disposition = self.static_transition_plan
+                    .recursive_residual_for_bound_context(context)?.cloned();
+                let gather_cannot_serve = inputs.len() != header.parameters as usize
+                    || claims.iter().any(|claim| claim.availability.context_capture.is_none());
+                if gather_cannot_serve != disposition.as_ref().is_some_and(|entry| entry.wrapped()) {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "RecursiveResidual",
+                        "the bound context needs a residual capture suffix but has no matching issued disposition",
+                    ));
+                }
+                if let Some(disposition) = disposition.filter(|entry| entry.wrapped()) {
+                    let base = carried_base.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "RecursiveResidual",
+                        "a bound generated context needs its carried recursive-position residual",
+                    ))?;
+                    let (_forwarded, worker, context) =
+                        self.decode_recursive_residual(builder, base, &disposition)?;
+                    // Both complete runs have independent cardinalities. A wrapped
+                    // value reads every Capture from the word, never from a frame.
+                    if worker.len() != disposition.worker_captures as usize
+                        || context.len() != disposition.context_captures as usize
+                        || claims.len() != context.len()
+                        || header.captures as usize != claims.len()
+                        || inputs.len().checked_add(worker.len()) != Some(header.parameters as usize)
+                    {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "RecursiveResidual",
+                            "the bound context's worker Parameter and Capture runs disagree with the residual schema",
+                        ));
+                    }
+                    inputs.extend(worker);
+                    carried_context = Some(context);
+                }
             }
             for (capture_index, capture) in claims.into_iter().enumerate() {
                 // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — present a producer-local
@@ -1226,9 +1278,13 @@ impl<'a> Lowering<'a> {
                         "RecursiveResidual", "a residual lacks a declared Capture",
                     ))?.clone()
                 } else {
+                    let mut availability = capture.availability;
+                    if let Some(claims) = caller_claims {
+                        availability.context_capture = Some(claims[capture_index]);
+                    }
                     let immediate_slot = self.resolve_context_capture_claim(
                         capture.coordinate,
-                        capture.availability,
+                        availability,
                         defining_owner,
                     )?;
                     // This seam holds an entry ABI run, not the producer's

@@ -8,408 +8,7 @@
 
 #![cfg(target_os = "linux")]
 
-const SOURCE: &str = r#"program capabilities FS AFull
-const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
-    (ResourceBodyOk Unit Unit MkUnit)
-
-const body_error_io : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
-    (ResourceBodyErr Unit Unit MkUnit)
-
-fn finish (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode =
-  match outcome {
-    Err error |-> host_exit AFull (Failure 91);
-    Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 92);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 93);
-      ResourceBracketBodyAndReleaseError body_error release_error |->
-        host_exit AFull (Failure 94)
-    }
-  }
-
-fn expect_bytes (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> body_ok_io
-  }
-
-fn expect_unit (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok unit |-> body_ok_io
-  }
-
-proc map_bytes_window (mapping : MappingHandle) (start : Int) (length : Int)
-  : HostIO AFull (Result ResourceError Bytes) visits [FS] =
-  mapBytes AFull mapping (MkMappingWindow start length)
-
-proc read_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (map_bytes_window mapping (2 : Int) (4 : Int))
-    (\outcome. expect_bytes outcome)
-
-proc read_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly read_body)
-    (\outcome. finish outcome)
-
-proc after_write (mapping : MappingHandle)
-  (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
-      (\bytes. expect_bytes bytes)
-  }
-
-proc write_read_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
-    (\outcome. after_write mapping outcome)
-
-proc write_read_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite write_read_body)
-    (\outcome. finish outcome)
-
-proc after_read (mapping : MappingHandle)
-  (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
-      (\written. expect_unit written)
-  }
-
-proc read_write_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (map_bytes_window mapping (2 : Int) (4 : Int))
-    (\outcome. after_read mapping outcome)
-
-proc read_write_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite read_write_body)
-    (\outcome. finish outcome)
-
-proc after_read_to_read (mapping : MappingHandle)
-  (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
-      (\read. expect_bytes read)
-  }
-
-proc read_read_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (map_bytes_window mapping (2 : Int) (4 : Int))
-    (\outcome. after_read_to_read mapping outcome)
-
-proc after_write_to_write (mapping : MappingHandle)
-  (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (2 : Int) (bytes_encode "EFGH"))
-      (\written. expect_unit written)
-  }
-
-proc write_write_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
-    (\outcome. after_write_to_write mapping outcome)
-
-proc after_second_write_to_read (mapping : MappingHandle)
-  (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
-      (\read. expect_bytes read)
-  }
-
-proc after_read_to_write_read (mapping : MappingHandle)
-  (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
-      (\written. after_second_write_to_read mapping written)
-  }
-
-proc read_write_read_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (map_bytes_window mapping (2 : Int) (4 : Int))
-    (\outcome. after_read_to_write_read mapping outcome)
-
-proc after_second_read_to_write (mapping : MappingHandle)
-  (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (2 : Int) (bytes_encode "EFGH"))
-      (\written. expect_unit written)
-  }
-
-proc after_write_to_read_write (mapping : MappingHandle)
-  (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
-      (\read. after_second_read_to_write mapping read)
-  }
-
-proc write_read_write_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
-    (\outcome. after_write_to_read_write mapping outcome)
-
-proc matrix_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite __MATRIX_BODY__)
-    (\outcome. finish outcome)
-
-fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Err InvalidBounds |-> body_ok_io;
-    Err error |-> body_error_io;
-    Ok bytes |-> body_error_io
-  }
-
-fn expect_invalid_bounds_unit (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Err InvalidBounds |-> body_ok_io;
-    Err error |-> body_error_io;
-    Ok unit |-> body_error_io
-  }
-
-proc out_of_range_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (mapBytes AFull mapping (MkMappingWindow (6 : Int) (4 : Int)))
-    (\outcome. expect_invalid_bounds outcome)
-
-proc out_of_range_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly out_of_range_body)
-    (\outcome. finish outcome)
-
-proc out_of_range_write_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (6 : Int) (bytes_encode "ABCD"))
-    (\outcome. expect_invalid_bounds_unit outcome)
-
-proc out_of_range_write_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite
-      out_of_range_write_body)
-    (\outcome. finish outcome)
-
-proc negative_window_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (mapBytes AFull mapping
-      (MkMappingWindow (sub_int (0 : Int) (1 : Int)) (1 : Int)))
-    (\outcome. expect_invalid_bounds outcome)
-
-proc negative_window_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly negative_window_body)
-    (\outcome. finish outcome)
-
-fn expect_read_only_refusal (outcome : Result ResourceError Unit)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Err (RightNotHeld required held) |-> body_ok_io;
-    Err error |-> body_error_io;
-    Ok unit |-> body_error_io
-  }
-
-proc after_read_to_read_only_write (mapping : MappingHandle)
-  (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (0 : Int) (bytes_encode "X"))
-      (\written. expect_read_only_refusal written)
-  }
-
-proc read_then_read_only_write_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (mapBytes AFull mapping (MkMappingWindow (0 : Int) (1 : Int)))
-    (\outcome. after_read_to_read_only_write mapping outcome)
-
-proc read_then_read_only_write_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly
-      read_then_read_only_write_body)
-    (\outcome. finish outcome)
-
-proc after_read_to_out_of_range (mapping : MappingHandle)
-  (outcome : Result ResourceError Bytes)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-      (mapBytes AFull mapping (MkMappingWindow (6 : Int) (4 : Int)))
-      (\read. expect_invalid_bounds read)
-  }
-
-proc read_then_out_of_range_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (mapBytes AFull mapping (MkMappingWindow (0 : Int) (1 : Int)))
-    (\outcome. after_read_to_out_of_range mapping outcome)
-
-proc read_then_out_of_range_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly
-      read_then_out_of_range_body)
-    (\outcome. finish outcome)
-
-proc read_only_write_body (mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (0 : Int) (bytes_encode "X"))
-    (\outcome. expect_read_only_refusal outcome)
-
-proc read_only_write_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly read_only_write_body)
-    (\outcome. finish outcome)
-
-proc accounting_body (_mapping : MappingHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  body_ok_io
-
-proc one_byte_accounting_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (1 : Int)) ReadOnly accounting_body)
-    (\outcome. finish outcome)
-
-proc over_page_accounting_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (4097 : Int)) ReadOnly accounting_body)
-    (\outcome. finish outcome)
-
-proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match caps {
-    MkProgramCaps cap |-> __ENTRY__ cap
-  }
-"#;
+const SOURCE: &str = include_str!("fixtures/d0_abi_mapping_source.ken");
 
 struct Differential {
     interpreted: ken_runtime::EffectObservation,
@@ -540,24 +139,10 @@ fn non_release_events(
         .collect()
 }
 
-fn release_set(observation: &ken_runtime::EffectObservation) -> Vec<String> {
-    let mut releases = observation
-        .effect_trace
-        .iter()
+fn release_count(observation: &ken_runtime::EffectObservation) -> usize {
+    observation.effect_trace.iter()
         .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
-        .map(|event| {
-            format!(
-                "{:?}",
-                (
-                    event.resource_bindings.clone(),
-                    event.request.clone(),
-                    event.outcome.clone(),
-                )
-            )
-        })
-        .collect::<Vec<_>>();
-    releases.sort();
-    releases
+        .count()
 }
 
 fn operation_events(
@@ -584,14 +169,8 @@ fn assert_parity(case: &str, result: &Differential) {
         "{case}: interpreter"
     );
     assert_eq!(
-        non_release_events(&result.native),
-        non_release_events(&result.interpreted),
-        "{case}: ordered non-release effects, requests, outcomes, and bindings"
-    );
-    assert_eq!(
-        release_set(&result.native),
-        release_set(&result.interpreted),
-        "{case}: release set parity; relative release order is excluded"
+        result.native.effect_trace, result.interpreted.effect_trace,
+        "{case}: complete ordered effects, releases, requests, outcomes, and bindings"
     );
     assert_eq!(
         result.native.terminal_exit, result.interpreted.terminal_exit,
@@ -612,11 +191,8 @@ fn parity_difference(case: &str, result: &Differential) -> Option<String> {
             result.native.terminal_error, result.interpreted.terminal_error
         ));
     }
-    if non_release_events(&result.native) != non_release_events(&result.interpreted) {
-        return Some(format!("{case}: ordered non-release traces differ"));
-    }
-    if release_set(&result.native) != release_set(&result.interpreted) {
-        return Some(format!("{case}: release sets differ"));
+    if result.native.effect_trace != result.interpreted.effect_trace {
+        return Some(format!("{case}: complete ordered traces differ"));
     }
     if result.native.terminal_exit != result.interpreted.terminal_exit {
         return Some(format!("{case}: terminal exit classes differ"));
@@ -695,7 +271,7 @@ fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
                         "{case}: operations {actual_operations:?}, expected {expected_operations:?}"
                     ));
                 }
-                if release_set(&result.native).len() != 1 {
+                if release_count(&result.native) != 1 {
                     failures.push(format!("{case}: expected exactly one release"));
                 }
             }
@@ -766,7 +342,7 @@ fn window_direct_map_bytes_executes_natively_and_matches_the_interpreter() {
         ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::Bytes(bytes))
             if bytes == &[0, 0, 0, 0]
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: durable behavioral invariant. CONTROL: one checked write at
@@ -811,7 +387,7 @@ fn offset_direct_map_write_then_window_read_preserves_process_local_bytes() {
         ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::Bytes(bytes))
             if bytes.as_slice() == b"ABCD"
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: durable behavioral invariant. CONTROL: one checked read of
@@ -862,7 +438,7 @@ fn window_read_then_offset_direct_map_write_executes_in_source_order() {
         events[2].outcome,
         ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::Unit)
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: normative compatibility vector. MEASURED: checked
@@ -900,7 +476,7 @@ fn fixed_accounting_boundary_lengths_reach_both_engines() {
                 ken_runtime::CanonicalReplyV1::ResourceAcquired { .. }
             )
         ));
-        assert_eq!(release_set(&result.native).len(), 1);
+        assert_eq!(release_count(&result.native), 1);
     }
 }
 
@@ -921,7 +497,7 @@ fn out_of_range_window_is_invalid_bounds_not_clamped() {
             ken_runtime::ResourceErrorV1::InvalidBounds
         ))
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: normative compatibility vector. MEASURED: a checked write of
@@ -949,7 +525,7 @@ fn out_of_range_map_write_is_invalid_bounds_not_clamped() {
             ken_runtime::ResourceErrorV1::InvalidBounds
         ))
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: durable narrowing invariant. MEASURED: a negative window
@@ -965,7 +541,7 @@ fn negative_window_skips_mapping_read_dispatch_in_both_engines() {
     assert!(
         operation_events(&result.interpreted, ken_runtime::HostOpV1::MappingReadView).is_empty()
     );
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: durable behavioral invariant. MEASURED: a valid first read
@@ -1003,7 +579,7 @@ fn second_mapping_effect_rechecks_read_only_rights() {
             }
         ))
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: durable behavioral invariant. MEASURED: a valid first read
@@ -1024,7 +600,7 @@ fn second_mapping_effect_rechecks_bounds() {
             ken_runtime::ResourceErrorV1::InvalidBounds
         ))
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }
 
 /// Promise class: normative compatibility vector. MEASURED: a checked mapWrite
@@ -1048,5 +624,5 @@ fn read_only_mapping_refuses_payload_write_with_exact_rights() {
             }
         ))
     ));
-    assert_eq!(release_set(&result.native).len(), 1);
+    assert_eq!(release_count(&result.native), 1);
 }

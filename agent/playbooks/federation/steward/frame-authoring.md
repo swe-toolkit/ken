@@ -60,7 +60,9 @@ Do not use:
 - a detector derived from the implementation it checks;
 - repository-text assertions as a substitute for product behavior;
 - a control that the failing configuration also passes;
-- an exhaustive checklist when the population has no proved closure.
+- an exhaustive checklist when the population has no proved closure;
+- an AC that requires a whole-crate or full-suite local test run; name the
+  test binaries instead (`COORDINATION.md §12`).
 
 Load `pin-a-property` only when the WP actually introduces a mechanical pin.
 Load `mutation-prove-a-pin` only when the frame requires a mutation proof. Those

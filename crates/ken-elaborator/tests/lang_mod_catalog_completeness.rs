@@ -70,8 +70,9 @@ fn named_axiom_trust_id(env: &ElabEnv, named: GlobalId) -> GlobalId {
 
 fn owned_ord_int_law_ids(env: &ElabEnv, lawful_owned: &[GlobalId]) -> BTreeSet<GlobalId> {
     let ord = env
-        .class_env
-        .class("Ord")
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("registered Ord class")
         .projection
         .type_id;

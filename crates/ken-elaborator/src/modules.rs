@@ -2130,6 +2130,7 @@ fn load_unit(
 pub(crate) fn execute_loaded_entry_checked_fences_v1(
     elab: &mut ElabEnv,
     entry: &str,
+    rejections: Option<&mut Vec<(std::ops::Range<usize>, ElabError)>>,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     if !elab.module_state.loaded_units.contains_key(entry) {
         return Err(ElabError::Internal(format!(
@@ -2151,7 +2152,7 @@ pub(crate) fn execute_loaded_entry_checked_fences_v1(
             ))
         })?;
     let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
-    let result = elab.execute_ken_md_checked_fences_v1(&source, &extracted);
+    let result = elab.execute_ken_md_checked_fences_reporting(&source, &extracted, rejections);
     elab.module_state.root_scope = previous;
     result
 }
@@ -2231,10 +2232,9 @@ fn elaborate_module_from_roots_with_mode_v1(
 /// qualified form (`prefix.name`), leaving every reference *inside* the
 /// decl's body/type/etc untouched (those are qualified later, post-resolve,
 /// by `rewrite_rdecl`). Only decl kinds with a single ordinary declared
-/// name participate in module qualification (`view`/`let`/`data`/`type`);
-/// classes/instances/laws/foreign/temporal/prove decls are elaborated
-/// unqualified even inside a module (out of this WP's scope — no seed case
-/// exercises them nested).
+/// name participate in module qualification. Class declarations are
+/// qualified like data, while remaining ordered barriers for class-registry
+/// side effects. Instances/laws/foreign/temporal/prove retain their own paths.
 fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
     match decl {
         Decl::ViewDecl {
@@ -2338,6 +2338,19 @@ fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
         Decl::TypeAlias { name, ty, span } => Decl::TypeAlias {
             name: qualify(prefix, name),
             ty: ty.clone(),
+            span: span.clone(),
+        },
+        Decl::ClassDecl {
+            name,
+            param,
+            param_kind,
+            fields,
+            span,
+        } => Decl::ClassDecl {
+            name: qualify(prefix, name),
+            param: param.clone(),
+            param_kind: param_kind.clone(),
+            fields: fields.clone(),
             span: span.clone(),
         },
         Decl::PropDecl {
@@ -2572,11 +2585,10 @@ fn rewrite_rexpr_inner(
         arm @ RExpr::RRecord { .. } => {
             rewrite_rexpr_inner_rrecord(scope, exports, arm, kernel_head)
         }
-        arm @ RExpr::RPosProj(..) => {
-            rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head)
-        }
+        arm @ RExpr::RPosProj(..) => rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head),
         arm @ RExpr::RProj(..) => rewrite_rexpr_inner_rproj(scope, exports, arm, kernel_head),
         arm @ RExpr::RPi(..) => rewrite_rexpr_inner_rpi(scope, exports, arm, kernel_head),
+        arm @ RExpr::RSigma(..) => rewrite_rexpr_inner_rsigma(scope, exports, arm, kernel_head),
         arm @ RExpr::RArrow(..) => rewrite_rexpr_inner_rarrow(scope, exports, arm, kernel_head),
         arm @ RExpr::RAttachedProofRef { .. } => {
             rewrite_rexpr_inner_rattachedproofref(scope, exports, arm, kernel_head)
@@ -2996,6 +3008,27 @@ fn rewrite_rexpr_inner_rpi(
 }
 
 #[inline(never)]
+fn rewrite_rexpr_inner_rsigma(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RSigma(x, a, b, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rsigma dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RSigma(
+            x,
+            Box::new(rewrite_rtype(scope, exports, *a)?),
+            Box::new(rewrite_rexpr(scope, exports, *b)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
 fn rewrite_rexpr_inner_rarrow(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -3384,10 +3417,8 @@ fn rewrite_rdecl(
 }
 
 /// Does this (unwrapped) decl kind participate in module-local-name
-/// shadowing / qualification (`view`/`let`/`data`/`type`)? Classes,
-/// instances, laws, foreign bindings, temporal obligations, and `prove`
-/// obligations are elaborated unqualified even inside a `module { … }`
-/// block (out of this WP's scope).
+/// shadowing / qualification? A class is qualified like a data type,
+/// though its registry update remains in the ordered barrier path.
 fn is_qualifiable(decl: &Decl) -> bool {
     matches!(
         decl,
@@ -3401,6 +3432,7 @@ fn is_qualifiable(decl: &Decl) -> bool {
             | Decl::DataDecl { .. }
             | Decl::ExplicitDataDecl { .. }
             | Decl::TypeAlias { .. }
+            | Decl::ClassDecl { .. }
     )
 }
 
@@ -4130,9 +4162,12 @@ fn synthesized_dictionary_name(
     let resolved_class = resolve_class_ref(scope, exports, class_name, span)?;
     let resolved_head = resolve_ref(scope, exports, head_name, span)?;
     Ok(SynthesizedDictionaryName {
+        // The unit-local alias follows its selected source spelling; the
+        // global key below follows the canonical checked class identity.
+        // Two aliased imports of same-spelled classes can therefore coexist.
         surface: format!(
             "{}_instance_{}",
-            canonical_leaf(&resolved_class),
+            canonical_leaf(class_name),
             canonical_leaf(&resolved_head)
         ),
         canonical: format!("{resolved_class}_instance_{resolved_head}"),
@@ -4346,8 +4381,7 @@ fn prebind_scope_declarations(
     // in legacy and strict resolution without spending the legacy stack budget.
     for decl in decls {
         let inner = decl.unwrap_pub();
-        let unqualified_local = matches!(inner, Decl::ClassDecl { .. });
-        if !is_qualifiable(inner) && !unqualified_local {
+        if !is_qualifiable(inner) {
             continue;
         }
         if let Decl::AttachedProofDecl { subject, proof_name, .. } = inner {
@@ -4357,11 +4391,7 @@ fn prebind_scope_declarations(
         let bare = inner.name().to_string();
         scope.current_local_names.insert(bare.clone());
         scope.checked_local_ids.remove(&bare);
-        let qualified = if unqualified_local {
-            bare.clone()
-        } else {
-            qualify(prefix, &bare)
-        };
+        let qualified = qualify(prefix, &bare);
         scope.bind_local(&bare, &qualified, inner.span())?;
         match inner {
             Decl::DataDecl { ctors, .. } => {
@@ -5491,9 +5521,9 @@ fn expand_scope(
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
-                // All qualifiable declarations are segment nodes; barriers
-                // remain on their original unqualified elaboration path.
-                if is_qualifiable(inner) {
+                // Class declarations are qualifiable but remain ordered
+                // registry barriers; all other qualifiable kinds are nodes.
+                if is_qualifiable(inner) && !matches!(inner, Decl::ClassDecl { .. }) {
                     return Err(ElabError::Internal(format!(
                         "qualifiable declaration {:?} reached the barrier path",
                         inner.name()
@@ -5501,8 +5531,9 @@ fn expand_scope(
                 }
                 {
                     // Class/instance/law/foreign/temporal/prove barriers.
+                    let renamed = qualify_decl_name(inner, prefix);
                     let rdecl = resolve_scoped_decl(
-                        inner,
+                        &renamed,
                         scope,
                         &elab.module_state.exports,
                         unit_definitions,
@@ -6343,7 +6374,7 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
                 .expect("file provider and facade check");
-            let id = env.globals["C_instance_Nat"];
+            let id = env.globals["Owner.C_instance_Nat"];
             (env, root, id)
         };
         let (mut imported, _root, file_id) = prepared();
@@ -6358,7 +6389,7 @@ mod namespace_effect_tests {
         local.elaborate_file(
             "module Owner { class C a { marker : Nat } instance C Nat { marker = Zero } const chosen : C Nat = C_instance_Nat }",
         ).expect("new local class and instance check without the import");
-        let local_id = local.globals["C_instance_Nat"];
+        let local_id = local.globals["Owner.C_instance_Nat"];
         assert_ne!(old_id, local_id);
         assert!(matches!(local.env.lookup(local.globals["Owner.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
@@ -6395,7 +6426,7 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
                 .expect("file derived provider and facade check");
-            let id = env.globals["Marker_instance_Owner.Head"];
+            let id = env.globals["Owner.Marker_instance_Owner.Head"];
             (env, root, id)
         };
         let (mut imported, _root, file_id) = prepared();
@@ -6410,7 +6441,7 @@ mod namespace_effect_tests {
         local.elaborate_file(
             "module Owner { class Marker a { } data Head = MkLocalHead derive Marker for Head theorem chosen : Marker Head = Marker_instance_Head }",
         ).expect("local-only derived dictionary checks");
-        let local_id = local.globals["Marker_instance_Owner.Head"];
+        let local_id = local.globals["Owner.Marker_instance_Owner.Head"];
         assert_ne!(old_id, local_id);
         assert!(matches!(local.env.lookup(local.globals["Owner.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
@@ -8060,7 +8091,7 @@ mod namespace_effect_tests {
                 let memory_source = "module A { pub class C a { marker : Nat } }";
                 let memory_id = if memory_first {
                     env.elaborate_file(memory_source).expect("check memory class");
-                    let id = env.globals["C"];
+                    let id = env.globals["A.C"];
                     env.elaborate_file(memory_client)
                         .expect("memory client selects Nat class");
                     Some(id)
@@ -8073,7 +8104,7 @@ mod namespace_effect_tests {
                 let memory_id = memory_id.unwrap_or_else(|| {
                     env.elaborate_file(memory_source)
                         .expect("check later memory class");
-                    env.globals["C"]
+                    env.globals["A.C"]
                 });
                 assert_ne!(file_id, memory_id);
                 env.elaborate_module_from_roots_strict(&roots, file_client)
@@ -8130,7 +8161,7 @@ mod namespace_effect_tests {
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
         env.elaborate_file("module A { pub class C a { marker : Nat } }")
             .expect("memory class has Nat field");
-        let memory_id = env.globals["C"];
+        let memory_id = env.globals["A.C"];
         assert_ne!(file_id, memory_id);
         assert!(matches!(
             env.elaborate_module_from_roots_strict(&roots, "Wrong"),
@@ -8165,9 +8196,9 @@ mod namespace_effect_tests {
         let mut env = ElabEnv::new().expect("prelude");
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
             .expect("file provider and its dictionary export");
-        let class_id = env.globals["Pick"];
+        let class_id = env.globals["A.Pick"];
         let old_head = env.globals["A.Foo"];
-        let old_dictionary = env.globals["Pick_instance_A.Foo"];
+        let old_dictionary = env.globals["A.Pick_instance_A.Foo"];
         assert_eq!(
             env.module_state.file_export_ids["P"]["P"]["Pick_instance_Foo"],
             old_dictionary,
@@ -8178,7 +8209,7 @@ mod namespace_effect_tests {
             "module A { import P (Pick) pub data Foo = MkNewFoo instance Pick Foo { selected = False } const selected : Bool where Pick Foo = d.selected }",
         ).expect("new checked head, dictionary and use in the same provider scope");
         let new_head = env.globals["A.Foo"];
-        let new_dictionary = env.globals["Pick_instance_A.Foo"];
+        let new_dictionary = env.globals["A.Pick_instance_A.Foo"];
         assert_ne!(old_head, new_head);
         assert_ne!(old_dictionary, new_dictionary);
         assert!(results.iter().any(|result| result.def_id == new_head));
@@ -8229,7 +8260,7 @@ mod namespace_effect_tests {
         )].instance_id;
         env.elaborate_file("module A { pub class C a { marker : Nat } instance C Nat { marker = Zero } }")
             .expect("distinct memory class and dictionary checked");
-        let memory_id = env.globals["C"];
+        let memory_id = env.globals["A.C"];
         assert_ne!(file_id, memory_id);
         let memory_dictionary = env.class_env.instances_by_id[&(
             memory_id, crate::classes::InstanceHeadKey::Global(nat_id)
@@ -8272,7 +8303,7 @@ mod namespace_effect_tests {
             "import A (Foo as NewFoo)\nconst wrong : Bool where C (Pair NewFoo Nat) = d.marker",
         );
         assert!(matches!(result, Err(ElabError::NoInstance { ref class, ref ty, .. })
-            if class == "C" && ty == "Pair"),
+            if class == "A.C" && ty == "Pair"),
             "wrong fixed constructor must fail during candidate match: {result:?}");
     }
 
@@ -8294,7 +8325,7 @@ mod namespace_effect_tests {
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
         env.elaborate_file("module A { pub class C a { step : a -> a } }")
             .expect("memory class declares ordinary field");
-        let memory_id = env.globals["C"];
+        let memory_id = env.globals["A.C"];
         assert_ne!(file_id, memory_id);
         let refused = env.elaborate_module_from_roots_strict(&roots, "B");
         assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
@@ -8326,14 +8357,20 @@ mod namespace_effect_tests {
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
         env.elaborate_file("module A { pub class C a { step : a -> a } }")
             .expect("memory class pure field checked");
-        assert_ne!(file_id, env.globals["C"]);
+        assert_ne!(file_id, env.globals["A.C"]);
         let refused = env.elaborate_module_from_roots_strict(&roots, "B");
         assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
             if reason.contains("Sink.step") && reason.contains("effectful")),
             "file-selected proc prerequisite cannot inhabit a marked fn field: {refused:?}");
         env.elaborate_module_from_roots_strict(&roots, "BP")
             .expect("file proc prerequisite builds a proc instance field");
-        let file_sink = env.class_env.class("SinkP").expect("file SinkP checked").projection.type_id;
+        let file_sink = env
+            .globals
+            .get("BP.SinkP")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .expect("file SinkP checked")
+            .projection
+            .type_id;
         let local_head = env.globals["BP.LocalP"];
         let info = &env.class_env.instances_by_id[&(
             file_sink, crate::classes::InstanceHeadKey::Global(local_head)
@@ -8367,7 +8404,11 @@ mod namespace_effect_tests {
             let error = env.elaborate_decl(later).expect_err("package duplicate must refuse");
             assert!(matches!(error, ElabError::DuplicateDefinition { name, .. } if name == "Shared"));
             assert_eq!(env.globals["Shared"], record_id);
-            assert!(env.class_env.class("Shared").is_none());
+            assert!(env
+                .globals
+                .get("Shared")
+                .and_then(|id| env.class_env.class_by_id(*id))
+                .is_none());
             assert!(env.class_env.class_by_id(record_id).is_none());
             assert_eq!(
                 env.class_env.projection_by_type_id(record_id).unwrap().field_names,
@@ -8397,7 +8438,7 @@ mod namespace_effect_tests {
         let file_head = ids["Target"];
         env.elaborate_file("module A { pub class Marker a { } pub data Target = MkMemoryTarget }")
             .expect("same-name memory providers checked");
-        let memory_class = env.globals["Marker"];
+        let memory_class = env.globals["A.Marker"];
         let memory_head = env.globals["A.Target"];
         assert_ne!((file_class, file_head), (memory_class, memory_head));
         env.elaborate_module_from_roots_strict(&roots, "B")

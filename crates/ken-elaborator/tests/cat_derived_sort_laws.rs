@@ -23,10 +23,16 @@ fn load() -> ElabEnv {
         .expect("roots-load real Derived and its providers");
     env.elaborate_file("import Data.Collections.Derived (count, Perm, insert, sort)")
         .expect("all four generic sort proofs must be importable with their owners");
-    for name in ["IsTrue", "bool_or", "leq_nat"] {
-        let id = env.globals[&format!("Core.Classes.LawfulClasses.{name}")];
-        env.globals.insert(name.to_owned(), id);
+    for name in ["bool_or", "leq_nat"] {
+        assert!(
+            !env.globals.contains_key(name),
+            "{name} must not enter the flat test fixture"
+        );
     }
+    env.elaborate_file(
+        "import Core.Classes.LawfulClasses (IsTrue as sort_is_true, bool_or, leq_nat)",
+    )
+    .expect("sort clients must import the checked LawfulClasses helpers");
     env
 }
 
@@ -68,13 +74,13 @@ fn generic_sort_laws_are_attached_to_the_derived_owners() {
          Perm a eqf xs (sort a le xs) = sort::perm a le xs eqf",
         "theorem sorted_insert_consumer \
          (a : Type) (le : a → a → Bool) \
-         (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x))) \
+         (total : (x : a) → (y : a) → sort_is_true (bool_or (le x y) (le y x))) \
          (x : a) (xs : List a) : \
          is_sorted a le xs → is_sorted a le (insert a le x xs) = \
          insert::sorted a le total x xs",
         "theorem sorted_sort_consumer \
          (a : Type) (le : a → a → Bool) \
-         (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x))) \
+         (total : (x : a) → (y : a) → sort_is_true (bool_or (le x y) (le y x))) \
          (xs : List a) : is_sorted a le (sort a le xs) = \
          sort::sorted a le total xs",
     ] {

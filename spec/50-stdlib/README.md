@@ -249,8 +249,9 @@ Specifying §§5–6 does not claim their catalog builds have landed.
 
 The **Layer-3 graphs and dependency contract** is pinned in
 **`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT), §2
-(SPEC-GRAPHS-CYCLE-REFUTES-ORDER), and §3
-(SPEC-GRAPHS-WALK-COMPOSITION-ORDER). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-CYCLE-REFUTES-ORDER), §3
+(SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
+(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -261,9 +262,14 @@ every topological order by its forward-edge field alone. Section 3
 specifies `walk_append` by recursion on the second walk and the checked
 `ordered_walk_forward` law for a walk with a first edge; the private
 `walk_before` remains unexported. The §2 seed's blocks were exercised
-only as scratch clients. Section 3's catalog exports and seed, shipped
-seed-harness execution, CI and a landed trust-delta measurement are not
-established by this spec-only candidate. No second fixed point is added.
+only as scratch clients. Section 3's catalog exports and package-owned
+seed test are present, but this candidate does not execute them.
+Section 4 specifies generic left-unit and associativity laws for
+`walk_append` and authors a closed conformance seed. Its Architect D0
+checked the generic proofs on a scratch overlay with no trust delta;
+§4 exports and shipped-seed execution are not established by this
+spec/seed candidate. No CI, publication, landing or landed §4 trust
+measurement is claimed. No second fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
@@ -293,11 +299,12 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–4
+**`65-linear-algebra.md`** §§1–5
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
-SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY).
+SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
+SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -305,12 +312,17 @@ awaits `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`. The existing seed
 includes closed §3 compatibility cases, with a catalog acceptance
 source target. Section 4 specifies row-wise public `matrix_add`,
 left and right matrix-product distribution, matrix-vector distribution
-in the matrix argument, and transposition of a sum. Its four generic
-laws were checked in Architect scratch D0 (rc 0, no new `Axiom`,
-trust identities 109 → 109), not delivered as §4 catalog exports or
-seed. The D0 census did not run to a verdict. No §4 shipped-seed
-execution, CI, publication, landing or landed trust measurement is
-claimed. No rational or `Float` tier is claimed.
+in the matrix argument, and transposition of a sum. Its four generic laws and
+operation are catalog exports with checked bodies and a package-owned
+seed test; Architect's historical scratch D0 had no census verdict
+and did not establish shipped execution. Section 5 specifies public
+commutativity and associativity of both sums for every dimension.
+Architect D0 checked four generic proofs, lifting the matrix laws
+row-wise from vector laws, with no new `Axiom` and unchanged scratch
+trust identities (114 → 114). The §5 catalog exports remain absent;
+this candidate authors a closed seed, not shipped-seed execution,
+CI, publication, landing or landed trust for §5. No rational or
+`Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–5 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
@@ -352,9 +364,9 @@ establish shipped-seed execution, CI or landed trust. A sorted-list
 normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–4 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–5 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
-SPEC-GEOMETRY-BOX-AREA).
+SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -377,21 +389,27 @@ natural-coordinate spans, with zero area when either axis is inverted.
 Three generic laws state containment monotonicity without an outer-
 validity premise and zero area for each inverted axis. Intersection
 area bounds follow from monotonicity and the public §3.2 corner
-laws; no extra intersection theorem is exported. Architect checked
-the §4 D0 in scratch (rc 0, no local `Axiom`, trust identities
-114 → 114), but §4 catalog exports and seed have not been delivered;
-that scratch result is not shipped-seed execution, CI or a landed
-trust measurement. The per-axis and proof helpers remain private.
-Signed-coordinate geometry, Euclidean and floating-point distance,
-other dimensions, canonical empty boxes and point-set equality remain
-outside scope.
+laws; no extra area-intersection theorem is exported. The §4 catalog
+exports and seed are now present on main, with a package-owned test
+executing its seed fences and measuring unchanged trust; Architect's
+older scratch D0 was not itself shipped-seed execution. Section 5
+adds unconditional public transitivity, greatest-intersection and
+least-hull laws for corner-wise `inside`, including inverted boxes.
+Architect checked them in scratch with unchanged 114 → 114 trusted
+identities, but the §5 exports are absent at this base. Its authored
+seed and scratch checks do not establish shipped-seed execution, CI,
+publication, landing or landed trust for §5. The new per-axis proof
+helpers stay private. Signed-coordinate geometry, Euclidean and
+floating-point distance, other dimensions, canonical empty boxes and
+point-set equality remain outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–4
+**`68-numerical.md`** §§1–5
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
-SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY). The §1–2
+SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
+SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -411,9 +429,17 @@ pass the endpoint test despite vacuous member-set inclusion. Section 4
 specifies four checked inclusions: each side of the
 left- and right-oriented distributivity pair lies inside the other
 by endpoint value, without structural `Equal Interval` or interval
-commutativity. Its catalog exports and conformance seed are not
-delivered by this spec-only candidate; the Architect's scratch D0
-is not shipped-seed execution, CI or a landed trust measurement.
+commutativity. The §4 exports and seed are now present on main,
+with a targeted package test; this is not official conformance
+execution or a landed trust measurement. Section 5 adds five
+generic obligations: transitivity of endpoint-wise inclusion and
+swapped-operand inclusion for addition, multiplication, hull and
+intersection. Their converses follow by swapping the theorem's
+arguments, without structural `Equal Interval` or extra public
+laws. Architect checked five generic proofs in scratch with no
+new `Axiom` and unchanged trust identities (114 → 114); §5
+catalog exports are absent. Its authored closed seed is not
+shipped-seed execution, CI, publication, landing or landed trust.
 Signed arithmetic, division, `Float`, rounding, width and structural
 hull/intersection algebra remain deferred.
 
@@ -445,22 +471,22 @@ and k-way merge remain deferred.
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
 SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4) and §3
-(SPEC-OPTIMIZATION-ARGMAX). The landed
-`Algorithm.Optimization.Argmin` selects the earliest minimum under a
-`Nat` cost from `NonEmpty a`, with no `DecEq a`; its seven checked laws
-and seed are present on main. Section 1.4 specifies `argmin_option`
-on a possibly empty `List a`, with `Nil`/`Cons` equations and direct
-membership and least-cost corollaries for a `Some` result. Its four
-laws were checked in Architect scratch D0; its catalog exports and
-seed are now present on main. Section 3 specifies `argmax` in the same
-module, selecting the earliest greatest-cost member of `NonEmpty a`
-under seven additional laws. Architect checked the §3 development
-with unchanged 114→114 trusted identities; §3 catalog exports and
-seed are not delivered by this spec-only candidate. Scratch checks
-alone establish neither shipped-seed execution, CI nor a landed trust
-measurement. Continuous or implicit search, heuristics, approximation,
-arbitrary-order or multi-objective costs, top-k and complexity claims
-remain deferred.
+(SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).
+The landed `Algorithm.Optimization.Argmin` selects the earliest minimum
+or greatest `Nat`-cost member of `NonEmpty a` with no `DecEq a`; the
+seven `argmin` and seven `argmax` laws and both seeds are present on
+main. Section 1.4's `argmin_option` and four laws are also landed.
+Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
+`Nil` yields `None`, and `Cons` yields `Some` of `argmax` over
+`nonempty_cons`. Four laws give the two equations and direct-to-`List`
+membership and greatest-cost consequences for an observed `Some`.
+Architect's D0 checked these laws at 114→114 trusted identities. The
+§3.4 catalog exports are not yet delivered; the new seed is authored
+and checked only on an isolated D0 overlay, not shipped exports or the
+official conformance runner. No CI, publication, landing or landed
+trust measurement follows from the scratch checks. Continuous or
+implicit search, heuristics, approximation, arbitrary-order or
+multi-objective costs, top-k and complexity claims remain deferred.
 
 The **finite bounded-search contract** is pinned in
 **`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).

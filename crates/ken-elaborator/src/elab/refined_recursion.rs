@@ -138,8 +138,9 @@ fn projection_pair(term: &Term) -> Option<(&Term, &Term)> {
 /// What a literal-pair projection may do during the rewrite.
 enum ProjectionRedexes {
     /// Pre-check: admit only a projection whose operand is a refined argument
-    /// of a saturated member call whose value is in flight: in that call's
-    /// result ascription or in the type and scope of a let that binds it.
+    /// of a saturated member call whose value is in flight: in its result
+    /// ascription, a let's type/scope when its value returns the call, or the
+    /// motive/methods of an eliminator that returns it on every path.
     /// Authority is inherited inward and never reset.
     Induced(Vec<Term>),
     /// Worker construction: reduce every literal-pair projection after the
@@ -162,22 +163,130 @@ impl ProjectionRedexes {
         }
     }
 
-    /// Add the refined arguments of a saturated member call to the inherited set.
+    /// Add the refined arguments of the member call a value returns to the inherited set.
     fn with_call(
         &self,
-        call: &Term,
+        env: &GlobalEnv,
+        value: &Term,
         members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
     ) -> Self {
         match self {
             Self::Induced(args) => Self::Induced(
                 args.iter()
                     .cloned()
-                    .chain(member_call_refined_args(call, members))
+                    .chain(returned_call_refined_args(
+                        env,
+                        value,
+                        members,
+                        &mut Vec::new(),
+                    ))
                     .collect(),
             ),
             Self::All => Self::All,
         }
     }
+}
+
+/// The refined arguments of the saturated member call a value returns, at the
+/// value's own scope. A value returns a call when it is the call, or when it
+/// returns one through an ascription, the body of an inner let (including a
+/// variable bound by such a let), or every method of an eliminator. Arguments
+/// introduced under a binder cannot name their bound variables at this scope.
+/// `scope[i]` holds what the i-th binder entered inside the value returns.
+fn returned_call_refined_args(
+    env: &GlobalEnv,
+    value: &Term,
+    members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+    scope: &mut Vec<Vec<Term>>,
+) -> Vec<Term> {
+    match strip_ascript(value) {
+        Term::Var(index) => scope
+            .len()
+            .checked_sub(index + 1)
+            .map(|at| scope[at].clone())
+            .unwrap_or_default(),
+        Term::Let { val, body, .. } => {
+            let bound = returned_call_refined_args(env, val, members, scope);
+            scope.push(bound);
+            let returned = returned_call_refined_args(env, body, members, scope);
+            scope.pop();
+            returned
+        }
+        Term::Elim { fam, methods, .. } => {
+            eliminator_returned_args(env, *fam, methods, 0, members, scope)
+        }
+        Term::App(..) if matches!(peel_app(strip_ascript(value)).0, Term::Elim { .. }) => {
+            let (head, args) = peel_app(strip_ascript(value));
+            let Term::Elim { fam, methods, .. } = head else {
+                unreachable!("guarded by the match arm")
+            };
+            eliminator_returned_args(env, fam, &methods, args.len(), members, scope)
+        }
+        call => member_call_refined_args(call, members)
+            .into_iter()
+            .filter_map(|mut arg| {
+                for _ in 0..scope.len() {
+                    if crate::fo_kripke::mentions_var0(&arg) {
+                        return None;
+                    }
+                    arg = shift(&arg, -1, 0);
+                }
+                Some(arg)
+            })
+            .collect(),
+    }
+}
+
+/// The refined arguments every possible method of an eliminator returns,
+/// applied to `applied` arguments (an index-equation convoy's premises). Each
+/// method binds its constructor's arguments, then their inductive hypotheses,
+/// then one binder per applied argument. A method whose body is a checked
+/// `Absurd` has no path and is not intersected; if none has a path, none is
+/// returned.
+fn eliminator_returned_args(
+    env: &GlobalEnv,
+    fam: GlobalId,
+    methods: &[Term],
+    applied: usize,
+    members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+    scope: &mut Vec<Vec<Term>>,
+) -> Vec<Term> {
+    let Some(Decl::Inductive(decl)) = env.lookup(fam) else {
+        return vec![];
+    };
+    if methods.is_empty() || decl.constructors.len() != methods.len() {
+        return vec![];
+    }
+    let mut common: Option<Vec<Term>> = None;
+    for (constructor, method) in decl.constructors.iter().zip(methods) {
+        let Ok(recursive) =
+            ken_kernel::inductive::recursive_shapes(env, constructor, fam, decl.params.len())
+        else {
+            return vec![];
+        };
+        let binders = constructor.args.len() + recursive.len() + applied;
+        let mut body = method;
+        for _ in 0..binders {
+            let Term::Lam(_, inner) = strip_ascript(body) else {
+                return vec![];
+            };
+            body = inner;
+        }
+        if matches!(strip_ascript(body), Term::Absurd(..)) {
+            continue;
+        }
+        scope.extend(std::iter::repeat_with(Vec::new).take(binders));
+        let returned = returned_call_refined_args(env, body, members, scope);
+        scope.truncate(scope.len() - binders);
+        common = Some(match common {
+            None => returned,
+            Some(prior) => prior
+                .into_iter()
+                .filter(|arg| returned.contains(arg))
+                .collect(),
+        });
+    }
+    common.unwrap_or_default()
 }
 
 /// The refined arguments of a saturated member call; otherwise none.
@@ -209,12 +318,13 @@ fn member_call_refined_args(
 /// body and type before any worker is staged. It recurses into method/motive
 /// terms and ascriptions, not only expression leaves.
 fn rewrite_core(
+    env: &GlobalEnv,
     term: &Term,
     members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
     mode: &ProjectionRedexes,
 ) -> Option<Term> {
-    let walk = |term: &Term| rewrite_core(term, members, mode);
-    let under_binder = |term: &Term| rewrite_core(term, members, &mode.under_binder());
+    let walk = |term: &Term| rewrite_core(env, term, members, mode);
+    let under_binder = |term: &Term| rewrite_core(env, term, members, &mode.under_binder());
     Some(match term {
         Term::App(..) => {
             let (head, args) = peel_app(term);
@@ -238,6 +348,17 @@ fn rewrite_core(
                     }
                     return Some(call);
                 }
+            }
+            // An eliminator applied to its convoy arguments returns what its
+            // methods return under those binders; its motive and methods
+            // inherit that call, not the bare eliminator's.
+            if matches!(head, Term::Elim { .. }) {
+                let returned = mode.with_call(env, term, members);
+                let mut call = rewrite_elim(env, &head, members, mode, &returned)?;
+                for arg in &args {
+                    call = Term::app(call, walk(arg)?);
+                }
+                return Some(call);
             }
             let mut call = walk(&head)?;
             for arg in &args {
@@ -267,18 +388,23 @@ fn rewrite_core(
             }
         }
         Term::Let { ty, val, body } => {
-            let bound = mode.with_call(val, members);
+            let bound = mode.with_call(env, val, members);
             Term::Let {
-                ty: Box::new(rewrite_core(ty, members, &bound)?),
+                ty: Box::new(rewrite_core(env, ty, members, &bound)?),
                 val: Box::new(walk(val)?),
-                body: Box::new(rewrite_core(body, members, &bound.under_binder())?),
+                body: Box::new(rewrite_core(env, body, members, &bound.under_binder())?),
             }
         }
         Term::Ascript(body, ty) => match mode {
             ProjectionRedexes::All => Term::Ascript(Box::new(walk(body)?), Box::new(walk(ty)?)),
             ProjectionRedexes::Induced(_) => Term::Ascript(
                 Box::new(walk(body)?),
-                Box::new(rewrite_core(ty, members, &mode.with_call(body, members))?),
+                Box::new(rewrite_core(
+                    env,
+                    ty,
+                    members,
+                    &mode.with_call(env, body, members),
+                )?),
             ),
         },
         Term::Eq(a, b, c) => Term::Eq(Box::new(walk(a)?), Box::new(walk(b)?), Box::new(walk(c)?)),
@@ -308,23 +434,12 @@ fn rewrite_core(
             respect: Box::new(walk(respect)?),
             scrut: Box::new(walk(scrut)?),
         },
-        Term::Elim {
-            fam,
-            level_args,
-            params,
-            motive,
-            methods,
-            indices,
-            scrut,
-        } => Term::Elim {
-            fam: *fam,
-            level_args: level_args.clone(),
-            params: params.iter().map(walk).collect::<Option<Vec<_>>>()?,
-            motive: Box::new(walk(motive)?),
-            methods: methods.iter().map(walk).collect::<Option<Vec<_>>>()?,
-            indices: indices.iter().map(walk).collect::<Option<Vec<_>>>()?,
-            scrut: Box::new(walk(scrut)?),
-        },
+        Term::Elim { .. } => {
+            // The motive and methods type and produce the value this
+            // eliminator returns, so they inherit the call it returns.
+            let returned = mode.with_call(env, term, members);
+            rewrite_elim(env, term, members, mode, &returned)?
+        }
         Term::Var(_)
         | Term::Const { .. }
         | Term::Type(_)
@@ -332,6 +447,40 @@ fn rewrite_core(
         | Term::IndFormer { .. }
         | Term::Constructor { .. }
         | Term::IntLit(_) => term.clone(),
+    })
+}
+
+/// Rewrite an eliminator whose motive and methods inherit `returned`; its
+/// parameters, indices and scrutinee keep the enclosing `mode`.
+fn rewrite_elim(
+    env: &GlobalEnv,
+    term: &Term,
+    members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+    mode: &ProjectionRedexes,
+    returned: &ProjectionRedexes,
+) -> Option<Term> {
+    let Term::Elim {
+        fam,
+        level_args,
+        params,
+        motive,
+        methods,
+        indices,
+        scrut,
+    } = term
+    else {
+        return None;
+    };
+    let walk = |term: &Term| rewrite_core(env, term, members, mode);
+    let typed = |term: &Term| rewrite_core(env, term, members, returned);
+    Some(Term::Elim {
+        fam: *fam,
+        level_args: level_args.clone(),
+        params: params.iter().map(walk).collect::<Option<Vec<_>>>()?,
+        motive: Box::new(typed(motive)?),
+        methods: methods.iter().map(typed).collect::<Option<Vec<_>>>()?,
+        indices: indices.iter().map(walk).collect::<Option<Vec<_>>>()?,
+        scrut: Box::new(walk(scrut)?),
     })
 }
 
@@ -391,15 +540,18 @@ impl RefinedWorkerPlan {
             .collect();
         for member in &members {
             // Permit only a refined call argument projected where that call's
-            // value is in flight: its result ascription, or a let that binds it.
+            // value is in flight: its result ascription, a let that returns it,
+            // or the typing and methods of an eliminator returning it.
             // Source literal-pair projections and every other shape retain the
             // original admission path.
             rewrite_core(
+                env,
                 &member.original_type,
                 &by_id,
                 &ProjectionRedexes::Induced(vec![]),
             )?;
             rewrite_core(
+                env,
                 &member.original_body,
                 &by_id,
                 &ProjectionRedexes::Induced(vec![]),
@@ -421,7 +573,7 @@ impl RefinedWorkerPlan {
             .collect()
     }
 
-    fn worker_bodies(&self, ids: &[GlobalId]) -> Option<Vec<Term>> {
+    fn worker_bodies(&self, env: &GlobalEnv, ids: &[GlobalId]) -> Option<Vec<Term>> {
         let by_id: HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)> = self
             .members
             .iter()
@@ -432,7 +584,7 @@ impl RefinedWorkerPlan {
             .iter()
             .map(|member| {
                 let split = split_body(&member.original_body, &member.positions)?;
-                rewrite_core(&split, &by_id, &ProjectionRedexes::All)
+                rewrite_core(env, &split, &by_id, &ProjectionRedexes::All)
             })
             .collect()
     }
@@ -512,7 +664,7 @@ pub(super) fn admit_pending_refined(
     };
     let worker_ids = workers.ids().to_vec();
     let Some((worker_bodies, wrappers)) = plan
-        .worker_bodies(&worker_ids)
+        .worker_bodies(env, &worker_ids)
         .zip(plan.wrapper_bodies(&worker_ids))
     else {
         let _ = ken_kernel::rollback_pending(env, workers);

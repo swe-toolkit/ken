@@ -44,6 +44,10 @@ file comes to state it.
   "As a general policy a red CI is a priority task and you should not use
   admin-merge-past authorization to ignore it, especially not so that it
   becomes normalized and SOP."
+- **Local tests are targeted** (2026-10-26), after one seat's whole-crate
+  local test run held the build lock for over an hour: "We do not run full CI
+  locally for exactly that reason. only targeted tests run locally and we
+  depend on CI to catch interactions that were unexpected."
 - **pi context** (2026-08-30): "the pi context PERCENTAGE is not a danger
   metric; STOP remediating pi seats on it." pi seats have a 272k window, not
   1M (2026-08-23).

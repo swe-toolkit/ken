@@ -288,15 +288,16 @@ fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
     .expect("public imports and `where Ord Bool` must resolve both laws and order vectors");
 
     let ord_class = env
-        .class_env
-        .class("Ord")
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("Ord must remain a checked class")
         .projection
         .type_id;
     assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
     let bool_instance = env
         .class_env
-        .instance_search("Ord", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.Ord", "Bool")
         .expect("the canonical Ord Bool dictionary must be registered");
     assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be LawfulClasses-owned");
     let wrapper_id = env.globals["cat_sort_bool_via_ord"];

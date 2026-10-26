@@ -457,7 +457,8 @@ impl<'a> LayoutPrinter<'a> {
             | Expr::EProj(_, _, span)
             | Expr::EPosProj(_, _, span)
             | Expr::EPair(_, span)
-            | Expr::EPi(_, _, _, span) => self.print_span(span),
+            | Expr::EPi(_, _, _, span)
+            | Expr::ESigma(_, _, _, span) => self.print_span(span),
             _ => self.print_span(expr.span()),
         };
         if reconstructed {
@@ -1807,7 +1808,7 @@ enum ExprContext {
 fn expr_precedence(expr: &Expr) -> u8 {
     match expr {
         Expr::ELam(_, _, _) | Expr::ELet(_, _, _) | Expr::EMatch { .. } | Expr::EIf { .. } => 0,
-        Expr::EPi(_, _, _, _) | Expr::EArrow(_, _, _) => 1,
+        Expr::EPi(_, _, _, _) | Expr::ESigma(_, _, _, _) | Expr::EArrow(_, _, _) => 1,
         Expr::EAsc(_, _, _) => 2,
         Expr::EBinOp(op, _, _, _) => binop_precedence(*op),
         Expr::EApp(_, _, _) => 7,

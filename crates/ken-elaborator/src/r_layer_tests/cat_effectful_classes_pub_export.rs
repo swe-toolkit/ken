@@ -58,8 +58,8 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
 fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
     if surface == "Applicative" {
         env.class_env
-            .class(surface)
-            .expect("Applicative must remain a registered class")
+            .class_by_id(env.globals[&format!("{EFFECTFUL_CLASSES}.{surface}")])
+            .expect("Applicative must remain a registered checked class")
             .projection
             .type_id
     } else {
@@ -393,13 +393,17 @@ fn effectful_classes_publication_preserves_class_and_instance_owners() {
             .keys()
             .map(String::as_str)
             .collect::<BTreeSet<_>>(),
-        BTreeSet::from(["Applicative", "Monad", "Traversable"]),
+        BTreeSet::from([
+            "Core.Classes.EffectfulClasses.Applicative",
+            "Core.Classes.EffectfulClasses.Monad",
+            "Core.Classes.EffectfulClasses.Traversable",
+        ]),
         "EC's owned class population changed"
     );
 
     let applicative = provider_identity(&env, "Applicative");
     assert_eq!(
-        applicative, owned_classes["Applicative"],
+        applicative, owned_classes["Core.Classes.EffectfulClasses.Applicative"],
         "the public name and class registry must retain one Applicative identity"
     );
     let owned_instances = env
@@ -420,20 +424,26 @@ fn effectful_classes_publication_preserves_class_and_instance_owners() {
             .map(|(class, head, _)| (class.as_str(), head.as_str()))
             .collect::<BTreeSet<_>>(),
         BTreeSet::from([
-            ("Applicative", "Core.Classes.EffectfulClasses.Identity"),
-            ("Applicative", "List"),
-            ("Applicative", "Option"),
-            ("Functor", "Core.Classes.EffectfulClasses.Identity"),
-            ("Monad", "List"),
-            ("Monad", "Option"),
-            ("Traversable", "List"),
-            ("Traversable", "Option"),
+            (
+                "Core.Classes.EffectfulClasses.Applicative",
+                "Core.Classes.EffectfulClasses.Identity"
+            ),
+            ("Core.Classes.EffectfulClasses.Applicative", "List"),
+            ("Core.Classes.EffectfulClasses.Applicative", "Option"),
+            (
+                "Core.Classes.LawfulFunctors.Functor",
+                "Core.Classes.EffectfulClasses.Identity"
+            ),
+            ("Core.Classes.EffectfulClasses.Monad", "List"),
+            ("Core.Classes.EffectfulClasses.Monad", "Option"),
+            ("Core.Classes.EffectfulClasses.Traversable", "List"),
+            ("Core.Classes.EffectfulClasses.Traversable", "Option"),
         ]),
         "EC's owned instance population changed"
     );
     let applicative_instances = owned_instances
         .iter()
-        .filter(|(class, _, _)| class == "Applicative")
+        .filter(|(class, _, _)| class == "Core.Classes.EffectfulClasses.Applicative")
         .collect::<Vec<_>>();
     assert_eq!(applicative_instances.len(), 3);
     for (_, _, instance) in applicative_instances {

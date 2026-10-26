@@ -4713,7 +4713,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                                 }
                                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable
                                                 | ComposedReturnForwardRetAuthorityOutcome::Formed(_)
-                                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_) => {}
+                                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
+                                                | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {}
                                                 #[cfg(feature = "px8-ds-test-support")]
                                                 ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
                                             }
@@ -4837,6 +4838,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 Some(authority._plan.active_frame_origin()),
                             ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) =>
                                 Some(proof.active_frame_origin()),
+                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, _) =>
+                                Some(proof.active_frame_origin()),
                             ComposedReturnForwardRetAuthorityOutcome::NonApplicable
                             | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
                             | ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
@@ -4869,6 +4872,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) => {
                                 ("FormedBasePath", Some(proof))
                             }
+                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, _) => {
+                                ("ConsumedBySettlement", Some(proof))
+                            }
                             ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
                                 ("MissingRequired", None)
                             }
@@ -4898,6 +4904,21 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     // retains the existing environment-capture producer path.
                     if current_checked_ih_projection.is_none() {
                         match forward_ret_outcome {
+                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
+                                self.pending_computational_ih_call.take();
+                                let result = self
+                                    .call_tail_checked_ih_transport_from_case_environment(
+                                        builder, &transport, &env,
+                                    )?;
+                                #[cfg(feature = "px8-ds-test-support")]
+                                record_settlement_consumed_tail(settlement, proof.source_call_identity());
+                                return Ok(SourceCallOutcome::Continue(
+                                    SourceMachineState::Value {
+                                        value: RoutedAnswer::checked(result),
+                                        control,
+                                    },
+                                ));
+                            }
                             ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                                 // RT-COMPOSED-RETURN-FORWARD-RET-EDGE D3-RECUT (b2
                                 // inc1, ruling A evt_h0vgd11g5xfb): the R3 shape gate
@@ -5095,7 +5116,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             match forward_ret_outcome {
                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {}
                                 ComposedReturnForwardRetAuthorityOutcome::Formed(_)
-                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_) => {
+                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
+                                | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {
                                     return Err(unsupported(LoweringCause::PlannerInvariant,
                                         "CheckedIhApplicationResult",
                                         "a Direct route unexpectedly formed Tail forward-Ret authority",
@@ -5130,6 +5152,21 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             // transfer, the active carried backedge, and the checked
                             // fallback. Same closeout as the non-governed seam above.
                             match forward_ret_outcome {
+                                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
+                                    self.pending_computational_ih_call.take();
+                                    let result = self
+                                        .call_tail_checked_ih_transport_from_case_environment(
+                                            builder, &transport, &env,
+                                        )?;
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    record_settlement_consumed_tail(settlement, proof.source_call_identity());
+                                    return Ok(SourceCallOutcome::Continue(
+                                        SourceMachineState::Value {
+                                            value: RoutedAnswer::checked(result),
+                                            control,
+                                        },
+                                    ));
+                                }
                                 ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                                     // (A) shape gate at consumption (evt_h0vgd11g5xfb),
                                     // mirrored at the governed seam. An EFFECT

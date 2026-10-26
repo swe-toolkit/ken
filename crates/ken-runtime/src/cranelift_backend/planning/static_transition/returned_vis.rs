@@ -41,6 +41,7 @@ pub fn with_forced_underived_owner<T>(owner_vis: u32, operation: impl FnOnce() -
 pub(in crate::cranelift_backend) struct ReturnedVisMember {
     pub(in crate::cranelift_backend) origin: StaticOriginId,
     pub(in crate::cranelift_backend) successor: Option<StaticResponseContinuation>,
+    pub(in crate::cranelift_backend) bracket: Option<super::brackets::BracketSettlementId>,
     pub(in crate::cranelift_backend) installed: bool,
     pub(in crate::cranelift_backend) relay: bool,
 }
@@ -103,6 +104,9 @@ pub(in crate::cranelift_backend) struct PendingVisSettlements {
     pub(in crate::cranelift_backend) protocol: Option<PendingVisRecordProtocol>,
     pub(in crate::cranelift_backend) owners:
         BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
+    /// Returned T1 settlement exits beside each owner's ordinary settlement.
+    pub(in crate::cranelift_backend) bracket_exits:
+        BTreeMap<StaticResponseContinuationId, BTreeSet<super::brackets::BracketSettlementId>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -207,6 +211,7 @@ impl StaticTransitionPlan<'_> {
     ) -> Result<PendingVisSettlements, CraneliftBackendError> {
         let admitted_relays = super::responses::settled_relay_owners(self);
         let mut settlements = BTreeMap::new();
+        let mut bracket_exits = BTreeMap::new();
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
         let mut frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth> = BTreeMap::new();
@@ -220,10 +225,19 @@ impl StaticTransitionPlan<'_> {
                     continue;
                 }
             };
+            let mut protocol = protocol;
+            let exits = protocol.contexts.iter().flat_map(|context| &context.members)
+                .filter_map(|member| member.bracket)
+                .collect::<BTreeSet<_>>();
+            if !exits.is_empty() {
+                for context in &mut protocol.contexts {
+                    context.members.retain(|member| member.bracket.is_none());
+                }
+                bracket_exits.insert(owner.id(), exits);
+            }
             // Source fusion consumes an admitted relay before this K returns.
             // Retain every non-relay successor and its existing exact row;
             // only an admitted owner's relay members leave the returned set.
-            let mut protocol = protocol;
             if protocol.excluded_by_relay && admitted_relays.contains(&owner.id()) {
                 for context in &mut protocol.contexts {
                     context.members.retain(|member| !member.relay);
@@ -302,6 +316,7 @@ impl StaticTransitionPlan<'_> {
                 frames,
             }),
             owners: settlements,
+            bracket_exits,
         })
     }
 
@@ -451,6 +466,32 @@ impl StaticTransitionPlan<'_> {
         Ok((returned, returning_units))
     }
 
+    /// A returned Vis with no ordinary successor row is the plane's T1 edge
+    /// (BodyExit -> Settlement) iff exactly one bracket instance settles at
+    /// it and the returning owner is that instance's acquire or lies in its
+    /// Body. Anything else stays underived; no ordinary row is consulted.
+    fn returned_bracket_settlement(
+        &self,
+        owner: &StaticResponseContinuation,
+        origin: StaticOriginId,
+    ) -> Result<Option<super::brackets::BracketSettlementId>, CraneliftBackendError> {
+        let mut instances = self.bracket_settlements.regions.iter()
+            .filter(|region| region.settlement == origin);
+        let Some(region) = instances.next() else { return Ok(None) };
+        if instances.next().is_some() {
+            return Err(planner_error(format!(
+                "returned Vis {origin:?} names two bracket settlement instances",
+            )));
+        }
+        let from = owner.vis_origin();
+        if from != region.acquire && !region.body.contains(&from) {
+            return Err(planner_error(format!(
+                "returned bracket settlement {origin:?} is reached from outside its region",
+            )));
+        }
+        Ok(Some(region.id))
+    }
+
     /// Resolve a response owner's complete returned-Vis K-context fixpoint.
     /// A relay makes the WHOLE owner ineligible; there is no partial route.
     /// Derived successors have the existing response-row type and are not
@@ -519,7 +560,10 @@ impl StaticTransitionPlan<'_> {
                     ));
                 }
                 let successor = matches.first().map(|row| (*row).clone());
-                if !relay {
+                let bracket = if relay || successor.is_some() { None } else {
+                    self.returned_bracket_settlement(owner, origin)?
+                };
+                if !relay && bracket.is_none() {
                     if !matches!(
                         self.source_occurrence(operation)?,
                         RuntimeExpr::Construct { .. }
@@ -546,6 +590,7 @@ impl StaticTransitionPlan<'_> {
                 members.push(ReturnedVisMember {
                     origin,
                     successor,
+                    bracket,
                     installed,
                     relay,
                 });

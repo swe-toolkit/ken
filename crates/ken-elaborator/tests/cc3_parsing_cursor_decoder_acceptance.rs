@@ -3,7 +3,7 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
@@ -30,19 +30,12 @@ fn dependency_env_with_provider_owned() -> (ElabEnv, Cc3ProviderOwned) {
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "LC must not provide a flat test alias"
+    );
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     (
         env,
         Cc3ProviderOwned {
@@ -63,7 +56,6 @@ fn load_cursor_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Cursor must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Cursor");
     owned
 }
 
@@ -73,7 +65,6 @@ fn load_decoder_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Decoder must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Decoder");
     owned
 }
 
@@ -83,7 +74,6 @@ fn load_parsing_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Parsing must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
     owned
 }
 
@@ -92,15 +82,19 @@ fn derived_fixture_retains_lawfulclasses_for_cc3_dependency_closure() {
     let _ = dependency_env();
 }
 
-fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
+fn assert_transparent_globals(
+    env: &ElabEnv,
+    module: &str,
+    owned: &BTreeSet<GlobalId>,
+    names: &[&str],
+) {
+    let owned: Vec<_> = owned.iter().copied().collect();
     for name in names {
-        let id = *env
-            .globals
-            .get(*name)
-            .unwrap_or_else(|| panic!("expected checked global `{name}`"));
+        let id = catalog_or::provider_owned_id(env, &owned, module, name)
+            .unwrap_or_else(|error| panic!("{module}.{name}: {error}"));
         assert!(
             env.env.transparent_body(id).is_some(),
-            "`{name}` must be a real transparent, kernel-checked term"
+            "`{module}.{name}` must be a real transparent, kernel-checked term"
         );
     }
 }
@@ -237,8 +231,16 @@ fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
     }
 }
 
-fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
-    let expected = env.globals[name];
+fn ctor_args<'a>(
+    env: &ElabEnv,
+    constructors: &BTreeMap<&str, GlobalId>,
+    value: &'a EvalVal,
+    name: &str,
+) -> &'a [EvalVal] {
+    let expected = constructors
+        .get(name)
+        .copied()
+        .unwrap_or_else(|| env.globals[name]);
     match value {
         EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
@@ -376,9 +378,11 @@ fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
 #[test]
 fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
     let mut env = dependency_env();
-    load_cursor_module(&mut env);
+    let cursor_owned = load_cursor_module(&mut env);
     assert_transparent_globals(
         &env,
+        "Capability.Parsing.Cursor",
+        &cursor_owned,
         &[
             "cursor_remaining",
             "cursor_peek",
@@ -398,9 +402,11 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
         ],
     );
 
-    load_decoder_module(&mut env);
+    let decoder_owned = load_decoder_module(&mut env);
     assert_transparent_globals(
         &env,
+        "Capability.Parsing.Decoder",
+        &decoder_owned,
         &[
             "decoder_error_location",
             "decoder_pure",
@@ -422,9 +428,11 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
         ],
     );
 
-    load_parsing_module(&mut env);
+    let parsing_owned = load_parsing_module(&mut env);
     assert_transparent_globals(
         &env,
+        "Capability.Parsing.Parsing",
+        &parsing_owned,
         &[
             "byte_cursor_remaining",
             "byte_cursor_peek",
@@ -606,11 +614,16 @@ fn repetition_progress_and_arg_locations_are_discriminating() {
 }
 
 fn repetition_progress_and_arg_locations_impl() {
-    let mut env = full_env();
+    let (mut env, constructors) = full_env();
     let long_len = 96;
     let long_bytes = "x".repeat(long_len);
     env.elaborate_file(&format!(
         r#"
+        import Capability.Parsing.Cursor
+          (ArgCursor, ArgLocation, arg_cursor_start, arg_cursor_ops)
+        import Capability.Parsing.Decoder
+          (Decoder, DecoderResult, decoder_satisfy, decoder_many,
+           decoder_pure, decoder_seq)
         const long_arg_bytes : Bytes = bytes_encode "{long_bytes}"
         const long_args : List Bytes = Cons Bytes long_arg_bytes (Nil Bytes)
         const long_start : ArgCursor = arg_cursor_start long_args
@@ -701,9 +714,9 @@ fn repetition_progress_and_arg_locations_impl() {
     neutralize_fixture_proofs(&env, &mut store, &["record_nil_val"]);
 
     let long_result = eval_global(&env, &mut store, "long_many_result");
-    let long_args = ctor_args(&env, &long_result, "Decoded");
+    let long_args = ctor_args(&env, &constructors, &long_result, "Decoded");
     assert_eq!(list_count(&env, &long_args[3]), long_len as u64);
-    let long_end = ctor_args(&env, &long_args[4], "MkArgCursor");
+    let long_end = ctor_args(&env, &constructors, &long_args[4], "MkArgCursor");
     assert_eq!(
         (nat_count(&env, &long_end[1]), nat_count(&env, &long_end[2])),
         (1, 0),
@@ -711,9 +724,9 @@ fn repetition_progress_and_arg_locations_impl() {
     );
 
     let zero_progress = eval_global(&env, &mut store, "zero_progress_result");
-    let zero_failed = ctor_args(&env, &zero_progress, "DecoderFailed");
-    let zero_error = ctor_args(&env, &zero_failed[3], "DecoderZeroProgress");
-    let zero_at = ctor_args(&env, &zero_error[1], "MkArgLocation");
+    let zero_failed = ctor_args(&env, &constructors, &zero_progress, "DecoderFailed");
+    let zero_error = ctor_args(&env, &constructors, &zero_failed[3], "DecoderZeroProgress");
+    let zero_at = ctor_args(&env, &constructors, &zero_error[1], "MkArgLocation");
     assert_eq!(
         (nat_count(&env, &zero_at[0]), nat_count(&env, &zero_at[1])),
         (0, 0),
@@ -721,9 +734,9 @@ fn repetition_progress_and_arg_locations_impl() {
     );
 
     let location_result = eval_global(&env, &mut store, "location_probe_result");
-    let location_failed = ctor_args(&env, &location_result, "DecoderFailed");
-    let rejected = ctor_args(&env, &location_failed[3], "DecoderRejected");
-    let at = ctor_args(&env, &rejected[1], "MkArgLocation");
+    let location_failed = ctor_args(&env, &constructors, &location_result, "DecoderFailed");
+    let rejected = ctor_args(&env, &constructors, &location_failed[3], "DecoderRejected");
+    let at = ctor_args(&env, &constructors, &rejected[1], "MkArgLocation");
     assert_eq!(
         (
             nat_count(&env, &at[0]),
@@ -736,10 +749,58 @@ fn repetition_progress_and_arg_locations_impl() {
 }
 
 #[allow(dead_code)]
-fn full_env() -> ElabEnv {
+fn full_env() -> (ElabEnv, BTreeMap<&'static str, GlobalId>) {
     let mut env = dependency_env();
-    load_cursor_module(&mut env);
-    load_decoder_module(&mut env);
+    let cursor_owned = load_cursor_module(&mut env);
+    let decoder_owned = load_decoder_module(&mut env);
     load_parsing_module(&mut env);
-    env
+    let mut constructors = BTreeMap::new();
+    for (module, owned, family, names) in [
+        (
+            "Capability.Parsing.Cursor",
+            &cursor_owned,
+            "ArgCursor",
+            &["MkArgCursor"][..],
+        ),
+        (
+            "Capability.Parsing.Cursor",
+            &cursor_owned,
+            "ArgLocation",
+            &["MkArgLocation"][..],
+        ),
+        (
+            "Capability.Parsing.Decoder",
+            &decoder_owned,
+            "DecoderResult",
+            &["Decoded", "DecoderFailed"][..],
+        ),
+        (
+            "Capability.Parsing.Decoder",
+            &decoder_owned,
+            "DecoderError",
+            &["DecoderZeroProgress", "DecoderRejected"][..],
+        ),
+    ] {
+        let family_id = env.globals[&format!("{module}.{family}")];
+        assert!(
+            owned.contains(&family_id),
+            "{family} must belong to {module}"
+        );
+        let family_decl = env
+            .env
+            .inductive(family_id)
+            .expect("checked constructor parent");
+        for &name in names {
+            let id = env.globals[&format!("{module}.{name}")];
+            assert!(
+                family_decl
+                    .constructors
+                    .iter()
+                    .any(|constructor| constructor.id == id),
+                "{module}.{name} must belong to its checked {family}"
+            );
+            assert!(constructors.insert(name, id).is_none());
+        }
+    }
+    (env, constructors)
 }

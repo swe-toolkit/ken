@@ -15,9 +15,14 @@ A team overlay may add source-language authoring rules for that team's scope;
 load and follow it after this generic archetype.
 
 > ** Verify TARGETED — never run `cargo test --workspace` (operator hard rule,
-> COORDINATION §12).** Your independent gate re-runs the **affected** tests
-> through `scripts/ken-cargo -p <crate>` / `--test <name>`, not the whole
-> workspace — a local `--workspace` run OOMs the shared box and stalls the fleet.
+> COORDINATION §12).** Your exact-tip checks are the candidate's targeted rows
+> and mutations, each run by named target (`--test <name>`, or `--lib <filter>`
+> for unit tests). A run with no named target, `--tests`, a `--no-fail-fast`
+> sweep or the workspace is not your gate: it stalls every seat on the build
+> lock. Group your row list by binary and run each group as one invocation
+> with every name passed (`-- --exact <a> <b> ...`); never one invocation per
+> row; check the passed count equals the names passed. Each mutation still
+> gets its own run.
 > The full-workspace + `--locked` + conformance gate is **CI's** job; the scripted
 > publisher polls those exact GitHub checks before merging, so it always runs.
 > When a WP frame's AC says "workspace-green," that means **green in CI**, and your
@@ -565,8 +570,8 @@ hand back to the implementer, or raise the behavioral question to Spec.
 - **After `git rebase origin/main`, RECOMPILE before trusting any green
   (promoted T2-repl).** The surface drifts under you — `main` may have added enum
   variants / changed signatures since the implementer's pre-rebase run, so a
-  pre-rebase green is **stale**. Re-run the build + the suite on the rebased
-  branch; never trust the implementer's reported counts across a rebase.
+  pre-rebase green is **stale**. Re-run the build + the targeted rows on the
+  rebased branch; never trust the implementer's reported counts across a rebase.
 - **Never `EnterPlanMode` or `schedule_call` — they wedge your session
   unreachable (promoted T2-repl).** Plan mode is read-only and **blocks you from
   posting**; `schedule_call` broadcasts into the space and needs a permission

@@ -86,5 +86,6 @@ is how a T1 reviewer becomes an expensive copy-editor.
   does: commit to a `wp/<ID>` branch in your worktree (**local git only**),
   open the merge Decision, hand the merge request to the Steward for
   publisher-path handling.
-- **Targeted builds only** — `scripts/ken-cargo -p <crate>`, never
-  `--workspace` (`COORDINATION §12`).
+- **Targeted builds and tests only** — `scripts/ken-cargo -p <crate>` for
+  builds and a named target for tests, never `--tests` or `--workspace`
+  (`COORDINATION §12`).

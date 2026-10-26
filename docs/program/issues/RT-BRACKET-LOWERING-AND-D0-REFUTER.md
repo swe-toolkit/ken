@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-LOWERING-AND-D0-REFUTER
 title: "CHILD 3 of RT-BRACKET-CONTROL-REGION-IR (after 1, 2a and 2b), AND THE ONLY ONE THAT ROUTES A CANDIDATE. The lowering consumer, the D0 EQUIVALENCE REFUTER, and closeout. Lowering receives ONLY a validated BracketSettlementControlView and consumes settlement, outcome merge and resume in order; an affine compiler ledger closes over exact region and edge identities. D0 IS NOT A CENSUS: it compares interpreter and linked-native normalized observation tuples over five mandatory rows and requires three compile-preserving mutations, and it CAN REFUTE THE REPRESENTATION where population equality provably cannot. ASSEMBLE CHILDREN 1, 2a AND 2b HERE AND ROUTE ONLY THE COMBINED TREE AS ONE ATOMIC CANDIDATE -- children 1, 2a and 2b are held, reviewed inputs and never independently landed products. Closeout un-ignores px8ta_oriented_subcontinuation::public_two_three_level_brackets_finish_and_release_lifo on BOTH its blockers and removes an order-excluding helper ONLY after both engines agree."
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
@@ -73,6 +73,16 @@ and do not compare release vectors alone.
 4. O0/read-offset and W0/read-window -- O0 live, W0 preserves main;
 5. one acquisition-failure case and one body-error/release-error discriminator,
    which observe the OUTCOME MERGE and not merely order.
+   **Bar (Architect `evt_1t3s9awyc14b7`):** no fixture can produce a real
+   cross-engine release error (`Closed` collapses into Ok or BodyError, and
+   `ReleaseFailed` needs a backend close/unmap fault). Row 5 is the
+   acquisition-failure tuple (exit 84), the body-error tuple (exit 81), the
+   outcome-merge bypass mutation below run on the body-error row, and one
+   more native-only scratch mutation that substitutes an error for the Ok
+   release result at the merge's release input: exit 0 must become the
+   ReleaseError class, and exit 81 the BodyAndReleaseError class. **Residual,
+   a follow-up candidate and not a blocker:** release-error parity across
+   engines needs a host fault-injection protocol, which is out of scope here.
 
 **Further measured members** (RT-NESTED-RELAY D0, `evt_3y63h26apw108`,
 folded in at `evt_5q52byr2tg4x2`). They join the D0 comparison as depth-2

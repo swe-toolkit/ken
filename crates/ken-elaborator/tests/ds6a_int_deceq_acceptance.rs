@@ -40,8 +40,9 @@ fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the LawfulClasses owner must roots-load in this environment");
     let class_id = env
-        .class_env
-        .class("DecEq")
+        .globals
+        .get("Core.Classes.LawfulClasses.DecEq")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
@@ -49,7 +50,7 @@ fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
     let instance_id = |head: &str| {
         let id = env
             .class_env
-            .instance_search("DecEq", head)
+            .instance_search("Core.Classes.LawfulClasses.DecEq", head)
             .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
         assert!(lawful_owned.contains(&id), "DecEq {head} must belong to LawfulClasses");
         id

@@ -10,16 +10,6 @@ fn assert_unresolved_owner(error: ElabError, expected: &str) {
     }
 }
 
-fn assert_no_instance(error: ElabError, expected_class: &str, expected_type: &str) {
-    match error {
-        ElabError::NoInstance { class, ty, .. } => {
-            assert_eq!(class, expected_class);
-            assert_eq!(ty, expected_type);
-        }
-        other => panic!("expected NoInstance for {expected_class} {expected_type}, got {other:?}"),
-    }
-}
-
 /// Durable invariant: a record's stored type identity reaches the same borrowed
 /// projection view used by `RProj`, while remaining outside class-only storage.
 #[test]
@@ -42,7 +32,10 @@ fn point_named_projections_are_typed_through_the_shared_owner_registry() {
     assert_eq!(projection.head_param, None);
     assert_eq!(projection.field_names, ["x", "y"]);
     assert!(
-        env.class_env.class("Point").is_none(),
+        env.globals
+            .get("Point")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .is_none(),
         "records must not enter class-only instance metadata"
     );
 }
@@ -73,8 +66,16 @@ fn class_instance_projection_is_unchanged_in_a_record_program() {
     )
     .expect("record and existing class/instance projection coexist");
 
-    assert!(env.class_env.class("Pick").is_some());
-    assert!(env.class_env.class("Point").is_none());
+    assert!(env
+        .globals
+        .get("Pick")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_some());
+    assert!(env
+        .globals
+        .get("Point")
+        .and_then(|id| env.class_env.class_by_id(*id))
+        .is_none());
 }
 
 /// Durable invariant: a class and a record may use the same field label while
@@ -102,8 +103,9 @@ fn shared_field_labels_keep_class_and_record_owners_distinct() {
         .projection_by_type_id(record_id)
         .expect("record projection owner");
     let class_projection = env
-        .class_env
-        .class("Selected")
+        .globals
+        .get("Selected")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("class owner")
         .projection;
 
@@ -112,10 +114,11 @@ fn shared_field_labels_keep_class_and_record_owners_distinct() {
     assert_eq!(record_projection.field_names, ["value"]);
     assert_eq!(class_projection.field_names, ["value"]);
     assert_ne!(record_projection.type_id, class_projection.type_id);
-    assert_eq!(
-        env.class_env.instance_search("Selected", "Bool"),
-        env.globals.get("Selected_instance_Bool").copied()
-    );
+    let selected = env
+        .class_env
+        .instance_search("Selected", "Bool")
+        .expect("the top-level Selected Bool instance must be registered");
+    assert_eq!(selected, env.globals["Selected_instance_Bool"]);
 
     let class_owners = env
         .class_env
@@ -156,7 +159,7 @@ fn records_are_unavailable_to_instance_constraint_and_derive_paths() {
     let constraint_error = env
         .elaborate_decl("fn constrained (x : Int) : Int where Point Int = x")
         .expect_err("record must not be accepted as a class constraint");
-    assert_no_instance(constraint_error, "Point", "Int");
+    assert_unresolved_owner(constraint_error, "Point");
 
     let derive_error = env
         .elaborate_decl("derive Point for Flag")

@@ -79,12 +79,9 @@ fn module_transparent_kernel_equivalents(
 fn map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Data.Numeric.Nat.Arithmetic",
-    )
-    .expect("Map's canonical Nat addition provider must roots-load");
+    let (lawful_owned, _) = catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("Map's canonical Nat addition provider must roots-load");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.Membership")
         .expect("Map's canonical Membership provider must roots-load");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Logic.Not")
@@ -94,8 +91,8 @@ fn map_dependency_env() -> ElabEnv {
         "Map must take Not from its selective import, not the prelude alias"
     );
     assert!(
-        env.globals.remove("Membership").is_some(),
-        "the dependency fixture must withhold the flat Membership alias"
+        !env.globals.contains_key("Membership"),
+        "module-qualified Membership must never install a flat alias"
     );
     for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(
@@ -104,9 +101,11 @@ fn map_dependency_env() -> ElabEnv {
         );
     }
     for imported in LC_BOOL_AND_SURFACES {
+        catalog_or::provider_owned_id(&env, &lawful_owned, LAWFUL, imported)
+            .unwrap_or_else(|error| panic!("LC must own {imported}: {error}"));
         assert!(
-            env.globals.remove(imported).is_some(),
-            "fixture must withhold selectively imported `{imported}`"
+            !env.globals.contains_key(imported),
+            "fixture must not prebind selectively imported `{imported}`"
         );
     }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")

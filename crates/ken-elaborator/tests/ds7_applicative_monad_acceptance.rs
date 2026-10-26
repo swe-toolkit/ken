@@ -225,8 +225,9 @@ fn trusted_base_delta_is_empty_across_the_entry() {
 #[test]
 fn wired_superclass_chain_and_nested_projection() {
     let mut env = base_env();
-    env.elaborate_decl(
-        "class Applicative (f : Type -> Type) { functor : Functor f ; pure : (a:Type) -> a -> f a ; ap : (a:Type) -> (b:Type) -> f (a -> b) -> f a -> f b }",
+    env.elaborate_file(
+        "import Core.Classes.LawfulFunctors (Functor)\n\
+         class Applicative (f : Type -> Type) { functor : Functor f ; pure : (a:Type) -> a -> f a ; ap : (a:Type) -> (b:Type) -> f (a -> b) -> f a -> f b }",
     )
     .expect("class Applicative with a wired Functor f field must elaborate");
     let r = env.elaborate_decl(

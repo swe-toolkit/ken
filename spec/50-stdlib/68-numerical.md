@@ -3,7 +3,8 @@
 > **Status: DRAFT v0 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT §1;
 > SPEC-NUMERICAL-INTERVAL-HULL §2;
 > SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3;
-> SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY §4).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY §4;
+> SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER §5).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -15,7 +16,12 @@
 > distributivity/factoring inclusions are now catalog exports, and a targeted
 > package test exercises the authored seed's positive and refused clients.
 > Package tests do not establish official conformance-runner execution, CI,
-> publication, landing or a landed trust measurement.
+> publication, landing or a landed trust measurement. Section 5 specifies
+> five new generic laws for transitivity and swapped-operand endpoint
+> inclusion. Architect checked their bodies in isolated D0 with no new
+> `Axiom`, Transparent ownership and unchanged scratch trusted identities
+> (114 → 114). The §5 catalog exports are absent at this base; the authored
+> seed and D0 checks are not shipped-seed execution, CI or landed trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -281,7 +287,8 @@ their intersection.
 
 These laws do **not** assert structural `Equal Interval` for
 commutativity, idempotence or associativity of either operation.
-No such law was proved by containment in D0 either. In particular,
+The §5 endpoint-value swap inclusions do not strengthen this to
+structural equality. In particular,
 the hull of the points at `half` and `two_quarters` stores
 `half` as its lower bound and `two_quarters` as its upper bound;
 swapping the arguments stores the reverse. Here `half = 1/2`
@@ -463,7 +470,8 @@ members of `i`. Pointwise member inclusion places both endpoints in
 inclusion is vacuous for inverted `[1/2,0]`, even though
 `interval_inside [1/2,0] [1,3]` is `False`. No unwitnessed converse,
 equivalence of member sets, or structural equality of intervals is
-promised. A transitivity law is not among these nine public laws.
+promised. Transitivity is not among these nine §3 laws; §5 states
+it separately, without a validity or membership premise.
 
 ### 3.3 Evidence and boundary
 
@@ -542,10 +550,12 @@ is `rational_equiv`. Thus these laws give equality of endpoint values
 without asserting `Equal Interval`: §64 operations can retain
 distinct spellings for equivalent rational values. No normalization, quotient
 carrier, structural distributivity theorem, or interval commutativity
-law is added. In particular, the **right** laws are not obtained by
-swapping interval factors through an unstated interval commutativity
-law; §64's `comm for rational_mul` supports a private right-hand
-Rational derivation from `distrib_l for rational_mul`.
+law is added **in §4**. Section 5 adds swapped-operand inclusion for
+endpoint values, not structural `Equal Interval`. In particular, the
+**right** laws here are not obtained by swapping interval factors
+through a §4 interval commutativity law; §64's `comm for rational_mul`
+supports a private right-hand Rational derivation from `distrib_l for
+rational_mul`.
 
 The checked development uses two private proof stages: `equiv_leq`
 carries `rational_equiv x y` into `IsTrue (rational_leq x y)` through
@@ -575,3 +585,72 @@ are package-test measurements, not official conformance-runner execution,
 CI, publication, landing or a landed trust measurement. The former §1–3
 sub-distributivity deferral is settled **here**, not by revising any §1–3
 operation or law.
+
+## 5. Endpoint inclusion order and operand swaps
+
+`Algorithm.Numeric.RationalInterval` extends the §3 endpoint test
+with one transitivity theorem and four operand-swap theorems. These
+are five **public checked-law obligations**, with exactly the
+following types:
+
+```ken
+pub theorem interval_inside_trans
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside i j)
+      → IsTrue (interval_inside j k)
+      → IsTrue (interval_inside i k)
+
+pub theorem interval_add_comm_inside (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_add i j) (interval_add j i))
+
+pub theorem interval_mul_comm_inside (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_mul i j) (interval_mul j i))
+
+pub theorem interval_hull_comm_inside (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_hull i j) (interval_hull j i))
+
+pub theorem interval_intersect_comm_inside (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_intersect i j) (interval_intersect j i))
+```
+
+Transitivity composes both §3.1 endpoint comparisons: if
+`i=[a,b]` lies inside `j=[c,d]` and `j` lies inside `k=[e,f]`,
+then `e ≤ c ≤ a` and `b ≤ d ≤ f`. It applies also to inverted
+intervals, because the test compares stored endpoint **values**,
+not the existence of a member. The proof uses §64's checked
+transitivity of `rational_leq` independently on the lower and
+upper endpoints. No interval validity or membership premise is
+added, and the witnessed converse in §3.2 remains witnessed.
+
+For every operation, the public swap law compares **the result
+of the operands in the written order** with **the result in reverse
+order** by `interval_inside`; its endpoints need not be stored
+identically. Applying the same public theorem at `(j, i)` gives
+the opposite inclusion. These two inclusions establish mutual
+endpoint-value order, not `Equal Interval` between the results.
+The addition and multiplication proofs transport §64's
+`rational_equiv` commutativity of the endpoint operations into
+`rational_leq` using the existing private `equiv_leq`. The hull
+and intersection proofs use §2.3's public min/max order bounds,
+not structural commutativity of those selectors. The private
+`equiv_leq` and `rational_distrib_r` remain unexported and
+unchanged; there is no new Rational declaration or proof helper.
+
+These four swaps are unconditional, including when either operand
+or an intersection has inverted endpoints. In particular, a
+reversed `interval_intersect` on disjoint inputs can be empty
+while still satisfying the endpoint comparisons. This does not
+assert equality of member sets as the definition of inclusion,
+canonical emptiness, structural commutativity, or any law for
+signed, approximate or divided intervals. It changes none of
+the §1–4 operations or laws, and adds no primitive or kernel rule.
+
+On base `d6c05223e`, Architect's isolated AC-0 patch checked all
+five generic proof bodies, their ownership and Transparent status,
+and a public-only client at `trusted_base()` identities 114 → 114;
+no new `Axiom` was present. The separate closed chain and operand
+pair tested in that D0 illustrate the obligations but do not prove
+the generic quantifiers. The §5 catalog exports are **not** on this
+base; the authored conformance seed cannot run against shipped §5
+exports yet. D0 is not official conformance execution, CI,
+publication, landing, or a landed trust measurement.

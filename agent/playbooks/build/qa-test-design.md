@@ -146,6 +146,7 @@ Apply at review; judgment, not syntax (§9 of the reference).
 9. **Maintenance** — the test states which intended extensions stay green and
    which incompatible changes go red. If both answers are "any change," it's a
    snapshot/sentinel, not an invariant — label it.
-10. **Targeted execution** — affected tests/packages via `scripts/ken-cargo`,
-    nonzero test count, inspect the message; **never the workspace locally** —
-    full-workspace consumer surprises stay CI's job.
+10. **Targeted execution** — the affected test binaries via `scripts/ken-cargo`
+    (named targets, `COORDINATION §12`), nonzero test count, inspect the
+    message; **never a crate's whole test population or the workspace
+    locally** — consumer surprises beyond the touched binaries stay CI's job.

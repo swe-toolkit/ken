@@ -37,23 +37,43 @@ fn mk_env_with_lawful_functors() -> ElabEnv {
 fn transport_fixture_aliases_reject_forged_qualified_provider_key() {
     let mut env = ElabEnv::new().expect("base environment");
     let transport_owned = catalog_or::load_core_logic_compare(&mut env);
-    let canonical = catalog_or::provider_owned_id(
-        &env, &transport_owned, "Core.Logic.Transport", "cong",
-    ).expect("Transport must own checked cong");
+    let canonical =
+        catalog_or::provider_owned_id(&env, &transport_owned, "Core.Logic.Transport", "cong")
+            .expect("Transport must own checked cong");
     let foreign = env.globals["Core.Logic.Compare.pair_compare"];
     assert_ne!(canonical, foreign);
     env.globals.insert("cong".to_owned(), foreign);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    assert_eq!(env.globals["cong"], canonical);
+    assert!(
+        !env.globals.contains_key("cong"),
+        "cong must not be a flat alias"
+    );
+    let client = env
+        .elaborate_decl(
+            "theorem transport_import_control (x : Bool) : Eq Bool x x = \
+             cong Bool Bool x x (\\u. u) Refl",
+        )
+        .expect("the authenticated Transport import must resolve checked cong");
+    assert!(catalog_or::declaration_references(
+        env.env.lookup(client).expect("checked import client"),
+    )
+    .contains(&canonical));
 
-    env.globals.insert("Core.Logic.Transport.cong".to_owned(), foreign);
+    env.globals
+        .insert("Core.Logic.Transport.cong".to_owned(), foreign);
     let error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    })).expect_err("forged qualified cong must fail Transport ownership");
-    let message = error.downcast_ref::<String>().map(String::as_str)
+    }))
+    .expect_err("forged qualified cong must fail Transport ownership");
+    let message = error
+        .downcast_ref::<String>()
+        .map(String::as_str)
         .or_else(|| error.downcast_ref::<&str>().copied())
         .expect("Transport refusal must report a string");
-    assert!(message.contains("does not own"), "unexpected refusal: {message}");
+    assert!(
+        message.contains("does not own"),
+        "unexpected refusal: {message}"
+    );
 }
 
 /// Promise class: durable checked-provider identity invariant.
@@ -68,25 +88,39 @@ fn lawful_fixture_withhold_rejects_forged_qualified_provider_key() {
     let (lawful_owned, _) =
         catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
     let canonical = catalog_or::provider_owned_id(
-        &env, &lawful_owned, "Core.Classes.LawfulClasses", "bool_and",
-    ).expect("LawfulClasses must own checked bool_and");
+        &env,
+        &lawful_owned,
+        "Core.Classes.LawfulClasses",
+        "bool_and",
+    )
+    .expect("LawfulClasses must own checked bool_and");
     let foreign = env.globals["Core.Logic.Compare.pair_compare"];
     assert_ne!(canonical, foreign);
     env.globals.insert("bool_and".to_owned(), foreign);
     assert_eq!(
         catalog_or::provider_owned_id(
-            &env, &lawful_owned, "Core.Classes.LawfulClasses", "bool_and",
+            &env,
+            &lawful_owned,
+            "Core.Classes.LawfulClasses",
+            "bool_and",
         ),
         Ok(canonical),
     );
-    env.globals.insert("Core.Classes.LawfulClasses.bool_and".to_owned(), foreign);
+    env.globals
+        .insert("Core.Classes.LawfulClasses.bool_and".to_owned(), foreign);
     let error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         catalog_or::withhold_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
-    })).expect_err("forged qualified bool_and must fail LC ownership");
-    let message = error.downcast_ref::<String>().map(String::as_str)
+    }))
+    .expect_err("forged qualified bool_and must fail LC ownership");
+    let message = error
+        .downcast_ref::<String>()
+        .map(String::as_str)
         .or_else(|| error.downcast_ref::<&str>().copied())
         .expect("LawfulClasses refusal must report a string");
-    assert!(message.contains("does not own"), "unexpected refusal: {message}");
+    assert!(
+        message.contains("does not own"),
+        "unexpected refusal: {message}"
+    );
 }
 
 #[test]

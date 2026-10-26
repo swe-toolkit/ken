@@ -25,8 +25,9 @@ fn type_id_projection_view_and_infer_route_are_live() {
 
     let type_id = env.globals["LookupProbe"];
     let keyed = env
-        .class_env
-        .class("LookupProbe")
+        .globals
+        .get("LookupProbe")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("keyed class view must exist");
     let by_id = env
         .class_env
@@ -82,8 +83,9 @@ fn surf2_d1_proc_traverse_parses_elaborates_and_registers_metadata() {
     .expect("landed marked Traversable signature must parse and elaborate");
 
     let traversable = env
-        .class_env
-        .class("Traversable")
+        .globals
+        .get("Traversable")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("Traversable class metadata is registered");
     assert_eq!(
         traversable.projection.field_names,
@@ -290,24 +292,41 @@ fn surf2_d1_unmarked_classes_and_sort_discriminant_stay_status_quo() {
     .expect("marked and unmarked sort-discriminant pairs elaborate");
 
     assert_eq!(
-        env.class_env.class("PlainStruct").unwrap().kind,
+        env.globals
+            .get("PlainStruct")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .unwrap()
+            .kind,
         &ClassKind::Structure
     );
     assert_eq!(
-        env.class_env.class("MarkedStruct").unwrap().kind,
+        env.globals
+            .get("MarkedStruct")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .unwrap()
+            .kind,
         &ClassKind::Structure
     );
     assert_eq!(
-        env.class_env.class("PlainProp").unwrap().kind,
+        env.globals
+            .get("PlainProp")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .unwrap()
+            .kind,
         &ClassKind::Property
     );
     assert_eq!(
-        env.class_env.class("MarkedProp").unwrap().kind,
+        env.globals
+            .get("MarkedProp")
+            .and_then(|id| env.class_env.class_by_id(*id))
+            .unwrap()
+            .kind,
         &ClassKind::Property
     );
     assert_eq!(
-        env.class_env
-            .class("PlainStruct")
+        env.globals
+            .get("PlainStruct")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .unwrap()
             .projection
             .field_types
@@ -315,8 +334,9 @@ fn surf2_d1_unmarked_classes_and_sort_discriminant_stay_status_quo() {
         1
     );
     assert_eq!(
-        env.class_env
-            .class("MarkedStruct")
+        env.globals
+            .get("MarkedStruct")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .unwrap()
             .projection
             .field_types
@@ -324,8 +344,9 @@ fn surf2_d1_unmarked_classes_and_sort_discriminant_stay_status_quo() {
         1
     );
     assert_eq!(
-        env.class_env
-            .class("PlainProp")
+        env.globals
+            .get("PlainProp")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .unwrap()
             .projection
             .field_types
@@ -333,8 +354,9 @@ fn surf2_d1_unmarked_classes_and_sort_discriminant_stay_status_quo() {
         1
     );
     assert_eq!(
-        env.class_env
-            .class("MarkedProp")
+        env.globals
+            .get("MarkedProp")
+            .and_then(|id| env.class_env.class_by_id(*id))
             .unwrap()
             .projection
             .field_types

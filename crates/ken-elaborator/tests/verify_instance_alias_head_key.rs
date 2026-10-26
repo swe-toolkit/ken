@@ -149,7 +149,7 @@ fn cross_module_alias_instance_resolves_at_imported_named_head() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_module_from_roots_strict(&[roots.0.clone()], "B")
         .expect("B must resolve A's alias-headed dictionary via T");
-    let dictionary = env.globals["E_instance_A.T2"];
+    let dictionary = env.globals["A.E_instance_A.T2"];
     assert!(env
         .resolution_provenance
         .iter()
@@ -191,7 +191,7 @@ fn imported_alias_cannot_evade_orphan_rule() {
         .elaborate_module_from_roots_strict(&[roots.0.clone()], "B")
         .expect_err("B owns neither class E nor unfolded head T");
     assert!(
-        matches!(error, ElabError::OrphanInstance { ref class, .. } if class == "E"),
+        matches!(error, ElabError::OrphanInstance { ref class, .. } if class == "A.E"),
         "expected orphan refusal at the unfolded head, got {error:?}"
     );
 }

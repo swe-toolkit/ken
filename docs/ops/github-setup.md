@@ -50,7 +50,10 @@ trailer. Dashboards and the path-guard key off these, not the GitHub author.
 ## CI
 
 `.github/workflows/ci.yml` runs on the publisher's `wp/<ID>` push (via the PR it
-opens) and on `push` to `main`. The heavy jobs (full `--workspace` build, the
+opens) and on PR reopen. It does not run on `push` to `main` (operator,
+2026-10-26): the publisher merges only when the PR's latest green run tested
+the merge onto the current `main` tip, so a post-merge run would repeat it.
+The heavy jobs (full `--workspace` build, the
 conformance suite) run on **GitHub-hosted runners** — this is the compute
 offload that keeps the 8-core laptop free (`compute-budget.md` lever 4).
 `concurrency` (cancel-in-progress) drops superseded runs. Once the conformance
