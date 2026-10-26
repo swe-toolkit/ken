@@ -30094,6 +30094,31 @@ mod class_identity_resolution_tests {
     use super::*;
 
     /// Promise class: durable invariant (spec 33 §3.3).
+    /// MEASURED: a registered module class cannot be selected by its bare
+    /// spelling, but the same checked ID is admitted when scope supplies it.
+    /// CLAIMED: an ambient class registry is not a scope import. THE GAP:
+    /// three-mode acceptance covers the ordinary resolved declaration path.
+    #[test]
+    fn dictionary_checked_class_id_requires_scope_selection() {
+        let mut elab = crate::ElabEnv::new().expect("prelude");
+        elab.elaborate_file("module A { pub class C a {} }")
+            .expect("checked module class fixture");
+        let owner = elab.globals["A.C"];
+        assert!(elab.class_env.class_by_id(owner).is_some());
+        assert!(!elab.globals.contains_key("C"));
+        let span = Span::zero();
+        assert!(matches!(
+            checked_class_id(&elab.class_env, &elab.globals, "C", None, &span),
+            Err(ElabError::UnresolvedCon { ref name, .. }) if name == "C"
+        ));
+        assert_eq!(
+            checked_class_id(&elab.class_env, &elab.globals, "C", Some(owner), &span)
+                .expect("the selected checked class must be usable"),
+            owner,
+        );
+    }
+
+    /// Promise class: durable invariant (spec 33 §3.3).
     /// MEASURED: the purity-only constraint lookup ignores an omitted checked
     /// class ID even when the exact same class spelling has a checked global
     /// and a registered instance. CLAIMED: a missing scope selection cannot
