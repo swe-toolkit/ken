@@ -527,6 +527,10 @@ struct Scope {
     /// remove a former occupant during prebinding; a stale ambient
     /// `globals[canonical]` must never stand in for the current local.
     checked_local_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// Canonical spellings of this expansion's classes whose ordered barrier
+    /// has not run. A reference to one has no checked identity yet, and
+    /// `globals[canonical]` may still hold another unit's class.
+    pending_local_classes: HashSet<String>,
     /// Immutable pre-source floor type IDs; a later flat globals entry cannot
     /// substitute another family's constructor when resolving `T.C`.
     floor_type_ids: HashMap<String, ken_kernel::GlobalId>,
@@ -917,6 +921,9 @@ fn resolve_checked_ref(
     let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
     let imported_qualified = name.rsplit_once('.')
         .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
+    if selected.is_none() && scope.pending_local_classes.contains(&canonical) {
+        return Err(ElabError::UnresolvedCon { name: canonical, span: span.clone() });
+    }
     if selected.is_some_and(|id| scope.private_ids.contains(&id))
         || (selected.is_none() && (imported_bare || imported_qualified))
     {
@@ -4393,6 +4400,9 @@ fn prebind_scope_declarations(
         scope.checked_local_ids.remove(&bare);
         let qualified = qualify(prefix, &bare);
         scope.bind_local(&bare, &qualified, inner.span())?;
+        if matches!(inner, Decl::ClassDecl { .. }) {
+            scope.pending_local_classes.insert(qualified.clone());
+        }
         match inner {
             Decl::DataDecl { ctors, .. } => {
                 for ctor in ctors {
@@ -5588,6 +5598,7 @@ fn expand_scope(
                         );
                     }
                     if matches!(inner, Decl::ClassDecl { .. }) {
+                        scope.pending_local_classes.remove(&qualify(prefix, inner.name()));
                         record_checked_local(scope, inner.name(), &result.name, result.def_id);
                         // Class-bearing references lack RCon. Once this local
                         // declaration is checked, pin later constraints and
@@ -5632,6 +5643,7 @@ fn expand_scope(
         )?;
     }
     scope.current_local_names.clear();
+    scope.pending_local_classes.clear();
     Ok((ids, exports_here))
 }
 
