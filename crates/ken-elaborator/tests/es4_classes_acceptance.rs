@@ -760,7 +760,10 @@ fn where_ord_supplies_same_comparator_as_explicit_form() {
 
     fn comparator<'a>(env: &ElabEnv, perm_id: GlobalId, t: &'a Term) -> &'a Term {
         let (and_head, conjuncts) = applied(t);
-        assert_eq!(*and_head, Term::const_(env.globals["Core.Logic.Conjunction.and"], vec![]));
+        assert_eq!(
+            *and_head,
+            Term::const_(env.globals["Core.Logic.Conjunction.and"], vec![])
+        );
         assert_eq!(
             conjuncts.len(),
             2,
@@ -768,7 +771,10 @@ fn where_ord_supplies_same_comparator_as_explicit_form() {
         );
         let (sorted_head, sorted_args) = applied(conjuncts[0]);
         let (perm_head, perm_args) = applied(conjuncts[1]);
-        assert_eq!(*sorted_head, Term::const_(env.globals["Data.Collections.Derived.is_sorted"], vec![]));
+        assert_eq!(
+            *sorted_head,
+            Term::const_(env.globals["Data.Collections.Derived.is_sorted"], vec![])
+        );
         assert_eq!(*perm_head, Term::const_(perm_id, vec![]));
         assert_eq!(
             sorted_args.len(),
