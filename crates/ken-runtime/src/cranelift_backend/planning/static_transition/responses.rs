@@ -2573,7 +2573,23 @@ fn tail_answers_directly(
             }
             tail_answers_directly(plan, *body, visited, true)
         }
-        _ => Ok(true),
+        // A callee tail that forwards a value it received or projected can
+        // return an ITree word it never constructed, so inside a callee it
+        // does not answer directly. Every other form is named, so a new
+        // RuntimeExpr variant has to be classified here.
+        RuntimeExpr::Var(_) | RuntimeExpr::Project { .. } => Ok(!inside_callee),
+        RuntimeExpr::Value(RuntimeValue::Constructor { constructor, .. }) => Ok(!inside_callee
+            || !(constructor.as_str().ends_with("::ITree::Ret")
+                || constructor.as_str().ends_with("::ITree::Vis"))),
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::PrimitiveCall { .. }
+        | RuntimeExpr::Record { .. }
+        | RuntimeExpr::Closure { .. }
+        | RuntimeExpr::LexicalClosure { .. }
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Effect { .. }
+        | RuntimeExpr::Trap(_) => Ok(true),
     }
 }
 
@@ -6045,6 +6061,48 @@ mod tests {
         assert!(
             !tail_answers_directly(&plan, copy_body, &mut BTreeSet::new(), true)
                 .expect("the ITree-form copy's tail is classified")
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: a K whose only tail exit
+    /// calls a declaration that forwards its argument is not direct-answering.
+    /// CLAIMED: P1 never admits a static tail callee that can return an ITree
+    /// word it did not construct. THE GAP: RuntimeExpr fixture, not a checked
+    /// occurrence; a direct-style callee whose tail is a Var is refused too,
+    /// conservatively.
+    #[test]
+    fn rt_p1_tail_walk_forwarding_callee_is_not_direct() {
+        let k_body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: "decl:fixture::pass".to_string(),
+            }),
+            args: vec![RuntimeExpr::Var(0)],
+        };
+        let pass = RuntimeDeclaration {
+            symbol: "decl:fixture::pass".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["tree".to_string()],
+                    body: Box::new(RuntimeExpr::Var(0)),
+                },
+            },
+            metadata: RuntimeSymbolMetadata::empty(),
+        };
+        let declarations = BTreeMap::from([(pass.symbol.as_str(), &pass)]);
+        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            .expect("the forwarding fixture plans");
+        let k_origin = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::Call { .. }))
+            .expect("K has a call occurrence")
+            .static_origin;
+        assert!(
+            !deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                .expect("the K's static call target resolves"),
+            "a forwarding callee must not count as direct-answering"
         );
     }
 }
