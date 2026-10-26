@@ -987,10 +987,6 @@ struct ElabCtx<'e> {
     /// bare-variable indices denote the constructor coordinate inside one arm.
     /// Name resolution only; convoy and closure planning never read it.
     arm_coordinates: HashMap<usize, (Term, Term, usize)>,
-    /// The leaf regime chosen for the next variable-side method by
-    /// `check_dependent_branch_regimes`; that method takes it at entry, so
-    /// nested methods choose their own.
-    method_regime: Option<MethodRegime>,
     /// During a generalized branch-goal check, a premise sentinel resolves to
     /// the temporary Pi binder rather than its original method premise. The
     /// bottom-relative position is stable across deeper local binders.
@@ -1201,7 +1197,6 @@ impl<'e> ElabCtx<'e> {
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
             arm_coordinates: HashMap::new(),
-            method_regime: None,
             active_index_refinements: Vec::new(),
             match_frames: Vec::new(),
             next_aux_sentinel_region: AUX_SENTINEL_REGION_BASE,
@@ -7537,87 +7532,6 @@ fn check_structured_constructor_method(
     Ok(method)
 }
 
-/// LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT D2: `check_match_dependent`'s
-/// capability-3 goal-refinement retry -- the arm taken only when the cheap
-/// unrefined attempt fails -- pulled into its own `#[inline(never)]` frame.
-/// Same reasoning as `LANG-RECORD-STACK-OVERFLOW`'s `check_pair_or_record`/
-/// `infer_record_requires_expected_type`: in an unoptimized build a
-/// function's frame is sized for every local declared anywhere in its body,
-/// paid on every call regardless of which branch runs. Unlike that node's
-/// extraction targets, this one matters here for a *narrower* reason worth
-/// recording: `check_match_dependent` is on the `check` <-> `check_match_
-/// dependent` mutual-recursion cycle that `decimal_char.rs`'s fixed
-/// 31-level `decimalPow10` cascade drives to full depth on every compile
-/// (`decimal_char.rs:62-75`), and every arm of that cascade is a bare
-/// literal or a two-way `eq_int` match that the cheap unrefined attempt
-/// always resolves -- so this fallback's own frame is declared (and paid
-/// for by its caller) on every level, but never otherwise entered on this
-/// path. Moving it out removes dead weight from
-/// the caller's always-paid frame without adding a frame that this
-/// particular recursion ever pays for. Unchanged control flow and
-/// semantics -- same `refine_branch_goal`/`simplify_branch_goal`/`check`/
-/// `Term::Cast` calls in the same order, only their host frame moved.
-///
-/// This coldness claim is about *which programs*, and it was measured on
-/// one: the `decimalPow10` cascade above. A recursion that DOES enter this
-/// fallback at every level pays the extracted frame's own call overhead at
-/// every level, on top of (not instead of) the reduced caller frame. The
-/// inversion mode for such a recursion is a SIGSEGV on the guard page, not
-/// a red test in this suite: nothing here would notice before it happened
-/// on that recursion's own deployment.
-///
-/// `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` `D4`, measured, not assumed:
-/// `objdump`'s prologue for this function gives `0x1000 + 0x48 = 4168`
-/// bytes/call -- well under the `+6472` measured on the reverted mirror
-/// extraction above. A recursion that entered this fallback at every level
-/// would pay `30232 + 4168 = 34400` bytes/call, `+1048` against the
-/// pre-extraction `33352` baseline, not the `+3352`/level a `6472`-sized
-/// frame would cost. Over 31 levels that is `+32488` bytes (~31.7 KiB), well
-/// inside the ~96 KiB this change bought, not the ~104 KiB that would
-/// exceed it.
-///
-/// `LANG-STACK-ARC-EVIDENCE-USABILITY` `D2`: the `4168` figure above is
-/// reproducible from a named artifact, not a one-off read. Build
-/// `ken-cli`'s test binaries (`scripts/ken-cargo build -p ken-cli --tests`,
-/// default/dev profile), resolve this function's mangled symbol in the
-/// `px4b_native_production` binary
-/// (`target/debug/deps/px4b_native_production-<hash>`) with
-/// `nm <binary> | grep refined_fallback`, then read `0x1000 + 0x48` off
-/// `objdump -d --disassemble='<mangled-name>' <binary>`'s prologue -- the
-/// two `sub $imm,%rsp` immediates, excluding the `push` register-save
-/// bytes.
-#[inline(never)]
-fn check_match_dependent_refined_fallback(
-    cx: &mut ElabCtx,
-    arm: &RMatchArm,
-    ind: &InductiveDecl,
-    params_terms: &[Term],
-    target_indices: &[Term],
-    scrut_indices: &[Term],
-    n: usize,
-    expected_here: &Term,
-    preserve_goal: bool,
-) -> Result<Term, ElabError> {
-    let (goal_refined, goal_restorations) = refine_branch_goal(
-        cx,
-        ind,
-        params_terms,
-        target_indices,
-        scrut_indices,
-        n,
-        expected_here,
-        false,
-    )?;
-    check_generalized_branch_goal(
-        cx,
-        arm,
-        goal_refined,
-        goal_restorations,
-        expected_here,
-        preserve_goal,
-    )
-}
-
 #[inline(never)]
 fn check_generalized_branch_goal(
     cx: &mut ElabCtx<'_>,
@@ -7632,6 +7546,7 @@ fn check_generalized_branch_goal(
     // universe metas may still be solved by the enclosing method checker.
     if !restorations.iter().any(|restoration| {
         matches!(restoration, BranchGoalRestoration::Generalized { binders, .. } if !binders.is_empty())
+            || matches!(restoration, BranchGoalRestoration::Generalized { solved: Some(_), .. })
     }) {
         let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
             goal_refined
@@ -7844,6 +7759,28 @@ fn check_generalized_branch_goal(
     frame.origins = saved_origins;
     frame.enclosing_telescope = saved_telescope;
     let mut body = attempt?;
+    // A body that mentions no reverted binder needs no transport back to the
+    // generalized telescope; keep it only if it checks at the arm's goal.
+    let reverted: usize = restorations
+        .iter()
+        .map(|restoration| match restoration {
+            BranchGoalRestoration::Generalized { binders, .. } => binders.len(),
+            _ => 0,
+        })
+        .sum();
+    let mut inner = &body;
+    let mut peeled = 0;
+    while peeled < reverted {
+        let Term::Lam(_, next) = inner else { break };
+        inner = next;
+        peeled += 1;
+    }
+    if peeled == reverted && (0..reverted).all(|index| !scrut_occurs(inner, &Term::var(index))) {
+        let lowered = ken_kernel::subst::shift(inner, -(reverted as i64), 0);
+        if kernel_check_current(cx, &lowered, expected_here).is_ok() {
+            return Ok(lowered);
+        }
+    }
     for restoration in restorations.into_iter().rev() {
         body = restoration.apply(body);
     }
@@ -9355,8 +9292,8 @@ fn check_constructor_convoy_branch(
     attempt.map(|body| Term::lam(branch_equation, body))
 }
 
-/// Only constructor-field variable leaves are eliminated. Outer-index-only
-/// leaves and non-variable leaves retain their proof-carrying alias path.
+/// Solve constructor-field variable leaves, including mixed methods and
+/// multi-leaf premise slots. Pure parameter-side leaves retain their aliases.
 fn method_has_variable_side_leaves(
     cx: &ElabCtx<'_>,
     ind: &InductiveDecl,
@@ -9379,136 +9316,16 @@ fn method_has_variable_side_leaves(
     else {
         return Ok(false);
     };
-    let mut variable = false;
-    let mut other = false;
-    for leaf in &leaves {
-        if matches!(leaf.target, Term::Var(v) if v < n) {
-            variable = true;
-        } else {
-            other = true;
-        }
-    }
-    // Eliminate only the population the per-leaf J is proved on: every leaf
-    // a field variable, and every premise slot projecting to a single leaf.
-    // Mixed methods and multi-leaf slots keep today's alias path until the
-    // per-equation unifier admits them.
-    if variable && other {
-        return Ok(false);
-    }
-    if variable {
-        for pair in &pairs {
-            let Some(slot_leaves) = project_method_index_premises(
-                cx,
-                &zonked_ctx,
-                std::slice::from_ref(pair),
-                sentinel_region,
-            )?
-            else {
-                return Ok(false);
-            };
-            if slot_leaves.len() > 1 {
-                return Ok(false);
-            }
-        }
-    }
-    Ok(variable)
+    Ok(leaves
+        .iter()
+        .any(|leaf| matches!(leaf.target, Term::Var(v) if v < n)))
 }
 
-/// The leaf regime of a variable-side solved-index method (class D closure).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum MethodRegime {
-    Retained,
-    Eliminated,
-}
-
-/// Retained first. Elimination is the fallback for a method the retained
-/// alias path cannot check, so every method the retained path accepts keeps
-/// the output shape that the C2 embedded-eliminator planner consumes when its
-/// definition is unfolded into a later goal. Outlined so the recursive
-/// `check_dependent_branch_body` frame carries none of this state.
-#[allow(clippy::too_many_arguments)]
-#[inline(never)]
-fn check_dependent_branch_regimes(
-    cx: &mut ElabCtx,
-    arm: &RMatchArm,
-    match_span: &Span,
-    ind: &InductiveDecl,
-    params: &[Term],
-    level_args: &[Level],
-    target_indices: &[Term],
-    scrut_indices: &[Term],
-    n: usize,
-    expected_here: &Term,
-    premise_domains: &[Term],
-    hidden_result_premise_slot: Option<usize>,
-    scrut_ty: &Term,
-    concrete: &Term,
-    scrut_core: &Term,
-    sentinel_region: usize,
-    convoy_refinements: &[(usize, Term, Term)],
-    equation_convoy: bool,
-    recursive_field_index_path: RecursiveFieldIndexPath,
-    branch_convoy: bool,
-) -> Result<Term, ElabError> {
-    let snapshot = refinement_snapshot::Snapshot::capture_boxed(cx);
-    cx.method_regime = Some(MethodRegime::Retained);
-    let retained = check_dependent_branch_body(
-        cx,
-        arm,
-        match_span,
-        ind,
-        params,
-        level_args,
-        target_indices,
-        scrut_indices,
-        n,
-        expected_here,
-        premise_domains,
-        hidden_result_premise_slot,
-        scrut_ty,
-        concrete,
-        scrut_core,
-        sentinel_region,
-        convoy_refinements,
-        equation_convoy,
-        recursive_field_index_path,
-        branch_convoy,
-    );
-    cx.method_regime = None;
-    let retained_error = match retained {
-        Ok(term) => return Ok(term),
-        // A split demand is control flow owned by an enclosing frame.
-        Err(error @ ElabError::RefinementSplitDemand { .. }) => return Err(error),
-        Err(error) => error,
+#[cfg(test)]
+thread_local! {
+    static SOLVED_INDEX_BODY_VISITS: std::cell::Cell<Option<usize>> = const {
+        std::cell::Cell::new(None)
     };
-    snapshot.rollback(cx)?;
-    cx.method_regime = Some(MethodRegime::Eliminated);
-    let eliminated = check_dependent_branch_body(
-        cx,
-        arm,
-        match_span,
-        ind,
-        params,
-        level_args,
-        target_indices,
-        scrut_indices,
-        n,
-        expected_here,
-        premise_domains,
-        hidden_result_premise_slot,
-        scrut_ty,
-        concrete,
-        scrut_core,
-        sentinel_region,
-        convoy_refinements,
-        equation_convoy,
-        recursive_field_index_path,
-        branch_convoy,
-    );
-    cx.method_regime = None;
-    // Both regimes refused: report the retained diagnostic, the program's
-    // refusal on the pre-elimination path.
-    eliminated.map_err(|_| retained_error)
 }
 
 /// Check an ordinary dependent-match arm outside the wide method-construction
@@ -9539,6 +9356,12 @@ fn check_dependent_branch_body(
     recursive_field_index_path: RecursiveFieldIndexPath,
     branch_convoy: bool,
 ) -> Result<Term, ElabError> {
+    #[cfg(test)]
+    SOLVED_INDEX_BODY_VISITS.with(|visits| {
+        if let Some(count) = visits.get() {
+            visits.set(Some(count + 1));
+        }
+    });
     let outer_scope_depth = cx.ctx.len() - n;
     let var_refinement_snapshot = cx.var_refinements.clone();
     let arm_coordinate_snapshot = cx.arm_coordinates.clone();
@@ -9558,37 +9381,6 @@ fn check_dependent_branch_body(
             n,
             sentinel_region,
         )?
-    };
-    // Retained first, elimination as the fallback, decided out of line so
-    // this recursive frame carries none of the regime state.
-    let variable_side = match cx.method_regime.take() {
-        Some(MethodRegime::Retained) => false,
-        Some(MethodRegime::Eliminated) => variable_side,
-        None if variable_side => {
-            return check_dependent_branch_regimes(
-                cx,
-                arm,
-                match_span,
-                ind,
-                params,
-                level_args,
-                target_indices,
-                scrut_indices,
-                n,
-                expected_here,
-                premise_domains,
-                hidden_result_premise_slot,
-                scrut_ty,
-                concrete,
-                scrut_core,
-                sentinel_region,
-                convoy_refinements,
-                equation_convoy,
-                recursive_field_index_path,
-                branch_convoy,
-            );
-        }
-        None => false,
     };
     let path_base = cx.path_conditions.len();
     if !branch_convoy {
@@ -9616,16 +9408,13 @@ fn check_dependent_branch_body(
         recursive_field_index_path,
         outer_scope_depth,
         variable_side,
+        branch_convoy,
     )
     .and_then(|(goal, preserve_nested_goal)| {
         complete_dependent_branch_body(
             cx,
             arm,
             match_span,
-            ind,
-            params,
-            target_indices,
-            scrut_indices,
             n,
             expected_here,
             premise_domains,
@@ -9634,12 +9423,10 @@ fn check_dependent_branch_body(
             scrut_core,
             sentinel_region,
             equation_convoy,
-            recursive_field_index_path,
             branch_convoy,
             path_base,
-            &goal,
+            goal,
             preserve_nested_goal,
-            variable_side,
         )
     });
 
@@ -9679,7 +9466,8 @@ fn prepare_dependent_branch_body(
     recursive_field_index_path: RecursiveFieldIndexPath,
     outer_scope_depth: usize,
     variable_side: bool,
-) -> Result<(Term, bool), ElabError> {
+    branch_convoy: bool,
+) -> Result<(PreparedArmGoal, bool), ElabError> {
     install_arm_coordinates(
         cx,
         ind,
@@ -9788,7 +9576,59 @@ fn prepare_dependent_branch_body(
                 install_depth: cx.ctx.len(),
             });
     }
-    Ok((expected_unrefined, preserve_nested_goal))
+    // One regime per arm, decided here before descent. Outside the
+    // plain-declared and constructor-convoy paths, the arm checks once
+    // against its refined goal: field-variable leaves are solved,
+    // parameter-side leaves are generalized. No unrefined attempt runs first,
+    // so neither a nested refusal nor an arm-level kernel rejection is retried.
+    if !variable_side
+        && (branch_convoy || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
+    {
+        return Ok((
+            PreparedArmGoal::Unrefined(expected_unrefined),
+            preserve_nested_goal,
+        ));
+    }
+    let (goal, restorations) = refine_branch_goal(
+        cx,
+        ind,
+        params,
+        target_indices,
+        scrut_indices,
+        n,
+        expected_here,
+        variable_side,
+    )?;
+    if restorations.iter().any(|restoration| {
+        matches!(restoration, BranchGoalRestoration::Generalized { binders, .. } if !binders.is_empty())
+            || matches!(restoration, BranchGoalRestoration::Generalized { solved: Some(_), .. })
+    }) {
+        return Ok((PreparedArmGoal::Reverted(goal, restorations), preserve_nested_goal));
+    }
+    let goal =
+        if equation_convoy || preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+            goal
+        } else {
+            simplify_branch_goal(cx.env, &cx.ctx, &goal)
+        };
+    Ok((
+        PreparedArmGoal::Refined(goal, restorations),
+        preserve_nested_goal,
+    ))
+}
+
+/// The goal a prepared dependent arm is checked against. It is decided before
+/// descent, so the recursive frames carry no regime state and share one
+/// in-place check for every arm that reverts no binder.
+enum PreparedArmGoal {
+    /// Plain-declared or constructor-convoy arm: the unrefined goal, admitted
+    /// by the kernel at the arm.
+    Unrefined(Term),
+    /// Refined goal that reverts no binder: checked in place, then restored.
+    Refined(Term, Vec<BranchGoalRestoration>),
+    /// Refined goal that reverts dependent binders: the outlined generalized
+    /// check.
+    Reverted(Term, Vec<BranchGoalRestoration>),
 }
 
 /// Check a prepared branch and restore its obligation prefix on fallback.
@@ -9799,10 +9639,6 @@ fn complete_dependent_branch_body(
     cx: &mut ElabCtx,
     arm: &RMatchArm,
     match_span: &Span,
-    ind: &InductiveDecl,
-    params: &[Term],
-    target_indices: &[Term],
-    scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
     premise_domains: &[Term],
@@ -9811,45 +9647,44 @@ fn complete_dependent_branch_body(
     scrut_core: &Term,
     sentinel_region: usize,
     equation_convoy: bool,
-    recursive_field_index_path: RecursiveFieldIndexPath,
     branch_convoy: bool,
     path_base: usize,
-    expected_unrefined: &Term,
+    prepared: PreparedArmGoal,
     preserve_nested_goal: bool,
-    variable_side: bool,
 ) -> Result<Term, ElabError> {
     let obligation_base = cx.obligations.len();
-    // The simplified goal retains every refinement root while exposing
-    // ordinary heads needed by dependent matches and their index convoy.
-    let attempt = if variable_side {
-        let (goal, restorations) = refine_branch_goal(
-            cx,
-            ind,
-            params,
-            target_indices,
-            scrut_indices,
-            n,
-            expected_here,
-            true,
-        )?;
-        return check_generalized_branch_goal(
-            cx,
-            arm,
-            goal,
-            restorations,
-            expected_here,
-            equation_convoy || preserve_nested_goal,
-        )
-        .and_then(|checked| {
-            wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
-        });
-    } else if branch_convoy {
+    let (arm_goal, restorations) = match prepared {
+        PreparedArmGoal::Reverted(goal, restorations) => {
+            return check_generalized_branch_goal(
+                cx,
+                arm,
+                goal,
+                restorations,
+                expected_here,
+                equation_convoy || preserve_nested_goal,
+            )
+            .and_then(|checked| {
+                wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
+            });
+        }
+        PreparedArmGoal::Refined(goal, restorations) => (goal, Some(restorations)),
+        PreparedArmGoal::Unrefined(goal) => (goal, None),
+    };
+    let attempt = if branch_convoy && restorations.is_none() {
         check_constructor_convoy_branch(
-            cx, arm, scrut_ty, scrut_core, concrete, n, expected_unrefined, path_base,
+            cx, arm, scrut_ty, scrut_core, concrete, n, &arm_goal, path_base,
         )
     } else {
-        check_match_arm_result(cx, arm, expected_unrefined, &arm.span).and_then(|checked| {
-            kernel_check_current(cx, &checked, expected_unrefined)
+        check_match_arm_result(cx, arm, &arm_goal, &arm.span).and_then(|checked| match restorations
+        {
+            // As on the generalized path, a refined goal gets no early kernel
+            // admission: declaration universe metas may still be solved by
+            // the enclosing method checker.
+            Some(restorations) => Ok(restorations
+                .into_iter()
+                .rev()
+                .fold(checked, |body, restoration| restoration.apply(body))),
+            None => kernel_check_current(cx, &checked, &arm_goal)
                 .map(|()| checked)
                 .map_err(|error| match error {
                     CurrentKernelQueryError::View(error) => error,
@@ -9857,34 +9692,18 @@ fn complete_dependent_branch_body(
                         error,
                         span: arm.span.clone(),
                     },
-                })
+                }),
         })
     };
-    let checked = match attempt {
-        Ok(checked) => checked,
-        Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
-            || branch_convoy
-            || matches!(&error, ElabError::RefinementSplitDemand { .. }
-                | ElabError::NonConvoyableRefinementSplit { .. }) => {
-            cx.obligations.truncate(obligation_base);
-            return Err(error);
+    match attempt {
+        Ok(checked) => {
+            wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
         }
-        Err(_) => {
+        Err(error) => {
             cx.obligations.truncate(obligation_base);
-            check_match_dependent_refined_fallback(
-                cx,
-                arm,
-                ind,
-                params,
-                target_indices,
-                scrut_indices,
-                n,
-                expected_here,
-                equation_convoy || preserve_nested_goal,
-            )?
+            Err(error)
         }
-    };
-    wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
+    }
 }
 
 /// Field refinements for one dependent branch. An equation-convoy branch then
@@ -10810,7 +10629,6 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 ))
             }
         } else {
-            let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
             let missing = missing_pattern_witness(cx, ctor.id);
             frame_try!(synthesize_omitted_index_method(
                 cx,
@@ -11489,9 +11307,13 @@ fn solved_index_dependency_binders(
                         "solved-index premise closure crosses outside the method".into(),
                     ));
                 }
-                // Its Eq proof is reconstructed as Refl at the use coordinate;
-                // it cannot be a dependent binder in the reverted telescope.
-                continue;
+                // An index-equation premise's proof is reconstructed as Refl at
+                // the use coordinate; it is never a dependent binder. A convoy
+                // companion premise (not an Eq) is a dependent of the
+                // eliminated binder and is reverted like any other.
+                if matches!(current_type, Term::Eq(..)) {
+                    continue;
+                }
             }
             _ => {}
         }
@@ -11532,6 +11354,64 @@ fn solved_index_dependency_binders(
         selected.dedup_by(|later, earlier| later.1 == earlier.1);
     }
     Ok(selected)
+}
+
+/// Re-derive a solved method premise at the solution coordinate from its
+/// observational reduct: solved leaves become Refl, Top becomes tt, and an
+/// untouched leaf keeps its projection of the original premise.
+fn reassemble_solved_premise(
+    env: &GlobalEnv,
+    ctx: &Context,
+    sub_ty: &Term,
+    orig_ty: &Term,
+    old: &Term,
+    proof: Term,
+) -> Option<Term> {
+    // Check the raw Eq before whnf: Eq (List A) X X reduces to a Sigma.
+    if let Term::Eq(carrier, left, right) = sub_ty {
+        if convert(env, ctx, carrier, left, right) {
+            return Some(Term::Refl(left.clone()));
+        }
+    }
+    let substituted = whnf(env, ctx, sub_ty);
+    if let Term::Eq(carrier, left, right) = &substituted {
+        if convert(env, ctx, carrier, left, right) {
+            return Some(Term::Refl(left.clone()));
+        }
+    }
+    if matches!(&substituted, Term::Const { id, .. } if *id == env.top_id()) {
+        return Some(Term::Const {
+            id: env.tt_id(),
+            level_args: vec![],
+        });
+    }
+    let original = whnf(env, ctx, orig_ty);
+    match (&substituted, &original) {
+        (Term::Sigma(first_sub, second_sub), Term::Sigma(first_orig, second_orig)) => {
+            let first = reassemble_solved_premise(
+                env,
+                ctx,
+                first_sub,
+                first_orig,
+                old,
+                Term::proj1(proof.clone()),
+            )?;
+            let second = reassemble_solved_premise(
+                env,
+                ctx,
+                &subst0(second_sub, &first),
+                &subst0(second_orig, &Term::proj1(proof.clone())),
+                old,
+                Term::proj2(proof),
+            )?;
+            Some(Term::Ascript(
+                Box::new(Term::pair(first, second)),
+                Box::new(substituted),
+            ))
+        }
+        (Term::Eq(..), Term::Eq(..)) if !scrut_occurs(orig_ty, old) => Some(proof),
+        _ => None,
+    }
 }
 
 /// Capability 3: does the branch's own CHECKING GOAL (not a context
@@ -11684,11 +11564,26 @@ fn refine_branch_goal(
                 };
                 let lhs = subst_term_generalize(first, old, new);
                 let rhs = subst_term_generalize(second, old, new);
-                if !convert(cx.env, &view.context, carrier, &lhs, &rhs) {
-                    return Err(ElabError::Internal(
-                        "solved premise does not become reflexive".into(),
-                    ));
-                }
+                let base = if convert(cx.env, &view.context, carrier, &lhs, &rhs) {
+                    Term::Refl(Box::new(lhs.clone()))
+                } else {
+                    let substituted = Term::Eq(
+                        carrier.clone(),
+                        Box::new(lhs.clone()),
+                        Box::new(rhs.clone()),
+                    );
+                    reassemble_solved_premise(
+                        cx.env,
+                        &view.context,
+                        &substituted,
+                        &premise_ty,
+                        old,
+                        raw.clone(),
+                    )
+                    .ok_or_else(|| {
+                        ElabError::Internal("solved premise does not reassemble".into())
+                    })?
+                };
                 let premise_sort =
                     kernel_infer_raw(cx.env, &view.context, &premise_ty).map_err(|error| {
                         ElabError::Internal(format!("solved premise has no sort: {error:?}"))
@@ -11698,9 +11593,8 @@ fn refine_branch_goal(
                         "solved premise is not a proposition".into(),
                     ));
                 };
-                candidate =
-                    subst_term_generalize(&candidate, &raw, &Term::Refl(Box::new(lhs.clone())));
-                solved_premises.push((raw, premise_ty, lhs, level));
+                candidate = subst_term_generalize(&candidate, &raw, &base);
+                solved_premises.push((raw, premise_ty, base, level));
             }
         }
         if candidate == generalized && eliminated_original.is_none() {
@@ -11739,7 +11633,7 @@ fn refine_branch_goal(
             };
             let mut family_at_y =
                 subst_term_generalize(&weaken(&generalized, 2), &weaken(old, 2), &Term::var(1));
-            for (raw, premise_ty, lhs, level) in &solved_premises {
+            for (raw, premise_ty, base, level) in &solved_premises {
                 let generic_premise =
                     subst_term_generalize(&weaken(premise_ty, 2), &weaken(old, 2), &Term::var(1));
                 let premise_family_at_y =
@@ -11751,7 +11645,7 @@ fn refine_branch_goal(
                     &premise_family_at_y,
                     &generic_premise,
                     level.clone(),
-                    Term::Refl(Box::new(weaken(lhs, 2))),
+                    weaken(base, 2),
                     Term::var(0),
                 );
                 family_at_y = subst_term_generalize(&family_at_y, &weaken(raw, 2), &derived);
@@ -28013,6 +27907,10 @@ mod omega_index_refinement_tests {
 #[cfg(test)]
 #[path = "sibling_goal_refinement_tests.rs"]
 mod sibling_goal_refinement_tests;
+
+#[cfg(test)]
+#[path = "elab/solved_index_equation_unifier_tests.rs"]
+mod solved_index_equation_unifier_tests;
 
 #[cfg(test)]
 mod result_transport_control_flow_tests {
