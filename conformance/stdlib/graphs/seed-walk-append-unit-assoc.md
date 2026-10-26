@@ -206,6 +206,8 @@ appended theorem beginning at 3459). Logs:
 `/tmp/spec-author-walk-unit-Positive.log` and
 `/tmp/spec-author-walk-unit-Refusal.log`. This is a source-shaped
 **D0-overlay check using an older CLI binary**, not an exact-base
-binary check or execution against shipped §4 exports. Neither it nor
-Architect's separate D0 establishes an official conformance run,
-CI, publication, landing or landed trust.
+binary check. A separate package-owned test now root-loads the checked
+§4 exports, elaborates this seed's entire accepted client and then the
+isolated refused claim, and measures the exact package-local trust delta.
+That targeted package-test observation is not an official conformance
+run, CI, publication, landing or landed trust.

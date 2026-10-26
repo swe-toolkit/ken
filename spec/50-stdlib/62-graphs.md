@@ -9,13 +9,11 @@
 > base. Section 2 adds three checked generic laws and has an authored
 > §2 conformance seed. Section 3's walk-composition operation and
 > first-edge order law now have checked catalog exports; the four §3 seed
-> fences are exercised in a package-owned test. Section 4 specifies two
-> further generic checked-law obligations, left unit and associativity of
-> `walk_append`; their catalog exports are not delivered by this candidate.
-> The closed §4 seed is authored here, not executed against shipped §4
-> exports. Historical §3 package tests are not official conformance-runner
-> execution or CI. No kernel, trust, or surface-syntax change or revision
-> to §61 §2 is required.
+> fences are exercised in a package-owned test. Section 4's left-unit and
+> associativity laws now have checked catalog exports, and the closed §4
+> seed is exercised by a package-owned test. These package tests are not
+> official conformance-runner execution or CI. No kernel, trust, or
+> surface-syntax change or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -506,9 +504,9 @@ refused for both laws: the claims are not mere definitional equality.
 The corresponding closed §4 seed uses a four-vertex diamond, exercises
 `WalkHere` in each of the three associativity positions, and contrasts
 two genuinely different routes with a same-input accepted route. That
-D0 measurement is not shipped §4 catalog delivery or execution of
-the authored seed against delivered exports. Official conformance
-execution, CI, publication, landing and landed trust for §4 are not
-established here. The separate CAT half must update the package's
-public-law count from eleven to thirteen and add both exports to its
-package-owned loop; this spec candidate does neither.
+D0 measurement predates the package delivery. The catalog now exports
+both checked laws, its public-law count is thirteen, and a package-owned
+test root-loads both names and exercises the §4 seed's accepted client
+and isolated refused route. This is a targeted package-test observation,
+not official conformance-runner execution, CI, publication, landing, or
+a landed trust measurement.
