@@ -515,23 +515,25 @@ fn pair_floor_beta_eta_are_definitional() {
     }
 }
 
-/// Fresh Strict execution re-derives the frontier after the five additional
-/// proposition/equality floor members, without projecting Legacy evidence or
-/// declaring every catalog subject closed.
+/// Promise class: transition sentinel. Fresh Strict execution re-derives the
+/// frontier after the Pair floor and the checked Conjunction import. Compare
+/// now closes; the remaining four reach the next unavailable `charToInt`.
+/// Retire this frontier vector when a checked import closes that dependency;
+/// no Legacy success or blanket catalog closure is inferred.
 #[test]
 fn pair_floor_closure_is_rederived_after_realization() {
     let root = catalog_root();
     let expected_failures = BTreeSet::from([
         "Algorithm.Numeric.Gcd",
         "Core.Classes.LawfulClasses",
-        "Core.Logic.Compare",
         "Data.Collections.Derived",
         "Data.Numeric.Nat.Order",
     ]);
+    let expected_successes = BTreeSet::from(["Core.Logic.Compare"]);
     let mut observed_failures = BTreeSet::new();
     let mut observed_successes = BTreeSet::new();
 
-    for module in &expected_failures {
+    for module in expected_failures.union(&expected_successes) {
         let mut env = ElabEnv::new().expect("base environment");
         let pair_bindings = PAIR_BINDINGS.map(|name| env.globals[name]);
         let result = env.elaborate_module_from_roots_strict(&[root.clone()], module);
@@ -547,22 +549,21 @@ fn pair_floor_closure_is_rederived_after_realization() {
             );
         }
         match result {
-            Err(ElabError::UnboundName { name, .. }) if name == "And" => {
+            Err(ElabError::UnboundName { name, .. })
+                if expected_failures.contains(module) && name == "charToInt" =>
+            {
                 observed_failures.insert(*module);
             }
-            Ok(_) => {
+            Ok(_) if expected_successes.contains(module) => {
                 observed_successes.insert(*module);
             }
             other => panic!(
-                "{module} must stop at the exact post-fifteen UnboundName(And) frontier, got {other:?}"
+                "{module} must match its checked Conjunction/charToInt Strict frontier, got {other:?}"
             ),
         }
     }
     assert_eq!(observed_failures, expected_failures);
-    assert!(
-        observed_successes.is_empty(),
-        "the five governed rows have no earned Strict success yet"
-    );
+    assert_eq!(observed_successes, expected_successes);
 
     let prod = match strict_one("def X = Prod Bool Bool") {
         Ok(_) => panic!("Prod must not enter the closure authority"),
