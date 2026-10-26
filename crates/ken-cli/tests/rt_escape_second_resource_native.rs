@@ -810,14 +810,76 @@ fn region_capacity_persistent_bytes_reach_typed_terminal() {
     });
 }
 
-// AC-2 measured gap: the checked `rt_uint64_checked_bounds_stage` source
-// computes `add_int 18446744073709551615 1`, but tightening persistent
-// native_int_limbs to 1 returned terminal None; tightening invocation limbs
-// to 1 (persistent ample) also returned None. Both linked artifacts built and
-// executed. This source does not reach `store_int_limbs`, so neither result
-// proves a checked program can reach the persistent limb producer. The
-// owner-backed recorder's limb attribution has direct unit coverage, not a
-// checked linked witness; this remains an explicit gap for a later frame.
+#[cfg(target_os = "linux")]
+fn escape_file_then_two_reads_with_wide_int() -> String {
+    let source = escape_file_then_two_reads();
+    let second_read = "    (\\outcome. bind (Coproduct (FSOp AFull) AmbientOp)";
+    let with_wide = r"    (\outcome. let w : Int = add_int 18446744073709551615
+      (match outcome {
+        Ok (ReadSome span count) |-> transfer_count_int count;
+        Ok ReadEof |-> (1 : Int);
+        Err _ |-> (1 : Int)
+      }) in
+      bind (Coproduct (FSOp AFull) AmbientOp)";
+    let result = "    (\\again. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let with_result = r"    (\again. match eq_int w (18446744073709551621 : Int) {
+      True |-> Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let terminal = "(ResourceBodyOk Unit Unit MkUnit)))";
+    let with_terminal = r"(ResourceBodyOk Unit Unit MkUnit);
+      False |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+    }))";
+    assert_eq!(source.matches(second_read).count(), 1);
+    assert_eq!(source.matches(result).count(), 1);
+    assert_eq!(source.matches(terminal).count(), 1);
+    let source = source.replacen(second_read, with_wide, 1)
+        .replacen(result, with_result, 1)
+        .replacen(terminal, with_terminal, 1);
+    assert_eq!(source.matches("(readAt AFull file_closed").count(), 2);
+    source
+}
+
+/// WIP checked-program limb witness, NOT an acceptance pin yet. MEASURED:
+/// deriving a wide Int from the first read's runtime transfer count before
+/// the second read and comparing it afterward still returns terminal None
+/// with a persistent limb limit of 1. CLAIMED: a live Big-tagged Int carried
+/// across that continuation would exhaust the persistent limb table at 1→2.
+/// THE GAP: the current source did not demonstrate a live Big carrier; a
+/// scratch wide-arm sentinel was not reached, while Small was reached.
+///
+/// Invocation NativeIntLimbs is structurally unreachable by this emitted
+/// path: the sole production `store_int_limbs` caller allocates a
+/// `PersistentGround` node; the invocation native-Int arena is separate from
+/// the boundary-region limb table, not charged to that profile cell.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_native_int_limbs_reach_typed_terminal() {
+    in_large_stack_thread("rt-region-persistent-limbs", || {
+        let source = escape_file_then_two_reads_with_wide_int();
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 128;
+        profile.persistent.words = 512;
+        profile.persistent.native_int_limbs = 1;
+        let at_limit = differential_with_profile("region-limbs-1", &source, profile);
+        assert_eq!(at_limit.interpreted.exit_status, 0, "interpreter control");
+        assert_eq!(at_limit.native.terminal_error, Some(
+            ken_runtime::TerminalErrorV1::CapacityExhausted(ken_runtime::CapacityExhaustedV1 {
+                scope: ken_runtime::CapacityScopeV1::Persistent,
+                resource: ken_runtime::CapacityResourceV1::NativeIntLimbs,
+                limit: 1,
+                requested: 2,
+            })
+        ));
+        let mut roomy = profile;
+        roomy.persistent.native_int_limbs = 64;
+        let at_64 = differential_with_profile("region-limbs-64", &source, roomy);
+        assert_native_matches_interpreter("region-limbs-64", &at_64);
+        assert_eq!(at_64.native.stdout, at_64.interpreted.stdout);
+        assert_eq!(at_64.native.effect_trace, at_64.interpreted.effect_trace);
+    });
+}
 
 #[cfg(target_os = "linux")]
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
