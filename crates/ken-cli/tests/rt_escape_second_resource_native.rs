@@ -616,6 +616,24 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
     });
 }
 
+#[cfg(target_os = "linux")]
+fn escape_file_then_two_reads() -> String {
+    let first = "    (\\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let second = r"    (\outcome. bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\again. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let end = "(ResourceBodyOk Unit Unit MkUnit))";
+    assert_eq!(ESCAPE_FILE_THEN_READAT.matches(first).count(), 1);
+    assert_eq!(ESCAPE_FILE_THEN_READAT.matches(end).count(), 1);
+    let source = ESCAPE_FILE_THEN_READAT
+        .replacen(first, second, 1)
+        .replacen(end, "(ResourceBodyOk Unit Unit MkUnit)))", 1);
+    assert_eq!(source.matches("(readAt AFull file_closed").count(), 2);
+    source
+}
+
 /// Promise class: normative compatibility vector for the declared invocation
 /// node limit. MEASURED: this checked, effect-bearing escape/read source with
 /// one extra read has a typed native Nodes(64→65) terminal and an interpreter
@@ -626,20 +644,7 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 #[test]
 fn region_capacity_escape_second_read_reports_typed_invocation_nodes() {
     in_large_stack_thread("rt-region-capacity-fshandle", || {
-        let first = "    (\\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)";
-        let second = r"    (\outcome. bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\again. Ret (Coproduct (FSOp AFull) AmbientOp)";
-        let end = "(ResourceBodyOk Unit Unit MkUnit))";
-        assert_eq!(ESCAPE_FILE_THEN_READAT.matches(first).count(), 1);
-        assert_eq!(ESCAPE_FILE_THEN_READAT.matches(end).count(), 1);
-        let source = ESCAPE_FILE_THEN_READAT
-            .replacen(first, second, 1)
-            .replacen(end, "(ResourceBodyOk Unit Unit MkUnit)))", 1);
-        assert_eq!(source.matches("(readAt AFull file_closed").count(), 2);
-
+        let source = escape_file_then_two_reads();
         let profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
         assert_eq!(profile.invocation.nodes, 64);
         let at_limit = differential_with_profile("region-node-64", &source, profile);
@@ -664,6 +669,128 @@ fn region_capacity_escape_second_read_reports_typed_invocation_nodes() {
         assert_eq!(at_65.native.effect_trace, at_65.interpreted.effect_trace);
     });
 }
+
+#[cfg(target_os = "linux")]
+fn region_capacity_string_lookalike() -> String {
+    let source = include_str!("fixtures/rt_bracket_body_once_lookalike.ken");
+    assert_eq!(source.matches("held-0.bin").count(), 1);
+    source.replacen("held-0.bin", "held.bin", 1)
+}
+
+#[cfg(target_os = "linux")]
+fn assert_linked_region_capacity(
+    case: &str,
+    source: &str,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+    scope: ken_runtime::CapacityScopeV1,
+    resource: ken_runtime::CapacityResourceV1,
+    limit: u128,
+) {
+    let diff = differential_with_profile(case, source, profile);
+    assert_eq!(diff.interpreted.exit_status, 0, "{case}: interpreter control");
+    match diff.native.terminal_error {
+        Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) => {
+            assert_eq!(fault.scope, scope, "{case}: capacity scope");
+            assert_eq!(fault.resource, resource, "{case}: capacity resource");
+            assert_eq!(fault.limit, limit, "{case}: declared limit");
+            assert!(fault.requested > fault.limit, "{case}: actual exhaustion");
+        }
+        other => panic!("{case}: expected emitted {scope:?}/{resource:?} exhaustion, got {other:?}"),
+    }
+}
+
+/// Promise class: normative compatibility vector for invocation child words.
+/// MEASURED: an unchanged checked two-read program with the words budget
+/// tightened but nodes ample reports a typed Words fault from linked code.
+/// CLAIMED: the alloc status distinguishes words from nodes on one owner.
+/// THE GAP: it does not independently measure the CLIF word counter; that is
+/// reconstructed by the recorder from the shared published region header.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_invocation_words_remains_distinct_from_nodes() {
+    in_large_stack_thread("rt-region-words-fshandle", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.invocation.words = 1;
+        assert_linked_region_capacity(
+            "region-words-1", &escape_file_then_two_reads(), profile,
+            ken_runtime::CapacityScopeV1::Invocation,
+            ken_runtime::CapacityResourceV1::Words, 1,
+        );
+    });
+}
+
+/// Promise class: normative compatibility vector for persistent node storage.
+/// MEASURED: a checked, linked run reaches its persistent node limit and
+/// reports the exact owner/resource without substituting invocation capacity.
+/// CLAIMED: alloc routes the persistent-band owner to the existing issuer.
+/// THE GAP: this fixture names one persistent allocation path, not all tags.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_nodes_are_owner_attributed() {
+    in_large_stack_thread("rt-region-persistent-nodes", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 1;
+        assert_linked_region_capacity(
+            "region-persistent-nodes-1", &escape_file_then_two_reads(), profile,
+            ken_runtime::CapacityScopeV1::Persistent,
+            ken_runtime::CapacityResourceV1::Nodes, 1,
+        );
+    });
+}
+
+/// Promise class: normative compatibility vector for persistent child words.
+/// MEASURED: a checked, linked run with ample persistent nodes exhausts its
+/// child words and reports the persistent owner and declared word limit.
+/// CLAIMED: Words and Nodes have distinct observed terminal identity.
+/// THE GAP: the recorder re-reads the region header after CLIF returns -6.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_words_are_not_nodes() {
+    in_large_stack_thread("rt-region-persistent-words", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 128;
+        profile.persistent.words = 1;
+        assert_linked_region_capacity(
+            "region-persistent-words-1", &region_capacity_string_lookalike(), profile,
+            ken_runtime::CapacityScopeV1::Persistent,
+            ken_runtime::CapacityResourceV1::Words, 1,
+        );
+    });
+}
+
+/// Promise class: normative compatibility vector for persistent data bytes.
+/// MEASURED: a checked, linked run with ample nodes/words reaches the byte
+/// table capacity and reports its owner/resource/limit as a typed terminal.
+/// CLAIMED: a stored literal's data status survives the generated call path.
+/// THE GAP: this fixture does not reach copied ResponseBytes, the other site.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_bytes_reach_typed_terminal() {
+    in_large_stack_thread("rt-region-persistent-bytes", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 128;
+        profile.persistent.words = 512;
+        profile.persistent.data_bytes = 1;
+        assert_linked_region_capacity(
+            "region-persistent-bytes-1", &region_capacity_string_lookalike(), profile,
+            ken_runtime::CapacityScopeV1::Persistent,
+            ken_runtime::CapacityResourceV1::DataBytes, 1,
+        );
+    });
+}
+
+// AC-2 measured gap: the checked `rt_uint64_checked_bounds_stage` source
+// computes `add_int 18446744073709551615 1`, but tightening persistent
+// native_int_limbs to 1 returned terminal None; tightening invocation limbs
+// to 1 (persistent ample) also returned None. Both linked artifacts built and
+// executed. This source does not reach `store_int_limbs`, so neither result
+// proves a checked program can reach the persistent limb producer. The
+// owner-backed recorder's limb attribution has direct unit coverage, not a
+// checked linked witness; this remains an explicit gap for a later frame.
 
 #[cfg(target_os = "linux")]
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
