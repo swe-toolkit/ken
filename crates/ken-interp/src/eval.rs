@@ -1379,8 +1379,14 @@ fn cast_push_params(
     store: &mut EvalStore,
 ) -> Option<EvalVal> {
     let (
-        EvalVal::IndTypeApp { id: family, args: source },
-        EvalVal::IndTypeApp { id: target_family, args: target },
+        EvalVal::IndTypeApp {
+            id: family,
+            args: source,
+        },
+        EvalVal::IndTypeApp {
+            id: target_family,
+            args: target,
+        },
     ) = (a_ty, b_ty)
     else {
         return None;
@@ -1549,7 +1555,10 @@ fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
         ) => {
             ia == ib
                 && aa.len() == ba.len()
-                && aa.iter().zip(ba.iter()).all(|(x, y)| values_agree(x, y, up_to_closures))
+                && aa
+                    .iter()
+                    .zip(ba.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         (EvalVal::Int(x), EvalVal::Int(y)) => x == y,
         (EvalVal::BigInt(x), EvalVal::BigInt(y)) => x == y,
@@ -1565,7 +1574,10 @@ fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
         (EvalVal::IndTypeApp { id: ia, args: aa }, EvalVal::IndTypeApp { id: ib, args: ba }) => {
             ia == ib
                 && aa.len() == ba.len()
-                && aa.iter().zip(ba.iter()).all(|(x, y)| values_agree(x, y, up_to_closures))
+                && aa
+                    .iter()
+                    .zip(ba.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         (
             EvalVal::Pair {
@@ -1590,7 +1602,10 @@ fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
             values_agree(ad, bd, up_to_closures)
                 && ac == bc
                 && ae.len() == be.len()
-                && ae.iter().zip(be.iter()).all(|(x, y)| values_agree(x, y, up_to_closures))
+                && ae
+                    .iter()
+                    .zip(be.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         (
             EvalVal::Ctor {
@@ -1602,7 +1617,10 @@ fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
         ) => {
             a == b
                 && aa.len() == ba.len()
-                && aa.iter().zip(ba.iter()).all(|(x, y)| values_agree(x, y, up_to_closures))
+                && aa
+                    .iter()
+                    .zip(ba.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         // A closure pair is never compared (`42 §1`). Only the parameters-
         // only push asks whether the value layer can refute agreement.
