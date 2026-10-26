@@ -554,7 +554,9 @@ fn assert_px8ds_p1_effect_trace(
 /// the same canonical effects and successful exit. CLAIMED: a P1 K whose
 /// only completions are direct static tail calls reaches its handler and
 /// returns the checked answer. THE GAP: this vector covers the one checked
-/// nested Console operation, not every response operation or depth.
+/// nested Console operation, not every response operation or depth. Reverting
+/// the P1 completion guard produces the measured base failure: native exit 1,
+/// an ITree PatternMatchFailure after one ConsoleIsTerminal and before release.
 #[cfg(target_os = "linux")]
 #[test]
 fn px8ds_p1_swapped_tail_call_exits_match_reference() {

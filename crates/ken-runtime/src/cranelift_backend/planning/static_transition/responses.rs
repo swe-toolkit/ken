@@ -5970,8 +5970,9 @@ mod tests {
     /// call a uniquely resolved countdown declaration is direct-answering;
     /// invoking the same walk *inside* a declaration whose tail builds an
     /// ITree::Ret is not. CLAIMED: P1 admits only direct-answering static
-    /// tail callees. THE GAP: this RuntimeExpr-level fixture models the two
-    /// px8ds tail forms; the linked px8ds row pins real checked-source reach.
+    /// tail callees. THE GAP: the negative arm uses a RuntimeExpr fixture
+    /// shaped like the px8ds ITree-form copy, not the checked occurrence 659.
+    /// AC-1 and its guard mutation pin the positive arm on checked px8ds.
     #[test]
     fn rt_p1_tail_walk_direct_countdown_and_itree_copy_discriminate() {
         let call_countdown = || RuntimeExpr::Call {
