@@ -2,7 +2,6 @@
 
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/66-symbolic-algebra.md` §6.
-Frame: `docs/program/issues/SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION.md`.
 
 The §6 export is absent from the landed base of this spec candidate.
 These source-shaped clients use the exact ruled public theorem; their
