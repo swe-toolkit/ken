@@ -1,7 +1,7 @@
 ---
 id: RT-P1-TAIL-CALL-EXIT-HANDLER
 title: "A P1 relay source whose K exits only by static tail calls has no admitted handler, because the deferred-handler fallback requires ret_exits > 0. On px8ds's true branch owner 0 stays Excluded{Relay} and native takes the owner loop's unknown-member exit where the interpreter runs countdown. Give such sources a settling route"
-status: draft
+status: ready
 owner: runtime
 size: M
 tier: T1

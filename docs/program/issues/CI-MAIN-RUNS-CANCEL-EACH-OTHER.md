@@ -1,7 +1,7 @@
 ---
 id: CI-MAIN-RUNS-CANCEL-EACH-OTHER
 title: "Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them"
-status: ready
+status: closed
 owner: verify
 size: S
 gate: none
@@ -116,3 +116,6 @@ deliberately non-blocking and that is not in scope here.
 
 **`#3676`'s standing prohibition is unaffected and still binds:** cause 2 is the
 gate working, and nobody repairs it toward green. It survives that PR's closure.
+
+Closed 2026-10-26, superseded: `CI-DROP-POST-MERGE-RUN` (`7e3768a99`)
+removed the push trigger, so main has no post-merge runs to cancel.
