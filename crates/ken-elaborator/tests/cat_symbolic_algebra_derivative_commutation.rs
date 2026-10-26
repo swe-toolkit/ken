@@ -210,16 +210,16 @@ fn cross_order_structural_equality_refuses_at_its_own_refl() {
         "refusal name must be unambiguous"
     );
     assert!(params.is_empty(), "structural refusal must be closed");
-    assert!(
-        matches!(body, SourceExpr::ECon(name, _) if name == "Refl"),
-        "structural refusal must try Refl"
-    );
     let [carrier, left, right] = equality(refused);
     let [same_carrier, same_left, same_right] = equality(theorem(&positives, "xy_left_self"));
     assert_eq!(
         shape(carrier),
         "name:Expr",
         "claim is structural Expr equality"
+    );
+    assert!(
+        matches!(body, SourceExpr::ECon(name, _) if name == "Refl"),
+        "structural refusal must try Refl"
     );
     assert_eq!(shape(same_carrier), shape(carrier));
     assert_eq!(shape(left), shape(same_left), "same left derivative tree");
