@@ -482,3 +482,124 @@ fn nonlinear_index_false_goal_refuses_and_reflexive_controls_check() {
         }
     });
 }
+
+const DEPENDENT_INDEX_FIXTURES: [&str; 4] = [
+    "data Box : Nat -> Type where { MkBox : (u : Nat) -> Box u }",
+    "data DI : (n : Nat) -> Box n -> Type where { MkDI : (u : Nat) -> (b : Box u) -> DI u b }",
+    "data DI2 : (n : Nat) -> Box n -> Type where { MkDI2 : (u : Nat) -> DI2 u (MkBox u) }",
+    "data DI3 : (n : Nat) -> Box n -> Type where { MkDI3 : (u : Nat) -> DI3 (Suc u) (MkBox (Suc u)) }",
+];
+
+fn dependent_index_env() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("prelude");
+    for fixture in DEPENDENT_INDEX_FIXTURES {
+        env.elaborate_decl(fixture)
+            .expect("dependent index fixture");
+    }
+    env
+}
+
+fn check_dependent_index_accepted(row: &str, source: &str) {
+    let mut env = dependent_index_env();
+    let trust = env.env.trusted_base();
+    env.elaborate_decl(source)
+        .unwrap_or_else(|error| panic!("{row}: {error:?}"));
+    assert_eq!(env.env.trusted_base(), trust, "{row}: no added trust");
+}
+
+/// Promise class: durable admission invariant (34 §3.5, 39 §2).
+/// MEASURED: DI2's dependent second index admits a value method without
+/// adding trust. CLAIMED: a projected premise plane missing that index does
+/// not authorize elimination of its outer-binder equation. THE GAP: the
+/// independent sibling test covers fields, continuations, theorems and DI3.
+#[test]
+fn dependent_index_di2_value_preserves_parent_alias_solution() {
+    on_elaboration_stack(|| {
+        check_dependent_index_accepted(
+            "di2_value",
+            "fn di2_value (x : Nat) (w : Box x) (z : DI2 x w) : Nat = match z { MkDI2 u ↦ u }",
+        );
+    });
+}
+
+/// Promise class: durable admission invariant (34 §3.5, 39 §2).
+/// MEASURED: four other DI/DI2 methods, a concrete-index control, and four
+/// outer-w/DI3/Box-continuation siblings admit without adding trust.
+/// CLAIMED: only omitted dependent-index equations use the retained alias
+/// path; a concrete index remains admitted. THE GAP: two false equalities
+/// have their own refusal pin below, and the library retains the no-trial rows.
+#[test]
+fn dependent_index_sibling_methods_preserve_parent_alias_solution() {
+    on_elaboration_stack(|| {
+        for (row, source) in [
+            (
+                "di_value",
+                "fn di_value (x : Nat) (w : Box x) (z : DI x w) : Nat = match z { MkDI u b ↦ u }",
+            ),
+            (
+                "di_box",
+                "fn di_box (x : Nat) (w : Box x) (z : DI x w) : Box x = match z { MkDI u b ↦ b }",
+            ),
+            (
+                "di_cont",
+                "fn di_cont (x : Nat) (w : Box x) (P : Nat -> Type) (h : (u : Nat) -> P u) (z : DI x w) : P x = match z { MkDI u b ↦ h u }",
+            ),
+            (
+                "di2_thm",
+                "theorem di2_thm (x : Nat) (w : Box x) (z : DI2 x w) : Equal (Box x) (MkBox x) w = match z { MkDI2 u ↦ Refl }",
+            ),
+            (
+                "di_concrete",
+                "fn di_concrete (x : Nat) (z : DI x (MkBox x)) : Nat = match z { MkDI u b ↦ u }",
+            ),
+            (
+                "x_di2_outer_w",
+                "fn x_di2_outer_w (x : Nat) (w : Box x) (z : DI2 x w) : Box x = match z { MkDI2 u ↦ w }",
+            ),
+            (
+                "x_di3_value",
+                "fn x_di3_value (x : Nat) (w : Box x) (z : DI3 x w) : Nat = match z { MkDI3 u ↦ u }",
+            ),
+            (
+                "x_di3_thm",
+                "theorem x_di3_thm (x : Nat) (w : Box x) (z : DI3 x w) : Equal (Box x) (MkBox x) w = match z { MkDI3 u ↦ Refl }",
+            ),
+            (
+                "x_di_box_cont",
+                "fn x_di_box_cont (x : Nat) (w : Box x) (P : (u : Nat) -> Box u -> Type) (h : (u : Nat) -> (b : Box u) -> P u b) (z : DI x w) : P x w = match z { MkDI u b ↦ h u b }",
+            ),
+        ] {
+            check_dependent_index_accepted(row, source);
+        }
+    });
+}
+
+/// Promise class: durable typed-refusal invariant (34 §3.5, 39 §2).
+/// MEASURED: a false Nat equality and a false Box equality reject as
+/// TypeMismatch with no trust change, rather than escaping with Internal.
+/// CLAIMED: alias routing solves only equations the goal actually warrants.
+/// THE GAP: the distinct closed Nat and nested no-trial rows stay above.
+#[test]
+fn dependent_index_false_equalities_refuse_as_type_mismatch() {
+    on_elaboration_stack(|| {
+        for (row, source) in [
+            (
+                "x_di2_false",
+                "theorem x_di2_false (x : Nat) (w : Box x) (z : DI2 x w) : Equal Nat x Zero = match z { MkDI2 u ↦ Refl }",
+            ),
+            (
+                "x_di_false_box",
+                "theorem x_di_false_box (x : Nat) (w : Box x) (z : DI x w) : Equal (Box x) (MkBox x) w = match z { MkDI u b ↦ Refl }",
+            ),
+        ] {
+            let mut env = dependent_index_env();
+            let trust = env.env.trusted_base();
+            let result = env.elaborate_decl(source);
+            assert!(
+                matches!(result, Err(ElabError::TypeMismatch { .. })),
+                "{row}: false equality must refuse at TypeMismatch: {result:?}"
+            );
+            assert_eq!(env.env.trusted_base(), trust, "{row}: no added trust");
+        }
+    });
+}
