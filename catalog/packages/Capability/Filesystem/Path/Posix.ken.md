@@ -12,7 +12,7 @@ import Core.Logic.Compare (list_eq)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Core.Classes.LawfulClasses (DecEq, bool_and, uint8_deceq_eq)
+import Core.Classes.LawfulClasses (DecEq, DecEq_instance_UInt8, bool_and, uint8_deceq_eq)
 
 import Data.Collections.Derived (list_append, map)
 

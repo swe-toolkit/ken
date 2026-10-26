@@ -48,7 +48,9 @@ fn entry_elaborates_with_every_checked_fence() {
     assert!(env.globals.contains_key("Traversable_instance_List"));
     assert!(env.globals.contains_key("Traversable_instance_Option"));
     assert!(env.globals.contains_key("Applicative_instance_Identity"));
-    assert!(env.globals.contains_key("Functor_instance_Identity"));
+    assert!(env
+        .globals
+        .contains_key("Core.Classes.LawfulFunctors.Functor_instance_Identity"));
 }
 
 // AC1/AC4: zero-Axiom acceptance bar, grounded on the CHECKED code only
@@ -191,10 +193,18 @@ fn wired_superclass_fields_reused_not_reproved() {
     let mut env = base_env();
     env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
         .expect("EffectfulClasses.ken.md must elaborate");
-    assert!(env.globals.contains_key("Functor_instance_List"));
-    assert!(env.globals.contains_key("Foldable_instance_List"));
-    assert!(env.globals.contains_key("Functor_instance_Option"));
-    assert!(env.globals.contains_key("Foldable_instance_Option"));
+    assert!(env
+        .globals
+        .contains_key("Core.Classes.LawfulFunctors.Functor_instance_List"));
+    assert!(env
+        .globals
+        .contains_key("Core.Classes.LawfulFunctors.Foldable_instance_List"));
+    assert!(env
+        .globals
+        .contains_key("Core.Classes.LawfulFunctors.Functor_instance_Option"));
+    assert!(env
+        .globals
+        .contains_key("Core.Classes.LawfulFunctors.Foldable_instance_Option"));
 }
 
 // AC6: `traverse`'s abstract-`g`-headed action classifies `proc` at the

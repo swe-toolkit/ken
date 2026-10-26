@@ -244,7 +244,7 @@ fn later_source_example_family_and_constructor_refs_refuse() {
 #[test]
 fn later_source_implicit_example_instance_refuses() {
     let class = "module Choices { pub class Select a { selected : a } }\nimport Choices (Select)\n";
-    let instance = "instance Select Bool { selected = True }\n";
+    let instance = "instance Choices.Select Bool { selected = True }\n";
     let later = "const main : Bool where Select Bool = d.selected";
     let admitted_source = format!("```ken\n{class}{instance}```\n");
     compile(&admitted_source, later, CompilerTargetKind::NonRuntime)

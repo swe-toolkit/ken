@@ -583,8 +583,9 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
         .expect("the full attached ParserLaws proof must be usable by a strict client");
     let source = loaded
         .env
-        .class_env
-        .class("Source")
+        .globals
+        .get("Capability.Parsing.Parsing.Source")
+        .and_then(|id| loaded.env.class_env.class_by_id(*id))
         .expect("strict Parsing must publish its one Source class identity");
     assert_eq!(
         source.projection.field_names,

@@ -183,15 +183,16 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
         .elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the class owner must roots-load in the same environment");
     let ord_class = env
-        .class_env
-        .class("Ord")
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("Ord must remain a checked class")
         .projection
         .type_id;
     assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
     let bool_instance = env
         .class_env
-        .instance_search("Ord", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.Ord", "Bool")
         .expect("Ord Bool must remain registered");
     assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be owner-checked");
     env.elaborate_file(

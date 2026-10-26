@@ -624,7 +624,8 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
         .expect("Data.Sums.Validation must roots-load");
     env.execute_loaded_entry_checked_fences(VALIDATION_MODULE)
         .expect("Data.Sums.Validation and every checked fence must elaborate");
-    let canonical_dictionary = env.globals["Semigroup_instance_Data.Collections.NonEmpty.NonEmpty"];
+    let canonical_dictionary = env.globals
+        ["Core.Classes.LawfulFunctors.Semigroup_instance_Data.Collections.NonEmpty.NonEmpty"];
     let (_, checked_record) = env
         .env
         .transparent_body(env.globals["checked_record"])
@@ -647,8 +648,8 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "Data.Sums.Validation.validation_ap_ich",
             "Data.Sums.Validation.validation_ap_cmp",
             "Data.Sums.Validation.validation_map_coh",
-            "Functor_instance_Data.Sums.Validation.Validation",
-            "Applicative_instance_Data.Sums.Validation.Validation",
+            "Core.Classes.LawfulFunctors.Functor_instance_Data.Sums.Validation.Validation",
+            "Core.Classes.EffectfulClasses.Applicative_instance_Data.Sums.Validation.Validation",
             "expected_errors",
             "both_errors_accumulate",
         ],
@@ -674,10 +675,10 @@ fn cc1_packages_have_zero_trusted_base_delta() {
 
 /// Promise class: durable invariant.
 ///
-/// The live resolver accepts Validation's lawful Applicative constraint while
-/// rejecting the same type constructor under a Monad constraint. The positive
-/// sibling makes an empty or unpopulated registry fail rather than vacuously
-/// satisfying the negative assertion.
+/// The live resolver accepts Validation's selected Applicative constraint.
+/// The checked private Monad class has no Validation instance in the registry;
+/// the positive sibling prevents a vacuous empty-registry observation. A
+/// client cannot directly select the private Monad for a NoInstance probe.
 #[test]
 fn validation_registry_has_applicative_but_no_monad_instance() {
     let mut env = dependency_env();
@@ -693,28 +694,31 @@ fn validation_registry_has_applicative_but_no_monad_instance() {
 
     assert_eq!(
         env.class_env
-            .instance_search("Applicative", "Data.Sums.Validation.Validation"),
-        Some(env.globals["Applicative_instance_Data.Sums.Validation.Validation"]),
+            .instance_search("Core.Classes.EffectfulClasses.Applicative", "Data.Sums.Validation.Validation"),
+        Some(env.globals["Core.Classes.EffectfulClasses.Applicative_instance_Data.Sums.Validation.Validation"]),
         "Validation's lawful Applicative dictionary must populate the live registry"
     );
-    env.elaborate_decl(
-        "fn cc1_applicative_registry_probe \
+    env.elaborate_file(
+        "import Core.Classes.EffectfulClasses (Applicative)\n\
+         fn cc1_applicative_registry_probe \
            (x : Validation (NonEmpty String) Bool) \
          : Validation (NonEmpty String) Bool \
          where Applicative (Validation (NonEmpty String)) = x",
     )
     .expect("the live resolver must discharge Validation's Applicative constraint");
 
-    match env.elaborate_decl(
-        "fn cc1_monad_registry_probe \
-           (x : Validation (NonEmpty String) Bool) \
-         : Validation (NonEmpty String) Bool \
-         where Monad (Validation (NonEmpty String)) = x",
-    ) {
-        Err(ElabError::NoInstance { class, ty, .. }) => {
-            assert_eq!(class, "Monad");
-            assert_eq!(ty, "Data.Sums.Validation.Validation");
-        }
-        other => panic!("Validation's Monad constraint must return exact NoInstance: {other:?}"),
-    }
+    let monad_id = env.globals["Core.Classes.EffectfulClasses.Monad"];
+    assert!(
+        env.class_env.class_by_id(monad_id).is_some(),
+        "the actual private Monad class must have a checked identity"
+    );
+    assert!(
+        env.class_env
+            .instance_search(
+                "Core.Classes.EffectfulClasses.Monad",
+                "Data.Sums.Validation.Validation",
+            )
+            .is_none(),
+        "the real Monad class must not register a Validation instance"
+    );
 }

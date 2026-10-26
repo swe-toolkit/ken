@@ -181,10 +181,9 @@ fn load_order() -> ElabEnv {
 }
 
 fn canonical_ord_nat(env: &ElabEnv) -> (GlobalId, GlobalId, GlobalId) {
-    // Class globals retain their canonical class-registry spelling while the
-    // loader records defined-at ownership separately in module/package
-    // provenance. Compare identities, never numeric allocation positions.
-    let ord = env.globals["Ord"];
+    // Class globals use their defined-at qualified key. Compare checked
+    // identities, never numeric allocation positions or ambient spellings.
+    let ord = env.globals[&format!("{LAWFUL}.Ord")];
     let nat = env.globals["Nat"];
     let mut matches = env
         .class_env
@@ -285,8 +284,9 @@ fn registry_has_one_lawful_classes_owned_ord_nat_dictionary() {
     let env = load_order();
     let (ord, _nat, dictionary) = canonical_ord_nat(&env);
     let class = env
-        .class_env
-        .class("Ord")
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("canonical Ord class metadata");
     assert_eq!(class.projection.type_id, ord);
 
@@ -338,7 +338,10 @@ fn order_facade_carries_relation_and_dictionary_identities() {
         .resolution_provenance
         .iter()
         .rev()
-        .find(|resolution| resolution.class_name == "Ord" && resolution.head_type == "Nat")
+        .find(|resolution| {
+            resolution.class_name == "Core.Classes.LawfulClasses.Ord"
+                && resolution.head_type == "Nat"
+        })
         .expect("Order-only consumer must record Ord Nat resolution provenance");
     assert_eq!(resolution.instance_id, dictionary);
     assert_eq!(resolution.defining_package, LAWFUL);
@@ -384,8 +387,9 @@ fn named_axiom_trust_id(env: &ElabEnv, named: GlobalId) -> GlobalId {
 
 fn owned_ord_int_law_ids(env: &ElabEnv, lawful_owned: &[GlobalId]) -> BTreeSet<GlobalId> {
     let ord = env
-        .class_env
-        .class("Ord")
+        .globals
+        .get("Core.Classes.LawfulClasses.Ord")
+        .and_then(|id| env.class_env.class_by_id(*id))
         .expect("registered Ord class")
         .projection
         .type_id;
@@ -525,6 +529,7 @@ fn ownership_move_preserves_trust_posture_and_behavior() {
 
     env.elaborate_file(
         "import Data.Numeric.Nat.Order (leq_nat)\n\
+         import Core.Classes.LawfulClasses (Ord_instance_Nat)\n\
          theorem cat_ord_lt_behavior\n\
            : Equal Bool (leq_nat Zero (Suc Zero)) True = Proved\n\
          theorem cat_ord_gt_behavior\n\
