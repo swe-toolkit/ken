@@ -18,13 +18,14 @@ use super::continuations::{
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
     generated_context_parameters,
     walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
-    ContinuationContextId, ContinuationEmissionOwner, ContinuationInputProjection,
+    ContinuationContextId, ContinuationEmissionOwner, ContinuationEnvironmentClaim,
+    ContinuationFrameIdentity, ContinuationInputProjection, ContinuationUnitView,
     ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
     ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
     RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
 };
-use super::occurrences::StaticOriginId;
+use super::occurrences::{occurrence_authority, StaticOriginId};
 use super::semantic_ir::ConstructorIdentity;
 use super::{
     occurrence_subtree_contains, peel_checked_bracket_operation, planner_capacity_error, planner_error,
@@ -727,6 +728,10 @@ impl StaticResponseContinuation {
     ) -> &[(u32, ContinuationSourceCoordinate, u32)] {
         &self.continuation_inputs
     }
+
+    pub(in crate::cranelift_backend) fn operation_root_origin(&self) -> StaticOriginId {
+        self.operation_root_origin
+    }
 }
 
 /// The classify verdict for one response `ITree::Vis` occurrence (recut
@@ -739,6 +744,8 @@ impl StaticResponseContinuation {
 /// `Deferred` is the complete residual: P1 plus ineligible or suppressed P2.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseDisposition {
+    /// Projected from an authenticated region and one exact response key.
+    BracketOwned(super::brackets::BracketSettlementId),
     Specialized,
     Deferred,
 }
@@ -825,6 +832,21 @@ impl DeferredResponseRow {
     }
 }
 
+/// One planner-selected transfer of a handler-owned Deferred response into
+/// the exact generated context already planned to execute its lexical K.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct HandlerDriveContextRoute {
+    pub(in crate::cranelift_backend) vis_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) handler: ContinuationEmissionOwner,
+    pub(in crate::cranelift_backend) context: ContinuationContextId,
+    pub(in crate::cranelift_backend) continuation_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) recursive_position: u32,
+    pub(in crate::cranelift_backend) worker_body_origin: StaticOriginId,
+    /// The context's Capture run, re-planned in its declared order for this
+    /// handler's actual defining frame rather than its original caller's.
+    pub(in crate::cranelift_backend) capture_claims: Vec<ContinuationEnvironmentClaim>,
+}
+
 /// Phase-A carry of the two-phase response context install (RECUT 2, HS5). Built
 /// by [`StaticTransitionPlan::install_static_response_context_plan`] at
 /// construction.rs:1213 and consumed by
@@ -835,6 +857,9 @@ impl DeferredResponseRow {
 #[derive(Clone, Debug)]
 pub(in crate::cranelift_backend) struct StaticResponsePhaseA {
     demands: Vec<StaticResponseContextDemand>,
+    /// Phase A's validated S demands retain their K-context authority, but
+    /// never enter ordinary Phase-B ownership, Deferred, or candidate rows.
+    marked: Vec<StaticResponseContextDemand>,
     preexisting_count: usize,
     deferred: Vec<DeferredResponseRow>,
 }
@@ -1098,40 +1123,34 @@ pub fn with_mixed_relay_refusal_observations<T>(operation: impl FnOnce() -> T)
     (result, observations)
 }
 
-// Route-B precision control for `RT-WRITEALL-SUCCESS-PLANE-CLOSE`. Production
-// promotes only exclusively-predeclared transport groups. This mutation removes
-// that ownership restriction and counts every mixed-owner response it actually
-// over-promotes; the real WRITE_ALL compile must then refuse the escaping
-// response placeholder.
+// AC-1 control: each marked S must stay outside ordinary response ownership.
+// At plan close, independently revalidate a scratch plan with one installed
+// bracket row illegally reinserted in ordinary ownership. Each S is tested
+// separately; a mutation that never reaches a row cannot count as a control.
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
-    static OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE: std::cell::Cell<bool> =
+    static BRACKET_ORDINARY_OWNER_MUTATION: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
-    static OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS: std::cell::Cell<usize> =
+    static BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn with_mixed_owner_execute_then_resume_overpromotion<T>(
-    operation: impl FnOnce() -> T,
-) -> (T, usize) {
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| {
-        assert!(
-            !slot.replace(true),
-            "mixed-owner execute-then-resume overpromotion mutations cannot nest"
-        );
+pub fn with_bracket_ordinary_owner_mutation<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| {
+        assert!(!slot.replace(true), "bracket owner mutations cannot nest");
     });
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS.with(|count| count.set(0));
+    BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS.with(|count| count.set(0));
     let result = operation();
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| slot.set(false));
-    let applications =
-        OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS.with(std::cell::Cell::get);
+    BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| slot.set(false));
+    let applications = BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS
+        .with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn mixed_owner_execute_then_resume_overpromotion_is_exact() -> bool {
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
+pub fn bracket_ordinary_owner_mutation_is_exact() -> bool {
+    BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| !slot.get())
 }
 
 /// Compile-preserving HS15/HS17 refutations. Each moves one operand of the
@@ -2688,6 +2707,67 @@ fn classify_deferred_response_tail(
 }
 
 impl StaticTransitionPlan<'_> {
+    /// Exact contexts at marked settlement S origins, before any ordinary
+    /// response demand or Phase-B owner decision. The marker determines the
+    /// population; a host operation is never a membership predicate.
+    pub(super) fn marked_bracket_response_contexts(
+        &self,
+        templates: &[super::brackets::BracketStaticRegion],
+    ) -> Result<BTreeMap<StaticOriginId, BTreeSet<super::brackets::BracketResponseContextKey>>,
+        CraneliftBackendError>
+    {
+        use super::brackets::BracketResponseContextKey;
+        let units = self.continuation_units()?;
+        let mut contexts = BTreeMap::new();
+        for template in templates {
+            let vis = template.settlement;
+            let RuntimeExpr::Construct { args, .. } = self.planned_occurrence_expr(vis)? else {
+                return Err(planner_error("a marked settlement is not a response Vis"));
+            };
+            if args.len() != 2 {
+                return Err(planner_error("a marked settlement has no response continuation"));
+            }
+            let matching = units.iter().filter(|unit| unit.producer_construct_origin() == vis)
+                .collect::<Vec<_>>();
+            let mut keys = BTreeSet::new();
+            if matching.is_empty() {
+                if matches!(&args[1], RuntimeExpr::Value(RuntimeValue::Unknown)) {
+                    return Err(planner_error("a marked bracket settlement has opaque response continuation"));
+                }
+                // Inline needs the exact source response coordinate, not an
+                // ordinary disposition. Membership was settled by the mark
+                // before this source-route projection was consulted.
+                let routes = host_response_routes(self)?;
+                let root = self.semantic.child_origin(vis, 0)?;
+                let (route, _) = selected_host_response_route(self, vis, root, &routes)?
+                    .ok_or_else(|| planner_error(
+                        "an unowned marked settlement has no exact inline response coordinate"))?;
+                keys.insert(BracketResponseContextKey::Inline {
+                    producer_call_origin: route.producer_call_origin,
+                    response_origin: route.response_origin,
+                    vis_origin: vis,
+                    operation_root_origin: root,
+                });
+            } else {
+                for unit in matching {
+                    let identity = self.continuation_call_binding_for(
+                        vis, unit.continuation_origin(), unit.producer_alternative(),
+                        unit.recursive_position(),
+                    )?.ok_or_else(|| planner_error(
+                        "a marked bracket response has no exact continuation call identity"))?;
+                    if !keys.insert(BracketResponseContextKey::Continuation(identity)) {
+                        return Err(planner_error(
+                            "dual ownership: two response rows share one marked settlement context"));
+                    }
+                }
+            }
+            if contexts.insert(vis, keys).is_some() {
+                return Err(planner_error("dual ownership: a settlement S occurs twice"));
+            }
+        }
+        Ok(contexts)
+    }
+
     /// Derive and fully validate every statically attributable response demand.
     ///
     /// This phase intentionally does not ask whether an old causal caller had
@@ -2695,15 +2775,103 @@ impl StaticTransitionPlan<'_> {
     /// a lawful context demand, so that question belongs to the union interner
     /// below. The outer `Result` is plan integrity; the inner `Result` retains
     /// only the SSA trichotomy's genuinely dynamic or non-expressible arm.
+    fn validated_response_context_demand(
+        &self,
+        vis_origin: StaticOriginId,
+        operation_root_origin: StaticOriginId,
+        selected_operation_origin: StaticOriginId,
+        route: HostResponseRoute,
+        unit: &ContinuationUnitView<'_>,
+        id: StaticResponseContinuationId,
+    ) -> Result<Result<StaticResponseContextDemand, SsaInfeasible>, CraneliftBackendError> {
+        let base_owner = ContinuationEmissionOwner::Specialization(unit.id());
+        let continuation_inputs = unit.prefinalization_continuation_inputs()?;
+        let infeasible = |reason| {
+            SsaInfeasible::at_vis(base_owner, vis_origin, Some(route.producer_call_origin), reason)
+                .with_k(route.operation, unit.worker_closure_origin(), unit.worker_body_origin(),
+                    unit.worker_capture_count(), continuation_inputs.len())
+        };
+        let k_identity = self.continuation_call_binding_for(
+            vis_origin, unit.continuation_origin(), unit.producer_alternative(),
+            unit.recursive_position(),
+        )?.ok_or_else(|| planner_error(
+            "a static response producer's own edge has no continuation call identity",
+        ))?;
+        let k_ret_identity = match exact_response_ret_identity(self, unit.continuation_origin())? {
+            Ok(identity) => identity,
+            Err(reason) => return Ok(Err(infeasible(reason))),
+        };
+        let envelope = unit.ordinary_envelope()?;
+        let mut captures = Vec::new();
+        for (position, member) in envelope.iter().enumerate() {
+            let super::continuations::ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+                ordinal, owner, source, ..
+            } = member else { continue };
+            let ContinuationWorkerCaptureSource::Lexical(origin) = source else {
+                return Ok(Err(infeasible(
+                    "a seeded K capture has no explicit producer-side source coordinate",
+                )));
+            };
+            let source = match exact_capture_source(self, *owner, *origin)? {
+                Ok(source) => source,
+                Err(reason) => return Ok(Err(infeasible(reason))),
+            };
+            captures.push(StaticResponseCapture {
+                ordinal: *ordinal, origin: *origin, source,
+                producer_abi_slot: u32::try_from(position).map_err(|_| {
+                    planner_capacity_error("static response capture slot exhausted")
+                })?,
+            });
+        }
+        if captures.iter().enumerate().any(|(ordinal, capture)|
+            capture.ordinal as usize != ordinal)
+        {
+            return Err(planner_error("static response captures are not dense in capture-ordinal order"));
+        }
+        let raw_owner = self.semantic.function_owner(unit.worker_body_origin())?
+            .ok_or_else(|| planner_error(
+                "a response K worker body has no predeclared source owner",
+            ))?;
+        let effect_source_owner = self.semantic.function_owner(route.effect_origin)?
+            .ok_or_else(|| planner_error(
+                "a static response effect has no predeclared source owner",
+            ))?;
+        let operation_source_owner = self.semantic.function_owner(selected_operation_origin)?
+            .ok_or_else(|| planner_error(
+                "a selected response operation has no predeclared source owner",
+            ))?;
+        let effect_environment = match static_response_effect_environment(
+            self, effect_source_owner, route.effect_origin, selected_operation_origin,
+            &captures, &continuation_inputs,
+        )? {
+            Ok(environment) => environment,
+            Err(reason) => return Ok(Err(infeasible(reason))),
+        };
+        Ok(Ok(StaticResponseContextDemand {
+            id, base_owner, producer_call_origin: route.producer_call_origin,
+            response_origin: route.response_origin, effect_origin: route.effect_origin,
+            operation_root_origin, effect_source_owner, operation_source_owner,
+            effect_environment, vis_origin, operation: route.operation, k_identity,
+            k_specialization: unit.id(), k_closure_origin: unit.worker_closure_origin(),
+            k_body_origin: unit.worker_body_origin(), k_ret_identity, raw_owner,
+            worker: unit.key.worker.clone(), captures,
+            continuation_inputs: continuation_inputs.iter().map(|input|
+                (input.ordinal, input.coordinate, input.ordinary_abi_position)).collect(),
+            context_inputs: unit.key.continuation_inputs.clone(),
+        }))
+    }
+
     #[allow(clippy::type_complexity)]
     fn static_response_context_demands_filtered(
         &self,
         operation: Option<HostOpV1>,
         apply_mutation: bool,
     ) -> Result<
-        Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), SsaInfeasible>,
+        Result<(Vec<StaticResponseContextDemand>, Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), SsaInfeasible>,
         CraneliftBackendError,
     > {
+        let marked = self.bracket_settlements.regions.iter().map(|region| region.settlement)
+            .collect::<BTreeSet<_>>();
         let routes = host_response_routes(self)?;
         let units = self.continuation_units()?;
         let mut response_vis = Vec::new();
@@ -2715,6 +2883,9 @@ impl StaticTransitionPlan<'_> {
                 continue;
             }
             let vis_origin = occurrence.static_origin;
+            // Decide marked membership before selecting any ordinary route.
+            let is_marked = marked.contains(&vis_origin);
+            if is_marked && operation.is_some() { continue; }
             let operation_origin = self.semantic.child_origin(vis_origin, 0)?;
             let Some((route, selected_operation_origin)) =
                 selected_host_response_route(self, vis_origin, operation_origin, &routes)?
@@ -2738,10 +2909,11 @@ impl StaticTransitionPlan<'_> {
                 selected_operation_origin,
                 route,
                 k_is_opaque,
+                is_marked,
             ));
         }
         response_vis.sort_by_key(
-            |(vis_origin, operation_origin, selected_operation_origin, route, _k_is_opaque)| {
+            |(vis_origin, operation_origin, selected_operation_origin, route, _k_is_opaque, _is_marked)| {
                 (
                     route.producer_call_origin,
                     *vis_origin,
@@ -2771,8 +2943,9 @@ impl StaticTransitionPlan<'_> {
         // hold across the two phases: phase A's demand domain is has-K-unit, phase
         // B's disposition domain is the whole population (P1 sealed via its own
         // main-lowered Deferred arm).
+        let mut marked_demands = Vec::new();
         let mut deferred: Vec<DeferredResponseRow> = Vec::new();
-        for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
+        for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque, is_marked) in
             response_vis
         {
             let matching = units
@@ -2780,6 +2953,7 @@ impl StaticTransitionPlan<'_> {
                 .filter(|unit| unit.producer_construct_origin() == vis_origin)
                 .collect::<Vec<_>>();
             if matching.is_empty() {
+                if is_marked { continue; } // Inline marked instances have no K context.
                 if k_is_opaque {
                     // Category (i): a genuinely opaque/dynamic K (RuntimeValue::
                     // Unknown) with no static continuation and no existing main
@@ -2821,145 +2995,23 @@ impl StaticTransitionPlan<'_> {
                 continue;
             }
             for unit in matching {
-                let base_owner = ContinuationEmissionOwner::Specialization(unit.id());
-                let continuation_inputs = unit.prefinalization_continuation_inputs()?;
-                let infeasible = |reason| {
-                    SsaInfeasible::at_vis(
-                        base_owner,
-                        vis_origin,
-                        Some(route.producer_call_origin),
-                        reason,
-                    )
-                    .with_k(
-                        route.operation,
-                        unit.worker_closure_origin(),
-                        unit.worker_body_origin(),
-                        unit.worker_capture_count(),
-                        continuation_inputs.len(),
-                    )
-                };
-                let k_identity = self
-                    .continuation_call_binding_for(
-                        vis_origin,
-                        unit.continuation_origin(),
-                        unit.producer_alternative(),
-                        unit.recursive_position(),
-                    )?
-                    .ok_or_else(|| {
-                        planner_error(
-                            "a static response producer's own edge has no continuation call identity",
-                        )
-                    })?;
-                // Phase A builds a demand for this has-K-unit member
-                // unconditionally. Phase B assigns its owner after the transport
-                // relation is known. In an eligible response plane, a
-                // transport-source identity is Specialized and its existing
-                // transport emission is the selected incoming response-owner
-                // call. An open/single-stage plane or suppression retains P2.
-                let k_ret_identity = match exact_response_ret_identity(
-                    self,
-                    unit.continuation_origin(),
+                let destination = if is_marked { &mut marked_demands } else { &mut demands };
+                let id = StaticResponseContinuationId::from_position(destination.len())?;
+                let demand = match self.validated_response_context_demand(
+                    vis_origin, operation_root_origin, selected_operation_origin, route,
+                    &unit, id,
                 )? {
-                    Ok(identity) => identity,
-                    Err(reason) => return Ok(Err(infeasible(reason))),
+                    Ok(demand) => demand,
+                    Err(reason) => return Ok(Err(reason)),
                 };
-                let envelope = unit.ordinary_envelope()?;
-                let mut captures = Vec::new();
-                for (position, member) in envelope.iter().enumerate() {
-                    let super::continuations::ContinuationOrdinaryEnvelopeRole::WorkerCapture {
-                        ordinal,
-                        owner,
-                        source,
-                        ..
-                    } = member
-                    else {
-                        continue;
-                    };
-                    let ContinuationWorkerCaptureSource::Lexical(origin) = source else {
-                        return Ok(Err(infeasible(
-                            "a seeded K capture has no explicit producer-side source coordinate",
-                        )));
-                    };
-                    let source = match exact_capture_source(self, *owner, *origin)? {
-                        Ok(source) => source,
-                        Err(reason) => return Ok(Err(infeasible(reason))),
-                    };
-                    captures.push(StaticResponseCapture {
-                        ordinal: *ordinal,
-                        origin: *origin,
-                        source,
-                        producer_abi_slot: u32::try_from(position).map_err(|_| {
-                            planner_capacity_error("static response capture slot exhausted")
-                        })?,
-                    });
-                }
-                if captures
-                    .iter()
-                    .enumerate()
-                    .any(|(ordinal, capture)| capture.ordinal as usize != ordinal)
-                {
-                    return Err(planner_error(
-                        "static response captures are not dense in capture-ordinal order",
-                    ));
-                }
-                let raw_owner = self
-                    .semantic
-                    .function_owner(unit.worker_body_origin())?
-                    .ok_or_else(|| {
-                        planner_error("a response K worker body has no predeclared source owner")
-                    })?;
-                let effect_source_owner = self
-                    .semantic
-                    .function_owner(route.effect_origin)?
-                    .ok_or_else(|| {
-                        planner_error("a static response effect has no predeclared source owner")
-                    })?;
-                let operation_source_owner = self
-                    .semantic
-                    .function_owner(selected_operation_origin)?
-                    .ok_or_else(|| {
-                        planner_error(
-                            "a selected response operation has no predeclared source owner",
-                        )
-                    })?;
-                let effect_environment = match static_response_effect_environment(
-                    self,
-                    effect_source_owner,
-                    route.effect_origin,
-                    selected_operation_origin,
-                    &captures,
-                    &continuation_inputs,
-                )? {
-                    Ok(environment) => environment,
-                    Err(reason) => return Ok(Err(infeasible(reason))),
-                };
-                demands.push(StaticResponseContextDemand {
-                    id: StaticResponseContinuationId::from_position(demands.len())?,
-                    base_owner,
-                    producer_call_origin: route.producer_call_origin,
-                    response_origin: route.response_origin,
-                    effect_origin: route.effect_origin,
-                    operation_root_origin,
-                    effect_source_owner,
-                    operation_source_owner,
-                    effect_environment,
-                    vis_origin,
-                    operation: route.operation,
-                    k_identity,
-                    k_specialization: unit.id(),
-                    k_closure_origin: unit.worker_closure_origin(),
-                    k_body_origin: unit.worker_body_origin(),
-                    k_ret_identity,
-                    raw_owner,
-                    worker: unit.key.worker.clone(),
-                    captures,
-                    continuation_inputs: continuation_inputs
-                        .iter()
-                        .map(|input| (input.ordinal, input.coordinate, input.ordinary_abi_position))
-                        .collect(),
-                    context_inputs: unit.key.continuation_inputs.clone(),
-                });
+                destination.push(demand);
             }
+        }
+        marked_demands.sort_by_key(|demand| {
+            (demand.producer_call_origin, demand.vis_origin, demand.k_identity.clone())
+        });
+        for (position, demand) in marked_demands.iter_mut().enumerate() {
+            demand.id = StaticResponseContinuationId::from_position(position)?;
         }
         demands.sort_by_key(|demand| {
             (
@@ -2972,6 +3024,8 @@ impl StaticTransitionPlan<'_> {
             demand.id = StaticResponseContinuationId::from_position(position)?;
         }
         let expected_demands = demands.clone();
+        #[cfg(feature = "px8-ds-test-support")]
+        let expected_marked_demands = marked_demands.clone();
         #[cfg(feature = "px8-ds-test-support")]
         if operation.is_none() && apply_mutation {
             if let Some(mutation) =
@@ -3041,11 +3095,14 @@ impl StaticTransitionPlan<'_> {
                             })?;
                     }
                     StaticResponseContextDemandMutation::MergeTwoKKeys => {
-                        let pair = demands
+                        // The shared producer's two release K keys are marked
+                        // S rows. AC-1 removed them from ordinary demands;
+                        // corrupt the plane-bound demands themselves instead.
+                        let pair = marked_demands
                             .iter()
                             .enumerate()
                             .find_map(|(left, first)| {
-                                demands.iter().enumerate().find_map(|(right, second)| {
+                                marked_demands.iter().enumerate().find_map(|(right, second)| {
                                     (left != right
                                         && first.producer_call_origin
                                             == second.producer_call_origin
@@ -3056,11 +3113,13 @@ impl StaticTransitionPlan<'_> {
                             })
                             .ok_or_else(|| {
                                 planner_error(
-                                    "the two-K merge mutation found no shared producer",
+                                    "the bracket two-K merge mutation found no shared producer",
                                 )
                             })?;
-                        demands[pair.1].k_specialization = demands[pair.0].k_specialization;
-                        demands[pair.1].k_body_origin = demands[pair.0].k_body_origin;
+                        marked_demands[pair.1].k_specialization =
+                            marked_demands[pair.0].k_specialization;
+                        marked_demands[pair.1].k_body_origin =
+                            marked_demands[pair.0].k_body_origin;
                     }
                     StaticResponseContextDemandMutation::SubstituteResponseWithOperation => {
                         demands[target].response_origin = demands[target].operation_root_origin;
@@ -3200,6 +3259,11 @@ impl StaticTransitionPlan<'_> {
                 }
                 STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
                     .with(|count| count.set(count.get() + applications));
+                if mutation == StaticResponseContextDemandMutation::MergeTwoKKeys {
+                    validate_static_response_demand_closure(
+                        &expected_marked_demands, &marked_demands,
+                    )?;
+                }
             }
         }
         validate_static_response_demand_closure(&expected_demands, &demands)?;
@@ -3224,7 +3288,30 @@ impl StaticTransitionPlan<'_> {
             target.context_inputs[1].coordinate = first;
         }
         deferred.sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
-        Ok(Ok((demands, deferred)))
+        Ok(Ok((demands, marked_demands, deferred)))
+    }
+
+    fn validate_marked_bracket_demands(
+        &self,
+        marked: &[StaticResponseContextDemand],
+    ) -> Result<(), CraneliftBackendError> {
+        use super::brackets::BracketResponseContextKey;
+        let expected = self.bracket_settlements.regions.iter().filter_map(|region| {
+            match &region.context {
+                BracketResponseContextKey::Continuation(identity) =>
+                    Some((region.settlement, identity.clone())),
+                BracketResponseContextKey::Inline { .. } => None,
+            }
+        }).collect::<Vec<_>>();
+        let actual = marked.iter().map(|demand| (demand.vis_origin, demand.k_identity.clone()))
+            .collect::<Vec<_>>();
+        if expected.len() != actual.len()
+            || expected.iter().collect::<BTreeSet<_>>() != actual.iter().collect::<BTreeSet<_>>()
+            || expected.iter().collect::<BTreeSet<_>>().len() != expected.len()
+        {
+            return Err(planner_error("marked demand and plane instance disagree"));
+        }
+        Ok(())
     }
 
     /// Intern the union of old causal-call contexts and response demands into a
@@ -3385,6 +3472,50 @@ impl StaticTransitionPlan<'_> {
         Ok(resolved)
     }
 
+    /// Resolve marked S against the already-interned K-context population.
+    /// Its identity is a region-local label, never an ordinary successor id or
+    /// a pending-Vis discriminant. Bind both directions: no two rows can claim
+    /// one region, and no Continuation-keyed region can remain unbound.
+    fn resolve_marked_bracket_rows(
+        &self,
+        mut marked: Vec<StaticResponseContextDemand>,
+        contexts: &[PlannedContinuationContext],
+        preexisting_count: usize,
+    ) -> Result<BTreeMap<super::brackets::BracketSettlementId, StaticResponseContinuation>,
+        CraneliftBackendError> {
+        use super::brackets::BracketResponseContextKey;
+        self.validate_marked_bracket_demands(&marked)?;
+        let mut ids = Vec::with_capacity(marked.len());
+        for demand in &mut marked {
+            let matches = self.bracket_settlements.regions.iter().filter(|region| {
+                region.settlement == demand.vis_origin && matches!(
+                    &region.context, BracketResponseContextKey::Continuation(identity)
+                        if identity == &demand.k_identity
+                )
+            }).collect::<Vec<_>>();
+            let [region] = matches.as_slice() else {
+                return Err(planner_error("marked demand and plane instance disagree"));
+            };
+            demand.id = StaticResponseContinuationId::from_position(
+                region.id.ordinal() as usize)?;
+            ids.push(region.id);
+        }
+        let rows = self.resolve_static_response_context_demands(
+            marked, contexts, preexisting_count)?;
+        let mut bound = BTreeMap::new();
+        for (id, row) in ids.into_iter().zip(rows) {
+            if bound.insert(id, row).is_some() {
+                return Err(planner_error("two marked rows claim one bracket region"));
+            }
+        }
+        if bound.len() != self.bracket_settlements.regions.iter()
+            .filter(|region| matches!(region.context,
+                BracketResponseContextKey::Continuation(_))).count() {
+            return Err(planner_error("a Continuation bracket region has no marked row"));
+        }
+        Ok(bound)
+    }
+
     /// PHASE A of the two-phase response context install (RECUT 2, HS5, Architect
     /// evt_7eh84c8n6w08e). Runs once at construction.rs:1213, after causal
     /// specialization planning closes and BEFORE the context ABI (:1221) and
@@ -3398,6 +3529,7 @@ impl StaticTransitionPlan<'_> {
     /// population intact.
     pub(super) fn install_static_response_context_plan(
         &mut self,
+        symbols: &crate::NativeProcessSymbols,
     ) -> Result<(), CraneliftBackendError> {
         if self.static_response_plan_installed
             || self.static_response_phase_a.is_some()
@@ -3407,19 +3539,28 @@ impl StaticTransitionPlan<'_> {
                 "the static response context plan phase A may run exactly once",
             ));
         }
-        let (demands, deferred) = match self.static_response_context_demands_filtered(None, true)? {
+        let roles = super::brackets::BracketRoles::from(symbols);
+        let static_regions = super::brackets::build_bracket_static_regions(self, &roles)?;
+        let marked = self.marked_bracket_response_contexts(&static_regions)?;
+        self.bracket_settlements = super::brackets::bind_bracket_contexts(
+            roles, &static_regions, &marked,
+        )?;
+        let (demands, marked_demands, deferred) = match self.static_response_context_demands_filtered(None, true)? {
             Ok(classified) => classified,
             Err(infeasible) => {
                 self.static_response_infeasible = Some(infeasible);
                 return Ok(());
             }
         };
+        self.validate_marked_bracket_demands(&marked_demands)?;
         let causal_contexts = self.continuation_contexts.clone();
-        let (contexts, preexisting_count) =
-            self.response_context_union(&causal_contexts, &demands)?;
+        let (contexts, preexisting_count) = self.response_context_union(
+            &causal_contexts, &[demands.as_slice(), marked_demands.as_slice()].concat(),
+        )?;
         self.continuation_contexts = contexts;
         self.static_response_phase_a = Some(StaticResponsePhaseA {
             demands,
+            marked: marked_demands,
             preexisting_count,
             deferred,
         });
@@ -3470,7 +3611,10 @@ impl StaticTransitionPlan<'_> {
             &contexts,
             phase_a.preexisting_count,
         )?;
+        let bracket_rows = self.resolve_marked_bracket_rows(
+            phase_a.marked, &contexts, phase_a.preexisting_count)?;
         self.static_response_continuations = rows;
+        self.bracket_rows = bracket_rows;
         self.static_response_deferred = deferred;
         self.static_response_plan_installed = true;
         Ok(())
@@ -3707,11 +3851,6 @@ impl StaticTransitionPlan<'_> {
             let suppress_execute = SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
             #[cfg(not(feature = "px8-ds-test-support"))]
             let suppress_execute = false;
-            #[cfg(feature = "px8-ds-test-support")]
-            let overpromote_mixed =
-                OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
-            #[cfg(not(feature = "px8-ds-test-support"))]
-            let overpromote_mixed = false;
             let transport_source = transport_sources.contains(&demand.k_identity);
             let exclusively_predeclared_stage = transport_producer_owners
                 .get(&demand.producer_call_origin)
@@ -3725,17 +3864,6 @@ impl StaticTransitionPlan<'_> {
                     demand.vis_origin,
                 )));
             }
-            #[cfg(feature = "px8-ds-test-support")]
-            if count_install_applications
-                && overpromote_mixed
-                && has_unitless_response
-                && requires_execute_then_resume
-                && transport_source
-                && !exclusively_predeclared_stage
-            {
-                OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS
-                    .with(|count| count.set(count.get() + 1));
-            }
             // Execute-then-resume is admitted only for the composed ordinary
             // has-K groups identified above. Unit-less P1 members are absent
             // from `demands` and remain on main lowering, so this loop cannot
@@ -3748,8 +3876,7 @@ impl StaticTransitionPlan<'_> {
                 && (suppress_execute
                     || !requires_execute_then_resume
                     || (has_unitless_response
-                        && !exclusively_predeclared_stage
-                        && !overpromote_mixed))
+                        && !exclusively_predeclared_stage))
             {
                 // Population-side mutation restores P2 for an otherwise eligible
                 // plane; open and single-stage planes remain lawful residuals.
@@ -3836,7 +3963,38 @@ impl StaticTransitionPlan<'_> {
                 "the final plan carries no installed static response context plan",
             ));
         }
-        let (demands, p1_deferred) =
+        #[cfg(feature = "px8-ds-test-support")]
+        if BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| slot.replace(false)) {
+            let result = (|| {
+                let mut first_refusal = None;
+                for row in self.bracket_rows.values() {
+                    let mut mutant = self.clone();
+                    mutant.static_response_continuations.push(row.clone());
+                    let Err(error) = mutant.validate_static_response_context_plan(causal_contexts)
+                    else {
+                        return Err(planner_error(
+                            "a bracket row reinserted as an ordinary owner passed plan close",
+                        ));
+                    };
+                    if !format!("{error:?}").contains(
+                        "the installed response context/continuation plane is not its exact closed derivation"
+                    ) {
+                        return Err(planner_error(
+                            "bracket ordinary-owner mutation reached a different refusal",
+                        ));
+                    }
+                    BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS
+                        .with(|count| count.set(count.get() + 1));
+                    first_refusal.get_or_insert(error);
+                }
+                first_refusal.ok_or_else(|| planner_error(
+                    "bracket ordinary-owner mutation found no installed marked row",
+                ))
+            })();
+            BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| slot.set(true));
+            return Err(result?);
+        }
+        let (demands, marked_demands, p1_deferred) =
             match self.static_response_context_demands_filtered(None, false)? {
                 Ok(classified) => classified,
                 Err(infeasible) => {
@@ -3846,6 +4004,7 @@ impl StaticTransitionPlan<'_> {
                     }
                     if self.static_response_infeasible.as_ref() != Some(&infeasible)
                         || !self.static_response_continuations.is_empty()
+                        || !self.bracket_rows.is_empty()
                         || !self.static_response_deferred.is_empty()
                         || landed_contexts != causal_contexts
                     {
@@ -3861,9 +4020,11 @@ impl StaticTransitionPlan<'_> {
                 "a feasible response derivation retained a stale typed SSA refusal",
             ));
         }
+        self.validate_marked_bracket_demands(&marked_demands)?;
         // Phase A re-derivation: the owner-less context-entry plane over has-K-unit.
-        let (mut expected_contexts, preexisting_count) =
-            self.response_context_union(causal_contexts, &demands)?;
+        let (mut expected_contexts, preexisting_count) = self.response_context_union(
+            causal_contexts, &[demands.as_slice(), marked_demands.as_slice()].concat(),
+        )?;
         // Phase B re-derivation uses the same pre-schema transport and relay
         // identities that preselection and the real phase-B install consumed.
         // Phase B re-derivation: a P1-bearing eligible plane gives each
@@ -3883,6 +4044,8 @@ impl StaticTransitionPlan<'_> {
             &expected_contexts,
             preexisting_count,
         )?;
+        let expected_bracket_rows = self.resolve_marked_bracket_rows(
+            marked_demands, &expected_contexts, preexisting_count)?;
         for context in &mut expected_contexts {
             context.finalized_availability.clear();
         }
@@ -3892,6 +4055,7 @@ impl StaticTransitionPlan<'_> {
         }
         if landed_contexts != expected_contexts
             || self.static_response_continuations != expected_rows
+            || self.bracket_rows != expected_bracket_rows
             || self.static_response_deferred != expected_deferred
         {
             return Err(planner_error(
@@ -3996,6 +4160,43 @@ impl StaticTransitionPlan<'_> {
         }
     }
 
+    /// Only the marked plane can mint `BracketOwned`; no Phase-B classifier
+    /// predicate can choose it. The response key is mandatory: an origin-only
+    /// query would collapse distinct instances at one shared S.
+    pub(in crate::cranelift_backend) fn bracket_response_disposition_at_vis(
+        &self,
+        vis_origin: StaticOriginId,
+        context: &super::brackets::BracketResponseContextKey,
+    ) -> Option<ResponseDisposition> {
+        self.bracket_settlements.regions.iter()
+            .find(|region| region.settlement == vis_origin && &region.context == context)
+            .map(|region| ResponseDisposition::BracketOwned(region.id))
+    }
+
+    /// The bracket settlement whose marked response context is exactly this
+    /// continuation identity (`marked_bracket_response_contexts`). Keyed on the
+    /// full identity, never on S alone, a selected caller, or emission
+    /// position. Two owners refuse.
+    pub(in crate::cranelift_backend) fn bracket_settlement_owning_continuation(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<Option<super::brackets::BracketSettlementId>, CraneliftBackendError> {
+        let mut owners = self.bracket_settlements.regions.iter().filter(|region| {
+            matches!(
+                &region.context,
+                super::brackets::BracketResponseContextKey::Continuation(owned)
+                    if owned == identity
+            )
+        });
+        let owner = owners.next().map(|region| region.id);
+        if owners.next().is_some() {
+            return Err(planner_error(
+                "dual ownership: two bracket regions own one continuation identity",
+            ));
+        }
+        Ok(owner)
+    }
+
     /// Derive the lexical K's single-shot and tail-exit facts from its source
     /// occurrence. Nothing here consults `RecursiveBackedge` or runtime tags.
     pub(super) fn deferred_response_continuation_shape(
@@ -4052,6 +4253,16 @@ impl StaticTransitionPlan<'_> {
             }
         }
         Ok(Some(Vec::new()))
+    }
+
+    /// A bracket ledger settles this marked S under its checked region row.
+    /// The S is an existing owner boundary, not a Deferred suffix member and
+    /// not an opaque Vis that invalidates the enclosing owner's suffix.
+    fn is_marked_bracket_settlement(&self, vis: StaticOriginId) -> bool {
+        self.bracket_settlements
+            .regions
+            .iter()
+            .any(|region| region.settlement == vis)
     }
 
     fn static_response_frontier(
@@ -4139,7 +4350,8 @@ impl StaticTransitionPlan<'_> {
                     || self
                         .static_response_deferred
                         .iter()
-                        .any(|row| row.vis_origin() == origin);
+                        .any(|row| row.vis_origin() == origin)
+                    || self.is_marked_bracket_settlement(origin);
                 if known {
                     Ok(Some(vec![origin]))
                 } else {
@@ -4207,6 +4419,7 @@ impl StaticTransitionPlan<'_> {
                 .static_response_continuations
                 .iter()
                 .any(|candidate| candidate.vis_origin() == vis)
+                || self.is_marked_bracket_settlement(vis)
             {
                 continue;
             }
@@ -4389,6 +4602,145 @@ impl StaticTransitionPlan<'_> {
                 "one Deferred response has more than one nearest static handler owner",
             )),
         }
+    }
+
+    /// Claim one exact member of the frame being defined by a handler-owned
+    /// response. Ambiguous membership refuses; absent membership is `None`,
+    /// since that frame cannot supply the coordinate. Neither falls back to a
+    /// root ABI position: the consumer will independently re-check this frame.
+    pub(in crate::cranelift_backend) fn entry_frame_claim_in(
+        &self,
+        handler: ContinuationEmissionOwner,
+        coordinate: ContinuationSourceCoordinate,
+    ) -> Result<Option<ContinuationEnvironmentClaim>, CraneliftBackendError> {
+        let mut found = None;
+        let mut offer = |member: ContinuationSourceCoordinate, slot: u32| {
+            if member == coordinate {
+                if found.replace(slot).is_some() {
+                    return Err(planner_error(
+                        "a handler drive frame declares two members for one continuation coordinate",
+                    ));
+                }
+            }
+            Ok(())
+        };
+        let frame = match handler {
+            ContinuationEmissionOwner::Predeclared(owner) => {
+                for (position, member) in continuation_owner_entry_sources(self, owner)?
+                    .into_iter()
+                    .enumerate()
+                {
+                    let position = u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("handler drive entry slot exhausted")
+                    })?;
+                    offer(member.coordinate, position)?;
+                }
+                ContinuationFrameIdentity::Predeclared(owner)
+            }
+            ContinuationEmissionOwner::Specialization(specialization) => {
+                let units = self.continuation_units()?;
+                let unit = units.get(specialization.0 as usize).ok_or_else(|| {
+                    planner_error("a handler drive names a specialization that was never interned")
+                })?;
+                let body = unit.worker_body_origin();
+                let context = self.continuation_context_for(specialization, body)?
+                    .ok_or_else(|| planner_error(
+                        "a handler drive's specialization has no defining generated context",
+                    ))?;
+                for (position, member) in self
+                    .continuation_context_parameter_members(context.id())?
+                    .into_iter()
+                    .enumerate()
+                {
+                    let position = u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("handler drive context Parameter slot exhausted")
+                    })?;
+                    offer(member, position)?;
+                }
+                for (position, capture) in context.captures()?.iter().enumerate() {
+                    let slot = u32::try_from(position).ok()
+                        .and_then(|position| context.parameters().checked_add(position))
+                        .ok_or_else(|| planner_capacity_error(
+                            "handler drive context Capture slot exhausted",
+                        ))?;
+                    offer(capture.coordinate, slot)?;
+                }
+                ContinuationFrameIdentity::GeneratedContext {
+                    context: context.id(),
+                    specialization,
+                    worker_body_origin: body,
+                }
+            }
+            ContinuationEmissionOwner::Fusion(_) => return Err(planner_error(
+                "a handler drive cannot claim an ordinary frame for an installed fusion",
+            )),
+        };
+        Ok(found.map(|declared_slot| {
+            ContinuationEnvironmentClaim::EntryFrame { frame, declared_slot }
+        }))
+    }
+
+    /// The planned context transfer for one handler-owned Deferred response.
+    pub(in crate::cranelift_backend) fn handler_drive_context_route(
+        &self,
+        row: &DeferredResponseRow,
+        handler: ContinuationEmissionOwner,
+    ) -> Result<Option<HandlerDriveContextRoute>, CraneliftBackendError> {
+        if self.admitted_deferred_handler_owner(row)? != Some(handler) {
+            return Ok(None);
+        }
+        // A unit-less P1 has no context to transfer into; its handler lowers K.
+        if row.sub_case == DeferredResponseSubCase::NoContinuationUnit {
+            return Ok(None);
+        }
+        let Some(body) = self.deferred_response_k_body(row)? else {
+            return Ok(None);
+        };
+        let units = self.continuation_units()?;
+        let selecting = units.iter()
+            .filter(|unit| unit.worker_body_origin() == body
+                && unit.producer_construct_origin() == row.vis_origin())
+            .collect::<Vec<_>>();
+        let [unit] = selecting.as_slice() else {
+            return Err(planner_error(
+                "a handler-owned drive's K body has no unique selecting specialization at its Vis",
+            ));
+        };
+        let context = self
+            .carried_invocation_context(unit.continuation_origin(), unit.recursive_position(), body)?
+            .ok_or_else(|| planner_error(
+                "a handler-owned drive's selecting specialization binds no carried context",
+            ))?;
+        let view = self.continuation_contexts()?.into_iter()
+            .find(|candidate| candidate.id() == context)
+            .ok_or_else(|| planner_error(
+                "a handler-owned drive's context has no projected view",
+            ))?;
+        let k_owner = occurrence_authority(self, body)?.owner;
+        if view.raw_owner() != k_owner {
+            return Err(planner_error(
+                "a handler-owned drive's context raw owner is not the K body's checked owner",
+            ));
+        }
+        // The real K closure supplies the full Parameter run. Certify that
+        // this context declares exactly its checked raw owner's entry members.
+        self.continuation_context_parameter_members(context)?;
+        let mut capture_claims = Vec::new();
+        for capture in view.captures()? {
+            // K closes over a coordinate the handler's frame does not hold, so
+            // no transfer leaves this handler. No route is planned; a drive
+            // that still reaches `drive_response_at_source` refuses there.
+            let Some(claim) = self.entry_frame_claim_in(handler, capture.coordinate)? else {
+                return Ok(None);
+            };
+            capture_claims.push(claim);
+        }
+        Ok(Some(HandlerDriveContextRoute {
+            vis_origin: row.vis_origin(), handler, context,
+            continuation_origin: unit.continuation_origin(),
+            recursive_position: unit.recursive_position(),
+            worker_body_origin: body, capture_claims,
+        }))
     }
 
     /// The prefix ending at the nearest enclosing continuation frame.
@@ -4610,7 +4962,7 @@ impl StaticTransitionPlan<'_> {
     pub(super) fn return_protocol_candidate_rows(
         &self,
     ) -> Result<Vec<StaticResponseContinuation>, CraneliftBackendError> {
-        let (demands, _deferred) = self
+        let (demands, _marked, _deferred) = self
             .static_response_context_demands_filtered(None, false)?
             .map_err(|failure| planner_error(format!(
                 "returned-Vis response demand is infeasible at {:?}: {}",

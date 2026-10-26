@@ -601,6 +601,7 @@ version = "0.0.0"
 dependencies = [
  "ken-diagnostic",
  "ken-elaborator",
+ "ken-host",
  "ken-interp",
  "ken-kernel",
  "ken-runtime",

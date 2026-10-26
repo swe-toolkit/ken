@@ -311,9 +311,12 @@ impl<'src> Planner<'src> {
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
                 continuation_specialization_calls: Vec::new(),
+                handler_resumptions: Vec::new(),
                 required_consumer_projections: BTreeMap::new(),
                 immediate_bridge_realizations: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
+                bracket_settlements: super::brackets::BracketSettlementPlan::default(),
+                bracket_rows: BTreeMap::new(),
                 static_response_continuations: Vec::new(),
                 static_response_plan_installed: false,
                 static_response_infeasible: None,
@@ -1419,7 +1422,7 @@ impl<'src> Planner<'src> {
         // must leave every prior descriptor, slot, input and affinity byte
         // unchanged, not merely leave the context count plausible.
         let causal_contexts = self.plan.continuation_contexts.clone();
-        self.plan.install_static_response_context_plan()?;
+        self.plan.install_static_response_context_plan(symbols)?;
         let mut causal_abi = self.plan.abi.clone();
         install_continuation_context_abi(&mut causal_abi, &causal_contexts)?;
         // `D5a`: the generated contexts' own ABI, in its own arenas. ⛔ Installed
@@ -1525,6 +1528,11 @@ impl<'src> Planner<'src> {
                 }
             }
         }
+        // Response phase B and the selected-owner agreement are final. Publish
+        // each resolved handler resumption once, then validate it before any
+        // lowering view can observe it; do not introduce a draft or reorder B.
+        self.plan.publish_handler_resumption_plan()?;
+        self.plan.validate_handler_resumption_plan()?;
         // Phase B has installed the final response-owner population and its
         // selected calls. Close the returned-Vis settlement exactly once before
         // ownership source (e) reads its successor rows.

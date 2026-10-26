@@ -1,7 +1,7 @@
 ---
 id: CAT-AND-SORTED-PRELUDE-MOVE
 title: "Move the prelude's And, and_intro, and_fst, and_snd and is_sorted into the L3 collections slice as checked catalog definitions, And spelled with expression-position Sigma and convertible with the prelude's, every catalog consumer importing them; the And-bearing successor to CAT-LOGIC-PRELUDE-MOVE"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: architect
@@ -22,11 +22,11 @@ through the prelude fall-through.
 
 ## Settled inputs -- to re-measure at the base
 
-- **The prelude definitions** (`prelude.rs`):
-  - `And` is registered at `:932`.
+- **The prelude definitions** (`prelude.rs` at `0ccd87dd6`):
+  - `And` is registered at `:1304`.
   - `and_intro`, `and_fst` and `and_snd` are the Σ intro/elim helpers at
-    `:957-1015`.
-  - `is_sorted` is at `:1266-1289` and uses `And` in its cons-cons case.
+    `:1329-1387`.
+  - `is_sorted` is at `:1477-1502` and uses `And` in its cons-cons case.
 - **`And` needs expression-position Σ** (`LANG-EXPRESSION-SIGMA`). A `fn`
   head must be a lowercase `value_name` (32 §1), so the catalog declares
   `pub fn and (a : Omega) (b : Omega) : Omega = (x : a) × b` and republishes
@@ -38,20 +38,34 @@ through the prelude fall-through.
   the renamed export.
 - **Carried pin.** Re-key `lang_expression_sigma.rs`'s `globals["And"]` pin
   to the catalog identity in this move (Architect carry).
-- **Home.** These names move together into the L3 collections slice, and
-  there is no `Core.Logic.And` (`CAT-LOGIC-PRELUDE-MOVE` settled inputs).
-  The Architect names the exact module at D0.
-- **Known consumer.** `Algorithm.Searching.OrderedSearch` keeps its ambient
-  `And`/`and_fst`/`and_snd` from `CAT-LOGIC-PRELUDE-MOVE`. It is the census's
-  baseline-red residual (`lang_mod_strict_resolution_d0.rs`), so the census
-  cannot see its names.
+- **Home (D0 `evt_56k6wn8p42efg`).**
+  - **And family.** A new leaf module `Core.Logic.Conjunction` with no
+    imports, so `Core.Logic.Compare` can import it. A collections home
+    would be a cycle, because `Data.Collections.Derived` imports Compare.
+  - **Helpers.** An Ω-valued `fn` is refused, so the three helpers are
+    `pub theorem`.
+  - **Cross-reference.** The module cross-references `Core.Logic.And`,
+    the Type-sorted, proof-relevant `data And` that Nfa and Regex use; a
+    rename of either is a carry.
+  - **`is_sorted`.** It goes in `Data.Collections.Derived` §2, directly
+    after `filter`.
+  - **Code.** The D0 gives the declarations, and its measurements cover
+    conversion, controls and loading.
+- **OrderedSearch is an ordinary consumer.** It has a normal census row,
+  and `expected_residuals` is empty, so it imports like the others.
 - **Known consumer.** `Capability.System.Error` uses the ambient `And`,
   `and_intro`, `Prod` and `MkProd` (its strict-resolution census row, from
   `CAT-SYSTEM-ERROR-PRELUDE-MOVE`; Architect `evt_6qgpyh2yqeexa`).
 - **Out of scope.** The prelude registrations stay until the L2 flip; there
   is no `crates/` change except test expectations. `sort` and its obligation
-  also stay out of scope unless D0 rules that they must move with
-  `is_sorted`.
+  also stay out of scope: no prelude consumer pins `is_sorted` (D0).
+- **Two `is_sorted` identities until the flip.** The catalog and prelude
+  `is_sorted` are not convertible on an open list, and a bare loose import
+  is ambiguous. Every mix fails closed, so loose harnesses import it by
+  alias, and pins are re-keyed by checked identity (the D0's list).
+- **Carry to the L2 flip.** Deleting prelude `is_sorted` needs nothing in
+  the prelude. Deleting `And` needs a disposition for the prelude's own
+  `resource_settle_*` theorems, which consume `And` and `and_intro`.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.

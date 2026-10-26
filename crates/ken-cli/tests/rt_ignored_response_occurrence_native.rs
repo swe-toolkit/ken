@@ -278,9 +278,14 @@ fn run_sequential_brackets_witness() {
         "the two Vis creation sites must retain W5/C4/M2 and W7/C6/M4 contexts: {dispositions:?}");
     let rows = diagnostics
         .iter()
-        .flat_map(|plan| &plan.all_static_response_rows)
+        .flat_map(|plan| &plan.bracket_response_rows)
         .filter(|row| row.operation == "ResourceRelease")
         .collect::<Vec<_>>();
+    for row in &rows {
+        assert!(diagnostics.iter().any(|plan|
+            plan.bracket_settlement_vis_origins.contains(&row.vis_origin)),
+            "each moved response Vis must belong to an authenticated bracket S");
+    }
     assert_eq!(
         rows.len(),
         2,
@@ -377,9 +382,14 @@ fn run_distinguishable_brackets_witness() {
     // observation; pin each bracket's pairing on its planned response row.
     let rows = diagnostics
         .iter()
-        .flat_map(|plan| &plan.all_static_response_rows)
+        .flat_map(|plan| &plan.bracket_response_rows)
         .filter(|row| row.operation == "ResourceRelease")
         .collect::<Vec<_>>();
+    for row in &rows {
+        assert!(diagnostics.iter().any(|plan|
+            plan.bracket_settlement_vis_origins.contains(&row.vis_origin)),
+            "each moved response Vis must belong to an authenticated bracket S");
+    }
     assert_eq!(
         rows.len(),
         2,

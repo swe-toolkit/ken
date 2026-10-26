@@ -7,6 +7,13 @@ recorded_by: steward
 
 # Clearing a merge asks two questions. The second one does not occur to you.
 
+**Mechanism superseded 2026-10-26.** `ci.yml` no longer runs on `push` to
+`main`, so a merge cannot cancel a `main` run and the `gh run list --branch
+main` check below has nothing to find. The second question still applies to
+open PRs: every merge makes their green runs stale, and the publisher
+re-triggers a PR's CI by close and reopen before merging it
+(`merge-procedure.md` M5).
+
 **When you route or publish a candidate you naturally ask: what CI does this
 change need?** For a doc-only node the answer is *none*, correctly.
 

@@ -131,11 +131,13 @@ thread_local! {
 }
 
 /// Compile-preserving controls for the two consumption seats of the
-/// handler-owned Deferred-response decomposition.
+/// handler-owned Deferred-response decomposition, and for the in-place bracket
+/// settlement that now consumes a marked S's K at its handler.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HandlerOwnedDeferredResponseMutation {
     SuppressUnitlessDrive,
     SuppressLocalContinuationDrive,
+    SuppressBracketInPlaceContinuation,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1167,7 +1169,14 @@ pub fn with_branched_scrutinee_unit_body_match_branch_entry_suppressed<R>(
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]
-fn record_branched_scrutinee_unit_body_route1(scrutinee: &RuntimeExpr) {
+fn record_branched_scrutinee_unit_body_route1(
+    origin: StaticOriginId,
+    scrutinee: &RuntimeExpr,
+) {
+    record_settlement_footprint(SettlementFootprintEvent::Route1 {
+        origin: origin.observation_ordinal(),
+        route1: true,
+    });
     BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
         if let Some(rows) = cell.borrow_mut().as_mut() {
             let (plain_match, match_scrutinee_is_var, match_cases, construct_bodies) = match scrutinee {
@@ -1255,7 +1264,8 @@ mod branched_scrutinee_unit_body_observer_tests {
         let (_, rows) = with_branched_scrutinee_unit_body_route1(|| {
             record_branched_scrutinee_unit_body_entry();
             record_branched_scrutinee_unit_body_match_branch_entered();
-            record_branched_scrutinee_unit_body_route1(&RuntimeExpr::Var(0));
+            record_branched_scrutinee_unit_body_route1(
+                StaticOriginId::for_validation_observation(0), &RuntimeExpr::Var(0));
         });
         assert_eq!(rows.len(), 1);
         assert!(rows[0].match_branch_entered && rows[0].route1, "{rows:?}");
@@ -2879,9 +2889,16 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         .collect::<BTreeSet<_>>();
     let pending_vis_record_protocol = static_transition_plan.pending_vis_settlements.protocol.clone();
     let response_owner_settlements = static_transition_plan.pending_vis_settlements.owners.clone();
+    let response_bracket_exits = static_transition_plan.pending_vis_settlements.bracket_exits.clone();
+    let bracket_view = BracketSettlementControlView::from_plan(&static_transition_plan)?;
+    let bracket_ledger = BracketSettlementLedger::open(&bracket_view);
     let mut compiler = Lowering {
         pending_vis_record_protocol,
         response_owner_settlements,
+        response_bracket_exits,
+        bracket_view,
+        bracket_ledger,
+        bracket_effect_claim: None,
         continuation_claims: None,
         lowered_construct_origins: BTreeSet::new(),
         fusion_compositions: None,
@@ -3130,6 +3147,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // question: an obligation opened in one descent whose discharge can
             // only be checked once every descent is done.
             compiler.require_complete_static_worker_disposition()?;
+            // Every source definition and the root adapter has now run. This
+            // is representation closure, not the D0 equivalence observation.
+            compiler.bracket_ledger.close()?;
             super::units::close_continuation_claim_ledger(&mut compiler)?;
             // `D2f` — the fused-region ledger's four-way closeout: ownership,
             // definition, redirect and takeover are each exactly the installed
@@ -3186,6 +3206,14 @@ enum ComposedReturn {
 enum ProducerTrampolineWork<'a> {
     Value {
         answer: RoutedAnswer,
+        eliminators: Vec<EliminatorFrame<'a>>,
+    },
+    // An in-place bracket S has performed its effect. Its lexical K is lowered
+    // at the trampoline's own depth, never under the producer stack, and its
+    // value continues through the remaining eliminators as an ordinary answer.
+    LexicalK {
+        body: StaticOriginId,
+        env: Vec<LoweringEnvironmentBinding>,
         eliminators: Vec<EliminatorFrame<'a>>,
     },
 }
@@ -3466,23 +3494,47 @@ impl<'a> Lowering<'a> {
         // can extract only a completed ordinary result.
         loop {
             step = match step {
-                ProducerTrampolineStep::Continue(work) => {
-                    let ProducerTrampolineWork::Value {
+                ProducerTrampolineStep::Continue(work) => match *work {
+                    ProducerTrampolineWork::Value {
                         answer,
                         eliminators,
-                    } = *work;
-                    self.lower_computational_match_value_composed_once(
+                    } => self.lower_computational_match_value_composed_once(
                         builder,
                         answer,
                         &eliminators,
-                    )?
-                }
+                    )?,
+                    ProducerTrampolineWork::LexicalK {
+                        body,
+                        env,
+                        eliminators,
+                    } => self.lower_bracket_lexical_k(builder, body, &env, eliminators)?,
+                },
                 ProducerTrampolineStep::Complete(returned) => {
                     let ComposedReturn::Ordinary(value) = *returned;
                     return Ok(value);
                 }
             };
         }
+    }
+
+    // Kept out of line: every nested trampoline level holds its loop frame on
+    // the stack, and only a settled bracket needs the room to lower K.
+    #[inline(never)]
+    fn lower_bracket_lexical_k<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        body: StaticOriginId,
+        env: &[LoweringEnvironmentBinding],
+        eliminators: Vec<EliminatorFrame<'b>>,
+    ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        let k_body = self.retained_body_occurrence(body)?;
+        let answer = RoutedAnswer::direct(self.lower_expr(builder, k_body, env)?);
+        Ok(ProducerTrampolineStep::Continue(Box::new(
+            ProducerTrampolineWork::Value {
+                answer,
+                eliminators,
+            },
+        )))
     }
 
     fn continue_composed_value<'b>(
@@ -4291,17 +4343,21 @@ impl<'a> Lowering<'a> {
         // return. No operand is cloned to keep these two states in agreement.
         loop {
             step = match step {
-                ProducerTrampolineStep::Continue(work) => {
-                    let ProducerTrampolineWork::Value {
+                ProducerTrampolineStep::Continue(work) => match *work {
+                    ProducerTrampolineWork::Value {
                         answer,
                         eliminators,
-                    } = *work;
-                    self.lower_computational_match_value_composed_once(
+                    } => self.lower_computational_match_value_composed_once(
                         builder,
                         answer,
                         &eliminators,
-                    )?
-                }
+                    )?,
+                    ProducerTrampolineWork::LexicalK {
+                        body,
+                        env,
+                        eliminators,
+                    } => self.lower_bracket_lexical_k(builder, body, &env, eliminators)?,
+                },
                 ProducerTrampolineStep::Complete(returned) => {
                     let ComposedReturn::Ordinary(value) = *returned;
                     return Ok(value);
@@ -5827,11 +5883,11 @@ impl<'a> Lowering<'a> {
     /// semantics, including zero or multiple reads of that typed parameter.
     /// Operation fields may already be carried or may still be specialized;
     /// both routes validate the same source identities before the existing
-    /// synchronous host dispatch. The K body is then lowered in this function,
-    /// so its closure does not cross a boundary and the current HostResult cannot
-    /// be replaced by a prior body result. A producer-path call receives its
-    /// current eliminator stack so the statically unrolled step resumes exactly
-    /// the surrounding ITree handler before returning to the response owner.
+    /// synchronous host dispatch. The drive calls K's one planned context
+    /// through a recorded route and receives the current HostResult rather
+    /// than a prior body result. The context returns K's raw result; the drive
+    /// applies the handler's complete eliminator run, beginning with the
+    /// route's recorded continuation.
     fn drive_handler_owned_deferred_response(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -5863,13 +5919,15 @@ impl<'a> Lowering<'a> {
         }
         self.drive_response_at_source(
             builder, vis_origin, lowered_args, row.operation_root_origin(),
-            row.effect_origin(), row.operation(), producer_eliminators,
+            row.effect_origin(), row.operation(), None, producer_eliminators, row,
         )
     }
 
     /// Perform a handler-owned Deferred response at its Construct-Vis source
-    /// and resume its exact lexical K through the active eliminators. This
-    /// path is not a relay drive; admitted relays use static producer fusion.
+    /// and transfer its exact lexical K through the planned context. The
+    /// context returns K's raw result; this drive applies the complete
+    /// eliminator run, including the first recorded continuation. In-place
+    /// settlement calls `perform_response_at_source` instead of this path.
     fn drive_response_at_source(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -5878,8 +5936,119 @@ impl<'a> Lowering<'a> {
         operation_root_origin: StaticOriginId,
         effect_origin: StaticOriginId,
         planned_operation: ken_host::HostOpV1,
+        effect_authority: Option<(ContinuationEmissionOwner, PredeclaredFunctionId)>,
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
+        row: &crate::cranelift_backend::planning::DeferredResponseRow,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let (body, k_env) = self.perform_response_at_source(
+            builder,
+            vis_origin,
+            lowered_args,
+            operation_root_origin,
+            effect_origin,
+            planned_operation,
+            effect_authority,
+        )?;
+        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+            LoweringCause::PlannerInvariant, "StaticResponseDeferred",
+            "a handler-owned drive transfer has no defining emission owner",
+        ))?;
+        let Some(record) = self.static_transition_plan
+            .handler_resumption_at_vis(vis_origin, owner)?.cloned()
+        else {
+            // Only a unit-less P1 is unplanned: K runs here under the live
+            // stack, as the established one-use tail-resumptive route.
+            if row.sub_case()
+                != crate::cranelift_backend::planning::DeferredResponseSubCase::NoContinuationUnit
+            {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "StaticResponseDeferred",
+                    "a handler-owned Deferred response has no planned resumption",
+                ));
+            }
+            let k_body = self.retained_body_occurrence(body)?;
+            return match producer_eliminators {
+                Some(eliminators) => {
+                    let eliminators = eliminators.to_vec();
+                    self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
+                }
+                None => self.lower_expr(builder, k_body, &k_env),
+            };
+        };
+        let route = &record.route;
+        if record.row != (row.vis_origin(), row.operation_root_origin(), row.effect_origin())
+            || body != route.worker_body_origin || vis_origin != route.vis_origin
+            || owner != route.handler
+        {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a handler-owned drive's K body or owner is not its recorded route",
+            ));
+        }
+        let Some(eliminators) = producer_eliminators else {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a context-transfer drive has no producer eliminator frames",
+            ));
+        };
+        let Some(first) = eliminators.first() else {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a context-transfer drive has an empty eliminator run",
+            ));
+        };
+        // Identity, not consumption: the context returns K's raw result,
+        // so the first frame still applies to it.
+        let EliminatorFrame::Computational(first) = first else {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a handler-owned drive's first eliminator is not computational",
+            ));
+        };
+        if first.static_origin != route.continuation_origin {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a planned resumption's first eliminator frame is not its route's continuation",
+            ));
+        }
+        // K's own handler-owned responses must lower under their owner: here,
+        // K runs under the live stack, which already threads its continuation.
+        if record.execution
+            == crate::cranelift_backend::planning::PlannedResumptionExecution::AtHandler
+        {
+            let k_body = self.retained_body_occurrence(body)?;
+            let eliminators = eliminators.to_vec();
+            return self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators);
+        }
+        let k_inputs = k_env.into_iter().map(|binding| match binding {
+            LoweringEnvironmentBinding::Value(value) => Ok(value),
+            LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(
+                LoweringCause::PlannerInvariant, "StaticResponseDeferred",
+                "a checked response K environment contains a non-value binding",
+            )),
+        }).collect::<Result<Vec<_>, _>>()?;
+        let resumed = self.call_declared_context(
+            builder, route.context, body, &k_inputs, None, Some(&route.capture_claims),
+            Some(&record),
+        )?;
+        self.lower_computational_match_value_composed(
+            builder, RoutedAnswer::direct(resumed), eliminators,
+        )
+    }
+
+    /// Perform the response's host effect at its Construct-Vis source and
+    /// return its exact lexical K body with the environment K is entered with.
+    /// The caller decides where K is lowered.
+    pub(super) fn perform_response_at_source(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        vis_origin: StaticOriginId,
+        lowered_args: &[LoweringOperand],
+        operation_root_origin: StaticOriginId,
+        effect_origin: StaticOriginId,
+        planned_operation: ken_host::HostOpV1,
+        effect_authority: Option<(ContinuationEmissionOwner, PredeclaredFunctionId)>,
+    ) -> Result<(StaticOriginId, Vec<LoweringEnvironmentBinding>), CraneliftBackendError> {
         let [operation, k] = lowered_args else {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
@@ -6115,6 +6284,11 @@ impl<'a> Lowering<'a> {
             .function_local
             .driven_deferred_response_effect
             .replace(effect.static_origin);
+        // A marked bracket's effect owns records under its checked row's base
+        // owner, even when this S is emitted in another owner's body. This
+        // binding ends before K: its closure and arguments stay copy-lexical.
+        let authority = effect_authority
+            .map(|(owner, unit)| AmbientBodyAuthority::bind(self, owner, unit));
         let response = self.lower_process_host_effect(
             builder,
             family,
@@ -6124,6 +6298,9 @@ impl<'a> Lowering<'a> {
             effect.static_origin,
             &effect_env,
         );
+        if let Some(authority) = authority {
+            authority.release(self);
+        }
         self.function_local.driven_deferred_response_effect = prior_driven_effect;
         let response = response?;
         if !matches!(
@@ -6143,14 +6320,7 @@ impl<'a> Lowering<'a> {
                 .cloned()
                 .map(LoweringEnvironmentBinding::Value),
         );
-        let k_body = self.retained_body_occurrence(*body)?;
-        match producer_eliminators {
-            Some(eliminators) => {
-                let eliminators = eliminators.to_vec();
-                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
-            }
-            None => self.lower_expr(builder, k_body, &k_env),
-        }
+        Ok((*body, k_env))
     }
 
     fn lower_computational_producer_call(
@@ -6964,6 +7134,37 @@ impl<'a> Lowering<'a> {
         self.static_transition_plan.reject_reached_admitted_relay(
             static_origin, constructor, args, self.defining_emission_owner,
         )?;
+        if let Some(region) = self.bracket_view.settlement_at(static_origin)?.cloned() {
+            match region.mode() {
+                BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
+                    HandlerOwnedDeferredResponseMutation::SuppressBracketInPlaceContinuation,
+                ) => {}
+                BracketSettlementMode::InPlace => {
+                    let lowered_args = args.iter().enumerate()
+                        .map(|(position, arg)| {
+                            let arg = self.child_occurrence(static_origin, position, arg)?;
+                            self.lower_expr(builder, arg, producer_env)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let (body, env) =
+                        self.settle_bracket_at_source(builder, &region, &lowered_args)?;
+                    return Ok(ProducerTrampolineStep::Continue(Box::new(
+                        ProducerTrampolineWork::LexicalK {
+                            body,
+                            env,
+                            eliminators: eliminators.to_vec(),
+                        },
+                    )));
+                }
+                BracketSettlementMode::Deferred => {
+                    self.bracket_ledger.consume_settlement(region.id(), region.mode(),
+                        region.body_exit(), static_origin)?;
+                    self.bracket_ledger.consume_outcome_merge(region.id(), region.outcome_merge())?;
+                    self.bracket_ledger.consume_resume(region.id(), region.resume())?;
+                    // The existing producer deforestation continues below this claim.
+                }
+            }
+        }
         let eliminator = eliminators[0];
         if let Some(row) = self
             .static_transition_plan
@@ -10288,6 +10489,19 @@ impl<'a> Lowering<'a> {
                         }
                     }
                 };
+                for resumption in self.static_transition_plan.handler_resumptions() {
+                    if resumption.emission_owner == defining_owner
+                        && resumption.route.worker_body_origin == worker_body_origin
+                        && (resumption.route.handler != defining_owner
+                            || resumption.route.context != claimed_context
+                            || resumption.route.context != context.id())
+                    {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "StaticResponseDeferred",
+                            "a resumption entry frame disagrees with its recorded owner or generated context route",
+                        ));
+                    }
+                }
                 if context.id() != claimed_context {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
@@ -10299,6 +10513,35 @@ impl<'a> Lowering<'a> {
                             context.id()
                         ),
                     ));
+                }
+                if declared_slot < context.parameters() {
+                    let members = self
+                        .static_transition_plan
+                        .continuation_context_parameter_members(context.id())?;
+                    let mut found = None;
+                    for (position, member) in members.iter().enumerate() {
+                        if *member != coordinate {
+                            continue;
+                        }
+                        if found.is_some() {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ContinuationSpecialization",
+                                "a generated context's parameter run declares two members for one continuation coordinate, so the declared slot is ambiguous",
+                            ));
+                        }
+                        found = Some(position);
+                    }
+                    let position = found.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "ContinuationSpecialization",
+                        format!("a generated context's parameter run declares no member for {coordinate:?}"),
+                    ))?;
+                    if u32::try_from(position).ok() != Some(declared_slot) {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "ContinuationSpecialization",
+                            format!("an entry-frame claim declares parameter slot {declared_slot} for {coordinate:?}, but the generated context declares that member at slot {position}"),
+                        ));
+                    }
+                    return Ok(());
                 }
                 let captures = context.captures()?;
                 let mut found = None;
@@ -14104,7 +14347,7 @@ impl<'a> Lowering<'a> {
             if let LoweringOperand::Residual(residual) = argument {
                 debug_assert!(residual_fields[position].is_none());
                 #[cfg(any(test, feature = "px8-ds-test-support"))]
-                record_site_a_residual_none_arrival();
+                record_site_a_residual_none_arrival(origin);
                 decoded[position] = Some(self.decode_residual_child(builder, *residual)?);
             }
         }
@@ -14815,7 +15058,7 @@ impl<'a> Lowering<'a> {
                 return agreeing_recursive_body_unit(declared_units);
             }
             #[cfg(any(test, feature = "px8-ds-test-support"))]
-            record_branched_scrutinee_unit_body_route1(source.expr);
+            record_branched_scrutinee_unit_body_route1(source_origin, source.expr);
             return Ok(None);
         };
         let Some(argument) = recursive_position_construct_argument(args, position, false)? else {
@@ -15067,6 +15310,16 @@ impl<'a> Lowering<'a> {
         else {
             return Ok(ComposedReturnForwardRetAuthorityOutcome::NonApplicable);
         };
+        // A continuation a marked bracket settlement owns is consumed by that
+        // settlement (evt_4t14zmba83hjm); keyed on the proof's exact identity.
+        if let Some(settlement) = self
+            .static_transition_plan
+            .bracket_settlement_owning_continuation(proof.source_call_identity())?
+        {
+            return Ok(ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(
+                proof, settlement,
+            ));
+        }
         #[cfg(feature = "px8-ds-test-support")]
         {
             let mutation = composed_return_forward_ret_authority_mutation();
@@ -16364,6 +16617,142 @@ impl<'a> Lowering<'a> {
         self.lower_expr(builder, body, &case_env)
     }
 
+    /// The bracket half of a `Construct` at a marked S, kept out of the
+    /// recursive `lower_expr` frame. An InPlace region settles here; a
+    /// Deferred one is claimed and only its id returns.
+    #[inline(never)]
+    fn lower_construct_bracket_entry(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        args: &[RuntimeExpr],
+        env: &[LoweringEnvironmentBinding],
+    ) -> ConstructBracketEntry {
+        let region = match self.bracket_view.settlement_at(static_origin) {
+            Ok(Some(region)) => region.clone(),
+            Ok(None) => return ConstructBracketEntry::Unmarked,
+            Err(error) => return ConstructBracketEntry::Done(Box::new(Err(error))),
+        };
+        if self.static_transition_plan
+            .response_disposition_at_operation_root(static_origin).is_some() {
+            return ConstructBracketEntry::Done(Box::new(Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                "a marked S acquired an ordinary operation-root disposition".to_string(),
+            ))));
+        }
+        match region.mode() {
+            BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
+                HandlerOwnedDeferredResponseMutation::SuppressBracketInPlaceContinuation,
+            ) => ConstructBracketEntry::Unmarked,
+            BracketSettlementMode::InPlace => ConstructBracketEntry::Done(Box::new((|| {
+                let lowered_args = args.iter().enumerate()
+                    .map(|(position, arg)| {
+                        let arg = self.child_occurrence(static_origin, position, arg)?;
+                        self.lower_expr(builder, arg, env)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let (body, k_env) =
+                    self.settle_bracket_at_source(builder, &region, &lowered_args)?;
+                let k_body = self.retained_body_occurrence(body)?;
+                self.lower_expr(builder, k_body, &k_env)
+            })())),
+            BracketSettlementMode::Deferred => match self.bracket_ledger.consume_settlement(
+                region.id(), region.mode(), region.body_exit(), static_origin,
+            ) {
+                Ok(()) => ConstructBracketEntry::Claimed(region.id()),
+                Err(error) => ConstructBracketEntry::Done(Box::new(Err(error))),
+            },
+        }
+    }
+
+    /// Close a Deferred settlement claimed by `lower_construct_bracket_entry`
+    /// once its constructor has lowered, then return that constructor.
+    #[inline(never)]
+    fn close_construct_bracket(
+        &mut self,
+        bracket: Option<BracketSettlementId>,
+        constructed: LoweringOperand,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let Some(id) = bracket else { return Ok(constructed) };
+        let region = self.bracket_view.region(id).ok_or_else(|| backend_module(
+            LoweringCause::PlannerInvariant,
+            "a claimed bracket settlement has no validated region".to_string(),
+        ))?;
+        let (outcome_merge, resume) = (region.outcome_merge(), region.resume());
+        self.bracket_ledger.consume_outcome_merge(id, outcome_merge)?;
+        self.bracket_ledger.consume_resume(id, resume)?;
+        Ok(constructed)
+    }
+
+    /// Descend through ordinary constructor arguments outside the recursive
+    /// dispatch frame; the marked settlement path retains its own ordering.
+    #[inline(never)]
+    fn lower_construct_arguments(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        args: &[RuntimeExpr],
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<Vec<LoweringOperand>, CraneliftBackendError> {
+        args.iter()
+            .enumerate()
+            .map(|(position, arg)| {
+                let arg = self.child_occurrence(static_origin, position, arg)?;
+                self.lower_expr(builder, arg, env)
+            })
+            .collect()
+    }
+
+    /// Keep the record field collection out of the recursive dispatcher.
+    #[inline(never)]
+    fn lower_record_expr(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        static_origin: StaticOriginId,
+        fields: &[(String, RuntimeExpr)],
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let lowered_fields = fields
+            .iter()
+            .enumerate()
+            .map(|(position, (name, expr))| {
+                let expr = self.child_occurrence(static_origin, position, expr)?;
+                Ok((position, name.clone(), self.lower_expr(builder, expr, env)?))
+            })
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+        let lowered_fields = lowered_fields
+            .into_iter()
+            .map(|(position, name, value)| {
+                Ok(LoweredRecordField {
+                    name,
+                    // The field schema is resolved at the producer. The name
+                    // is compile-time spelling, not its checked identity.
+                    identity: Some(
+                        self.static_transition_plan
+                            .record_field_identity(static_origin, position)?,
+                    ),
+                    value: value.specialized_at("a record field's value")?,
+                })
+            })
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+        Ok(LoweringOperand::Specialized(Lowered::Record {
+            occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
+                static_origin,
+                PlannedAggregateShape::Record,
+            )?),
+            fields: lowered_fields,
+        }))
+    }
+
+    #[inline(never)]
+    fn origin_only_bracket_owned_refusal() -> Result<LoweringOperand, CraneliftBackendError> {
+        Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            "a bracket-owned response reached the origin-only operation-root disposition"
+                .to_string(),
+        ))
+    }
+
     /// Lowers one source occurrence.
     ///
     /// ## The per-variant child-position table
@@ -16673,6 +17062,15 @@ impl<'a> Lowering<'a> {
                 self.static_transition_plan.reject_reached_admitted_relay(
                     static_origin, constructor, args, self.defining_emission_owner,
                 )?;
+                // Kept out of this recursive frame: only a claimed Deferred
+                // settlement's Copy id stays live across the arm below.
+                let bracket = match self.lower_construct_bracket_entry(
+                    builder, static_origin, args, env,
+                ) {
+                    ConstructBracketEntry::Done(result) => return *result,
+                    ConstructBracketEntry::Claimed(id) => Some(id),
+                    ConstructBracketEntry::Unmarked => None,
+                };
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the
                 // build here.
@@ -16704,6 +17102,13 @@ impl<'a> Lowering<'a> {
                         // Unlicensed: the root lowers ordinarily rather than
                         // supplying a placeholder without an owner retarget.
                     }
+                    // Only the keyed bracket query mints BracketOwned. An
+                    // origin-only query yielding it has collapsed distinct
+                    // settlement instances at one S; ordinary lowering here
+                    // would bypass the settlement. Child 3 replaces this arm.
+                    Some(ResponseDisposition::BracketOwned(_)) => {
+                        return Self::origin_only_bracket_owned_refusal();
+                    }
                     // Deferred (R3): the residual falls through to the ordinary
                     // Construct arm below -- main's pre-WP lowering, the exact path
                     // that compiled and ran at 4a088d8aa, no placeholder/owner. A
@@ -16733,25 +17138,14 @@ impl<'a> Lowering<'a> {
                 // descent.
                 let recognized = Self::recognized_constructor_worker_fields(args, env);
                 if recognized.iter().any(Option::is_some) {
-                    return Ok(LoweringOperand::Specialized(
-                        self.static_worker_constructor_template(
-                            builder,
-                            static_origin,
-                            constructor,
-                            args,
-                            &recognized,
-                            env,
-                        )?,
-                    ));
+                    let constructed = self.static_worker_constructor_template(
+                        builder, static_origin, constructor, args, &recognized, env,
+                    )?;
+                    return self.close_construct_bracket(
+                        bracket, LoweringOperand::Specialized(constructed));
                 }
-                let lowered_args = args
-                    .iter()
-                    .enumerate()
-                    .map(|(position, arg)| {
-                        let arg = self.child_occurrence(static_origin, position, arg)?;
-                        self.lower_expr(builder, arg, env)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let lowered_args =
+                    self.lower_construct_arguments(builder, static_origin, args, env)?;
                 if lowered_args
                     .iter()
                     .any(|arg| match &arg {
@@ -16836,17 +17230,13 @@ impl<'a> Lowering<'a> {
                     LoweringOperand::Residual(_) => true,
                     LoweringOperand::Specialized(_) => false,
                 }) {
-                    return Ok(LoweringOperand::Carried(
-                        self.transfer_constructor_operands(
-                            builder,
-                            static_origin,
-                            constructor,
-                            &lowered_args,
-                            Some(env),
-                        )?,
-                    ));
+                    let constructed = self.transfer_constructor_operands(
+                        builder, static_origin, constructor, &lowered_args, Some(env),
+                    )?;
+                    return self.close_construct_bracket(
+                        bracket, LoweringOperand::Carried(constructed));
                 }
-                Ok(LoweringOperand::Specialized(Lowered::Constructor {
+                let constructed = LoweringOperand::Specialized(Lowered::Constructor {
                     constructor: constructor.clone(),
                     synthesized_identity: Some(
                         self.static_transition_plan
@@ -16862,7 +17252,8 @@ impl<'a> Lowering<'a> {
                         &lowered_args,
                         "a constructor argument",
                     )?,
-                }))
+                });
+                self.close_construct_bracket(bracket, constructed)
             }
             RuntimeExpr::Match { scrutinee, cases, default } => {
                 self.lower_runtime_match_expr(builder, static_origin, scrutinee, cases, default, env)
@@ -16884,44 +17275,7 @@ impl<'a> Lowering<'a> {
                 )
             }
             RuntimeExpr::Record { fields } => {
-                let lowered_fields = fields
-                    .iter()
-                    .enumerate()
-                    .map(|(position, (name, expr))| {
-                        let expr = self.child_occurrence(static_origin, position, expr)?;
-                        Ok((position, name.clone(), self.lower_expr(builder, expr, env)?))
-                    })
-                    .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
-                let lowered_fields = lowered_fields
-                    .into_iter()
-                    .map(|(position, name, value)| {
-                        Ok(LoweredRecordField {
-                            name,
-                            // ⭐ `D7` — the field SCHEMA is resolved at the
-                            // producer, beside the ownership record, and for the
-                            // same reason: a record forwarded through a `Var` or
-                            // handed to a call arrives where the plan cannot
-                            // lawfully be re-queried for it. ⛔ The `name` above
-                            // is the compile-time spelling and is never the key.
-                            identity: Some(
-                                self.static_transition_plan
-                                    .record_field_identity(static_origin, position)?,
-                            ),
-                            value: value.specialized_at("a record field's value")?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
-                Ok(LoweringOperand::Specialized(Lowered::Record {
-                    // ⭐ `D7` — resolved AT THE PRODUCER and carried with the
-                    // template, exactly as the `Construct` arms resolve theirs.
-                    // This is the one place a source record's ownership record
-                    // may be looked up: everywhere downstream is a use.
-                    occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
-                        static_origin,
-                        PlannedAggregateShape::Record,
-                    )?),
-                    fields: lowered_fields,
-                }))
+                self.lower_record_expr(builder, static_origin, fields, env)
             }
             RuntimeExpr::Project { record, field } => {
                 let record = self.child_occurrence(static_origin, 0, record)?;
@@ -17879,4 +18233,11 @@ fn d3b_replace_claim_index(
             }
         }
     }
+}
+
+/// What the bracket half of a `Construct` left for `lower_expr` to do.
+enum ConstructBracketEntry {
+    Unmarked,
+    Done(Box<Result<LoweringOperand, CraneliftBackendError>>),
+    Claimed(BracketSettlementId),
 }

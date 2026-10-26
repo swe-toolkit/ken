@@ -2122,6 +2122,37 @@ impl SemanticPlane {
         )
     }
 
+    /// Re-seat the source-child arena on a graph independently walked from
+    /// RuntimeExpr references. The record ranges are only storage coordinates:
+    /// their length and the original edges must agree with the direct graph
+    /// before the rebuilt edges can be read by the bracket plane's second pass.
+    pub(super) fn direct_source_child_arena(
+        &self,
+        direct: &BTreeMap<StaticOriginId, Vec<StaticOriginId>>,
+    ) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
+        let mut arena = self.child_origins.clone();
+        for (&origin, children) in direct {
+            let range = self.record_for(origin)?.child_origins;
+            let start = range.start as usize;
+            let end = start.checked_add(range.len as usize).ok_or_else(|| {
+                planner_error("direct bracket rebuild child range overflows")
+            })?;
+            let original = self.child_origins.get(start..end).ok_or_else(|| {
+                planner_error("direct bracket rebuild child range is outside the arena")
+            })?;
+            if original != children.as_slice() {
+                return Err(planner_error(format!(
+                    "direct bracket rebuild child graph differs at {origin:?}",
+                )));
+            }
+            let slot = arena.get_mut(start..end).ok_or_else(|| {
+                planner_error("direct bracket rebuild child range is outside the arena")
+            })?;
+            slot.copy_from_slice(children);
+        }
+        Ok(arena)
+    }
+
     /// The validated function-unit owner of one source occurrence.
     ///
     /// Result-phase planning uses this capability rather than exposing the

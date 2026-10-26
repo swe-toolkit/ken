@@ -206,17 +206,20 @@ assignment. So after every kickoff, **confirm the worker actually engaged** —
 the only backstop, and it should not have to be.
 
 
-## Never instruct your ring to run a local `--workspace` build
+## Never instruct your ring to run a local `--workspace` build or test population
 
 **Operator hard rule.** The
 full-workspace + `--locked` + conformance gate is **CI's** job (COORDINATION §12,
 operator hard rule — a local `--workspace` OOMs the shared box). When you relay a
 WP-frame acceptance criterion that says "workspace-green," translate it to
-**targeted local validation** (`scripts/ken-cargo -p <crate>` / `--test <name>`
-on the affected areas) plus **CI-green at merge** — the publisher polls the
-GitHub workspace checks before merging. If a frame's AC literally says "run
-`cargo test --workspace`," it is mis-authored; validate targeted and flag it to
-the Steward, don't push a full local build onto your implementer/QA.
+**targeted local validation** (the touched binaries by named target, plus the
+frame's named rows and mutations; COORDINATION §12) plus **CI-green at merge**
+— the publisher polls the GitHub workspace checks before merging. If a frame,
+ruling or audit asks for `--workspace`, a test run with no named target,
+`--tests`, or a `--no-fail-fast` sweep of a crate, it is mis-authored;
+validate targeted and flag it to the Steward, don't push a population run onto
+your implementer/QA. When cross-cutting reach worries you, name the binaries
+in the kickoff, as §12 says.
 
 ## Never tell your ring to wait for the build lock
 

@@ -100,6 +100,7 @@ pub use lowering::units::{
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
     with_residual_lowering_counters, ResidualLoweringCounters,
+    with_settlement_footprint_sequence, SettlementFootprintEvent,
     with_recursive_residual_match_guard_observations,
     with_plain_native_unit_ir_observations,
     RecursiveResidualMatchGuardMutation, RecursiveResidualMatchGuardObservation,
@@ -145,7 +146,7 @@ pub use planning::{
     composed_return_forward_ret_authority_mutation_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    bracket_ordinary_owner_mutation_is_exact,
     static_response_context_demand_mutation_is_exact,
     suppressed_execute_then_resume_response_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
@@ -164,7 +165,7 @@ pub use planning::{
     SelectedPendingMatchEmissionObservation,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
-    with_mixed_owner_execute_then_resume_overpromotion,
+    with_bracket_ordinary_owner_mutation,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
     with_pending_checked_ret_sink_applications,
     with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,

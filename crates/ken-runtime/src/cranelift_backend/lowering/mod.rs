@@ -21,6 +21,9 @@ use crate::cranelift_backend::surface::LoweringCause;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
     RecursiveCarrierSlotKey, Representation};
 mod frame_validation;
+mod bracket_ledger;
+mod bracket_emission;
+use bracket_ledger::BracketSettlementLedger;
 use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
 // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. A sibling of
@@ -465,7 +468,9 @@ pub(in crate::cranelift_backend) use super::planning::{
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
+    ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
+    BracketSettlementId,
+    BracketSettlementMode, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
@@ -3039,6 +3044,11 @@ enum ComposedReturnForwardRetAuthorityOutcome {
     /// The exact Tail plan formed, but the Ret body has no Ready strict sink.
     /// Keep its checked control on the base call-tail continuation path.
     FormedBasePath(CheckedIhForwardRetPlanProof),
+    /// The exact Tail plan formed, but a marked bracket settlement owns its
+    /// continuation identity (release-order ruling evt_4t14zmba83hjm). That
+    /// settlement is the one consumer: the seat keeps the base call-tail path
+    /// and emits no forward edge.
+    ConsumedBySettlement(CheckedIhForwardRetPlanProof, BracketSettlementId),
     #[cfg(feature = "px8-ds-test-support")]
     MissingRequired,
     #[cfg(feature = "px8-ds-test-support")]
@@ -3277,6 +3287,11 @@ struct Lowering<'a> {
     refused_scalar_join: Option<&'a std::cell::Cell<Option<StaticOriginId>>>,
     pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
     response_owner_settlements: BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
+    response_bracket_exits: BTreeMap<StaticResponseContinuationId, BTreeSet<BracketSettlementId>>,
+    bracket_view: BracketSettlementControlView,
+    bracket_ledger: BracketSettlementLedger,
+    /// Exactly one validated S effect may run under the in-place release call.
+    bracket_effect_claim: Option<(BracketSettlementId, StaticOriginId)>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,
@@ -4113,8 +4128,77 @@ fn record_residual_counter_event(site: &'static str) {
     }
 }
 
+/// Test-support sequence of lowering acts, not a source-ancestry or runtime
+/// execution trace. Settlement-delimited segments include every entry from
+/// all recorder producers in one thread and build; no entry is filtered.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
-fn record_site_a_residual_none_arrival() {
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum SettlementFootprintEvent {
+    Consumed { settlement: u32, construct: u32 },
+    ResidualArrival { origin: u32 },
+    Route1 { origin: u32, route1: bool },
+    RecursorApplied { layer: u32 },
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static SETTLEMENT_FOOTPRINT_SEQUENCE:
+        std::cell::RefCell<Option<Vec<SettlementFootprintEvent>>> =
+            const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_settlement_footprint_sequence<T>(body: impl FnOnce() -> T) ->
+    (T, Vec<SettlementFootprintEvent>)
+{
+    struct Restore(Option<Vec<SettlementFootprintEvent>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+                *cell.borrow_mut() = self.0.take();
+            });
+        }
+    }
+    let previous = SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+        cell.borrow_mut().replace(Vec::new())
+    });
+    let restore = Restore(previous);
+    let value = body();
+    let sequence = SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+        cell.borrow_mut().take().expect("settlement footprint sequence scope")
+    });
+    drop(restore);
+    (value, sequence)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_settlement_footprint(event: SettlementFootprintEvent) {
+    SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+        if let Some(sequence) = cell.borrow_mut().as_mut() {
+            sequence.push(event);
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_settlement_consumed_tail(
+    settlement: BracketSettlementId,
+    identity: &ContinuationCallIdentity,
+) {
+    let settlement = settlement.ordinal();
+    let construct = identity.producer_construct_origin().observation_ordinal();
+    record_settlement_footprint(SettlementFootprintEvent::Consumed { settlement, construct });
+    if std::env::var_os("KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD").is_some() {
+        eprintln!("RT_BRACKET_SETTLEMENT_CONSUMED_TAIL settlement={settlement} construct={construct}");
+    }
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_site_a_residual_none_arrival(origin: StaticOriginId) {
+    record_settlement_footprint(SettlementFootprintEvent::ResidualArrival {
+        origin: origin.observation_ordinal(),
+    });
     RESIDUAL_LOWERING_COUNTERS.with(|counter| {
         let mut measured = counter.get();
         measured.site_a_none_arrivals += 1;
@@ -11909,6 +11993,9 @@ impl SourceComputationalAnswerRoute {
                 eprintln!(
                     "RT_ITREE_D1_RECURSOR_APPLIED mode=drop-checked-frame-1 frame=1"
                 );
+                record_settlement_footprint(SettlementFootprintEvent::RecursorApplied {
+                    layer: layer.static_origin.observation_ordinal(),
+                });
                 Self::DirectScrutinee
             }
             Ok("drop-checked-frame-1") => route,

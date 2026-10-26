@@ -465,12 +465,31 @@ Violating this OOMs the machine and stalls everyone. Configuration:
 - **Build and test only through `scripts/ken-cargo`**, never raw `cargo
   build`/`cargo test`. It holds a machine-wide lock (`KEN_BUILD_SLOTS`,
   default 1) so one build runs at a time across all agents.
-- **Scope to the touched crate** (`-p <crate>` or `--test <name>`), never
-  `--workspace`: the full workspace runs in CI, so a frame's "no-regression"
-  means green in CI (operator hard rule; enforced, §12a).
-- **Do not mandate full local test runs.** Frames, rulings and reviews ask for
-  the targeted suites the change touches; CI runs everything, and an
-  occasional red CI is an accepted cost (operator, 2026-09-26).
+- **Scope builds to the touched crate** (`-p <crate>`), never `--workspace`:
+  the full workspace runs in CI (operator hard rule; enforced, §12a).
+- **A local test run is targeted, never a population.** Run the tests for the
+  code the candidate touches, each by a named target (`test -p <crate> --test
+  <name>`, or `--lib <filter>` for unit tests), plus the WP's named acceptance
+  rows and mutations. Run a binary's named tests in one invocation with every
+  filter at once (`--test <name> -- --exact <a> <b> ...`, or `--lib -- --exact
+  ...` for unit tests, each name its full module path), and collect a WP's or
+  review's rows for the same binary into that run. Its per-test `ok` lines are
+  the per-row evidence, and its passed count must equal the names passed,
+  since a misspelt name matches nothing and still exits 0. One invocation per
+  test re-queues on the build lock for every row. Mutation runs are the
+  exception, since each needs its own build. A test invocation without a named
+  target is a population run and is not a local gate; neither are `--tests`, a
+  `--no-fail-fast` sweep of every binary in a crate, a full-suite rerun, or
+  re-running a whole package "for safety". The no-regression claim is CI
+  green; CI runs everything, and an occasional red CI is an accepted cost
+  (operator, 2026-09-26 and 2026-10-26).
+- **Frames, rulings, reviews and audits name binaries, not populations.** None
+  may require a whole-crate test run. When cross-cutting reach is the worry,
+  name the binaries that test the changed symbol's direct consumers, and
+  leave indirect reach to CI.
+- **A long run stalls every other seat.** Each `scripts/ken-cargo` call holds
+  `/tmp/ken-build-locks/build.lock` for its whole duration; one 72-binary
+  `ken-cli` test sweep held it for over an hour (2026-10-26).
 - **`source scripts/ken-env.sh`** at session start for the shared `sccache` +
   `CARGO_HOME`.
 - **Idle = paused.** A ring that is blocked or waiting (including on CI, ADR

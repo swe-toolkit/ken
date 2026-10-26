@@ -169,9 +169,14 @@ next advancing stop is the node's 9th, a Research trigger.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 11, child 3 aggregate 12 (Architect `evt_5aw3s64w0zan7`: the
-capsule footprint declared from a filtered projection; advancing, next
-Research trigger at 12). Before it: 10, aggregate 11
+§1a: 13, child 3 aggregate 14 (Architect `evt_3kd7n1m3611zg`: class C,
+the handler resumption route required for every admitted handler-owned
+Deferred row; advancing, next Research trigger at 15). Before it: 12,
+aggregate 13 (Architect `evt_4hendk9snt9em`, Research `evt_6xjyeh42hvapg`;
+stands as published; its diagnosis was refuted and the rescope withdrawn
+by the non-advancing ruling `evt_7pa9km38hak7s`). Before that: 11,
+aggregate 12 (Architect `evt_5aw3s64w0zan7`: the capsule footprint
+declared from a filtered projection). Before that: 10, aggregate 11
 (`evt_2rp8t2pz1rz4f`: the respin's attribution baseline failed on a
 mis-specified criterion). Before that: 9, aggregate 10
 (`evt_61nznjb9jvcer`: the df26d3135 CI red; Research `evt_yxd12w9d32sx`,
@@ -268,6 +273,25 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    a population declared from a partial projection; F is now the
    measured complete-log delta against M-2' (Architect
    `evt_5aw3s64w0zan7`).
+12. Bracket settlement membership was decided per static Vis origin;
+   Vis 537's ordinary owner-4 instance left ordinary ownership although
+   only 975 is Consumed. Keyed on: static source origin, versus the exact
+   settlement context set from `marked_bracket_response_contexts`
+   (Architect `evt_4hendk9snt9em`).
+   12-corr: M-3 refuted the static-origin key as the cause; the three
+   reds have three causes (R2, px8f, px4b below). R2 is a pin keyed on
+   main's representation of an intended ownership move (migrated); px8f
+   is a mutation hook and a suppressed plane on a consumer the WP no
+   longer goes through; px4b is `lower_expr` stack-frame growth, closed
+   by an `#[inline(never)]` hoist. They share no predicate. Carry:
+   per-instance settlement keying once a witness exists (Architect
+   `evt_7pa9km38hak7s`).
+13. Handler resumption route required for every admitted handler-owned
+   Deferred row, keyed on admitted ownership; transfer feasibility (K's
+   captures held by the handler frame) not consulted. Plus control hook
+   keyed on the pre-move Deferred plane (same ownership move as R2)
+   (Architect `evt_3kd7n1m3611zg`). Not a third-entry checkpoint; the
+   predicate question is next due at 15.
 
 **Shared predicate, entries 4, 8 and 8 (correction)** (Architect
 `evt_2j4fxp3ekyr03`): the drive's composition, both its frames and its

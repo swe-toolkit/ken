@@ -30,5 +30,6 @@ serde_json = "1"
 libc = { version = "=0.2.186", default-features = false }
 
 [dev-dependencies]
+ken-host = { path = "../ken-host" }
 ken-runtime = { path = "../ken-runtime", features = ["px8-ds-test-support"] }
 tempfile = "3"

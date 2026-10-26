@@ -249,8 +249,9 @@ Specifying §§5–6 does not claim their catalog builds have landed.
 
 The **Layer-3 graphs and dependency contract** is pinned in
 **`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT), §2
-(SPEC-GRAPHS-CYCLE-REFUTES-ORDER), and §3
-(SPEC-GRAPHS-WALK-COMPOSITION-ORDER). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-CYCLE-REFUTES-ORDER), §3
+(SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
+(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -261,9 +262,14 @@ every topological order by its forward-edge field alone. Section 3
 specifies `walk_append` by recursion on the second walk and the checked
 `ordered_walk_forward` law for a walk with a first edge; the private
 `walk_before` remains unexported. The §2 seed's blocks were exercised
-only as scratch clients. Section 3's catalog exports and seed, shipped
-seed-harness execution, CI and a landed trust-delta measurement are not
-established by this spec-only candidate. No second fixed point is added.
+only as scratch clients. Section 3's catalog exports and package-owned
+seed test are present, but this candidate does not execute them.
+Section 4 specifies generic left-unit and associativity laws for
+`walk_append` and authors a closed conformance seed. Its Architect D0
+checked the generic proofs on a scratch overlay with no trust delta;
+§4 exports and shipped-seed execution are not established by this
+spec/seed candidate. No CI, publication, landing or landed §4 trust
+measurement is claimed. No second fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
@@ -398,11 +404,12 @@ floating-point distance, other dimensions, canonical empty boxes and
 point-set equality remain outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–4
+**`68-numerical.md`** §§1–5
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
-SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY). The §1–2
+SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
+SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -422,9 +429,17 @@ pass the endpoint test despite vacuous member-set inclusion. Section 4
 specifies four checked inclusions: each side of the
 left- and right-oriented distributivity pair lies inside the other
 by endpoint value, without structural `Equal Interval` or interval
-commutativity. Its catalog exports and conformance seed are not
-delivered by this spec-only candidate; the Architect's scratch D0
-is not shipped-seed execution, CI or a landed trust measurement.
+commutativity. The §4 exports and seed are now present on main,
+with a targeted package test; this is not official conformance
+execution or a landed trust measurement. Section 5 adds five
+generic obligations: transitivity of endpoint-wise inclusion and
+swapped-operand inclusion for addition, multiplication, hull and
+intersection. Their converses follow by swapping the theorem's
+arguments, without structural `Equal Interval` or extra public
+laws. Architect checked five generic proofs in scratch with no
+new `Axiom` and unchanged trust identities (114 → 114); §5
+catalog exports are absent. Its authored closed seed is not
+shipped-seed execution, CI, publication, landing or landed trust.
 Signed arithmetic, division, `Float`, rounding, width and structural
 hull/intersection algebra remain deferred.
 

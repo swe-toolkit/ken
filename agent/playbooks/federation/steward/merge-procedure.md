@@ -102,8 +102,7 @@ Never print the token.
 
 ## M5 — Publish and wait for CI
 
-Before publishing, ensure no publisher already owns the window and no
-`main` CI run would be cancelled by a new push. Then run:
+Before publishing, ensure no publisher already owns the window. Then run:
 
 ```sh
 scripts/scripted-pr-automerge.sh \
@@ -114,10 +113,21 @@ scripts/scripted-pr-automerge.sh \
 Use the background path for code candidates. Do not fetch or mutate refs while
 the publisher is active.
 
+There is no CI run on `main` after a merge; nothing waits for one. The PR run
+is the only CI the landed tree gets. So the publisher merges a code candidate
+only when the PR's latest run is green and tested a merge commit whose first
+parent is the current `origin/main` tip and whose second parent is the routed
+SHA. The run records that commit in its `ci-tested-tree` artifact. If `main`
+moved after that run, the publisher closes and reopens the PR to re-trigger
+CI, waits for the new run, and checks again, up to three times. It refuses
+without merging when it cannot determine the tested base.
+
 On red, stop. Attribute the failure to candidate, base, or infrastructure and
 relay the evidence to the ring and Steward. The ring owns any respin; the
 Steward verifies and routes the new SHA. Retry an infrastructure failure on the
-same SHA only after confirming the SHA and PR head did not move.
+same SHA only after confirming the SHA and PR head did not move: close and
+reopen the PR, then re-run the publisher. Never `gh run rerun`: it is refused
+(`COORDINATION.md §12a`) and would retest the old merge ref.
 
 ## M6 — Verify the landing
 
