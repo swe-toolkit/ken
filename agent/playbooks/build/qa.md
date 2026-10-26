@@ -19,7 +19,10 @@ load and follow it after this generic archetype.
 > and mutations, each run by named target (`--test <name>`, or `--lib <filter>`
 > for unit tests). A run with no named target, `--tests`, a `--no-fail-fast`
 > sweep or the workspace is not your gate: it stalls every seat on the build
-> lock.
+> lock. Group your row list by binary and run each group as one invocation
+> with every name passed (`-- --exact <a> <b> ...`); never one invocation per
+> row; check the passed count equals the names passed. Each mutation still
+> gets its own run.
 > The full-workspace + `--locked` + conformance gate is **CI's** job; the scripted
 > publisher polls those exact GitHub checks before merging, so it always runs.
 > When a WP frame's AC says "workspace-green," that means **green in CI**, and your
