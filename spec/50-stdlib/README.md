@@ -364,9 +364,10 @@ establish shipped-seed execution, CI or landed trust. A sorted-list
 normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–5 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–6 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
-SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER).
+SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER;
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -396,12 +397,20 @@ older scratch D0 was not itself shipped-seed execution. Section 5
 adds unconditional public transitivity, greatest-intersection and
 least-hull laws for corner-wise `inside`, including inverted boxes.
 Architect checked them in scratch with unchanged 114 → 114 trusted
-identities, but the §5 exports are absent at this base. Its authored
-seed and scratch checks do not establish shipped-seed execution, CI,
-publication, landing or landed trust for §5. The new per-axis proof
-helpers stay private. Signed-coordinate geometry, Euclidean and
-floating-point distance, other dimensions, canonical empty boxes and
-point-set equality remain outside scope.
+identities; §5 exports, seed and package-owned test are now on main.
+The package test does not establish official conformance execution or
+landed trust. The per-axis order helpers stay private. Section 6 adds
+public `comm for min` and `comm for max` selectors in Nat Order and
+structural `intersect_comm` and `hull_comm` in NatBox, including
+inverted boxes. Unlike rational interval endpoint swaps, Nat corners
+support structural `Equal Box`. Architect D0 checked all four generic
+proofs without a new `Axiom`, at equal scratch trust identities
+114 → 114. The §6 catalog exports remain absent at this base; its
+closed seed and D0 do not establish shipped §6 execution, official
+conformance, CI, publication, landing or landed trust.
+Signed-coordinate geometry, Euclidean and floating-point distance,
+other dimensions, canonical empty boxes and point-set equality remain
+outside scope.
 
 The **exact rational-interval contract** is pinned in
 **`68-numerical.md`** §§1–5
