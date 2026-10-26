@@ -3,6 +3,7 @@
 > **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT §1;
 > SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** Section 1 specifies the
 > non-empty least-cost selector and seven laws; its catalog module and
@@ -10,11 +11,11 @@
 > and seed are also present on main. Section 2's catalog module and
 > seed are present on main. Section 3's greatest-cost selector and
 > seven laws are landed; §3.4 specifies the Option-returning extension
-> and its four laws from Architect-checked D0. This candidate supplies the
-> §3.4 catalog exports and a package test checking the authored seed's
-> accepted and refused assertions against roots-loaded exports. This is not
-> official conformance-runner execution, CI, publication, landing or a
-> landed `trusted_base()` measurement.
+> and its four laws from Architect-checked D0. The §3.4 catalog exports,
+> seed and package test are now present on main; the package test is not
+> official conformance-runner execution or a landed `trusted_base()`
+> measurement. This §2.4 spec/seed candidate delivers no catalog export,
+> CI, publication or landing.
 
 ## 1. Least-cost candidate
 
@@ -264,10 +265,12 @@ module imports.
 
 ## 2. Least witness below a finite bound
 
-> **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).**
-> Three general laws were checked in Architect D0; the catalog module
-> and this section's conformance seed are now present on main. Scratch
-> checks alone establish neither their shipped execution nor CI.
+> **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4).** The
+> original three general laws, catalog module and seed are present on
+> main. Section 2.4's fourth law was checked in Architect D0; its
+> catalog export is absent on this base. The new seed and D0 do not
+> establish shipped §2.4 execution, CI or landed trust.
 
 ### 2.1 Carrier and result
 
@@ -298,9 +301,10 @@ three laws below may use different evaluation strategies.
 ### 2.2 Three checked laws
 
 The module must export checked proof bodies, not postulates or unproved
-goals, for exactly these three generic theorem interfaces. The
-result-equality premises connect each claim to the actual `Option`
-result, and `Data.Numeric.Nat.Order.lt_nat` supplies strict order:
+goals, for the three generic theorem interfaces below, plus the
+bound-stability law of §2.4. The result-equality premises connect each
+claim to the actual `Option` result, and
+`Data.Numeric.Nat.Order.lt_nat` supplies strict order:
 
 ```ken
 pub theorem find_below_sound
@@ -361,8 +365,9 @@ The proof of the missing case also uses the private Nat fact that
 **separately bound `Bool` variable** rather than matching dependently
 on an indirectly computed `p b` avoids assuming a refinement the
 elaborator does not provide. These explain the D0 evidence; no
-private helper is a fourth public law or a mandated implementation
-strategy.
+private helper is an additional public law or a mandated
+implementation strategy. Section 2.4 introduces a fourth public law
+with its own private `leq_suc_not_leq_same` proof helper.
 
 Section 1.4 now specifies the `Option`-returning selector over a
 possibly empty `List`: it wraps `argmin` after distinguishing `Nil`
@@ -371,16 +376,77 @@ General implicit or infinite search, heuristics and approximations,
 arbitrary candidate orders, and machine-checked performance guarantees
 remain outside this bounded contract.
 
+### 2.4 Bound stability for an observed witness
+
+The existing `Algorithm.Optimization.BoundedSearch` module must export
+one further **public Transparent theorem** with a checked proof body,
+not a postulate. Its name, argument order and exact public type are:
+
+```ken
+pub theorem find_below_stable
+      (p : Nat → Bool) (bound : Nat) (larger : Nat) (n : Nat)
+    : Equal Bool (leq_nat bound larger) True
+      → Equal (Option Nat) (find_below p bound) (Some Nat n)
+      → Equal (Option Nat) (find_below p larger) (Some Nat n)
+```
+
+For every Boolean predicate and natural bounds with
+`leq_nat bound larger = True`, an observed `Some n` below `bound`
+remains **the same** `Some n` at `larger`. The observed result is the
+second premise, as in the existing soundness and leastness laws. The
+non-strict `leq_nat` premise covers an unchanged bound as well as a
+strictly greater one; no distinctness or positive-extension premise
+is required. The statement is not a promise about predicate calls,
+search direction or computational cost.
+
+The premise directly states the order relation a client ordinarily
+knows. A client with an extension written `add bound extra` can apply
+this same law using the existing public Nat-order fact
+`leq_nat_add_left_bound bound extra`. The reverse choice—requiring an
+additive decomposition rather than `leq_nat bound larger = True`—would
+oblige such an order-only client to derive an additional decomposition
+lemma that the current Nat-order interface does not export. No second
+public bound-stability law is introduced for the additive spelling.
+
+The Architect's checked proof inducts on `larger`. With `larger = Zero`,
+the premises contradict either a nonzero `bound` or a `Some` result at
+`bound = Zero`. At `Suc below`, it splits on the computed Boolean
+`leq_nat bound below` **with its equation**. If true, the inductive
+hypothesis finds the same `Some n` below `below`, which `find_next`
+keeps at `Suc below`. Otherwise a new private Nat-order helper
+`leq_suc_not_leq_same` shows `bound = Suc below`, and equality
+transport reuses the observed result. The helper belongs directly
+after the existing private `lt_suc_not_lt_same`; it is not a public
+fifth law or a new assumption. The proof changes no §1–3 operation
+or existing theorem, and uses only the existing private `find_next`,
+congruence, symmetry and transitivity. Matching on a computed order
+comparison supplies an explicit equation, not a refinement inferred
+from an indirectly convertible expression.
+
+There is **no corresponding `None`-stability law**. For
+`above_two n = lt_nat two n`, `find_below above_two three` is `None`,
+while `find_below above_two ten` is `Some three`. Growing a bound can
+introduce a first hit; the accepted same-premise `Some` result and the
+refused false `None` conclusion are paired in the closed seed at
+`conformance/stdlib/optimization/seed-bounded-search-bound-stability.md`.
+The finite instance checks the boundary but does not prove the
+generic theorem. Architect's isolated D0 at landed base `0bb872591`
+checked the generic body (`ken check` and `ken fmt --check` rc 0), two
+probe tests, no new `Axiom`, and identical scratch `trusted_base()`
+GlobalId sets 114 → 114. This spec/seed candidate does **not** deliver
+the §2.4 catalog export. D0 and authored-seed checks do not establish
+execution against shipped §2.4 exports, official conformance, CI,
+publication, landing or landed trust.
+
 ## 3. Greatest-cost candidate
 
 > **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** The §3.1–§3.2 operation
 > and seven laws, plus their seed, are present on main. Architect
-> checked §3.4 on an isolated D0 from `914cfbda0`; this candidate
-> supplies the §3.4 exports and a package test checking the authored
-> seed's assertions against roots-loaded exports. It does not establish
-> official conformance-runner execution, CI, publication, landing or
-> landed trust.
+> checked §3.4 on an isolated D0 from `914cfbda0`; the §3.4 exports,
+> seed and package-owned test are now on main. Those package checks
+> are not official conformance-runner execution or a landed trust
+> measurement; this §2.4 candidate claims no new §3 delivery or CI.
 
 ### 3.1 Carrier, operation and tie rule
 
@@ -474,8 +540,8 @@ declarations. A generic client restating all eight `argmax` statements
 checked. The closed earliest-tie control selected `3` and its
 later-tie refusal `4` reached the kernel's `TypeMismatch`; a local
 non-strict selector reversed those two observations. These are
-Architect-reported D0 measurements for §3.1–§3.2; only the §3.4
-package test executes this candidate's new seed.
+Architect-reported D0 measurements for §3.1–§3.2; the separately
+delivered §3.4 package test executes its authored seed.
 
 The checked D0 shares a private selection fold and membership proof
 between `argmin` and `argmax`, with a private greatest-cost proof and
@@ -551,11 +617,11 @@ Architect's checked §3.4 D0 from `914cfbda0` reported `ken check` and
 providers. The four new generic laws were consumed by a scratch
 client; the `Nil`, singleton and tied-maximum controls and five
 false-claim probes were checked separately in scratch. Those are
-Architect-reported measurements. This candidate's package test instead
-loads the §3.4 exports from the catalog and checks the seed's accepted
-client and each isolated refused theorem. It checks the exact
-trusted-base identities relative to the provider closure, without
-claiming a landed trust measurement. No ambient name beyond the
+Architect-reported measurements. The landed §3.4 package test instead
+loads its catalog exports and checks the seed's accepted client and
+each isolated refused theorem. It checks the exact trusted-base
+identities relative to the provider closure, without claiming a
+landed trust measurement. No ambient name beyond the
 package's current census row or change to existing selectors is
 required. Option minimization remains §1.4; `argmax_option` adds no
 `argmax` law, generic Option search, top-k selection or runtime-cost
