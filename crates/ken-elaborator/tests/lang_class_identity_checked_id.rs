@@ -299,8 +299,8 @@ fn qualified_import_and_two_aliases_select_distinct_dictionaries() {
 /// declarations, so it collides with a same-spelled imported class, and it is
 /// usable as a type after its declaration in every mode.
 /// CLAIMED: a local class takes part in scope collision exactly as local data
-/// does. THE GAP: a reference to a class before its ordered barrier stays
-/// refused and is not pinned here.
+/// does. MEASURED separately below: before its ordered barrier, a class
+/// reference is refused even if another class holds its canonical key.
 #[test]
 fn local_class_is_prebound_for_collision_and_type_use() {
     for mode in [Mode::Strict, Mode::Legacy] {
@@ -327,5 +327,105 @@ fn local_class_is_prebound_for_collision_and_type_use() {
             "class View a { get : a -> a }\nfn f (d : View Nat) : View Nat = d",
         )
         .expect("a local class is usable as a type after its declaration");
+    }
+}
+
+const FILE_CLASS: &str = "pub class View a { get : a -> a }\ninstance View Nat { get = \\x. x }";
+
+fn class_session(warm: bool) -> (tempfile::TempDir, ElabEnv) {
+    let root = tempfile::tempdir().expect("class fixture root");
+    let mut env = ElabEnv::new().expect("base environment");
+    if warm {
+        fs::write(root.path().join("A.ken"), FILE_CLASS).expect("write A provider");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("check old A provider");
+    }
+    (root, env)
+}
+
+/// Promise class: durable invariant (spec 33 §§1, 3.3).
+/// MEASURED: type, where, own-field and superclass references to an
+/// unadmitted local class all refuse with its canonical name, whether another
+/// unit already loaded that name or this is a fresh session.
+/// CLAIMED: a pending local class cannot borrow an older checked global ID.
+/// THE GAP: nested inline-module classes are not exercised here.
+#[test]
+fn forward_local_class_refuses_stale_warm_identity() {
+    for (row, source) in [
+        (
+            "F",
+            "module A { fn early (d : View Nat) : View Nat = d\npub class View a { other : Nat } }",
+        ),
+        (
+            "W",
+            "module A { const early : Nat where View Nat = d.get Zero\npub class View a { other : Nat } }",
+        ),
+        (
+            "SELF",
+            "module A { pub class View a { other : View a -> Nat } }",
+        ),
+        (
+            "SUPER-FWD",
+            "module A { pub class Sub a { base : View a }\npub class View a { other : Nat } }",
+        ),
+    ] {
+        assert_pending_class_refuses(row, source);
+    }
+}
+
+fn assert_pending_class_refuses(row: &str, source: &str) {
+    for warm in [false, true] {
+        let (_root, mut env) = class_session(warm);
+        let error = env
+            .elaborate_file(source)
+            .expect_err("class reference before its barrier must refuse");
+        assert!(
+            matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "A.View"),
+            "{row}/warm={warm}: expected canonical unresolved class, got {error:?}"
+        );
+    }
+}
+
+/// Promise class: durable invariant (spec 33 §§1, 3.3).
+/// MEASURED: a class instance preceding the class barrier cannot use a prior
+/// file-loaded class at the same canonical key; its result equals fresh-env
+/// refusal, not a conflict with the prior provider's instance.
+/// CLAIMED: instance registration cannot borrow an older class identity.
+/// THE GAP: other instance-head shapes are covered by class registry tests.
+#[test]
+fn instance_before_local_class_refuses_stale_warm_identity() {
+    assert_pending_class_refuses(
+        "INST-BEFORE",
+        "module A { instance View Nat { other = Zero }\npub class View a { other : Nat } }",
+    );
+}
+
+/// Promise class: durable invariant (spec 33 §§1, 3.3).
+/// MEASURED: a reference after the ordered barrier uses its new checked class
+/// ID, not an older class at the same key; ordinary data forward use remains
+/// accepted, both after a previous provider load and in a fresh session.
+/// CLAIMED: the class guard is confined to pending classes, not all forward
+/// names or already checked classes. THE GAP: imported class IDs are tested
+/// by the existing selection and alias tests above rather than here.
+#[test]
+fn after_class_barrier_and_data_forward_keep_checked_identity() {
+    let after =
+        "module A { pub class View a { other : Nat }\nfn late (d : View Nat) : View Nat = d }";
+    let data = "module A { fn early (t : T) : T = t\npub data T = MkT }";
+    for warm in [false, true] {
+        let (_root, mut env) = class_session(warm);
+        let old_owner = env.globals.get("A.View").copied();
+        env.elaborate_file(after)
+            .unwrap_or_else(|error| panic!("AFTER/warm={warm}: {error:?}"));
+        let new_owner = env.globals["A.View"];
+        if let Some(old_owner) = old_owner {
+            assert_ne!(old_owner, new_owner, "the local class must have a new ID");
+        }
+        checked_type_mentions(&env, env.globals["A.late"], new_owner);
+
+        let (_root, mut env) = class_session(warm);
+        env.elaborate_file(data)
+            .unwrap_or_else(|error| panic!("DATA-FWD/warm={warm}: {error:?}"));
+        checked_type_mentions(&env, env.globals["A.early"], env.globals["A.T"]);
     }
 }

@@ -3,7 +3,8 @@
 > **Status: DRAFT v0 (SPEC-TIME-EVENT-TRACE-CONTRACT §1;
 > SPEC-TIME-WINDOW-MEMBERSHIP §2;
 > SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3;
-> SPEC-TIME-MERGE-MEMBERSHIP §4).** The §1–2 EventTrace
+> SPEC-TIME-MERGE-MEMBERSHIP §4;
+> SPEC-TIME-WINDOW-COMPOSITION §5).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -16,6 +17,13 @@
 > catalog exports. A targeted package test executes the authored seed's
 > positive and refused clients, but neither official conformance-runner
 > execution, CI nor a landed trust measurement is established here.
+> Section 5 specifies one unconditional window-composition equality
+> and two merge-empty unit laws. Architect's D0 on `98970bde7`
+> checked all three generic proofs, owned Transparent exports and
+> scratch trusted identities 114 → 114 without a new `Axiom`.
+> Section 5 is spec and seed only on this base: its catalog exports
+> are absent, and D0 is not execution of the authored seed against
+> shipped exports, official conformance, CI or landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -367,15 +375,19 @@ the false equality were also rejected. These are **scratch D0**
 results, not publication of the §3 catalog export, execution of a
 shipped §3 seed, CI, or a landed trust measurement. The delivered
 catalog candidate checks this law and runs the authored seed in targeted
-package acceptance; CI and landing remain separate measurements.
+package acceptance; CI and a landed trust measurement remain separate
+measurements.
 
 The catalog export makes the existing generic `filter_starts_after`
 proof public in `Data.Collections.Derived`. `Data.Time.EventTrace`
 reaches it by adding the name to its existing
 `import Data.Collections.Derived` selection, not by adding a new
 import declaration. No duplicate local proof or new ambient name is
-specified. The new merge/window proof helpers remain private. The
-only new §3 public law is `trace_window_merge`.
+specified. The new merge/window proof helpers remain private **at §3**.
+Section 5 promotes the existing private `trace_merge_nil_right` helper
+as one of its two public merge-unit laws, with the same name and proof;
+no second declaration is added. The other merge/window proof helpers
+remain private. The only new §3 public law is `trace_window_merge`.
 
 ## 4. Premise-free membership of a merge
 
@@ -456,3 +468,75 @@ client and its paired refusal on the same fixtures and measures the exact
 `trusted_base()` identity sets before and after loading EventTrace. That
 package test is not official conformance-runner execution, CI,
 publication, landing or a landed trust measurement.
+
+## 5. Composition of windows and empty merge units
+
+`Data.Time.EventTrace` must export **three checked public laws** with
+exactly the following types. The first two bounds describe the inner
+window, and the next two describe the outer window:
+
+```ken
+pub theorem trace_window_window
+  (p : Type) (lo1 : Nat) (hi1 : Nat) (lo2 : Nat) (hi2 : Nat)
+  (tr : List (Event p)) :
+  Equal (List (Event p))
+    (trace_window p lo2 hi2 (trace_window p lo1 hi1 tr))
+    (trace_window p (max lo1 lo2) (min hi1 hi2) tr)
+
+pub theorem trace_merge_nil_left
+  (p : Type) (ys : List (Event p)) :
+  Equal (List (Event p)) (trace_merge p (Nil (Event p)) ys) ys
+
+pub theorem trace_merge_nil_right
+  (p : Type) (xs : List (Event p)) :
+  Equal (List (Event p)) (trace_merge p xs (Nil (Event p))) xs
+```
+
+Window composition is **one structural list equality**: a window
+`[lo1, hi1)` followed by `[lo2, hi2)` keeps exactly the events in
+`[max lo1 lo2, min hi1 hi2)`, each unchanged and in its original
+order. The two sides filter the **same list**; neither needs
+`time_ordered`, a payload equality decision, a validity proof for
+the bounds, or §3's two ordered-merge premises. The equality holds
+also for disjoint or inverted windows: if the intersected lower
+bound meets or exceeds its upper bound, both sides are empty by
+§1.2. This is not the weaker pair of a commutation law and an
+idempotence law, and it does not require public max/min
+commutativity or idempotence. `max` and `min` are the existing
+`Data.Numeric.Nat.Order` exports, which the catalog module must
+import alongside its existing `lt_nat` import.
+
+The two unit laws make §1.2's empty-input behavior explicit as
+checked equalities of **lists of stored events in order**, with no
+ordering premise. `trace_merge_nil_left` is definitionally closed
+by `Refl`; `trace_merge_nil_right` **promotes the existing private
+§3 helper** with that exact name and argument order, retaining its
+checked proof rather than introducing another declaration. On an
+open `xs`, structural `Refl` does not close the right-unit type;
+its existing inductive proof is essential. Neither law changes
+`trace_merge` or chooses a new tie or payload ordering rule.
+
+The new proof tools `leq_nat_max_split`, `lt_nat_min_split`,
+`bool_and_interchange`, `event_in_window_inter`, `window_keep`,
+`window_filter_fuse_cons` and `window_filter_fuse` stay **private**
+to EventTrace. They are not additional public laws or exports. If
+the generic Nat split or filter-fusion tools later gain a public
+use, their natural homes are `Data.Numeric.Nat.Order` and
+`Data.Collections.Derived`, respectively, not a second EventTrace
+API. Other §1–4 laws and operations are unchanged.
+
+On the landed ancestor `98970bde7`, Architect's isolated D0 checked
+all three generic proof bodies, their owner-local Transparent
+identities, a generic public-only client and six private import
+refusals, with no new `Axiom` and identical `trusted_base()` sets
+114 → 114. Closed D0 clients accepted a `[1,6)` then `[3,9)`
+window over events at times 1, 4 and 7, yielding only the time-4
+event on both sides, and both merge-unit instances. They rejected
+the union-bounds proposition over that same trace while accepting
+closed exact-value controls. That is **scratch D0** evidence, not
+execution of the authored §5 seed or of shipped §5 catalog exports.
+The §5 catalog delivery must separately promote
+`trace_merge_nil_right` without leaving a privacy-pin consumer
+expecting its import to fail. No shipped-seed or official conformance
+execution, CI, publication, landing or landed trust follows from
+this spec-and-seed candidate.

@@ -444,9 +444,9 @@ Signed arithmetic, division, `Float`, rounding, width and structural
 hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–4 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–5 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
-SPEC-TIME-MERGE-MEMBERSHIP).
+SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -460,13 +460,21 @@ premises adds no public law. The checked §3 catalog export is present in
 CI and a landed trust measurement are not established by this status.
 Section 4 specifies three checked, premise-free `list_elem` laws:
 merge-member soundness and separate left/right member preservation.
-Their catalog exports and conformance seed are not delivered by this
-spec-only candidate. Architect AC-0 checked the generic proof bodies
-in scratch without `Axiom`; it did not execute the shipped seed or
-measure landed trust. A private one-way window-of-merge membership
-consequence adds no public law. Clock effects, durations, causality,
-infinite streams, premise-free structural window/merge distribution
-and k-way merge remain deferred.
+Their catalog exports and conformance seed are now present on main;
+a targeted package test checks the corrected seed, not official
+conformance or a landed trust measurement. A private one-way
+window-of-merge membership consequence adds no public law.
+Section 5 specifies one unconditional structural equality for nested
+windows at intersected `max`/`min` bounds and two empty-merge unit
+laws. It promotes §3's existing private `trace_merge_nil_right`
+proof without duplicating it. Seven new window-composition proof
+tools stay private. Architect's isolated D0 checked the three
+public proofs with unchanged scratch trusted identities 114 → 114;
+§5 catalog exports remain absent at this base. Its authored closed
+seed and D0 do not establish shipped-seed execution, official
+conformance, CI, publication, landing or landed trust. Clock effects,
+durations, causality, infinite streams, premise-free structural
+window/merge distribution and k-way merge remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
