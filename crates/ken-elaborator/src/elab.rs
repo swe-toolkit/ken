@@ -9316,9 +9316,24 @@ fn method_has_variable_side_leaves(
     else {
         return Ok(false);
     };
-    Ok(leaves
-        .iter()
-        .any(|leaf| matches!(leaf.target, Term::Var(v) if v < n)))
+    // A field solved by one leaf and mentioned by another leaf's target leaves
+    // a residual equation between outer terms. Only the alias rule rewrites
+    // outer indices, so a non-linear field keeps the whole method there.
+    let nonlinear = leaves.iter().any(|leaf| match &leaf.target {
+        Term::Var(v) if *v < n => {
+            let field = Term::Var(*v);
+            leaves
+                .iter()
+                .filter(|other| scrut_occurs(&other.target, &field))
+                .count()
+                > 1
+        }
+        _ => false,
+    });
+    Ok(!nonlinear
+        && leaves
+            .iter()
+            .any(|leaf| matches!(leaf.target, Term::Var(v) if v < n)))
 }
 
 #[cfg(test)]

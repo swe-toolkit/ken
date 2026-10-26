@@ -378,3 +378,107 @@ fn multi_leaf_equation_eliminates_its_field() {
 fn mixed_equation_eliminates_its_field() {
     on_elaboration_stack(|| checked_hand_rows(true));
 }
+
+const NONLINEAR_INDEX_FIXTURES: [&str; 6] = [
+    "data GridPoint : Type where { Pt : Nat -> Nat -> GridPoint }",
+    "data Two : Nat -> Nat -> Type where { MkTwo : (u : Nat) -> Two u u }",
+    "data TwoS : Nat -> Nat -> Type where { MkTwoS : (u : Nat) -> TwoS u (Suc u) }",
+    "data Diag : GridPoint -> Type where { MkDiag : (u : Nat) -> Diag (Pt u u) }",
+    "data SucD : GridPoint -> Type where { MkSucD : (u : Nat) -> SucD (Pt u (Suc u)) }",
+    "data Tri : GridPoint -> Nat -> Type where { MkTri : (u : Nat) -> Tri (Pt u Zero) u }",
+];
+
+fn nonlinear_index_env() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("prelude");
+    for fixture in NONLINEAR_INDEX_FIXTURES {
+        env.elaborate_decl(fixture).expect("indexed family fixture");
+    }
+    env
+}
+
+fn check_nonlinear_accepted(row: &str, source: &str) {
+    let mut env = nonlinear_index_env();
+    let trust = env.env.trusted_base();
+    env.elaborate_decl(source)
+        .unwrap_or_else(|error| panic!("{row}: {error:?}"));
+    assert_eq!(env.env.trusted_base(), trust, "{row}: no added trust");
+}
+
+/// Promise class: durable admission invariant (34 §3.5, 39 §2).
+/// MEASURED: five indexed constructor families with a repeated field each
+/// admit a plain value, a dependent continuation and a Refl theorem, without
+/// adding trusted declarations. CLAIMED: the method's non-linear residual
+/// receives the same sound alias solution as before the solved-index unifier.
+/// THE GAP: acceptance does not assert the emitted core's Cast shape; the
+/// separate mixed and multi-leaf tests above pin the elimination boundary.
+#[test]
+fn nonlinear_index_fields_preserve_parent_accepted_methods() {
+    on_elaboration_stack(|| {
+        for (tag, scrutinee, constructor, equality) in [
+            ("two", "Two x y", "MkTwo u", "Equal Nat x y"),
+            ("twos", "TwoS x y", "MkTwoS u", "Equal Nat (Suc x) y"),
+            ("diag", "Diag (Pt x y)", "MkDiag u", "Equal Nat x y"),
+            ("sucd", "SucD (Pt x y)", "MkSucD u", "Equal Nat (Suc x) y"),
+            ("tri", "Tri (Pt x Zero) y", "MkTri u", "Equal Nat x y"),
+        ] {
+            for (kind, source) in [
+                (
+                    "value",
+                    format!("fn {tag}_value (x : Nat) (y : Nat) (z : {scrutinee}) : Nat = match z {{ {constructor} ↦ u }}"),
+                ),
+                (
+                    "continuation",
+                    format!("fn {tag}_continuation (x : Nat) (y : Nat) (P : Nat -> Type) (h : (u : Nat) -> P u) (z : {scrutinee}) : P x = match z {{ {constructor} ↦ h u }}"),
+                ),
+                (
+                    "theorem",
+                    format!("theorem {tag}_theorem (x : Nat) (y : Nat) (z : {scrutinee}) : {equality} = match z {{ {constructor} ↦ Refl }}"),
+                ),
+            ] {
+                check_nonlinear_accepted(&format!("{tag}/{kind}"), &source);
+            }
+        }
+    });
+}
+
+/// Promise class: durable refusal and acceptance boundaries.
+/// MEASURED: a false TwoS equality refuses specifically as TypeMismatch,
+/// not an internal solved-premise error; both reflexive Two forms and two
+/// continuations to P y remain accepted without a trusted-base delta.
+/// CLAIMED: routing a non-linear method to the alias rule does not make a
+/// false theorem provable or reject a method already valid on the parent.
+/// THE GAP: deeper nested-constructor costs stay with the depth-seven test.
+#[test]
+fn nonlinear_index_false_goal_refuses_and_reflexive_controls_check() {
+    on_elaboration_stack(|| {
+        let mut env = nonlinear_index_env();
+        let trust = env.env.trusted_base();
+        let false_theorem = "theorem twos_false (x : Nat) (y : Nat) (z : TwoS x y) : Equal Nat x y = match z { MkTwoS u ↦ Refl }";
+        let result = env.elaborate_decl(false_theorem);
+        assert!(
+            matches!(result, Err(ElabError::TypeMismatch { .. })),
+            "false TwoS equality must refuse as TypeMismatch: {result:?}"
+        );
+        assert_eq!(env.env.trusted_base(), trust, "false theorem adds no trust");
+        for (row, source) in [
+            (
+                "two_reflexive_value",
+                "fn two_reflexive_value (x : Nat) (z : Two x x) : Nat = match z { MkTwo u ↦ u }",
+            ),
+            (
+                "two_reflexive_theorem",
+                "theorem two_reflexive_theorem (x : Nat) (z : Two x x) : Equal Nat x x = match z { MkTwo u ↦ Refl }",
+            ),
+            (
+                "two_continuation_y",
+                "fn two_continuation_y (x : Nat) (y : Nat) (P : Nat -> Type) (h : (u : Nat) -> P u) (z : Two x y) : P y = match z { MkTwo u ↦ h u }",
+            ),
+            (
+                "twos_continuation_y",
+                "fn twos_continuation_y (x : Nat) (y : Nat) (P : Nat -> Type) (h : (u : Nat) -> P (Suc u)) (z : TwoS x y) : P y = match z { MkTwoS u ↦ h u }",
+            ),
+        ] {
+            check_nonlinear_accepted(row, source);
+        }
+    });
+}
