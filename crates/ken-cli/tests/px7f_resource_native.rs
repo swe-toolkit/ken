@@ -561,12 +561,12 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
 fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     use std::collections::{BTreeMap, BTreeSet};
 
-    let fixtures: &[(&str, &str, u32, &[(u32, &[u32])])] = &[
-        ("right-denial-protocol", RIGHT_NOT_HELD, 587, &[(0, &[564]), (1, &[])]),
+    let fixtures: &[(&str, &str, u32, &[(u32, &[u32])], u32)] = &[
+        ("right-denial-protocol", RIGHT_NOT_HELD, 587, &[(0, &[564])], 564),
         ("double-release-protocol", DOUBLE_RELEASE, 618,
-            &[(1, &[607]), (0, &[526]), (2, &[])]),
+            &[(1, &[607]), (0, &[526])], 526),
     ];
-    for &(label, source, owner, expected) in fixtures {
+    for &(label, source, owner, expected, bracket_origin) in fixtures {
         let dir = output_dir(label);
         let ((((compiled, plans), captures), frames), callers) =
             ken_runtime::with_pending_vis_caller_payload_observations(|| {
@@ -601,15 +601,48 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
             .collect::<Vec<_>>();
         assert_eq!(owner_frames.len(), 1,
             "{label}: actual response-owner frame was not emitted exactly once");
-        let expected_capture_width = observed.contexts.iter()
-            .flat_map(|(_, members)| members)
+        let marked = plans.iter().flat_map(|plan| &plan.bracket_response_rows)
+            .filter(|row| row.vis_origin == bracket_origin).collect::<Vec<_>>();
+        assert_eq!(marked.len(), 1, "{label}: the former returned-Vis row is bracket-owned");
+        assert!(plans.iter().any(|plan|
+            plan.bracket_settlement_vis_origins.contains(&bracket_origin)),
+            "{label}: the moved Vis must belong to an authenticated S");
+        assert!(plans.iter().flat_map(|plan| &plan.all_static_response_rows)
+            .any(|row| row.vis_origin == owner));
+        assert!(plans.iter().flat_map(|plan| &plan.all_static_response_rows)
+            .all(|row| row.vis_origin != bracket_origin),
+            "{label}: bracket S cannot also be an ordinary owner");
+        let bracket_members = observed.contexts.iter().flat_map(|(_, members)| members)
+            .filter(|member| member.origin == bracket_origin).collect::<Vec<_>>();
+        assert_eq!(bracket_members.len(), 1,
+            "{label}: one bracket member survives in the returned-origin fixpoint");
+        let bracket_member = bracket_members[0];
+        assert!(bracket_member.successor_id.is_none()
+            && bracket_member.successor_context.is_none()
+            && bracket_member.capture_origins.is_empty(),
+            "{label}: a bracket member cannot retain an ordinary successor: {bracket_member:?}");
+        let ordinary_members = observed.contexts.iter().flat_map(|(_, members)| members)
+            .filter(|member| member.origin != bracket_origin).collect::<Vec<_>>();
+        if ordinary_members.is_empty() {
+            // ESCAPE_CLOSED no longer emits an ordinary owner. This right-denial
+            // owner is the live no-ordinary-successor frame/control instead.
+            let frame = owner_frames[0];
+            assert!(frame.widths.is_none() && frame.frame_bytes.is_none(),
+                "{label}: the ordinary owner has no pending-Vis record tail: {frame:?}");
+            let incoming = callers.iter().filter(|call| call.response_id == frame.response_id)
+                .collect::<Vec<_>>();
+            assert_eq!(incoming.len(), 1, "one owner call must allocate a base frame");
+            assert_eq!(incoming[0].base_frame_bytes, frame.base_frame_bytes);
+            assert_eq!(incoming[0].allocated_bytes, frame.base_frame_bytes);
+            continue;
+        }
+        let expected_capture_width = ordinary_members.iter()
             .map(|member| member.capture_origins.len())
             .max().expect("a protocol has a nonempty successor set");
         let width = owner_frames[0].widths.expect("the active owner needs a record tail");
         assert_eq!(usize::try_from(width.0).unwrap(), expected_capture_width,
             "{label}: owner capture tail must match its own successor fixpoint");
-        let expected_input_width = observed.contexts.iter()
-            .flat_map(|(_, members)| members)
+        let expected_input_width = ordinary_members.iter()
             .map(|member| member.continuation_input_count
                 .expect("a returned member needs one existing response row"))
             .max().expect("a protocol has a successor row");
@@ -631,6 +664,7 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
         eprintln!("RT-OWNER-VIS FRAME {label} owner={owner} widths={width:?} all={frames:?} caller={incoming:?}");
         for (_, members) in &observed.contexts {
             for member in members {
+                if member.origin == bracket_origin { continue; }
                 assert!(!member.relay, "{label}: a returned member needs relay representation");
                 assert!(member.successor_id.is_some() && member.successor_context.is_some()
                     && member.effect_origin.is_some(),
@@ -670,46 +704,43 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
             }
         }
     }
-    let dir = output_dir("escape-protocol-empty-control");
-    let (((compiled, plans), frames), callers) =
-        ken_runtime::with_pending_vis_caller_payload_observations(|| {
-            ken_runtime::with_pending_vis_owner_frame_observations(|| {
-                ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                    ken_cli::build_native_program(
-                        ESCAPE_CLOSED, ken_cli::SourceFormat::Ken,
-                        "escape-protocol-empty-control", dir.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
-                })
-            })
-        });
-    let _output = compiled.expect("unaffected owner compiles");
-    let protocols = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
+}
+
+/// Promise class: durable invariant. E4 compares each source parameter's
+/// descriptor metadata with the ordinary response-owner slot actually loaded
+/// by the emitter. DOUBLE_RELEASE retains an ordinary owner beside a separate
+/// bracket S; the bracket route itself has no owner-frame Load. MEASURED:
+/// two distinct source positions reach two distinct loaded slots and offsets.
+/// CLAIMED: owner-frame values are selected by producer ABI slot, never by
+/// metadata coordinates. THE GAP: the existing in-emitter checks join the
+/// actual Load offset to the owner descriptor, rather than rereading the plan.
+#[cfg(target_os = "linux")]
+#[test]
+fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
+    let dir = output_dir("e4-double-release-owner-slots");
+    let ((compiled, plans), pairs) = ken_runtime::with_rt_seed_response_metadata_observations(|| {
+        ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                DOUBLE_RELEASE, ken_cli::SourceFormat::Ken, "e4-double-release-owner-slots",
+                dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        })
+    });
+    compiled.expect("the ordinary two-parameter response owner compiles");
+    let ordinary = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
         .collect::<Vec<_>>();
-    let empty = protocols.iter().find(|protocol| protocol.error.is_none()
-        && !protocol.excluded_by_relay && !protocol.contexts.is_empty()
-        && protocol.contexts.iter().all(|(_, members)| members.is_empty()));
-    let empty = empty.unwrap_or_else(||
-        panic!("unaffected empty-successor owner was not exercised: {protocols:?}"));
-    let empty_owner = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
-        .find(|row| row.vis_origin == empty.owner_origin)
-        .expect("the empty-successor protocol belongs to a generated response owner");
-    let empty_frames = frames.iter().filter(|frame|
-        frame.owner_origin == empty_owner.vis_origin).collect::<Vec<_>>();
-    assert_eq!(empty_frames.len(), 1,
-        "empty-successor owner was not emitted exactly once: {frames:?}");
-    assert!(empty_frames.iter().all(|frame| frame.widths.is_none()
-        && frame.frame_bytes.is_none()),
-        "an owner with no successors acquired a record tail: {frames:?}");
-    let incoming = callers.iter().filter(|call|
-        call.response_id == empty_frames[0].response_id).collect::<Vec<_>>();
-    assert_eq!(incoming.len(), 1,
-        "empty-successor owner call was not emitted exactly once: {callers:?}");
-    assert_eq!(incoming[0].base_frame_bytes, empty_frames[0].base_frame_bytes,
-        "empty-successor caller and owner disagree on base frame size");
-    assert_eq!(incoming[0].allocated_bytes, empty_frames[0].base_frame_bytes,
-        "empty-successor caller acquired an unplanned tail");
-    eprintln!("RT-OWNER-VIS EMPTY OWNER {empty:?} frames={frames:?} caller={incoming:?}");
+    assert_eq!(ordinary.len(), 1, "this fixture has exactly one ordinary response owner");
+    assert_eq!(ordinary[0].vis_origin, 618, "E4 observes the non-bracket owner");
+    assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
+        .any(|row| row.vis_origin == 526), "the distinct bracket S remains plane-owned");
+    assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
+        .all(|row| row.vis_origin != 618), "the E4 owner cannot be bracket-owned");
+    assert_eq!(pairs.len(), 2, "both source parameter captures must reach the response emitter");
+    let source_positions = pairs.iter().map(|(source, _, _)| *source)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(source_positions, std::collections::BTreeSet::from([0, 1]));
+    assert_ne!(pairs[0].1, pairs[1].1, "the capture values occupy distinct response slots");
+    assert_ne!(pairs[0].2, pairs[1].2, "the capture values load from distinct frame offsets");
 }
 
 /// Promise class: durable invariant. An owner whose generated K result is
@@ -723,13 +754,13 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
 #[cfg(target_os = "linux")]
 #[test]
 fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
-    let dir = output_dir("right-denial-unchecked-k-result");
+    let dir = output_dir("double-release-unchecked-k-result");
     let ((compiled, frames), applications) = ken_runtime::with_static_response_owner_body_mutation(
         ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
         || ken_runtime::with_pending_vis_owner_frame_observations(|| {
             ken_cli::build_native_program(
-                RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken,
-                "right-denial-unchecked-k-result", dir.path(),
+                DOUBLE_RELEASE, ken_cli::SourceFormat::Ken,
+                "double-release-unchecked-k-result", dir.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         }),
@@ -748,7 +779,7 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     // is the last one emitted; its planned record tail places it on the
     // pending-Vis verifier.
     let refused = frames.last().expect("the refused owner was emitted");
-    assert_eq!(refused.owner_origin, 587, "the refused owner is the protocol owner");
+    assert_eq!(refused.owner_origin, 618, "the refused owner is the ordinary K protocol owner");
     assert!(refused.widths.is_some(), "the refused owner took the pending-Vis arm: {frames:?}");
 }
 

@@ -61,459 +61,7 @@ fn output_dir(name: &str) -> tempfile::TempDir {
     tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
-const RT_PARITY_SOURCE: &str = r#"program capabilities FS AFull
-fn rt_body_ok (_buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
-
-fn rt_expect_invalid_offset (outcome : Result ResourceError ReadProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-Err InvalidOffset |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-fn rt_expect_invalid_bounds (outcome : Result ResourceError ReadProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-Err InvalidBounds |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-fn rt_expect_write_invalid_offset (outcome : Result ResourceError WriteProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-Err InvalidOffset |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-fn rt_bracket_done
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode =
-  match outcome {
-Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
-Ok bracket |-> host_exit AFull (Failure 51);
-Err error |-> host_exit AFull (Failure 52)
-  }
-
-fn rt_buffer_bracket_done
-  (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode =
-  match outcome {
-Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
-Ok bracket |-> host_exit AFull (Failure 53);
-Err error |-> host_exit AFull (Failure 54)
-  }
-
-fn rt_inner_bracket_result
-  (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-Ok (ResourceBracketOk unit) |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Ok bracket |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-fn rt_allocate_done
-  (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode =
-  match outcome {
-Err InvalidBounds |-> host_exit AFull Success;
-Err error |-> host_exit AFull (Failure 41);
-Ok bracket |-> host_exit AFull (Failure 42)
-  }
-
-proc rt_allocate_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-(withBuffer AFull Unit Unit (sub_int 0 1) rt_body_ok)
-(\outcome. rt_allocate_done outcome)
-
-proc rt_read_offset_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-(readAt AFull file (sub_int 0 1) buffer (MkBufferWindow (0 : Int) (1 : Int)))
-(\outcome. rt_expect_invalid_offset outcome)
-
-proc rt_read_offset_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError (ResourceBracketResult Unit Unit))
-(ResourceBodyResult Unit Unit)
-(withBuffer AFull Unit Unit (1 : Int) (rt_read_offset_body file))
-(\outcome. rt_inner_bracket_result outcome)
-
-proc rt_read_offset_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_read_offset_file)
-(\outcome. rt_bracket_done outcome)
-
-proc rt_read_window_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-(readAt AFull file (0 : Int) buffer
-  (MkBufferWindow (sub_int 0 1) (1 : Int)))
-(\outcome. rt_expect_invalid_bounds outcome)
-
-proc rt_read_window_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError (ResourceBracketResult Unit Unit))
-(ResourceBodyResult Unit Unit)
-(withBuffer AFull Unit Unit (1 : Int) (rt_read_window_body file))
-(\outcome. rt_inner_bracket_result outcome)
-
-proc rt_read_window_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_read_window_file)
-(\outcome. rt_bracket_done outcome)
-
-proc rt_read_norights_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "sink")
-  (ResourceWriteCreate CreateOrTruncate) rt_read_offset_file)
-(\outcome. rt_bracket_done outcome)
-
-proc rt_write_after_read
-  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  (outcome : Result ResourceError ReadProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
-  (writeAt AFull file (sub_int 0 1) buffer span)
-  (\written. rt_expect_write_invalid_offset written);
-Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc rt_write_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-(readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (1 : Int)))
-(\outcome. rt_write_after_read file buffer outcome)
-
-proc rt_write_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError (ResourceBracketResult Unit Unit))
-(ResourceBodyResult Unit Unit)
-(withBuffer AFull Unit Unit (1 : Int) (rt_write_body file))
-(\outcome. rt_inner_bracket_result outcome)
-
-proc rt_write_readonly_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_write_file)
-(\outcome. rt_bracket_done outcome)
-
-fn rt_file_bracket_result
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-Ok (ResourceBracketOk unit) |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Ok bracket |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc rt_write_pair_after
-  (sink : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  (outcome : Result ResourceError ReadProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
-  (writeAt AFull sink (sub_int 0 1) buffer span)
-  (\written. rt_expect_write_invalid_offset written);
-Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-  (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-  (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc rt_write_pair_buffer
-  (source : Resource ResourceKind.FsHandle) (sink : Resource ResourceKind.FsHandle)
-  (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-(readAt AFull source (0 : Int) buffer (MkBufferWindow (0 : Int) (1 : Int)))
-(\outcome. rt_write_pair_after sink buffer outcome)
-
-proc rt_write_pair_sink
-  (source : Resource ResourceKind.FsHandle) (sink : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result ResourceError (ResourceBracketResult Unit Unit))
-(ResourceBodyResult Unit Unit)
-(withBuffer AFull Unit Unit (1 : Int) (rt_write_pair_buffer source sink))
-(\outcome. rt_inner_bracket_result outcome)
-
-proc rt_write_pair_source (cap : Cap AFull) (source : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit))
-(ResourceBodyResult Unit Unit)
-(withResource AFull Unit Unit cap (bytes_encode "sink")
-  (ResourceWriteCreate CreateOrTruncate) (rt_write_pair_sink source))
-(\outcome. rt_file_bracket_result outcome)
-
-proc rt_write_writable_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-(resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-(Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-(withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead (rt_write_pair_source cap))
-(\outcome. rt_bracket_done outcome)
-
-fn rt_cap41_expect_eof (outcome : Result ResourceError ReadProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-  Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-  Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-  Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc rt_cap41_endpoint_buffer
-  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file (0 : Int) buffer
-      (MkBufferWindow (8 : Int) (4 : Int)))
-    (\outcome. rt_cap41_expect_eof outcome)
-
-proc rt_cap41_out_of_range_buffer
-  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file (0 : Int) buffer
-      (MkBufferWindow (9 : Int) (4 : Int)))
-    (\outcome. rt_expect_invalid_bounds outcome)
-
-proc rt_cap41_out_of_range_eof_buffer
-  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file (0 : Int) buffer
-      (MkBufferWindow (9 : Int) (4 : Int)))
-    (\outcome. rt_cap41_expect_eof outcome)
-
-proc rt_cap41_offset_endpoint_buffer
-  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file (sub_int 0 1) buffer
-      (MkBufferWindow (8 : Int) (4 : Int)))
-    (\outcome. rt_expect_invalid_offset outcome)
-
-proc rt_cap41_offset_out_of_range_buffer
-  (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file (sub_int 0 1) buffer
-      (MkBufferWindow (9 : Int) (4 : Int)))
-    (\outcome. rt_expect_invalid_offset outcome)
-
-proc rt_cap41_endpoint_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_endpoint_buffer file))
-    (\outcome. rt_inner_bracket_result outcome)
-
-proc rt_cap41_out_of_range_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_out_of_range_buffer file))
-    (\outcome. rt_inner_bracket_result outcome)
-
-proc rt_cap41_out_of_range_eof_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withBuffer AFull Unit Unit (8 : Int)
-      (rt_cap41_out_of_range_eof_buffer file))
-    (\outcome. rt_inner_bracket_result outcome)
-
-proc rt_cap41_offset_endpoint_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withBuffer AFull Unit Unit (8 : Int) (rt_cap41_offset_endpoint_buffer file))
-    (\outcome. rt_inner_bracket_result outcome)
-
-proc rt_cap41_offset_out_of_range_file (file : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withBuffer AFull Unit Unit (8 : Int)
-      (rt_cap41_offset_out_of_range_buffer file))
-    (\outcome. rt_inner_bracket_result outcome)
-
-proc rt_cap41_endpoint_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-    (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_endpoint_file)
-    (\outcome. rt_bracket_done outcome)
-
-proc rt_cap41_out_of_range_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-    (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_out_of_range_file)
-    (\outcome. rt_bracket_done outcome)
-
-proc rt_cap41_out_of_range_eof_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-    (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_out_of_range_eof_file)
-    (\outcome. rt_bracket_done outcome)
-
-proc rt_cap41_offset_endpoint_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-    (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_offset_endpoint_file)
-    (\outcome. rt_bracket_done outcome)
-
-proc rt_cap41_offset_out_of_range_stage (cap : Cap AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-    (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_offset_out_of_range_file)
-    (\outcome. rt_bracket_done outcome)
-
-fn rt_uint64_checked_bounds_stage (_cap : Cap AFull)
-  : HostIO AFull ExitCode =
-  match intToUInt64 18446744073709551615 {
-  None |-> host_exit AFull (Failure 61);
-  Some bounded |-> match intToUInt64
-      (add_int 18446744073709551615 1) {
-    Some overflow |-> host_exit AFull (Failure 62);
-    None |-> match intToUInt64 (sub_int 0 1) {
-      Some negative |-> host_exit AFull (Failure 63);
-      None |-> host_exit AFull Success
-      }
-    }
-  }
-
-proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match caps {
-MkProgramCaps cap |-> __RT_PARITY_ENTRY__ cap
-  }
-"#;
+const RT_PARITY_SOURCE: &str = include_str!("fixtures/d0_rt_parity_source.ken");
 
 /// One case's differential outcome, used for the exact-variant assertions.
 struct Differential {
@@ -589,52 +137,6 @@ fn operation_events(
         .collect()
 }
 
-// RT-BRACKET-RELEASE-ORDER-PARITY split, shared by EVERY native/interpreter
-// effect-trace parity site. The interpreter and native disagree only on the
-// relative ORDER in which a nested/multi-resource bracket releases its resources
-// (outcome-independent, lives in bracket teardown, pre-existing, tracked as its
-// own node); the spec-correct order is not yet adjudicated, so a parity
-// assertion MUST compare non-release events IN ORDER and release events AS A SET
-// -- never pin a release order to either side. Both `assert_narrowed_alike` and
-// `assert_d1_route_control_child`'s specialized (native-returns) arm route
-// through these two helpers, so the exclusion cannot be applied at one site and
-// missed at the sibling. When RT-BRACKET-RELEASE-ORDER-PARITY fixes the
-// violating executor, delete both helpers and restore the full ordered
-// `effect_trace` equality at every caller.
-fn non_release_events(
-    observation: &ken_runtime::EffectObservation,
-) -> Vec<ken_runtime::EffectEvent> {
-    observation
-        .effect_trace
-        .iter()
-        .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
-        .cloned()
-        .collect()
-}
-
-fn release_set(observation: &ken_runtime::EffectObservation) -> Vec<String> {
-    // Order-insensitive: keyed on the Debug rendering of (resource_bindings,
-    // request, outcome) so no Ord bound is required on the canonical release
-    // payloads. Relative RELEASE ORDER is excluded per the note above.
-    let mut releases = observation
-        .effect_trace
-        .iter()
-        .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
-        .map(|event| {
-            format!(
-                "{:?}",
-                (
-                    event.resource_bindings.clone(),
-                    event.request.clone(),
-                    event.outcome.clone(),
-                )
-            )
-        })
-        .collect::<Vec<_>>();
-    releases.sort();
-    releases
-}
-
 /// Assert both discriminators for one narrowing case.
 ///
 /// `operation` is the consuming host operation whose narrowing rejects the
@@ -662,20 +164,9 @@ fn assert_narrowed_alike(
     );
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
-    // Effect-trace parity with the bracket RELEASE ORDER excluded via the shared
-    // `non_release_events` / `release_set` split (see the helper note above;
-    // RT-BRACKET-RELEASE-ORDER-PARITY). Non-release events must agree in order;
-    // releases must agree as a set.
     assert_eq!(
-        non_release_events(&native),
-        non_release_events(&interpreted),
-        "{case}: complete ordered NON-release effects, requests, outcomes, and resource provenance must agree",
-    );
-    assert_eq!(
-        release_set(&native),
-        release_set(&interpreted),
-        "{case}: the SET of bracket releases (resources, requests, outcomes) must agree across \
-         executors; their relative ORDER is excluded here per RT-BRACKET-RELEASE-ORDER-PARITY",
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: complete ordered host effects, releases, requests, outcomes and provenance",
     );
     assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,
@@ -729,7 +220,7 @@ fn assert_narrowed_alike(
 ///
 /// Promise class: durable invariant. MEASURED: the fixture's sole successful
 /// branch is `Ok ReadEof`; both engines exit successfully without a terminal
-/// error, agree on non-release and release traces, and record no `FsReadAt`.
+/// error, agree on the complete ordered trace, and record no `FsReadAt`.
 /// CLAIMED: a valid endpoint window yields `ReadEof` without visiting the host.
 /// THE GAP: the internal `ReadProgress` is observed through the fixture's exact
 /// branch-to-exit discriminator rather than as a public effect event.
@@ -749,14 +240,8 @@ fn assert_read_eof_alike(case: &str, result: &Differential) {
     assert_eq!(interpreted.terminal_error, None, "{case}: interpreter");
     assert_eq!(native.terminal_error, None, "{case}: native");
     assert_eq!(
-        non_release_events(native),
-        non_release_events(interpreted),
-        "{case}: ordered non-release effects must agree"
-    );
-    assert_eq!(
-        release_set(native),
-        release_set(interpreted),
-        "{case}: release sets must agree"
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: complete ordered host effects and releases must agree"
     );
     assert_eq!(
         interpreted.terminal_exit, native.terminal_exit,
@@ -1052,12 +537,9 @@ fn fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness() {
             invalid_bounds.native.terminal_exit
         );
         assert_eq!(
-            non_release_events(&invalid_bounds.native),
-            non_release_events(&invalid_bounds.interpreted)
-        );
-        assert_eq!(
-            release_set(&invalid_bounds.native),
-            release_set(&invalid_bounds.interpreted)
+            invalid_bounds.native.effect_trace,
+            invalid_bounds.interpreted.effect_trace,
+            "out-of-bounds complete ordered trace"
         );
         assert!(
             operation_events(&invalid_bounds.interpreted, ken_runtime::HostOpV1::FsReadAt)
@@ -1086,12 +568,9 @@ fn fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness() {
             rejected.native.terminal_exit
         );
         assert_eq!(
-            non_release_events(&rejected.native),
-            non_release_events(&rejected.interpreted)
-        );
-        assert_eq!(
-            release_set(&rejected.native),
-            release_set(&rejected.interpreted)
+            rejected.native.effect_trace,
+            rejected.interpreted.effect_trace,
+            "ReadEof-refusal complete ordered trace"
         );
         assert!(
             operation_events(&rejected.interpreted, ken_runtime::HostOpV1::FsReadAt).is_empty()
@@ -1585,36 +1064,118 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
+type StaticResponseMarkedKey = (u32, String);
+type StaticResponseMarkedKeys = std::collections::BTreeSet<StaticResponseMarkedKey>;
+
+/// Classify marked-S members omitted by the post-strip protocol projection.
+/// Owner relay exclusion can erase the same post observation as the strip, so
+/// only the non-relay, owner-surviving cases are direct strip evidence.
+fn classify_marked_returned_vis_strips(
+    diagnostic: &ken_runtime::StaticResponseFeasibilityDiagnostic,
+    marked_keys: &StaticResponseMarkedKeys,
+) -> (StaticResponseMarkedKeys, StaticResponseMarkedKeys) {
+    let mut post_members_by_owner = std::collections::BTreeMap::new();
+    for (owner, members) in &diagnostic.settled_returned_vis_protocols {
+        let previous = post_members_by_owner.insert(
+            *owner,
+            members
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>(),
+        );
+        assert!(previous.is_none(), "duplicate post-strip owner {owner}");
+    }
+
+    let mut observed = std::collections::BTreeSet::new();
+    let mut inferred = std::collections::BTreeSet::new();
+    for protocol in &diagnostic.returned_vis_protocols {
+        for (_, members) in &protocol.contexts {
+            for member in members {
+                let matches = marked_keys
+                    .iter()
+                    .filter(|key| key.0 == member.origin)
+                    .collect::<Vec<_>>();
+                if matches.is_empty() {
+                    continue;
+                }
+                if post_members_by_owner
+                    .get(&protocol.owner_origin)
+                    .is_some_and(|post_members| post_members.contains(&member.origin))
+                {
+                    continue;
+                }
+                assert_eq!(
+                    matches.len(),
+                    1,
+                    "each removed marked-S member must join exactly one key: \
+                     owner={}, member={}, matches={matches:?}",
+                    protocol.owner_origin,
+                    member.origin
+                );
+                let key = (*matches[0]).clone();
+                let is_observed = !member.relay
+                    && (!protocol.excluded_by_relay
+                        || post_members_by_owner.contains_key(&protocol.owner_origin));
+                if is_observed {
+                    assert!(
+                        !inferred.contains(&key),
+                        "marked key has both observed and inferred strip evidence: {key:?}"
+                    );
+                    observed.insert(key);
+                } else {
+                    assert!(
+                        !observed.contains(&key),
+                        "marked key has both observed and inferred strip evidence: {key:?}"
+                    );
+                    inferred.insert(key);
+                }
+            }
+        }
+    }
+    (observed, inferred)
+}
+
 /// **Promise class: transition sentinel.** A reviewed graph change may replace
 /// these dense coordinates, but must replace the complete response-producer
 /// ledger and retain one fully validated context demand per singleton K row.
 ///
-/// **MEASURED:** the read product has four response rows and the write product
-/// has seven. Their earlier `FsReadAt` rows require new contexts while the later
-/// `BufferAllocate` rows reuse causal context zero; every row has one exact
-/// owner ABI and selected caller.
-/// **CLAIMED:** absence from the old-caller context population is a demand, not
-/// SSA infeasibility. Every fixed row has one explicit capture/input schema and
-/// resolves by `(ContinuationSpecializationId, worker body)` after old context
-/// identities are preserved as the union prefix.
-/// **THE GAP:** this fixture observes planning and ABI identity. Finished owner
-/// body, exact context-call/Ret closure, and runtime InvalidOffset behavior are
-/// independently pinned below. Runtime closure remains unselected.
+/// **MEASURED:** the fixed products retain one exact owner ABI and selected
+/// caller per response row. The read product has no Deferred
+/// `UnconsumedTransportCaller` rows; its former P2 population is represented by
+/// distinct marked `(S, Continuation identity)` rows partitioned between the
+/// returned-Vis removal class and forward-Ret settlement. The read removal is
+/// INFERRED because its owner is relay-excluded and absent post-strip. The write
+/// product still has no Deferred rows.
+/// **CLAIMED:** the former P2 population belongs in the marked Continuation
+/// plane, not ordinary Deferred execution. Every fixed row has one explicit
+/// capture/input schema and resolves by `(ContinuationSpecializationId, worker
+/// body)` after old context identities are preserved as the union prefix.
+/// **THE GAP:** because the read removal is INFERRED, its absence is also
+/// consistent with relay exclusion, so this row does not directly observe the
+/// strip consumer. `returned_bracket_settlement -> None` fails closed at
+/// packaging before this row, not as a row-redden. Finished owner body, exact
+/// context-call/Ret closure, and runtime InvalidOffset behavior are independently
+/// pinned below. Removing marking fails closed in `validate_direct_rebuild`,
+/// and routing a marked row back to demands fails in
+/// `validate_marked_bracket_demands`; neither counterfactual reaches this row's
+/// assertions; marking removal is not row-mutated.
 #[test]
 fn static_response_context_demand_ledger_closes_fixed_products() {
     in_generated_entry_stack_thread("rt-parity-static-response-demand", || {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("static-response-demand-{label}"));
-            let (result, diagnostics) =
-                ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        &format!("rt_parity_static_response_demand_{label}"),
-                        root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
+            let ((result, diagnostics), role_rows) =
+                ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                    ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_static_response_demand_{label}"),
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
                 });
             result.expect("the fixed response-demand product must compile");
             assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
@@ -1698,38 +1259,95 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
                 }
                 assert!(owner.frame_bytes > 0);
             }
-            diagnostic
+            (diagnostic, role_rows)
         };
 
-        let read = compile("read", "rt_read_offset_stage");
-        let write = compile("write", "rt_write_writable_stage");
-        // Structural totality for both products. The pure read plane retains its
-        // P2 transport sources so inc1's forward-Ret path remains live. The
-        // read-then-write plane has two producer groups whose transport sources
-        // are exclusively predeclared, so execute-then-resume specializes every
-        // has-K transport source. Each
-        // Specialized row owns one forward declaration, without baked ids/counts.
+        let (read, read_roles) = compile("read", "rt_read_offset_stage");
+        let (write, _) = compile("write", "rt_write_writable_stage");
+        // Structural totality for both products. The former read P2 population
+        // belongs to marked Continuation regions, while the eligible write plane
+        // specializes its transport sources. Each Specialized row owns one
+        // forward declaration, without baked ids or counts.
         for diagnostic in [&read, &write] {
             assert!(
                 !diagnostic.all_static_response_rows.is_empty(),
                 "each fixed product specializes at least one response"
             );
         }
+        let deferred_read_p2 = read
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.sub_case == "UnconsumedTransportCaller")
+            .collect::<Vec<_>>();
         assert!(
-            !read.static_response_deferred.is_empty()
-                && read
-                    .static_response_deferred
-                    .iter()
-                    .all(|row| row.sub_case == "UnconsumedTransportCaller"),
-            "the single-stage read plane must retain only P2: {:?}",
-            read.static_response_deferred
+            deferred_read_p2.is_empty(),
+            "read UnconsumedTransportCaller rows must be in the marked plane: \
+             {deferred_read_p2:?}"
         );
+
         assert!(
             read.static_response_deferred
                 .iter()
                 .all(|row| row.handler_owner.is_none()),
             "a P1-free plane acquired handler-owned Deferred execution: {:?}",
             read.static_response_deferred
+        );
+
+        let marked_rows = &read.bracket_response_rows;
+        let marked_keys = marked_rows
+            .iter()
+            .map(|row| (row.vis_origin, row.k_identity.clone()))
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            marked_keys.len() == marked_rows.len() && marked_keys.len() >= 2,
+            "read marked rows need at least two distinct (S, identity) keys: \
+             {marked_rows:?}"
+        );
+
+        let (observed_strip_keys, inferred_strip_keys) =
+            classify_marked_returned_vis_strips(&read, &marked_keys);
+        assert!(
+            observed_strip_keys.is_disjoint(&inferred_strip_keys),
+            "a marked key cannot have both observed and inferred strip evidence"
+        );
+        let strip_keys = observed_strip_keys
+            .union(&inferred_strip_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut settled_keys = std::collections::BTreeSet::new();
+        for outcome in read_roles
+            .iter()
+            .filter(|row| row.outcome == "ConsumedBySettlement")
+        {
+            let matches = marked_keys
+                .iter()
+                .filter(|key| key.1.as_str() == outcome.selected_source_call_identity.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                matches.len(),
+                1,
+                "each ConsumedBySettlement identity must join exactly one marked key: \
+                 outcome={outcome:?}, matches={matches:?}"
+            );
+            settled_keys.insert((*matches[0]).clone());
+        }
+        assert!(
+            !strip_keys.is_empty() && !settled_keys.is_empty(),
+            "both returned-Vis stripping and forward-Ret settlement must consume \
+             marked regions: strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        assert!(
+            strip_keys.is_disjoint(&settled_keys),
+            "a marked region has both strip and forward-Ret consumers: \
+             strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        let consumed_keys = strip_keys
+            .union(&settled_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            consumed_keys, marked_keys,
+            "strip and ConsumedBySettlement must partition marked regions"
         );
         assert!(
             write.static_response_deferred.is_empty(),
@@ -1934,13 +1552,18 @@ static_response_context_demand_test!(
 // retains every capture/input coordinate in exact order. MEASURED: row
 // drop/duplicate/vary, K-key merge, three response-authority substitutions, and
 // independent drop/permute/vary of every fixed READ and WRITE capture/input each
-// reach the closed demand validator and red; the fixed ledgers also contain
-// shared producers whose distinct K callers remain distinct, and the eligible
-// write plane selects distinct owners for them. CLAIMED:
-// context interning cannot launder a malformed producer/K row or an incomplete
-// explicit input run. THE GAP: exact duplicate context demand reuse is separately
-// pinned by static_response_context_demand_duplicate_is_idempotent; these
-// controls move producer rows and each element of their typed population instead.
+// reach the closed demand validator and red; the read's former P2 fan-out is
+// measured through distinct Continuation identities in marked bracket rows,
+// not Deferred rows; the write's former fan-out is measured in that same marked
+// plane, while ordinary Specialized rows have no shared-producer group. The
+// write's removed marked-S members are INFERRED because their owners are
+// relay-excluded and absent post-strip; this is a strip-evidence GAP.
+// CLAIMED: the former P2 read and write populations belong to the marked
+// Continuation plane; context interning cannot launder a malformed producer/K row or an
+// incomplete explicit input run. THE GAP: exact duplicate context demand reuse
+// is separately pinned by static_response_context_demand_duplicate_is_idempotent;
+// these controls move producer rows and each element of their typed population
+// instead.
 
 // DRY compile step for the decomposed full-demand controls -- a macro (not a fn)
 // so the build/diagnostic return types stay inferred at each call site, as in the
@@ -1965,90 +1588,170 @@ macro_rules! full_demand_compile {
 #[test]
 fn static_response_full_demand_fan_out_population_is_distinct() {
     in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
-        // The shared-producer fan-out remains affine across both dispositions.
-        // The pure read plane retains P2; the eligible write plane specializes
-        // the same shape to distinct owners. Producers are selected structurally,
-        // never by baked native ids.
+        // The former P2 fan-out now resides in marked bracket rows for both
+        // products; ordinary write rows no longer carry a shared-producer group.
+        // The write strip partition retains INFERRED members as a disclosed GAP,
+        // not as direct evidence that the bracket strip alone removed them.
+        // Producers are selected structurally, never by baked native ids.
         let (read_root, (read_result, read)) =
             full_demand_compile!("rt_read_offset_stage", "baseline");
         read_result.expect("the exact READ response population compiles");
-        let (write_root, (write_result, write)) =
-            full_demand_compile!("rt_write_writable_stage", "baseline");
+        let ((write_root, (write_result, write)), write_roles) =
+            ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                full_demand_compile!("rt_write_writable_stage", "baseline")
+            });
         write_result.expect("the exact WRITE response population compiles");
         assert_eq!(read.len(), 1);
         assert_eq!(write.len(), 1);
 
-        let mut read_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+        let read_regions = &read[0].bracket_response_rows;
+        let read_identities = read_regions
+            .iter()
+            .map(|row| row.k_identity.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            read_regions.len() >= 2,
+            "pure read has fewer than two marked bracket regions: {read_regions:?}"
+        );
+        assert_eq!(
+            read_identities.len(),
+            read_regions.len(),
+            "read marked regions must have pairwise-distinct Continuation identities: \
+             {read_regions:?}"
+        );
+
+        let write_deferred_p2 = write[0]
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.sub_case == "UnconsumedTransportCaller")
+            .collect::<Vec<_>>();
+        assert!(
+            write_deferred_p2.is_empty(),
+            "write UnconsumedTransportCaller rows must be in the marked plane: \
+             {write_deferred_p2:?}"
+        );
+
+        let marked_rows = &write[0].bracket_response_rows;
+        let marked_keys = marked_rows
+            .iter()
+            .map(|row| (row.vis_origin, row.k_identity.clone()))
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            marked_keys.len() == marked_rows.len() && marked_keys.len() >= 2,
+            "write marked rows need at least two distinct (S, identity) keys: \
+             {marked_rows:?}"
+        );
+        let marked_origins = marked_rows
+            .iter()
+            .map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        let settlement_origins = write[0]
+            .bracket_settlement_vis_origins
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            marked_origins, settlement_origins,
+            "write marked-row origins must equal bracket settlement origins"
+        );
+
+        let mut ordinary_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
             std::collections::BTreeMap::new();
-        for row in &read[0].static_response_deferred {
-            read_by_producer
+        for row in &write[0].all_static_response_rows {
+            ordinary_by_producer
                 .entry(row.producer_call_origin)
                 .or_default()
                 .push(row);
         }
-        let read_fan_outs = read_by_producer
+        let ordinary_fan_outs = ordinary_by_producer
             .iter()
             .filter(|(_, rows)| rows.len() >= 2)
             .collect::<Vec<_>>();
         assert!(
-            !read_fan_outs.is_empty(),
-            "pure read has no shared-producer P2 fan-out: {:?}",
-            read[0].static_response_deferred
+            ordinary_fan_outs.is_empty(),
+            "ordinary write plane retains a shared-producer fan-out: \
+             {ordinary_fan_outs:?}"
         );
-        for (producer, fan_out) in read_fan_outs {
+
+        let mut marked_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for row in marked_rows {
+            marked_by_producer
+                .entry(row.producer_call_origin)
+                .or_default()
+                .push(row);
+        }
+        let marked_fan_outs = marked_by_producer
+            .iter()
+            .filter(|(_, rows)| rows.len() >= 2)
+            .collect::<Vec<_>>();
+        assert!(
+            !marked_fan_outs.is_empty(),
+            "eligible write has no shared-producer marked-row fan-out: {marked_rows:?}"
+        );
+        for (producer, fan_out) in marked_fan_outs {
+            let keys = fan_out
+                .iter()
+                .map(|row| (row.vis_origin, row.k_identity.as_str()))
+                .collect::<std::collections::BTreeSet<_>>();
             assert_eq!(
-                fan_out
-                    .iter()
-                    .map(|row| row.vis_origin)
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
+                keys.len(),
                 fan_out.len(),
-                "read producer {producer} merged distinct K into one P2 row"
-            );
-            assert!(
-                fan_out
-                    .iter()
-                    .all(|row| row.sub_case == "UnconsumedTransportCaller")
+                "write marked producer {producer} merged distinct (S, identity) keys"
             );
         }
 
-        let mut write_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
-            std::collections::BTreeMap::new();
-        for row in &write[0].all_static_response_rows {
-            write_by_producer
-                .entry(row.producer_call_origin)
-                .or_default()
-                .push(row);
-        }
-        let write_fan_outs = write_by_producer
-            .iter()
-            .filter(|(_, rows)| rows.len() >= 2)
-            .collect::<Vec<_>>();
+        let (observed_strip_keys, inferred_strip_keys) =
+            classify_marked_returned_vis_strips(&write[0], &marked_keys);
         assert!(
-            !write_fan_outs.is_empty(),
-            "eligible write has no shared-producer Specialized fan-out: {:?}",
-            write[0].all_static_response_rows
+            observed_strip_keys.is_disjoint(&inferred_strip_keys),
+            "a marked key cannot have both observed and inferred strip evidence"
         );
-        for (producer, fan_out) in write_fan_outs {
+        assert!(
+            observed_strip_keys.is_empty(),
+            "write strip members are INFERRED because their owners are relay-excluded: \
+             observed={observed_strip_keys:?}, inferred={inferred_strip_keys:?}"
+        );
+        let strip_keys = observed_strip_keys
+            .union(&inferred_strip_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+
+        let mut settled_keys = std::collections::BTreeSet::new();
+        for outcome in write_roles
+            .iter()
+            .filter(|row| row.outcome == "ConsumedBySettlement")
+        {
+            let matches = marked_keys
+                .iter()
+                .filter(|key| key.1.as_str() == outcome.selected_source_call_identity.as_str())
+                .collect::<Vec<_>>();
             assert_eq!(
-                fan_out
-                    .iter()
-                    .map(|row| row.vis_origin)
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
-                fan_out.len(),
-                "write producer {producer} merged distinct K into one response row"
+                matches.len(),
+                1,
+                "each ConsumedBySettlement identity must join exactly one marked key: \
+                 outcome={outcome:?}, matches={matches:?}"
             );
-            assert_eq!(
-                fan_out
-                    .iter()
-                    .map(|row| row.k_identity.as_str())
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
-                fan_out.len(),
-                "write producer {producer} merged distinct K identities"
-            );
+            settled_keys.insert((*matches[0]).clone());
         }
+        assert!(
+            !strip_keys.is_empty() && !settled_keys.is_empty(),
+            "both returned-Vis stripping and forward-Ret settlement must consume \
+             marked regions: strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        assert!(
+            strip_keys.is_disjoint(&settled_keys),
+            "a marked region has both strip and forward-Ret consumers: \
+             strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        let consumed_keys = strip_keys
+            .union(&settled_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            consumed_keys, marked_keys,
+            "strip and ConsumedBySettlement must partition write marked regions"
+        );
         drop((write_root, read_root));
     });
 }
@@ -2064,6 +1767,22 @@ fn full_demand_producer_k_control(
         .expect("READ response-grid executable bytes");
     let read_hash = read_result.artifact.executable_hash;
     assert_eq!(read.len(), 1);
+    if label == "merge-k" {
+        let bracket = &read[0].bracket_response_rows;
+        assert_eq!(bracket.len(), 2, "both moved K rows remain plane-bound");
+        let vis = bracket.iter().map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(vis.len(), 2, "the bracket K rows have distinct source Vis identities");
+        assert_eq!(vis, read[0].bracket_settlement_vis_origins.iter()
+            .copied().collect(), "the moved rows belong to authenticated S regions");
+        assert!(bracket.iter().all(|row| row.operation == "ResourceRelease"));
+        assert_eq!(bracket.iter().map(|row| row.producer_call_origin)
+            .collect::<std::collections::BTreeSet<_>>().len(), 1,
+            "the two bracket K rows share one producer");
+        assert_eq!(bracket.iter().map(|row| row.k_identity.as_str())
+            .collect::<std::collections::BTreeSet<_>>().len(), 2,
+            "the shared producer retains distinct K identities");
+    }
 
     let ((_root, (result, diagnostics)), applications) =
         ken_runtime::with_static_response_context_demand_mutation(mutation, || {
@@ -3533,20 +3252,83 @@ macro_rules! generated_entry_split_checked_case {
     };
 }
 
+// Promise class: transition sentinel. MEASURED: all three D1 marker producers
+// in the child's complete settlement-delimited log. CLAIMED: only authenticated
+// Vis 745 accounts for the temporarily reached read-route producers. THE GAP:
+// these are compile-time producer events, not executed cross-engine semantics;
+// the child's separate differential test guards denotation. The settlement
+// forward edge retires this base-path footprint, not the ordinary D1 controls.
+fn assert_d1_settlement_footprint(
+    stderr: &str,
+    mode: &str,
+    control: Option<&str>,
+    recursor: Option<&str>,
+) {
+    use std::collections::BTreeMap;
+
+    const CONSUMED_PREFIX: &str = "RT_BRACKET_SETTLEMENT_CONSUMED_TAIL ";
+    const RECURSOR_PREFIX: &str = "RT_ITREE_D1_RECURSOR_APPLIED ";
+    const CONTROL_PREFIX: &str = "RT_ITREE_D1_CONTROL_APPLIED ";
+    let consumed = "RT_BRACKET_SETTLEMENT_CONSUMED_TAIL settlement=1 construct=745";
+    assert!(stderr.contains("RT_D1_AUTHENTICATED_SETTLEMENT_VIS=745"),
+        "{mode}: the D1 child's diagnostic did not authenticate Vis 745: {stderr}");
+    let mut footprint = BTreeMap::<String, usize>::new();
+    if let Some(recursor) = recursor {
+        footprint.insert(format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor} frame=1"), 16);
+    }
+    if let Some(control) = control {
+        let edge = if mode == "ordinary-read" { "initial" } else { "active" };
+        footprint.insert(format!(
+            "RT_ITREE_D1_CONTROL_APPLIED mode={control} frame=1 edge={edge}"
+        ), 16);
+    }
+    let mut segments = vec![BTreeMap::<String, usize>::new()];
+    let mut actual_non_consumed = BTreeMap::<String, usize>::new();
+    for line in stderr.lines().filter(|line| {
+        line.starts_with(CONSUMED_PREFIX)
+            || line.starts_with(RECURSOR_PREFIX)
+            || line.starts_with(CONTROL_PREFIX)
+    }) {
+        if line.starts_with(CONSUMED_PREFIX) {
+            assert_eq!(line, consumed, "{mode}: unauthenticated D1 settlement");
+            segments.push(BTreeMap::new());
+        } else {
+            *actual_non_consumed.entry(line.to_owned()).or_default() += 1;
+        }
+        *segments.last_mut().expect("segment zero exists")
+            .entry(line.to_owned()).or_default() += 1;
+    }
+    // (a) Consumed count + authenticated construct; (b) every complete segment.
+    assert_eq!(segments.len(), 17, "{mode}: exactly sixteen settlement tails");
+    assert!(segments[0].is_empty(), "{mode}: segment zero is ordinary d26");
+    let mut expected_segment = BTreeMap::from([(consumed.to_owned(), 1usize)]);
+    for line in footprint.keys() {
+        expected_segment.insert(line.clone(), 1);
+    }
+    for (index, segment) in segments.iter().enumerate().skip(1) {
+        assert_eq!(*segment, expected_segment,
+            "{mode}: complete segment {index} does not match its measured multiset");
+    }
+    // (c) Subtract the full measured counterfactual delta and pin the ordinary
+    // D1 population at its d26 empty multiset, not just one marker's absence.
+    for (line, count) in footprint {
+        assert_eq!(actual_non_consumed.remove(&line), Some(count),
+            "{mode}: the counterfactual footprint member changed: {line}");
+    }
+    assert!(actual_non_consumed.is_empty(),
+        "{mode}: non-footprint producer events changed: {actual_non_consumed:?}");
+}
+
 macro_rules! d1_route_case {
     // `$specialized_tie`: None for a LIVE route whose runtime frame-1 route-control
     // producer is still emitted (unspecialized -- e.g. the write route); the
     // producer-reached assertion (APPLIED/RECURSOR_APPLIED) stays. Some(tie) for a
-    // read route whose runtime producer is ELIMINATED by the D3 static forward-edge
-    // specialization (evt_2427xbynt1d2e): there is no runtime word left to perturb,
-    // so the producer-reached assertion is RETIRED-WITH-TIE (Architect evt_2tfjhm4ybxgkk).
-    // The tie is not a silent delete: (1) the child still runs and its body's
-    // native==interpreter parity (the specialized `_` arm) proves the DENOTATION,
-    // asserted via child success below; (2) we POSITIVELY assert the runtime producer
-    // is inert (no APPLIED marker), so if a future change un-specializes the read the
-    // marker reappears and THIS test re-reddens -- a transition sentinel, not a gap;
-    // (3) `$specialized_tie` documents the static coverage that replaces the guarded
-    // runtime-route failure (which cannot occur once the route is static).
+    // read route whose ordinary runtime producer is ELIMINATED by D3's static
+    // forward edge (evt_2427xbynt1d2e). Retired for ordinary checked IH;
+    // reachable only as the base-path footprint of a settlement-consumed tail
+    // until the settlement forward-edge follow-up (evt_2jmz10nnvq3zd).
+    // This transition sentinel checks exact authenticated sequence attribution
+    // when the recursor producer is reached, while child parity guards denotation.
     ($name:ident, $mode:literal, $control:expr, $recursor:expr, $specialized_tie:expr) => {
         #[test]
         fn $name() {
@@ -3576,8 +3358,7 @@ macro_rules! d1_route_case {
                     if let Some(recursor) = recursor { assert!(stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")), "{}: the recursor-route mutation did not reach its real producer: {}", $mode, stderr); }
                 }
                 Some(_tie) => {
-                    if let Some(control) = control { assert!(!stderr.contains(&format!("RT_ITREE_D1_CONTROL_APPLIED mode={control}")), "{}: the runtime route-control producer is expected ELIMINATED by the D3 static forward-edge specialization (retired-with-tie), but it reached a producer -- the tie no longer holds, reopen this mode: {}", $mode, stderr); }
-                    if let Some(recursor) = recursor { assert!(!stderr.contains(&format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor}")), "{}: the runtime recursor-route producer is expected ELIMINATED by the D3 static forward-edge specialization (retired-with-tie), but it reached a producer -- the tie no longer holds, reopen this mode: {}", $mode, stderr); }
+                    assert_d1_settlement_footprint(&stderr, $mode, control, recursor);
                 }
             }
         }
@@ -4249,22 +4030,100 @@ fn assert_execute_then_resume_rekey_child() {
     let mode = std::env::var(EXECUTE_THEN_RESUME_REKEY_CHILD)
         .expect("execute-then-resume rekey child mode");
     if mode == "outer-carried" {
-        let (built, residual_counters) = ken_runtime::with_residual_lowering_counters(|| {
-            ken_runtime::with_suppressed_execute_then_resume_response(
-                build_write_stage_for_materialization_control,
-            )
-        });
+        let (((built, residual_counters), diagnostics), sequence) =
+            ken_runtime::with_settlement_footprint_sequence(|| {
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_runtime::with_residual_lowering_counters(|| {
+                        ken_runtime::with_suppressed_execute_then_resume_response(
+                            build_write_stage_for_materialization_control,
+                        )
+                    })
+                })
+            });
         built.expect("ETR-only suppression still lowers the residual");
+        assert_eq!(diagnostics.len(), 1, "one write response plan authenticates the Tail");
+        use ken_runtime::SettlementFootprintEvent as Event;
+        use std::collections::BTreeMap;
+        let authenticated = &diagnostics[0].bracket_settlement_vis_origins;
+        if std::env::var_os("RT_FOOTPRINT_DETERMINISM").is_some() {
+            eprintln!("RT_SETTLEMENT_FOOTPRINT_SEQUENCE {sequence:?}");
+        }
+        let consumed = Event::Consumed { settlement: 2, construct: 983 };
+        let arrival = |origin| Event::ResidualArrival { origin };
+        let route = |origin| Event::Route1 { origin, route1: true };
+        let mut segments = vec![BTreeMap::<Event, usize>::new()];
+        let mut non_consumed = BTreeMap::<Event, usize>::new();
+        let mut arrivals = 0;
+        for &event in &sequence {
+            if let Event::Consumed { construct, .. } = event {
+                assert_eq!(event, consumed, "only settlement 2 may own the capsule Tail");
+                assert!(authenticated.contains(&construct),
+                    "capsule Tail Vis {construct} was not authenticated by its response plan");
+                segments.push(BTreeMap::new());
+            } else {
+                *non_consumed.entry(event).or_default() += 1;
+            }
+            if matches!(event, Event::ResidualArrival { .. }) { arrivals += 1; }
+            *segments.last_mut().expect("segment zero exists").entry(event).or_default() += 1;
+        }
+        // Promise class: transition sentinel. MEASURED: the complete four-kind
+        // source-lowering sequence, not a projection to site-A or its adjacency.
+        // CLAIMED: every consumed Tail is authenticated, each settlement segment
+        // has the measured members, and subtracting the complete M-2' delta
+        // leaves the exact ordinary population (the RA subset is d26).
+        // THE GAP: compiler lowering order is not runtime execution; the future
+        // settlement forward edge deliberately retires this temporary footprint.
+        // (a) Authenticate the exact eight settlement delimited segments.
+        assert_eq!(segments.len(), 9, "eight authenticated capsule Tail consumptions");
+        // (b) Exact per-segment multisets. Ordinary entries are kept even when
+        // interleaved inside an authenticated segment; no log event is filtered.
+        assert_eq!(segments[0], BTreeMap::from([(route(1278), 1)]),
+            "capsule segment zero must equal its ordinary prefix");
+        for (index, segment) in segments.iter().enumerate().skip(1) {
+            let mut expected = BTreeMap::from([
+                (consumed, 1), (arrival(771), 1), (route(1286), 1),
+            ]);
+            match index {
+                1 | 5 => {
+                    expected.insert(route(1277), 1);
+                    expected.insert(route(1278), 1);
+                }
+                2 | 3 | 6 | 7 => { expected.insert(route(1278), 1); }
+                4 => {
+                    expected.insert(arrival(994), 1);
+                    expected.insert(route(1278), 1);
+                }
+                8 => {
+                    expected.insert(arrival(548), 2);
+                    expected.insert(route(1308), 2);
+                }
+                _ => unreachable!("exactly eight authenticated segments"),
+            }
+            assert_eq!(*segment, expected,
+                "capsule segment {index} changed from its full measured multiset");
+        }
+        // (c) F is the WHOLE measured M-2' delta, not just the site-A slice:
+        // eight RA771 and eight Route1(1286,true) disappear under classification
+        // fallthrough; the 15-entry remainder equals the counterfactual log.
+        for footprint in [arrival(771), route(1286)] {
+            assert_eq!(non_consumed.remove(&footprint), Some(8),
+                "capsule measured footprint member changed: {footprint:?}");
+        }
+        let ordinary = BTreeMap::from([
+            (arrival(548), 2), (arrival(994), 1),
+            (route(1277), 2), (route(1278), 8), (route(1308), 2),
+        ]);
+        assert_eq!(non_consumed, ordinary,
+            "all non-footprint capsule entries must equal the complete M-2' population");
+        let ordinary_site_a = non_consumed.iter().filter_map(|(event, count)| {
+            if let Event::ResidualArrival { origin } = event { Some((*origin, *count)) }
+            else { None }
+        }).collect::<BTreeMap<_, _>>();
+        assert_eq!(ordinary_site_a, BTreeMap::from([(548, 2), (994, 1)]),
+            "ordinary site-A arrivals must independently reproduce d26");
         eprintln!("RT_RESIDUAL_LOWERING_COUNTERS {residual_counters:?}");
-        // Promise class: transition sentinel. Three source-constructor R
-        // arrivals currently require K fields. A changed count reopens the
-        // G533-to-G355 Ret, closure523 capture and S6 Match514 review; the
-        // I-1 ABI-kind issuance review retires or revalidates this sentinel.
-        // It does not prove every constructor store has this representation.
-        assert_eq!(
-            residual_counters.site_a_none_arrivals, 3,
-            "id41's issued R arrivals must decode at ordinary constructor fields"
-        );
+        assert_eq!(arrivals, residual_counters.site_a_none_arrivals,
+            "the sequence must include every counter arrival");
         assert!(
             ken_runtime::suppressed_execute_then_resume_response_is_exact(),
             "materialization suppression did not restore"
@@ -4596,17 +4455,21 @@ fn composed_return_ret_sink_population_is_unique() {
         let compile = |case: &str, entry: &str, label: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("composed-return-ret-sink-{label}"));
-            let (artifact, observations, applications) =
+            let (((artifact, plan_rows), diagnostics), observations, applications) =
                 ken_runtime::with_composed_return_ret_sink_mutation(
                     ken_runtime::ComposedReturnRetSinkMutation::Exact,
                     || {
-                        ken_cli::build_native_program(
-                            &source,
-                            ken_cli::SourceFormat::Ken,
-                            &format!("rt_parity_composed_return_ret_sink_{label}"),
-                            root.path(),
-                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                        )
+                        ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                            ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    &format!("rt_parity_composed_return_ret_sink_{label}"),
+                                    root.path(),
+                                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                                )
+                            })
+                        })
                     },
                 );
             artifact.expect("the exact D1 sink population compiles");
@@ -4619,7 +4482,7 @@ fn composed_return_ret_sink_population_is_unique() {
                 observations.len() > 1,
                 "{case}: the fixture must instantiate more than one sink: {observations:#?}"
             );
-            observations
+            (observations, plan_rows, diagnostics)
         };
 
         let read = compile("fs-read-at-offset-single", "rt_read_offset_stage", "read");
@@ -4628,9 +4491,32 @@ fn composed_return_ret_sink_population_is_unique() {
             "rt_write_writable_stage",
             "write",
         );
-        for (label, observations, expected_semantic_count) in
-            [("read", read, 3), ("write", write, 6)]
-        {
+        // Exact d26 ordinary members + the authenticated settled Ret bodies.
+        let expected_read = [(12, 343, 0), (350, 524, 0), (529, 564, 0), (750, 817, 0)];
+        let expected_write = [
+            (25, 356, 0), (363, 537, 0), (542, 577, 0), (584, 760, 0),
+            (765, 800, 0), (806, 983, 0), (988, 1136, 0),
+        ];
+        for (label, (observations, plan_rows, diagnostics), expected, settled) in [
+            ("read", read, expected_read.as_slice(), (745, 350, 524)),
+            ("write", write, expected_write.as_slice(), (983, 584, 760)),
+        ] {
+            let (vis, frame, body) = settled;
+            assert!(diagnostics.iter().any(|plan|
+                plan.bracket_settlement_vis_origins.contains(&vis)),
+                "{label}: the response plan did not authenticate settled Vis {vis}");
+            assert!(plan_rows.iter().flat_map(|row| &row.forward_ret_coordinates)
+                .any(|coordinate| {
+                    coordinate.source_call_identity.contains(&format!(
+                        "producer_construct_origin: StaticOriginId({vis})"))
+                        && coordinate.entry_binding.contains(&format!(
+                            "frame_origin: StaticOriginId({frame}),"))
+                }),
+                "{label}: settled Vis {vis} does not bind the sink's frame {frame}");
+            assert!(observations.iter().any(|row|
+                parse_static_origin_id(&row.active_frame_origin) == frame
+                    && parse_static_origin_id(&row.ret_case_body_origin) == body),
+                "{label}: authenticated frame {frame} has no Ret sink at {body}");
             let semantic_coordinates = observations
                 .iter()
                 .map(|row| {
@@ -4641,11 +4527,10 @@ fn composed_return_ret_sink_population_is_unique() {
                     )
                 })
                 .collect::<std::collections::BTreeSet<_>>();
-            assert_eq!(
-                semantic_coordinates.len(),
-                expected_semantic_count,
-                "{label}: the fixed semantic sink cardinality changed"
-            );
+            assert_eq!(semantic_coordinates,
+                expected.iter().copied().collect::<std::collections::BTreeSet<_>>(),
+                "{label}: exact d26 ordinary and authenticated settled sink members changed");
+            let expected_semantic_count = expected.len();
             assert!(
                 semantic_coordinates
                     .iter()
@@ -4861,43 +4746,124 @@ fn composed_return_ret_sink_is_byte_inert() {
     });
 }
 
+fn forward_ret_source_construct(identity: &str) -> u32 {
+    identity.split_once("producer_construct_origin: StaticOriginId(")
+        .and_then(|(_, tail)| tail.split_once(')'))
+        .unwrap_or_else(|| panic!("forward-Ret proof lacks a construct: {identity}"))
+        .0.parse().expect("numeric forward-Ret source construct")
+}
+
+fn assert_forward_ret_consumption_partition(
+    planned_coordinates: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
+    planned_reaches: usize,
+    formed: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
+    settled: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
+    edge_authorities: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
+    authenticated_vis: impl IntoIterator<Item = u32>,
+    label: &str,
+) {
+    let planned = planned_coordinates
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let formed = formed.into_iter().collect::<Vec<_>>();
+    let settled = settled.into_iter().collect::<Vec<_>>();
+    let edges = edge_authorities.into_iter().collect::<Vec<_>>();
+    let formed_set = formed
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let settled_set = settled
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let edge_set = edges
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let constructs = |coordinates: &std::collections::BTreeSet<_>| {
+        coordinates.iter().map(|coordinate: &ken_runtime::ComposedReturnForwardRetCoordinateObservation|
+            forward_ret_source_construct(&coordinate.source_call_identity))
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    let (ordinary, consumed) = if label.contains("read") { (856, 745) }
+        else if label.contains("write") { (1300, 983) }
+        else { panic!("unregistered fixed forward-Ret fixture {label}") };
+    assert_eq!(constructs(&planned), [ordinary, consumed].into_iter().collect(),
+        "{label}: exact ordinary and settled planned source members changed");
+    assert_eq!(constructs(&formed_set), [ordinary].into_iter().collect(),
+        "{label}: only the ordinary planned source may form a forward edge");
+    assert_eq!(constructs(&settled_set), [consumed].into_iter().collect(),
+        "{label}: the moved read/write Vis must be consumed by settlement");
+    assert!(authenticated_vis.into_iter().any(|vis| vis == consumed),
+        "{label}: the response plan did not authenticate settled Vis {consumed}");
+
+    assert!(!formed.is_empty(), "{label}: no formed forward-Ret edge");
+    assert_eq!(
+        formed.len(),
+        edges.len(),
+        "{label}: formed outcome multiplicity changed"
+    );
+    assert_eq!(
+        formed_set, edge_set,
+        "{label}: formed outcomes and edge authorities differ"
+    );
+    assert!(
+        formed_set.is_disjoint(&settled_set),
+        "{label}: one planned proof has both Formed and ConsumedBySettlement outcomes"
+    );
+    assert_eq!(
+        formed.len() + settled.len(),
+        planned_reaches,
+        "{label}: each reached plan proof must yield exactly one consumer outcome"
+    );
+    assert_eq!(
+        planned,
+        formed_set.union(&settled_set).cloned().collect(),
+        "{label}: every reached plan proof must be consumed as Formed or ConsumedBySettlement"
+    );
+}
+
 /// **Promise class: durable invariant.**
 ///
-/// **MEASURED:** D3 consumes the post-selection authority as a live forward SSA
-/// edge, so exact authority formation and complete suppression emit the SAME
-/// upstream plan (transport hash) and SAME core semantic hash but DIFFERENT
-/// executable bytes; every exact observation still names forward,
-/// producer-result-direct delivery to field zero of one compiler-local Ret block.
-/// **CLAIMED:** the authority is now load-bearing at codegen (forming vs
-/// suppressing it changes the emitted code), and the change is confined to
-/// codegen -- no spec, kernel, ABI, wire, or semantic-plan change accompanies it
-/// (AC-NO-BOUNDARY-REOPEN: the edge is compiler state, not a runtime lane).
-/// **THE GAP:** this differential isolates that the forward edge is emitted and
-/// that its effect is codegen-only; the population and role-witness controls
-/// establish the authority's coordinate identity, and the durable
-/// `fs_*_narrows` products below establish the executed behavior.
+/// **MEASURED:** the exact read fixture's planned forward-Ret proofs partition
+/// into emitted `Formed` edge authorities and `ConsumedBySettlement` outcomes;
+/// every formed edge observation names forward, producer-result-direct delivery
+/// to field zero of one compiler-local Ret block. Suppressing the emitted edge
+/// preserves the upstream plan and core semantic hash but changes executable
+/// bytes.
+/// **CLAIMED:** each planned proof is accounted for exactly once, and forming
+/// versus suppressing the one emitted edge changes codegen output without a
+/// spec, kernel, ABI, wire, or semantic-plan change.
+/// **THE GAP:** this build-only differential establishes emission and the
+/// proof-consumption partition, not runtime reachability of an emitted edge.
 #[test]
-fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
-    in_large_stack_thread("rt-parity-forward-ret-authority-live", || {
+fn composed_return_forward_ret_proof_consumption_partition_is_exact() {
+    in_large_stack_thread("rt-parity-forward-ret-proof-partition", || {
         use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
 
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-        let exact_root = output_dir("forward-ret-authority-live-exact");
-        let suppressed_root = output_dir("forward-ret-authority-live-suppressed");
-        let (exact, exact_rows, exact_applications) =
+        let exact_root = output_dir("forward-ret-proof-partition-exact");
+        let suppressed_root = output_dir("forward-ret-proof-partition-suppressed");
+        let ((((exact, exact_plan_rows), diagnostics), exact_role_rows), exact_rows, exact_applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::Exact,
                 || {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_authority_live",
-                        exact_root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
+                    ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                        ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                            ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                                ken_cli::build_native_program(
+                                    &source,
+                                    ken_cli::SourceFormat::Ken,
+                                    "rt_parity_forward_ret_proof_partition",
+                                    exact_root.path(),
+                                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                                )
+                            })
+                        })
+                    })
                 },
             );
-        let exact = exact.expect("exact D3 forward-Ret authority artifact");
+        let exact = exact.expect("exact D3 forward-Ret partition artifact");
         let (suppressed, suppressed_rows, suppressed_applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::SuppressForInertness,
@@ -4905,37 +4871,82 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
                     ken_cli::build_native_program(
                         &source,
                         ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_authority_live",
+                        "rt_parity_forward_ret_proof_partition",
                         suppressed_root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 },
             );
-        let suppressed = suppressed.expect("suppressed D3 forward-Ret authority artifact");
+        let suppressed = suppressed.expect("suppressed D3 forward-Ret partition artifact");
 
         assert!(
             !exact_rows.is_empty(),
-            "the real Tail authority population must reach"
+            "the real forward-Ret proof population must reach"
         );
         assert!(suppressed_rows.is_empty());
-        assert_eq!(exact_applications, exact_rows.len());
+        assert!(
+            exact_role_rows
+                .iter()
+                .all(|row| match row.outcome.as_str() {
+                    "Formed" | "ConsumedBySettlement" => row.formed_coordinate.is_some(),
+                    _ => row.formed_coordinate.is_none(),
+                }),
+            "the exact read fixture must classify every proof-bearing role row"
+        );
+        assert!(
+            exact_role_rows
+                .iter()
+                .any(|row| row.outcome == "ConsumedBySettlement"),
+            "the exact read fixture must reach the bracket-settlement consumer"
+        );
+        let exact_planned_rows = exact_plan_rows
+            .iter()
+            .filter(|row| {
+                row.installed && row.reached_count > 0 && !row.forward_ret_coordinates.is_empty()
+            })
+            .collect::<Vec<_>>();
+        let exact_planned_reaches = exact_planned_rows
+            .iter()
+            .map(|row| row.reached_count)
+            .sum::<usize>();
+        assert_forward_ret_consumption_partition(
+            exact_planned_rows
+                .iter()
+                .flat_map(|row| row.forward_ret_coordinates.iter().cloned()),
+            exact_planned_reaches,
+            exact_role_rows
+                .iter()
+                .filter(|row| row.outcome == "Formed")
+                .map(|row| {
+                    row.formed_coordinate
+                        .clone()
+                        .expect("a Formed outcome must carry its proof coordinate")
+                }),
+            exact_role_rows
+                .iter()
+                .filter(|row| row.outcome == "ConsumedBySettlement")
+                .map(|row| {
+                    row.formed_coordinate
+                        .clone()
+                        .expect("a settlement outcome must carry its proof coordinate")
+                }),
+            exact_rows.iter().map(|row| row.coordinate.clone()),
+            diagnostics.iter().flat_map(|plan| plan.bracket_settlement_vis_origins.iter().copied()),
+            "exact read fixture",
+        );
         // (A) ruling evt_h0vgd11g5xfb: formation is unnarrowed, so the read
-        // program's successful-path effect Tail also forms. In the EXACT build the
-        // forward edge delivers the answer and short-circuits, bypassing EXACTLY
-        // ONE continuation -- that effect Tail -- which the SuppressForInertness
-        // collapse still lowers; so suppressed builds exactly one more plan-proof
-        // application than exact. That -1 is the SIGNATURE of a LIVE forward edge:
-        // a bare `<=` would also pass if the edge went dead (exact == 0), so pin
-        // both the exact relationship and the presence of the forward-edge
-        // application in exact.
+        // program's successful-path effect Tail also forms. The suppressed build
+        // lowers that continuation and records exactly one more plan-proof
+        // application. This is a compiler-build observation, not evidence that an
+        // emitted edge is dynamically reached.
         assert!(
             exact_applications >= 1,
-            "the forward-edge application must be present in exact (edge liveness)"
+            "the exact build must include the formed edge application"
         );
         assert_eq!(
             suppressed_applications,
             exact_applications + 1,
-            "the forward edge must bypass exactly one continuation (the successful-path effect Tail the SuppressForInertness collapse still lowers)"
+            "suppression must add exactly one plan-proof application for the successful-path effect Tail"
         );
         assert!(exact_rows.iter().all(|row| {
             row.coordinate
@@ -4972,17 +4983,17 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
 
 /// **Promise class: durable invariant.**
 ///
-/// **MEASURED:** at the actual consumer call, every formed authority pairs the
-/// current C/admission and selected I with the same `(I,E,S)` coordinate that
-/// the independent planner and authority observers report; E's existing
-/// capsule row is installed and reached, and at least one real row has C != E.
-/// **CLAIMED:** current consumer call C and certificate entry E have distinct
-/// roles, while exact whole-transport selection I causally joins C to the real
-/// planned and reached `(E,S)` certificate without storing I in access.
+/// **MEASURED:** every planned forward-Ret proof has exactly one
+/// `Formed`-edge or `ConsumedBySettlement` outcome. Each formed authority pairs
+/// the current C/admission and selected I with the same `(I,E,S)` coordinate
+/// that the independent planner reports; E's capsule row is installed and
+/// reached, and at least one real row has C != E.
+/// **CLAIMED:** no planned proof is dropped or consumed twice, while each
+/// formed authority keeps the distinct roles of consumer call C, selected I,
+/// and certificate entry E.
 /// **THE GAP:** the role witness is observation-only and cannot license
 /// authority; existing production equality/member/source/projection/sink gates
-/// remain the enforcement, while the paired witness prevents their coordinates
-/// from being misdescribed as one call again.
+/// remain the enforcement.
 #[test]
 fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
     in_large_stack_thread("rt-parity-forward-ret-role-witness", || {
@@ -4991,31 +5002,28 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("forward-ret-role-witness-{label}"));
-            let (((result, plan_rows), role_rows), authorities, applications) =
+            let ((((result, plan_rows), diagnostics), role_rows), authorities, _applications) =
                 ken_runtime::with_composed_return_forward_ret_authority_mutation(
                     Mutation::Exact,
                     || {
                         ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
-                            ken_runtime::with_checked_ih_generated_entry_observations(|| {
-                                ken_cli::build_native_program(
-                                    &source,
-                                    ken_cli::SourceFormat::Ken,
-                                    &format!("rt_parity_forward_ret_role_witness_{label}"),
-                                    root.path(),
-                                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                                )
+                            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                                ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                                    ken_cli::build_native_program(
+                                        &source,
+                                        ken_cli::SourceFormat::Ken,
+                                        &format!("rt_parity_forward_ret_role_witness_{label}"),
+                                        root.path(),
+                                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                                    )
+                                })
                             })
                         })
                     },
                 );
             result.expect("the exact C/I/E/S role witness fixture must compile");
             assert!(!authorities.is_empty(), "{label}: no authority formed");
-            assert_eq!(applications, authorities.len());
 
-            let planned = plan_rows
-                .iter()
-                .flat_map(|row| row.forward_ret_coordinates.iter().cloned())
-                .collect::<std::collections::BTreeSet<_>>();
             let formed = authorities
                 .iter()
                 .map(|row| row.coordinate.clone())
@@ -5043,18 +5051,53 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
                     coordinate
                 })
                 .collect::<std::collections::BTreeSet<_>>();
-            assert_eq!(planned, formed, "{label}: planned/formed Tail set changed");
-            assert_eq!(
-                formed, paired,
-                "{label}: formed authority lacks one C/I/E/S row"
+            assert!(
+                role_rows.iter().all(|row| match row.outcome.as_str() {
+                    "Formed" | "ConsumedBySettlement" => row.formed_coordinate.is_some(),
+                    _ => row.formed_coordinate.is_none(),
+                }),
+                "{label}: every proof-bearing role row must be Formed or ConsumedBySettlement"
             );
-            assert_eq!(
+            let reached_plan_rows = plan_rows
+                .iter()
+                .filter(|row| {
+                    row.installed
+                        && row.reached_count > 0
+                        && !row.forward_ret_coordinates.is_empty()
+                })
+                .collect::<Vec<_>>();
+            let planned_reaches = reached_plan_rows
+                .iter()
+                .map(|row| row.reached_count)
+                .sum::<usize>();
+            assert_forward_ret_consumption_partition(
+                reached_plan_rows
+                    .iter()
+                    .flat_map(|row| row.forward_ret_coordinates.iter().cloned()),
+                planned_reaches,
                 role_rows
                     .iter()
                     .filter(|row| row.outcome == "Formed")
-                    .count(),
-                authorities.len(),
-                "{label}: paired rows and formed authorities differ in multiplicity"
+                    .map(|row| {
+                        row.formed_coordinate
+                            .clone()
+                            .expect("a Formed outcome must carry its proof coordinate")
+                    }),
+                role_rows
+                    .iter()
+                    .filter(|row| row.outcome == "ConsumedBySettlement")
+                    .map(|row| {
+                        row.formed_coordinate
+                            .clone()
+                            .expect("a settlement outcome must carry its proof coordinate")
+                    }),
+                authorities.iter().map(|row| row.coordinate.clone()),
+                diagnostics.iter().flat_map(|plan| plan.bracket_settlement_vis_origins.iter().copied()),
+                label,
+            );
+            assert_eq!(
+                formed, paired,
+                "{label}: formed authority lacks one C/I/E/S row"
             );
             assert!(
                 role_rows.iter().any(|row| {
@@ -5153,8 +5196,8 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
         };
 
         // The pure read narrowing: every formed Tail route is a value-returning
-        // tail -> collapsible (the guard's positive arm; also bracketed by
-        // forward_ret_edge_substituted_word_reds staying GREEN).
+        // tail -> collapsible (the guard's positive arm). The retired edge-mutation
+        // rows did not establish runtime reachability.
         let read = determine("read", "rt_read_offset_stage");
         assert!(
             read.values().all(|(collapsible, body_purities)| {
@@ -5195,16 +5238,16 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
 
 /// **Promise class: durable invariant.**
 ///
-/// **MEASURED:** the complete set of real planned Tail coordinates equals the
-/// unique set of formed post-selection authorities across disjoint read and
-/// write fixtures; removing each Tail member or duplicating one makes the
-/// unchanged source consumer refuse before call emission.
-/// **CLAIMED:** every validated Tail producer-to-Ret route forms exactly one
-/// move-only authority, while Direct and non-governed routes form none.
+/// **MEASURED:** each fixed fixture has exact planned source members: one
+/// ordinary formed edge and one authenticated settlement-consumed Tail. The
+/// formed-source removal at index 0 and duplicate mutation both refuse; index
+/// 1 is inert because the consumed Tail bypasses their hook.
+/// **CLAIMED:** no planned Tail proof disappears or forms a second edge into a
+/// bracket settlement; an ordinary missing or duplicate authority fails closed.
 /// **THE GAP:** plan and authority observations come from independent sides of
-/// the consumer join; exact set equality closes pairing, per-source removal
-/// proves no member may fail open, and duplication separately closes
-/// multiplicity rather than relying on set equality.
+/// the consumer join. Removal probes only the ordinary reached source, while
+/// role-witness and the M-2' counterfactual establish the settled arm; the
+/// remaining historical stripes must not be counted as mutation witnesses.
 // K=4 was selected from the current baseline: local stripe runs measured
 // 43.3-89.7s against the post-split indivisible-test floor of about 280s.
 const FORWARD_RET_REMOVAL_STRIPES: usize = 4;
@@ -5222,16 +5265,18 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
     let compile = |label: &str, mutation: Mutation, entry: &str| {
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
         let root = output_dir(&format!("forward-ret-authority-population-{label}"));
-        let ((result, plan_rows), formed, applications) =
+        let (((result, plan_rows), diagnostics), formed, applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
-                ken_runtime::with_checked_ih_generated_entry_observations(|| {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        &format!("rt_parity_forward_ret_authority_population_{label}"),
-                        root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_forward_ret_authority_population_{label}"),
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
                 })
             });
         let expected = plan_rows
@@ -5242,40 +5287,60 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             .iter()
             .map(|row| row.coordinate.clone())
             .collect::<Vec<_>>();
+        if mutation == Mutation::Exact && result.is_ok() {
+            let planned = expected.iter().map(|row|
+                forward_ret_source_construct(&row.source_call_identity))
+                .collect::<std::collections::BTreeSet<_>>();
+            let formed = actual.iter().map(|row|
+                forward_ret_source_construct(&row.source_call_identity))
+                .collect::<std::collections::BTreeSet<_>>();
+            let (ordinary, consumed) = if label.starts_with("read") { (856, 745) }
+                else { (1300, 983) };
+            assert_eq!(planned, [ordinary, consumed].into_iter().collect(),
+                "{label}: exact planned ordinary and settled forward-Ret members changed");
+            assert_eq!(formed, [ordinary].into_iter().collect(),
+                "{label}: only the ordinary proof may form an edge");
+            assert!(diagnostics.iter().any(|plan|
+                plan.bracket_settlement_vis_origins.contains(&consumed)),
+                "{label}: moved Vis {consumed} lacks authenticated settlement");
+        }
         (root, result, expected, actual, applications)
     };
     macro_rules! validate_removal {
-        ($side:literal, $target:expr, $expected:expr, $expected_set:expr, $entry:literal) => {{
+        ($side:literal, $target:expr, $expected:expr, $actual:expr, $applications:expr, $entry:literal) => {{
             let target = $target;
             let (_root, result, removed_expected, removed_actual, applications) = compile(
                 &format!("{}-remove-{target}", $side),
                 Mutation::RemoveTailAuthorityAt(target),
                 $entry,
             );
-            let error = result.expect_err("one missing Tail authority must refuse");
-            assert!(
-                format!("{error:?}").contains(
-                    "validated Tail producer-to-Ret route has no exact post-selection authority"
-                ),
-                "{} removal {target} reached the wrong refusal: {error:?}",
-                $side
-            );
             assert_eq!(removed_expected.as_slice(), $expected.as_slice());
-            assert_eq!(applications, removed_actual.len() + 1);
-            let removed_set = removed_actual
-                .iter()
-                .cloned()
-                .collect::<std::collections::BTreeSet<_>>();
-            assert!(
-                removed_set.is_subset($expected_set) && removed_set != *$expected_set,
-                "{} removal {target} did not remove one real planned coordinate",
-                $side
-            );
-            assert!(
-                ken_runtime::composed_return_forward_ret_authority_mutation_is_exact(),
-                "{} removal {target} did not restore its scoped mutation",
-                $side
-            );
+            if target == 0 {
+                // The mutation indexes *reachable formed* sources. With the
+                // settled proof consumed before its hook, only index 0 exists.
+                let error = result.expect_err("one missing ordinary Tail authority must refuse");
+                assert!(format!("{error:?}").contains(
+                    "validated Tail producer-to-Ret route has no exact post-selection authority"),
+                    "{} removal {target} reached the wrong refusal: {error:?}", $side);
+                assert!(applications > 0 && applications < $applications,
+                    "{} removal did not interrupt real proof consumption", $side);
+                let exact_set = $actual.iter().cloned().collect::<std::collections::BTreeSet<_>>();
+                let removed_set = removed_actual.iter().cloned()
+                    .collect::<std::collections::BTreeSet<_>>();
+                assert!(removed_set.is_subset(&exact_set) && removed_set != exact_set,
+                    "{} removal did not take the one ordinary authority", $side);
+            } else {
+                // The other planned member is settlement-consumed ahead of the
+                // formed-source mutation hook. Index 1 must remain inert, not
+                // be falsely counted as a tested missing-authority refusal.
+                result.expect("the settled-only index cannot remove a formed authority");
+                assert_eq!(removed_actual.as_slice(), $actual.as_slice(),
+                    "{}: index {target} unexpectedly mutated a formed authority", $side);
+                assert_eq!(applications, $applications,
+                    "{}: settled-only index changed proof consumption", $side);
+            }
+            assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact(),
+                "{} removal {target} did not restore its scoped mutation", $side);
         }};
     }
 
@@ -5301,8 +5366,13 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
                 expected_set.len(),
                 "the real planned Tail population must be unique"
             );
-            assert_eq!(expected_set, actual_set);
-            assert_eq!(exact_applications, actual.len());
+            assert_eq!(actual_set.iter().map(|row|
+                forward_ret_source_construct(&row.source_call_identity))
+                .collect::<std::collections::BTreeSet<_>>(),
+                [856].into_iter().collect(),
+                "read: the moved Vis 745 must not form an ordinary edge");
+            assert!(exact_applications > actual.len(),
+                "read: settlement-consumed reaches remain in the plan count");
             assert!(
                 expected.iter().all(|coordinate| (
                     &coordinate.entry_binding,
@@ -5333,15 +5403,20 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
                 .collect::<std::collections::BTreeSet<_>>();
             assert!(write_expected_set.len() > 1);
             assert_eq!(write_expected.len(), write_expected_set.len());
-            assert_eq!(write_expected_set, write_actual_set);
-            assert_eq!(write_applications, write_actual.len());
+            assert_eq!(write_actual_set.iter().map(|row|
+                forward_ret_source_construct(&row.source_call_identity))
+                .collect::<std::collections::BTreeSet<_>>(),
+                [1300].into_iter().collect(),
+                "write: the moved Vis 983 must not form an ordinary edge");
+            assert!(write_applications > write_actual.len(),
+                "write: settlement-consumed reaches remain in the plan count");
             assert_eq!(
                 expected_set.union(&write_expected_set).count(),
                 expected_set.len() + write_expected_set.len(),
                 "read and write fixtures must cover disjoint Tail coordinates"
             );
 
-            let duplicate_target = expected.len() / 2;
+            let duplicate_target = 0; // the only reached formed-source index
             let (_duplicate_root, result, duplicate_expected, duplicated, applications) = compile(
                 "read-duplicate",
                 Mutation::DuplicateTailAuthorityAt(duplicate_target),
@@ -5350,7 +5425,8 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             let error = result.expect_err("one duplicated Tail authority must refuse");
             assert!(format!("{error:?}").contains("validated Tail producer-to-Ret route formed more than one post-selection authority"), "duplication reached the wrong refusal: {error:?}");
             assert_eq!(duplicate_expected, expected);
-            assert_eq!(applications, duplicated.len());
+            assert!(applications > duplicated.len(),
+                "settled proof reaches remain counted even on duplicate refusal");
             let [.., penultimate, last] = duplicated.as_slice() else {
                 panic!("the duplication control formed fewer than two authorities");
             };
@@ -5361,7 +5437,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
         }
         ForwardRetPopulationArm::ReadRemoval(stripe) => {
-            let (_root, exact, expected, _actual, _applications) =
+            let (_root, exact, expected, actual, exact_applications) =
                 compile("read-exact", Mutation::Exact, "rt_read_offset_stage");
             exact.expect("the exact read-side Tail population must compile");
             let expected_set = expected
@@ -5373,16 +5449,13 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
                 (0..expected.len()).filter(|target| target % FORWARD_RET_REMOVAL_STRIPES == stripe)
             {
                 validate_removal!(
-                    "read",
-                    target,
-                    &expected,
-                    &expected_set,
+                    "read", target, &expected, &actual, exact_applications,
                     "rt_read_offset_stage"
                 );
             }
         }
         ForwardRetPopulationArm::WriteRemoval(stripe) => {
-            let (_root, exact, expected, _actual, _applications) =
+            let (_root, exact, expected, actual, exact_applications) =
                 compile("write-exact", Mutation::Exact, "rt_write_writable_stage");
             exact.expect("the exact write-side Tail population must compile");
             let expected_set = expected
@@ -5394,10 +5467,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
                 (0..expected.len()).filter(|target| target % FORWARD_RET_REMOVAL_STRIPES == stripe)
             {
                 validate_removal!(
-                    "write",
-                    target,
-                    &expected,
-                    &expected_set,
+                    "write", target, &expected, &actual, exact_applications,
                     "rt_write_writable_stage"
                 );
             }
@@ -5862,10 +5932,20 @@ fn assert_d1_route_control_child() {
         ),
         other => panic!("unknown D1 route-control child mode: {other}"),
     };
-    let Differential {
+    let (Differential {
         native,
         interpreted,
-    } = differential(case, entry);
+    }, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        differential(case, entry)
+    });
+    if matches!(mode.as_str(),
+        "drop-read" | "unknown-read" | "ordinary-read" | "direct-read" | "misroute-direct-read")
+    {
+        assert!(diagnostics.iter().any(|plan|
+            plan.bracket_settlement_vis_origins.contains(&745)),
+            "the D1 child's authenticated read settlement must contain Vis 745");
+        eprintln!("RT_D1_AUTHENTICATED_SETTLEMENT_VIS=745");
+    }
     // Relocation (Architect re-rule evt_2427xbynt1d2e, Q2). SSA response
     // specialization statically supersedes the runtime route control for the
     // routes it specializes, so a runtime route-control perturbation of a
@@ -5915,23 +5995,9 @@ fn assert_d1_route_control_child() {
                 native.exit_status, interpreted.exit_status,
                 "{mode}: specialized-route native/interpreter exit parity"
             );
-            // RT-BRACKET-RELEASE-ORDER-PARITY: this specialized (native-returns)
-            // route now reaches a full effect-trace compare for the first time
-            // (base trapped here), so it hits the same pre-existing bracket
-            // release-order divergence that `assert_narrowed_alike` already
-            // excludes. Apply the identical split via the shared helpers: every
-            // NON-release event must agree IN ORDER; the releases must agree AS A
-            // SET, their relative order excluded. When the violating executor is
-            // fixed, restore the full ordered `effect_trace` equality here.
             assert_eq!(
-                non_release_events(&native),
-                non_release_events(&interpreted),
-                "{mode}: specialized-route native/interpreter complete ordered NON-release effects must agree",
-            );
-            assert_eq!(
-                release_set(&native),
-                release_set(&interpreted),
-                "{mode}: specialized-route the SET of bracket releases must agree; relative ORDER excluded per RT-BRACKET-RELEASE-ORDER-PARITY",
+                native.effect_trace, interpreted.effect_trace,
+                "{mode}: specialized-route native/interpreter complete ordered effects",
             );
         }
     }
@@ -5953,8 +6019,10 @@ fn assert_d1_route_control_child() {
 // the READ route STATICALLY, so the runtime frame-1 route-control word these read
 // modes perturb is ELIMINATED -- there is no runtime producer left to reach, and the
 // wrong-runtime-route failure they guarded CANNOT OCCUR. Each read mode's producer-
-// reached assertion is therefore retired (Some(tie), which POSITIVELY asserts the
-// producer is inert -- a sentinel that re-reddens if the read is ever un-specialized).
+// reached assertion is a transition sentinel: retired for ordinary checked IH;
+// reachable only as the base-path footprint of a settlement-consumed tail until
+// the settlement forward-edge follow-up. The sequence checker re-reddens for
+// ordinary applications or when that planned edge retires this footprint.
 // Per-mode coverage transfer (nothing silently vanished):
 //   - DENOTATION, every mode: the child body's specialized-route native==interpreter
 //     parity (assert_d1_route_control_child `_` arm), asserted via child success.
@@ -6207,146 +6275,13 @@ fn suppressing_both_materialization_authorities_refuses_at_the_relay_edge() {
     });
 }
 
-// -- D3 forward-SSA-edge causal controls ---------------------------------
+// -- D3 forward-SSA-edge mutation controls retired -----------------------
 //
-// Each runs the read-offset durable product under ONE compile-time mutation of
-// the governed Tail closeout and asserts native no longer cleanly observes
-// InvalidOffset, while the interpreter -- untouched by a cranelift-only mutation
-// -- still does. The divergence is the causal evidence that the exact forward
-// SSA edge carrying the exact Trap-checked Result, and only it, produces the
-// durable product. The twice-closeout (DuplicateTailAuthorityAt) and
-// missing-authority (RemoveTailAuthorityAt) refusals are separately closed by
-// `composed_return_forward_ret_authority_population_is_exact` above.
-
-/// Run the read-offset differential under one forward-Ret authority mutation and
-/// assert native fails the fixture's own axis-1 green condition (exit 0 with no
-/// terminal error) while the interpreter still meets it.
-fn assert_forward_ret_authority_control_reds(
-    mutation: ken_runtime::ComposedReturnForwardRetAuthorityMutation,
-) {
-    let (
-        Differential {
-            interpreted,
-            native,
-        },
-        _rows,
-        _applications,
-    ) = ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
-        differential("fs-read-at-offset-single", "rt_read_offset_stage")
-    });
-    assert_eq!(
-        interpreted.exit_status, 0,
-        "{mutation:?}: the interpreter still observes InvalidOffset (cranelift-only mutation): {interpreted:?}"
-    );
-    assert_eq!(
-        interpreted.terminal_error, None,
-        "{mutation:?}: interpreter"
-    );
-    assert!(
-        native.exit_status != 0 || native.terminal_error.is_some(),
-        "{mutation:?}: native must NOT cleanly observe InvalidOffset -- only the exact forward edge delivers the product: {native:?}"
-    );
-}
-
-/// **Promise class: durable invariant.** AC-EXACT-ONCE (zero-closeout): suppress
-/// the authority and the governed Tail reverts to the source-machine answer
-/// collapse, so native reddens on the base ResourceBodyResult trap. The causal
-/// pair of `fs_read_at_malformed_offset_narrows_to_invalid_offset`.
-#[test]
-fn forward_ret_edge_suppressed_reverts_to_collapse() {
-    in_large_stack_thread("rt-parity-forward-ret-suppressed", || {
-        assert_forward_ret_authority_control_reds(
-            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
-        );
-    });
-}
-
-/// **Promise class: durable invariant.** AC-CAUSAL-PAIR (b): keep the edge and
-/// the sink but carry an independent non-result word, so the exact Trap-checked
-/// Result no longer reaches the exit -- separating result identity from producer
-/// existence and binding, which the suppress control (no edge at all) and the
-/// population control (which authority) hold fixed.
-///
-/// Under (A) (evt_h0vgd11g5xfb) the read program's successful-path effect Tail
-/// takes the base `call_tail -> Continue` path, so a corrupted edge word
-/// manifests as an `UnclassifiedRuntimeTrap` rather than a clean captured red.
-/// The mutant is still KILLED; this pins the exact green->trap FLIP (the
-/// unmutated edge runs clean, `SubstituteForwardEdgeWord` traps) and CATCHES the
-/// trap rather than relying on a panicking differential helper. The edge word is
-/// compiler-produced and never attacker-controlled, so the trap is unreachable
-/// in unmutated production and no runtime guard is warranted.
-#[test]
-fn forward_ret_edge_substituted_word_reds() {
-    in_large_stack_thread("rt-parity-forward-ret-substituted", || {
-        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
-
-        // Build + run the read fixture's native artifact under `mutation`,
-        // returning the run Result so a corrupted-edge trap is CAUGHT here, not
-        // panicked through the differential helper.
-        fn run_native(
-            mutation: Mutation,
-        ) -> Result<ken_runtime::EffectObservation, ken_runtime::NativeEffectRunErrorV1> {
-            // The mutation wrapper returns (closure_result, authority_rows,
-            // applications); only the run Result is needed here.
-            let (run_result, _rows, _applications) =
-                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
-                    let root = output_dir(&format!("forward-ret-substituted-{mutation:?}"));
-                    std::fs::write(root.path().join("source"), b"ab").unwrap();
-                    let source =
-                        RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-                    let output = ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_substituted",
-                        root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
-                    .expect("the substituted-edge control reaches linked native lowering");
-                    ken_runtime::run_bound_process_effect_observation(
-                        &output.artifact,
-                        &ken_runtime::NativeEffectRunOptionsV1 {
-                            arguments: Vec::new(),
-                            environment: Vec::new(),
-                            cwd: root.path().to_owned(),
-                            plan_hash: output.plan_transport_hash,
-                        },
-                    )
-                });
-            run_result
-        }
-
-        // Unmutated: the compiler-produced edge delivers the Trap-checked Result,
-        // so native cleanly observes InvalidOffset (exit 0, no trap) -- GREEN.
-        let unmutated =
-            run_native(Mutation::Exact).expect("the unmutated forward edge runs cleanly");
-        assert_eq!(
-            unmutated.exit_status, 0,
-            "unmutated: native cleanly observes InvalidOffset via the forward edge: {unmutated:?}"
-        );
-        assert_eq!(
-            unmutated.terminal_error, None,
-            "unmutated: native must not trap"
-        );
-
-        // SubstituteForwardEdgeWord: the edge carries an independent non-result
-        // word, so the Trap-checked Result never reaches the exit and native
-        // TRAPS. The green->trap flip is the mutant-kill for "the edge word
-        // matters"; pin the exact trap, do not accept "any non-green".
-        match run_native(Mutation::SubstituteForwardEdgeWord) {
-            Err(ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap {
-                terminal_value,
-            }) => {
-                assert_eq!(
-                    terminal_value, -1,
-                    "SubstituteForwardEdgeWord: native traps with terminal value -1"
-                );
-            }
-            other => panic!(
-                "SubstituteForwardEdgeWord must flip the clean edge to UnclassifiedRuntimeTrap {{ terminal_value: -1 }}; got {other:?}"
-            ),
-        }
-    });
-}
+// The former `forward_ret_edge_*` rows could mutate only a formed forward edge.
+// A's bracket settlement is live (the user96 trap) but returns before those
+// edge mutations; B's emitted edge has no observed live consumer on these
+// fixtures. These controls therefore have no live edge-consumer discriminator.
+// Do not retarget them to B or count a settlement hit as an edge mutation.
 
 // -- BufferFreeze --------------------------------------------------------
 

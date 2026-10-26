@@ -219,9 +219,10 @@ pub(in crate::cranelift_backend) struct PlannedContinuationContext {
     pub(super) enclosing_specialization: ContinuationSpecializationId,
     /// The raw worker body lowered inside this context.
     pub(super) worker_body_origin: StaticOriginId,
-    /// ⚠ **PROVENANCE ONLY.** The predeclared unit the worker body textually
-    /// belongs to. Retained so a reader can see which raw body this context
-    /// executes; it confers no emission authority — that is the whole point.
+    /// The predeclared unit the worker body textually belongs to. It can
+    /// enumerate the context's Parameter members only after the worker and raw
+    /// closure provenance are certified against one another; it never confers
+    /// emission authority on the context.
     pub(super) raw_owner: PredeclaredFunctionId,
     /// Raw declared arity + raw capture count: the context's `Parameter` run.
     pub(super) parameters: u32,
@@ -6973,6 +6974,103 @@ pub(super) fn generated_context_parameters(
         .ok_or_else(|| planner_capacity_error("generated context parameter run exhausted"))
 }
 
+/// Certify each Parameter member of a context against the raw closure's entry
+/// run and the specialization worker that actually supplies its operands.
+/// The context remains the emitting frame; its raw owner grants no authority.
+pub(super) fn generated_context_parameter_members(
+    plan: &StaticTransitionPlan<'_>,
+    units: &[PlannedContinuationSpecialization],
+    context: &PlannedContinuationContext,
+) -> Result<Vec<ContinuationSourceCoordinate>, CraneliftBackendError> {
+    let unit = units
+        .get(context.enclosing_specialization.0 as usize)
+        .ok_or_else(|| planner_error("a generated context names a specialization that was never interned"))?;
+    let worker = &unit.key.worker;
+    if worker.body_origin != context.worker_body_origin {
+        return Err(planner_error(
+            "a generated context's worker body is not its specialization's worker",
+        ));
+    }
+    let descriptor = plan
+        .abi
+        .descriptors
+        .iter()
+        .find(|descriptor| descriptor.function == context.raw_owner)
+        .ok_or_else(|| planner_error("a generated context's raw owner has no ABI descriptor"))?;
+    let defining_origin = match descriptor.definition {
+        AbiUnitDefinition::ClosureBody { defining_origin, .. }
+        | AbiUnitDefinition::CallableDeclaration {
+            declaration_origin: defining_origin,
+            ..
+        } => defining_origin,
+        _ => return Err(planner_error(
+            "a generated context's raw owner is not closure-shaped, so its entry run cannot enumerate the context's parameter run",
+        )),
+    };
+    let body = occurrence_authority(plan, defining_origin)?
+        .children
+        .iter()
+        .find(|child| child.position == 0)
+        .map(|child| child.origin);
+    if defining_origin != worker.closure_origin || body != Some(worker.body_origin) {
+        return Err(planner_error(
+            "a generated context's raw owner is not the closure its worker was built from",
+        ));
+    }
+    if descriptor.header.parameters != worker.declared_arity
+        || usize::try_from(descriptor.header.captures).ok() != Some(worker.captures.len())
+    {
+        return Err(planner_error(
+            "a generated context's parameter run and its raw owner's entry run disagree in shape",
+        ));
+    }
+    let members = continuation_owner_entry_sources(plan, context.raw_owner)?;
+    for (index, capture) in worker.captures.iter().enumerate() {
+        if usize::try_from(capture.ordinal).ok() != Some(index)
+            || capture.closure_origin != worker.closure_origin
+        {
+            return Err(planner_error(
+                "a generated context's parameter run and its raw owner's entry run disagree in shape",
+            ));
+        }
+        let member_position = usize::try_from(worker.declared_arity)
+            .ok()
+            .and_then(|arity| arity.checked_add(index))
+            .ok_or_else(|| planner_capacity_error("generated context Parameter member exhausted"))?;
+        let member = members.get(member_position).ok_or_else(|| planner_error(
+            "a generated context's parameter run has no member for its worker capture",
+        ))?;
+        let source_agrees = match (capture.source, member.coordinate) {
+            (
+                ContinuationWorkerCaptureSource::Lexical(worker_origin),
+                ContinuationSourceCoordinate::EntryAbi {
+                    source: ContinuationInputSource::LexicalCapture { source_origin },
+                    ..
+                },
+            ) => worker_origin == source_origin,
+            (
+                ContinuationWorkerCaptureSource::Seed,
+                ContinuationSourceCoordinate::EntryAbi {
+                    source: ContinuationInputSource::SeedCapture { defining_origin },
+                    ..
+                },
+            ) => defining_origin == worker.closure_origin,
+            (ContinuationWorkerCaptureSource::Lexical(_), _) | (ContinuationWorkerCaptureSource::Seed, _) => false,
+        };
+        if !source_agrees {
+            return Err(planner_error(
+                "a generated context's worker capture source disagrees with its raw owner's entry source",
+            ));
+        }
+    }
+    if usize::try_from(context.parameters).ok() != Some(members.len()) {
+        return Err(planner_error(
+            "a generated context's parameter count is not its raw owner's entry run",
+        ));
+    }
+    Ok(members.into_iter().map(|member| member.coordinate).collect())
+}
+
 /// **`D5a` — intern the generated producer execution contexts, AFTER the fixed
 /// point.**
 ///
@@ -7690,6 +7788,25 @@ impl<'src> StaticTransitionPlan<'src> {
                 .nth(index)
                 .expect("an index taken from this same population")
         }))
+    }
+
+    /// Parameter members of a generated context, certified against the exact
+    /// raw closure and the specialization worker that supplies its operand run.
+    pub(in crate::cranelift_backend) fn continuation_context_parameter_members(
+        &self,
+        context: ContinuationContextId,
+    ) -> Result<Vec<ContinuationSourceCoordinate>, CraneliftBackendError> {
+        let contexts = self.continuation_contexts()?;
+        let mut matching = contexts.iter().filter(|candidate| candidate.id() == context);
+        let planned = matching.next().ok_or_else(|| {
+            planner_error("a generated context Parameter member query names no context")
+        })?;
+        if matching.next().is_some() {
+            return Err(planner_error(
+                "a generated context Parameter member query has ambiguous identity",
+            ));
+        }
+        generated_context_parameter_members(self, &self.continuation_specializations, planned.planned)
     }
 
     /// Every already-validated continuation call token, with the full producer

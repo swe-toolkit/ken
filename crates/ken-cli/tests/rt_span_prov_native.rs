@@ -353,24 +353,36 @@ fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
         let _output = built.expect("the completed span plan must compile");
         assert_eq!(diagnostics.len(), 1, "the completed plan records its diagnostics");
         let plan = &diagnostics[0];
-        assert_eq!(plan.all_static_response_rows.len(), 8, "all specialized rows remain recorded");
-        assert_eq!(plan.static_response_owners.len(), 8, "every installed owner remains recorded");
-        let owner_four = plan.static_response_owners.iter().find(|owner| owner.owner == 4)
-            .expect("span's relay-bearing response owner remains installed");
-        let owner_four_origin = plan.all_static_response_rows.get(owner_four.response as usize)
-            .expect("span owner 4 has its exact installed response row").vis_origin;
+        assert_eq!(plan.all_static_response_rows.len(), 5,
+            "five non-bracket specialized rows remain recorded");
+        assert_eq!(plan.bracket_response_rows.len(), 3,
+            "three marked S rows moved from ordinary ownership to the bracket plane");
+        assert_eq!(plan.static_response_owners.len(), 5,
+            "every ordinary installed owner remains recorded");
+        let ordinary = plan.all_static_response_rows.iter().map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        let bracket = plan.bracket_response_rows.iter().map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(ordinary.len(), 5, "ordinary owners remain distinct");
+        assert_eq!(bracket.len(), 3, "bracket settlement origins remain distinct");
+        assert!(ordinary.is_disjoint(&bracket), "a bracket S cannot retain ordinary ownership");
+        assert_eq!(ordinary.union(&bracket).count(), 8,
+            "the original eight response Vis rows retain their full population");
+        assert_eq!(bracket, plan.bracket_settlement_vis_origins.iter().copied().collect(),
+            "every moved Vis belongs to an authenticated bracket S");
+        assert!(plan.bracket_response_rows.iter().all(|row| row.operation == "ResourceRelease"));
+        let freeze_owner = plan.static_response_owners.iter().find(|owner|
+            plan.all_static_response_rows.get(owner.response as usize)
+                .is_some_and(|row| row.vis_origin == 1158))
+            .expect("the non-bracket freeze owner remains installed");
+        let freeze_origin = plan.all_static_response_rows[freeze_owner.response as usize].vis_origin;
         let returned = plan.settled_returned_vis_protocols.iter()
-            .find(|(owner, _)| *owner == owner_four_origin)
+            .find(|(owner, _)| *owner == freeze_origin)
             .map(|(_, members)| members.as_slice())
-            .expect("span owner 4 retains a pending-Vis protocol after source drive");
-        assert_eq!(returned, &[537], "span owner 4 returns only its non-relay Vis");
-        let owner_six = plan.static_response_owners.iter().find(|owner| owner.owner == 6)
-            .expect("owner 6 stays specialized");
-        let owner_six_row = plan.all_static_response_rows.get(owner_six.response as usize)
-            .expect("owner 6 must name an installed response row");
-        assert_eq!(owner_six_row.vis_origin, 754, "fixture-local owner 6 Vis");
-        assert_eq!(owner_six_row.base_owner, owner_six.base_owner,
-            "owner 6 must match its specialized response row");
+            .expect("span freeze owner retains a pending-Vis protocol after source drive");
+        assert_eq!(returned, &[1090], "span freeze owner returns only its non-relay Vis");
+        assert!(plan.bracket_response_rows.iter().any(|row| row.vis_origin == 754),
+            "the old owner-6 Vis is now in the authenticated bracket plane");
         assert!(matches!(plan.static_response_deferred.as_slice(), [row]
             if row.vis_origin == 1090 && row.sub_case == "ContinuationBodyTail"
                 && row.handler_owner.is_none()),

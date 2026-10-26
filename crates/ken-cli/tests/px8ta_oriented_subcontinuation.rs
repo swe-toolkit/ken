@@ -5,82 +5,6 @@ fn output_dir(name: &str) -> tempfile::TempDir {
     tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
-const NESTED_BRACKET_PROGRAM: &str = r#"program capabilities FS AFull
-fn leaf_body (_resource : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
-    (ResourceBodyOk Unit Unit MkUnit)
-
-fn body_result
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Ok (ResourceBracketOk unit) |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
-        (ResourceBodyOk Unit Unit MkUnit);
-    Ok bracket |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
-        (ResourceBodyErr Unit Unit MkUnit);
-    Err error |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
-        (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc level_one_body
-  (cap : Cap AFull) (_resource : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-      ResourceMetadata leaf_body)
-    (\outcome. body_result outcome)
-
-proc level_two_body
-  (cap : Cap AFull) (_resource : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-      ResourceMetadata (\resource. level_one_body cap resource))
-    (\outcome. body_result outcome)
-
-fn after_root
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode =
-  match outcome {
-    Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
-    Ok (ResourceBracketBodyError error) |-> host_exit AFull (Failure 81);
-    Ok (ResourceBracketReleaseError error) |-> host_exit AFull (Failure 82);
-    Ok (ResourceBracketBodyAndReleaseError body_error release_error) |->
-      host_exit AFull (Failure 83);
-    Err error |-> host_exit AFull (Failure 84)
-  }
-
-proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match caps {
-    MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-        (withResource AFull Unit Unit cap (bytes_encode "held-0.bin")
-          ResourceMetadata __ROOT_BODY__)
-        (\outcome. after_root outcome)
-  }
-"#;
-
 const PX8DS_SIBLING_RECURSION_PROGRAM: &str = r#"program capabilities FS APartial
 proc countdown (fuel : Nat)
   : HostIO APartial (Result Int Bool) visits [Console] =
@@ -156,41 +80,14 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (\outcome. finish_buffer outcome)
 "#;
 
+#[path = "support/rt_bracket_nested_source.rs"]
+mod bracket_source;
+#[cfg(target_os = "linux")]
+use bracket_source::nested_bracket_source;
+
 #[cfg(target_os = "linux")]
 fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
-    let body = match depth {
-        1 => "leaf_body",
-        2 => {
-            r#"(\resource.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit))
-            (ResourceBodyResult Unit Unit)
-            (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-              ResourceMetadata leaf_body)
-            (\outcome. body_result outcome))"#
-        }
-        3 => {
-            r#"(\resource.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit))
-            (ResourceBodyResult Unit Unit)
-            (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-              ResourceMetadata (\inner_resource.
-                bind (Coproduct (FSOp AFull) AmbientOp)
-                  (resp_coproduct (FSOp AFull) AmbientOp
-                    (fs_resp AFull) ambient_resp)
-                  (Result FileError (ResourceBracketResult Unit Unit))
-                  (ResourceBodyResult Unit Unit)
-                  (withResource AFull Unit Unit cap (bytes_encode "held-2.bin")
-                    ResourceMetadata leaf_body)
-                  (\inner_outcome. body_result inner_outcome)))
-            (\outcome. body_result outcome))"#
-        }
-        _ => panic!("PX8-TA public control supports depths one through three"),
-    };
-    let source = NESTED_BRACKET_PROGRAM.replace("__ROOT_BODY__", body);
+    let source = nested_bracket_source(depth);
     let dir = output_dir(&format!("depth-{depth}"));
     for index in 0..depth {
         std::fs::write(
@@ -232,6 +129,135 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
     (observation, plan.frames.len())
 }
 
+/// Promise class: durable invariant. MEASURED: the actual depth-three plan's
+/// repeated-producer Deferred FsOpen has the same statically bounded handler
+/// as its specialized FsOpen row. CLAIMED: the marked bracket release ends
+/// the Deferred suffix without swallowing the intervening acquisition.
+/// THE GAP: this planner observation does not prove the linked owner executes
+/// that acquisition; the separate-process native effect trace tests that.
+#[cfg(target_os = "linux")]
+#[test]
+fn nested_bracket_repeated_producer_has_bounded_deferred_owner() {
+    // Measured here on β′ with a test-only Builder stack-size override:
+    // 1920 KiB overflows, 1984 KiB passes (64-KiB grid). The stated
+    // 256 MiB provision leaves 260160 KiB of headroom over that bound;
+    // no ambient RUST_MIN_STACK is used to select the thread stack.
+    std::thread::Builder::new()
+        .name("px8ta-bounded-owner".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(check_nested_bracket_repeated_producer_owner)
+        .expect("spawn stated-stack depth-three planner control")
+        .join()
+        .expect("depth-three planner control thread");
+}
+
+#[cfg(target_os = "linux")]
+fn check_nested_bracket_repeated_producer_owner() {
+    let dir = output_dir("depth-3-bounded-owner");
+    let (built, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            &nested_bracket_source(3),
+            ken_cli::SourceFormat::Ken,
+            "px8ta-depth-3-bounded-owner",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    built.expect("the checked depth-three program builds a native artifact");
+    let plans: Vec<_> = plans
+        .iter()
+        .filter(|plan| {
+            plan.all_static_response_rows.iter().any(|row| row.operation == "FsOpen")
+                && plan
+                    .static_response_deferred
+                    .iter()
+                    .any(|row| row.operation == "FsOpen")
+        })
+        .collect();
+    let [plan] = plans.as_slice() else {
+        panic!("one checked depth-three response plan has both FsOpen rows: {plans:?}");
+    };
+    let specialized: Vec<_> = plan
+        .all_static_response_rows
+        .iter()
+        .filter(|row| row.operation == "FsOpen")
+        .collect();
+    let deferred: Vec<_> = plan
+        .static_response_deferred
+        .iter()
+        .filter(|row| row.operation == "FsOpen")
+        .collect();
+    let ([specialized], [deferred]) = (specialized.as_slice(), deferred.as_slice()) else {
+        panic!("the nested checked program has one specialized and one Deferred FsOpen row");
+    };
+    assert_eq!(deferred.sub_case, "UnconsumedTransportCaller");
+    assert_eq!(deferred.producer_call_origin, specialized.producer_call_origin);
+    assert_ne!(deferred.vis_origin, specialized.vis_origin);
+    assert_eq!(
+        deferred.bounded_handler_owner.as_deref(),
+        Some(specialized.base_owner.as_str()),
+        "the Deferred nested acquisition must have its enclosing checked owner"
+    );
+}
+
+/// Promise class: durable invariant. R-2′ in
+/// docs/program/issues/RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER.md:
+/// a nested Deferred region has no planned release order, so the planner
+/// refuses depth two before native artifact emission. The gate is
+/// test-support-only and requires an explicit forced-mode run.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "run with RT_RECUT_FORCE_DEFERRED=1 and ken-runtime/px8-ds-test-support"]
+fn forced_nested_deferred_depth_two_refuses_at_planning() {
+    assert_nested_deferred_refuses_at_planning(2);
+}
+
+/// Promise class: durable invariant. R-1′ in
+/// docs/program/issues/RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER.md:
+/// depth three has two nested regions and refuses before the former trap-40
+/// execution, not merely before its outer resource is released.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "run with RT_RECUT_FORCE_DEFERRED=1 and ken-runtime/px8-ds-test-support"]
+fn forced_nested_deferred_depth_three_refuses_at_planning() {
+    assert_nested_deferred_refuses_at_planning(3);
+}
+
+#[cfg(target_os = "linux")]
+fn assert_nested_deferred_refuses_at_planning(depth: usize) {
+    assert!(std::env::var_os("RT_RECUT_FORCE_DEFERRED").is_some(),
+        "forced nested Deferred refusal needs its explicit test-support gate");
+    // Measured here with a test-only Builder stack-size override, at both
+    // depths two and three: 1600 KiB overflows, 1664 KiB passes (64-KiB
+    // grid). Stated 256 MiB leaves 260480 KiB of headroom over the passing
+    // bound. Do not rely on the harness's ambient thread stack.
+    std::thread::Builder::new()
+        .name(format!("px8ta-deferred-refusal-{depth}"))
+        .stack_size(256 * 1024 * 1024)
+        .spawn(move || {
+            let dir = output_dir(&format!("forced-deferred-{depth}"));
+            let result = ken_cli::build_native_program(
+                &nested_bracket_source(depth),
+                ken_cli::SourceFormat::Ken,
+                &format!("px8ta-forced-deferred-{depth}"),
+                dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            );
+            let error = match result {
+                Err(error) => error,
+                Ok(_) => panic!("depth {depth}: nested Deferred emitted native code"),
+            };
+            let diagnostic = format!("{error:?}");
+            assert!(diagnostic.contains(
+                "a nested bracket region has no in-place settlement owner; \
+                 deferred settlement order is not planned for nested regions"),
+                "depth {depth}: expected the exact nested-region planner refusal, got {diagnostic}");
+        })
+        .expect("spawn stated-stack forced Deferred control")
+        .join()
+        .expect("forced Deferred control thread");
+}
+
 #[cfg(target_os = "linux")]
 // Readmitted under RT-IGNORED-PASSING-ROWS, row 4 of 11.
 //
@@ -258,118 +284,42 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
 // finalize-all path, and a bracket that releases explicitly never reaches it.
 #[test]
 fn public_one_level_bracket_finishes_and_releases() {
-    // RT-PLANNER-SEED-BINDING-ORDER E4: this is the source-reachable response
-    // route. At the response emitter, compare each source descriptor's metadata
-    // with the actual Load-selected response slot. Values themselves are read
-    // by the frame slot issued from the producer's lexical index, not by the
-    // coordinate. Promise class: durable relation over both source parameters.
-    let ((), pairs) = ken_runtime::with_rt_seed_response_metadata_observations(|| {
-        assert_depth_finishes_and_releases_lifo(1);
-    });
-    assert_eq!(pairs.len(), 2, "both source parameter captures must reach the response emitter");
-    let source_positions = pairs.iter().map(|(source, _, _)| *source)
-        .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(source_positions, std::collections::BTreeSet::from([0, 1]));
-    assert_ne!(pairs[0].1, pairs[1].1, "the capture values occupy distinct response slots");
-    assert_ne!(pairs[0].2, pairs[1].2, "the capture values load from distinct frame offsets");
+    // S 426 is an authenticated bracket settlement on the Deferred producer
+    // route: it emits no response owner and selects no owner-frame Load. E4's
+    // source-to-loaded-slot pin now runs on the ordinary DOUBLE_RELEASE owner
+    // in px7f_resource_native. This row keeps its LIFO behavioral observation.
+    // Residual: a source-parameter slot swap cannot be instrumented here:
+    // Deferred producer deforestation selects no owner-frame slot or Load.
+    // LIFO therefore does not claim to test source-parameter slot identity.
+    assert_depth_finishes_and_releases_lifo(1);
 }
 
 #[cfg(target_os = "linux")]
-// Re-measured under RT-SUBCONTINUATION-LIFO-RELEASE-ORDER (failing-rows
-// ledger row 9) at main 5899268451d42e7c1337929a996921d6483b6541. The layers
-// below are STRUCK together rather than appended to, as the depth-1 row above
-// already does.
-//
-//   1. "Ignored pending RT-CLOSURE-BOUNDARY-LANE ... a closure cannot cross
-//      the boundary: it is runtime-local and live-domain only, and it has no
-//      durable lane" -- does not reproduce. The closure-lane signature
-//      appears at NEITHER depth.
-//   2. "It refuses at object emission, so the program never executes and no
-//      binding order is observable in it." -- half true, which is what made
-//      it misleading rather than merely stale. FALSE of depth 2, TRUE of
-//      depth 3. Which program it was written about is not recorded and is
-//      not established here: it is struck on the measurement, not on a
-//      reading of its author's intent.
-//   3. "depth 2 reaches the closure lane first" -- depth 2 reaches no refusal
-//      at all. It builds, links, executes and exits 0.
-//
-// WHAT THIS ROW DOES, MEASURED. The body runs `for depth in 2..=3`, so it is
-// two programs. Depth 2 panics, which is why the second has never been
-// observed by any measurement of this row, the ledger's included:
-//
-//   depth 2  EXECUTES. Exit 0, no terminal error, every bracket continuation
-//            retained. The strict-LIFO assertion below then fails:
-//              left  [ResourceTraceIdentityV1(1), ResourceTraceIdentityV1(2)]
-//              right [ResourceTraceIdentityV1(2), ResourceTraceIdentityV1(1)]
-//            LEFT is observed, RIGHT is expected -- read the assert_eq!, not
-//            the panic message. Releases come back in ACQUISITION order: the
-//            outer bracket's resource is released before the inner one's.
-//            Deterministic across 20 fresh processes, 20 identical results.
-//            That excludes instability at or above rate 0.15 at >= 96%; it is
-//            a bound, NOT a demonstration of stability, which repetition
-//            cannot return.
-//   depth 3  REFUSES at object emission, and not with the struck label's
-//            signature:
-//              unsupported runtime-IR lowering: ContinuationSpecialization:
-//              the claimed continuation target was not declared into this
-//              function
-//            Measured by running both depths under catch_unwind, and again
-//            with depth 3 first. The two programs use separate output
-//            directories and separate build_native_program calls, so the
-//            result is order-independent.
-//
-// SO THIS ROW IS TWO BLOCKERS UNDER ONE #[ignore] AND EITHER FIX ALONE LEAVES
-// IT RED. The ordering defect is a PRODUCT defect: it is escalated under
-// RT-SUBCONTINUATION-LIFO-RELEASE-ORDER D0 arm (i) rather than repaired here,
-// because the expectation is correct and editing it to match the observation
-// would encode the defect in the fixture. The depth-3 refusal is a separate
-// finding, reported with it and not owned by that node.
-//
-// RT-CLOSURE-BOUNDARY-LANE is cited for provenance only -- merged, no frame,
-// never names this row, and the ledger records its label as not agreeing with
-// what the row does.
-//
-// Both the panic and the refusal surface on the helper thread
-// 'px8ta-nested-brackets'; this test thread then fails only with the wrapper
-//   nested-bracket control thread: Any { .. }
-// which carries no signature of its own. The signatures above are the real
-// causes.
-//
-// Annotation only -- test body and expectations are unchanged.
+// Measured on the combined link-3/child-3 tree: depth 2 builds, executes,
+// exits zero with no terminal error, and releases both resources in strict
+// reverse acquisition order. It is no longer an ignored blocker.
 #[test]
-#[ignore = "RT-SUBCONTINUATION-LIFO-RELEASE-ORDER: depth 2 executes and releases in acquisition order rather than strict LIFO (product defect, escalated); depth 3 separately refuses at object emission on ContinuationSpecialization"]
-fn public_two_three_level_brackets_finish_and_release_lifo() {
-    // Lowering nested checked brackets is stack-hungry, and libtest hands a
-    // test a 2 MiB (2048 KiB) worker thread. Bisected minimum passing stack
-    // for this test, measured on both commits at 64 KiB resolution:
-    //
-    //   70bd2c74   > 1984 KiB, <= 2048 KiB   -- cleared the default by < 64 KiB
-    //   08633b3c   > 2112 KiB, <= 2176 KiB   -- does not fit; SIGABRT
-    //
-    // Production is unaffected: this test drives the lowering directly on the
-    // libtest worker, while a real build runs on the main thread (8 MiB by
-    // `ulimit -s`), so the product had ~3.7x the headroom this harness gave
-    // itself. The wrapper below gives the harness **at least** the product's
-    // headroom, exactly as
-    // `px8ds_real_same_depth_path_runs_exact_edges` in
-    // this file already does. ⚠ Not "matches the product": 256 MiB is 32x the
-    // product's 8 MiB, and saying "matches" would understate by how much this
-    // stops being able to observe a stack regression at all.
-    //
-    // ⛔ This is a harness fix and nothing more. It is NOT scaling evidence for
-    // per-static-origin target functions, and it does NOT discharge the n=3..7
-    // nesting-depth gate -- the fixture only defines depths 1/2/3 by hand, so
-    // n >= 4 is not even expressible here. The thresholds above are recorded so
-    // the next reader sees how little room there was instead of rediscovering
-    // it from a red shard.
+fn public_two_level_brackets_finish_and_release_lifo() {
+    assert_nested_depth_on_existing_test_thread(2);
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: durable invariant. Depth 3 now builds, exits without a
+// terminal error, and releases all three resources in reverse acquisition
+// order through the same strict-LIFO observation as depths 1 and 2.
+#[test]
+fn public_three_level_brackets_finish_and_release_lifo() {
+    assert_nested_depth_on_existing_test_thread(3);
+}
+
+#[cfg(target_os = "linux")]
+fn assert_nested_depth_on_existing_test_thread(depth: usize) {
+    // Preserve the old nested fixture's 256 MiB harness provision unchanged.
+    // This is not evidence for default-stack lowering or depths beyond three.
     std::thread::Builder::new()
         .name("px8ta-nested-brackets".to_string())
         .stack_size(256 * 1024 * 1024)
-        .spawn(|| {
-            for depth in 2..=3 {
-                assert_depth_finishes_and_releases_lifo(depth);
-            }
-        })
+        .spawn(move || assert_depth_finishes_and_releases_lifo(depth))
         .expect("spawn large-stack nested-bracket control")
         .join()
         .expect("nested-bracket control thread");

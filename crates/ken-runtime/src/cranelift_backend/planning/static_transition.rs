@@ -7,6 +7,11 @@
 
 mod abi;
 mod aggregates;
+mod brackets;
+pub(in crate::cranelift_backend) use brackets::{
+    BracketSettlement, BracketSettlementControlView, BracketSettlementId,
+    BracketSettlementMode,
+};
 mod closure;
 mod construction;
 mod continuations;
@@ -31,6 +36,10 @@ mod joins_traps;
 pub use joins_traps::with_forced_carrier_match_joins;
 mod occurrences;
 mod responses;
+mod resumptions;
+pub(in crate::cranelift_backend) use resumptions::{
+    PlannedHandlerResumptionCall, PlannedResumptionExecution, PlannedResumptionParameter,
+};
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
@@ -146,10 +155,10 @@ pub(in crate::cranelift_backend) use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    bracket_ordinary_owner_mutation_is_exact,
     static_response_context_demand_mutation_is_exact,
     suppressed_execute_then_resume_response_is_exact,
-    with_mixed_owner_execute_then_resume_overpromotion,
+    with_bracket_ordinary_owner_mutation,
     with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
     with_suppressed_relay_promotion,
     with_mixed_relay_refusal_observations,
@@ -637,6 +646,8 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// facts, but no lowering accessor exists until the activation slice.
     continuation_specializations: Vec<PlannedContinuationSpecialization>,
     continuation_specialization_calls: Vec<PlannedContinuationSpecializationCall>,
+    /// Handler-owned Deferred drives have a separate, post-response-B identity domain.
+    handler_resumptions: Vec<PlannedHandlerResumptionCall>,
     /// One independently validated consumer-level occurrence per continuation
     /// call whose discovery established the relation. Keyed by the whole opaque
     /// call identity, never by specialization identity or function provenance.
@@ -652,6 +663,12 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// `(specialization, worker body)` interner before this population's ABI is
     /// installed.
     continuation_contexts: Vec<PlannedContinuationContext>,
+    /// Checked-marker regions and exact response-context instances. Constructed
+    /// from the raw marked partition before ordinary response demands exist.
+    bracket_settlements: brackets::BracketSettlementPlan,
+    /// Marked S demands resolved against the existing K-context ABI. This is
+    /// disjoint from ordinary response ownership and pending-Vis successors.
+    bracket_rows: BTreeMap<BracketSettlementId, StaticResponseContinuation>,
     /// Every validated response edge resolved through the installed union
     /// context population. Empty exactly when `static_response_infeasible` is
     /// populated or the complete response population is empty.
@@ -812,11 +829,13 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 
 /// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// The five sources are (a) predeclared units containing the seat, (b)
+/// The six sources are (a) predeclared units containing the seat, (b)
 /// continuation specializations whose selected case body contains it, (c)
 /// Specialized response rows under their base owner, (d) Deferred responses
-/// handled by another owner, and (e) returned-Vis successors performed by the
-/// pending-Vis loop under each successor row's base owner. Those are the
+/// handled by another owner, (e) returned-Vis successors performed by the
+/// pending-Vis loop under each successor row's base owner, and (f) a marked
+/// bracket's host effect under its row's base-owner authority at every S copy.
+/// Those are the
 /// emission populations lowering enters, not a reconstruction from response
 /// disposition alone. Generated continuation contexts are a narrower,
 /// post-hoc population and cannot authorize the records by themselves.
@@ -825,9 +844,9 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 /// `seat`: host-result constructors and unit-boundary environments. A checked-IH
 /// environment is force-emitted at a different seat and uses its explicit force
 /// relation instead.
-fn inline_synthesized_seat_emission_owners(
+fn emission_owners_containing(
     plan: &StaticTransitionPlan<'_>,
-    seat: StaticOriginId,
+    origin: StaticOriginId,
 ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
     let mut owners = Vec::new();
     // Source ownership is only a traversal boundary. A retained checked-IH
@@ -837,7 +856,7 @@ fn inline_synthesized_seat_emission_owners(
     for unit in plan.emittable_units()? {
         if plan
             .emission_source_origins(unit.function(), unit.body_occurrence())?
-            .contains(&seat)
+            .contains(&origin)
         {
             owners.push(ContinuationEmissionOwner::Predeclared(unit.function()));
         }
@@ -861,11 +880,24 @@ fn inline_synthesized_seat_emission_owners(
             .checked_add(1)
             .ok_or_else(|| planner_capacity_error("continuation case position overflows"))?;
         let body = plan.semantic.child_origin(unit.continuation_origin(), body_position)?;
-        if occurrence_subtree_contains(plan, body, seat)? {
+        if occurrence_subtree_contains(plan, body, origin)? {
             owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
     }
+    Ok(owners)
+}
+
+fn inline_synthesized_seat_emission_owners(
+    plan: &StaticTransitionPlan<'_>,
+    seat: StaticOriginId,
+) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
+    let mut owners = emission_owners_containing(plan, seat)?;
     if plan.static_response_plan_installed {
+        if !plan.bracket_settlements.regions.is_empty() && plan.bracket_rows.is_empty() {
+            return Err(planner_error(
+                "bracket rows are not resolved before synthesized seat ownership",
+            ));
+        }
         let responses = match plan.static_response_feasibility_ledger_all()? {
             Ok(responses) => responses,
             Err(_) => Vec::new(),
@@ -896,7 +928,16 @@ fn inline_synthesized_seat_emission_owners(
             let Some(owner) = plan.deferred_response_handler_owner(row)? else {
                 continue;
             };
-            owners.push(owner);
+            if !owners.contains(&owner) {
+                owners.push(owner);
+            }
+        }
+        // (f) A marked bracket's host effect is lowered under its row's
+        // planned authority at every copy of S, including foreign owners.
+        for row in plan.bracket_rows.values() {
+            if row.effect_origin() == seat && !owners.contains(&row.base_owner()) {
+                owners.push(row.base_owner());
+            }
         }
         // (e) A Vis returned by a K context is performed by its response
         // owner's pending-Vis loop under the successor row's base owner
@@ -1073,7 +1114,8 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
-    let plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
+    let mut plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
+    brackets::validate_direct_rebuild(&mut plan, entry, declarations, symbols)?;
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]
@@ -1163,6 +1205,9 @@ pub struct DeferredResponseObservation {
     /// zero). Eligible-plane has-K census comes from Specialized rows.
     pub capture_count: usize,
     pub continuation_input_count: usize,
+    /// The statically bounded P2 suffix owner, before the ordinary handler
+    /// fallback. Exposed for tests of the actual checked response plan.
+    pub bounded_handler_owner: Option<String>,
     /// The structurally nearest specialized handler, only when the lexical K
     /// is single-shot and tail-resumptive.
     pub handler_owner: Option<String>,
@@ -1185,6 +1230,12 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+    /// Marked demand rows resolved under the bracket plane, outside ordinary
+    /// Specialized/Deferred ownership. Their source fields are observed by the
+    /// same projection as ordinary rows; the plane origins are separate so a
+    /// test can verify every moved row belongs to an authenticated settlement.
+    pub bracket_response_rows: Vec<StaticResponseFeasibilityObservation>,
+    pub bracket_settlement_vis_origins: Vec<u32>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
     /// Planner-only, pre-schema identities, exposed solely to test whether
     /// the early and late strata agree on exact members rather than counts.
@@ -1334,6 +1385,11 @@ fn record_static_response_feasibility_diagnostic(
     )?;
     let (all_static_response_rows, all_static_response_infeasible) =
         observe(plan.static_response_feasibility_ledger_all()?)?;
+    let (bracket_response_rows, bracket_infeasible) =
+        observe(Ok(plan.bracket_rows.values().cloned().collect()))?;
+    if bracket_infeasible.is_some() {
+        return Err(planner_error("installed bracket row is infeasible"));
+    }
     let static_response_owners = match plan.static_response_owner_specializations()? {
         Ok(owners) => owners
             .iter()
@@ -1370,6 +1426,9 @@ fn record_static_response_feasibility_diagnostic(
                 sub_case: format!("{:?}", row.sub_case()),
                 capture_count: row.capture_count(),
                 continuation_input_count: row.continuation_input_count(),
+                bounded_handler_owner: plan
+                    .bounded_deferred_response_handler_owner(row)?
+                    .map(|owner| format!("{owner:?}")),
                 handler_owner: plan
                     .deferred_response_handler_owner(row)?
                     .map(|owner| format!("{owner:?}")),
@@ -1441,6 +1500,10 @@ fn record_static_response_feasibility_diagnostic(
                 static_response_infeasible,
                 all_static_response_rows,
                 all_static_response_infeasible,
+                bracket_response_rows,
+                bracket_settlement_vis_origins: plan.bracket_settlements.regions.iter()
+                    .map(|region| region.settlement.0).collect::<BTreeSet<_>>()
+                    .into_iter().collect(),
                 static_response_owners,
                 pre_schema_transport_sources: plan.pre_schema_transport_sources.iter()
                     .map(|identity| format!("{identity:?}")).collect(),
