@@ -66,3 +66,10 @@ base, stop and report the mismatch.
 
 - The typed terminal needs a host ABI version change.
 - Any kernel, trust or spec change.
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. ownerless test rigs bind the boundary arena with no activation services; the capacity helper's owner precondition — keyed on presence of a published issuer (services pointer).
+```
