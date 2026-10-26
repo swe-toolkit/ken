@@ -27,6 +27,8 @@ The public operation and its three laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Core.Logic.Transport (cong, trans)
 
 import Data.Numeric.Nat.Order (lt_nat)

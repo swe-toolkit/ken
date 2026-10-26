@@ -35,6 +35,8 @@ the left input without examining payloads. Membership uses Ω-valued `list_elem`
 so neither a payload equality decision nor an ordering premise is needed.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Core.Classes.LawfulClasses (IsTrue, and_true, bool_and, bool_or, leq_nat)
 
 import Core.Logic.Transport (cong, sym, trans)
@@ -44,6 +46,8 @@ import Core.Logic.Or (Or, Inl, Inr)
 import Data.Numeric.Nat.Arithmetic (add)
 
 import Data.Numeric.Nat.Order (lt_nat)
+
+import Data.Collections.Derived (is_sorted)
 
 import Data.Collections.Derived
   (filter,

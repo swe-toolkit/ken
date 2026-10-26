@@ -73,6 +73,8 @@ import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)
 
 import Core.Logic.And (And as Conj)
 
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.OrdResult
@@ -155,8 +157,11 @@ membership through mapping, append, concatenated mapping, and equality.
 The filter theorems also characterize membership after selection without
 deciding equality on the element type: a selected member was present in
 the input and satisfies the predicate, and an input member satisfying
-the predicate is selected. Their `And` is the ambient Ω conjunction,
-not the imported Type-valued `Conj` carrier.
+the predicate is selected. Their `And` is the imported Ω conjunction
+from `Core.Logic.Conjunction`, not the separate Type-valued `Conj` carrier.
+The structural `is_sorted` predicate uses that same Ω conjunction for
+adjacent elements and recurses on the tail; empty and singleton lists are
+vacuously sorted. Its checked definition adds no trusted-base entry.
 
 ```ken
 pub fn list_elem (a : Type) (x : a) (xs : List a) : Omega =
@@ -558,6 +563,16 @@ pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
       match p h {
         True ↦ Cons a h (filter a p t);
         False ↦ filter a p t
+      }
+  }
+
+pub fn is_sorted (a : Type) (leq : a → a → Bool) (xs : List a) : Omega =
+  match xs {
+    Nil ↦ Top;
+    Cons x xs2 ↦
+      match xs2 {
+        Nil ↦ Top;
+        Cons y r ↦ And (Equal Bool (leq x y) True) (is_sorted a leq xs2)
       }
   }
 

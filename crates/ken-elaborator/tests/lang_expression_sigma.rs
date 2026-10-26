@@ -18,15 +18,29 @@ fn catalog_and_expression_sigma_converts_with_prelude_both_ways() {
     let mut env = env();
     let baseline = env.env.trusted_base();
     let prelude_and = env.globals["And"];
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    let owned = env
+        .elaborate_module_from_roots(&[root], "Core.Logic.Conjunction")
+        .expect("the real conjunction package loads");
     env.elaborate_file(
-        "module SigmaCatalog {\n\
-             pub fn And (a : Omega) (b : Omega) : Omega = (x : a) × b\n\
-         }\n\
-         theorem prelude_to_catalog (a : Omega) (b : Omega) (p : And a b) : SigmaCatalog.And a b = p\n\
-         theorem catalog_to_prelude (a : Omega) (b : Omega) (p : SigmaCatalog.And a b) : And a b = p",
+        "import Core.Logic.Conjunction (And as CAnd, and_intro as c_intro)\n\
+         theorem prelude_to_catalog (a : Omega) (b : Omega) (p : And a b) : CAnd a b = p\n\
+         theorem catalog_to_prelude (a : Omega) (b : Omega) (p : CAnd a b) : And a b = p\n\
+         theorem mixed_projection (a : Omega) (b : Omega) (x : a) (y : b) :\n\
+           a = and_fst a b (c_intro a b x y)",
     )
-    .expect("catalog And and two directions of conversion check without axioms");
-    let catalog_and = env.globals["SigmaCatalog.And"];
+    .expect("real catalog And converts in both directions and mixes with prelude projection");
+    let catalog_and = env.globals["Core.Logic.Conjunction.and"];
+    assert!(
+        owned.contains(&catalog_and),
+        "And must use the owned catalog definition"
+    );
+    assert!(
+        !env.globals.contains_key("Core.Logic.Conjunction.And"),
+        "renamed export must not mint another GlobalId"
+    );
     assert_ne!(catalog_and, prelude_and);
     let (_, catalog_body) = env
         .env

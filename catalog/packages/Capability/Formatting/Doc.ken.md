@@ -20,6 +20,8 @@ The algebra is closed at six constructors. `Text` stores characters directly;
 content.
 
 ```ken
+import Core.Logic.Conjunction (And, and_fst, and_snd)
+
 import Core.Classes.LawfulClasses (leq_nat)
 
 import Core.Logic.Or (Or, Inl, Inr)

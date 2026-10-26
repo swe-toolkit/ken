@@ -11,6 +11,8 @@ package names only the argv projection and replacement operation, while the
 match keeps the environment and working-directory bytes unchanged.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro)
+
 import Capability.Parsing.Cursor (ArgLocation, MkArgLocation)
 
 import Core.Classes.LawfulClasses (leq_nat)

@@ -371,6 +371,31 @@ fn ambient_dependencies(root: &Path, entry: &str) -> Result<Vec<String>, String>
     Err("ambient dependency census exceeded the initial global inventory".to_string())
 }
 
+/// Promise class: durable provider-edge invariant.
+/// MEASURED: strict-floor roots loading of both direct consumers reaches no
+/// ambient `And` family or `is_sorted` convenience. CLAIMED: their checked
+/// imports supply these names. THE GAP: the two measured modules are the
+/// import-withdrawal controls, not the entire 19-module catalog population;
+/// the full-corpus census below checks that population independently.
+#[test]
+fn conjunction_and_sorted_imports_avoid_ambient_fallback() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    let compare = ambient_dependencies(&root, "Core.Logic.Compare")
+        .expect("Compare must load against the strict floor");
+    assert!(
+        compare.is_empty(),
+        "Compare must be strict-floor clean: {compare:?}"
+    );
+    let sort = ambient_dependencies(&root, "Algorithm.Sorting.InsertionSort")
+        .expect("InsertionSort must load against the strict floor");
+    assert!(
+        !sort.iter().any(|name| name == "is_sorted"),
+        "InsertionSort must import Derived.is_sorted: {sort:?}"
+    );
+}
+
 fn expected_vector_strict_floor_names() -> Vec<String> {
     vec![]
 }
@@ -426,110 +451,54 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Dfa".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Minimisation".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Nfa".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Reachability".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Regex".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
-            // NatBox reuses the checked Boolean and natural-order providers;
-            // their four conjunction conveniences remain ambient in Strict.
-            // SUBSET-SIGMA K-a Char projection: inherited from
-            // Core.Classes.LawfulClasses in this import closure.
-            "Algorithm.Geometry.NatBox".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
+            ["Unit", "charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
+        ),
+        (
+            // NatBox reuses the checked Boolean and natural-order providers;
+            // conjunction is now imported from its checked package.
+            // SUBSET-SIGMA K-a Char projection: inherited from
+            // Core.Classes.LawfulClasses in this import closure.
+            "Algorithm.Geometry.NatBox".to_string(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Graph reachability reuses the formal-languages search and
@@ -538,127 +507,73 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Graphs.Dependency".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Numeric.Gcd".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
-            // RationalInterval reuses the checked rational provider; its
-            // conjunction names remain ambient under the strict floor.
+            // RationalInterval reuses checked rational and conjunction
+            // providers; only the inherited Char bridge is still ambient.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Numeric.RationalInterval".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Argmin imports NonEmpty, Derived membership, Nat Order and Or.
-            // The provider closure retains nine compiler conveniences under
+            // The provider closure retains four compiler conveniences under
             // the strict-floor probe; neither Nat bridge adds an assumption.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Optimization.Argmin".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
-            // BoundedSearch imports Nat Order and Transport; its proof invariant
-            // retains the compiler's conjunction vocabulary under strict mode.
+            // BoundedSearch imports Nat Order, Transport and Conjunction;
+            // only the inherited Char bridge remains ambient.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Optimization.BoundedSearch".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
-            // With its own Dec-family imports, this package now reaches the
-            // strict-floor census. Its conjunction names remain prelude-bound
-            // until the separate collections slice moves And and is_sorted.
+            // OrderedSearch's Dec-family and Conjunction imports reach the
+            // strict-floor census; only the inherited Char bridge is ambient.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Searching.OrderedSearch".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Sorting.InsertionSort".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Empirical statistics reuse Exact, NonEmpty, Derived and
-            // transport; their provider closures retain the same nine
+            // transport; their provider closures retain four unrelated
             // prelude conveniences measured by the strict-floor probe.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Statistics.Empirical".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Exact natural-weight distributions inherit the arithmetic,
@@ -666,39 +581,19 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Statistics.Exact".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.SymbolicAlgebra.NatPolynomial".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // ArgParse now declares its exact Schema, diagnostics, formatting,
@@ -706,20 +601,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // boundary loads while strict mode retains only provider compiler
             // conveniences.
             "Application.CommandLine.ArgParse".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Configuration.Decoder now declares its exact Schema,
@@ -731,18 +616,13 @@ fn catalog_ambient_passthrough_migration_census() {
             // Core.Classes.LawfulClasses in this import closure.
             "Application.Configuration.Decoder".to_string(),
             [
-                "And",
                 "MkProcessInput",
                 "MkProd",
                 "ProcessInput",
                 "Prod",
                 "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
                 "charToInt",
                 "eqChar",
-                "is_sorted",
                 "leqChar",
             ]
             .into_iter()
@@ -757,20 +637,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Application.Input.Schema".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Capability.Console.Text".to_string(),
@@ -783,10 +653,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Diagnostics.Core".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Diagnostics.Render now declares its exact Diagnostics.Core and
@@ -796,20 +663,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Diagnostics.Render".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             "Capability.Filesystem.Authority".to_string(),
@@ -857,20 +714,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Filesystem.Path.Posix".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Formatting.Doc now declares its exact Transport and Derived
@@ -879,20 +726,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Formatting.Doc".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Parsing.Cursor now declares its exact lower-tier value closure,
@@ -902,20 +739,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Parsing.Cursor".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Parsing.Decoder now declares its exact six-name Cursor value
@@ -924,20 +751,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Parsing.Decoder".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Lexer imports Dfa and Cursor in one direction; strict mode
@@ -945,50 +762,27 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Parsing.Lexer".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Parsing.Numeric now declares its exact Diagnostics.Core and
             // Transport dependencies. Its ordinary package boundary loads
             // while strict mode retains compiler conveniences.
             "Capability.Parsing.Numeric".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Parsing.Parsing declares its exact package dependencies; its
             // byte bridges use provider-less prelude builtin charToInt.
             // Strict mode retains that name and the compiler conveniences.
             "Capability.Parsing.Parsing".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Process.Arguments now declares its exact LawfulClasses, Derived,
@@ -999,16 +793,11 @@ fn catalog_ambient_passthrough_migration_census() {
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Process.Arguments".to_string(),
             [
-                "And",
                 "MkProcessInput",
                 "ProcessInput",
                 "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
                 "charToInt",
                 "eqChar",
-                "is_sorted",
                 "leqChar",
             ]
             .into_iter()
@@ -1060,7 +849,6 @@ fn catalog_ambient_passthrough_migration_census() {
             "Capability.System.Error".to_string(),
             [
                 "AlreadyExists",
-                "And",
                 "BrokenPipe",
                 "CapabilityDenied",
                 "FileError",
@@ -1095,7 +883,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "Prod",
                 "Revoked",
                 "Unsupported",
-                "and_intro",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1154,29 +941,16 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Classes.EffectfulClasses".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: introduced by this
             // package's own checked Char laws and instances.
             "Core.Classes.LawfulClasses".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Migrated to declared imports by CAT-LAWFULFUNCTORS-STANDALONE-IMPORT
@@ -1186,20 +960,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Classes.LawfulFunctors".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Membership explicitly imports IsTrue and contributes no ambient
@@ -1207,38 +971,21 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Classes.Membership".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        ),
-        (
-            "Core.Logic.Compare".to_string(),
-            ["And", "and_intro"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Logic.EmptyDec".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
-            // The operator facade this WP adds. It declares the standard
-            // operator bindings and inherits its ambient set from the
-            // conjunction vocabulary those bindings are checked against.
+            // The operator facade declares the standard bindings and inherits
+            // its one ambient Char bridge from checked provider closures.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Operators.Standard".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // The historical package now imports the canonical class owner and
@@ -1247,87 +994,43 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Binary.BytesKeys".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
+            ["charToInt"].into_iter().map(str::to_string).collect(),
+        ),
+        (
+            // AC-5: Derived closure set plus charToInt, this package's own provider-less builtin use.
+            "Data.Binary.BytesPrimitiveContracts".to_string(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
-            // AC-5: Derived closure set plus charToInt, this package's own provider-less builtin use.
-            "Data.Binary.BytesPrimitiveContracts".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.Deque".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Derived now owns both structural list operations directly.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.Derived".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.Map".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // NonEmpty now declares its exact LawfulFunctors, Transport, and
@@ -1336,20 +1039,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.NonEmpty".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // PriorityQueue declares LawfulClasses plus the Derived length and
@@ -1359,60 +1052,33 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.PriorityQueue".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Finite.Finite".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Numeric.Nat.Order".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
-            // Rational imports the checked Nat, Order, and Transport providers;
-            // only the inherited conjunction vocabulary remains ambient.
+            // Rational imports checked Nat, Order and Transport providers;
+            // only the inherited Char bridge remains ambient.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Numeric.Rational".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
+            ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
             // Json now declares its exact Derived and Cursor dependencies. Its
@@ -1421,20 +1087,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Serialization.Json".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // JsonCodec imports the canonical Json carrier, Derived's list
@@ -1443,20 +1099,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Serialization.JsonCodec".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Validation now declares its EffectfulClasses, LawfulFunctors,
@@ -1465,20 +1111,10 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Sums.Validation".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Equality and order moved to their canonical class owner. The
@@ -1487,51 +1123,27 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Text.StringKeys".to_string(),
-            ["And", "and_fst", "and_intro", "and_snd", "charToInt"]
+            ["charToInt"].into_iter().map(str::to_string).collect(),
+        ),
+        (
+            // EventTrace imports generic Derived list proofs and sortedness;
+            // four unrelated compiler conveniences remain ambient in Strict.
+            // SUBSET-SIGMA K-a Char projection: inherited from
+            // Core.Classes.LawfulClasses in this import closure.
+            "Data.Time.EventTrace".to_string(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
-            // EventTrace imports generic Derived list proofs; the nine
-            // inherited compiler conveniences remain ambient in Strict.
-            // SUBSET-SIGMA K-a Char projection: inherited from
-            // Core.Classes.LawfulClasses in this import closure.
-            "Data.Time.EventTrace".to_string(),
-            [
-                "And",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Tooling.Testing.Property".to_string(),
-            [
-                "And",
-                "MkUnit",
-                "Unit",
-                "and_fst",
-                "and_intro",
-                "and_snd",
-                "charToInt",
-                "eqChar",
-                "is_sorted",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
     ];
     assert_eq!(
@@ -1552,6 +1164,8 @@ fn catalog_ambient_passthrough_migration_census() {
         "Algorithm.LinearAlgebra.NatMatrix",
         "Core.Function.Combinators",
         "Core.Logic.And",
+        "Core.Logic.Compare",
+        "Core.Logic.Conjunction",
         "Core.Logic.Not",
         "Data.Collections.List",
         "Data.Numeric.Nat.Arithmetic",

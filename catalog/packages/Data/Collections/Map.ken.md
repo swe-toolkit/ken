@@ -85,6 +85,8 @@ and closes with `Proved` — the same non-inductive shape as
 immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Core.Classes.LawfulClasses (bool_and, bool_not)
 
 import Core.Classes.LawfulClasses (Ord)
@@ -99,7 +101,7 @@ import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (cong, trans, sym)
 
-import Data.Collections.Derived (list_append, length)
+import Data.Collections.Derived (list_append, length, is_sorted)
 
 import Data.Numeric.Nat.Arithmetic (add)
 

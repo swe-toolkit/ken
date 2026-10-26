@@ -13,7 +13,7 @@ comparator-indexed operations and proofs for sorting and permutation.
 ```ken
 import Core.Classes.LawfulClasses (Ord, ord_leq_at)
 
-import Data.Collections.Derived (eq_from_ord)
+import Data.Collections.Derived (eq_from_ord, is_sorted)
 
 import Data.Collections.Derived as DC
 

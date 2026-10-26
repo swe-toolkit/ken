@@ -17,6 +17,8 @@ from different `CursorOps` instances are not position-comparable without an
 explicit conversion chosen by the caller.
 
 ```ken
+import Core.Logic.Conjunction (And, and_fst, and_snd)
+
 import Capability.Parsing.Cursor
   (CursorOps, cursor_advance, cursor_locate, cursor_peek, cursor_remaining)
 

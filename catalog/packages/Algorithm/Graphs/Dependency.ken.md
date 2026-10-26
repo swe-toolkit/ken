@@ -32,12 +32,16 @@ available to clients. The private DFA encoding, search, ranking,
 deduplication, sorting and proofs are given below.
 
 ```ken
+import Core.Logic.Conjunction (and_fst, and_snd)
+
 import Data.Finite.Finite (Finite, MkFinite, elements, covers)
 
 import Core.Logic.Transport (cong, sym, trans)
 
 import Core.Classes.LawfulClasses
   (DecEq, bool_or, bool_and, leq_nat, bool_cases, or_cases, or_left, or_right)
+
+import Data.Collections.Derived (is_sorted)
 
 import Data.Collections.Derived as DC
 

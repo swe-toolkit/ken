@@ -10,6 +10,66 @@ pub fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
+/// Alias only whole `is_sorted` tokens: loose prelude-bearing clients cannot
+/// import the distinct Derived declaration at the same unqualified spelling.
+pub fn rename_sorted_token(line: &str, in_derived_import: bool) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut previous_end = 0;
+    for (start, _) in line.match_indices("is_sorted") {
+        let end = start + "is_sorted".len();
+        let ident = |c: char| c.is_alphanumeric() || c == '_';
+        let left_ident = line[..start].chars().next_back().is_some_and(ident);
+        let right_ident = line[end..].chars().next().is_some_and(ident);
+        if left_ident || right_ident {
+            continue;
+        }
+        out.push_str(&line[previous_end..start]);
+        out.push_str(if in_derived_import {
+            "is_sorted as catalog_is_sorted"
+        } else {
+            "catalog_is_sorted"
+        });
+        previous_end = end;
+    }
+    out.push_str(&line[previous_end..]);
+    out
+}
+
+/// Legacy Map tests elaborate the literate source in a loose, prelude-bearing
+/// environment rather than under its package module scope. Alpha-rename only
+/// the imported sortedness binding inside source fences to preserve the real
+/// Derived GlobalId without introducing a prelude name collision. Prose,
+/// other identifiers such as is_sorted_append, and non-source fences stay put.
+pub fn map_source_for_loose_environment(source: &str) -> String {
+    let mut source_fence = false;
+    let mut derived_import = false;
+    let mut out = String::with_capacity(source.len());
+    for line in source.split_inclusive('\n') {
+        if line == "```ken\n" {
+            source_fence = true;
+            out.push_str(line);
+        } else if line.starts_with("```") {
+            source_fence = false;
+            derived_import = false;
+            out.push_str(line);
+        } else if source_fence {
+            if line
+                .trim_start()
+                .starts_with("import Data.Collections.Derived")
+            {
+                derived_import = true;
+            }
+            out.push_str(&rename_sorted_token(line, derived_import));
+            if derived_import && line.contains(')') {
+                derived_import = false;
+            }
+        } else {
+            out.push_str(line);
+        }
+    }
+    out
+}
+
 /// Promise class: durable checked-identity invariant. Qualified spelling
 /// locates a candidate in the mutable host table; the real loader's owned-ID
 /// population, captured in this same environment, authenticates its provider.

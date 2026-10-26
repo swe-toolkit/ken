@@ -113,7 +113,7 @@ fn generic_trace_and_derived_laws_check_without_new_trust() {
 // Restate generic types independently of package law declarations, including
 // a classifier with no payload equality or sorted-input premise.
 const GENERIC_CLIENT: &str = r##"
-import Data.Collections.Derived (count, filter, filter_sorted, count_cons)
+import Data.Collections.Derived (count, filter, filter_sorted, count_cons, is_sorted as catalog_is_sorted)
 import Data.Time.EventTrace
   (Event, event_before, event_in_window, time_ordered, trace_window,
    trace_merge, trace_window_ordered, trace_merge_ordered, trace_merge_count)
@@ -125,7 +125,7 @@ theorem client_filter_sorted
     Equal Bool (le x y) True → Equal Bool (le y z) True →
     Equal Bool (le x z) True)
   (keep : a → Bool) (xs : List a) :
-  is_sorted a le xs → is_sorted a le (filter a keep xs) =
+  catalog_is_sorted a le xs → catalog_is_sorted a le (filter a keep xs) =
   filter_sorted a le le_trans keep xs
 
 theorem client_count_cons
