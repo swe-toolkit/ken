@@ -88,10 +88,15 @@ token mint:
   releases and kicks through `release-and-handoff.md`; you do not publish a
   separate status transition or invent a successor.
 - **Merge-mechanics fault recovery.** A path-guard check stuck at
-  `status=in_progress` with `conclusion=success` → `gh run rerun <runid>`
-  (needs actions:write; leaves the PR open; the run must be `completed` first),
-  else close+reopen the PR — the SHA never changes, so the merge Decision stays
-  bound. A transient publisher death → re-run the publisher on the SAME SHA.
+  `status=in_progress` with `conclusion=success` → close+reopen the PR — the
+  SHA never changes, so the merge Decision stays bound. `gh run rerun` is
+  refused (COORDINATION §12a) and would retest the old merge ref. A transient
+  publisher death → re-run the publisher on the SAME SHA.
+- **No main CI to watch.** CI does not run on `main` after a merge. The
+  publisher merges only on a green PR run that tested the current
+  `origin/main` tip and the routed SHA, and re-triggers by close+reopen when
+  `main` moved (`merge-procedure.md` M5). Do not wait for, or check, a `main`
+  run after a landing; M6 blob verification is the post-merge check.
 
 ## §3. THE BRIGHT LINE — what is yours, and what you escalate
 
