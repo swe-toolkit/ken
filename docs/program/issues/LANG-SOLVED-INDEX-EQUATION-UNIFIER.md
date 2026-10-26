@@ -1,7 +1,7 @@
 ---
 id: LANG-SOLVED-INDEX-EQUATION-UNIFIER
 title: "Stage 2 of solved-index elimination: LANG-SOLVED-INDEX-SUBSTITUTION eliminates only all-variable methods whose premise slots each project to one leaf, and mixed methods and multi-leaf slots keep the alias path. Replace the per-leaf plan with a per-equation unifier (an equation telescope, injectivity decomposition, per-equation rule dispatch, dependency-ordered transport) and lift the gate"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1
