@@ -146,82 +146,105 @@ impl Fixture {
     }
 }
 
-/// Promise: durable invariant. MEASURED: checked closed casts at convertible
-/// function-bearing parameters return constructor heads and identity at two
-/// ground inputs. CLAIMED: the C6 parameters-only push computes. THE GAP:
-/// selected applications are not a proof of arbitrary closure equivalence.
-#[test]
-fn closed_refl_pushes_convertible_function_parameters() {
-    let mut f = Fixture::new();
-    let src = f.identity();
-    let dst = f.via_idn();
-    for (family, constructor, source, target, pair) in [
-        ("CFn", "MkCFn", src.clone(), dst.clone(), false),
-        (
-            "CPairFn",
-            "MkCPairFn",
-            Term::pair(src.clone(), f.one()),
-            Term::pair(dst, f.one()),
-            true,
-        ),
-        (
-            "CFn",
-            "MkCFn",
-            Term::app(f.constant("addN"), f.zero()),
-            f.constant("idN"),
-            false,
-        ),
-    ] {
-        let a = f.family(family, source.clone());
-        let b = f.family(family, target);
-        let term = f.cast(a, b.clone(), f.ctor(constructor, source));
-        f.observe_head_and_function(&term, &b, constructor, pair, false);
-    }
+fn observe_refl(f: &mut Fixture, family: &str, ctor: &str, source: Term, target: Term, pair: bool) {
+    let a = f.family(family, source.clone());
+    let b = f.family(family, target);
+    let term = f.cast(a, b.clone(), f.ctor(ctor, source));
+    f.observe_head_and_function(&term, &b, ctor, pair, false);
 }
 
-/// Promise: durable invariant. MEASURED: J's endpoint route computes for
-/// convertible endpoints, including the exact identical-endpoint F1 row;
-/// selected Nat applications remain ground identity. CLAIMED: both producer
-/// sites of C6 reach the push. THE GAP: a finite probe does not enumerate
-/// all possible source families or dependent fields.
-#[test]
-fn j_endpoints_push_convertible_and_identical_parameters() {
-    let mut f = Fixture::new();
-    let src = f.identity();
-    let dst = f.via_idn();
-    for (family, constructor, source, target, pair) in [
-        ("CFn", "MkCFn", src.clone(), dst.clone(), false),
-        (
-            "CPairFn",
-            "MkCPairFn",
-            Term::pair(src, f.one()),
-            Term::pair(dst, f.one()),
-            true,
-        ),
-        (
-            "CFn",
-            "MkCFn",
-            Term::app(f.constant("addN"), f.zero()),
-            f.constant("idN"),
-            false,
-        ),
-        ("CFn", "MkCFn", f.constant("idf"), f.constant("idf"), false),
-    ] {
-        let a = f.family(family, source.clone());
-        let b = f.family(family, target);
-        let proof = Term::Refl(Box::new(a.clone()));
-        let term = f.via_j(a, b.clone(), proof, f.ctor(constructor, source));
-        f.observe_head_and_function(&term, &b, constructor, pair, false);
-    }
+fn observe_j(f: &mut Fixture, family: &str, ctor: &str, source: Term, target: Term, pair: bool) {
+    let a = f.family(family, source.clone());
+    let b = f.family(family, target);
+    let proof = Term::Refl(Box::new(a.clone()));
+    let term = f.via_j(a, b.clone(), proof, f.ctor(ctor, source));
+    f.observe_head_and_function(&term, &b, ctor, pair, false);
 }
 
-/// Promise: durable invariant. MEASURED: J with a false axiom re-heads a
-/// field-free constructor at the target parameter, while a non-convertible
-/// dependent field stays Unknown and kernel-stuck. CLAIMED: the target is
-/// used but field types still guard the push. THE GAP: the axiom is a typed
-/// test premise, not a consistent closed witness of unequal parameters.
+/// Promise: durable invariant. MEASURED: a checked CFn refl cast yields the
+/// same head and identity at two Nat inputs. CLAIMED: C6 computes row 5.
+/// THE GAP: selected applications do not compare closures universally.
 #[test]
-fn j_twin_uses_target_and_refuses_nonconvertible_field() {
+fn closed_refl_cfn_computes() {
+    let mut f = Fixture::new();
+    let (source, target) = (f.identity(), f.via_idn());
+    observe_refl(&mut f, "CFn", "MkCFn", source, target, false);
+}
+
+/// Promise: durable invariant. MEASURED: a checked pair-parameter refl cast
+/// preserves its ground second component and two ground applications.
+/// CLAIMED: C6 computes row 6. THE GAP: nested observations are selective.
+#[test]
+fn closed_refl_cpairfn_computes() {
+    let mut f = Fixture::new();
+    let (source, target) = (
+        Term::pair(f.identity(), f.one()),
+        Term::pair(f.via_idn(), f.one()),
+    );
+    observe_refl(&mut f, "CPairFn", "MkCPairFn", source, target, true);
+}
+
+/// Promise: durable invariant. MEASURED: the captured addN Zero parameter
+/// evaluates through a checked cast and ground identity applications.
+/// CLAIMED: the push does not require an empty function environment.
+/// THE GAP: only this checked closed capture and two inputs are observed.
+#[test]
+fn closed_refl_captured_parameter_computes() {
+    let mut f = Fixture::new();
+    let (source, target) = (Term::app(f.constant("addN"), f.zero()), f.constant("idN"));
+    observe_refl(&mut f, "CFn", "MkCFn", source, target, false);
+}
+
+/// Promise: durable invariant. MEASURED: J endpoint evaluation produces a
+/// constructor and two ground identity applications for row 5. CLAIMED:
+/// J reaches C6. THE GAP: no claim about all J motives or all closures.
+#[test]
+fn j_cfn_convertible_computes() {
+    let mut f = Fixture::new();
+    let (source, target) = (f.identity(), f.via_idn());
+    observe_j(&mut f, "CFn", "MkCFn", source, target, false);
+}
+
+/// Promise: durable invariant. MEASURED: J preserves the pair's ground Nat
+/// and the selected function applications in row 6. CLAIMED: nested
+/// parameters reach C6. THE GAP: selected probes are not closure equality.
+#[test]
+fn j_cpairfn_convertible_computes() {
+    let mut f = Fixture::new();
+    let (source, target) = (
+        Term::pair(f.identity(), f.one()),
+        Term::pair(f.via_idn(), f.one()),
+    );
+    observe_j(&mut f, "CPairFn", "MkCPairFn", source, target, true);
+}
+
+/// Promise: durable invariant. MEASURED: a captured source parameter travels
+/// through J to a CFn head and ground identity. CLAIMED: captured C6 route.
+/// THE GAP: selected ground inputs do not inspect closure representation.
+#[test]
+fn j_captured_parameter_computes() {
+    let mut f = Fixture::new();
+    let (source, target) = (Term::app(f.constant("addN"), f.zero()), f.constant("idN"));
+    observe_j(&mut f, "CFn", "MkCFn", source, target, false);
+}
+
+/// Promise: durable invariant. MEASURED: the J route at identical CFn idf
+/// endpoints gives a constructor and identity at two ground inputs (F1).
+/// CLAIMED: non-syntactic endpoint equality does not leave J Unknown.
+/// THE GAP: this is a checked source row, not arbitrary closure equality.
+#[test]
+fn j_identical_idf_computes() {
+    let mut f = Fixture::new();
+    let idf = f.constant("idf");
+    observe_j(&mut f, "CFn", "MkCFn", idf.clone(), idf, false);
+}
+
+/// Promise: durable invariant. MEASURED: a false-axiom J cast of a
+/// field-free CFn yields the target's successor on Zero and One. CLAIMED:
+/// parameters come from the target. THE GAP: the typed axiom is not a
+/// consistent closed equality between these different functions.
+#[test]
+fn j_twin_uses_target_parameter() {
     let mut f = Fixture::new();
     let a = f.family("CFn", f.constant("idN"));
     let b = f.family("CFn", f.constant("succN"));
@@ -232,7 +255,40 @@ fn j_twin_uses_target_and_refuses_nonconvertible_field() {
         f.ctor("MkCFn", f.constant("idN")),
     );
     f.observe_head_and_function(&term, &b, "MkCFn", false, true);
+}
 
+/// Promise: durable invariant. MEASURED: a checked dependent-field CDep
+/// with convertible parameters rebuilds its head and retains MkBox Zero.
+/// CLAIMED: the field-type gate admits its positive case. THE GAP: this
+/// witness does not test a field under non-convertible parameter types.
+#[test]
+fn closed_refl_dependent_field_computes() {
+    let mut f = Fixture::new();
+    let a = f.family("CDep", f.identity());
+    let b = f.family("CDep", f.via_idn());
+    let box_zero = f.ctor("MkBox", f.zero());
+    let value = Term::app(f.ctor("MkCDep", f.identity()), box_zero);
+    let term = f.cast(a, b.clone(), value);
+    f.checked(&term, &b);
+    assert!(
+        matches!(peel_app(&whnf(&f.elab.env, &Context::new(), &term)).0, Term::Constructor { id, .. } if id == f.id("MkCDep"))
+    );
+    let EvalVal::Ctor { id, args, .. } = f.eval(&term) else {
+        panic!("convertible dependent field must rebuild")
+    };
+    assert_eq!(id, f.id("MkCDep"));
+    assert_eq!(args.len(), 2);
+    let expected_box = f.ctor("MkBox", f.zero());
+    assert_eq!(args[1], f.eval(&expected_box));
+}
+
+/// Promise: durable fail-closed invariant. MEASURED: CDep with a field
+/// indexed by a non-convertible parameter stays Unknown where kernel is
+/// stuck. CLAIMED: the field-type gate blocks an unsound re-heading.
+/// THE GAP: the axiom is a typed test premise, not consistent equality.
+#[test]
+fn j_dependent_field_twin_stays_unknown() {
+    let mut f = Fixture::new();
     let a = f.family("CDep", f.constant("idN"));
     let b = f.family("CDep", f.constant("succN"));
     let field = f.ctor("MkBox", f.zero());
