@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE
 title: "Spec 72 section 1 states what argmin selects for one cost function, but no law relates two cost functions. Rule from a checked D0 at zero trust that composing the cost with a function that preserves and reflects the strict Nat order selects the same candidate, including on ties, and state it with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
@@ -17,8 +17,8 @@ origin: "Operator 2026-10-08: \"start l3 on the establish catalog program\"; ope
 ## Objective
 
 Spec 72 states, as a public checked law over
-`Algorithm.Optimization.Argmin`, that `argmin a (λx. f (cost x)) xs`
-equals `argmin a cost xs` for every nonempty `xs`, whenever `f`
+`Algorithm.Optimization.Argmin`, that `argmin a (comp a Nat Nat f cost)
+xs` equals `argmin a cost xs` for every nonempty `xs`, whenever `f`
 preserves and reflects the strict Nat order.
 
 ## Settled inputs (spec 72 §1, main `9e1d6e9cd`)
@@ -64,8 +64,9 @@ is a separate Foundation WP built from the AC-0 D0.
 - **AC-2.** The seed's accepted client uses four labelled candidates
   whose costs include a tie that is not at the head, for example costs
   `5, 2, 7, 2`, and `f` adding three. It applies the law, and checks
-  both selections independently by `Refl` to be the earlier tied
-  label. Its refused block pins one false proposition on the same
+  both selections independently by `Proved` to be the earlier tied
+  label (AC-0 `evt_64h89e05agzat`: a lambda in type position and `Refl`
+  on a closed evaluation are both refused). Its refused block pins one false proposition on the same
   candidates: with `f = λc. Zero`, the selection claimed equal to the
   cost-only `argmin`.
 
