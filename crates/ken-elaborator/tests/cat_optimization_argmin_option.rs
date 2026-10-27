@@ -172,6 +172,8 @@ fn generic_option_exports_check_without_new_trust_or_public_helpers() {
         "option_least",
         "argmin_option_member_base",
         "argmin_option_least_base",
+        "select_from_cost_order",
+        "choose_cost_order",
     ] {
         match env.elaborate_file(&format!("import {ARGMIN} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
