@@ -15027,3 +15027,68 @@ pub(in crate::cranelift_backend) fn lrc_d2b_entered() -> BTreeSet<StaticOriginId
 pub(in crate::cranelift_backend) fn lrc_d2b_worker_calls() -> BTreeSet<StaticOriginId> {
     LRC_D2B_WORKER_CALLS.with(|cell| cell.borrow().clone())
 }
+
+
+/// Move-only compiler authority for publishing one generated-context Result.
+///
+/// The identity comes from the context plan and the value from an exact
+/// governed producer. Neither field is serialized or added to the carrier.
+#[derive(Clone, Copy)]
+struct GeneratedConstructorAuthority {
+    identity: ConstructorIdentity,
+    word: cranelift_codegen::ir::Value,
+}
+
+
+/// One declared call-result obligation, located in a single finished CLIF
+/// function.  Every instruction/value/slot here is only a locator: the
+/// finished verifier reads the actual instruction data, direct callee,
+/// comparisons, branches, and memory operands before issuing a seed.
+#[derive(Clone)]
+struct PendingCallResultObligation {
+    identity: Option<ConstructorIdentity>,
+    realization_required: bool,
+    call: cranelift_codegen::ir::Inst,
+    payload: cranelift_codegen::ir::StackSlot,
+    status: cranelift_codegen::ir::Value,
+    status_compare: cranelift_codegen::ir::Value,
+    status_branch: cranelift_codegen::ir::Inst,
+    trap_word: cranelift_codegen::ir::Value,
+    trap_compare: cranelift_codegen::ir::Value,
+    trap_branch: cranelift_codegen::ir::Inst,
+    result_word: cranelift_codegen::ir::Value,
+    frame_bytes: u32,
+    trap_offset: i32,
+    result_offset: i32,
+}
+
+
+impl Lowering<'_> {
+    fn register_generated_constructor_authority(
+        &mut self,
+        identity: ConstructorIdentity,
+        word: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        let authority = GeneratedConstructorAuthority {
+            identity,
+            word: word.word,
+        };
+        if let Some(existing) = self
+            .function_local
+            .generated_constructor_authorities
+            .get(&word.word)
+        {
+            if existing.identity == authority.identity && existing.word == authority.word {
+                return Ok(());
+            }
+            return Err(backend_module(
+                "one generated-context Result word acquired incompatible terminal authorities"
+                    .to_string(),
+            ));
+        }
+        self.function_local
+            .generated_constructor_authorities
+            .insert(word.word, authority);
+        Ok(())
+    }
+}
