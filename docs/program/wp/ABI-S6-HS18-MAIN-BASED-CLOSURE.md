@@ -5,7 +5,8 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base (increment A):** `origin/main` `537fa2afbdab8962717d43640afbd04719d1b258`.
+**Base (increment A):** `origin/main` `b8fb28e3f7bde81ab44b05a4d1090b9a19aa1439` (the main the
+candidate `bdf0e4755` is cut from; moved 2026-10-27 by DOC-BUNDLE-304).
 Increments B and C pin their own bases in §4a-pin. This header is A's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
@@ -181,7 +182,7 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=537fa2afbdab8962717d43640afbd04719d1b258   # increment A's pinned base
+BASE=b8fb28e3f7bde81ab44b05a4d1090b9a19aa1439   # increment A's pinned base
 PATHS='-- crates/'                               # the domain, all three crates
 
 # THE PIN NEED NOT EQUAL THE CUT POINT -- requiring that regresses, because

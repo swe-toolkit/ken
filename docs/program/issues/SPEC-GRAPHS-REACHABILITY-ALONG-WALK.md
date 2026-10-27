@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-ALONG-WALK
 title: "Spec 62 decides reachability from one start and composes walks, but no law carries a reachability answer back along a walk: if t reaches a target and a walk runs from s to t, then s reaches it. Rule from a checked D0 at zero trust that it holds, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

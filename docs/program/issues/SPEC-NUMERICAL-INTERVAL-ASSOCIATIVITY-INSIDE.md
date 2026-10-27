@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE
 title: "Spec 68 states interval add and mul commute by endpoint-value inclusion, but no law says either associates. Rule from a checked D0 at zero trust that both regroupings of interval_add and of interval_mul are mutually included, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

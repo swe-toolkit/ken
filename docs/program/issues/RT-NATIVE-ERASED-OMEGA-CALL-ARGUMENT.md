@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-ERASED-OMEGA-CALL-ARGUMENT
 title: "A native build refuses a recursive callee that takes an erased proof argument: fn fw (n : Nat) : Nat requires Top = match n { Zero ↦ Zero; Suc m ↦ Suc (Suc (fw m)) } fails with E0074 at the computational-IH collector, though the reference runtime runs it. Lower calls that carry an erased Ω argument natively"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1
