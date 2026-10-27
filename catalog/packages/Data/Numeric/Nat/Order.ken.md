@@ -922,8 +922,9 @@ argument and its bridge exposes the canonical successor relation.
    facts; fourteen attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
    positive-right-multiplication order transports; the six `min`/`max` bounds
-   and their two `comm` selectors; the three `compare` agreements; and the five inductive
-   `sub` proofs, including `sub::add_cancel`. `OrdResult` remains package-local.
+   and their two `comm` selectors; the three `compare` agreements;
+   and the five inductive `sub` proofs, including `sub::add_cancel`.
+   `OrdResult` remains package-local.
 2. **Source map.**
 
    | Task | Section |

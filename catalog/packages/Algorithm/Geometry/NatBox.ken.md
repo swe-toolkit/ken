@@ -30,9 +30,9 @@ The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
 box-and-distance laws lead the definition; the two structural
 commutativity laws follow the intersection and hull laws, ahead of the
-two metric laws. The corner-wise `inside` operation and its seven laws come next, then the three
-inclusion-order laws, followed by `area` and its three laws. Per-axis proof
-helpers and distance helpers stay private.
+two metric laws. The corner-wise `inside` operation and its seven laws
+come next, then the three inclusion-order laws, followed by `area` and
+its three laws. Per-axis proof helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -1945,13 +1945,14 @@ this interface.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
-   `intersect_comm`, `hull_comm`, `manhattan_symm`, `manhattan_self`, `manhattan_triangle`,
-   `manhattan_zero_equal`, `inside`, `inside_sound`, `inside_refl`,
-   `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`,
-   `inside_hull_right`, `inside_complete`, `inside_trans`,
-   `intersect_greatest`, `hull_least`, `area`, `area_inside`,
-   `area_inverted_x`, and `area_inverted_y`. `axis_within`, `axis_span`,
-   `box_with_lo`, `box_with_hi`, `box_equal`, generic subtraction and
+   `intersect_comm`, `hull_comm`, `manhattan_symm`, `manhattan_self`,
+   `manhattan_triangle`, `manhattan_zero_equal`, `inside`,
+   `inside_sound`, `inside_refl`, `intersect_inside_left`,
+   `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
+   `inside_complete`, `inside_trans`, `intersect_greatest`,
+   `hull_least`, `area`, `area_inside`, `area_inverted_x`,
+   and `area_inverted_y`. `axis_within`, `axis_span`, `box_with_lo`,
+   `box_with_hi`, `box_equal`, generic subtraction and
    multiplication bounds, per-axis lemmas and proof transport helpers
    remain private.
 3. **Source map.** Definition contains the constructors and operations,
