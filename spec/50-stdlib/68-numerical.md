@@ -672,13 +672,14 @@ test is official conformance-runner execution, CI or landing.
 ## 6. Associativity by endpoint-value inclusion
 
 > **Section 6 status: DRAFT v0
-> (SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE).** Architect checked
-> four generic Transparent proof bodies in isolated D0 on `edc1da359`:
-> `ken check` and `ken fmt --check` rc 0, no new `Axiom`, scratch
-> `trusted_base()` GlobalIds identical at 114 → 114, and three probes
-> passed. These results do not deliver the §6 catalog exports or
-> establish shipped-seed execution, official conformance, CI,
-> publication, landing or landed trust.
+> (SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE).** Architect's isolated
+> D0 checked four generic proof bodies on `edc1da359` with no new
+> `Axiom` or trusted GlobalId. The catalog candidate now exports all
+> four Transparent laws: its targeted package test root-loads the
+> generic client and whole accepted §6 seed, rejects the isolated false
+> inclusion, and measures no local trust delta. This is candidate
+> package-test evidence, not official conformance, CI, publication,
+> landing or landed trust.
 
 For every three intervals `i`, `j`, `k`, including inverted ones,
 `Algorithm.Numeric.RationalInterval` must export these **four**
@@ -747,5 +748,6 @@ sum. Its true `IsTrue (interval_inside _ (interval_add i j)) = Proved`
 control and independent `False` value establish that the refusal
 comes from the false endpoint comparison rather than the proof form.
 These closed checks are examples, not proofs of the generic laws.
-The Architect's D0 checks a proposed implementation only; delivery
-against shipped exports and official conformance remain separate.
+The Architect's earlier D0 checked a proposed implementation. The
+catalog candidate's package test now checks the landed seed against its
+exports; neither observation is official conformance or landed trust.
