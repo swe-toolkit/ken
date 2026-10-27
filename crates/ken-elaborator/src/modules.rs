@@ -88,6 +88,11 @@ pub struct ModuleState {
     /// Plural resolver input for this run. N2 accepts exactly one populated
     /// root; retaining the list here makes later roots a data change.
     catalog_roots: Vec<PathBuf>,
+    /// Exact module path → successful owning compilation unit (`33 §3.1`).
+    /// A global declaration spelling cannot confer ownership of a path.
+    module_path_owners: HashMap<String, ModuleUnitOwner>,
+    /// The next distinct in-memory unit identity, committed only on success.
+    next_in_memory_unit: u64,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
     /// V1 results owned by each loaded file unit, retained for cached roots
@@ -136,6 +141,21 @@ pub struct ModuleState {
 type FileExportTables = HashMap<String, HashMap<String, HashMap<String, String>>>;
 type ProviderExportIds = HashMap<String, HashMap<String, ken_kernel::GlobalId>>;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ModuleUnitOwner {
+    File(String),
+    InMemory(u64),
+}
+
+impl ModuleUnitOwner {
+    fn description(&self) -> String {
+        match self {
+            Self::File(path) => format!("file {path}"),
+            Self::InMemory(id) => format!("in-memory unit {id}"),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct ExportProvenance {
     inline_paths: HashSet<String>,
@@ -146,6 +166,31 @@ struct ExportProvenance {
 }
 
 impl ModuleState {
+    fn require_module_path_available(
+        &self,
+        path: &str,
+        claimant: &ModuleUnitOwner,
+        span: &Span,
+    ) -> Result<(), ElabError> {
+        if let Some(owner) = self.module_path_owners.get(path) {
+            if owner != claimant {
+                return Err(ElabError::ModuleOwnerClash {
+                    path: path.to_string(),
+                    owner: owner.description(),
+                    claimant: claimant.description(),
+                    span: span.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn record_module_paths(&mut self, paths: impl IntoIterator<Item = String>, owner: &ModuleUnitOwner) {
+        for path in paths {
+            self.module_path_owners.insert(path, owner.clone());
+        }
+    }
+
     pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
         self.declaration_descriptions
             .retain(|id, _| !removed.contains(id));
@@ -1643,6 +1688,25 @@ fn apply_export(
     Ok(())
 }
 
+// Check the whole claiming unit before it can mutate checked declarations or
+// interface tables. The inline claim-site check below additionally covers
+// claims introduced by a dependency loaded after this preflight.
+fn precheck_module_paths(
+    state: &ModuleState,
+    decls: &[Decl],
+    prefix: &str,
+    claimant: &ModuleUnitOwner,
+) -> Result<(), ElabError> {
+    for decl in decls {
+        if let Decl::ModuleDecl { name, decls: inner, span } = decl.unwrap_pub() {
+            let path = qualify(prefix, name);
+            state.require_module_path_available(&path, claimant, span)?;
+            precheck_module_paths(state, inner, &path, claimant)?;
+        }
+    }
+    Ok(())
+}
+
 fn declared_module_paths(decls: &[Decl], prefix: &str, out: &mut HashSet<String>) {
     for decl in decls {
         if let Decl::ModuleDecl {
@@ -1957,6 +2021,9 @@ fn load_unit(
         return Ok((ids.clone(), results));
     }
 
+    let owner = ModuleUnitOwner::File(module.to_string());
+    elab.module_state
+        .require_module_path_available(module, &owner, span)?;
     let root = elab
         .module_state
         .catalog_roots
@@ -1965,6 +2032,7 @@ fn load_unit(
         .clone();
     let path = source_path(&root, module, span)?;
     let ParsedUnit { decls, literate } = parse_unit_source(&path, span)?;
+    precheck_module_paths(&elab.module_state, &decls, module, &owner)?;
 
     let previous_package = elab.class_env.current_package.clone();
     let previous_direct_use = elab.class_env.direct_use_packages.clone();
@@ -1997,12 +2065,12 @@ fn load_unit(
         previous_implicit_single_provider
     };
 
+    let mut local_modules = HashSet::new();
+    declared_module_paths(&decls, module, &mut local_modules);
     elab.module_state.active_imports.push(module.to_string());
     let mut dependency_results = Vec::new();
     let mut loaded_dependencies = Vec::new();
     let result = (|| {
-        let mut local_modules = HashSet::new();
-        declared_module_paths(&decls, module, &mut local_modules);
         let mut imports = Vec::new();
         imported_module_paths(&decls, module, &mut imports);
         for (dependency, owner, import_span) in imports {
@@ -2016,6 +2084,11 @@ fn load_unit(
             }
         }
         refresh_carried_instance_admission(elab);
+        // A dependency can claim a previously unowned path during this load.
+        // Recheck before this unit writes any of its own declarations.
+        elab.module_state
+            .require_module_path_available(module, &owner, span)?;
+        precheck_module_paths(&elab.module_state, &decls, module, &owner)?;
 
         // Every loaded source unit is an ordinary orphan-check module. Assign
         // its id only after dependencies return so their current-module ids do
@@ -2030,6 +2103,7 @@ fn load_unit(
             elab,
             &decls,
             module,
+            &owner,
             &local_modules,
             &mut ordered_inline_modules,
             &mut scope,
@@ -2105,6 +2179,8 @@ fn load_unit(
     elab.class_env.implicit_single_provider = previous_implicit_single_provider;
 
     let (ids, own_results) = result?;
+    elab.module_state
+        .record_module_paths(local_modules.into_iter().chain(std::iter::once(module.to_string())), &owner);
     let mut closure_results = Vec::new();
     let mut seen_ids = HashSet::new();
     for result in dependency_results.into_iter().chain(own_results.iter().cloned()) {
@@ -4806,6 +4882,7 @@ fn expand_scope(
     elab: &mut ElabEnv,
     decls: &[Decl],
     prefix: &str,
+    unit_owner: &ModuleUnitOwner,
     unit_inline_modules: &HashSet<String>,
     ordered_inline_modules: &mut HashSet<String>,
     scope: &mut Scope,
@@ -4908,15 +4985,18 @@ fn expand_scope(
             Decl::ModuleDecl {
                 name,
                 decls: inner,
-                span: _,
+                span,
             } => {
                 let child_prefix = qualify(prefix, name);
+                elab.module_state
+                    .require_module_path_available(&child_prefix, unit_owner, span)?;
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
                 child_scope.private_ids.clone_from(&scope.private_ids);
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
                     &child_prefix,
+                    unit_owner,
                     unit_inline_modules,
                     ordered_inline_modules,
                     &mut child_scope,
@@ -5735,6 +5815,13 @@ pub fn expand_and_elaborate(
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     let boundary = admission_boundary(decls)?;
+    let mut local_modules = HashSet::new();
+    declared_module_paths(decls, "", &mut local_modules);
+    let owner = match elab.module_state.active_imports.last() {
+        Some(file) => ModuleUnitOwner::File(file.clone()),
+        None => ModuleUnitOwner::InMemory(elab.module_state.next_in_memory_unit),
+    };
+    precheck_module_paths(&elab.module_state, decls, "", &owner)?;
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();
     let previous_package = elab.class_env.current_package.clone();
     let previous_direct_use = elab.class_env.direct_use_packages.clone();
@@ -5754,13 +5841,12 @@ pub fn expand_and_elaborate(
     }
     let mut scope = elab.module_state.root_scope.clone();
     let mut unit_definitions = elab.module_state.package_definitions.clone();
-    let mut local_modules = HashSet::new();
-    declared_module_paths(decls, "", &mut local_modules);
     let mut ordered_inline_modules = HashSet::new();
     let expanded = expand_scope(
         elab,
         decls,
         "",
+        &owner,
         &local_modules,
         &mut ordered_inline_modules,
         &mut scope,
@@ -5809,6 +5895,10 @@ pub fn expand_and_elaborate(
     }
     elab.module_state.root_scope = scope;
     elab.module_state.package_definitions = unit_definitions;
+    elab.module_state.record_module_paths(local_modules, &owner);
+    if matches!(owner, ModuleUnitOwner::InMemory(_)) {
+        elab.module_state.next_in_memory_unit += 1;
+    }
     Ok(results)
 }
 
@@ -6663,6 +6753,112 @@ mod namespace_effect_tests {
         let root = tempfile::tempdir().expect("temporary module root");
         fs::write(root.path().join("A.ken"), source).expect("write inline owner unit");
         root
+    }
+
+    /// Promise class: durable invariant (33 §3.1, D6).
+    /// MEASURED: independent units cannot claim P in either order, despite
+    /// disjoint members, and the second unit installs no checked declarations,
+    /// globals, exports or provenance. Distinct R and strict child P.Q accept.
+    /// CLAIMED: module ownership is exact-path and success-only, not a member
+    /// collision or a mutable global spelling. THE GAP: the session test
+    /// separately pins per-call identity; the space-operation test pins a
+    /// failed file that must never reserve its path.
+    #[test]
+    fn foreign_inline_path_owner_clashes_in_both_orders_without_writes() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(root.path().join("P.ken"), "pub const file_only : Nat = Zero\n")
+            .expect("write file unit");
+        let roots = [root.path().to_path_buf()];
+        for file_first in [true, false] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let inline = "module P { pub const inline_only : Nat = Suc Zero }";
+            if file_first {
+                env.elaborate_module_from_roots(&roots, "P")
+                    .expect("first file owner");
+            } else {
+                env.elaborate_file(inline).expect("first in-memory owner");
+            }
+            let before_env = env.env.clone();
+            let before_globals = env.globals.clone();
+            let before_exports = env.module_state.exports.clone();
+            let before_owners = env.module_state.module_path_owners.clone();
+            let before_provenance = env.module_state.export_provenance
+                .iter()
+                .map(|(path, value)| (path.clone(), value.member_ids.clone()))
+                .collect::<HashMap<_, _>>();
+            let before_loaded = env.loaded_module_count();
+            let err = if file_first {
+                env.elaborate_file(inline).expect_err("foreign inline claim")
+            } else {
+                env.elaborate_module_from_roots(&roots, "P")
+                    .expect_err("foreign file claim")
+            };
+            assert!(matches!(
+                err,
+                ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
+                    if path == "P"
+                        && if file_first {
+                            owner == "file P" && claimant.starts_with("in-memory unit ")
+                        } else {
+                            owner.starts_with("in-memory unit ") && claimant == "file P"
+                        }
+            ), "wrong owner-clash boundary: {err:?}");
+            assert_eq!(env.env, before_env, "no checked declaration from rejected unit");
+            assert_eq!(env.globals, before_globals, "no foreign global binding");
+            assert_eq!(env.module_state.exports, before_exports, "no foreign interface");
+            assert_eq!(env.module_state.module_path_owners, before_owners);
+            assert_eq!(
+                env.module_state.export_provenance.iter()
+                    .map(|(path, value)| (path.clone(), value.member_ids.clone()))
+                    .collect::<HashMap<_, _>>(),
+                before_provenance,
+                "no foreign interface provenance"
+            );
+            assert_eq!(env.loaded_module_count(), before_loaded);
+        }
+
+        let mut control = ElabEnv::new().expect("base environment");
+        control.elaborate_module_from_roots(&roots, "P").expect("file P");
+        let file_id = control.globals["P.file_only"];
+        control.elaborate_file("module R { pub const other : Nat = Suc Zero }")
+            .expect("distinct path R");
+        control.elaborate_file("module P.Q { pub const child : Nat = Suc Zero }")
+            .expect("strict child P.Q");
+        assert_eq!(control.globals["P.file_only"], file_id);
+        assert!(control.globals.contains_key("R.other"));
+        assert!(control.globals.contains_key("P.Q.child"));
+    }
+
+    /// Promise class: durable invariant (33 §3.1, AC-0 §6).
+    /// MEASURED: two separate session calls claiming P refuse on the second
+    /// call, while P then R accepts. CLAIMED: a session entry is a unit even
+    /// though flat declarations retain their REPL redefinition policy.
+    /// THE GAP: the two calls must use the real session route, not direct file
+    /// elaboration or a hand-constructed unit-ownership table.
+    #[test]
+    fn session_entries_claim_distinct_inline_module_owners() {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_session_decl_results_v1("module P { pub const first : Nat = Zero }")
+            .expect("first session owner P");
+        let before = env.env.clone();
+        let err = env
+            .elaborate_session_decl_results_v1("module P { pub const second : Nat = Suc Zero }")
+            .expect_err("second session entry cannot claim P");
+        assert!(matches!(err, ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
+            if path == "P" && owner.starts_with("in-memory unit ")
+                && claimant.starts_with("in-memory unit ") && owner != claimant),
+            "wrong session owner-clash boundary: {err:?}");
+        assert_eq!(env.env, before);
+        assert!(!env.globals.contains_key("P.second"));
+
+        let mut control = ElabEnv::new().expect("base environment");
+        control
+            .elaborate_session_decl_results_v1("module P { pub const first : Nat = Zero }")
+            .expect("session P");
+        control
+            .elaborate_session_decl_results_v1("module R { pub const second : Nat = Suc Zero }")
+            .expect("independent session R");
+        assert!(control.globals.contains_key("R.second"));
     }
 
     const INLINE_OWNER: &str = "module N {\n\
