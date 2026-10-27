@@ -31,9 +31,11 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 >   fn, `Lowering::validate_checked_ih_detached_result_shape`. The 38
 >   increment-1 conflict hunks fall inside the 16. Row 17's delta has no
 >   host on main and drops; it is never re-hosted by importing the prefix
->   fn or `post_call_consumer`. The adjudication table shows by grep that no
->   transport result can match a pending call-result obligation by
->   `result_word`. If one can, stop and post to the Architect.
+>   fn or `post_call_consumer`. No lowering path attaches a detached-return
+>   consumer to a transport result (`ClaimedContinuationResult` carries
+>   none); detached demands reach lowering only as static-response selected
+>   callers, whose owner emission realizes the exact call word (Architect
+>   `evt_3adhrn49d55h3`). If one does, stop and post to the Architect.
 > - The result contract's planner fn is already on main, identical. A's
 >   rewrite of its lowering half is A's substance and lands here.
 > - Calls into `backend_module` and `unsupported` take main's
@@ -69,7 +71,7 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 > the main its candidate is cut from (`b8fb28e3f` at the `bdf0e4755`
 > handoff), adopted by §4a-pin's empty-`crates/`-diff condition at
 > handoff. Frame §4a-pin holds it as a literal, re-pinned at each no-rebase
-> main merge (now `12e91c41b`, the cut of `d6a6cc6d`; DOC-BUNDLE-307). Runtime
+> main merge (now `9e5d4bc7d`, the cut of `59b930cc9`; DOC-BUNDLE-309). Runtime
 > QA `evt_7tnep6swjbag0` showed a computed merge-base breaks §4b and §8.
 > Older literals elsewhere are records. R1's per-mutation pairing
 > (`generated_result_path_proof_rejects_each_certificate_corruption`) lives
@@ -166,8 +168,8 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 > **Not releasable while the banner above stands.** The pin below is current and
 > correct; it is not what blocks.
 >
-> **Increment A's base is `origin/main` `12e91c41baf9b23e7b9268f6372320ca28afef83`**
-> (re-pinned 2026-10-27 to the cut of `d6a6cc6d`; frame §4a-pin)
+> **Increment A's base is `origin/main` `9e5d4bc7d986616a1e8a27688edc2ea89beeb031`**
+> (re-pinned 2026-10-27 to the cut of `59b930cc9`; frame §4a-pin)
 > — B and C pin their own bases in frame 4a-pin, which is the only place
 > either value is written.
 >

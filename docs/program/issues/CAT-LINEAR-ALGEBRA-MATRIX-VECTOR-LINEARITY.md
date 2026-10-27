@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY
 title: "Algorithm.LinearAlgebra.NatMatrix exports spec 65 section 6: matrix_vector_additive and matrix_vector_homogeneous, proved at zero trust from the Architect's D0, with the section 6 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
