@@ -442,7 +442,8 @@ The **exact rational-interval contract** is pinned in
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
 SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
-SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER). The §1–2
+SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER;
+SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -470,11 +471,21 @@ swapped-operand inclusion for addition, multiplication, hull and
 intersection. Their converses follow by swapping the theorem's
 arguments, without structural `Equal Interval` or extra public
 laws. Architect checked five generic proofs in scratch with no
-new `Axiom` and unchanged trust identities (114 → 114); §5
-catalog exports are absent. Its authored closed seed is not
-shipped-seed execution, CI, publication, landing or landed trust.
-Signed arithmetic, division, `Float`, rounding, width and structural
-hull/intersection algebra remain deferred.
+new `Axiom` and unchanged scratch trust identities (114 → 114).
+The §5 catalog exports and a package-owned seed test are on main;
+that test is not official conformance execution, CI or landed trust.
+Section 6 specifies four premise-free laws for mutual endpoint-value
+inclusion under both addition and multiplication regroupings, in
+either nesting direction, even for inverted intervals. Closed
+regroupings coincide structurally by `Refl`; open regroupings are
+not definitionally convertible, and generic structural equality
+would need an out-of-scope Rational export. Architect's isolated
+D0 checked the four generic proofs without a new `Axiom` and with
+scratch trusted identities unchanged (114 → 114). The §6 exports
+are absent on this base; its authored closed seed is not shipped
+execution, official conformance, CI, publication, landing or landed
+trust. Signed arithmetic, division, `Float`, rounding, width and
+structural hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–5 (SPEC-TIME-EVENT-TRACE-CONTRACT;

@@ -15,9 +15,10 @@
 > are present on main. That test is not official conformance-runner
 > execution or a landed trust measurement. Section 6 specifies two
 > additional structural box equalities and two public Nat Order
-> selector laws; their exports are absent from this base. Isolated D0
-> and the new seed do not establish shipped §6 execution, CI, publication,
-> landing or landed trust.
+> selector laws. This catalog candidate exports all four checked proofs;
+> its package test roots-loads Order and NatBox and checks the authored
+> seed. These local checks are not official conformance-runner execution,
+> CI, publication, landing or a landed trust measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -602,11 +603,11 @@ execution, CI, publication, landing or landed trust.
 > **Section 6 status: DRAFT v0
 > (SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).** Architect's
 > isolated D0 on `0bb872591` checked all four generic proofs, no new
-> `Axiom`, and equal `trusted_base()` identities 114 → 114. This
-> spec/seed candidate delivers neither the Nat Order selectors nor
-> the `NatBox` laws. Its closed seed and scratch checks do not establish
-> shipped §6 execution, official conformance, CI, publication, landing
-> or landed trust.
+> `Axiom`, and equal `trusted_base()` identities 114 → 114. The catalog
+> candidate exports both Nat Order selectors and both NatBox laws, and
+> a package test checks the §6 seed against roots-loaded candidate
+> exports. The test is not official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
 
 ### 6.1 Two public selector laws in Nat Order
 
@@ -688,7 +689,13 @@ scratch `trusted_base()` GlobalId sets 114 → 114. The two Nat Order
 selectors and two box laws were owned Transparent globals; selective
 imports of the three new box helpers were refused. The new seed was
 accepted with an overlay of only that checked package patch, and its
-one false claim was refused there. Neither this historical D0 nor a
-seed authored in this candidate establishes delivery of the §6
-catalog exports, execution against shipped exports, official
-conformance, CI, publication, landing or landed trust.
+one false claim was refused there. The catalog candidate now exports
+all four checked laws. A roots-loaded package test accepts the entire
+seed client, including both direct Order selectors, independent value
+checks and the same-form true `Equal Box` control; it pins the refused
+`seed_neg` proposition and observes `TypeMismatch` at its own `Refl`.
+The test separately checks the four generic public types and exact
+before/after `trusted_base()` GlobalId sets (114 → 114), and refuses
+selective imports of the three private helpers. These local checks
+are not official conformance-runner execution, CI, publication, landing
+or a landed trust measurement.

@@ -1,7 +1,7 @@
 ---
 id: CAT-TIME-WINDOW-COMPOSITION
 title: "Data.Time.EventTrace exports spec 69 section 5: trace_window_window and the two trace_merge empty-unit laws, proved at zero trust from the Architect's D0, with the section 5 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2

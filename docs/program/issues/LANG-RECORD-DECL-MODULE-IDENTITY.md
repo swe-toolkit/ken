@@ -1,7 +1,7 @@
 ---
 id: LANG-RECORD-DECL-MODULE-IDENTITY
 title: "A module's record declaration enters globals under its bare spelling and is never scope-bound, so the Legacy roots loader and the direct API admit an unimported use of another module's record. Qualify and scope-bind records exactly as data types are, so an unselected record is refused in every mode and a public record is importable"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T2

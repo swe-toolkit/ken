@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION
 title: "Algorithm.SymbolicAlgebra.NatPolynomial exports spec 66 section 6: deriv_commute, proved at zero trust from the Architect's D0, with the section 6 seed run by a package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

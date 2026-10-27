@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-D5B-SUBSTRATE-PORT
 title: "Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held."
-status: ready
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -11,6 +11,32 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-17, ruling runtime-leader's measured scope fork (evt_1yma657vq6bkg) after the Architect answered both extent questions from measurement (evt_6fr79bx4cjhsw). The fork offered two dispositions -- re-scope increment A, or re-sequence behind B -- and the ruling is NEITHER (evt_2dgjc1h7as88w): widening A makes A the whole substance again, which the increment split exists to prevent, and B supplies source.rs, one row of an eight-row table. This node is the third disposition, a prerequisite increment in front of A."
 ---
+
+> # CLOSED 2026-10-27 WITHOUT A PORT. NOTHING FROM THIS NODE LANDS.
+>
+> The Architect's concept D0 (`evt_pkj06ks8sv44`) bounded the work by what
+> increment A reaches on main. Every reached concept is either subsumed by
+> main or is A's own substance, so no re-derivation increment exists, and
+> the recut's point 4 closes the node (`evt_3evzz6gcayac`). The path there:
+>
+> - Increment 1 measured the A-plus-58-row worklist (`evt_436m0xmfnzd7g`).
+> - Increment 2 (`a0de8d29e`) was refused as a landable slice: 51 of its
+>   52 rows were rustfmt reformatting. On the rustfmt-canonical plane OWED
+>   falls from 243 to 23 (`evt_7mntdjr1j6wna`).
+> - Increment 3's D0 found no buildable mechanical slice. Every block was
+>   the same predicate: S consumes a concept main re-derived independently
+>   (`evt_2fxpn3v17kqb0`). The node was recut to concepts
+>   (`evt_vqch635vy6qz`).
+> - S already contains A content-wise, so "port S, then rebase A" ported
+>   A's substance twice. The only reached concept, the result contract, is
+>   (a) on its planner half and A's rewrite on its lowering half.
+>
+> The 38 A-versus-main conflict hunks, A's seven introduced names and
+> AC-1a's second half ("the rebased A compiles") moved to
+> `ABI-S6-HS18-MAIN-BASED-CLOSURE` (`evt_7hwy3g9aakpfp`), which now rebases A
+> directly. The increment artifacts stay as its inputs:
+> `local/abi-substrate-inc1-df0b57/` and
+> `local/architect-shared/abi-substrate-d0/inc2-review/`.
 
 > # RECUT 2026-10-27 (THIRD). ONE T1 NODE, KEYED ON COMPILE CLOSURE.
 >

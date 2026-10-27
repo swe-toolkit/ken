@@ -89,11 +89,12 @@ fn geometry_env() -> ElabEnv {
 /// SOURCE: spec/50-stdlib/67-geometry.md §§1.3–1.4.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: after provider closure, both checked Nat.Order bound proofs
-/// and all six geometry laws are transparent; six independently restated
-/// generic theorem clients elaborate, with identical trusted GlobalId sets
+/// and the six original geometry laws plus the two commutativity laws are
+/// transparent; six independent original law clients elaborate, with identical
+/// trusted GlobalId sets
 /// before and after loading Nat.Order and then NatBox.
 /// CLAIMED: both tightness laws are reusable as public proofs and the
-/// six generic geometry laws add no new trust.
+/// original six generic geometry laws and two commutativity laws add no new trust.
 /// THE GAP: checking loaded theorem types and transparent proof bodies is
 /// universal proof evidence, while closed output behavior is pinned below;
 /// inherited provider assumptions remain in both exact identity sets.
@@ -136,6 +137,8 @@ fn generic_public_geometry_laws_and_order_bounds_add_no_trust() {
         "intersect_complete",
         "hull_contains_left",
         "hull_contains_right",
+        "intersect_comm",
+        "hull_comm",
         "manhattan_symm",
         "manhattan_self",
     ] {
