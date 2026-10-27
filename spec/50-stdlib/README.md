@@ -299,12 +299,13 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–5
+**`65-linear-algebra.md`** §§1–6
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
 SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
-SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC).
+SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC;
+SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -319,10 +320,16 @@ and did not establish shipped execution. Section 5 specifies public
 commutativity and associativity of both sums for every dimension.
 Architect D0 checked four generic proofs, lifting the matrix laws
 row-wise from vector laws, with no new `Axiom` and unchanged scratch
-trust identities (114 → 114). The §5 catalog exports remain absent;
-this candidate authors a closed seed, not shipped-seed execution,
-CI, publication, landing or landed trust for §5. No rational or
-`Float` tier is claimed.
+trust identities (114 → 114). The §5 exports and package-owned seed
+test are now on main; that test is not official conformance execution
+or landed trust. Section 6 adds premise-free vector-argument
+additivity and homogeneity for `matrix_vector`, including zero
+dimensions. Architect D0 checked both generic proofs with no new
+`Axiom` and unchanged scratch trust identities (109 → 109). The §6
+catalog exports are absent; its authored closed seed and D0 do not
+establish shipped-seed execution, official conformance, CI,
+publication, landing or landed trust. No rational or `Float` tier is
+claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–6 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
