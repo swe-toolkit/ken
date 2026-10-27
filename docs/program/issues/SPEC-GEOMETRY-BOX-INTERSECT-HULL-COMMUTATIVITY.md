@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY
 title: "Spec 67 defines intersect and hull on natural boxes corner by corner through max and min, but states no law that either is commutative. Rule from a checked D0 at zero trust that both are commutative as structural Equal Box, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

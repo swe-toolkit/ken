@@ -46,6 +46,22 @@ A §6 in spec 69 stating the ruled law by its public type, and a closed
 conformance seed under `conformance/stdlib/time-and-events/`, with the
 status lines changed in the same candidate.
 
+**Amended 2026-10-27 (`evt_5xar42txx6wnr`).** The Architect's D0
+(`evt_6mr5nvg6z9jat`) proves the law with no premise. The candidate also
+carries the catalog addition: `trace_merge_assoc` and its seven private
+helpers in `catalog/packages/Data/Time/EventTrace.ken.md`, in `ken fmt`
+form, with that module's prose and law counts updated. No
+`CAT-TIME-MERGE-ASSOCIATIVITY` node is framed. The Architect reviews the
+exact tip for the catalog half. The seed keeps the a1/c0 tie at time 4,
+which is the only thing that makes the refused block bite.
+
+**Held 2026-10-27 (`evt_5teqh3b03e0gx`).** Approved `a4d1662df` conflicts
+with the queued `CAT-TIME-WINDOW-COMPOSITION` (`27d8b4d70`) in both
+EventTrace and spec 69. After that lands, merge main without rebasing,
+re-derive the law counts from the merged module, and say that the proof
+reuses the now-public `trace_merge_nil_right` (`evt_4etpas5xnb38k`). Then
+take fresh votes and a fresh Decision.
+
 ## Acceptance
 
 - **AC-0 (D0, Architect).** A checked development on the landed base,

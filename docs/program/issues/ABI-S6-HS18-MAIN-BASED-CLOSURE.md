@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-MAIN-BASED-CLOSURE
 title: "Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation."
-status: draft
+status: active
 owner: runtime
 size: L
 gate: none
@@ -11,6 +11,56 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's OPERATIVE base is a separate value living in frame 4a-pin and MAY DIFFER from this SHA -- it already does."
 ---
+
+> # ACTIVE 2026-10-27: INCREMENT A REBASES DIRECTLY ONTO MAIN.
+>
+> This banner supersedes every banner below wherever they conflict,
+> including the BLOCKED banner. `ABI-S6-HS18-D5B-SUBSTRATE-PORT` closed
+> without a port (concept D0 `evt_pkj06ks8sv44`), and
+> `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` is merged. Kicked
+> `evt_5kne1n2vh7hk1`, amended `evt_7a0nvvb4f7y1y`. L, T1, gate architect.
+>
+> **Increment A** is `git diff 30d35f625 5d977ac79` minus the AC-1e
+> acceptance file, rebased onto current main.
+>
+> - The unit is A's delta applied to main's body, per fn. Never take a
+>   whole `5d977ac79` body, which re-imports the prefix context. Never
+>   resolve per hunk (`evt_387nkc09gkmyt` point 1).
+> - A changes 81 fns: 64 new, 16 main-moved and present on main (calls.rs
+>   2, core.rs 3, core tests 6, mod.rs 1, units.rs 4), and one prefix-only
+>   fn, `Lowering::validate_checked_ih_detached_result_shape`. The 38
+>   increment-1 conflict hunks fall inside the 16. Row 17's delta has no
+>   host on main and drops; it is never re-hosted by importing the prefix
+>   fn or `post_call_consumer`. The adjudication table shows by grep that no
+>   transport result can match a pending call-result obligation by
+>   `result_word`. If one can, stop and post to the Architect.
+> - The result contract's planner fn is already on main, identical. A's
+>   rewrite of its lowering half is A's substance and lands here.
+> - Calls into `backend_module` and `unsupported` take main's
+>   `LoweringCause` variant.
+> - The refused grant stays out: zero added lines name
+>   `MappingAcquireFile` or `mapping_acquire_file`, and the six-site
+>   exclusion holds under frame §4b and §4d, with the base pinned by §4a-pin.
+>   The `preserve/` refs are evidence, never bases.
+>
+> **Acceptance.**
+>
+> - AC-1: `scripts/ken-cargo check -p ken-runtime --lib` and
+>   `--profile test` are both RC 0.
+> - AC-2: A's own pins pass on the rebased tree, each with a base control
+>   on main, plus main's `rt_parity_native
+>   checked_ih_generated_entry_admission_population_is_total`. A's
+>   acceptance file stays AC-1e DEFERRED.
+> - AC-3: QA reverts one fn to A's whole body, choosing from the eight
+>   with no absent token: `transfer_unit_result_into_carrier`,
+>   `call_declared_unit_target`, `compile_expr_into_module_with_root_projection`,
+>   `transfer_constructor_operands`, `verify_static_response_finished_body`,
+>   `declare_owned_in_func`, `declare_response_context_call_in_func` and
+>   `declare_context_calls_in_func`. The mutant must compile (RC 0 on the
+>   test profile) before a named pin's reddening counts.
+>
+> The Architect reviews the per-fn adjudication of the 16 before the
+> implementer finishes them. Increments B and C are framed after A lands.
 
 > # BLOCKED AGAIN, on a SECOND dependency. `ABI-S6-HS18-D5B-SUBSTRATE-PORT` LANDS FIRST.
 >
