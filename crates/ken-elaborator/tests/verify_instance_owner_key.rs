@@ -196,16 +196,26 @@ fn newly_qualified_kinds_have_distinct_module_owners() {
     }
 }
 
-/// Promise class: transition sentinel (spec 33 §3–4). ProveDecl still follows
-/// the bare barrier; LANG-PROVE-DECL-MODULE-IDENTITY retires this refusal after
-/// measuring and deciding its separate module-identity route.
+/// Promise class: durable invariant (spec 33 §3–4; 22 §1). MEASURED: the
+/// same `prove` spelling in two modules elaborates into distinct checked
+/// identities at the two qualified keys, without a bare key, and each
+/// obligation id follows its owner. CLAIMED: a prove obligation is owned by its
+/// module, not a flat global. THE GAP: one same-spelling pair; privacy and
+/// in-module use are pinned per mode by the module-scope tests.
 #[test]
-fn prove_decl_still_refuses_same_spelling_in_two_modules() {
-    let error = ElabEnv::new()
-        .unwrap()
+fn prove_decl_has_distinct_module_owners() {
+    let mut env = ElabEnv::new().unwrap();
+    let results = env
         .elaborate_file_v1("module M { prove p : Top }\nmodule N { prove p : Top }\n")
-        .expect_err("the out-of-scope prove form still has one bare key");
-    assert!(matches!(error, ElabError::DuplicateDefinition { name, .. } if name == "p"));
+        .expect("same-spelling module-owned prove declarations");
+    assert_ne!(env.globals["M.p"], env.globals["N.p"]);
+    assert!(!env.globals.contains_key("p"));
+    let ids = results
+        .iter()
+        .flat_map(|result| ken_elaborator::v2_extract(result).obligations)
+        .map(|triple| triple.id.0)
+        .collect::<Vec<_>>();
+    assert_eq!(ids, ["M.p.prove", "N.p.prove"]);
 }
 
 /// Promise class: durable invariant (33 §5 and 46 §3.2). MEASURED: the

@@ -2244,9 +2244,9 @@ fn elaborate_module_from_roots_with_mode_v1(
 /// by `rewrite_rdecl`). Only decl kinds with a single ordinary declared
 /// name participate in module qualification. Class declarations are
 /// qualified like data, while remaining ordered barriers for class-registry
-/// side effects. Records, laws, foreign declarations and temporal obligations
-/// also qualify on their ordered barrier paths. Instances and prove declarations
-/// retain separate elaboration paths.
+/// side effects. Records, laws, foreign declarations, temporal obligations and
+/// prove obligations also qualify on their ordered barrier paths. Instances
+/// retain a separate elaboration path.
 fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
     match decl {
         Decl::ViewDecl {
@@ -2407,6 +2407,11 @@ fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
             name: qualify(prefix, name),
             formula: formula.clone(),
             source: source.clone(),
+            span: span.clone(),
+        },
+        Decl::ProveDecl { name, prop, span } => Decl::ProveDecl {
+            name: qualify(prefix, name),
+            prop: prop.clone(),
             span: span.clone(),
         },
         Decl::PropDecl {
@@ -3493,6 +3498,7 @@ fn is_qualifiable(decl: &Decl) -> bool {
             | Decl::LawDecl { .. }
             | Decl::ForeignDecl { .. }
             | Decl::TemporalDecl { .. }
+            | Decl::ProveDecl { .. }
     )
 }
 
@@ -5595,8 +5601,8 @@ fn expand_scope(
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
-                // Class, record, law, foreign and temporal declarations are
-                // qualifiable but remain ordered barriers; other kinds are nodes.
+                // Class, record, law, foreign, temporal and prove declarations
+                // are qualifiable but remain ordered barriers; other kinds are nodes.
                 if is_qualifiable(inner)
                     && !matches!(
                         inner,
@@ -5605,6 +5611,7 @@ fn expand_scope(
                             | Decl::LawDecl { .. }
                             | Decl::ForeignDecl { .. }
                             | Decl::TemporalDecl { .. }
+                            | Decl::ProveDecl { .. }
                     )
                 {
                     return Err(ElabError::Internal(format!(
@@ -5689,6 +5696,7 @@ fn expand_scope(
                             | Decl::LawDecl { .. }
                             | Decl::ForeignDecl { .. }
                             | Decl::TemporalDecl { .. }
+                            | Decl::ProveDecl { .. }
                     ) {
                         record_checked_local(scope, inner.name(), &result.name, result.def_id);
                     }
