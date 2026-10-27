@@ -2030,16 +2030,18 @@ fn load_unit(
         return Ok((ids.clone(), results));
     }
 
-    let owner = ModuleUnitOwner::File(module.to_string());
-    elab.module_state
-        .require_module_path_available(module, &owner, span)?;
     let root = elab
         .module_state
         .catalog_roots
         .first()
         .expect("N2 root count is checked at the public entry point")
         .clone();
+    // A missing file is not a unit and claims no path; it refuses at its
+    // import (`33 §3.2`). Only a located file unit can clash (`33 §3.1`).
     let path = source_path(&root, module, span)?;
+    let owner = ModuleUnitOwner::File(module.to_string());
+    elab.module_state
+        .require_module_path_available(module, &owner, span)?;
     let ParsedUnit { decls, literate } = parse_unit_source(&path, span)?;
     precheck_module_paths(&elab.module_state, &decls, module, &owner)?;
 
@@ -7451,12 +7453,13 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: at the empty-prefix in-memory unit root, `import N` before
-    /// its own `module N` rejects at that import both cold and after a separate
-    /// unit installed `N.external`. CLAIMED: a later local root child is not
-    /// an absolute import of ambient N. THE GAP: when the preloaded call
-    /// succeeds, the checked body/ID below identifies the wrong provider;
-    /// the ordered-root positive below proves the same syntax can work.
+    /// MEASURED: at the empty-prefix in-memory root, `import N` before its
+    /// own `module N` rejects at the import while cold; after another unit
+    /// owns N, the foreign claim refuses before any import. CLAIMED: a later
+    /// local root child is not an absolute import of ambient N, and a second
+    /// unit cannot claim N. THE GAP: the cold error is pinned at its import;
+    /// the warm refusal leaves both `own` and `borrowed` absent. The ordered-
+    /// root positive below proves the same syntax can work.
     #[test]
     fn in_memory_root_import_refuses_later_child_even_when_external_n_is_loaded() {
         const SOURCE: &str = "import N\nconst borrowed : Nat = N.external\n\
@@ -7492,9 +7495,24 @@ mod namespace_effect_tests {
                 );
             }
             match result {
-                Err(ElabError::UnboundName { name, span }) => {
+                Err(ElabError::UnboundName { name, span }) if !preload_external => {
                     assert_eq!(name, "N");
                     assert_eq!((span.start, span.end), (0, "import N".len()));
+                }
+                // The earlier unit owns N, so this unit's own `module N` is a
+                // foreign claim; the whole unit refuses before any import.
+                Err(ElabError::ModuleOwnerClash {
+                    path,
+                    owner,
+                    claimant,
+                    ..
+                }) if preload_external => {
+                    assert_eq!(path, "N");
+                    assert!(owner.starts_with("in-memory unit "), "{owner}");
+                    assert!(claimant.starts_with("in-memory unit "), "{claimant}");
+                    assert_ne!(owner, claimant);
+                    assert_eq!(own_id, None, "the refused unit declares nothing");
+                    assert_eq!(borrowed_id, None, "the refused unit borrows nothing");
                 }
                 other => panic!(
                     "later root child must reject regardless of preload {preload_external}: {other:?}"
