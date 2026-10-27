@@ -290,6 +290,10 @@ fn new_jit_module() -> Result<JITModule, CraneliftBackendError> {
         "ken_selected_call_v1_consume",
         crate::activation_abi::ken_selected_call_v1_consume as *const u8,
     );
+    builder.symbol(
+        "ken_activation_v1_record_region_capacity",
+        crate::activation_abi::ken_activation_v1_record_region_capacity as *const u8,
+    );
     Ok(JITModule::new(builder))
 }
 

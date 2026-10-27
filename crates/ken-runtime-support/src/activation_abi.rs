@@ -46,7 +46,9 @@ use crate::boundary_resource_profile::{
     BOUNDARY_RESOURCE_PROFILE_VERSION, BoundaryRegionLimitsV1, BoundaryResourceProfileV3,
     InvocationCallLimitsV3, RuntimeResourceLimitsV2,
 };
-use crate::boundary_value::{BoundaryValueStore, BoundaryWord};
+use crate::boundary_value::{
+    BoundaryReferentOwner, BoundaryTag, BoundaryValueStore, BoundaryWord, RegionHeaderField,
+};
 use crate::activation_services::GeneratedActivationServicesV1;
 use crate::invocation_tickets::{InvocationTicketIssuerV1, IssuerTerminalFaultV1,
     SelectedCallTargetV1, SelectedCallTicketV1};
@@ -76,6 +78,16 @@ pub const KEN_ACTIVATION_ERR_CAPACITY: i64 = -7;
 /// A later store supplied a different process-wide epoch ceiling. No store
 /// handle was published and no capacity fault was minted.
 pub const KEN_ACTIVATION_ERR_PROFILE_MISMATCH: i64 = -8;
+/// A region-capacity recorder call supplied an invalid tag/table or counters
+/// that do not attest the claimed exhaustion. No terminal fault is recorded.
+pub const KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE: i64 = -9;
+
+/// The region operation whose returned capacity status generated the record.
+/// These identifiers are shared with emitted lowering; they are not a second
+/// resource mapping. The recorder reads the actual region counters and limits.
+pub const KEN_REGION_CAPACITY_ALLOC: u64 = 0;
+pub const KEN_REGION_CAPACITY_LIMBS: u64 = 1;
+pub const KEN_REGION_CAPACITY_BYTES: u64 = 2;
 
 /// **The deployment-authorized profile, as it crosses into C.**
 ///
@@ -264,6 +276,118 @@ pub unsafe extern "C" fn ken_selected_call_v1_issue(
             ken_host::CAPACITY_EXHAUSTED_STATUS_V1
         }
     }
+}
+
+/// Record the exact capacity fault that a boundary helper just reported.
+/// The owner is the live activation's existing ticket issuer; the generated
+/// status alone cannot mint a typed fault. The table identifies the failed
+/// operation, while the selected region's published header supplies the
+/// measured resource and effective limit.
+///
+/// # Safety
+/// `services` must be a live published activation service pointer. Its
+/// boundary arena and call-event issuer must outlive this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_record_region_capacity(
+    services: *const GeneratedActivationServicesV1,
+    tag: u64,
+    table: u64,
+    need: u64,
+) -> i64 {
+    if services.is_null() {
+        return KEN_ACTIVATION_ERR_NULL;
+    }
+    let service = unsafe { &*services };
+    if service.call_events.is_null() || service.boundary_arena.is_null() {
+        return KEN_ACTIVATION_ERR_NULL;
+    }
+    let issuer = unsafe { &mut *service.call_events.cast::<InvocationTicketIssuerV1>() };
+    if let Some(fault) = issuer.terminal_fault() {
+        return match fault {
+            IssuerTerminalFaultV1::Capacity(_) => ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+            IssuerTerminalFaultV1::Integrity(_) => ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1,
+        };
+    }
+    let (scope, region) = match BoundaryTag::from_bits(tag).map(BoundaryTag::referent_owner) {
+        Some(BoundaryReferentOwner::InvocationArena) => (
+            ken_host::CapacityScopeV1::Invocation,
+            service.boundary_arena.cast_const(),
+        ),
+        Some(BoundaryReferentOwner::PersistentStore) => {
+            let base = service.boundary_arena;
+            let persistent = unsafe {
+                *base.add(
+                    RegionHeaderField::Persistent.offset() as usize / std::mem::size_of::<u64>(),
+                )
+            };
+            if persistent == 0 {
+                return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE;
+            }
+            (
+                ken_host::CapacityScopeV1::Persistent,
+                persistent as usize as *const u64,
+            )
+        }
+        Some(BoundaryReferentOwner::NoReferent) | None => {
+            return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE;
+        }
+    };
+    // RegionHeaderField is the single header-layout authority shared by the
+    // CLIF helpers and this owner-side attribution. Read no Rust-side mirror.
+    let read = |field: RegionHeaderField| unsafe {
+        *region.add(field.offset() as usize / std::mem::size_of::<u64>()) as u128
+    };
+    let failed = match table {
+        KEN_REGION_CAPACITY_ALLOC => {
+            let nodes = read(RegionHeaderField::NodeCount);
+            let node_limit = read(RegionHeaderField::NodeCapacity);
+            if nodes >= node_limit {
+                Some((ken_host::CapacityResourceV1::Nodes, node_limit, nodes + 1))
+            } else {
+                let words = read(RegionHeaderField::WordCount);
+                let word_limit = read(RegionHeaderField::WordCapacity);
+                let requested = words + u128::from(need);
+                (u128::from(need) > word_limit || requested > word_limit).then_some((
+                    ken_host::CapacityResourceV1::Words,
+                    word_limit,
+                    requested,
+                ))
+            }
+        }
+        KEN_REGION_CAPACITY_LIMBS => {
+            let live = read(RegionHeaderField::LimbCount);
+            let limit = read(RegionHeaderField::LimbCapacity);
+            let requested = live + u128::from(need);
+            (u128::from(need) > limit || requested > limit).then_some((
+                ken_host::CapacityResourceV1::NativeIntLimbs,
+                limit,
+                requested,
+            ))
+        }
+        KEN_REGION_CAPACITY_BYTES => {
+            let live = read(RegionHeaderField::DataCount);
+            let limit = read(RegionHeaderField::DataCapacity);
+            let requested = live + u128::from(need);
+            (u128::from(need) > limit || requested > limit).then_some((
+                ken_host::CapacityResourceV1::DataBytes,
+                limit,
+                requested,
+            ))
+        }
+        _ => return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE,
+    };
+    let Some((resource, limit, requested)) = failed else {
+        return KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE;
+    };
+    issuer.record_terminal_fault(IssuerTerminalFaultV1::Capacity(
+        ken_host::CapacityExhaustedV1 {
+            scope,
+            resource,
+            limit,
+            requested,
+        },
+    ));
+    ken_host::CAPACITY_EXHAUSTED_STATUS_V1
 }
 
 /// Consume exactly one selected ticket before accessing its borrowed inputs.
@@ -718,13 +842,14 @@ pub unsafe extern "C" fn ken_activation_v1_destroy(activation: *mut KenActivatio
 /// ⭐ `D1`'s own warning is that a `crate-type` line is a **build-system**
 /// claim and not a **link** one. ⇒ The archive is checked against *this* list.
 /// ⛔ Pinned as the exact permitted set, so an addition reddens too.
-pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 16] = [
+pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 17] = [
     "ken_boundary_store_v1_open",
     "ken_boundary_store_v1_destroy",
     "ken_activation_v1_begin",
     "ken_activation_v1_finish_capacity_failure",
     "ken_activation_v1_write_starter_capacity_failure",
     "ken_selected_call_v1_issue",
+    "ken_activation_v1_record_region_capacity",
     "ken_selected_call_v1_consume",
     "ken_activation_v1_take_selected_call_failure",
     "ken_activation_v1_finish_selected_call_failure",
@@ -757,6 +882,254 @@ mod tests {
             persistent_data_bytes: 84,
             persistent_native_int_limbs: 96,
         }
+    }
+
+    fn with_region_capacity_services(
+        action: impl FnOnce(
+            *const GeneratedActivationServicesV1,
+            &mut [u64; RegionHeaderField::ALL.len()],
+            &mut [u64; RegionHeaderField::ALL.len()],
+        ),
+    ) {
+        let mut invocation = [0u64; RegionHeaderField::ALL.len()];
+        let mut persistent = [0u64; RegionHeaderField::ALL.len()];
+        let mut issuer = InvocationTicketIssuerV1::reserve(
+            42,
+            InvocationCallLimitsV3 {
+                event_generations: 20,
+                live_pending_slots: 4,
+            },
+        )
+        .expect("small ticket backing");
+        for (header, limits) in [
+            (&mut invocation, [12, 24, 36, 48]),
+            (&mut persistent, [60, 72, 84, 96]),
+        ] {
+            for (field, limit) in [
+                RegionHeaderField::NodeCapacity,
+                RegionHeaderField::WordCapacity,
+                RegionHeaderField::DataCapacity,
+                RegionHeaderField::LimbCapacity,
+            ]
+            .into_iter()
+            .zip(limits)
+            {
+                header[field as usize] = limit;
+            }
+        }
+        invocation[RegionHeaderField::Persistent as usize] = persistent.as_ptr() as u64;
+        let services = GeneratedActivationServicesV1::new(
+            std::ptr::null_mut(),
+            invocation.as_mut_ptr(),
+            (&mut issuer as *mut InvocationTicketIssuerV1).cast(),
+        );
+        action(&services, &mut invocation, &mut persistent);
+    }
+
+    /// Promise class: normative compatibility vector for the closed region
+    /// resource and scope identities. MEASURED: a live issuer records the exact
+    /// resource/counter/limit selected from both headers, with Nodes preceding
+    /// Words. CLAIMED: a reported -6 can become an owner-backed typed fault.
+    /// THE GAP: these synthetic headers do not exercise a generated call edge.
+    #[test]
+    fn region_capacity_recorder_attributes_each_resource_in_allocator_order() {
+        use ken_host::{CapacityResourceV1 as Resource, CapacityScopeV1 as Scope};
+        let rows = [
+            (
+                BoundaryTag::InvocationAggregate,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::NodeCount,
+                12,
+                0,
+                Scope::Invocation,
+                Resource::Nodes,
+                12,
+                13,
+            ),
+            (
+                BoundaryTag::InvocationAggregate,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::WordCount,
+                24,
+                1,
+                Scope::Invocation,
+                Resource::Words,
+                24,
+                25,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::NodeCount,
+                60,
+                0,
+                Scope::Persistent,
+                Resource::Nodes,
+                60,
+                61,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_ALLOC,
+                RegionHeaderField::WordCount,
+                72,
+                1,
+                Scope::Persistent,
+                Resource::Words,
+                72,
+                73,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_BYTES,
+                RegionHeaderField::DataCount,
+                84,
+                1,
+                Scope::Persistent,
+                Resource::DataBytes,
+                84,
+                85,
+            ),
+            (
+                BoundaryTag::PersistentGround,
+                KEN_REGION_CAPACITY_LIMBS,
+                RegionHeaderField::LimbCount,
+                96,
+                1,
+                Scope::Persistent,
+                Resource::NativeIntLimbs,
+                96,
+                97,
+            ),
+        ];
+        for (tag, table, field, live, need, scope, resource, limit, requested) in rows {
+            with_region_capacity_services(|services, invocation, persistent| {
+                let header = if scope == Scope::Invocation {
+                    invocation
+                } else {
+                    persistent
+                };
+                header[field as usize] = live;
+                let result = unsafe {
+                    ken_activation_v1_record_region_capacity(services, tag as u64, table, need)
+                };
+                assert_eq!(
+                    result,
+                    ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+                    "{resource:?}"
+                );
+                let issuer =
+                    unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
+                assert_eq!(
+                    issuer.take_terminal_fault(),
+                    Some(IssuerTerminalFaultV1::Capacity(
+                        ken_host::CapacityExhaustedV1 {
+                            scope,
+                            resource,
+                            limit,
+                            requested
+                        }
+                    ))
+                );
+            });
+        }
+        // Both counters exhausted: an alloc names Nodes rather than Words.
+        with_region_capacity_services(|services, invocation, _| {
+            invocation[RegionHeaderField::NodeCount as usize] = 12;
+            invocation[RegionHeaderField::WordCount as usize] = 24;
+            assert_eq!(
+                unsafe {
+                    ken_activation_v1_record_region_capacity(
+                        services,
+                        BoundaryTag::InvocationAggregate as u64,
+                        KEN_REGION_CAPACITY_ALLOC,
+                        1,
+                    )
+                },
+                ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+            );
+            let issuer =
+                unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
+            assert!(matches!(
+                issuer.take_terminal_fault(),
+                Some(IssuerTerminalFaultV1::Capacity(
+                    ken_host::CapacityExhaustedV1 {
+                        resource: Resource::Nodes,
+                        ..
+                    }
+                ))
+            ));
+        });
+    }
+
+    /// Promise class: durable fail-closed invariant. MEASURED: null inputs,
+    /// unknown/immediate tags, unknown table and a non-exhausted header cannot
+    /// mint an issuer fault; an already recorded fault remains sticky.
+    /// CLAIMED: the recorder cannot turn a spurious call into capacity.
+    /// THE GAP: this is direct recorder invocation, not linked executable ABI.
+    #[test]
+    fn region_capacity_recorder_refuses_spurious_or_unauthorized_calls() {
+        assert_eq!(
+            unsafe {
+                ken_activation_v1_record_region_capacity(
+                    std::ptr::null(),
+                    9,
+                    KEN_REGION_CAPACITY_ALLOC,
+                    1,
+                )
+            },
+            KEN_ACTIVATION_ERR_NULL
+        );
+        let empty = GeneratedActivationServicesV1::default();
+        assert_eq!(
+            unsafe {
+                ken_activation_v1_record_region_capacity(&empty, 9, KEN_REGION_CAPACITY_ALLOC, 1)
+            },
+            KEN_ACTIVATION_ERR_NULL
+        );
+        with_region_capacity_services(|services, _, _| {
+            for (tag, table, need) in [
+                (
+                    BoundaryTag::ImmediateInt as u64,
+                    KEN_REGION_CAPACITY_ALLOC,
+                    1,
+                ),
+                (u64::MAX, KEN_REGION_CAPACITY_ALLOC, 1),
+                (BoundaryTag::InvocationAggregate as u64, u64::MAX, 1),
+                (
+                    BoundaryTag::InvocationAggregate as u64,
+                    KEN_REGION_CAPACITY_ALLOC,
+                    0,
+                ),
+                (
+                    BoundaryTag::PersistentGround as u64,
+                    KEN_REGION_CAPACITY_LIMBS,
+                    1,
+                ),
+            ] {
+                assert_eq!(
+                    unsafe { ken_activation_v1_record_region_capacity(services, tag, table, need) },
+                    KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE
+                );
+            }
+            let issuer =
+                unsafe { &mut *(*services).call_events.cast::<InvocationTicketIssuerV1>() };
+            assert_eq!(issuer.take_terminal_fault(), None);
+            issuer.record_terminal_fault(IssuerTerminalFaultV1::Integrity(
+                ken_host::SelectedCallIntegrityFaultV1::Spent,
+            ));
+            assert_eq!(
+                unsafe {
+                    ken_activation_v1_record_region_capacity(
+                        services,
+                        BoundaryTag::InvocationAggregate as u64,
+                        KEN_REGION_CAPACITY_ALLOC,
+                        1,
+                    )
+                },
+                ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1
+            );
+        });
     }
 
     /// Durable capacity invariant: both opaque C owners preserve the exact
@@ -1177,6 +1550,7 @@ mod tests {
             KEN_ACTIVATION_ERR_BUFFER,
             KEN_ACTIVATION_ERR_CAPACITY,
             KEN_ACTIVATION_ERR_PROFILE_MISMATCH,
+            KEN_ACTIVATION_ERR_REGION_CAPACITY_STATE,
         ];
         let distinct = statuses.iter().collect::<std::collections::BTreeSet<_>>();
         assert_eq!(distinct.len(), statuses.len());
