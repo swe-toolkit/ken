@@ -103,6 +103,20 @@ pub proof greatest for min
       }
   }
 
+pub proof comm for min (m : Nat) (n : Nat) : Equal Nat (min m n) (min n m) =
+  match m {
+    Zero ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ Proved
+      };
+    Suc m2 ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ cong Nat Nat (min m2 n2) (min n2 m2) Suc ((proof comm for min) m2 n2)
+      }
+  }
+
 pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
@@ -152,6 +166,20 @@ pub proof least for max
             Zero ↦ λhm. λhn. absurd hm;
             Suc k2 ↦ λhm. λhn. (proof least for max) k2 m2 n2 hm hn
           }
+      }
+  }
+
+pub proof comm for max (m : Nat) (n : Nat) : Equal Nat (max m n) (max n m) =
+  match m {
+    Zero ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ Refl
+      };
+    Suc m2 ↦
+      match n {
+        Zero ↦ Refl;
+        Suc n2 ↦ cong Nat Nat (max m2 n2) (max n2 m2) Suc ((proof comm for max) m2 n2)
       }
   }
 
@@ -831,7 +859,9 @@ consumers pass canonical `leq_nat` evidence without restating the underlying
 Boolean equation.
 The four `min`/`max` bounds use the same form. The two public tightness
 proofs complete these bounds: any common lower bound lies below `min`, and
-`max` lies below every common upper bound. The private `compare` proofs
+`max` lies below every common upper bound. The public `min::comm` and
+`max::comm` proofs swap the two Nat operands by structural recursion,
+without changing the operations. The private `compare` proofs
 establish the missing result directions: self-comparison is `Eq`, a strict
 left side gives `Lt`, and `Lt` reverses to `Gt`. The three public `compare`
 agreements return the forward order for `Lt`, propositional equality for `Eq`,
@@ -891,8 +921,8 @@ argument and its bridge exposes the canonical successor relation.
    `max`, `sub`, `compare`, and `lt_nat` operations; their three zero computation
    facts; fourteen attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
-   positive-right-multiplication order transports; the six `min`/`max` bounds;
-   the three `compare` agreements; and the five inductive
+   positive-right-multiplication order transports; the six `min`/`max` bounds
+   and their two `comm` selectors; the three `compare` agreements; and the five inductive
    `sub` proofs, including `sub::add_cancel`. `OrdResult` remains package-local.
 2. **Source map.**
 
