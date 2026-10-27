@@ -5958,12 +5958,21 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 return_inst: pending.return_inst,
             }
         };
+        // The bypass hook admits this owner past the entire finished-body
+        // layer, which includes the staged Result proof. It publishes no
+        // proven Result, so nothing can be realized or certified through it.
+        #[cfg(feature = "px8-ds-test-support")]
+        let publication = (body_mutation
+            != Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis))
+        .then_some(publication);
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let publication = Some(publication);
         staged.push(stage_result_body(
             compiler,
             ExistingResultUnitIdentity::Response(emission.owner.id()),
             id,
             func,
-            Some(publication),
+            publication,
             None,
             Some(emission.row.k_ret_identity()),
         ));
@@ -12209,14 +12218,24 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             let mut dependencies_ready = true;
             for obligation in &body.call_obligations {
                 let target = Lowering::decode_direct_callee(func, obligation.call)?;
-                if obligation.realization_required {
-                    let target_unit = exact_staged_unit(&staged, target)?;
-                    if !realizations.iter().any(|realization| {
+                // A callee's realization is a fact about its own finished
+                // body, so it grounds every protocol-verified call of it,
+                // demanded or not. Only a demanded call must wait for it.
+                let target_unit = if obligation.realization_required {
+                    Some(exact_staged_unit(&staged, target)?)
+                } else {
+                    staged_unit(&staged, target)?
+                };
+                let realized = target_unit.is_some_and(|target_unit| {
+                    realizations.iter().any(|realization| {
                         realization.target == target && realization.unit == target_unit
-                    }) {
-                        dependencies_ready = false;
-                        break;
-                    }
+                    })
+                });
+                if obligation.realization_required && !realized {
+                    dependencies_ready = false;
+                    break;
+                }
+                if realized {
                     realized_call_words.insert(obligation.result_word);
                 }
             }
@@ -12316,9 +12335,14 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             }
         }
     }
+    // A demand at an undeclared call is derived from its consumer: the callee
+    // must prove the same identity from its own finished body. Only the
+    // declared demands are owed; derived ones only seed their callers.
+    let declared_required = required.clone();
     let mut finished = Vec::<FinishedUnitResultContract>::new();
     loop {
         let mut progress = false;
+        let mut derived = Vec::<(FuncId, ConstructorIdentity)>::new();
         for (body, func) in staged.iter().zip(&indexed) {
             let demanded = required
                 .iter()
@@ -12361,7 +12385,24 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                             };
                             Some(*certificate)
                         }
-                        None => None,
+                        None => match staged_unit(&staged, target)? {
+                            Some(target_unit) => {
+                                if !required.contains(&(target, identity))
+                                    && !derived.contains(&(target, identity))
+                                {
+                                    derived.push((target, identity));
+                                }
+                                finished
+                                    .iter()
+                                    .find(|certificate| {
+                                        certificate.unit == target_unit
+                                            && certificate.target == target
+                                            && certificate.identity == identity
+                                    })
+                                    .copied()
+                            }
+                            None => None,
+                        },
                     };
                     let certified_target =
                         certificate.map_or(target, |certificate| certificate.target);
@@ -12429,11 +12470,15 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 }
             }
         }
+        if !derived.is_empty() {
+            required.extend(derived);
+            progress = true;
+        }
         if !progress {
             break;
         }
     }
-    let missing = required
+    let missing = declared_required
         .iter()
         .filter(|(target, identity)| {
             let target_unit = exact_staged_unit(&staged, *target)
@@ -12962,17 +13007,28 @@ fn exact_staged_unit(
     staged: &[StagedResultBody],
     target: FuncId,
 ) -> Result<ExistingResultUnitIdentity, CraneliftBackendError> {
+    staged_unit(staged, target)?.ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            format!("a generated-Result proof dependency targets unstaged function {target:?}"),
+        )
+    })
+}
+
+/// The one typed unit staged under `target`, or `None` when the call leaves
+/// the staged set.
+fn staged_unit(
+    staged: &[StagedResultBody],
+    target: FuncId,
+) -> Result<Option<ExistingResultUnitIdentity>, CraneliftBackendError> {
     let matches = staged
         .iter()
         .filter(|body| body.target == target)
         .map(|body| body.unit)
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [unit] => Ok(*unit),
-        [] => Err(backend_module(
-            LoweringCause::FinishedCode,
-            format!("a generated-Result proof dependency targets unstaged function {target:?}"),
-        )),
+        [] => Ok(None),
+        [unit] => Ok(Some(*unit)),
         _ => Err(backend_module(
             LoweringCause::FinishedCode,
             format!("more than one typed unit is staged under function {target:?}"),
