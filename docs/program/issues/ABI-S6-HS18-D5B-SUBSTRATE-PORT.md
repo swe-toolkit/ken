@@ -8,9 +8,37 @@ gate: none
 depends_on: []
 blocks: [ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION, ABI-S6-HS18-MAIN-BASED-CLOSURE]
 github: null
-tier: T2
+tier: T1
 origin: "Steward cut 2026-09-17, ruling runtime-leader's measured scope fork (evt_1yma657vq6bkg) after the Architect answered both extent questions from measurement (evt_6fr79bx4cjhsw). The fork offered two dispositions -- re-scope increment A, or re-sequence behind B -- and the ruling is NEITHER (evt_2dgjc1h7as88w): widening A makes A the whole substance again, which the increment split exists to prevent, and B supplies source.rs, one row of an eight-row table. This node is the third disposition, a prerequisite increment in front of A."
 ---
+
+> # RECUT 2026-10-27 (THIRD). ONE T1 NODE, KEYED ON COMPILE CLOSURE.
+>
+> This banner supersedes the earlier recut banners below wherever they
+> conflict. The Architect re-measured on `df0b57c98` (`evt_5ca5b8sdx469t`):
+> the need stands (0 of 150 ABSENT names and 0 of the 13 production-cluster
+> names exist on main; the acceptance test is absent), but the split that
+> made this the mechanical T2 half does not. Region 2 now holds no Rust
+> file, ADJUDICATE grew about eight-fold, and a 58-row standalone OWED set
+> fails to build on main (RC 101, 12 errors at 6 sites). Steward recut
+> `evt_a6zz0v47y5s3`:
+>
+> 1. `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` folds into this node, now
+>    T1. That node closes as superseded.
+> 2. The work is what increment A needs on main, found by compile closure
+>    (the frame's D0-2 method). The OWED/ABSENT/ADJUDICATE table stays the
+>    classification denominator, and ADJUDICATE defaults to main's body.
+> 3. The instrument covers non-fn items too: struct, enum and variant,
+>    const, static, type and struct fields. The cluster is named from one
+>    tree, S `b601e2ec7`.
+> 4. Retained: the AC-1e DEFERRED predicate, the six-site grant exclusion,
+>    the reaching-consumer rule, D0-3 and the HS10-inline ruling.
+>
+> **Increment 1 is a measurement.** Apply increment A's nine files plus the
+> Architect's 58-row set on a scratch branch from main, build `ken-runtime
+> --lib` and its test profile, and post the error worklist by file, symbol
+> and bucket, with a size in about-one-turn increments. The Architect rules
+> increment 2 from it. Artifacts: `local/architect-shared/abi-substrate-d0/`.
 
 > # RECUT 2026-09-17 (SECOND). NOW THE MECHANICAL HALF, AND T2.
 >

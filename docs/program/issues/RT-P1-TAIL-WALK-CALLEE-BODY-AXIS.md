@@ -1,7 +1,7 @@
 ---
 id: RT-P1-TAIL-WALK-CALLEE-BODY-AXIS
 title: "RT-P1's tail walk recurses into a declaration callee from the call edge's callee_origin, which is the callee's scheduling entry, not its body. For a ComputationalMatch body the entry is the scrutinee, so a callee whose every tail builds ITree::Ret is admitted as direct-answering and its ITree word reaches the drive as the checked answer. Walk the body axis"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1
