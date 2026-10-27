@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY
 title: "Algorithm.Optimization.BoundedSearch exports spec 72 section 2.4: find_below_stable, proved at zero trust from the Architect's D0, with the section 2.4 seed run by a package test"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2

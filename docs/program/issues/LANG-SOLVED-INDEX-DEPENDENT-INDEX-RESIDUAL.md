@@ -1,7 +1,7 @@
 ---
 id: LANG-SOLVED-INDEX-DEPENDENT-INDEX-RESIDUAL
 title: "Since LANG-SOLVED-INDEX-EQUATION-UNIFIER (b7e85023e), a match on a family with a dependent index, such as DI : (n : Nat) -> Box n -> Type against z : DI x w with w : Box x, fails with ElabError::Internal(\"solved-index dependency closure crosses outside the method\"). The parent accepts it, and the NONLINEAR gate does not see the dependent index. Restore the parent's verdict, never an internal error"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1
