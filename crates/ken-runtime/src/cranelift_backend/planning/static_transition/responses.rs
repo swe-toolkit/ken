@@ -5985,8 +5985,8 @@ mod tests {
     /// Promise class: durable invariant. MEASURED: a K whose only tail exits
     /// call a uniquely resolved countdown declaration is direct-answering;
     /// invoking the same walk *inside* a declaration whose tail builds an
-    /// ITree::Ret is not. CLAIMED: P1 admits only direct-answering static
-    /// tail callees. THE GAP: the negative arm uses a RuntimeExpr fixture
+    /// ITree::Ret or ITree::Vis is not. CLAIMED: P1 admits only direct-answering
+    /// static tail callees. THE GAP: the negative arm uses a RuntimeExpr fixture
     /// shaped like the px8ds ITree-form copy, not the checked occurrence 659.
     /// AC-1 and its guard mutation pin the positive arm on checked px8ds.
     #[test]
@@ -6020,48 +6020,51 @@ mod tests {
             },
             metadata: RuntimeSymbolMetadata::empty(),
         };
-        let itree_copy = RuntimeDeclaration {
-            symbol: "decl:fixture::itree_copy".to_string(),
-            kind: RuntimeDeclarationKind::Transparent {
-                body: RuntimeExpr::LexicalClosure {
-                    captures: Vec::new(),
-                    params: vec!["answer".to_string()],
-                    body: Box::new(RuntimeExpr::Construct {
-                        constructor: "ctor:fixture::ITree::Ret".to_string(),
-                        args: vec![RuntimeExpr::Var(0)],
-                    }),
+        for role in ["Ret", "Vis"] {
+            let itree_copy = RuntimeDeclaration {
+                symbol: "decl:fixture::itree_copy".to_string(),
+                kind: RuntimeDeclarationKind::Transparent {
+                    body: RuntimeExpr::LexicalClosure {
+                        captures: Vec::new(),
+                        params: vec!["answer".to_string()],
+                        body: Box::new(RuntimeExpr::Construct {
+                            constructor: format!("ctor:fixture::ITree::{role}"),
+                            args: vec![RuntimeExpr::Var(0)],
+                        }),
+                    },
                 },
-            },
-            metadata: RuntimeSymbolMetadata::empty(),
-        };
-        let declarations = BTreeMap::from([
-            (countdown.symbol.as_str(), &countdown),
-            (itree_copy.symbol.as_str(), &itree_copy),
-        ]);
-        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
-            .expect("the direct-countdown and ITree-form copy fixtures plan");
-        let k_origin = plan
-            .source_occurrences
-            .iter()
-            .flatten()
-            .find(|entry| matches!(entry.expr, RuntimeExpr::If { .. }))
-            .expect("K has a checked branch occurrence")
-            .static_origin;
-        let copy_decl = plan
-            .declaration_occurrence_origin(&itree_copy.symbol)
-            .expect("ITree-form declaration has an origin");
-        let copy_body = plan
-            .semantic
-            .child_origin(copy_decl, 0)
-            .expect("ITree-form closure has a body");
-        assert!(
-            deferred_response_tail_callees_answer_directly(&plan, k_origin)
-                .expect("the K's static call targets resolve")
-        );
-        assert!(
-            !tail_answers_directly(&plan, copy_body, &mut BTreeSet::new(), true)
-                .expect("the ITree-form copy's tail is classified")
-        );
+                metadata: RuntimeSymbolMetadata::empty(),
+            };
+            let declarations = BTreeMap::from([
+                (countdown.symbol.as_str(), &countdown),
+                (itree_copy.symbol.as_str(), &itree_copy),
+            ]);
+            let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+                .expect("the direct-countdown and ITree-form copy fixtures plan");
+            let k_origin = plan
+                .source_occurrences
+                .iter()
+                .flatten()
+                .find(|entry| matches!(entry.expr, RuntimeExpr::If { .. }))
+                .expect("K has a checked branch occurrence")
+                .static_origin;
+            let copy_decl = plan
+                .declaration_occurrence_origin(&itree_copy.symbol)
+                .expect("ITree-form declaration has an origin");
+            let copy_body = plan
+                .semantic
+                .child_origin(copy_decl, 0)
+                .expect("ITree-form closure has a body");
+            assert!(
+                deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                    .expect("the K's static call targets resolve")
+            );
+            assert!(
+                !tail_answers_directly(&plan, copy_body, &mut BTreeSet::new(), true)
+                    .expect("the ITree-form copy's tail is classified"),
+                "a Construct ITree::{role} tail must not answer directly"
+            );
+        }
     }
 
     /// Promise class: durable invariant. MEASURED: a K whose only tail exit
@@ -6152,48 +6155,50 @@ mod tests {
     }
 
     /// Promise class: durable invariant. MEASURED: a declaration tail with
-    /// a literal ITree::Ret RuntimeValue is refused by the production planner's
-    /// direct-answer walk. CLAIMED: an ITree-form value, whether held as a
-    /// Value or built as a Construct, is not a direct answer. THE GAP: this
-    /// RuntimeExpr fixture is not px8ds's checked ITree-form occurrence;
-    /// the identity convention here still keys on the constructor's suffix.
+    /// literal ITree::Ret and ITree::Vis RuntimeValues are refused by the
+    /// production planner's direct-answer walk. CLAIMED: an ITree-form value,
+    /// whether held as a Value or built as a Construct, is not a direct answer.
+    /// THE GAP: this RuntimeExpr fixture is not px8ds's checked ITree-form
+    /// occurrence; the identity convention still keys on constructor suffix.
     #[test]
     fn rt_p1_tail_walk_itree_value_callee_is_not_direct() {
-        let k_body = RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::DeclarationRef {
+        for role in ["Ret", "Vis"] {
+            let k_body = RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::DeclarationRef {
+                    symbol: "decl:fixture::value_tree".to_string(),
+                }),
+                args: vec![RuntimeExpr::Var(0)],
+            };
+            let value_tree = RuntimeDeclaration {
                 symbol: "decl:fixture::value_tree".to_string(),
-            }),
-            args: vec![RuntimeExpr::Var(0)],
-        };
-        let value_tree = RuntimeDeclaration {
-            symbol: "decl:fixture::value_tree".to_string(),
-            kind: RuntimeDeclarationKind::Transparent {
-                body: RuntimeExpr::LexicalClosure {
-                    captures: Vec::new(),
-                    params: vec!["answer".to_string()],
-                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Constructor {
-                        constructor: "ctor:fixture::ITree::Ret".to_string(),
-                        args: vec![RuntimeValue::Bool(true)],
-                    })),
+                kind: RuntimeDeclarationKind::Transparent {
+                    body: RuntimeExpr::LexicalClosure {
+                        captures: Vec::new(),
+                        params: vec!["answer".to_string()],
+                        body: Box::new(RuntimeExpr::Value(RuntimeValue::Constructor {
+                            constructor: format!("ctor:fixture::ITree::{role}"),
+                            args: vec![RuntimeValue::Bool(true)],
+                        })),
+                    },
                 },
-            },
-            metadata: RuntimeSymbolMetadata::empty(),
-        };
-        let declarations = BTreeMap::from([(value_tree.symbol.as_str(), &value_tree)]);
-        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
-            .expect("the ITree-value callee fixture plans");
-        let k_origin = plan
-            .source_occurrences
-            .iter()
-            .flatten()
-            .find(|entry| matches!(entry.expr, RuntimeExpr::Call { .. }))
-            .expect("K has a call occurrence")
-            .static_origin;
-        assert!(
-            !deferred_response_tail_callees_answer_directly(&plan, k_origin)
-                .expect("the K's static call target resolves"),
-            "an ITree Value callee must not count as direct-answering"
-        );
+                metadata: RuntimeSymbolMetadata::empty(),
+            };
+            let declarations = BTreeMap::from([(value_tree.symbol.as_str(), &value_tree)]);
+            let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+                .expect("the ITree-value callee fixture plans");
+            let k_origin = plan
+                .source_occurrences
+                .iter()
+                .flatten()
+                .find(|entry| matches!(entry.expr, RuntimeExpr::Call { .. }))
+                .expect("K has a call occurrence")
+                .static_origin;
+            assert!(
+                !deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                    .expect("the K's static call target resolves"),
+                "an ITree::{role} Value callee must not count as direct-answering"
+            );
+        }
     }
 }
 
