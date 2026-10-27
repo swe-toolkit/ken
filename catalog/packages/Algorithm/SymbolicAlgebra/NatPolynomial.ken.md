@@ -2695,7 +2695,8 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
 [composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md),
-and [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md)
+[derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md),
+and [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md)
 specify the public surface and closed observations. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
 and seventeen checked theorems; Horner, substitution and differentiation expose
