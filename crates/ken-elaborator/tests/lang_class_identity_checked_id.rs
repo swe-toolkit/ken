@@ -344,11 +344,12 @@ fn class_session(warm: bool) -> (tempfile::TempDir, ElabEnv) {
 }
 
 /// Promise class: durable invariant (spec 33 §§1, 3.3).
-/// MEASURED: type, where, own-field and superclass references to an
-/// unadmitted local class all refuse with its canonical name, whether another
-/// unit already loaded that name or this is a fresh session.
+/// MEASURED: cold type, where, own-field and superclass references to an
+/// unadmitted local class refuse with its canonical name. Warm: the owner
+/// gate refuses the in-memory A claim before any class guard (33 §3.1).
 /// CLAIMED: a pending local class cannot borrow an older checked global ID.
-/// THE GAP: nested inline-module classes are not exercised here.
+/// THE GAP: nested inline-module classes are not exercised here; a warm
+/// same-path replacement is no longer an admissible stale-identity route.
 #[test]
 fn forward_local_class_refuses_stale_warm_identity() {
     for (row, source) in [
@@ -376,22 +377,61 @@ fn forward_local_class_refuses_stale_warm_identity() {
 fn assert_pending_class_refuses(row: &str, source: &str) {
     for warm in [false, true] {
         let (_root, mut env) = class_session(warm);
+        let old_owner = env.globals.get("A.View").copied();
         let error = env
             .elaborate_file(source)
             .expect_err("class reference before its barrier must refuse");
-        assert!(
-            matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "A.View"),
-            "{row}/warm={warm}: expected canonical unresolved class, got {error:?}"
-        );
+        if warm {
+            assert_foreign_a_claim_refused(row, &env, &error, old_owner);
+        } else {
+            assert!(
+                matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "A.View"),
+                "{row}/warm={warm}: expected canonical unresolved class, got {error:?}"
+            );
+        }
     }
 }
 
+/// After file `A` is checked, an in-memory `module A` is a foreign claim on
+/// an owned path (`33 §3.1`), so the stale-identity route closes before any
+/// class guard runs: the unit refuses whole and file A's class is unchanged.
+fn assert_foreign_a_claim_refused(
+    row: &str,
+    env: &ElabEnv,
+    error: &ElabError,
+    old_owner: Option<GlobalId>,
+) {
+    match error {
+        ElabError::ModuleOwnerClash {
+            path,
+            owner,
+            claimant,
+            ..
+        } => {
+            assert_eq!(path, "A", "{row}/warm");
+            assert_eq!(owner, "file A", "{row}/warm");
+            assert!(
+                claimant.starts_with("in-memory unit "),
+                "{row}/warm: {claimant}"
+            );
+        }
+        other => panic!("{row}/warm=true: expected ModuleOwnerClash on A, got {other:?}"),
+    }
+    assert!(old_owner.is_some(), "{row}/warm: file A checked its View");
+    assert_eq!(
+        env.globals.get("A.View").copied(),
+        old_owner,
+        "{row}/warm: the refused unit leaves file A's View identity in place"
+    );
+}
+
 /// Promise class: durable invariant (spec 33 §§1, 3.3).
-/// MEASURED: a class instance preceding the class barrier cannot use a prior
-/// file-loaded class at the same canonical key; its result equals fresh-env
-/// refusal, not a conflict with the prior provider's instance.
+/// MEASURED: a cold class instance before the class barrier refuses at its
+/// canonical unresolved name. Warm: the owner gate refuses the in-memory A
+/// claim before any class guard (33 §3.1), preserving file A's class identity.
 /// CLAIMED: instance registration cannot borrow an older class identity.
-/// THE GAP: other instance-head shapes are covered by class registry tests.
+/// THE GAP: other instance-head shapes are covered by class registry tests;
+/// a warm same-path replacement is no longer admissible.
 #[test]
 fn instance_before_local_class_refuses_stale_warm_identity() {
     assert_pending_class_refuses(
@@ -401,9 +441,9 @@ fn instance_before_local_class_refuses_stale_warm_identity() {
 }
 
 /// Promise class: durable invariant (spec 33 §§1, 3.3).
-/// MEASURED: a reference after the ordered barrier uses its new checked class
-/// ID, not an older class at the same key; ordinary data forward use remains
-/// accepted, both after a previous provider load and in a fresh session.
+/// MEASURED: cold references after the barrier use the checked local class
+/// ID and cold data forward use accepts. Warm: the owner gate refuses the
+/// in-memory A claim before any class guard (33 §3.1), preserving file A.
 /// CLAIMED: the class guard is confined to pending classes, not all forward
 /// names or already checked classes. THE GAP: imported class IDs are tested
 /// by the existing selection and alias tests above rather than here.
@@ -415,6 +455,21 @@ fn after_class_barrier_and_data_forward_keep_checked_identity() {
     for warm in [false, true] {
         let (_root, mut env) = class_session(warm);
         let old_owner = env.globals.get("A.View").copied();
+        if warm {
+            let error = env
+                .elaborate_file(after)
+                .expect_err("in-memory A after file A");
+            assert_foreign_a_claim_refused("AFTER", &env, &error, old_owner);
+            assert!(!env.globals.contains_key("A.late"));
+            let (_root, mut env) = class_session(warm);
+            let old_owner = env.globals.get("A.View").copied();
+            let error = env
+                .elaborate_file(data)
+                .expect_err("in-memory A after file A");
+            assert_foreign_a_claim_refused("DATA-FWD", &env, &error, old_owner);
+            assert!(!env.globals.contains_key("A.early"));
+            continue;
+        }
         env.elaborate_file(after)
             .unwrap_or_else(|error| panic!("AFTER/warm={warm}: {error:?}"));
         let new_owner = env.globals["A.View"];

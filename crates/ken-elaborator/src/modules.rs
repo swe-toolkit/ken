@@ -88,6 +88,11 @@ pub struct ModuleState {
     /// Plural resolver input for this run. N2 accepts exactly one populated
     /// root; retaining the list here makes later roots a data change.
     catalog_roots: Vec<PathBuf>,
+    /// Exact module path → successful owning compilation unit (`33 §3.1`).
+    /// A global declaration spelling cannot confer ownership of a path.
+    module_path_owners: HashMap<String, ModuleUnitOwner>,
+    /// The next distinct in-memory unit identity, committed only on success.
+    next_in_memory_unit: u64,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
     /// V1 results owned by each loaded file unit, retained for cached roots
@@ -136,6 +141,21 @@ pub struct ModuleState {
 type FileExportTables = HashMap<String, HashMap<String, HashMap<String, String>>>;
 type ProviderExportIds = HashMap<String, HashMap<String, ken_kernel::GlobalId>>;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ModuleUnitOwner {
+    File(String),
+    InMemory(u64),
+}
+
+impl ModuleUnitOwner {
+    fn description(&self) -> String {
+        match self {
+            Self::File(path) => format!("file {path}"),
+            Self::InMemory(id) => format!("in-memory unit {id}"),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct ExportProvenance {
     inline_paths: HashSet<String>,
@@ -146,6 +166,35 @@ struct ExportProvenance {
 }
 
 impl ModuleState {
+    fn require_module_path_available(
+        &self,
+        path: &str,
+        claimant: &ModuleUnitOwner,
+        span: &Span,
+    ) -> Result<(), ElabError> {
+        if let Some(owner) = self.module_path_owners.get(path) {
+            if owner != claimant {
+                return Err(ElabError::ModuleOwnerClash {
+                    path: path.to_string(),
+                    owner: owner.description(),
+                    claimant: claimant.description(),
+                    span: span.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn record_module_paths(
+        &mut self,
+        paths: impl IntoIterator<Item = String>,
+        owner: &ModuleUnitOwner,
+    ) {
+        for path in paths {
+            self.module_path_owners.insert(path, owner.clone());
+        }
+    }
+
     pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
         self.declaration_descriptions
             .retain(|id, _| !removed.contains(id));
@@ -1643,6 +1692,30 @@ fn apply_export(
     Ok(())
 }
 
+// Check the whole claiming unit before it can mutate checked declarations or
+// interface tables. The inline claim-site check below additionally covers
+// claims introduced by a dependency loaded after this preflight.
+fn precheck_module_paths(
+    state: &ModuleState,
+    decls: &[Decl],
+    prefix: &str,
+    claimant: &ModuleUnitOwner,
+) -> Result<(), ElabError> {
+    for decl in decls {
+        if let Decl::ModuleDecl {
+            name,
+            decls: inner,
+            span,
+        } = decl.unwrap_pub()
+        {
+            let path = qualify(prefix, name);
+            state.require_module_path_available(&path, claimant, span)?;
+            precheck_module_paths(state, inner, &path, claimant)?;
+        }
+    }
+    Ok(())
+}
+
 fn declared_module_paths(decls: &[Decl], prefix: &str, out: &mut HashSet<String>) {
     for decl in decls {
         if let Decl::ModuleDecl {
@@ -1963,8 +2036,14 @@ fn load_unit(
         .first()
         .expect("N2 root count is checked at the public entry point")
         .clone();
+    // A missing file is not a unit and claims no path; it refuses at its
+    // import (`33 §3.2`). Only a located file unit can clash (`33 §3.1`).
     let path = source_path(&root, module, span)?;
+    let owner = ModuleUnitOwner::File(module.to_string());
+    elab.module_state
+        .require_module_path_available(module, &owner, span)?;
     let ParsedUnit { decls, literate } = parse_unit_source(&path, span)?;
+    precheck_module_paths(&elab.module_state, &decls, module, &owner)?;
 
     let previous_package = elab.class_env.current_package.clone();
     let previous_direct_use = elab.class_env.direct_use_packages.clone();
@@ -1997,12 +2076,12 @@ fn load_unit(
         previous_implicit_single_provider
     };
 
+    let mut local_modules = HashSet::new();
+    declared_module_paths(&decls, module, &mut local_modules);
     elab.module_state.active_imports.push(module.to_string());
     let mut dependency_results = Vec::new();
     let mut loaded_dependencies = Vec::new();
     let result = (|| {
-        let mut local_modules = HashSet::new();
-        declared_module_paths(&decls, module, &mut local_modules);
         let mut imports = Vec::new();
         imported_module_paths(&decls, module, &mut imports);
         for (dependency, owner, import_span) in imports {
@@ -2016,6 +2095,11 @@ fn load_unit(
             }
         }
         refresh_carried_instance_admission(elab);
+        // A dependency can claim a previously unowned path during this load.
+        // Recheck before this unit writes any of its own declarations.
+        elab.module_state
+            .require_module_path_available(module, &owner, span)?;
+        precheck_module_paths(&elab.module_state, &decls, module, &owner)?;
 
         // Every loaded source unit is an ordinary orphan-check module. Assign
         // its id only after dependencies return so their current-module ids do
@@ -2030,6 +2114,7 @@ fn load_unit(
             elab,
             &decls,
             module,
+            &owner,
             &local_modules,
             &mut ordered_inline_modules,
             &mut scope,
@@ -2105,6 +2190,12 @@ fn load_unit(
     elab.class_env.implicit_single_provider = previous_implicit_single_provider;
 
     let (ids, own_results) = result?;
+    elab.module_state.record_module_paths(
+        local_modules
+            .into_iter()
+            .chain(std::iter::once(module.to_string())),
+        &owner,
+    );
     let mut closure_results = Vec::new();
     let mut seen_ids = HashSet::new();
     for result in dependency_results.into_iter().chain(own_results.iter().cloned()) {
@@ -4867,6 +4958,7 @@ fn expand_scope(
     elab: &mut ElabEnv,
     decls: &[Decl],
     prefix: &str,
+    unit_owner: &ModuleUnitOwner,
     unit_inline_modules: &HashSet<String>,
     ordered_inline_modules: &mut HashSet<String>,
     scope: &mut Scope,
@@ -4969,15 +5061,18 @@ fn expand_scope(
             Decl::ModuleDecl {
                 name,
                 decls: inner,
-                span: _,
+                span,
             } => {
                 let child_prefix = qualify(prefix, name);
+                elab.module_state
+                    .require_module_path_available(&child_prefix, unit_owner, span)?;
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
                 child_scope.private_ids.clone_from(&scope.private_ids);
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
                     &child_prefix,
+                    unit_owner,
                     unit_inline_modules,
                     ordered_inline_modules,
                     &mut child_scope,
@@ -5834,6 +5929,13 @@ pub fn expand_and_elaborate(
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     let boundary = admission_boundary(decls)?;
+    let mut local_modules = HashSet::new();
+    declared_module_paths(decls, "", &mut local_modules);
+    let owner = match elab.module_state.active_imports.last() {
+        Some(file) => ModuleUnitOwner::File(file.clone()),
+        None => ModuleUnitOwner::InMemory(elab.module_state.next_in_memory_unit),
+    };
+    precheck_module_paths(&elab.module_state, decls, "", &owner)?;
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();
     let previous_package = elab.class_env.current_package.clone();
     let previous_direct_use = elab.class_env.direct_use_packages.clone();
@@ -5853,13 +5955,12 @@ pub fn expand_and_elaborate(
     }
     let mut scope = elab.module_state.root_scope.clone();
     let mut unit_definitions = elab.module_state.package_definitions.clone();
-    let mut local_modules = HashSet::new();
-    declared_module_paths(decls, "", &mut local_modules);
     let mut ordered_inline_modules = HashSet::new();
     let expanded = expand_scope(
         elab,
         decls,
         "",
+        &owner,
         &local_modules,
         &mut ordered_inline_modules,
         &mut scope,
@@ -5908,6 +6009,10 @@ pub fn expand_and_elaborate(
     }
     elab.module_state.root_scope = scope;
     elab.module_state.package_definitions = unit_definitions;
+    elab.module_state.record_module_paths(local_modules, &owner);
+    if matches!(owner, ModuleUnitOwner::InMemory(_)) {
+        elab.module_state.next_in_memory_unit += 1;
+    }
     Ok(results)
 }
 
@@ -6386,10 +6491,9 @@ mod namespace_effect_tests {
     /// same canonical spelling but different checked identities. Their
     /// collision refuses in both textual orders, including when `x` is not
     /// used. Isolated local and import controls both resolve to the intended
-    /// checked ID. CLAIMED: a stale global cannot certify a prebound current
-    /// local as the same declaration as an import. THE GAP: the existing
-    /// ambient-local same-ID control separately keeps genuine repeated routes
-    /// idempotent after that local is already checked.
+    /// checked ID. CLAIMED: a distinct-path local B.x cannot coalesce with
+    /// imported A.x, even if globals["B.x"] holds the checked A.x decoy.
+    /// THE GAP: the same-ID control keeps true repeated routes idempotent.
     #[test]
     fn current_local_refuses_stale_same_spelling_import_in_either_order() {
         let prepared = || {
@@ -6405,12 +6509,15 @@ mod namespace_effect_tests {
         };
 
         let (mut local, _root, file_id) = prepared();
-        local.elaborate_file(
-            "module A { const x : Nat = Suc Zero const y : Nat = x }",
-        ).expect("local-only source checks");
-        let local_id = local.globals["A.x"];
-        assert_ne!(file_id, local_id, "new local mints a distinct identity");
-        match local.env.lookup(local.globals["A.y"]) {
+        local
+            .elaborate_file("module B { const x : Nat = Suc Zero const y : Nat = x }")
+            .expect("distinct-path local-only source checks");
+        let local_id = local.globals["B.x"];
+        assert_ne!(
+            file_id, local_id,
+            "distinct-path local mints another identity"
+        );
+        match local.env.lookup(local.globals["B.y"]) {
             Some(ken_kernel::Decl::Transparent { body, .. }) => {
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. } if *id == local_id));
             }
@@ -6418,29 +6525,36 @@ mod namespace_effect_tests {
         }
 
         let (mut imported, _root, imported_id) = prepared();
-        imported.elaborate_file("module A { import P (x) const y : Nat = x }")
-            .expect("import-only source checks");
-        match imported.env.lookup(imported.globals["A.y"]) {
+        imported
+            .elaborate_file("module B { import P (x) const y : Nat = x }")
+            .expect("import-only distinct-path source checks");
+        match imported.env.lookup(imported.globals["B.y"]) {
             Some(ken_kernel::Decl::Transparent { body, .. }) => {
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. } if *id == imported_id));
             }
             other => panic!("import-only y must select the file x: {other:?}"),
         }
 
-        for (source, pending) in [
-            ("module A { import P (x) const x : Nat = Suc Zero const y : Nat = Zero }", true),
-            ("module A { const x : Nat = Suc Zero import P (x) const y : Nat = Zero }", false),
+        for source in [
+            "module B { import P (x) const x : Nat = Suc Zero const y : Nat = Zero }",
+            "module B { const x : Nat = Suc Zero import P (x) const y : Nat = Zero }",
         ] {
             let (mut env, _root, selected_id) = prepared();
             assert_eq!(env.globals["A.x"], selected_id);
+            assert_eq!(env.globals.insert("B.x".into(), selected_id), None);
             match env.elaborate_file(source) {
                 Err(ElabError::AmbiguousReference { name, sources, .. }) => {
                     assert_eq!(name, "x");
                     assert_eq!(sources.len(), 2);
-                    assert!(sources[0].contains(if pending { "pending local" } else { "local g" }),
-                        "local identity must be attributed honestly: {sources:?}");
-                    assert!(sources[1].contains(&format!("import {selected_id:?}")),
-                        "the selected file identity must be attributed: {sources:?}");
+                    assert!(
+                        sources.iter().any(|source| source.contains("B.x")),
+                        "local identity must be attributed to B: {sources:?}"
+                    );
+                    assert!(
+                        sources.iter().any(|source| source.contains("A.x")),
+                        "file identity must be attributed to A: {sources:?}"
+                    );
+                    assert_eq!(selected_id, file_id, "file provider stays stable");
                 }
                 other => panic!("a current local cannot coalesce with stale file ID: {other:?}"),
             }
@@ -6471,11 +6585,10 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §3.3, 39 §6.1).
     ///
-    /// MEASURED: a file dictionary and a new local instance have the same
-    /// generated spelling but distinct class/dictionary IDs. Both source
-    /// orders refuse an unused dictionary import, while isolated file and
-    /// local clients select their own checked dictionary ID. CLAIMED: a
-    /// pending synthesized producer is no more ambient than an ordinary local.
+    /// MEASURED: Owner's imported dictionary and B's local generated
+    /// dictionary bind the same bare name, while globals at B's pending key
+    /// holds Owner's checked ID. Both orders refuse ambiguous imports.
+    /// CLAIMED: a pending synthesized producer cannot borrow ambient identity.
     /// THE GAP: the derive test below covers the other synthesis producer.
     #[test]
     fn generated_instance_import_refuses_stale_provider_in_either_order() {
@@ -6494,28 +6607,34 @@ mod namespace_effect_tests {
             (env, root, id)
         };
         let (mut imported, _root, file_id) = prepared();
-        imported.elaborate_file(
-            "module Owner { import P (C, C_instance_Nat) const chosen : C Nat = C_instance_Nat }",
-        ).expect("file dictionary is an independently usable import");
-        assert!(matches!(imported.env.lookup(imported.globals["Owner.chosen"]),
+        imported
+            .elaborate_file(
+                "module B { import P (C, C_instance_Nat) const chosen : C Nat = C_instance_Nat }",
+            )
+            .expect("file dictionary is an independently usable import");
+        assert!(matches!(imported.env.lookup(imported.globals["B.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
                 if *id == file_id));
 
         let (mut local, _root, old_id) = prepared();
         local.elaborate_file(
-            "module Owner { class C a { marker : Nat } instance C Nat { marker = Zero } const chosen : C Nat = C_instance_Nat }",
-        ).expect("new local class and instance check without the import");
-        let local_id = local.globals["Owner.C_instance_Nat"];
+            "module B { class C a { marker : Nat } instance C Nat { marker = Zero } const chosen : C Nat = C_instance_Nat }",
+        ).expect("distinct-path class and instance check without import");
+        let local_id = local.globals["B.C_instance_Nat"];
         assert_ne!(old_id, local_id);
-        assert!(matches!(local.env.lookup(local.globals["Owner.chosen"]),
+        assert!(matches!(local.env.lookup(local.globals["B.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
                 if *id == local_id));
 
         for source in [
-            "module Owner { import P (C_instance_Nat) class C a { marker : Nat } instance C Nat { marker = Zero } }",
-            "module Owner { class C a { marker : Nat } instance C Nat { marker = Zero } import P (C_instance_Nat) }",
+            "module B { import P (C_instance_Nat) class C a { marker : Nat } instance C Nat { marker = Zero } }",
+            "module B { class C a { marker : Nat } instance C Nat { marker = Zero } import P (C_instance_Nat) }",
         ] {
             let (mut env, _root, selected_id) = prepared();
+            assert_eq!(
+                env.globals.insert("B.C_instance_Nat".into(), selected_id),
+                None
+            );
             let result = env.elaborate_file(source);
             assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
                 if name == "C_instance_Nat"),
@@ -6526,9 +6645,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §3.3, 5.6).
     ///
-    /// MEASURED: `derive` uses the same generated-name prebind and cannot
-    /// coalesce a pending new owner with a prior file dictionary. Both source
-    /// orders reject; isolated local and imported derivations remain usable.
+    /// MEASURED: B's derived prebind cannot coalesce with Owner's file
+    /// dictionary despite a checked Owner ID planted at B's pending key.
+    /// Both orders reject; isolated local and imported derivations work.
     #[test]
     fn generated_derive_import_refuses_stale_provider_in_either_order() {
         let prepared = || {
@@ -6547,27 +6666,32 @@ mod namespace_effect_tests {
         };
         let (mut imported, _root, file_id) = prepared();
         imported.elaborate_file(
-            "module Owner { import P (Marker, Head, Marker_instance_Head) theorem chosen : Marker Head = Marker_instance_Head }",
+            "module B { import P (Marker, Head, Marker_instance_Head) theorem chosen : Marker Head = Marker_instance_Head }",
         ).expect("file derive is an independently usable import");
-        assert!(matches!(imported.env.lookup(imported.globals["Owner.chosen"]),
+        assert!(matches!(imported.env.lookup(imported.globals["B.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
                 if *id == file_id));
 
         let (mut local, _root, old_id) = prepared();
         local.elaborate_file(
-            "module Owner { class Marker a { } data Head = MkLocalHead derive Marker for Head theorem chosen : Marker Head = Marker_instance_Head }",
+            "module B { class Marker a { } data Head = MkLocalHead derive Marker for Head theorem chosen : Marker Head = Marker_instance_Head }",
         ).expect("local-only derived dictionary checks");
-        let local_id = local.globals["Owner.Marker_instance_Owner.Head"];
+        let local_id = local.globals["B.Marker_instance_B.Head"];
         assert_ne!(old_id, local_id);
-        assert!(matches!(local.env.lookup(local.globals["Owner.chosen"]),
+        assert!(matches!(local.env.lookup(local.globals["B.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
                 if *id == local_id));
 
         for source in [
-            "module Owner { import P (Marker_instance_Head) class Marker a { } data Head = MkLocalHead derive Marker for Head }",
-            "module Owner { class Marker a { } data Head = MkLocalHead derive Marker for Head import P (Marker_instance_Head) }",
+            "module B { import P (Marker_instance_Head) class Marker a { } data Head = MkLocalHead derive Marker for Head }",
+            "module B { class Marker a { } data Head = MkLocalHead derive Marker for Head import P (Marker_instance_Head) }",
         ] {
             let (mut env, _root, selected_id) = prepared();
+            assert_eq!(
+                env.globals
+                    .insert("B.Marker_instance_B.Head".into(), selected_id),
+                None
+            );
             let result = env.elaborate_file(source);
             assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
                 if name == "Marker_instance_Head"),
@@ -6764,6 +6888,191 @@ mod namespace_effect_tests {
         root
     }
 
+    // A foreign claim must refuse before the rejected unit publishes any
+    // checked declaration or interface, not just produce the right error.
+    fn assert_owner_clash_without_writes<T>(
+        env: &mut ElabEnv,
+        path: &str,
+        attempt: impl FnOnce(&mut ElabEnv) -> Result<T, ElabError>,
+    ) {
+        let before_env = env.env.clone();
+        let before_globals = env.globals.clone();
+        let before_exports = env.module_state.exports.clone();
+        let before_owners = env.module_state.module_path_owners.clone();
+        let before_provenance = env
+            .module_state
+            .export_provenance
+            .iter()
+            .map(|(path, value)| (path.clone(), value.member_ids.clone()))
+            .collect::<HashMap<_, _>>();
+        let before_loaded = env.loaded_module_count();
+        let error = match attempt(env) {
+            Ok(_) => panic!("foreign unit wrongly claimed module {path}"),
+            Err(error) => error,
+        };
+        match error {
+            ElabError::ModuleOwnerClash {
+                path: refused,
+                owner,
+                claimant,
+                ..
+            } => {
+                assert_eq!(refused, path);
+                assert_ne!(owner, claimant);
+            }
+            other => panic!("wrong refusal for foreign module {path}: {other:?}"),
+        }
+        assert_eq!(
+            env.env, before_env,
+            "rejected unit changed checked declarations"
+        );
+        assert_eq!(env.globals, before_globals, "rejected unit changed globals");
+        assert_eq!(
+            env.module_state.exports, before_exports,
+            "rejected unit changed exports"
+        );
+        assert_eq!(env.module_state.module_path_owners, before_owners);
+        assert_eq!(
+            env.module_state
+                .export_provenance
+                .iter()
+                .map(|(path, value)| (path.clone(), value.member_ids.clone()))
+                .collect::<HashMap<_, _>>(),
+            before_provenance,
+            "rejected unit changed export provenance"
+        );
+        assert_eq!(env.loaded_module_count(), before_loaded);
+    }
+
+    /// Promise class: durable invariant (33 §3.1, D6).
+    /// MEASURED: independent units cannot claim P in either order, despite
+    /// disjoint members, and the second unit installs no checked declarations,
+    /// globals, exports or provenance. Distinct R and strict child P.Q accept.
+    /// CLAIMED: module ownership is exact-path and success-only, not a member
+    /// collision or a mutable global spelling. THE GAP: the session test
+    /// separately pins per-call identity; the space-operation test pins a
+    /// failed file that must never reserve its path.
+    #[test]
+    fn foreign_inline_path_owner_clashes_in_both_orders_without_writes() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(
+            root.path().join("P.ken"),
+            "pub const file_only : Nat = Zero\n",
+        )
+        .expect("write file unit");
+        let roots = [root.path().to_path_buf()];
+        for file_first in [true, false] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let inline = "module P { pub const inline_only : Nat = Suc Zero }";
+            if file_first {
+                env.elaborate_module_from_roots(&roots, "P")
+                    .expect("first file owner");
+            } else {
+                env.elaborate_file(inline).expect("first in-memory owner");
+            }
+            let before_env = env.env.clone();
+            let before_globals = env.globals.clone();
+            let before_exports = env.module_state.exports.clone();
+            let before_owners = env.module_state.module_path_owners.clone();
+            let before_provenance = env
+                .module_state
+                .export_provenance
+                .iter()
+                .map(|(path, value)| (path.clone(), value.member_ids.clone()))
+                .collect::<HashMap<_, _>>();
+            let before_loaded = env.loaded_module_count();
+            let err = if file_first {
+                env.elaborate_file(inline)
+                    .expect_err("foreign inline claim")
+            } else {
+                env.elaborate_module_from_roots(&roots, "P")
+                    .expect_err("foreign file claim")
+            };
+            assert!(
+                matches!(
+                    err,
+                    ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
+                        if path == "P"
+                            && if file_first {
+                                owner == "file P" && claimant.starts_with("in-memory unit ")
+                            } else {
+                                owner.starts_with("in-memory unit ") && claimant == "file P"
+                            }
+                ),
+                "wrong owner-clash boundary: {err:?}"
+            );
+            assert_eq!(
+                env.env, before_env,
+                "no checked declaration from rejected unit"
+            );
+            assert_eq!(env.globals, before_globals, "no foreign global binding");
+            assert_eq!(
+                env.module_state.exports, before_exports,
+                "no foreign interface"
+            );
+            assert_eq!(env.module_state.module_path_owners, before_owners);
+            assert_eq!(
+                env.module_state
+                    .export_provenance
+                    .iter()
+                    .map(|(path, value)| (path.clone(), value.member_ids.clone()))
+                    .collect::<HashMap<_, _>>(),
+                before_provenance,
+                "no foreign interface provenance"
+            );
+            assert_eq!(env.loaded_module_count(), before_loaded);
+        }
+
+        let mut control = ElabEnv::new().expect("base environment");
+        control
+            .elaborate_module_from_roots(&roots, "P")
+            .expect("file P");
+        let file_id = control.globals["P.file_only"];
+        control
+            .elaborate_file("module R { pub const other : Nat = Suc Zero }")
+            .expect("distinct path R");
+        control
+            .elaborate_file("module P.Q { pub const child : Nat = Suc Zero }")
+            .expect("strict child P.Q");
+        assert_eq!(control.globals["P.file_only"], file_id);
+        assert!(control.globals.contains_key("R.other"));
+        assert!(control.globals.contains_key("P.Q.child"));
+    }
+
+    /// Promise class: durable invariant (33 §3.1, AC-0 §6).
+    /// MEASURED: two separate session calls claiming P refuse on the second
+    /// call, while P then R accepts. CLAIMED: a session entry is a unit even
+    /// though flat declarations retain their REPL redefinition policy.
+    /// THE GAP: the two calls must use the real session route, not direct file
+    /// elaboration or a hand-constructed unit-ownership table.
+    #[test]
+    fn session_entries_claim_distinct_inline_module_owners() {
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_session_decl_results_v1("module P { pub const first : Nat = Zero }")
+            .expect("first session owner P");
+        let before = env.env.clone();
+        let err = env
+            .elaborate_session_decl_results_v1("module P { pub const second : Nat = Suc Zero }")
+            .expect_err("second session entry cannot claim P");
+        assert!(
+            matches!(err, ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
+            if path == "P" && owner.starts_with("in-memory unit ")
+                && claimant.starts_with("in-memory unit ") && owner != claimant),
+            "wrong session owner-clash boundary: {err:?}"
+        );
+        assert_eq!(env.env, before);
+        assert!(!env.globals.contains_key("P.second"));
+
+        let mut control = ElabEnv::new().expect("base environment");
+        control
+            .elaborate_session_decl_results_v1("module P { pub const first : Nat = Zero }")
+            .expect("session P");
+        control
+            .elaborate_session_decl_results_v1("module R { pub const second : Nat = Suc Zero }")
+            .expect("independent session R");
+        assert!(control.globals.contains_key("R.second"));
+    }
+
     const INLINE_OWNER: &str = "module N {\n\
          pub const x : Nat = Zero\n\
          const s : Nat = Suc Zero\n\
@@ -6889,10 +7198,8 @@ mod namespace_effect_tests {
         let roots = [root.path().to_path_buf()];
         for preload_n in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
-            env.elaborate_file(
-                "module Data { module Foo { module N { pub const x : Nat = Zero } } }",
-            )
-            .expect("separately declared inline Data.Foo.N");
+            env.elaborate_file("module Data.Foo.N { pub const x : Nat = Zero }")
+                .expect("separately declared strict child Data.Foo.N");
             if preload_n {
                 env.elaborate_module_from_roots(&roots, "N")
                     .expect("preload actual file-backed N");
@@ -7168,12 +7475,11 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §3.3 per-unit closure).
     ///
-    /// MEASURED: an external A.N.decoy was checked before loading A.ken, but
-    /// neither that edge nor a cold run makes A.P's premature import valid.
-    /// CLAIMED: an ordered edge must originate in this file unit, not merely
-    /// exist globally or appear in the unit's all-declarations pre-scan.
-    /// THE GAP: the preloaded run records its actual external GlobalId and
-    /// body, distinguishing a wrong provider from an unrelated late failure.
+    /// MEASURED: a cold A.ken refuses P's premature import of later N in
+    /// both class replay modes. An ordered file-owned A.N and a foreign
+    /// preloaded A.N cannot coexist, regardless of their disjoint members.
+    /// CLAIMED: ordered same-unit authority cannot be borrowed from a
+    /// separately owned module path. THE GAP: earlier N is a positive control.
     #[test]
     fn external_inline_edge_cannot_predeclare_later_same_unit_sibling() {
         const A: &str = "module P { import N\npub const bound : Nat = N.decoy }\n\
@@ -7182,70 +7488,66 @@ mod namespace_effect_tests {
                          import N\ninstance Marker Nat {}\n\
                          pub const bound : Nat = N.decoy }\n\
                          module N { pub const x : Nat = Zero }\n";
+        const ORDERED: &str = "module N { pub const x : Nat = Zero }\n\
+                               module P { import N\npub const bound : Nat = N.x }\n";
+        const ORDERED_WITH_REPLAY: &str = "module N { pub const x : Nat = Zero }\n\
+                                           module P { class Marker a {}\nimport N\n\
+                                           instance Marker Nat {}\n\
+                                           pub const bound : Nat = N.x }\n";
         let root = inline_owner_root(A);
         let roots = [root.path().to_path_buf()];
-        let mut results = Vec::new();
+        let inline = "module A.N { pub const decoy : Nat = Suc Zero }";
         for (preload_inline, with_replay) in
             [(false, false), (true, false), (false, true), (true, true)]
         {
-            let source = if with_replay { A_WITH_REPLAY } else { A };
+            let source = match (preload_inline, with_replay) {
+                (false, false) => A,
+                (false, true) => A_WITH_REPLAY,
+                (true, false) => ORDERED,
+                (true, true) => ORDERED_WITH_REPLAY,
+            };
             fs::write(root.path().join("A.ken"), source).expect("write A unit for replay arm");
             let mut env = ElabEnv::new().expect("base environment");
             if preload_inline {
-                env.elaborate_file("module A { module N { pub const decoy : Nat = Suc Zero } }")
-                    .expect("independent inline A.N.decoy");
-            }
-            let external_id = env.globals.get("A.N.decoy").copied();
-            let result = env.elaborate_module_from_roots(&roots, "A");
-            let body_id = env.globals.get("A.P.bound").and_then(|id| {
-                let (_, body) = env.env.transparent_body(*id)?;
-                match body {
-                    ken_kernel::Term::Const { id, .. } => Some(id),
-                    other => panic!("bound body must reference decoy: {other:?}"),
+                env.elaborate_file(inline).expect("first in-memory A.N");
+                assert_owner_clash_without_writes(&mut env, "A.N", |env| {
+                    env.elaborate_module_from_roots(&roots, "A")
+                });
+            } else {
+                let error = env
+                    .elaborate_module_from_roots(&roots, "A")
+                    .expect_err("later N cannot authorize premature import");
+                match error {
+                    ElabError::UnboundName { name, span } => {
+                        assert_eq!(name, "N");
+                        let at = source.find("import N").unwrap();
+                        assert_eq!((span.start, span.end), (at, at + "import N".len()));
+                    }
+                    other => panic!("replay={with_replay}: wrong cold refusal: {other:?}"),
                 }
-            });
-            eprintln!(
-                "external-edge probe: preload={preload_inline} replay={with_replay} \
-                 result={result:?} external={external_id:?} body={body_id:?}"
-            );
-            results.push((
-                preload_inline,
-                with_replay,
-                source,
-                result,
-                external_id,
-                body_id,
-            ));
-        }
-        for (preload_inline, with_replay, source, result, external_id, body_id) in results {
-            if preload_inline && result.is_ok() {
-                assert_eq!(body_id, external_id, "base must bind the external decoy");
-            }
-            match result {
-                Err(ElabError::UnboundName { name, span }) => {
-                    assert_eq!(
-                        name, "N",
-                        "preload {preload_inline} replay {with_replay} must reject at import"
-                    );
-                    let import_start = source.find("import N").unwrap();
-                    assert_eq!(span.start, import_start);
-                    assert_eq!(span.end, import_start + "import N".len());
-                }
-                other => panic!(
-                    "preload {preload_inline} replay {with_replay} must reject later A.N: {other:?}"
-                ),
             }
         }
+        // A completed file owner is also protected from a later foreign A.N.
+        fs::write(
+            root.path().join("A.ken"),
+            "module N { pub const x : Nat = Zero }\n",
+        )
+        .expect("write successful same-unit A.N");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&roots, "A")
+            .expect("first file owner A.N");
+        assert_owner_clash_without_writes(&mut env, "A.N", |env| env.elaborate_file(inline));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: at the empty-prefix in-memory unit root, `import N` before
-    /// its own `module N` rejects at that import both cold and after a separate
-    /// unit installed `N.external`. CLAIMED: a later local root child is not
-    /// an absolute import of ambient N. THE GAP: when the preloaded call
-    /// succeeds, the checked body/ID below identifies the wrong provider;
-    /// the ordered-root positive below proves the same syntax can work.
+    /// MEASURED: at the empty-prefix in-memory root, `import N` before its
+    /// own `module N` rejects at the import while cold; after another unit
+    /// owns N, the foreign claim refuses before any import. CLAIMED: a later
+    /// local root child is not an absolute import of ambient N, and a second
+    /// unit cannot claim N. THE GAP: the cold error is pinned at its import;
+    /// the warm refusal leaves both `own` and `borrowed` absent. The ordered-
+    /// root positive below proves the same syntax can work.
     #[test]
     fn in_memory_root_import_refuses_later_child_even_when_external_n_is_loaded() {
         const SOURCE: &str = "import N\nconst borrowed : Nat = N.external\n\
@@ -7281,9 +7583,24 @@ mod namespace_effect_tests {
                 );
             }
             match result {
-                Err(ElabError::UnboundName { name, span }) => {
+                Err(ElabError::UnboundName { name, span }) if !preload_external => {
                     assert_eq!(name, "N");
                     assert_eq!((span.start, span.end), (0, "import N".len()));
+                }
+                // The earlier unit owns N, so this unit's own `module N` is a
+                // foreign claim; the whole unit refuses before any import.
+                Err(ElabError::ModuleOwnerClash {
+                    path,
+                    owner,
+                    claimant,
+                    ..
+                }) if preload_external => {
+                    assert_eq!(path, "N");
+                    assert!(owner.starts_with("in-memory unit "), "{owner}");
+                    assert!(claimant.starts_with("in-memory unit "), "{claimant}");
+                    assert_ne!(owner, claimant);
+                    assert_eq!(own_id, None, "the refused unit declares nothing");
+                    assert_eq!(borrowed_id, None, "the refused unit borrows nothing");
                 }
                 other => panic!(
                     "later root child must reject regardless of preload {preload_external}: {other:?}"
@@ -7294,11 +7611,11 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: `module N` expanded before an in-memory import at the root
-    /// or in sibling P selects this unit's N.own, not the other unit's
-    /// preloaded N.external. CLAIMED: the empty-root declaration order, not
-    /// an unconditional refusal or ambient selection, governs both scopes.
-    /// THE GAP: the paired later-child case supplies the negative boundary.
+    /// MEASURED: a root or sibling import selects its own earlier N.own
+    /// without an external owner. A different in-memory N cannot coexist in
+    /// either call order and contributes no checked state when refused.
+    /// CLAIMED: earlier local selection is valid; foreign exact-path reuse
+    /// is not. THE GAP: the paired later-child case covers ordered refusal.
     #[test]
     fn in_memory_root_import_keeps_earlier_declared_child() {
         const ROOT: &str = "module N { pub const own : Nat = Zero }\n\
@@ -7306,25 +7623,26 @@ mod namespace_effect_tests {
         const SIBLING: &str = "module N { pub const own : Nat = Zero }\n\
                                module P { import N\npub const selected : Nat = N.own }\n";
         for (source, selected_name) in [(ROOT, "selected"), (SIBLING, "P.selected")] {
-            for preload_external in [false, true] {
+            let external = "module N { pub const external : Nat = Suc Zero }";
+            for external_first in [false, true] {
                 let mut env = ElabEnv::new().expect("base environment");
-                if preload_external {
-                    env.elaborate_file("module N { pub const external : Nat = Suc Zero }")
-                        .expect("independent earlier in-memory unit");
-                }
-                env.elaborate_file(source)
-                    .expect("earlier same-unit root child must remain importable");
-                let own_id = env.globals["N.own"];
-                if preload_external {
-                    assert_ne!(own_id, env.globals["N.external"]);
-                }
-                let (_, body) = env
-                    .env
-                    .transparent_body(env.globals[selected_name])
-                    .expect("selected is transparent");
-                match body {
-                    ken_kernel::Term::Const { id, .. } => assert_eq!(id, own_id),
-                    other => panic!("{selected_name} must use this unit's N.own: {other:?}"),
+                if external_first {
+                    env.elaborate_file(external).expect("first owner N");
+                    assert_owner_clash_without_writes(&mut env, "N", |env| {
+                        env.elaborate_file(source)
+                    });
+                } else {
+                    env.elaborate_file(source)
+                        .expect("earlier same-unit child remains importable");
+                    let own_id = env.globals["N.own"];
+                    let (_, body) = env
+                        .env
+                        .transparent_body(env.globals[selected_name])
+                        .expect("selected is transparent");
+                    assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == own_id));
+                    assert_owner_clash_without_writes(&mut env, "N", |env| {
+                        env.elaborate_file(external)
+                    });
                 }
             }
         }
@@ -7376,33 +7694,38 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3).
     ///
-    /// MEASURED: an unrelated inline N provides only decoy; A's `import N`
-    /// still loads catalog N.ken and its checked N.x. CLAIMED: an ambient
-    /// export-table hit is not file-import authority. THE GAP: the earlier
-    /// same-unit case above proves this is not a ban on inline modules.
+    /// MEASURED: a successful file N and a foreign inline N cannot coexist
+    /// in either order, although the leaf names are disjoint. The rejected
+    /// unit contributes no declarations or interface. CLAIMED: exact-path
+    /// ownership precedes file-import resolution. THE GAP: the uncontested
+    /// file-import control below still checks the selected file identity.
     #[test]
     fn file_import_uses_catalog_source_despite_unrelated_inline_name() {
         let root = inline_owner_root("import N\npub const selected : Nat = N.x\n");
         fs::write(root.path().join("N.ken"), "pub const x : Nat = Suc Zero\n")
             .expect("write catalog source for N");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_file("module N { pub const decoy : Nat = Zero }")
-            .expect("independent inline N is checked");
-        let unrelated_id = env.globals["N.decoy"];
         let roots = [root.path().to_path_buf()];
-        let result = env.elaborate_module_from_roots(&roots, "A");
-        eprintln!("absolute file-import probe: result={result:?} unrelated={unrelated_id:?}");
-        result.expect("A must import the actual N.ken even with ambient inline N");
-        let file_id = env.globals["N.x"];
-        assert_ne!(unrelated_id, file_id);
-        assert!(env.module_state.loaded_units.contains_key("N"));
-        let (_, body) = env
-            .env
-            .transparent_body(env.globals["A.selected"])
-            .expect("selected is transparent");
-        match body {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id),
-            other => panic!("selected must use catalog N.x: {other:?}"),
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if file_first {
+                env.elaborate_module_from_roots(&roots, "A")
+                    .expect("uncontested A imports catalog N.ken");
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["A.selected"])
+                    .expect("checked file selection");
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. }
+                    if id == env.globals["N.x"]));
+                assert_owner_clash_without_writes(&mut env, "N", |env| {
+                    env.elaborate_file("module N { pub const decoy : Nat = Zero }")
+                });
+            } else {
+                env.elaborate_file("module N { pub const decoy : Nat = Zero }")
+                    .expect("first inline N");
+                assert_owner_clash_without_writes(&mut env, "N", |env| {
+                    env.elaborate_module_from_roots(&roots, "A")
+                });
+            }
         }
     }
 
@@ -7447,10 +7770,8 @@ mod namespace_effect_tests {
         for preload in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
             let external = if preload {
-                env.elaborate_file(
-                    "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
-                )
-                .expect("unrelated in-memory descendant");
+                env.elaborate_file("module A.N.Q { pub const leak : Nat = Suc Zero }")
+                    .expect("unrelated strict child A.N.Q");
                 Some(env.globals["A.N.Q.leak"])
             } else {
                 None
@@ -7476,11 +7797,11 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: when A.ken actually declares N.Q, P's import N authorizes
-    /// N.Q.leak and binds the new file's checked id, not an earlier in-memory
-    /// identity with the same spelling. CLAIMED: the per-edge gate preserves
-    /// transitive authority for genuine same-unit descendants. THE GAP: the
-    /// missing-Q negative above rejects the other provenance at this path.
+    /// MEASURED: file A's earlier N.Q authorizes P's import and binds its
+    /// checked leaf. A foreign inline A cannot also own N.Q in either order;
+    /// a refused second unit changes no declarations or interface.
+    /// CLAIMED: same-unit authority survives the exact-path owner gate.
+    /// THE GAP: the missing-Q negative above checks absent provenance.
     #[test]
     fn file_unit_own_inline_grandchild_selects_its_checked_identity() {
         let root = inline_owner_root(
@@ -7491,21 +7812,18 @@ mod namespace_effect_tests {
         );
         for preload in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
-            let unrelated = if preload {
-                env.elaborate_file(
-                    "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
-                )
-                .expect("unrelated in-memory descendant");
-                Some(env.globals["A.N.Q.leak"])
-            } else {
-                None
-            };
-            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-                .expect("file-owned N.Q must remain accessible through imported N");
-            let own = env.globals["A.N.Q.leak"];
-            if let Some(unrelated) = unrelated {
-                assert_ne!(own, unrelated, "file Q must have a new checked identity");
+            let memory = "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }";
+            if preload {
+                env.elaborate_file(memory)
+                    .expect("first inline A.N.Q owner");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+                });
+                continue;
             }
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+                .expect("file-owned N.Q accessible through imported N");
+            let own = env.globals["A.N.Q.leak"];
             let (_, borrowed) = env
                 .env
                 .transparent_body(env.globals["A.P.borrowed"])
@@ -7514,6 +7832,7 @@ mod namespace_effect_tests {
                 ken_kernel::Term::Const { id, .. } => assert_eq!(id, own),
                 other => panic!("own grandchild body did not select Q.leak: {other:?}"),
             }
+            assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
         }
     }
 
@@ -7546,13 +7865,11 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: after a file A with N.Q.leak is loaded, a new in-memory
-    /// A with only N.memory replaces A's export provider. An in-memory import
-    /// can select that memory leaf, but cannot borrow the old file Q edge.
-    /// The file-root import B still selects the file-owned Q despite the
-    /// unrelated in-memory owner. CLAIMED: the import's provenance belongs
-    /// to its selected export provider, not a preferred map of the same name.
-    /// THE GAP: the inverse source-order case below checks the file provider.
+    /// MEASURED: file A owns N.Q, while inline A would own N.memory. The
+    /// later claimant is refused in either order without altering the first
+    /// owner's declarations or interface. CLAIMED: imported provenance may
+    /// not be replaced by a foreign same-path module. THE GAP: uncontested
+    /// in-memory and file-import controls check each accepted owner's scope.
     #[test]
     fn in_memory_import_uses_current_owner_not_stale_file_provenance() {
         let root = inline_owner_root("module N { module Q { pub const leak : Nat = Zero } }\n");
@@ -7561,69 +7878,65 @@ mod namespace_effect_tests {
             "import A as K\nconst file_selected : Nat = K.N.Q.leak\n",
         )
         .expect("write separate strict file-import client");
-        let mut env = ElabEnv::new().expect("base environment");
-        let trust_before = env.env.trusted_base();
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("load file A and its checked Q leaf");
-        let old_file = env.globals["A.N.Q.leak"];
-        env.elaborate_file("import A as K\nconst earlier_file : Nat = K.N.Q.leak")
-            .expect("first import actually named the file-owned descendant");
-        let (_, earlier) = env
-            .env
-            .transparent_body(env.globals["earlier_file"])
-            .expect("first import has a checked body");
-        match earlier {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
-            other => panic!("first import did not select file Q: {other:?}"),
-        }
-        env.elaborate_file("module A { module N { pub const memory : Nat = Suc Zero } }")
-            .expect("independent in-memory owner takes A's export slot");
-        let memory = env.globals["A.N.memory"];
-        env.elaborate_file("import A as K\nconst memory_selected : Nat = K.N.memory")
-            .expect("memory owner's own N leaf is importable");
-        let (_, selected) = env
-            .env
-            .transparent_body(env.globals["memory_selected"])
-            .expect("memory selection has a checked body");
-        match selected {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, memory),
-            other => panic!("memory owner was not selected: {other:?}"),
-        }
-        let source = "import A as K\nconst selected : Nat = K.N.Q.leak";
-        let error = env
-            .elaborate_file(source)
-            .expect_err("memory A did not declare file A's Q edge");
-        let at = source.find("K.N.Q.leak").expect("one denied reference");
-        match error {
-            ElabError::UnboundName { name, span } => {
-                assert_eq!(name, "K.N.Q.leak");
-                assert_eq!((span.start, span.end), (at, at + "K.N.Q.leak".len()));
+        let roots = [root.path().to_path_buf()];
+        let memory_source = "module A { module N { pub const memory : Nat = Suc Zero } }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            let trust_before = env.env.trusted_base();
+            if !file_first {
+                env.elaborate_file(memory_source).expect("first inline A");
+                let memory = env.globals["A.N.memory"];
+                env.elaborate_file("import A as K\nconst memory_selected : Nat = K.N.memory")
+                    .expect("memory owner's leaf is importable");
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["memory_selected"])
+                    .expect("checked memory selection");
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == memory));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
+                assert_eq!(env.env.trusted_base(), trust_before);
+                continue;
             }
-            other => panic!("wrong refusal for absent memory Q: {other:?}"),
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A and checked Q leaf");
+            let old_file = env.globals["A.N.Q.leak"];
+            env.elaborate_file("import A as K\nconst earlier_file : Nat = K.N.Q.leak")
+                .expect("first import actually named the file-owned descendant");
+            let (_, earlier) = env
+                .env
+                .transparent_body(env.globals["earlier_file"])
+                .expect("first import has a checked body");
+            match earlier {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
+                other => panic!("first import did not select file Q: {other:?}"),
+            }
+            assert_owner_clash_without_writes(&mut env, "A", |env| {
+                env.elaborate_file(memory_source)
+            });
+            assert_eq!(env.globals["A.N.Q.leak"], old_file);
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+                .expect("file B imports the actual file A, not the in-memory A");
+            let (_, selected) = env
+                .env
+                .transparent_body(env.globals["B.file_selected"])
+                .expect("B's checked body");
+            match selected {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
+                other => panic!("file-root import lost the file-owned Q: {other:?}"),
+            }
+            assert_eq!(env.env.trusted_base(), trust_before);
         }
-        assert!(!env.globals.contains_key("selected"));
-        assert_eq!(env.globals["A.N.Q.leak"], old_file);
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
-            .expect("file B imports the actual file A, not the in-memory A");
-        let (_, selected) = env
-            .env
-            .transparent_body(env.globals["B.file_selected"])
-            .expect("B's checked body");
-        match selected {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
-            other => panic!("file-root import lost the file-owned Q: {other:?}"),
-        }
-        assert_eq!(env.env.trusted_base(), trust_before);
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: B's strict import of A still selects A.ken's public root
-    /// leaf after an in-memory A replaces the global export table. It refuses
-    /// a memory-only root leaf at the exact selector. CLAIMED: file-backed
-    /// imports use that file's public export table as well as its inline
-    /// provenance; the current global table is not a substitute for either.
-    /// THE GAP: the in-memory-owner test above chooses the opposite provider.
+    /// MEASURED: file A exports file_only while inline A exports memory_only;
+    /// either first owner blocks the foreign second owner without writes.
+    /// CLAIMED: file root interfaces cannot be replaced by an inline owner.
+    /// THE GAP: file-only positive and denied imports still check the file
+    /// interface without depending on an illegal shared module path.
     #[test]
     fn file_root_import_uses_its_own_exports_after_memory_shadow() {
         let root = inline_owner_root("pub const file_only : Nat = Zero\n");
@@ -7644,14 +7957,22 @@ mod namespace_effect_tests {
             "import A (memory_only)\nconst denied : Nat = memory_only\n",
         )
         .expect("write forbidden selective importer");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("load file A");
-        let file = env.globals["A.file_only"];
-        env.elaborate_file("module A { pub const memory_only : Nat = Suc Zero }")
-            .expect("later memory A has a disjoint root export");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
-            .expect("file B must import A.ken's original public root leaf");
+        let roots = [root.path().to_path_buf()];
+        let memory = "module A { pub const memory_only : Nat = Suc Zero }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if !file_first {
+                env.elaborate_file(memory).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
+                continue;
+            }
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A");
+            let file = env.globals["A.file_only"];
+            env.elaborate_module_from_roots_strict(&roots, "B")
+                .expect("file B imports A's public root leaf");
         let (_, selected) = env
             .env
             .transparent_body(env.globals["B.selected"])
@@ -7688,17 +8009,18 @@ mod namespace_effect_tests {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.memory_only"),
             other => panic!("selective file import borrowed memory owner: {other:?}"),
         }
-        assert!(!env.globals.contains_key("E.denied"));
+            assert!(!env.globals.contains_key("E.denied"));
+            assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a later memory owner redeclares the exact A.N.Q module
-    /// path with different public leaves. A file-root client still sees the
-    /// original file Q export table, not memory Q's exported leaf.
-    /// CLAIMED: every descendant's public table shares the same selected
-    /// file provider as its authorizing inline edge. THE GAP: the root-only
-    /// case above separately checks the file root's own public interface.
+    /// MEASURED: file and inline owners cannot redeclare the exact A.N.Q
+    /// path with disjoint public leaves, in either order, without an owner
+    /// clash; a file-only descendant client still selects the file identity.
+    /// CLAIMED: the owner gate protects descendant public tables too.
+    /// THE GAP: an uncontested client and denied leaf still check file scope.
     #[test]
     fn file_import_keeps_descendant_exports_from_selected_file_provider() {
         let root =
@@ -7710,16 +8032,23 @@ mod namespace_effect_tests {
         .expect("write file descendant client");
         let c_source = "import A as K\nconst denied : Nat = K.N.Q.memory_only\n";
         fs::write(root.path().join("C.ken"), c_source).expect("write denied client");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("load file A.Q");
-        let file = env.globals["A.N.Q.file_only"];
-        env.elaborate_file(
-            "module A { module N { module Q { pub const memory_only : Nat = Suc Zero } } }",
-        )
-        .expect("memory owner replaces every shared module table");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
-            .expect("file B retains A.ken's nested export identity");
+        let roots = [root.path().to_path_buf()];
+        let memory =
+            "module A { module N { module Q { pub const memory_only : Nat = Suc Zero } } }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if !file_first {
+                env.elaborate_file(memory).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
+                continue;
+            }
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A");
+            let file = env.globals["A.N.Q.file_only"];
+            env.elaborate_module_from_roots_strict(&roots, "B")
+                .expect("file B imports A's Q export");
         let (_, selected) = env
             .env
             .transparent_body(env.globals["B.selected"])
@@ -7741,16 +8070,18 @@ mod namespace_effect_tests {
             }
             other => panic!("wrong descendant export refusal: {other:?}"),
         }
-        assert!(!env.globals.contains_key("C.denied"));
+            assert!(!env.globals.contains_key("C.denied"));
+            assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §3.2).
     ///
-    /// MEASURED: file B's facade export selects A.ken's public leaf even
-    /// after an in-memory A replaces the global export table; it cannot
-    /// republish A's memory-only leaf. CLAIMED: facade file dependencies use
-    /// the same file-identity boundary as ordinary file imports.
-    /// THE GAP: the direct-import control above pins the qualified path.
+    /// MEASURED: file A and inline A cannot replace one another's interface
+    /// in either order, while uncontested facade B republishes A.file_only
+    /// and rejects a missing A.memory_only. CLAIMED: facade dependencies
+    /// cannot borrow an interface from a foreign same-path owner.
+    /// THE GAP: direct-import controls check the non-facade path.
     #[test]
     fn file_facade_uses_source_file_exports_not_memory_shadow() {
         let root = inline_owner_root("pub const file_only : Nat = Zero\n");
@@ -7762,14 +8093,22 @@ mod namespace_effect_tests {
         .expect("write facade consumer");
         fs::write(root.path().join("C.ken"), "export A (memory_only)\n")
             .expect("write forbidden facade");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("load file A");
-        let file = env.globals["A.file_only"];
-        env.elaborate_file("module A { pub const memory_only : Nat = Suc Zero }")
-            .expect("later in-memory A has different exports");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Good")
-            .expect("facade B must republish the file A leaf");
+        let roots = [root.path().to_path_buf()];
+        let memory = "module A { pub const memory_only : Nat = Suc Zero }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if !file_first {
+                env.elaborate_file(memory).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
+                continue;
+            }
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A");
+            let file = env.globals["A.file_only"];
+            env.elaborate_module_from_roots_strict(&roots, "Good")
+                .expect("facade B republishes file A's leaf");
         let (_, selected) = env
             .env
             .transparent_body(env.globals["Good.selected"])
@@ -7782,154 +8121,144 @@ mod namespace_effect_tests {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "A.memory_only"),
             other => panic!("file facade cannot republish memory owner: {other:?}"),
         }
+            assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: file A first declares Q, then in-memory A redeclares Q.
-    /// Import from memory must bind its newer checked Q identity, not the
-    /// same-spelling cached file identity. CLAIMED: source-order changes the
-    /// selected provider but cannot silently switch to a stale provenance.
-    /// THE GAP: the missing-Q case above detects over-authorization.
+    /// MEASURED: file A's checked Q cannot be replaced by a foreign inline
+    /// A in either order, even when both Q leaves have different definitions.
+    /// CLAIMED: exact-path owner identity precedes provider selection.
+    /// THE GAP: the uncontested file import still pins Q's checked body.
     #[test]
     fn in_memory_q_after_file_selects_its_own_checked_identity() {
         let root = inline_owner_root("module N { module Q { pub const leak : Nat = Zero } }\n");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("file A owns its Q");
-        let file = env.globals["A.N.Q.leak"];
-        env.elaborate_file(
-            "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
-        )
-        .expect("later in-memory A owns a distinct Q");
-        let memory = env.globals["A.N.Q.leak"];
-        assert_ne!(file, memory);
-        env.elaborate_file("import A as K\nconst selected : Nat = K.N.Q.leak")
-            .expect("import chooses the current memory provider");
-        let (_, selected) = env
-            .env
-            .transparent_body(env.globals["selected"])
-            .expect("checked selection");
-        match selected {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, memory),
-            other => panic!("did not select memory-owned Q: {other:?}"),
+        let roots = [root.path().to_path_buf()];
+        let memory = "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if file_first {
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
+                let file = env.globals["A.N.Q.leak"];
+                env.elaborate_file("import A as K\nconst selected : Nat = K.N.Q.leak")
+                    .expect("file import checks against its selected provider");
+                let (_, selected) = env
+                    .env
+                    .transparent_body(env.globals["selected"])
+                    .expect("checked selection");
+                assert!(matches!(selected, ken_kernel::Term::Const { id, .. } if id == file));
+                assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
+            } else {
+                env.elaborate_file(memory).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
+            }
         }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a memory A with N.memory precedes a file A with N.Q.
-    /// The later import selects file-owned Q and cannot borrow memory-only
-    /// leaves. CLAIMED: provider/export pairing tracks replacement in both
-    /// directions, instead of unconditionally preferring in-memory paths.
-    /// THE GAP: the file-first memory-second negative above probes the inverse.
+    /// MEASURED: an inline A with N.memory and a file A with N.Q refuse
+    /// a second claim in both orders without modifying the checked owner.
+    /// CLAIMED: a module path cannot change provider through source order.
+    /// THE GAP: uncontested file and memory imports are selected separately.
     #[test]
     fn file_q_after_memory_owner_selects_file_provenance() {
         let root = inline_owner_root("module N { module Q { pub const leak : Nat = Zero } }\n");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_file("module A { module N { pub const memory : Nat = Suc Zero } }")
-            .expect("first memory owner");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("later file owner");
-        let file = env.globals["A.N.Q.leak"];
-        env.elaborate_file("import A as K\nconst selected : Nat = K.N.Q.leak")
-            .expect("import chooses current file provider");
-        let (_, selected) = env
-            .env
-            .transparent_body(env.globals["selected"])
-            .expect("checked selection");
-        match selected {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, file),
-            other => panic!("did not select file-owned Q: {other:?}"),
-        }
-        let source = "import A as K\nconst denied : Nat = K.N.memory";
-        let error = env
-            .elaborate_file(source)
-            .expect_err("file A did not declare the memory-only leaf");
-        let at = source.find("K.N.memory").expect("one denied reference");
-        match error {
-            ElabError::UnboundName { name, span } => {
-                assert_eq!(name, "K.N.memory");
-                assert_eq!((span.start, span.end), (at, at + "K.N.memory".len()));
+        let roots = [root.path().to_path_buf()];
+        let memory = "module A { module N { pub const memory : Nat = Suc Zero } }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if file_first {
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
+                let file = env.globals["A.N.Q.leak"];
+                env.elaborate_file("import A as K\nconst selected : Nat = K.N.Q.leak")
+                    .expect("file import");
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["selected"])
+                    .expect("checked selected body");
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == file));
+                assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
+            } else {
+                env.elaborate_file(memory).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
-            other => panic!("wrong refusal for memory-only leaf: {other:?}"),
         }
-        assert!(!env.globals.contains_key("denied"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3).
     ///
-    /// MEASURED: a checked file A exists, but `export A` inside an in-memory
-    /// `module A` refuses at its facade instead of borrowing that file's ID.
-    /// CLAIMED: an inline unit being expanded is unavailable even to its own
-    /// facade. THE GAP: the separate file-facade control measures a genuinely
-    /// absolute file A, and the available-child cases measure selected IDs.
+    /// MEASURED: a file A and foreign inline A cannot coexist, in either
+    /// order, even when their public leaf names differ. The rejected second
+    /// unit publishes nothing. CLAIMED: a self-facade that depended on
+    /// foreign same-path identity is source-unreachable after owner gating.
+    /// THE GAP: same-unit facade refusal remains guarded separately.
     #[test]
     fn facade_inside_self_module_cannot_borrow_ambient_file_id() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("file provider checked");
-        let file_id = env.globals["A.leak"];
-        let source = "module A { pub const leak : Nat = Suc Zero export A (leak) }";
-        match env.elaborate_file(source) {
-            Err(ElabError::UnboundName { name, span }) => {
-                assert_eq!(name, "A");
-                assert_eq!(span.start, source.find("export A (leak)").unwrap());
+        let roots = [root.path().to_path_buf()];
+        let inline = "module A { pub const other : Nat = Suc Zero }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if file_first {
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+            } else {
+                env.elaborate_file(inline).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
-            other => panic!("same-unit A is not an absolute facade: {other:?}"),
         }
-        assert_ne!(file_id, env.globals["A.leak"]);
     }
 
     /// Promise class: durable invariant (spec 33 §4.3).
     ///
-    /// MEASURED: F republishes file A.leak, then an in-memory A checks a
-    /// distinct A.leak and republishes F's selected leaf under the same
-    /// surface. Both providers have the SAME canonical spelling but distinct
-    /// GlobalIds, and the export site raises ReExportCollision. CLAIMED: an
-    /// interface cannot identify two checked declarations by one public name
-    /// merely because their canonical spellings agree. THE GAP: the L4
-    /// distinct-spelling collision cannot detect removal of the checked-ID
-    /// guard, so this case must preserve both same-spelling IDs.
+    /// MEASURED: facade F loads file A, and a foreign inline A cannot
+    /// also own path A, in either load order, with no second-unit writes.
+    /// CLAIMED: same-canonical distinct-checked-ID export collision needs
+    /// two units owning A and is now source-unreachable. THE GAP: L4 keeps
+    /// reachable re-export collision coverage; the checked-ID guard remains.
     #[test]
     fn facade_selected_equal_canonical_distinct_ids_collide_at_export() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
         fs::write(root.path().join("F.ken"), "export A (leak)\n")
             .expect("write file facade F");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "F")
-            .expect("file F must republish A's checked leaf");
-        let file_id = env.globals["A.leak"];
-        assert_eq!(env.module_state.file_export_ids["F"]["F"]["leak"], file_id);
-
-        let source = "module A { pub const leak : Nat = Suc Zero\n\
-                      import F (leak as selected)\n\
-                      export selected as leak }";
-        match env.elaborate_file(source) {
-            Err(ElabError::ReExportCollision {
-                surface_name,
-                existing,
-                incoming,
-                span,
-            }) => {
-                assert_eq!(surface_name, "leak");
-                assert_eq!(existing, "A.leak");
-                assert_eq!(incoming, "A.leak");
-                assert_eq!(span.start, source.find("export selected as leak").unwrap());
+        let roots = [root.path().to_path_buf()];
+        let inline = "module A { pub const other : Nat = Suc Zero }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if file_first {
+                env.elaborate_module_from_roots_strict(&roots, "F")
+                    .expect("facade F republishes file A.leak");
+                let file_id = env.globals["A.leak"];
+                assert_eq!(env.module_state.file_export_ids["F"]["F"]["leak"], file_id);
+                assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+            } else {
+                env.elaborate_file(inline).expect("first inline A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "F")
+                });
             }
-            other => panic!("same-canonical distinct checked IDs must clash: {other:?}"),
         }
-        assert_ne!(file_id, env.globals["A.leak"]);
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: an explicit local export BEFORE its declaration selects the
-    /// new local's ID rather than the old file declaration's ID at the same
-    /// canonical spelling. CLAIMED: prebound locals are paired only once
-    /// checked. THE GAP: an earlier file ID exists and differs, so an eager
-    /// ambient lookup would select the wrong provider and fail this assertion.
+    /// MEASURED: a file A and a foreign inline A cannot both own A.leak in
+    /// either order; a legal B forward export still selects its checked local.
+    /// CLAIMED: the original same-canonical two-owner collision is unreachable.
+    /// THE GAP: a forged globals["B.leak"] decoy does not redden eager lookup
+    /// because export is applied after B.leak is checked. The forward export
+    /// success remains a control, not an AC-2 identity-mutation claim.
     #[test]
     fn forward_local_export_waits_for_its_checked_id() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
@@ -7937,12 +8266,30 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file provider checked");
         let old = env.globals["A.leak"];
-        env.elaborate_file("module A { export leak\nconst leak : Nat = Suc Zero }")
-            .expect("forward in-scope export resolves after local check");
-        let local = env.globals["A.leak"];
+        let inline = "module A { export leak\nconst leak : Nat = Suc Zero }";
+        assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+        let mut memory_first = ElabEnv::new().expect("base environment");
+        memory_first
+            .elaborate_file(inline)
+            .expect("first inline owner A");
+        assert_owner_clash_without_writes(&mut memory_first, "A", |env| {
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+        });
+        env.elaborate_file("module Decoy { pub const leak : Nat = Zero }")
+            .expect("independent checked decoy");
+        let decoy = env.globals["Decoy.leak"];
+        assert_eq!(env.globals.insert("B.leak".into(), decoy), None);
+        env.elaborate_file("module B { export leak\nconst leak : Nat = Suc Zero }")
+            .expect("forward export resolves after local check");
+        let local = env.globals["B.leak"];
         assert_ne!(old, local);
-        env.elaborate_file("import A as M\nconst selected : Nat = M.leak")
-            .expect("memory client selects the forward-published local");
+        assert_ne!(decoy, local);
+        assert_eq!(
+            env.module_state.export_provenance["B"].member_ids["B"]["leak"],
+            local
+        );
+        env.elaborate_file("import B as M\nconst selected : Nat = M.leak")
+            .expect("client selects the forward-published local");
         let (_, body) = env.env.transparent_body(env.globals["selected"])
             .expect("selected local has a checked body");
         match body {
@@ -7987,27 +8334,30 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a forward local export is pending and a same-unit facade
-    /// follows it, while a checked file A has the same canonical leaf.
-    /// CLAIMED: neither the unready local nor the ambient file can authorize
-    /// `export A` inside the unit A being expanded. THE GAP: a separate pin
-    /// checks forward local ID reconciliation without a facade.
+    /// MEASURED: a checked file A and a foreign inline A with a forward
+    /// export cannot coexist in either order; the second leaves no checked
+    /// state. CLAIMED: the same-canonical self-facade collision is now
+    /// unreachable from source after path ownership. THE GAP: the separate
+    /// forward-local pin checks legal forward ID reconciliation.
     #[test]
     fn forward_local_export_cannot_authorize_unavailable_self_facade() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
-        let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("file provider checked");
-        let old = env.globals["A.leak"];
-        let source = "module A { export leak\nexport A (leak)\nconst leak : Nat = Suc Zero }";
-        match env.elaborate_file(source) {
-            Err(ElabError::UnboundName { name, span }) => {
-                assert_eq!(name, "A");
-                assert_eq!(span.start, source.find("export A (leak)").unwrap());
+        let roots = [root.path().to_path_buf()];
+        let inline = "module A { export leak\nconst leak : Nat = Suc Zero }";
+        for file_first in [false, true] {
+            let mut env = ElabEnv::new().expect("base environment");
+            if file_first {
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+            } else {
+                env.elaborate_file(inline)
+                    .expect("first inline forward export A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
-            other => panic!("forward export cannot enable self facade: {other:?}"),
         }
-        assert_eq!(old, env.globals["A.leak"], "the later local never elaborated");
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
@@ -8058,8 +8408,8 @@ mod namespace_effect_tests {
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3, §4.3).
-    /// MEASURED: competing in-scope exports under one surface refuse at the
-    /// second export; A.p survives while the provider's A.leak ID stays put.
+    /// MEASURED: independent B.p and B.q exported under one surface refuse
+    /// at the second export; B.p survives while file A.leak stays unchanged.
     /// CLAIMED: a collision does not admit a later local. THE GAP: facade
     /// versus in-scope checked-ID collisions have their own sibling below.
     #[test]
@@ -8069,7 +8419,7 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file provider checked");
         let provider_id = env.globals["A.leak"];
-        let source = "module A { const p : Nat = Zero const q : Nat = Suc Zero export p as y export q as y const leak : Nat = Zero }";
+        let source = "module B { const p : Nat = Zero const q : Nat = Suc Zero export p as y export q as y const leak : Nat = Zero }";
         match env.elaborate_file(source) {
             Err(ElabError::ReExportCollision { surface_name, span, .. }) => {
                 assert_eq!(surface_name, "y");
@@ -8078,7 +8428,7 @@ mod namespace_effect_tests {
             other => panic!("two exports under y must collide: {other:?}"),
         }
         assert_eq!(env.globals["A.leak"], provider_id);
-        assert!(env.globals.contains_key("A.p"));
+        assert!(env.globals.contains_key("B.p"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3, §4.3).
@@ -8106,13 +8456,10 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a file owner and a later or earlier in-memory owner mint
-    /// distinct checked declarations at the SAME canonical leaf. File B's
-    /// imported alias must select the file's GlobalId even if the mutable
-    /// process-global spelling currently names the in-memory GlobalId; an
-    /// independent memory import must select the in-memory ID. CLAIMED:
-    /// source-to-resolved references carry the chosen provider's identity.
-    /// THE GAP: descendant/export checks alone cannot catch an ID re-lookup.
+    /// MEASURED: file A and inline A cannot claim the same exact path in
+    /// either order, despite a legal file-import identity control. CLAIMED:
+    /// the owner gate prevents same-canonical foreign provider replacement.
+    /// THE GAP: distinct-path provider checks cover resolver-ID selection.
     #[test]
     fn file_import_retains_checked_leaf_identity_across_same_name_memory_owner() {
         let root = inline_owner_root(
@@ -8123,60 +8470,36 @@ mod namespace_effect_tests {
             "import A as K\nconst selected : Nat = K.N.Q.leak\n",
         )
         .expect("write file-backed client");
-        for memory_first in [false, true] {
+        let roots = [root.path().to_path_buf()];
+        let memory = "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }";
+        for file_first in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
-            let memory_source =
-                "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }";
-            let first_memory_id = if memory_first {
-                env.elaborate_file(memory_source)
-                    .expect("first in-memory A has a checked leaf");
-                Some(env.globals["A.N.Q.leak"])
-            } else {
-                None
-            };
-            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-                .expect("load file A's checked leaf");
-            let file_id = env.globals["A.N.Q.leak"];
-            let memory_id = if memory_first {
-                first_memory_id
-            } else {
-                env.elaborate_file(memory_source)
-                    .expect("later in-memory A has a distinct checked leaf");
-                Some(env.globals["A.N.Q.leak"])
-            };
-            assert_ne!(file_id, memory_id.expect("both owners are checked"));
-            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
-                .expect("B imports file A even with the memory A in process");
-            let (_, body) = env
-                .env
-                .transparent_body(env.globals["B.selected"])
-                .expect("checked B selection");
-            match body {
-                ken_kernel::Term::Const { id, .. } => assert_eq!(id, file_id, "memory_first={memory_first}"),
-                other => panic!("file import selected non-constant: {other:?}"),
-            }
-            if !memory_first {
-                env.elaborate_file("import A as M\nconst memory_selected : Nat = M.N.Q.leak")
-                    .expect("separate in-memory importer selects its current owner");
+            if file_first {
+                env.elaborate_module_from_roots_strict(&roots, "B")
+                    .expect("file B imports file A's checked leaf");
+                let file_id = env.globals["A.N.Q.leak"];
                 let (_, body) = env
                     .env
-                    .transparent_body(env.globals["memory_selected"])
-                    .expect("checked memory selection");
-                match body {
-                    ken_kernel::Term::Const { id, .. } => assert_eq!(id, memory_id.unwrap()),
-                    other => panic!("memory import selected non-constant: {other:?}"),
-                }
+                    .transparent_body(env.globals["B.selected"])
+                    .expect("checked B selection");
+                assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == file_id));
+                assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
+            } else {
+                env.elaborate_file(memory).expect("first in-memory A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
         }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.2–5.5).
     ///
-    /// MEASURED: two checked classes with one canonical spelling retain their
-    /// separate field telescopes and exact checked dictionary class heads.
-    /// File and memory imports each select their own provider, in either load
-    /// order. CLAIMED: class and instance consumers use checked IDs, not the
-    /// mutable last owner of a spelling. THE GAP: this does not exercise
+    /// MEASURED: file A.C and independent inline M.C retain their distinct
+    /// field telescopes and checked dictionary class heads. File and memory
+    /// imports each select their own provider, in either load order. CLAIMED:
+    /// class and instance consumers use checked IDs, not a bare C spelling.
+    /// THE GAP: this does not exercise
     /// parameterized-head instance search or constraint recursion.
     #[test]
     fn imported_classes_and_instances_keep_provider_id_after_same_name_shadow() {
@@ -8195,19 +8518,19 @@ mod namespace_effect_tests {
             for (file_client, memory_client) in [
                 (
                     "B",
-                    "import A (C)\ndata MemoryLocal = MkMemoryLocal\ninstance C MemoryLocal { marker = Zero }",
+                    "import M (C)\ndata MemoryLocal = MkMemoryLocal\ninstance C MemoryLocal { marker = Zero }",
                 ),
                 (
                     "BQ",
-                    "import A as K\ndata MemoryLocal = MkMemoryLocal\ninstance K.C MemoryLocal { marker = Zero }",
+                    "import M as K\ndata MemoryLocal = MkMemoryLocal\ninstance K.C MemoryLocal { marker = Zero }",
                 ),
             ] {
                 let mut env = ElabEnv::new().expect("base environment");
                 let roots = [root.path().to_path_buf()];
-                let memory_source = "module A { pub class C a { marker : Nat } }";
+                let memory_source = "module M { pub class C a { marker : Nat } }";
                 let memory_id = if memory_first {
                     env.elaborate_file(memory_source).expect("check memory class");
-                    let id = env.globals["A.C"];
+                    let id = env.globals["M.C"];
                     env.elaborate_file(memory_client)
                         .expect("memory client selects Nat class");
                     Some(id)
@@ -8220,9 +8543,10 @@ mod namespace_effect_tests {
                 let memory_id = memory_id.unwrap_or_else(|| {
                     env.elaborate_file(memory_source)
                         .expect("check later memory class");
-                    env.globals["A.C"]
+                    env.globals["M.C"]
                 });
                 assert_ne!(file_id, memory_id);
+                assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
                 env.elaborate_module_from_roots_strict(&roots, file_client)
                     .expect("file class's Bool marker accepts True");
                 if !memory_first {
@@ -8260,7 +8584,7 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.2–5.5).
     ///
-    /// MEASURED: after both same-spelling class providers have loaded, a
+    /// MEASURED: after independent A.C and M.C providers load, a
     /// wrong-provider field is rejected by the selected class's checked
     /// telescope, not by imports or orphan checking. Both directions reach
     /// a locally owned head and their particular kernel mismatch.
@@ -8275,10 +8599,11 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&roots, "A")
             .expect("file class has Bool field");
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
-        env.elaborate_file("module A { pub class C a { marker : Nat } }")
-            .expect("memory class has Nat field");
-        let memory_id = env.globals["A.C"];
+        env.elaborate_file("module M { pub class C a { marker : Nat } }")
+            .expect("distinct-path class has Nat field");
+        let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
+        assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
         assert!(matches!(
             env.elaborate_module_from_roots_strict(&roots, "Wrong"),
             Err(ElabError::KernelRejected {
@@ -8286,7 +8611,7 @@ mod namespace_effect_tests {
             })
         ), "file-selected Bool telescope must refuse memory-only Zero");
         assert!(matches!(
-            env.elaborate_file("import A (C)\ndata MemoryLocal = MkMemoryLocal\ninstance C MemoryLocal { marker = True }"),
+            env.elaborate_file("import M (C)\ndata MemoryLocal = MkMemoryLocal\ninstance C MemoryLocal { marker = True }"),
             Err(ElabError::KernelRejected {
                 error: ken_kernel::KernelError::TypeMismatch { .. }, ..
             })
@@ -8294,11 +8619,10 @@ mod namespace_effect_tests {
     }
 
     /// Promise class: durable invariant (spec 33 §§3.3, 5.3–5.5, 39 §6).
-    /// MEASURED: a user-spelled data rebind and its same-spelling minted
-    /// dictionary both admit; the old/new checked-head registry keys retain
-    /// their own dictionaries and a use of the new head selects the new one.
-    /// CLAIMED: a later provider of the same canonical spelling pair does
-    /// not erase the earlier provider's checked identity. THE GAP: a later
+    /// MEASURED: file A.Foo and independent M.Foo keep their checked-head
+    /// registry keys and dictionaries; a use of the new head selects M's
+    /// dictionary. CLAIMED: a later bare Foo with a distinct checked ID
+    /// does not erase the earlier provider's identity. THE GAP: a later
     /// user declaration replacing a dictionary is a separate successor WP.
     #[test]
     fn rebound_head_instances_keep_both_checked_providers() {
@@ -8322,10 +8646,12 @@ mod namespace_effect_tests {
         );
         env.resolution_provenance.clear();
         let results = env.elaborate_file_v1(
-            "module A { import P (Pick) pub data Foo = MkNewFoo instance Pick Foo { selected = False } const selected : Bool where Pick Foo = d.selected }",
-        ).expect("new checked head, dictionary and use in the same provider scope");
-        let new_head = env.globals["A.Foo"];
-        let new_dictionary = env.globals["A.Pick_instance_A.Foo"];
+            "module M { import P (Pick) pub data Foo = MkNewFoo instance Pick Foo { selected = False } const selected : Bool where Pick Foo = d.selected }",
+        ).expect("new distinct-path head, dictionary and use in one scope");
+        let new_head = env.globals["M.Foo"];
+        let new_dictionary = env.class_env.instances_by_id
+            [&(class_id, crate::classes::InstanceHeadKey::Global(new_head))]
+            .instance_id;
         assert_ne!(old_head, new_head);
         assert_ne!(old_dictionary, new_dictionary);
         assert!(results.iter().any(|result| result.def_id == new_head));
@@ -8353,9 +8679,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§5.3–5.5, 39 §6).
     ///
-    /// MEASURED: two same-spelling canonical instances on the SAME Nat head
-    /// coexist because their class IDs differ. File and memory `where` lookups
-    /// select their own admitted dictionary, not the current name-map entry.
+    /// MEASURED: A.C and M.C instances on the SAME Nat head coexist because
+    /// their class IDs differ. File and memory `where` lookups select their
+    /// own admitted dictionary rather than a bare class spelling.
     /// THE GAP: the parameterized-head matcher is checked separately.
     #[test]
     fn same_head_class_instances_search_by_selected_provider_identity() {
@@ -8371,13 +8697,16 @@ mod namespace_effect_tests {
             .expect("file class and dictionary checked");
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
         let nat_id = env.globals["Nat"];
-        let file_dictionary = env.class_env.instances_by_id[&(
-            file_id, crate::classes::InstanceHeadKey::Global(nat_id)
-        )].instance_id;
-        env.elaborate_file("module A { pub class C a { marker : Nat } instance C Nat { marker = Zero } }")
-            .expect("distinct memory class and dictionary checked");
-        let memory_id = env.globals["A.C"];
+        let file_dictionary = env.class_env.instances_by_id
+            [&(file_id, crate::classes::InstanceHeadKey::Global(nat_id))]
+            .instance_id;
+        env.elaborate_file(
+            "module M { pub class C a { marker : Nat } instance C Nat { marker = Zero } }",
+        )
+        .expect("distinct-path class and dictionary checked");
+        let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
+        assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
         let memory_dictionary = env.class_env.instances_by_id[&(
             memory_id, crate::classes::InstanceHeadKey::Global(nat_id)
         )].instance_id;
@@ -8385,7 +8714,7 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&roots, "B")
             .expect("file class search selects Bool dictionary");
         assert_eq!(env.resolution_provenance.last().map(|p| p.instance_id), Some(file_dictionary));
-        env.elaborate_file("import A (C)\nconst memory_selected : Nat where C Nat = d.marker")
+        env.elaborate_file("import M (C)\nconst memory_selected : Nat where C Nat = d.marker")
             .expect("memory class search selects Nat dictionary");
         assert_eq!(env.resolution_provenance.last().map(|p| p.instance_id), Some(memory_dictionary));
         for (name, ty) in [("B.file_selected", "Bool"), ("memory_selected", "Nat")] {
@@ -8396,9 +8725,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§5.3–5.5, 39 §6).
     ///
-    /// MEASURED: one class's parameterized Pair-head builder retains the
-    /// checked fixed Foo constructor in its saved pattern. A later same-name
-    /// Foo does not match the old builder despite the identical Pair head.
+    /// MEASURED: one class's Pair-head builder retains the checked A.Foo
+    /// constructor in its pattern. The distinct-path M.Foo does not match
+    /// the old builder despite the same bare spelling and Pair head.
     #[test]
     fn fixed_instance_pattern_rejects_same_spelling_other_head_identity() {
         let root = inline_owner_root(
@@ -8411,12 +8740,12 @@ mod namespace_effect_tests {
         env.elaborate_file("import A (C,Foo)\nconst selected_old : Bool where C (Pair Foo Nat) = d.marker")
             .expect("old Foo matches its checked builder");
         let old_foo = env.module_state.file_export_ids["A"]["A"]["Foo"];
-        env.elaborate_file("module A { pub data Foo = MkNewFoo }")
-            .expect("second Foo occupies the same canonical spelling");
-        let new_foo = env.globals["A.Foo"];
+        env.elaborate_file("module M { pub data Foo = MkNewFoo }")
+            .expect("second Foo has a distinct lawful module path");
+        let new_foo = env.globals["M.Foo"];
         assert_ne!(old_foo, new_foo);
         let result = env.elaborate_file(
-            "import A (Foo as NewFoo)\nconst wrong : Bool where C (Pair NewFoo Nat) = d.marker",
+            "import M (Foo as NewFoo)\nconst wrong : Bool where C (Pair NewFoo Nat) = d.marker",
         );
         assert!(matches!(result, Err(ElabError::NoInstance { ref class, ref ty, .. })
             if class == "A.C" && ty == "Pair"),
@@ -8425,9 +8754,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.2; 36 §1.6).
     ///
-    /// MEASURED: an imported bound dictionary's projection uses the checked
-    /// file class's proc marker after a pure, unmarked same-name memory class
-    /// takes the current-name slot. The inverse memory selection stays pure.
+    /// MEASURED: an imported bound dictionary uses checked file A.C's proc
+    /// marker with a distinct-path pure M.C in scope. An inverse import of M
+    /// remains pure; a bare class spelling cannot select a different owner.
     #[test]
     fn bound_dictionary_purity_uses_selected_class_id() {
         let root = inline_owner_root("pub class C a { proc step : a ->[FS] a }\n");
@@ -8439,23 +8768,24 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&roots, "A")
             .expect("file class declares proc field");
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
-        env.elaborate_file("module A { pub class C a { step : a -> a } }")
-            .expect("memory class declares ordinary field");
-        let memory_id = env.globals["A.C"];
+        env.elaborate_file("module M { pub class C a { step : a -> a } }")
+            .expect("independent memory class declares ordinary field");
+        let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
+        assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
         let refused = env.elaborate_module_from_roots_strict(&roots, "B");
         assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
             if reason.contains("false purity or effect escape") || reason.contains("EffectEscapes")),
             "file proc classification cannot be borrowed as pure from memory: {refused:?}");
-        env.elaborate_file("import A (C)\nfn allowed (d : C Int) (x : Int) : Int = d.step x")
+        env.elaborate_file("import M (C)\nfn allowed (d : C Int) (x : Int) : Int = d.step x")
             .expect("memory class's unmarked pure projection remains available");
     }
 
     /// Promise class: durable invariant (spec 33 §§5.2–5.4, 36 §1.6).
     ///
-    /// MEASURED: an instance prerequisite binder projected into a marked fn
-    /// field uses its selected file class's proc metadata; the inverse memory
-    /// class has a pure field and permits the same shape. This reaches the
+    /// MEASURED: an instance prerequisite binder uses file A.C's proc
+    /// metadata despite a distinct-path pure M.C; the inverse M-selected
+    /// class permits the same shape. This reaches the
     /// instance-field purity gate rather than only a top-level bound caller.
     #[test]
     fn constrained_instance_field_purity_tracks_imported_class_id() {
@@ -8471,9 +8801,11 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&roots, "A")
             .expect("file class proc field checked");
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
-        env.elaborate_file("module A { pub class C a { step : a -> a } }")
-            .expect("memory class pure field checked");
-        assert_ne!(file_id, env.globals["A.C"]);
+        env.elaborate_file("module M { pub class C a { step : a -> a } }")
+            .expect("distinct-path pure class checked");
+        let decoy_id = env.globals["M.C"];
+        assert_ne!(file_id, decoy_id);
+        assert_eq!(env.globals.insert("A.C".into(), decoy_id), Some(file_id));
         let refused = env.elaborate_module_from_roots_strict(&roots, "B");
         assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
             if reason.contains("Sink.step") && reason.contains("effectful")),
@@ -8496,7 +8828,7 @@ mod namespace_effect_tests {
         assert!(matches!(&info.constraints[0].core_type, ken_kernel::Term::App(class, _)
             if matches!(class.as_ref(), ken_kernel::Term::Const { id, .. } if *id == file_id)));
         env.elaborate_file(
-            "import A (C)\nclass MemorySink a { fn step : Int -> Int }\ndata MemoryLocal = MkMemoryLocal\ninstance MemorySink MemoryLocal where (chosen : C Int) { step = chosen.step }",
+            "import M (C)\nclass MemorySink a { fn step : Int -> Int }\ndata MemoryLocal = MkMemoryLocal\ninstance MemorySink MemoryLocal where (chosen : C Int) { step = chosen.step }",
         ).expect("memory-selected pure prerequisite permits marked fn implementation");
     }
 
@@ -8535,10 +8867,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.6).
     ///
-    /// MEASURED: `derive` carries both selected class and selected head IDs
-    /// through a same-spelling class/type collision. The two checked generated
-    /// dictionaries have distinct exact kernel types, not merely distinct
-    /// generated display names.
+    /// MEASURED: `derive` carries selected class and head IDs from file A
+    /// and independent inline M, whose bare class/type spellings overlap.
+    /// The checked generated dictionaries have distinct exact kernel types.
     #[test]
     fn derive_keeps_selected_class_and_data_ids_after_shadow() {
         let root = inline_owner_root("pub class Marker a { }\npub data Target = MkTarget\n");
@@ -8552,15 +8883,23 @@ mod namespace_effect_tests {
         let ids = &env.module_state.file_export_ids["A"]["A"];
         let file_class = ids["Marker"];
         let file_head = ids["Target"];
-        env.elaborate_file("module A { pub class Marker a { } pub data Target = MkMemoryTarget }")
-            .expect("same-name memory providers checked");
-        let memory_class = env.globals["A.Marker"];
-        let memory_head = env.globals["A.Target"];
+        env.elaborate_file("module M { pub class Marker a { } pub data Target = MkMemoryTarget }")
+            .expect("distinct-path memory providers checked");
+        let memory_class = env.globals["M.Marker"];
+        let memory_head = env.globals["M.Target"];
         assert_ne!((file_class, file_head), (memory_class, memory_head));
+        assert_eq!(
+            env.globals.insert("A.Marker".into(), memory_class),
+            Some(file_class)
+        );
+        assert_eq!(
+            env.globals.insert("A.Target".into(), memory_head),
+            Some(file_head)
+        );
         env.elaborate_module_from_roots_strict(&roots, "B")
             .expect("file derive uses file providers");
-        env.elaborate_file("import A (Marker,Target)\nderive Marker for Target")
-            .expect("memory derive uses memory providers");
+        env.elaborate_file("import M (Marker,Target)\nderive Marker for Target")
+            .expect("memory derive uses independent memory providers");
         for (class_id, head_id) in [(file_class, file_head), (memory_class, memory_head)] {
             let info = env.class_env.instances_by_id.get(&(
                 class_id, crate::classes::InstanceHeadKey::Global(head_id)
@@ -8574,9 +8913,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a file-owned inductive former and an in-memory former share
-    /// one canonical name but not one checked ID. A strict imported annotation
-    /// in both the domain and result type retains the selected file ID.
+    /// MEASURED: a file-owned inductive former and checked independent
+    /// decoy differ in ID even when globals["A.T"] points at the decoy. A
+    /// strict imported annotation in both type positions retains file A.T.
     /// CLAIMED: type elaboration consumes the same provider identity as term
     /// elaboration. THE GAP: asserting both Pi branches prevents a body-only
     /// repair from being mistaken for a type-position repair.
@@ -8592,10 +8931,11 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file A declares an inductive former");
         let file = env.globals["A.T"];
-        env.elaborate_file("module A { pub data T = Other }")
-            .expect("in-memory A declares a distinct same-spelling former");
-        let memory = env.globals["A.T"];
+        env.elaborate_file("module Decoy { pub data T = Other }")
+            .expect("independent checked decoy former");
+        let memory = env.globals["Decoy.T"];
         assert_ne!(file, memory);
+        assert_eq!(env.globals.insert("A.T".into(), memory), Some(file));
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
             .expect("checked type positions select file A");
         let (_, checked_type) = env.env.const_type(env.globals["B.selected"])
@@ -8611,8 +8951,8 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: explicit constructor export at a file owner stays distinct
-    /// from a later same-spelling non-constructor declaration in memory.
+    /// MEASURED: file A's exported constructor stays distinct from a checked
+    /// non-constructor decoy placed in globals["A.MkT"] by the test.
     /// CLAIMED: an imported constructor pattern uses its selected checked ID.
     /// THE GAP: the matching term and type both select the same file family.
     #[test]
@@ -8628,9 +8968,11 @@ mod namespace_effect_tests {
             .expect("file A explicitly exports its constructor");
         let file_ctor = env.globals["A.MkT"];
         let file_former = env.globals["A.T"];
-        env.elaborate_file("module A { pub const MkT : Nat = Zero }")
-            .expect("memory A owns distinct same-spelling non-constructor");
-        assert_ne!(file_ctor, env.globals["A.MkT"]);
+        env.elaborate_file("module Decoy { pub const MkT : Nat = Zero }")
+            .expect("independent non-constructor decoy");
+        let decoy = env.globals["Decoy.MkT"];
+        assert_ne!(file_ctor, decoy);
+        assert_eq!(env.globals.insert("A.MkT".into(), decoy), Some(file_ctor));
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
             .expect("imported file pattern selects the checked constructor");
         assert!(env.env.constructor(file_ctor).is_some());
@@ -8646,17 +8988,18 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a selective file binding and a later in-memory binding
-    /// contest the SAME bare name, despite identical canonical strings.
-    /// CLAIMED: ID inequality rejects true selective clashes, while a repeated
-    /// import of the SAME selected ID remains idempotent. THE GAP: a qualified
-    /// file-only use would not exercise this unqualified binding collision.
+    /// MEASURED: a repeated file A.leak selective binding is idempotent;
+    /// a foreign inline A cannot claim the same canonical path in either
+    /// order without an owner clash and no writes. CLAIMED: two selected
+    /// IDs under one canonical provider path are source-unreachable after
+    /// owner gating. THE GAP: distinct-path imports check bare-name clashes.
     #[test]
     fn selective_import_distinguishes_same_spelling_providers_and_same_idempotence() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
         let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("file provider checked");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("first file provider checked");
         let file_id = env.globals["A.leak"];
         env.elaborate_file("import A (leak)\nconst same : Nat = leak")
             .expect("selective file binding checked");
@@ -8669,21 +9012,23 @@ mod namespace_effect_tests {
                 other => panic!("{name} did not select file ID: {other:?}"),
             }
         }
-        env.elaborate_file("module A { pub const leak : Nat = Suc Zero }")
-            .expect("second in-memory provider checked");
-        assert_ne!(env.globals["A.leak"], file_id);
-        match env.elaborate_file("import A (leak)\nconst wrong : Nat = leak") {
-            Err(ElabError::AmbiguousReference { name, .. }) => assert_eq!(name, "leak"),
-            other => panic!("distinct IDs on one bare selective name must clash: {other:?}"),
-        }
-        assert!(!env.globals.contains_key("wrong"));
+        let inline = "module A { pub const leak : Nat = Suc Zero }";
+        assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+        assert_eq!(env.globals["A.leak"], file_id);
+        let mut memory_first = ElabEnv::new().expect("base environment");
+        memory_first
+            .elaborate_file(inline)
+            .expect("first in-memory owner A");
+        assert_owner_clash_without_writes(&mut memory_first, "A", |env| {
+            env.elaborate_module_from_roots_strict(&roots, "A")
+        });
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: both the facade and in-scope re-export of file A's leaf
-    /// preserve the file's checked ID after memory A owns the same name.
-    /// CLAIMED: a second module interface republishes the provider identity,
+    /// MEASURED: facade and in-scope re-exports of file A.leak retain its
+    /// checked ID while globals["A.leak"] holds an independent checked decoy.
+    /// CLAIMED: a second module interface republishes provider identity,
     /// not its canonical spelling's current mutable lookup. THE GAP: both
     /// facade and in-scope paths are independently read in checked bodies.
     #[test]
@@ -8700,9 +9045,11 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file A checked");
         let file_id = env.globals["A.leak"];
-        env.elaborate_file("module A { pub const leak : Nat = Suc Zero }")
-            .expect("memory A checked");
-        assert_ne!(file_id, env.globals["A.leak"]);
+        env.elaborate_file("module Decoy { pub const leak : Nat = Suc Zero }")
+            .expect("independent decoy checked");
+        let decoy_id = env.globals["Decoy.leak"];
+        assert_ne!(file_id, decoy_id);
+        assert_eq!(env.globals.insert("A.leak".into(), decoy_id), Some(file_id));
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
             .expect("file re-exports carry the original checked provider");
         for name in ["B.from_facade", "B.from_in_scope"] {
@@ -8716,9 +9063,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: file prop intro helpers are used through direct alias,
-    /// facade, and in-scope selective family paths after a memory declaration
-    /// overwrites the same canonical intro spelling. CLAIMED: selectors carry
+    /// MEASURED: file prop intros remain selected through aliases, facade
+    /// and in-scope paths after globals["A.HasProof.intro"] is overwritten
+    /// with a checked independent decoy. CLAIMED: selectors carry
     /// their owning file family's checked helper ID. THE GAP: both checked
     /// body and type must originate from the file, not the memory impostor.
     #[test]
@@ -8737,9 +9084,14 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file prop family checked");
         let file_intro = env.globals["A.HasProof.intro"];
-        env.elaborate_file("module A { module HasProof { pub const intro : Nat = Zero } }")
-            .expect("distinct memory owner checks a same-spelling intro");
-        assert_ne!(file_intro, env.globals["A.HasProof.intro"]);
+        env.elaborate_file("module Decoy.HasProof { pub const intro : Nat = Zero }")
+            .expect("independent checked decoy intro");
+        let decoy_id = env.globals["Decoy.HasProof.intro"];
+        assert_ne!(file_intro, decoy_id);
+        assert_eq!(
+            env.globals.insert("A.HasProof.intro".into(), decoy_id),
+            Some(file_intro)
+        );
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
             .expect("file family selectors keep their owning intro");
         for name in ["B.direct", "B.facade", "B.in_scope"] {
@@ -8760,9 +9112,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: file A's effectful checked `proc` and memory A's pure
-    /// same-spelling `const` differ in declared row. A pure strict file
-    /// importer must fail purity while an FS-qualified importer succeeds.
+    /// MEASURED: file A's effectful checked proc and a distinct-path pure
+    /// const differ in declared row, even when globals["A.f"] points at the
+    /// pure decoy. The pure strict importer refuses; FS-qualified accepts.
     /// CLAIMED: imported checked identity selects both the body and its row.
     /// THE GAP: memory A's ambient spelling is pure, so name-keyed row lookup
     /// would admit the wrong source; the positive rules out blanket rejection.
@@ -8779,9 +9131,11 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("effectful file provider checked");
         let file_id = env.globals["A.f"];
-        env.elaborate_file("module A { pub const f : Nat = Zero }")
-            .expect("pure memory provider checked");
-        assert_ne!(file_id, env.globals["A.f"]);
+        env.elaborate_file("module Decoy { pub const f : Nat = Zero }")
+            .expect("pure independent decoy checked");
+        let decoy_id = env.globals["Decoy.f"];
+        assert_ne!(file_id, decoy_id);
+        assert_eq!(env.globals.insert("A.f".into(), decoy_id), Some(file_id));
         match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Bad") {
             Err(ElabError::TypeMismatch { reason, .. }) => {
                 assert!(reason.contains("false purity"), "wrong refusal: {reason}");
@@ -8816,9 +9170,10 @@ mod namespace_effect_tests {
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file family and intro checked");
-        env.elaborate_file("module A { module HasProof { pub const private : Nat = Zero } }")
-            .expect("unrelated memory owner checks its leaf");
-        assert!(env.globals.contains_key("A.HasProof.private"));
+        env.elaborate_file("module Decoy.HasProof { pub const private : Nat = Zero }")
+            .expect("independent private-leaf decoy checked");
+        let decoy = env.globals["Decoy.HasProof.private"];
+        assert_eq!(env.globals.insert("A.HasProof.private".into(), decoy), None);
         let at = bad.find("HasProof.private").expect("single private selector");
         match env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B") {
             Err(ElabError::UnboundName { name, span }) => {
@@ -8855,11 +9210,11 @@ mod namespace_effect_tests {
             .expect("file attached proof checked");
         let file_proof = env.globals["A.id::same"];
         env.elaborate_file(
-            "module A { pub fn id (x : Nat) : Nat = x\n\
+            "module Decoy { pub fn id (x : Nat) : Nat = x\n\
              pub proof extra for id (x : Nat) : Eq Nat (id x) x = Refl }",
         )
-        .expect("memory owner checks a different attached proof");
-        let memory_proof = env.globals["A.id::extra"];
+        .expect("distinct-path owner checks a different attached proof");
+        let memory_proof = env.globals["Decoy.id::extra"];
         assert_ne!(file_proof, memory_proof);
         assert_eq!(env.globals.insert("A.id::same".to_string(), memory_proof), Some(file_proof));
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
@@ -8910,7 +9265,7 @@ mod namespace_effect_tests {
             other => panic!("selective file subject cannot borrow memory proof: {other:?}"),
         }
         env.elaborate_file(
-            "import A as M\ntheorem memory_selected (x : Nat) : Eq Nat (M.id x) x = (proof extra for M.id) x",
+            "import Decoy as M\ntheorem memory_selected (x : Nat) : Eq Nat (M.id x) x = (proof extra for M.id) x",
         )
         .expect("independent memory importer selects its own attached proof");
         let (_, body) = env.env.transparent_body(env.globals["memory_selected"])
@@ -8926,9 +9281,9 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3, §6).
     ///
-    /// MEASURED: a selectively imported symbolic operator keeps the file
-    /// provider's checked ID and right fixity when the memory provider has
-    /// the same canonical name and left fixity. CLAIMED: both reassociation
+    /// MEASURED: file A.<+> keeps its checked ID and right fixity when a
+    /// distinct-path left-fixity operator occupies globals["A.<+>"].
+    /// CLAIMED: both reassociation
     /// and operator elaboration consume the selected ID. THE GAP: the exact
     /// right-nested checked term distinguishes either wrong fixity or ID.
     #[test]
@@ -8946,11 +9301,12 @@ mod namespace_effect_tests {
             .expect("file operator and fixity checked");
         let file_op = env.globals["A.<+>"];
         env.elaborate_file(
-            "module A { pub fn <+> (a : Nat) (b : Nat) : Nat = b\ninfixl 5 <+> }",
+            "module Decoy { pub fn <+> (a : Nat) (b : Nat) : Nat = b\ninfixl 5 <+> }",
         )
-        .expect("memory operator with left fixity checked");
-        let memory_op = env.globals["A.<+>"];
+        .expect("independent operator with left fixity checked");
+        let memory_op = env.globals["Decoy.<+>"];
         assert_ne!(file_op, memory_op);
+        assert_eq!(env.globals.insert("A.<+>".into(), memory_op), Some(file_op));
         assert_eq!(env.fixities[&file_op].associativity, crate::ast::FixityAssoc::Right);
         assert_eq!(env.fixities[&memory_op].associativity, crate::ast::FixityAssoc::Left);
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
@@ -9002,10 +9358,8 @@ mod namespace_effect_tests {
         for preload in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
             let external = if preload {
-                env.elaborate_file(
-                    "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }",
-                )
-                .expect("unrelated in-memory descendant");
+                env.elaborate_file("module A.N.Q { pub const leak : Nat = Suc Zero }")
+                    .expect("unrelated strict child A.N.Q");
                 Some(env.globals["A.N.Q.leak"])
             } else {
                 None
