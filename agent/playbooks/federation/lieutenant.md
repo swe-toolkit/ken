@@ -205,6 +205,11 @@ implementer -> leader -> {QA, Architect}      (review routing, UNCHANGED)
   wait on and the seat that owes it, you are stalled — find out.
 - **Held finished work is the top of the queue** (COORDINATION §10⁻). A routed
   candidate waiting to merge outranks starting anything else.
+- **Chain landings; never end on one** (operator, 2026-10-27). The turn that
+  finishes M6-M9 for a landing starts M4-M5 for the next routed candidate
+  before it ends. A landing is not a stopping point while the queue holds a
+  routed SHA. On 2026-10-27 the Steward had to rouse this seat after eight
+  landings, because a background publisher's exit wakes nothing.
 
 ## §8. ARM YOUR OWN MONITORING INTERVAL AT SESSION START
 
@@ -217,11 +222,13 @@ of its skill."*
 **Arm it at session start, and again after every compaction,** while any
 candidate is routed and unpublished:
 
-    set_interval(seconds=900,
-      prompt="[monitor tick] list routed-but-unpublished candidates; read
-      origin/main's SHA; for each, is a PR open and what is its check state?
-      Publish the next one in the Steward's order. Reap dead monitors. If the
-      queue is empty and nothing is owed, do nothing.")
+    set_interval(seconds=120,
+      prompt="[monitor tick] 1. Is my publisher process still running
+      (pgrep -af scripted-pr-automerge)? If it has exited, read its log: on a
+      landing, finish M6-M9 for it now; on a red, attribute it (M5). 2. If no
+      publisher is running and a routed candidate is unpublished, start the next
+      one in the Steward's order in this same turn. 3. Reap dead monitors. If
+      the queue is empty and nothing is owed, do nothing.")
 
 It is the **same sanctioned, provider-agnostic mechanism the Steward uses**
 (`COORDINATION §13`) — it works identically on Claude-Code and terra/Codex
@@ -233,9 +240,10 @@ to every participant.
 **You hold exactly one interval; a second `set_interval` replaces it silently.**
 So re-arming after a compaction is safe and is the correct move — there is no
 way to list an interval back, and a re-arm you did not need costs nothing while
-a re-arm you skipped leaves this backstop dead. **900s is an upper bound, not a
-prescription** — a shorter period is fine (the minimum is 60), and the lieutenant
-seat has run this at 600s.
+a re-arm you skipped leaves this backstop dead. **120s is the period** (operator,
+2026-10-27): a background publisher's exit fires no event in this seat, so the
+tick is what notices a landing, and at 900s each landing could idle the queue
+for up to fifteen minutes. A quiet tick costs one `pgrep` and nothing else.
 
 ## WHY THIS IS NOT "POLLING", WHICH §7 FORBIDS
 
