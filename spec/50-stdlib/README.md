@@ -338,12 +338,13 @@ publication, landing or landed trust. No rational or `Float` tier is
 claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–6 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–7 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE;
-SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION). The §1
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION;
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -381,11 +382,18 @@ environment, not their `Expr` structure. `poly_eq_complete` gives a
 `True` decision as a client consequence without a new exported
 corollary. The only new proof helper remains private. Architect D0
 checked the generic proof with no new `Axiom` and unchanged scratch
-trusted identities 114 → 114; the §6 export is absent on this base.
-The authored §6 seed and D0 do not establish shipped-seed execution,
-official conformance, CI, publication, landing or landed trust for
-§6. A sorted-list normal form and signed/field arithmetic remain
-deferred.
+trusted identities 114 → 114. The §6 export and package-owned seed
+test are on main; neither establishes official conformance or landed
+trust. Section 7 specifies the public `deriv_independent` law: if
+changing every variable except `v` leaves the value of `e` unchanged,
+its derivative in `v` evaluates to zero at the given environment.
+The premise is semantic, even when `v` occurs in a zero-valued product.
+Architect D0 checked the generic proof on `9e1d6e9cd` with no new
+`Axiom` and unchanged scratch trusted identities 114 → 114. This
+candidate adds the checked catalog export and a same-input accepted
+and refused seed; author-local checks do not establish official
+conformance, CI, publication, landing or landed trust. A sorted-list
+normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–6 (SPEC-GEOMETRY-EXACT-CONTRACT;

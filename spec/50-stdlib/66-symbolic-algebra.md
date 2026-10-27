@@ -5,14 +5,17 @@
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5;
-> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION §6).** The §1–5 catalog
-> operations and checked laws and their authored seeds are present on main.
-> Earlier scratch D0 and seed authorship do not by themselves establish
-> shipped seed-harness execution or CI. Section 6 specifies one checked
-> pointwise-evaluation law from Architect D0 on `2f78d45b8`; the §6
-> catalog export is absent on this base. Scratch trust 114 → 114 is not
-> a landed trust measurement or execution of the §6 seed against shipped
-> exports.
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION §6;
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE §7).** The §1–6
+> catalog operations and checked laws and their authored seeds are present
+> on main; their earlier scratch D0 alone does not establish official
+> conformance execution, CI or landed trust. Section 7 specifies one
+> checked pointwise zero-derivative law when the value of the expression
+> is independent of the differentiated variable. Architect D0 on
+> `9e1d6e9cd` checked its generic proof with no new `Axiom` and equal
+> scratch trusted identities 114 → 114. This candidate carries its
+> catalog export and closed seed, not an official conformance run or
+> landed trust measurement.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -637,7 +640,7 @@ client accepted the generic `xy` application, both computed-one
 controls and same-tree structural reflexivity; it refused the false
 cross-order structural equality. The §6 seed is authored at
 `conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md`.
-The §6 catalog candidate now exports this checked law. Its roots-loaded
+The §6 catalog export and package-owned seed test are now on main. That
 package test checks an arbitrary-argument client of the full public type,
 checks the accepted seed including both closed values and same-tree `Refl`,
 and rejects the seed's false cross-order `Equal Expr` theorem at its own
@@ -647,3 +650,69 @@ private helper. This is package-test execution on the candidate, **not**
 official conformance-runner execution, CI, publication, landing or a
 landed trust measurement. No result for signed coefficients, fields,
 analytic limits, or derivative/substitution commutation follows from §6.
+
+## 7. A derivative in a semantically unused variable is zero
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent theorem with a checked body and the following exact
+name, argument order and type:
+
+```ken
+pub theorem deriv_independent
+      (v : Nat)
+      (e : Expr)
+      (env : Nat → Nat)
+      (h : (env2 : Nat → Nat)
+        → ((w : Nat) → (Equal Nat v w → Bottom) → Equal Nat (env2 w) (env w))
+        → Equal
+        Nat
+        (eval env2 e)
+        (eval env e))
+    : Equal Nat (eval env (deriv v e)) Zero
+```
+
+The premise says that **every** environment `env2` agreeing with
+`env` at all indices other than `v` leaves `e`'s value unchanged.
+The conclusion is pointwise at the supplied `env`; applying the
+same theorem at each environment yields an every-environment
+consequence, not a second export. Both the premise and result use
+only public `Equal`, `Bottom`, `eval`, `deriv` and function types.
+The negation `Equal Nat v w → Bottom` rules out the distinguished
+index without an exported bump operation. Neither the premise
+nor the conclusion equates `Expr` trees structurally.
+
+Independence is **semantic**, not absence of `EVar v` in the syntax.
+For instance, variable `Suc Zero` occurs in
+`EAdd (EVar Zero) (EMul (EVar (Suc Zero)) (EConst Zero))`, but that
+product contributes zero under every environment. Its value still
+depends on variable `Zero`, whose derivative evaluates to one.
+This same expression separates a valid unused-variable application
+from the false claim that the used-variable derivative is zero.
+A closed seed discharges the premise through the public agreement
+at index `Zero` and checks a true value for each derivative before
+refusing the false zero claim. Those closed checks do not establish
+the theorem's quantifiers.
+
+The checked proof reuses the private `deriv_taylor` identity and
+`deriv_extract` of §5.2. Let `d = eval env (deriv v e)` and choose
+the positive bump `t = Suc d`. The bumped environment agrees with
+`env` away from `v`, so `h` equates the bumped evaluation with
+`eval env e`. Taylor expansion then expresses that same value as
+`eval env e + t·(d + t·r)`. Extraction with the second derivative
+and remainder set to zero gives `d = Zero`; the bounds close by
+natural-order reflexivity. This uses no new public operation,
+postulate, kernel form or surface rule. The new helpers
+`nat_same_sound`, `bump_at_off` and `bump_env_off` stay private;
+`bump_at_off` matches an arbitrary Boolean before its application
+to the computed `nat_same v w`. All §1–6 operations and laws keep
+their prior signatures and bodies.
+
+Architect's isolated D0 on `9e1d6e9cd` checked this generic proof
+with `ken check` and `ken fmt --check` rc 0, no new `Axiom`, owner-local
+Transparent status, three private import refusals, two probe tests
+passing and exact scratch `trusted_base()` identity sets 114 → 114.
+The candidate carries the catalog proof and the authored seed; local
+checks on it do not establish official conformance-runner execution,
+CI, publication, landing or a landed trust measurement. No law for
+syntactic occurrence, structural derivative equality, signed
+coefficients or analytic differentiation follows from §7.
