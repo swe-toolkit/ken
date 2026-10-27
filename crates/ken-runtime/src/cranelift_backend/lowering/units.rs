@@ -12020,6 +12020,17 @@ impl<'f> IndexedFunction<'f> {
                     args[0],
                     resolve_stack_address(self, args[1])?.map(|(slot, _)| slot),
                 ),
+                data if data.opcode().can_store() => {
+                    // An atomic or other undecoded store may write any stack
+                    // address among its operands somewhere this index cannot
+                    // name, so each such address escapes.
+                    for &argument in self.func.dfg.inst_args(inst) {
+                        if let Some((slot, _)) = resolve_stack_address(self, argument)? {
+                            stored_slots.entry(slot).or_default().push(None);
+                        }
+                    }
+                    continue;
+                }
                 _ => continue,
             };
             let Some((stored_slot, _)) = resolve_stack_address(self, stored)? else {
@@ -13766,7 +13777,12 @@ fn stack_write_effect(
             },
             value: *arg,
         },
-        cranelift_codegen::ir::InstructionData::Store { args, offset, .. } => {
+        cranelift_codegen::ir::InstructionData::Store {
+            opcode,
+            args,
+            offset,
+            ..
+        } if *opcode == cranelift_codegen::ir::Opcode::Store => {
             match resolve_stack_address(func, args[1])? {
                 Some((slot, base)) => StackWriteEffect::Exact {
                     location: StackMemoryLocation {
@@ -13792,32 +13808,9 @@ fn stack_write_effect(
                 None => StackWriteEffect::Unknown,
             }
         }
-        cranelift_codegen::ir::InstructionData::AtomicCas { args, .. } => {
-            match resolve_stack_address(func, args[0])? {
-                Some((slot, offset)) => StackWriteEffect::Exact {
-                    location: StackMemoryLocation {
-                        slot,
-                        offset,
-                        bytes: func.dfg.value_type(args[0]).bytes(),
-                    },
-                    value: args[0],
-                },
-                None => StackWriteEffect::Unknown,
-            }
-        }
-        cranelift_codegen::ir::InstructionData::AtomicRmw { args, .. } => {
-            match resolve_stack_address(func, args[0])? {
-                Some((slot, offset)) => StackWriteEffect::Exact {
-                    location: StackMemoryLocation {
-                        slot,
-                        offset,
-                        bytes: func.dfg.value_type(args[0]).bytes(),
-                    },
-                    value: args[0],
-                },
-                None => StackWriteEffect::Unknown,
-            }
-        }
+        // A narrow store writes part of its operand and an atomic write stores
+        // a word no operand names, so neither establishes exact contents.
+        data if data.opcode().can_store() => StackWriteEffect::Unknown,
         _ => StackWriteEffect::None,
     };
     Ok(effect)
@@ -14647,10 +14640,15 @@ fn verify_publication_and_terminals(
     _call_obligations_verified: bool,
 ) -> Result<(), CraneliftBackendError> {
     match &func.dfg.insts[publication.result_store] {
-        cranelift_codegen::ir::InstructionData::Store { args, offset, .. }
-            if args[0] == publication.returned_word
-                && args[1] == publication.frame
-                && i32::from(*offset) == publication.result_offset => {}
+        cranelift_codegen::ir::InstructionData::Store {
+            opcode,
+            args,
+            offset,
+            ..
+        } if *opcode == cranelift_codegen::ir::Opcode::Store
+            && args[0] == publication.returned_word
+            && args[1] == publication.frame
+            && i32::from(*offset) == publication.result_offset => {}
         _ => {
             return Err(backend_module(
                 LoweringCause::FinishedCode,
@@ -14713,12 +14711,17 @@ fn verify_publication_and_terminals(
         }
         let explicit_trap = iconst_value(func, returned) == Some(0)
             && func.layout.block_insts(return_block).any(|inst| {
-                let cranelift_codegen::ir::InstructionData::Store { args, offset, .. } =
-                    &func.dfg.insts[inst]
+                let cranelift_codegen::ir::InstructionData::Store {
+                    opcode,
+                    args,
+                    offset,
+                    ..
+                } = &func.dfg.insts[inst]
                 else {
                     return false;
                 };
-                args[1] == publication.frame
+                *opcode == cranelift_codegen::ir::Opcode::Store
+                    && args[1] == publication.frame
                     && i32::from(*offset) == publication.trap_offset
                     && (value_is_provably_nonzero(func, args[0])
                         || value_is_guarded_nonzero_at_inst(func, args[0], inst))
@@ -15283,6 +15286,200 @@ mod generated_result_protocol_verifier {
     fn raw_alias_clobber_invalidates_unit_memory_flow() {
         assert!(call_refusal(CallProtocolMutation::RawTrapClobber).contains("after a clobber"));
         assert!(call_refusal(CallProtocolMutation::RawResultClobber).contains("after a clobber"));
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    enum StoreForm {
+        Full,
+        Narrow,
+        Atomic,
+    }
+
+    fn store_form(
+        builder: &mut FunctionBuilder<'_>,
+        form: StoreForm,
+        word: cranelift_codegen::ir::Value,
+        address: cranelift_codegen::ir::Value,
+        offset: i32,
+    ) {
+        let flags = cranelift_codegen::ir::MemFlags::trusted();
+        match form {
+            StoreForm::Full => {
+                builder.ins().store(flags, word, address, offset);
+            }
+            StoreForm::Narrow => {
+                builder.ins().istore8(flags, word, address, offset);
+            }
+            StoreForm::Atomic => {
+                let address = builder.ins().iadd_imm(address, i64::from(offset));
+                builder.ins().atomic_rmw(
+                    types::I64,
+                    flags,
+                    cranelift_codegen::ir::AtomicRmwOp::Xchg,
+                    address,
+                    word,
+                );
+            }
+        }
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: on one fixture, a full store establishes the exact word it
+    /// stores; a narrow store and an atomic exchange of the same word to the
+    /// same address leave the location Unknown.
+    /// CLAIMED: only a full-width store names the contents it leaves behind.
+    /// THE GAP: none for the store opcodes this Cranelift can emit.
+    #[test]
+    fn only_a_full_store_establishes_exact_contents() {
+        for form in [StoreForm::Full, StoreForm::Narrow, StoreForm::Atomic] {
+            let mut func = Function::new();
+            func.signature.call_conv = CallConv::SystemV;
+            func.signature.returns.push(AbiParam::new(types::I64));
+            let slot =
+                func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+            let mut context = FunctionBuilderContext::new();
+            let mut builder = FunctionBuilder::new(&mut func, &mut context);
+            let entry = builder.create_block();
+            builder.switch_to_block(entry);
+            builder.seal_block(entry);
+            let earlier = builder.ins().iconst(types::I64, 7);
+            builder.ins().stack_store(earlier, slot, 0);
+            let word = builder.ins().iconst(types::I64, 0x100);
+            let address = builder.ins().stack_addr(types::I64, slot, 0);
+            store_form(&mut builder, form, word, address, 0);
+            let loaded = builder.ins().stack_load(types::I64, slot, 0);
+            let returned = builder.ins().return_(&[loaded]);
+            builder.finalize();
+            let states = reaching_memory_states_before(
+                &IndexedFunction::new(&func),
+                StackMemoryLocation {
+                    slot,
+                    offset: 0,
+                    bytes: 8,
+                },
+                returned,
+            )
+            .expect("reaching contents are decidable");
+            let expected = match form {
+                StoreForm::Full => ReachingMemoryState::Exact(word),
+                StoreForm::Narrow | StoreForm::Atomic => ReachingMemoryState::Unknown,
+            };
+            assert_eq!(states, BTreeSet::from([expected]), "{form:?}");
+        }
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: an atomic exchange that stores a slot's address to a
+    /// non-stack destination escapes the slot; exchanging an ordinary word
+    /// through the same instruction does not.
+    /// CLAIMED: every storing opcode feeds the escape index.
+    /// THE GAP: none for the store opcodes this Cranelift can emit.
+    #[test]
+    fn an_atomic_store_of_a_slot_address_escapes_it() {
+        for store_address in [true, false] {
+            let mut func = Function::new();
+            func.signature.call_conv = CallConv::SystemV;
+            func.signature.returns.push(AbiParam::new(types::I64));
+            let slot =
+                func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+            let mut context = FunctionBuilderContext::new();
+            let mut builder = FunctionBuilder::new(&mut func, &mut context);
+            let entry = builder.create_block();
+            builder.switch_to_block(entry);
+            builder.seal_block(entry);
+            let word = if store_address {
+                builder.ins().stack_addr(types::I64, slot, 0)
+            } else {
+                builder.ins().iconst(types::I64, 0)
+            };
+            let heap = builder.ins().iconst(types::I64, 0x1000);
+            store_form(&mut builder, StoreForm::Atomic, word, heap, 0);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().return_(&[zero]);
+            builder.finalize();
+            let access = location_access(
+                &IndexedFunction::new(&func),
+                StackMemoryLocation {
+                    slot,
+                    offset: 0,
+                    bytes: 8,
+                },
+            )
+            .expect("slot escape is decidable");
+            assert_eq!(access.escaped, store_address);
+        }
+    }
+
+    fn certificate_refusal(result_form: StoreForm, trap_form: StoreForm) -> Option<String> {
+        let mut func = Function::new();
+        func.signature.call_conv = CallConv::SystemV;
+        func.signature.params.push(AbiParam::new(types::I64));
+        func.signature.returns.push(AbiParam::new(types::I64));
+        let slot =
+            func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let entry = builder.create_block();
+        let publish = builder.create_block();
+        let trap = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        let selector = builder.block_params(entry)[0];
+        let frame = builder.ins().stack_addr(types::I64, slot, 0);
+        builder.ins().brif(selector, publish, &[], trap, &[]);
+        builder.switch_to_block(publish);
+        let returned_word = builder.ins().iconst(types::I64, 41);
+        store_form(&mut builder, result_form, returned_word, frame, 0);
+        let zero = builder.ins().iconst(types::I64, 0);
+        let return_inst = builder.ins().return_(&[zero]);
+        builder.switch_to_block(trap);
+        let trap_word = builder.ins().iconst(types::I64, 0x100);
+        store_form(&mut builder, trap_form, trap_word, frame, 8);
+        let trap_zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().return_(&[trap_zero]);
+        builder.seal_all_blocks();
+        builder.finalize();
+        let result_store = func
+            .layout
+            .block_insts(publish)
+            .find(|inst| func.dfg.insts[*inst].opcode().can_store())
+            .expect("the publish block stores");
+        verify_publication_and_terminals(
+            &IndexedFunction::new(&func),
+            FunctionResultPublication {
+                frame,
+                result_offset: 0,
+                trap_offset: 8,
+                result_store,
+                returned_word,
+                return_inst,
+            },
+            true,
+        )
+        .err()
+        .map(|error| format!("{error:?}"))
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: with full stores the Result and Trap certificates hold; a
+    /// narrow store of the same word refuses the Result certificate, and a
+    /// narrow Trap store whose low byte is zero leaves its terminal
+    /// uncertified.
+    /// CLAIMED: Result and Trap words are certified only from full stores.
+    /// THE GAP: none for the store opcodes this Cranelift can emit.
+    #[test]
+    fn result_and_trap_certificates_require_full_stores() {
+        assert_eq!(certificate_refusal(StoreForm::Full, StoreForm::Full), None);
+        assert!(
+            certificate_refusal(StoreForm::Narrow, StoreForm::Full)
+                .expect("a narrow Result store is refused")
+                .contains("does not bind its exact word/frame/store")
+        );
+        assert!(
+            certificate_refusal(StoreForm::Full, StoreForm::Narrow)
+                .expect("a narrow Trap store is refused")
+                .contains("uncertified status-zero terminal")
+        );
     }
 
     /// Promise class: durable invariant.
