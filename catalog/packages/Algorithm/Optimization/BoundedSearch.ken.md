@@ -339,5 +339,6 @@ recursion, Boolean case analysis, transport/congruence, and the checked strict
 Nat order. Its declarations add no `Axiom`, postulate, primitive, or foreign
 trust; the package inherits only its imports' existing assumptions. The
 [bounded-search seed](../../../../conformance/stdlib/optimization/seed-bounded-search.md)
-and its client acceptance test exercise the operation, public laws, and false
-results. No time, space, or predicate-call-count guarantee is claimed.
+and [bound-stability seed](../../../../conformance/stdlib/optimization/seed-bounded-search-bound-stability.md)
+exercise the operation, all four public laws and the false results in
+package tests. No time, space, or predicate-call-count guarantee is claimed.
