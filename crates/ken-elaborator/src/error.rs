@@ -201,6 +201,14 @@ pub enum ElabError {
         second: String,
         span: Span,
     },
+    /// A different compilation unit claimed an exact qualified module path
+    /// already owned by a successful file or in-memory unit (`33 §3.1`).
+    ModuleOwnerClash {
+        path: String,
+        owner: String,
+        claimant: String,
+        span: Span,
+    },
     /// A second top-level definition of a name already defined in the same
     /// compilation unit (`33 §3`, ADR 0014 MRES-5/MRES-7).
     DuplicateDefinition { name: String, span: Span },
@@ -674,6 +682,16 @@ impl fmt::Display for ElabError {
             } => write!(
                 f,
                 "declaration identity collision for `{identity}`: `{first}` and `{second}`",
+            ),
+            ElabError::ModuleOwnerClash {
+                path,
+                owner,
+                claimant,
+                span,
+            } => write!(
+                f,
+                "module path `{path}` at {}-{} is owned by {owner}; {claimant} cannot claim it",
+                span.start, span.end,
             ),
             ElabError::DuplicateDefinition { name, span } => write!(
                 f,

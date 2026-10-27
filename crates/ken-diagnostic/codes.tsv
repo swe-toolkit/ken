@@ -84,6 +84,7 @@ E0082	elab.refinement_split_demand	active	ElabError::RefinementSplitDemand
 E0083	elab.non_convoyable_refinement_split	active	ElabError::NonConvoyableRefinementSplit
 E0084	compiler.invalid_bracket_region	active	CompilerDriverError::InvalidBracketRegion
 E0085	compiler.invalid_bracket_release_host_operation	active	CompilerDriverError::InvalidBracketReleaseHostOperation
+E0086	elab.module_owner_clash	active	ElabError::ModuleOwnerClash
 K0001	kernel.var_out_of_scope	active	KernelError::VarOutOfScope
 K0002	kernel.k2_reserved_former	active	KernelError::K2ReservedFormer
 K0003	kernel.universe_inconsistency	active	KernelError::UniverseInconsistency

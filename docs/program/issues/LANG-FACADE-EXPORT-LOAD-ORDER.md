@@ -1,7 +1,7 @@
 ---
 id: LANG-FACADE-EXPORT-LOAD-ORDER
 title: "A facade export M (…) must select the same provider whatever the caller loaded first: when the unit also declares an inline module M, the facade today fails cold but is admitted, publishing the file M's names, when a caller imported M earlier; route the facade edge through the same order-independent identity as import"
-status: ready
+status: merged
 owner: language
 size: S
 gate: architect

@@ -5769,6 +5769,7 @@ fn pub_eligibility(decl: &Decl) -> PubEligibility {
         | Decl::ExplicitDataDecl { .. }
         | Decl::TypeAlias { .. }
         | Decl::RecordDecl { .. }
+        | Decl::ForeignDecl { .. }
         | Decl::ClassDecl { .. } => PubEligibility::Eligible,
 
         // Anonymous headers, structural scope forms, generated instances,
@@ -5786,7 +5787,6 @@ fn pub_eligibility(decl: &Decl) -> PubEligibility {
         Decl::FixityDecl { .. } => PubEligibility::Ineligible("a fixity declaration"),
         Decl::ProveDecl { .. } => PubEligibility::Ineligible("a `prove` obligation"),
         Decl::LawDecl { .. } => PubEligibility::Ineligible("a `law` declaration"),
-        Decl::ForeignDecl { .. } => PubEligibility::Ineligible("a `foreign` declaration"),
         Decl::TemporalDecl { .. } => PubEligibility::Ineligible("a `temporal` obligation"),
         Decl::InstanceDecl { .. } => PubEligibility::Ineligible("an `instance` declaration"),
         Decl::DeriveDecl { .. } => PubEligibility::Ineligible("a `derive` declaration"),

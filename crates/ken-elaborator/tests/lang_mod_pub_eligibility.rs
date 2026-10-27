@@ -56,7 +56,6 @@ fn every_parsed_ineligible_pub_placement_is_a_surface_error() {
         "pub instance C Int { field = 0 }",
         "pub prove p : Top",
         "pub law L (x) { field : Top }",
-        "pub foreign f : Int = \"f\" \"libf\" pure",
         "pub temporal t { event }",
         "pub program",
         "pub package",
@@ -64,6 +63,25 @@ fn every_parsed_ineligible_pub_placement_is_a_surface_error() {
     ] {
         assert_ineligible_pub(src);
     }
+}
+
+/// Promise class: durable invariant (spec 32 §1, 33 §4.1).
+/// MEASURED: pub foreign parses, exports from a module, and a selective client
+/// refers to the checked provider binding. CLAIMED: foreign has a public
+/// module-interface identity. THE GAP: this pure declaration cannot exercise
+/// a nonempty effect row; module-scope controls test that independently.
+#[test]
+fn public_foreign_is_eligible_and_importable() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file(
+        "module M { pub foreign f : Int -> Int = \"native_f\" \"libf\" pure } \
+         import M (f) \
+         fn used (x : Int) : Int = f x",
+    )
+    .expect("public foreign must be visible to a selective importer");
+    assert!(env.globals.contains_key("M.f"));
+    assert!(!env.globals.contains_key("f"));
+    assert!(env.globals.contains_key("used"));
 }
 
 /// Durable invariant: the normative postfix derive form reaches the existing
