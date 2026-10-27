@@ -488,9 +488,10 @@ trust. Signed arithmetic, division, `Float`, rounding, width and
 structural hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–5 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–6 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
-SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION).
+SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION;
+SPEC-TIME-MERGE-ASSOCIATIVITY).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -510,15 +511,22 @@ conformance or a landed trust measurement. A private one-way
 window-of-merge membership consequence adds no public law.
 Section 5 specifies one unconditional structural equality for nested
 windows at intersected `max`/`min` bounds and two empty-merge unit
-laws. It promotes §3's existing private `trace_merge_nil_right`
-proof without duplicating it. Seven new window-composition proof
-tools stay private. Architect's isolated D0 checked the three
-public proofs with unchanged scratch trusted identities 114 → 114;
-§5 catalog exports remain absent at this base. Its authored closed
-seed and D0 do not establish shipped-seed execution, official
-conformance, CI, publication, landing or landed trust. Clock effects,
-durations, causality, infinite streams, premise-free structural
-window/merge distribution and k-way merge remain deferred.
+laws. The catalog promotes §3's original private
+`trace_merge_nil_right` proof without duplicating it. Seven new
+window-composition proof tools stay private. Architect's isolated
+D0 checked the three public proofs with unchanged scratch trusted
+identities 114 → 114; §5 catalog exports and a targeted package-owned
+seed test are now present on main. This does not establish official
+conformance, CI or a landed trust measurement. Section 6
+specifies premise-free structural associativity of `trace_merge` on
+arbitrary lists, including unordered inputs. The candidate carries
+the catalog law with seven private helpers and a closed seed that
+separates an outer-operand swap by a cross-input time-4 tie. Architect
+D0 checked the generic proof with no new `Axiom` and equal scratch
+trusted identities (114 → 114); candidate-local checks do not claim
+official conformance, CI, publication, landing or landed trust. Clock
+effects, durations, causality, infinite streams, premise-free
+structural window/merge distribution and k-way merge remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
