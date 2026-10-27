@@ -68,10 +68,10 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 > **Base and deferral (Steward `evt_3ssd5awf9p3v4`).** A's operative pin is
 > the main its candidate is cut from (`b8fb28e3f` at the `bdf0e4755`
 > handoff), adopted by §4a-pin's empty-`crates/`-diff condition at
-> handoff. Frame §4a-pin now computes it as `git merge-base HEAD
-> origin/main` (DOC-BUNDLE-306), because each no-rebase main merge staled
-> the literal (Runtime QA `evt_6zp61stcbacz5`, `evt_2r0sxp587jm26`). Older
-> literals elsewhere are records. R1's per-mutation pairing
+> handoff. Frame §4a-pin holds it as a literal, re-pinned at each no-rebase
+> main merge (now `12e91c41b`, the cut of `d6a6cc6d`; DOC-BUNDLE-307). Runtime
+> QA `evt_7tnep6swjbag0` showed a computed merge-base breaks §4b and §8.
+> Older literals elsewhere are records. R1's per-mutation pairing
 > (`generated_result_path_proof_rejects_each_certificate_corruption`) lives
 > only in the AC-1e file, so it is deferred with AC-1e to the increment
 > that restores that file.
@@ -166,8 +166,8 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 > **Not releasable while the banner above stands.** The pin below is current and
 > correct; it is not what blocks.
 >
-> **Increment A's base is its merge-base with `origin/main`** (frame
-> §4a-pin; a property since DOC-BUNDLE-306, last literal `b8fb28e3f`)
+> **Increment A's base is `origin/main` `12e91c41baf9b23e7b9268f6372320ca28afef83`**
+> (re-pinned 2026-10-27 to the cut of `d6a6cc6d`; frame §4a-pin)
 > — B and C pin their own bases in frame 4a-pin, which is the only place
 > either value is written.
 >
