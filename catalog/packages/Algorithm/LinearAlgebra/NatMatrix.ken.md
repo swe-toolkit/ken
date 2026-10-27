@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and eighteen algebraic laws have checked proofs.
+all arithmetic is exact, and twenty algebraic laws have checked proofs.
 
 ## Contents
 
@@ -778,6 +778,78 @@ pub theorem vector_add_assoc
                 (vector_add_assoc k tail_xs tail_ys tail_zs)
           }
       }
+  }
+
+pub theorem matrix_vector_additive
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat n)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m n a (vector_add n x y))
+        (vector_add m (matrix_vector m n a x) (matrix_vector m n a y)) =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        old_head = dot n row (vector_add n x y);
+        new_head = add (dot n row x) (dot n row y);
+        old_tail = matrix_vector k n rest (vector_add n x y);
+        new_tail = vector_add k (matrix_vector k n rest x) (matrix_vector k n rest y)
+      in
+        trans
+          (Vec Nat (Suc k))
+          (VCons Nat k old_head old_tail)
+          (VCons Nat k new_head old_tail)
+          (VCons Nat k new_head new_tail)
+          (cong
+            Nat
+            (Vec Nat (Suc k))
+            old_head
+            new_head
+            (λv. VCons Nat k v old_tail)
+            (dot_distrib_right n row x y))
+          (cong
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            old_tail
+            new_tail
+            (VCons Nat k new_head)
+            (matrix_vector_additive k n rest x y))
+  }
+
+pub theorem matrix_vector_homogeneous
+      (m : Nat) (n : Nat) (factor : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m n a (vector_scale n factor x))
+        (vector_scale m factor (matrix_vector m n a x)) =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        old_head = dot n row (vector_scale n factor x);
+        new_head = mul factor (dot n row x);
+        old_tail = matrix_vector k n rest (vector_scale n factor x);
+        new_tail = vector_scale k factor (matrix_vector k n rest x)
+      in
+        trans
+          (Vec Nat (Suc k))
+          (VCons Nat k old_head old_tail)
+          (VCons Nat k new_head old_tail)
+          (VCons Nat k new_head new_tail)
+          (cong
+            Nat
+            (Vec Nat (Suc k))
+            old_head
+            new_head
+            (λv. VCons Nat k v old_tail)
+            (dot_scale_right n factor row x))
+          (cong
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            old_tail
+            new_tail
+            (VCons Nat k new_head)
+            (matrix_vector_homogeneous k n factor rest x))
   }
 
 theorem matrix_add_assoc_cons
@@ -2191,6 +2263,23 @@ theorem dot_distrib_right
         (cong Nat Nat (dot n ys xs) (dot n xs ys) (λv. add v (dot n zs xs)) (dot_comm n ys xs))
         (cong Nat Nat (dot n zs xs) (dot n xs zs) (add (dot n xs ys)) (dot_comm n zs xs))))
 
+theorem dot_scale_right
+      (n : Nat) (factor : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    : Equal Nat (dot n xs (vector_scale n factor ys)) (mul factor (dot n xs ys)) =
+  trans
+    Nat
+    (dot n xs (vector_scale n factor ys))
+    (dot n (vector_scale n factor ys) xs)
+    (mul factor (dot n xs ys))
+    (dot_comm n xs (vector_scale n factor ys))
+    (trans
+      Nat
+      (dot n (vector_scale n factor ys) xs)
+      (mul factor (dot n ys xs))
+      (mul factor (dot n xs ys))
+      (dot_scale n factor ys xs)
+      (cong Nat Nat (dot n ys xs) (dot n xs ys) (mul factor) (dot_comm n ys xs)))
+
 theorem columns_add_right
       (n : Nat) (q : Nat) (row : Vec Nat n) (cs : Vec (Vec Nat n) q) (ds : Vec (Vec Nat n) q)
     : Equal
@@ -2386,6 +2475,12 @@ the checked natural associativity proof with `sym` to match the displayed
 left-grouped-to-right-grouped direction; `matrix_add_assoc` lifts the vector
 step and recursive row equality. These proofs include zero indices.
 
+`matrix_vector_additive` uses the private right-argument dot-distribution
+lemma to transport each row's head, then transports the tail by induction.
+`matrix_vector_homogeneous` uses a private right-argument scaling lemma
+obtained from `dot_comm` and the public `dot_scale` proof. The two results
+hold for any row and column counts, including zero.
+
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
@@ -2396,7 +2491,9 @@ transposed-product reversal connect the same operations without adding a new
 matrix carrier; the row, empty-width and prepend proof stages stay private.
 `matrix_add` adds rows with `vector_add`; it neither truncates nor broadcasts,
 and its six matrix sum laws hold for arbitrary well-typed dimensions. Two
-vector sum laws supply commutativity and associativity for each row. The named
+vector sum laws supply commutativity and associativity for each row. Matrix-
+vector application also preserves a sum or scaling in its vector argument;
+this differs from adding matrices while keeping the vector fixed. The named
 `dot_with` helper passes the row's dot product to `map` without a
 lambda-headed application in a proof goal. A rational-valued
 or approximate matrix would require a different statement of equality and is
@@ -2411,18 +2508,22 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–5 owns
-twenty-six public names across eight operations and eighteen laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–6 owns
+twenty-eight public names across eight operations and twenty laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
-[distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md)
-and [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md)
+[distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
+[sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md)
+and [matrix-vector linearity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-vector-linearity.md)
 provide finite behavioral clients. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
-prepending, row products and proof bridges remain private. All eighteen
+prepending, row products and proof bridges remain private. The new
+`dot_scale_right` helper, like `dot_distrib_right`, is not public. All twenty
 public theorems have checked bodies. This package adds no Axiom, postulate,
 primitive, `Float` or trusted-base entry; dependencies retain their own trust
 posture. Root-loaded acceptance tests check generic
 imports, closed values and indexed relations, isolated refused claims, and
 the exact trusted-identity set. The indexed-sum package test checks the authored
-positive client and four isolated refusals against root-loaded exports; this
-is not an official conformance-runner result, CI, publication or landing.
+positive client and four isolated refusals; the matrix-vector linearity test
+checks its authored accepted client and isolated refusal. Both tests use
+root-loaded exports. They are not official conformance-runner runs or claims
+of CI, publication or landing.

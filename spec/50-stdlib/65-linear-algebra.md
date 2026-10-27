@@ -9,10 +9,10 @@
 > and their eighteen public checked laws are present in the catalog.
 > The §4–5 package-owned tests check their authored seeds against
 > root-loaded exports; they are not official conformance-runner runs.
-> This candidate specifies §6's two new generic laws and a closed seed.
-> Its §6 catalog exports are absent, and neither isolated D0 checks nor
-> this seed establish shipped §6 execution, official conformance, CI,
-> publication, landing or landed §6 trust.
+> Section 6 specifies two generic laws and a closed seed. Both laws now have
+> candidate catalog proof bodies; a package test checks the seed against
+> root-loaded exports. That is distinct from the isolated D0, official
+> conformance-runner execution, CI, publication, landing and landed §6 trust.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -523,10 +523,10 @@ is not official conformance-runner execution or a landed trust delta.
 > (SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY).** Architect's
 > isolated D0 on `aa6370449` checked both generic proofs with no new
 > `Axiom` and identical scratch `trusted_base()` GlobalIds (109 → 109).
-> The two catalog exports are absent on this base. The closed seed
-> below is authored separately from those exports: neither D0 nor the
-> seed establishes shipped §6 execution, official conformance, CI,
-> publication, landing or landed trust.
+> The two catalog exports have candidate checked bodies, and a package
+> test checks the authored seed against root-loaded exports. The isolated
+> D0 and package test do not establish official conformance-runner execution,
+> CI, publication, landing or landed trust.
 
 ### 6.1 Two public checked-law obligations
 
@@ -592,6 +592,7 @@ helpers were refused. The separately authored seed has independent
 closed `Refl` value oracles for a non-square `2 × 3` matrix, direct
 applications of both new public laws, and one false equation after
 a fresh accepted prefix; its closed instances do not prove generic
-linearity. This D0 checks proposed proofs, not exports on main. The
-§6 catalog implementation and shipped-seed execution are separate
-work; official conformance, CI and landed trust remain unmeasured.
+linearity. The D0 checked proposed proofs in isolation, not exports on main. The
+candidate catalog adds both checked exports and a root-loaded package test
+of the seed. Official conformance, CI, publication, landing and landed trust
+remain unmeasured.
