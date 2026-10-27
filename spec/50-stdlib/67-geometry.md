@@ -4,16 +4,20 @@
 > SPEC-GEOMETRY-MANHATTAN-METRIC §2;
 > SPEC-GEOMETRY-BOX-CONTAINMENT §3;
 > SPEC-GEOMETRY-BOX-AREA §4;
-> SPEC-GEOMETRY-BOX-INSIDE-ORDER §5).** Sections 1–4, their catalog
-> operations and checked laws, and their seeds are present on main.
+> SPEC-GEOMETRY-BOX-INSIDE-ORDER §5;
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY §6).** Sections 1–4,
+> their catalog operations and checked laws, and their seeds are present
+> on main.
 > Section 4's package-owned roots-loader test executes its positive
 > and refused seed fences and measures unchanged trusted identities
 > (114 → 114); no official conformance-runner run is established.
-> Section 5 adds three generic checked-law obligations. This candidate
-> supplies the §5 catalog exports and a package test checking the authored
-> seed's accepted client and three isolated refusals against root-loaded
-> exports. The test does not establish official conformance-runner execution,
-> CI, publication, landing or a landed trusted-base measurement.
+> Section 5's three generic checked laws, seed and package-owned test
+> are present on main. That test is not official conformance-runner
+> execution or a landed trust measurement. Section 6 specifies two
+> additional structural box equalities and two public Nat Order
+> selector laws; their exports are absent from this base. Isolated D0
+> and the new seed do not establish shipped §6 execution, CI, publication,
+> landing or landed trust.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -502,11 +506,10 @@ supplies a runtime-cost guarantee.
 
 > **Section 5 status: DRAFT v0 (SPEC-GEOMETRY-BOX-INSIDE-ORDER).**
 > Architect checked three generic transparent laws in an isolated D0
-> on `4f337ec26`. This candidate delivers those §5 `NatBox` exports
-> and a package test checking the authored seed's accepted client and
-> each isolated refusal through root-loaded exports. Neither D0 nor
-> package tests establish official conformance-runner execution, CI,
-> publication, landing or a landed trusted-base measurement.
+> on `4f337ec26`. Those §5 `NatBox` exports, the authored seed and a
+> package-owned test of its positive client and three isolated refusals
+> are present on main. Neither D0 nor package tests establish official
+> conformance-runner execution or a landed trusted-base measurement.
 
 ### 5.1 Three checked-law obligations
 
@@ -593,3 +596,99 @@ same-operand positive controls.
 The scratch results alone do not establish this catalog delivery; neither
 the package test nor those results establish official conformance-runner
 execution, CI, publication, landing or landed trust.
+
+## 6. Intersection and hull commute as boxes
+
+> **Section 6 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).** Architect's
+> isolated D0 on `0bb872591` checked all four generic proofs, no new
+> `Axiom`, and equal `trusted_base()` identities 114 → 114. This
+> spec/seed candidate delivers neither the Nat Order selectors nor
+> the `NatBox` laws. Its closed seed and scratch checks do not establish
+> shipped §6 execution, official conformance, CI, publication, landing
+> or landed trust.
+
+### 6.1 Two public selector laws in Nat Order
+
+`Data.Numeric.Nat.Order` must export exactly these two additional
+**public Transparent checked proof selectors** for its existing `min`
+and `max` functions. The declarations sit in their respective
+operation families: `comm for min` after `greatest for min`, and
+`comm for max` after `least for max`.
+
+```ken
+pub proof comm for min (m : Nat) (n : Nat) : Equal Nat (min m n) (min n m)
+
+pub proof comm for max (m : Nat) (n : Nat) : Equal Nat (max m n) (max n m)
+```
+
+A client imports `min` or `max` and applies `(proof comm for min) m n`
+or `(proof comm for max) m n`. These are facts about the public Nat
+operations, not geometry-private copies. The existing §1.4 public
+min/max bounds remain unchanged; no new Nat carrier, order operation,
+axiom or primitive is needed. Their checked proof route splits each
+pair of natural arguments and recurses on successor tails, using
+congruence through `Suc`. The open successor cases require the
+appropriate equality constructor (`Refl` in the two open max corners)
+rather than replacing them all with `Proved`. No implementation strategy
+is otherwise fixed by the public types.
+
+### 6.2 Two structural box equalities
+
+`Algorithm.Geometry.NatBox` must export exactly these two further
+**public Transparent checked theorems**, in the existing package and
+after `hull_contains_right` with the other §1 box-operation laws:
+
+```ken
+pub theorem intersect_comm (b : Box) (c : Box) : Equal Box (intersect b c) (intersect c b)
+
+pub theorem hull_comm (b : Box) (c : Box) : Equal Box (hull b c) (hull c b)
+```
+
+The equalities hold for **every** pair of boxes, without a point
+witness, nonemptiness or ordered-corner premise. In §1.2's formula,
+intersection takes `max` of each lower coordinate and `min` of each
+upper coordinate; hull takes the opposite selectors. Swapping the
+two boxes swaps arguments to those Nat selectors, which are equal by
+§6.1. Every stored corner coordinate is a `Nat`, so the four
+coordinate equalities give equality of both `Point` corners and then
+**structural `Equal Box`**. This includes inverted boxes: the
+coordinate formulas remain total and the proof does not infer
+identity from an empty set of members. It does not equate every
+representation of an empty box, or state idempotence, associativity,
+or a complement law.
+
+The private `point_equal` from the existing package stays private.
+The new `box_with_lo`, `box_with_hi` and `box_equal` are private
+congruence tools for rebuilding `MkBox` from equal corners, placed
+directly after `point_equal`; no client may import them. The box
+proofs destructure their two operands to the eight `Nat` coordinates,
+apply the Order selectors to each, and assemble corners with
+`point_equal` and `box_equal`. These are checked proofs in ordinary
+Ken, not a new conversion rule or an `Eq Box` quotient. The existing
+§1–§5 operations and laws are unchanged.
+
+The distinction from `68-numerical.md` §5 matters: its rational
+interval endpoints can have equivalent **values** but unequal stored
+spellings. Swapping operands there guarantees mutual endpoint-value
+inclusion, not structural `Equal Interval`. Here each corner is a
+`Nat`, so the ruled min/max equalities give exactly the constructor
+components needed for `Equal Box`, even if a box is inverted. The
+closed seed at
+`conformance/stdlib/geometry/seed-box-intersect-hull-commutativity.md`
+uses overlapping but unequal boxes: both public laws apply; the
+false claim that their hull equals their intersection is refused
+with a same-proof-form equal-box control. Those examples delimit the
+claim, not the generic proof.
+
+Architect's isolated D0 at landed base `0bb872591` checked `ken check`
+and `ken fmt --check` for both package files (rc 0), the four generic
+bodies and two probe tests (2/2), with no new `Axiom` and unchanged
+scratch `trusted_base()` GlobalId sets 114 → 114. The two Nat Order
+selectors and two box laws were owned Transparent globals; selective
+imports of the three new box helpers were refused. The new seed was
+accepted with an overlay of only that checked package patch, and its
+one false claim was refused there. Neither this historical D0 nor a
+seed authored in this candidate establishes delivery of the §6
+catalog exports, execution against shipped exports, official
+conformance, CI, publication, landing or landed trust.
