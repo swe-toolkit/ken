@@ -185,7 +185,11 @@ impl ModuleState {
         Ok(())
     }
 
-    fn record_module_paths(&mut self, paths: impl IntoIterator<Item = String>, owner: &ModuleUnitOwner) {
+    fn record_module_paths(
+        &mut self,
+        paths: impl IntoIterator<Item = String>,
+        owner: &ModuleUnitOwner,
+    ) {
         for path in paths {
             self.module_path_owners.insert(path, owner.clone());
         }
@@ -1698,7 +1702,12 @@ fn precheck_module_paths(
     claimant: &ModuleUnitOwner,
 ) -> Result<(), ElabError> {
     for decl in decls {
-        if let Decl::ModuleDecl { name, decls: inner, span } = decl.unwrap_pub() {
+        if let Decl::ModuleDecl {
+            name,
+            decls: inner,
+            span,
+        } = decl.unwrap_pub()
+        {
             let path = qualify(prefix, name);
             state.require_module_path_available(&path, claimant, span)?;
             precheck_module_paths(state, inner, &path, claimant)?;
@@ -2179,8 +2188,12 @@ fn load_unit(
     elab.class_env.implicit_single_provider = previous_implicit_single_provider;
 
     let (ids, own_results) = result?;
-    elab.module_state
-        .record_module_paths(local_modules.into_iter().chain(std::iter::once(module.to_string())), &owner);
+    elab.module_state.record_module_paths(
+        local_modules
+            .into_iter()
+            .chain(std::iter::once(module.to_string())),
+        &owner,
+    );
     let mut closure_results = Vec::new();
     let mut seen_ids = HashSet::new();
     for result in dependency_results.into_iter().chain(own_results.iter().cloned()) {
@@ -6395,11 +6408,14 @@ mod namespace_effect_tests {
         };
 
         let (mut local, _root, file_id) = prepared();
-        local.elaborate_file(
-            "module B { const x : Nat = Suc Zero const y : Nat = x }",
-        ).expect("distinct-path local-only source checks");
+        local
+            .elaborate_file("module B { const x : Nat = Suc Zero const y : Nat = x }")
+            .expect("distinct-path local-only source checks");
         let local_id = local.globals["B.x"];
-        assert_ne!(file_id, local_id, "distinct-path local mints another identity");
+        assert_ne!(
+            file_id, local_id,
+            "distinct-path local mints another identity"
+        );
         match local.env.lookup(local.globals["B.y"]) {
             Some(ken_kernel::Decl::Transparent { body, .. }) => {
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. } if *id == local_id));
@@ -6408,7 +6424,8 @@ mod namespace_effect_tests {
         }
 
         let (mut imported, _root, imported_id) = prepared();
-        imported.elaborate_file("module B { import P (x) const y : Nat = x }")
+        imported
+            .elaborate_file("module B { import P (x) const y : Nat = x }")
             .expect("import-only distinct-path source checks");
         match imported.env.lookup(imported.globals["B.y"]) {
             Some(ken_kernel::Decl::Transparent { body, .. }) => {
@@ -6428,10 +6445,14 @@ mod namespace_effect_tests {
                 Err(ElabError::AmbiguousReference { name, sources, .. }) => {
                     assert_eq!(name, "x");
                     assert_eq!(sources.len(), 2);
-                    assert!(sources.iter().any(|source| source.contains("B.x")),
-                        "local identity must be attributed to B: {sources:?}");
-                    assert!(sources.iter().any(|source| source.contains("A.x")),
-                        "file identity must be attributed to A: {sources:?}");
+                    assert!(
+                        sources.iter().any(|source| source.contains("B.x")),
+                        "local identity must be attributed to B: {sources:?}"
+                    );
+                    assert!(
+                        sources.iter().any(|source| source.contains("A.x")),
+                        "file identity must be attributed to A: {sources:?}"
+                    );
                     assert_eq!(selected_id, file_id, "file provider stays stable");
                 }
                 other => panic!("a current local cannot coalesce with stale file ID: {other:?}"),
@@ -6485,9 +6506,11 @@ mod namespace_effect_tests {
             (env, root, id)
         };
         let (mut imported, _root, file_id) = prepared();
-        imported.elaborate_file(
-            "module B { import P (C, C_instance_Nat) const chosen : C Nat = C_instance_Nat }",
-        ).expect("file dictionary is an independently usable import");
+        imported
+            .elaborate_file(
+                "module B { import P (C, C_instance_Nat) const chosen : C Nat = C_instance_Nat }",
+            )
+            .expect("file dictionary is an independently usable import");
         assert!(matches!(imported.env.lookup(imported.globals["B.chosen"]),
             Some(ken_kernel::Decl::Transparent { body: ken_kernel::Term::Const { id, .. }, .. })
                 if *id == file_id));
@@ -6768,7 +6791,9 @@ mod namespace_effect_tests {
         let before_globals = env.globals.clone();
         let before_exports = env.module_state.exports.clone();
         let before_owners = env.module_state.module_path_owners.clone();
-        let before_provenance = env.module_state.export_provenance
+        let before_provenance = env
+            .module_state
+            .export_provenance
             .iter()
             .map(|(path, value)| (path.clone(), value.member_ids.clone()))
             .collect::<HashMap<_, _>>();
@@ -6789,12 +6814,20 @@ mod namespace_effect_tests {
             }
             other => panic!("wrong refusal for foreign module {path}: {other:?}"),
         }
-        assert_eq!(env.env, before_env, "rejected unit changed checked declarations");
+        assert_eq!(
+            env.env, before_env,
+            "rejected unit changed checked declarations"
+        );
         assert_eq!(env.globals, before_globals, "rejected unit changed globals");
-        assert_eq!(env.module_state.exports, before_exports, "rejected unit changed exports");
+        assert_eq!(
+            env.module_state.exports, before_exports,
+            "rejected unit changed exports"
+        );
         assert_eq!(env.module_state.module_path_owners, before_owners);
         assert_eq!(
-            env.module_state.export_provenance.iter()
+            env.module_state
+                .export_provenance
+                .iter()
                 .map(|(path, value)| (path.clone(), value.member_ids.clone()))
                 .collect::<HashMap<_, _>>(),
             before_provenance,
@@ -6814,8 +6847,11 @@ mod namespace_effect_tests {
     #[test]
     fn foreign_inline_path_owner_clashes_in_both_orders_without_writes() {
         let root = tempfile::tempdir().expect("temporary module root");
-        fs::write(root.path().join("P.ken"), "pub const file_only : Nat = Zero\n")
-            .expect("write file unit");
+        fs::write(
+            root.path().join("P.ken"),
+            "pub const file_only : Nat = Zero\n",
+        )
+        .expect("write file unit");
         let roots = [root.path().to_path_buf()];
         for file_first in [true, false] {
             let mut env = ElabEnv::new().expect("base environment");
@@ -6830,33 +6866,47 @@ mod namespace_effect_tests {
             let before_globals = env.globals.clone();
             let before_exports = env.module_state.exports.clone();
             let before_owners = env.module_state.module_path_owners.clone();
-            let before_provenance = env.module_state.export_provenance
+            let before_provenance = env
+                .module_state
+                .export_provenance
                 .iter()
                 .map(|(path, value)| (path.clone(), value.member_ids.clone()))
                 .collect::<HashMap<_, _>>();
             let before_loaded = env.loaded_module_count();
             let err = if file_first {
-                env.elaborate_file(inline).expect_err("foreign inline claim")
+                env.elaborate_file(inline)
+                    .expect_err("foreign inline claim")
             } else {
                 env.elaborate_module_from_roots(&roots, "P")
                     .expect_err("foreign file claim")
             };
-            assert!(matches!(
-                err,
-                ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
-                    if path == "P"
-                        && if file_first {
-                            owner == "file P" && claimant.starts_with("in-memory unit ")
-                        } else {
-                            owner.starts_with("in-memory unit ") && claimant == "file P"
-                        }
-            ), "wrong owner-clash boundary: {err:?}");
-            assert_eq!(env.env, before_env, "no checked declaration from rejected unit");
+            assert!(
+                matches!(
+                    err,
+                    ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
+                        if path == "P"
+                            && if file_first {
+                                owner == "file P" && claimant.starts_with("in-memory unit ")
+                            } else {
+                                owner.starts_with("in-memory unit ") && claimant == "file P"
+                            }
+                ),
+                "wrong owner-clash boundary: {err:?}"
+            );
+            assert_eq!(
+                env.env, before_env,
+                "no checked declaration from rejected unit"
+            );
             assert_eq!(env.globals, before_globals, "no foreign global binding");
-            assert_eq!(env.module_state.exports, before_exports, "no foreign interface");
+            assert_eq!(
+                env.module_state.exports, before_exports,
+                "no foreign interface"
+            );
             assert_eq!(env.module_state.module_path_owners, before_owners);
             assert_eq!(
-                env.module_state.export_provenance.iter()
+                env.module_state
+                    .export_provenance
+                    .iter()
                     .map(|(path, value)| (path.clone(), value.member_ids.clone()))
                     .collect::<HashMap<_, _>>(),
                 before_provenance,
@@ -6866,11 +6916,15 @@ mod namespace_effect_tests {
         }
 
         let mut control = ElabEnv::new().expect("base environment");
-        control.elaborate_module_from_roots(&roots, "P").expect("file P");
+        control
+            .elaborate_module_from_roots(&roots, "P")
+            .expect("file P");
         let file_id = control.globals["P.file_only"];
-        control.elaborate_file("module R { pub const other : Nat = Suc Zero }")
+        control
+            .elaborate_file("module R { pub const other : Nat = Suc Zero }")
             .expect("distinct path R");
-        control.elaborate_file("module P.Q { pub const child : Nat = Suc Zero }")
+        control
+            .elaborate_file("module P.Q { pub const child : Nat = Suc Zero }")
             .expect("strict child P.Q");
         assert_eq!(control.globals["P.file_only"], file_id);
         assert!(control.globals.contains_key("R.other"));
@@ -6892,10 +6946,12 @@ mod namespace_effect_tests {
         let err = env
             .elaborate_session_decl_results_v1("module P { pub const second : Nat = Suc Zero }")
             .expect_err("second session entry cannot claim P");
-        assert!(matches!(err, ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
+        assert!(
+            matches!(err, ElabError::ModuleOwnerClash { ref path, ref owner, ref claimant, .. }
             if path == "P" && owner.starts_with("in-memory unit ")
                 && claimant.starts_with("in-memory unit ") && owner != claimant),
-            "wrong session owner-clash boundary: {err:?}");
+            "wrong session owner-clash boundary: {err:?}"
+        );
         assert_eq!(env.env, before);
         assert!(!env.globals.contains_key("P.second"));
 
@@ -7346,10 +7402,12 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             if preload_inline {
                 env.elaborate_file(inline).expect("first in-memory A.N");
-                assert_owner_clash_without_writes(&mut env, "A.N", |env|
-                    env.elaborate_module_from_roots(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A.N", |env| {
+                    env.elaborate_module_from_roots(&roots, "A")
+                });
             } else {
-                let error = env.elaborate_module_from_roots(&roots, "A")
+                let error = env
+                    .elaborate_module_from_roots(&roots, "A")
                     .expect_err("later N cannot authorize premature import");
                 match error {
                     ElabError::UnboundName { name, span } => {
@@ -7362,11 +7420,14 @@ mod namespace_effect_tests {
             }
         }
         // A completed file owner is also protected from a later foreign A.N.
-        fs::write(root.path().join("A.ken"),
-            "module N { pub const x : Nat = Zero }\n")
-            .expect("write successful same-unit A.N");
+        fs::write(
+            root.path().join("A.ken"),
+            "module N { pub const x : Nat = Zero }\n",
+        )
+        .expect("write successful same-unit A.N");
         let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots(&roots, "A").expect("first file owner A.N");
+        env.elaborate_module_from_roots(&roots, "A")
+            .expect("first file owner A.N");
         assert_owner_clash_without_writes(&mut env, "A.N", |env| env.elaborate_file(inline));
     }
 
@@ -7443,17 +7504,21 @@ mod namespace_effect_tests {
                 let mut env = ElabEnv::new().expect("base environment");
                 if external_first {
                     env.elaborate_file(external).expect("first owner N");
-                    assert_owner_clash_without_writes(&mut env, "N", |env|
-                        env.elaborate_file(source));
+                    assert_owner_clash_without_writes(&mut env, "N", |env| {
+                        env.elaborate_file(source)
+                    });
                 } else {
                     env.elaborate_file(source)
                         .expect("earlier same-unit child remains importable");
                     let own_id = env.globals["N.own"];
-                    let (_, body) = env.env.transparent_body(env.globals[selected_name])
+                    let (_, body) = env
+                        .env
+                        .transparent_body(env.globals[selected_name])
                         .expect("selected is transparent");
                     assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == own_id));
-                    assert_owner_clash_without_writes(&mut env, "N", |env|
-                        env.elaborate_file(external));
+                    assert_owner_clash_without_writes(&mut env, "N", |env| {
+                        env.elaborate_file(external)
+                    });
                 }
             }
         }
@@ -7521,17 +7586,21 @@ mod namespace_effect_tests {
             if file_first {
                 env.elaborate_module_from_roots(&roots, "A")
                     .expect("uncontested A imports catalog N.ken");
-                let (_, body) = env.env.transparent_body(env.globals["A.selected"])
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["A.selected"])
                     .expect("checked file selection");
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. }
                     if id == env.globals["N.x"]));
-                assert_owner_clash_without_writes(&mut env, "N", |env|
-                    env.elaborate_file("module N { pub const decoy : Nat = Zero }"));
+                assert_owner_clash_without_writes(&mut env, "N", |env| {
+                    env.elaborate_file("module N { pub const decoy : Nat = Zero }")
+                });
             } else {
                 env.elaborate_file("module N { pub const decoy : Nat = Zero }")
                     .expect("first inline N");
-                assert_owner_clash_without_writes(&mut env, "N", |env|
-                    env.elaborate_module_from_roots(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "N", |env| {
+                    env.elaborate_module_from_roots(&roots, "A")
+                });
             }
         }
     }
@@ -7621,9 +7690,11 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             let memory = "module A { module N { module Q { pub const leak : Nat = Suc Zero } } }";
             if preload {
-                env.elaborate_file(memory).expect("first inline A.N.Q owner");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A"));
+                env.elaborate_file(memory)
+                    .expect("first inline A.N.Q owner");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+                });
                 continue;
             }
             env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
@@ -7693,40 +7764,44 @@ mod namespace_effect_tests {
                 let memory = env.globals["A.N.memory"];
                 env.elaborate_file("import A as K\nconst memory_selected : Nat = K.N.memory")
                     .expect("memory owner's leaf is importable");
-                let (_, body) = env.env.transparent_body(env.globals["memory_selected"])
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["memory_selected"])
                     .expect("checked memory selection");
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == memory));
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
                 assert_eq!(env.env.trusted_base(), trust_before);
                 continue;
             }
             env.elaborate_module_from_roots_strict(&roots, "A")
                 .expect("first file A and checked Q leaf");
-        let old_file = env.globals["A.N.Q.leak"];
-        env.elaborate_file("import A as K\nconst earlier_file : Nat = K.N.Q.leak")
-            .expect("first import actually named the file-owned descendant");
-        let (_, earlier) = env
-            .env
-            .transparent_body(env.globals["earlier_file"])
-            .expect("first import has a checked body");
-        match earlier {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
-            other => panic!("first import did not select file Q: {other:?}"),
-        }
-        assert_owner_clash_without_writes(&mut env, "A", |env|
-            env.elaborate_file(memory_source));
-        assert_eq!(env.globals["A.N.Q.leak"], old_file);
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
-            .expect("file B imports the actual file A, not the in-memory A");
-        let (_, selected) = env
-            .env
-            .transparent_body(env.globals["B.file_selected"])
-            .expect("B's checked body");
-        match selected {
-            ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
-            other => panic!("file-root import lost the file-owned Q: {other:?}"),
-        }
+            let old_file = env.globals["A.N.Q.leak"];
+            env.elaborate_file("import A as K\nconst earlier_file : Nat = K.N.Q.leak")
+                .expect("first import actually named the file-owned descendant");
+            let (_, earlier) = env
+                .env
+                .transparent_body(env.globals["earlier_file"])
+                .expect("first import has a checked body");
+            match earlier {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
+                other => panic!("first import did not select file Q: {other:?}"),
+            }
+            assert_owner_clash_without_writes(&mut env, "A", |env| {
+                env.elaborate_file(memory_source)
+            });
+            assert_eq!(env.globals["A.N.Q.leak"], old_file);
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
+                .expect("file B imports the actual file A, not the in-memory A");
+            let (_, selected) = env
+                .env
+                .transparent_body(env.globals["B.file_selected"])
+                .expect("B's checked body");
+            match selected {
+                ken_kernel::Term::Const { id, .. } => assert_eq!(id, old_file),
+                other => panic!("file-root import lost the file-owned Q: {other:?}"),
+            }
             assert_eq!(env.env.trusted_base(), trust_before);
         }
     }
@@ -7764,11 +7839,13 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             if !file_first {
                 env.elaborate_file(memory).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
                 continue;
             }
-            env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A");
             let file = env.globals["A.file_only"];
             env.elaborate_module_from_roots_strict(&roots, "B")
                 .expect("file B imports A's public root leaf");
@@ -7838,11 +7915,13 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             if !file_first {
                 env.elaborate_file(memory).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
                 continue;
             }
-            env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A");
             let file = env.globals["A.N.Q.file_only"];
             env.elaborate_module_from_roots_strict(&roots, "B")
                 .expect("file B imports A's Q export");
@@ -7896,11 +7975,13 @@ mod namespace_effect_tests {
             let mut env = ElabEnv::new().expect("base environment");
             if !file_first {
                 env.elaborate_file(memory).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
                 continue;
             }
-            env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+            env.elaborate_module_from_roots_strict(&roots, "A")
+                .expect("first file A");
             let file = env.globals["A.file_only"];
             env.elaborate_module_from_roots_strict(&roots, "Good")
                 .expect("facade B republishes file A's leaf");
@@ -7934,18 +8015,22 @@ mod namespace_effect_tests {
         for file_first in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
             if file_first {
-                env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
                 let file = env.globals["A.N.Q.leak"];
                 env.elaborate_file("import A as K\nconst selected : Nat = K.N.Q.leak")
                     .expect("file import checks against its selected provider");
-                let (_, selected) = env.env.transparent_body(env.globals["selected"])
+                let (_, selected) = env
+                    .env
+                    .transparent_body(env.globals["selected"])
                     .expect("checked selection");
                 assert!(matches!(selected, ken_kernel::Term::Const { id, .. } if id == file));
                 assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
             } else {
                 env.elaborate_file(memory).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
         }
     }
@@ -7964,18 +8049,22 @@ mod namespace_effect_tests {
         for file_first in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
             if file_first {
-                env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
                 let file = env.globals["A.N.Q.leak"];
                 env.elaborate_file("import A as K\nconst selected : Nat = K.N.Q.leak")
                     .expect("file import");
-                let (_, body) = env.env.transparent_body(env.globals["selected"])
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["selected"])
                     .expect("checked selected body");
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == file));
                 assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
             } else {
                 env.elaborate_file(memory).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
         }
     }
@@ -7995,12 +8084,14 @@ mod namespace_effect_tests {
         for file_first in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
             if file_first {
-                env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
                 assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
             } else {
                 env.elaborate_file(inline).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
         }
     }
@@ -8029,8 +8120,9 @@ mod namespace_effect_tests {
                 assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
             } else {
                 env.elaborate_file(inline).expect("first inline A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "F"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "F")
+                });
             }
         }
     }
@@ -8053,9 +8145,12 @@ mod namespace_effect_tests {
         let inline = "module A { export leak\nconst leak : Nat = Suc Zero }";
         assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
         let mut memory_first = ElabEnv::new().expect("base environment");
-        memory_first.elaborate_file(inline).expect("first inline owner A");
-        assert_owner_clash_without_writes(&mut memory_first, "A", |env|
-            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A"));
+        memory_first
+            .elaborate_file(inline)
+            .expect("first inline owner A");
+        assert_owner_clash_without_writes(&mut memory_first, "A", |env| {
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+        });
         env.elaborate_file("module Decoy { pub const leak : Nat = Zero }")
             .expect("independent checked decoy");
         let decoy = env.globals["Decoy.leak"];
@@ -8065,7 +8160,10 @@ mod namespace_effect_tests {
         let local = env.globals["B.leak"];
         assert_ne!(old, local);
         assert_ne!(decoy, local);
-        assert_eq!(env.module_state.export_provenance["B"].member_ids["B"]["leak"], local);
+        assert_eq!(
+            env.module_state.export_provenance["B"].member_ids["B"]["leak"],
+            local
+        );
         env.elaborate_file("import B as M\nconst selected : Nat = M.leak")
             .expect("client selects the forward-published local");
         let (_, body) = env.env.transparent_body(env.globals["selected"])
@@ -8125,12 +8223,15 @@ mod namespace_effect_tests {
         for file_first in [false, true] {
             let mut env = ElabEnv::new().expect("base environment");
             if file_first {
-                env.elaborate_module_from_roots_strict(&roots, "A").expect("first file A");
+                env.elaborate_module_from_roots_strict(&roots, "A")
+                    .expect("first file A");
                 assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
             } else {
-                env.elaborate_file(inline).expect("first inline forward export A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                env.elaborate_file(inline)
+                    .expect("first inline forward export A");
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
         }
     }
@@ -8253,14 +8354,17 @@ mod namespace_effect_tests {
                 env.elaborate_module_from_roots_strict(&roots, "B")
                     .expect("file B imports file A's checked leaf");
                 let file_id = env.globals["A.N.Q.leak"];
-                let (_, body) = env.env.transparent_body(env.globals["B.selected"])
+                let (_, body) = env
+                    .env
+                    .transparent_body(env.globals["B.selected"])
                     .expect("checked B selection");
                 assert!(matches!(body, ken_kernel::Term::Const { id, .. } if id == file_id));
                 assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(memory));
             } else {
                 env.elaborate_file(memory).expect("first in-memory A");
-                assert_owner_clash_without_writes(&mut env, "A", |env|
-                    env.elaborate_module_from_roots_strict(&roots, "A"));
+                assert_owner_clash_without_writes(&mut env, "A", |env| {
+                    env.elaborate_module_from_roots_strict(&roots, "A")
+                });
             }
         }
     }
@@ -8421,11 +8525,9 @@ mod namespace_effect_tests {
             "module M { import P (Pick) pub data Foo = MkNewFoo instance Pick Foo { selected = False } const selected : Bool where Pick Foo = d.selected }",
         ).expect("new distinct-path head, dictionary and use in one scope");
         let new_head = env.globals["M.Foo"];
-        assert_eq!(env.globals.insert("A.Foo".into(), new_head), Some(old_head));
-        let new_dictionary = env.class_env.instances_by_id[&(
-            class_id,
-            crate::classes::InstanceHeadKey::Global(new_head),
-        )].instance_id;
+        let new_dictionary = env.class_env.instances_by_id
+            [&(class_id, crate::classes::InstanceHeadKey::Global(new_head))]
+            .instance_id;
         assert_ne!(old_head, new_head);
         assert_ne!(old_dictionary, new_dictionary);
         assert!(results.iter().any(|result| result.def_id == new_head));
@@ -8471,11 +8573,13 @@ mod namespace_effect_tests {
             .expect("file class and dictionary checked");
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
         let nat_id = env.globals["Nat"];
-        let file_dictionary = env.class_env.instances_by_id[&(
-            file_id, crate::classes::InstanceHeadKey::Global(nat_id)
-        )].instance_id;
-        env.elaborate_file("module M { pub class C a { marker : Nat } instance C Nat { marker = Zero } }")
-            .expect("distinct-path class and dictionary checked");
+        let file_dictionary = env.class_env.instances_by_id
+            [&(file_id, crate::classes::InstanceHeadKey::Global(nat_id))]
+            .instance_id;
+        env.elaborate_file(
+            "module M { pub class C a { marker : Nat } instance C Nat { marker = Zero } }",
+        )
+        .expect("distinct-path class and dictionary checked");
         let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
         assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
@@ -8516,7 +8620,6 @@ mod namespace_effect_tests {
             .expect("second Foo has a distinct lawful module path");
         let new_foo = env.globals["M.Foo"];
         assert_ne!(old_foo, new_foo);
-        assert_eq!(env.globals.insert("A.Foo".into(), new_foo), Some(old_foo));
         let result = env.elaborate_file(
             "import M (Foo as NewFoo)\nconst wrong : Bool where C (Pair NewFoo Nat) = d.marker",
         );
@@ -8661,8 +8764,14 @@ mod namespace_effect_tests {
         let memory_class = env.globals["M.Marker"];
         let memory_head = env.globals["M.Target"];
         assert_ne!((file_class, file_head), (memory_class, memory_head));
-        assert_eq!(env.globals.insert("A.Marker".into(), memory_class), Some(file_class));
-        assert_eq!(env.globals.insert("A.Target".into(), memory_head), Some(file_head));
+        assert_eq!(
+            env.globals.insert("A.Marker".into(), memory_class),
+            Some(file_class)
+        );
+        assert_eq!(
+            env.globals.insert("A.Target".into(), memory_head),
+            Some(file_head)
+        );
         env.elaborate_module_from_roots_strict(&roots, "B")
             .expect("file derive uses file providers");
         env.elaborate_file("import M (Marker,Target)\nderive Marker for Target")
@@ -8783,9 +8892,12 @@ mod namespace_effect_tests {
         assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
         assert_eq!(env.globals["A.leak"], file_id);
         let mut memory_first = ElabEnv::new().expect("base environment");
-        memory_first.elaborate_file(inline).expect("first in-memory owner A");
-        assert_owner_clash_without_writes(&mut memory_first, "A", |env|
-            env.elaborate_module_from_roots_strict(&roots, "A"));
+        memory_first
+            .elaborate_file(inline)
+            .expect("first in-memory owner A");
+        assert_owner_clash_without_writes(&mut memory_first, "A", |env| {
+            env.elaborate_module_from_roots_strict(&roots, "A")
+        });
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
@@ -8852,7 +8964,10 @@ mod namespace_effect_tests {
             .expect("independent checked decoy intro");
         let decoy_id = env.globals["Decoy.HasProof.intro"];
         assert_ne!(file_intro, decoy_id);
-        assert_eq!(env.globals.insert("A.HasProof.intro".into(), decoy_id), Some(file_intro));
+        assert_eq!(
+            env.globals.insert("A.HasProof.intro".into(), decoy_id),
+            Some(file_intro)
+        );
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "B")
             .expect("file family selectors keep their owning intro");
         for name in ["B.direct", "B.facade", "B.in_scope"] {
