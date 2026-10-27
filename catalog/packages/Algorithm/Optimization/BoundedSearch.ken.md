@@ -23,15 +23,15 @@ arbitrary predicates or an unbounded search mechanism.
 
 ## Definition
 
-The public operation and its three laws lead. The private outcome invariant
+The public operation and its four laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
 import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
 
-import Core.Logic.Transport (cong, trans)
+import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Numeric.Nat.Order (lt_nat)
+import Data.Numeric.Nat.Order (leq_nat, lt_nat)
 
 pub fn find_below (p : Nat → Bool) (bound : Nat) : Option Nat =
   match bound {
@@ -70,6 +70,46 @@ pub theorem find_below_complete
       → Equal Bool (lt_nat m bound) True
       → Equal Bool (p m) False =
   λmissing. J (λr _. found_spec p bound r) (find_below_correct p bound) missing
+
+pub theorem find_below_stable
+      (p : Nat → Bool) (bound : Nat) (larger : Nat) (n : Nat)
+    : Equal Bool (leq_nat bound larger) True
+      → Equal (Option Nat) (find_below p bound) (Some Nat n)
+      → Equal (Option Nat) (find_below p larger) (Some Nat n) =
+  match larger {
+    Zero ↦
+      match bound {
+        Zero ↦ λwithin. λfound. absurd found;
+        Suc below ↦ λwithin. λfound. absurd within
+      };
+    Suc below ↦
+      λwithin.
+        λfound.
+          match leq_nat bound below eqn : earlier {
+            True ↦
+              cong
+                (Option Nat)
+                (Option Nat)
+                (find_below p below)
+                (Some Nat n)
+                (find_next p below)
+                (find_below_stable p bound below n earlier found);
+            False ↦
+              trans
+                (Option Nat)
+                (find_below p (Suc below))
+                (find_below p bound)
+                (Some Nat n)
+                (cong
+                  Nat
+                  (Option Nat)
+                  (Suc below)
+                  bound
+                  (find_below p)
+                  (sym Nat bound (Suc below) (leq_suc_not_leq_same bound below within earlier)))
+                found
+          }
+  }
 
 fn find_next (p : Nat → Bool) (below : Nat) (prior : Option Nat) : Option Nat =
   match prior {
@@ -212,6 +252,29 @@ theorem lt_suc_not_lt_same
               λnot_earlier. cong Nat Nat m2 b2 Suc (lt_suc_not_lt_same m2 b2 within not_earlier)
         }
   }
+
+theorem leq_suc_not_leq_same
+      (a : Nat)
+    : (b : Nat)
+      → Equal Bool (leq_nat a (Suc b)) True
+      → Equal Bool (leq_nat a b) False
+      → Equal Nat a (Suc b) =
+  match a {
+    Zero ↦ λb. λwithin. λnot_earlier. absurd not_earlier;
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦
+            match a2 {
+              Zero ↦ λwithin. λnot_earlier. Proved;
+              Suc a3 ↦ λwithin. λnot_earlier. absurd within
+            };
+          Suc b2 ↦
+            λwithin.
+              λnot_earlier.
+                cong Nat Nat a2 (Suc b2) Suc (leq_suc_not_leq_same a2 b2 within not_earlier)
+        }
+  }
 ```
 
 ## Using it
@@ -226,8 +289,13 @@ range. See the checked examples and refusals in the
 `find_below_sound` establishes that a reported witness is within the strict
 bound and satisfies the predicate. `find_below_least` establishes that no
 smaller number is a hit. `find_below_complete` establishes that an absent
-answer entails no hit anywhere below the bound. All three are checked proof
-bodies: they transport `find_below_correct` across the actual result equality.
+answer entails no hit anywhere below the bound. These three checked proof
+bodies transport `find_below_correct` across the actual result equality.
+`find_below_stable` proves that an observed `Some n` persists when the bound
+grows. Its proof inducts over the larger bound: an earlier bound fits within
+the predecessor and reuses the induction hypothesis, or equals the new bound
+and transports the observed result. No corresponding `None` law holds: a
+larger range can contain a new hit.
 
 `find_below_correct` inducts over the bound. Its private `found_spec` states
 the stronger outcome invariant: `None` entails `none_below`, while `Some n`
@@ -235,20 +303,23 @@ records an in-range hit and no earlier hit. At each successor, `find_next`
 keeps an existing least witness, or `found_at_correct` checks the new candidate.
 For a failing candidate, `lt_suc_not_lt_same` identifies any member of the
 extended range that was not in the prior range, letting the failure at the
-new bound complete the no-hit proof.
+new bound complete the no-hit proof. The private
+`leq_suc_not_leq_same` proves the equality needed by the stability proof's
+new-bound branch without adding a public order law.
 
 ## Design notes
 
 The public contract fixes the least result or its absence, not an iteration
 order or a number of predicate calls. A bound controls the domain without
 introducing an equality operation on predicates. The outcome invariant and
-`lt_suc_not_lt_same` are private proof scaffolding, not additional public laws.
+`lt_suc_not_lt_same` and `leq_suc_not_leq_same` are private proof
+scaffolding, not additional public laws.
 Unlike `argmin` over an existing nonempty list, this package searches a numeric
 range and can return `None`.
 
 ## References
 
-- [Finite bounded-search contract](../../../../spec/50-stdlib/72-optimization.md#2-least-witness-below-a-finite-bound) — the three public laws and scope.
+- [Finite bounded-search contract](../../../../spec/50-stdlib/72-optimization.md#2-least-witness-below-a-finite-bound) — the four public laws and scope.
 - [Argmin](Argmin.ken.md) — least-cost selection from a nonempty input,
   with a different carrier.
 - [Brute-force search](https://en.wikipedia.org/wiki/Brute-force_search) —
@@ -258,7 +329,7 @@ range and can return `None`.
 ## Trust & derivation
 
 The source implements the contract in `spec/50-stdlib/72-optimization.md` §2.
-Its public interface consists of `find_below` and the three named laws above;
+Its public interface consists of `find_below` and the four named laws above;
 all invariant and proof helpers are private. For the operation and its proof
 family, read Definition; for a closed client, follow Using it; for proof
 structure and scope, read Laws & proofs and Design notes.
