@@ -10,9 +10,11 @@ matrix and distinct length-three vectors. Four independently written
 `3x` against concrete indexed vectors. The last `Refl` control uses
 the same left endpoint and proof form as the refused claim below,
 but has the correct right endpoint. These closed examples do not
-prove either generic law. The new §6 catalog exports are absent from
-this candidate's base; D0-overlay checks are not shipped-export
-execution, official conformance, CI, publication, landing or landed
+prove either generic law. The two §6 exports have checked bodies in the
+catalog candidate, and a root-loaded package test checks this accepted
+client and the isolated refusal. D0-overlay checks remain historical; the
+package test is not official conformance-runner execution, CI, publication,
+landing or landed
 trust. Each case promises a durable invariant.
 
 ## Accepted shared client
@@ -156,7 +158,8 @@ are in `/workspaces/ken/local/` under `spec-author-mv-` with suffixes
 `positive`, `false`, `base-value-controls`, and `base-laws` (`.log`).
 The scratch overlay and worktree were removed; the CLI binary predates
 the detached base and is not an exact-base toolchain measurement.
-These D0 observations test proposed scratch proofs and closed
-instances, not §6 exports on main. Neither the seed text nor the
-overlay establishes shipped-seed execution, official conformance,
-CI, publication, landing or landed trust.
+These D0 observations test proposed scratch proofs and closed instances,
+not §6 exports on main. The candidate package test checks the accepted
+client and isolated refusal against root-loaded §6 exports, but neither
+its result nor this seed text establishes official conformance-runner
+execution, CI, publication, landing or landed trust.
