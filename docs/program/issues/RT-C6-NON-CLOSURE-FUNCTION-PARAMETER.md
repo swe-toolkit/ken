@@ -1,7 +1,7 @@
 ---
 id: RT-C6-NON-CLOSURE-FUNCTION-PARAMETER
 title: "A closed, checked refl cast whose function parameter is an unapplied constructor on one side, such as CFn Suc to CFn (λn. Suc n), evaluates to Unknown while the kernel reduces it, because RT-C6's push-mode tolerance in values_agree covers only a Closure pair and a CtorPending value falls to the refusing arm. Extend the push to every function-value representation without comparing them"
-status: ready
+status: active
 owner: runtime
 size: S
 tier: T1

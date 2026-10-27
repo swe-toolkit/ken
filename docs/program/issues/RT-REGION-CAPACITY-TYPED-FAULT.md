@@ -1,7 +1,7 @@
 ---
 id: RT-REGION-CAPACITY-TYPED-FAULT
 title: "Emitted code that exhausts a declared invocation-region limit returns UnclassifiedRuntimeTrap { terminal_value: -1 }: require_i64 turns the allocator's BOUNDARY_ERR_CAPACITY into the same bare -1 a miscompile guard returns. Route every capacity status from emitted code to the typed CapacityExhausted terminal, naming the profile and the limit"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -72,4 +72,5 @@ base, stop and report the mismatch.
 ```text
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. ownerless test rigs bind the boundary arena with no activation services; the capacity helper's owner precondition — keyed on presence of a published issuer (services pointer).
+2. the limb witness needed a value in a boundary carrier; a live local is not one, and a closure-captured parameter is. Keyed on carrier capture.
 ```

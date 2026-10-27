@@ -1,7 +1,7 @@
 ---
 id: CAT-AND-SORTED-PRELUDE-MOVE
 title: "Move the prelude's And, and_intro, and_fst, and_snd and is_sorted into the L3 collections slice as checked catalog definitions, And spelled with expression-position Sigma and convertible with the prelude's, every catalog consumer importing them; the And-bearing successor to CAT-LOGIC-PRELUDE-MOVE"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: architect
