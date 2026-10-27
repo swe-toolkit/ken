@@ -1983,6 +1983,8 @@ this interface.
    checks an inverted transitive chain, an overlapping meet and a hull with an
    inverted operand, followed by three isolated false reverse inclusions.
    Its package test root-loads the catalog and checks the accepted client and
-   each refusal. This does not claim official conformance-runner execution,
-   CI, publication or landing. All five seeds supplement rather than replace
-   the checked law bodies.
+   each refusal. The [commutativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-commutativity.md)
+   checks both public Nat Order selectors, overlapping Box swaps, and a false
+   hull-versus-intersection claim in a roots-loaded package test. These tests
+   are not official conformance-runner execution, CI, publication or landing.
+   All six seeds supplement rather than replace the checked law bodies.
