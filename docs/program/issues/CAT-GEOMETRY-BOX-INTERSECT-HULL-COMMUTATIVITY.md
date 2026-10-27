@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY
 title: "Data.Numeric.Nat.Order exports comm for min and max, and Algorithm.Geometry.NatBox exports spec 67 section 6: intersect_comm and hull_comm, proved at zero trust from the Architect's D0, with the section 6 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
