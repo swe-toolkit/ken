@@ -251,7 +251,8 @@ The **Layer-3 graphs and dependency contract** is pinned in
 **`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT), §2
 (SPEC-GRAPHS-CYCLE-REFUTES-ORDER), §3
 (SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
-(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC), and §5
+(SPEC-GRAPHS-REACHABILITY-ALONG-WALK). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -265,11 +266,16 @@ specifies `walk_append` by recursion on the second walk and the checked
 only as scratch clients. Section 3's catalog exports and package-owned
 seed test are present, but this candidate does not execute them.
 Section 4 specifies generic left-unit and associativity laws for
-`walk_append` and authors a closed conformance seed. Its Architect D0
-checked the generic proofs on a scratch overlay with no trust delta;
-§4 exports and shipped-seed execution are not established by this
-spec/seed candidate. No CI, publication, landing or landed §4 trust
-measurement is claimed. No second fixed point is added.
+`walk_append`. Its catalog exports and package-owned seed test are on
+main; the latter is not official conformance execution or landed
+trust. Section 5 specifies a checked `graph_reachable_along_walk`
+law: reachability at a walk's endpoint carries back to its start.
+The Architect's isolated D0 checked the generic proof on `454adf947`
+with no new `Axiom` and identical scratch trusted GlobalIds
+(114 → 114). The §5 export is absent; the separately authored closed
+seed does not establish shipped §5 execution, official conformance,
+CI, publication, landing or landed trust. No second fixed point is
+added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
