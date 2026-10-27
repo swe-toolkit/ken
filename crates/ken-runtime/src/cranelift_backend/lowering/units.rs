@@ -11678,6 +11678,11 @@ enum StackWriteEffect {
 struct LocationAccess {
     containers: BTreeSet<cranelift_codegen::ir::StackSlot>,
     escaped: bool,
+    /// Calls that receive a container's address. Once one returns, its callee
+    /// may hold the pointer, and any later call may write through it.
+    retaining_calls: BTreeSet<cranelift_codegen::ir::Inst>,
+    /// Blocks entered on some path after a retaining call has returned.
+    retained_blocks: std::cell::OnceCell<BTreeSet<Block>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -11734,6 +11739,11 @@ struct IndexedFunction<'f> {
             Vec<(cranelift_codegen::ir::Inst, cranelift_codegen::ir::Value)>,
         >,
     >,
+    call_address_arguments: std::cell::OnceCell<
+        BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Inst>>,
+    >,
+    location_accesses:
+        std::cell::RefCell<BTreeMap<cranelift_codegen::ir::StackSlot, std::rc::Rc<LocationAccess>>>,
 }
 
 /// The finalized CFG restricted to blocks reachable from the entry, with each
@@ -11784,7 +11794,37 @@ impl<'f> IndexedFunction<'f> {
             branches_on: std::cell::OnceCell::new(),
             branches_comparing: std::cell::OnceCell::new(),
             loads: std::cell::OnceCell::new(),
+            call_address_arguments: std::cell::OnceCell::new(),
+            location_accesses: std::cell::RefCell::default(),
         }
+    }
+
+    /// Every call, direct or indirect, keyed by each stack slot whose address
+    /// it receives as an argument.
+    fn call_address_arguments(
+        &self,
+    ) -> Result<
+        &BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Inst>>,
+        CraneliftBackendError,
+    > {
+        if let Some(calls) = self.call_address_arguments.get() {
+            return Ok(calls);
+        }
+        let mut calls = BTreeMap::<_, Vec<_>>::new();
+        for inst in self.insts() {
+            if !self.func.dfg.insts[inst].opcode().is_call() {
+                continue;
+            }
+            for argument in self.func.dfg.inst_args(inst) {
+                if let Some((slot, _)) = resolve_stack_address(self, *argument)? {
+                    let receivers = calls.entry(slot).or_default();
+                    if receivers.last() != Some(&inst) {
+                        receivers.push(inst);
+                    }
+                }
+            }
+        }
+        Ok(self.call_address_arguments.get_or_init(|| calls))
     }
 
     fn insts(&self) -> impl Iterator<Item = cranelift_codegen::ir::Inst> + '_ {
@@ -12160,7 +12200,7 @@ fn call_may_access_location(
             _ => {}
         }
     }
-    Ok(false)
+    Ok(call_follows_retention(func, call, access))
 }
 
 pub(super) fn close_and_define_staged_result_bodies<M: Module>(
@@ -13174,7 +13214,10 @@ fn loaded_stack_location(
 fn location_access(
     func: &IndexedFunction<'_>,
     location: StackMemoryLocation,
-) -> Result<LocationAccess, CraneliftBackendError> {
+) -> Result<std::rc::Rc<LocationAccess>, CraneliftBackendError> {
+    if let Some(access) = func.location_accesses.borrow().get(&location.slot) {
+        return Ok(access.clone());
+    }
     // The containers are the slots reachable from `location.slot` through
     // "this slot's address is stored into that slot" edges.
     let stored_slots = func.stored_slots()?;
@@ -13193,10 +13236,64 @@ fn location_access(
             }
         }
     }
-    Ok(LocationAccess {
+    let call_arguments = func.call_address_arguments()?;
+    let retaining_calls = containers
+        .iter()
+        .flat_map(|slot| call_arguments.get(slot).into_iter().flatten().copied())
+        .collect();
+    let access = std::rc::Rc::new(LocationAccess {
         containers,
         escaped,
-    })
+        retaining_calls,
+        retained_blocks: std::cell::OnceCell::new(),
+    });
+    func.location_accesses
+        .borrow_mut()
+        .insert(location.slot, access.clone());
+    Ok(access)
+}
+
+/// Whether some retaining call of `access` can return before `call` runs.
+fn call_follows_retention(
+    func: &IndexedFunction<'_>,
+    call: cranelift_codegen::ir::Inst,
+    access: &LocationAccess,
+) -> bool {
+    if access.retaining_calls.is_empty() {
+        return false;
+    }
+    let Some(block) = func.layout.inst_block(call) else {
+        return true;
+    };
+    let retained = access.retained_blocks.get_or_init(|| {
+        let cfg = func.cfg();
+        let mut retained = BTreeSet::new();
+        let mut pending = access
+            .retaining_calls
+            .iter()
+            .filter_map(|retaining| func.layout.inst_block(*retaining))
+            .flat_map(|block| cfg.succ_iter(block))
+            .collect::<Vec<_>>();
+        while let Some(block) = pending.pop() {
+            if retained.insert(block) {
+                pending.extend(cfg.succ_iter(block));
+            }
+        }
+        retained
+    });
+    if retained.contains(&block) {
+        return true;
+    }
+    // Same block: a retaining call strictly earlier in the layout.
+    for inst in func.layout.block_insts(block) {
+        if inst == call {
+            return false;
+        }
+        if access.retaining_calls.contains(&inst) {
+            return true;
+        }
+    }
+    false
 }
 
 fn locations_overlap(left: StackMemoryLocation, right: StackMemoryLocation) -> bool {
@@ -15186,6 +15283,75 @@ mod generated_result_protocol_verifier {
     fn raw_alias_clobber_invalidates_unit_memory_flow() {
         assert!(call_refusal(CallProtocolMutation::RawTrapClobber).contains("after a clobber"));
         assert!(call_refusal(CallProtocolMutation::RawResultClobber).contains("after a clobber"));
+    }
+
+    /// Promise class: durable invariant. A callee may retain a stack address
+    /// it receives, so a later call can write through it without passing the
+    /// address again. A call that runs before the retaining call cannot, and
+    /// passing an ordinary word retains nothing.
+    #[test]
+    fn retained_call_argument_reaches_only_later_calls() {
+        fn fixture(
+            expose_slot: bool,
+        ) -> (
+            Function,
+            cranelift_codegen::ir::StackSlot,
+            cranelift_codegen::ir::Inst,
+            cranelift_codegen::ir::Inst,
+        ) {
+            let mut func = Function::new();
+            func.signature.call_conv = CallConv::SystemV;
+            func.signature.returns.push(AbiParam::new(types::I64));
+            let exposure = direct_callee(&mut func, FuncId::from_u32(91), 1);
+            let other = direct_callee(&mut func, FuncId::from_u32(92), 0);
+            let slot =
+                func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+            let mut context = FunctionBuilderContext::new();
+            let mut builder = FunctionBuilder::new(&mut func, &mut context);
+            let entry = builder.create_block();
+            let after = builder.create_block();
+            builder.switch_to_block(entry);
+            builder.seal_block(entry);
+            let earlier_call = builder.ins().call(other, &[]);
+            let argument = if expose_slot {
+                builder.ins().stack_addr(types::I64, slot, 0)
+            } else {
+                builder.ins().iconst(types::I64, 0)
+            };
+            builder.ins().call(exposure, &[argument]);
+            builder.ins().jump(after, &[]);
+            builder.switch_to_block(after);
+            builder.seal_block(after);
+            let later_call = builder.ins().call(other, &[]);
+            let zero = builder.ins().iconst(types::I64, 0);
+            finish_return(&mut builder, zero);
+            builder.finalize();
+            (func, slot, earlier_call, later_call)
+        }
+        for exposed in [true, false] {
+            let (func, slot, earlier, later) = fixture(exposed);
+            let indexed = IndexedFunction::new(&func);
+            let access = location_access(
+                &indexed,
+                StackMemoryLocation {
+                    slot,
+                    offset: 0,
+                    bytes: 8,
+                },
+            )
+            .expect("slot retention is decidable from the finished call operands");
+            assert_eq!(
+                call_may_access_location(&indexed, later, &access)
+                    .expect("later call aliasing is decidable"),
+                exposed,
+                "a call need not pass the retained pointer again to write through it"
+            );
+            assert!(
+                !call_may_access_location(&indexed, earlier, &access)
+                    .expect("earlier call aliasing is decidable"),
+                "a call that runs before the retaining call cannot use its pointer"
+            );
+        }
     }
 
     fn query_refusal(mutation: QueryMutation) -> String {
