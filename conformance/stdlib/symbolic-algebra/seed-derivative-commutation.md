@@ -3,11 +3,12 @@
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/66-symbolic-algebra.md` §6.
 
-The §6 export is absent from the landed base of this spec candidate.
-These source-shaped clients use the exact ruled public theorem; their
-closed fixtures do not prove its quantifiers. Architect D0 checked the
-law generically in a separate catalog-only scratch development. Do not
-interpret that check as shipped §6 seed execution.
+These clients use the §6 public theorem. Their closed fixtures do not
+prove its quantifiers; the checked generic proof and arbitrary-argument
+client are separate evidence. Architect D0 checked the law in an isolated
+scratch development. The catalog candidate now roots-loads the theorem
+and exercises both seed cases in a package test. Neither observation is
+official conformance-runner execution or a landing claim.
 
 ## Accepted client
 
@@ -114,9 +115,10 @@ no new `Axiom`, and identical scratch `trusted_base()` identity
 sets 114 → 114. Its root-loaded client accepted the same generic
 `xy` application, independent closed value proofs and same-tree
 `Refl`, then rejected the false cross-order structural claim with
-`TypeMismatch` at `Refl`. These are isolated D0 checks, not checks against shipped §6
-catalog exports. The authored fences were checked separately in an
-isolated worktree at the same exact base. Only the catalog path of
+`TypeMismatch` at `Refl`. Those were isolated D0 checks, not checks
+against the later catalog candidate. The authored fences were checked
+separately in an isolated worktree at the same exact base. Only the
+catalog path of
 Architect's D0 patch (SHA-256
 `9be6778006eb50954e476ca3690273dee329db6e4ec1e8dde71c72ce8cfb345d`)
 was applied; its test path was not applied. Architect's locally
@@ -130,5 +132,15 @@ at byte 798. The accepted prefix checks the same-operand,
 same-form structural `Refl` control and both exact-value rows,
 so this refusal is at the intended false cross-order claim.
 Logs: `/tmp/spec-author-deriv-commute-{Positive,StructuralRefusal}.log`.
-These are D0-overlay checks, not shipped-seed execution, official
-conformance, CI, publication, landing or landed trust.
+Those are historical D0-overlay checks, not tests of the catalog
+candidate. The candidate's package test root-loads the checked §6 law
+and accepts the complete positive seed: generic `xy_commute`, independent
+closed values of one for both orders, and same-tree structural `Refl`.
+It checks that the refused theorem has the same left derivative and the
+opposite right order, while the two value controls share `env23`, then
+rejects that theorem at its own `Refl` with `TypeMismatch`. A separate
+arbitrary-argument client checks the full public interface; exact
+`trusted_base()` identities are equal before and after loading (114 →
+114), and the private helper refuses selective import. This is local
+package-test evidence on the candidate, **not** official
+conformance-runner execution, CI, publication, landing or landed trust.

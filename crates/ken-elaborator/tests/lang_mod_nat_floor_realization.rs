@@ -792,7 +792,7 @@ const BINDING_ROUTE_CASES: &[BindingRouteCase] = &[
         label: "record",
         collision_template: "record {name} { field : Bool }",
         renamed_source: "record LocalRecord { field : Bool }",
-        renamed_identity: "LocalRecord",
+        renamed_identity: "Entry.LocalRecord",
     },
     BindingRouteCase {
         label: "class",

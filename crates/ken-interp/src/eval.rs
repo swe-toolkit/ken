@@ -1531,9 +1531,9 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
     values_agree(a, b, false)
 }
 
-/// Structural agreement in which a closure pair is not refuted: the value
-/// layer can neither confirm nor deny it (`42 §1`), so a checked cast's typing
-/// is the only evidence. Every closure-free position must still agree.
+/// Structural agreement in which a function-value pair is not refuted: the
+/// value layer can neither confirm nor deny it (`42 §1`), so a checked cast's
+/// typing is the only evidence. Every other position must still agree.
 fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
     match (a, b) {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
@@ -1622,9 +1622,22 @@ fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
                     .zip(ba.iter())
                     .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
-        // A closure pair is never compared (`42 §1`). Only the parameters-
-        // only push asks whether the value layer can refute agreement.
-        (EvalVal::Closure { .. }, EvalVal::Closure { .. }) => up_to_closures,
+        // A function pair is never compared (`42 §1`), whichever values
+        // represent the two functions. Only the parameters-only push asks
+        // whether the value layer can refute agreement, and for functions it
+        // cannot.
+        (a, b) if is_function_value(a) && is_function_value(b) => up_to_closures,
+        _ => false,
+    }
+}
+
+/// A value that only application can observe: a closure, an unsaturated
+/// constructor or primitive, or an unsaturated W-style IH.
+fn is_function_value(value: &EvalVal) -> bool {
+    match value {
+        EvalVal::Closure { .. } => true,
+        EvalVal::CtorPending { args, need, .. } => args.len() < *need,
+        EvalVal::IhClosure { applied, nb, .. } => applied.len() < *nb,
         _ => false,
     }
 }

@@ -1,7 +1,7 @@
 ---
 id: RT-SELECTED-LIBRARY-DECLARATION-CLOSURE
 title: "A selected Library package omits a declaration that a delivered owner's declared type references, so checked core cannot read the owner's sort: theorem proof_match (b : Bool) : Top = match b { True ↦ Proved; False ↦ Proved } is refused as UnsupportedProofOnlyMatch on the Library route, though host preparation of the same source delivers Top and admits it. Deliver the declarations a selected owner's type references"
-status: ready
+status: closed
 owner: runtime
 size: M
 tier: T1
@@ -70,3 +70,14 @@ stop and report the mismatch.
 - A closure that delivers a declaration the selection's owners do not
   reference.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closure (2026-10-27)
+
+Closed without repair, as the frame anticipated. The Architect's
+measure-only D0 (`evt_3bb2dnvj5mtd2`, artifacts in
+`local/architect-shared/selected-lib-closure-d0/`) found no computational
+owner whose admission needs an omitted type-referenced declaration.
+Elaborated motives are ascribed and read their codomain without a
+declaration, and the only type-reading admission arm admits Omega-sorted
+owners only. Any closure would deliver declarations whose absence
+changes no outcome, which is this frame's first stop condition.

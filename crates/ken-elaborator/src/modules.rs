@@ -2452,6 +2452,11 @@ fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
             fields: fields.clone(),
             span: span.clone(),
         },
+        Decl::RecordDecl { name, fields, span } => Decl::RecordDecl {
+            name: qualify(prefix, name),
+            fields: fields.clone(),
+            span: span.clone(),
+        },
         Decl::PropDecl {
             name,
             params,
@@ -3531,6 +3536,7 @@ fn is_qualifiable(decl: &Decl) -> bool {
             | Decl::DataDecl { .. }
             | Decl::ExplicitDataDecl { .. }
             | Decl::TypeAlias { .. }
+            | Decl::RecordDecl { .. }
             | Decl::ClassDecl { .. }
     )
 }
@@ -5627,9 +5633,11 @@ fn expand_scope(
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
-                // Class declarations are qualifiable but remain ordered
-                // registry barriers; all other qualifiable kinds are nodes.
-                if is_qualifiable(inner) && !matches!(inner, Decl::ClassDecl { .. }) {
+                // Class and record declarations are qualifiable but remain
+                // ordered registry barriers; all other qualifiable kinds are nodes.
+                if is_qualifiable(inner)
+                    && !matches!(inner, Decl::ClassDecl { .. } | Decl::RecordDecl { .. })
+                {
                     return Err(ElabError::Internal(format!(
                         "qualifiable declaration {:?} reached the barrier path",
                         inner.name()
@@ -5706,7 +5714,10 @@ fn expand_scope(
                             .binding_ids
                             .insert(inner.name().to_string(), result.def_id);
                     }
-                    if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
+                    if matches!(inner, Decl::RecordDecl { .. }) {
+                        record_checked_local(scope, inner.name(), &result.name, result.def_id);
+                    }
+                    if is_pub && matches!(inner, Decl::ClassDecl { .. } | Decl::RecordDecl { .. }) {
                         publish_checked_identity(
                             scope,
                             &mut exports_here,

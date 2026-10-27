@@ -50,10 +50,11 @@ that substitution preserves a `False` answer. `compose_subst` applies its
 second argument first and then its first argument to each inserted expression.
 Two checked laws establish structural composition and constructor identity;
 private expression congruence proofs support their inductive branches.
-`deriv` differentiates each expression constructor structurally. Its two
+`deriv` differentiates each expression constructor structurally. Its three
 checked laws say that equal polynomial functions have equal derivatives at
-every environment and that `poly_eq` preserves a `True` answer after
-differentiation. Private Taylor and natural-arithmetic proofs support them.
+every environment, that `poly_eq` preserves a `True` answer after
+differentiation, and that the two orders of differentiation evaluate equally.
+Private Taylor, natural-arithmetic, and product-summand proofs support them.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -922,6 +923,101 @@ pub theorem poly_eq_deriv
     (deriv v e1)
     (deriv v e2)
     (λenv. deriv_respects_eval v e1 e2 (λg. poly_eq_sound e1 e2 h g) env)
+
+pub theorem deriv_commute
+      (v : Nat) (w : Nat) (e : Expr) (env : Nat → Nat)
+    : Equal Nat (eval env (deriv v (deriv w e))) (eval env (deriv w (deriv v e))) =
+  match e {
+    EConst c ↦ Proved;
+    EVar u ↦
+      trans
+        Nat
+        (eval env (deriv v (var_deriv (nat_same w u))))
+        Zero
+        (eval env (deriv w (var_deriv (nat_same v u))))
+        (deriv_var_deriv_eval v (nat_same w u) env)
+        (sym
+          Nat
+          (eval env (deriv w (var_deriv (nat_same v u))))
+          Zero
+          (deriv_var_deriv_eval w (nat_same v u) env));
+    EAdd a b ↦
+      add_cong
+        (eval env (deriv v (deriv w a)))
+        (eval env (deriv w (deriv v a)))
+        (eval env (deriv v (deriv w b)))
+        (eval env (deriv w (deriv v b)))
+        (deriv_commute v w a env)
+        (deriv_commute v w b env);
+    EMul a b ↦
+      trans
+        Nat
+        (add
+          (add
+            (mul (eval env (deriv v (deriv w a))) (eval env b))
+            (mul (eval env (deriv w a)) (eval env (deriv v b))))
+          (add
+            (mul (eval env (deriv v a)) (eval env (deriv w b)))
+            (mul (eval env a) (eval env (deriv v (deriv w b))))))
+        (add
+          (add
+            (mul (eval env (deriv v (deriv w a))) (eval env b))
+            (mul (eval env (deriv v a)) (eval env (deriv w b))))
+          (add
+            (mul (eval env (deriv w a)) (eval env (deriv v b)))
+            (mul (eval env a) (eval env (deriv v (deriv w b))))))
+        (add
+          (add
+            (mul (eval env (deriv w (deriv v a))) (eval env b))
+            (mul (eval env (deriv v a)) (eval env (deriv w b))))
+          (add
+            (mul (eval env (deriv w a)) (eval env (deriv v b)))
+            (mul (eval env a) (eval env (deriv w (deriv v b))))))
+        (add_interchange
+          (mul (eval env (deriv v (deriv w a))) (eval env b))
+          (mul (eval env (deriv w a)) (eval env (deriv v b)))
+          (mul (eval env (deriv v a)) (eval env (deriv w b)))
+          (mul (eval env a) (eval env (deriv v (deriv w b)))))
+        (add_cong
+          (add
+            (mul (eval env (deriv v (deriv w a))) (eval env b))
+            (mul (eval env (deriv v a)) (eval env (deriv w b))))
+          (add
+            (mul (eval env (deriv w (deriv v a))) (eval env b))
+            (mul (eval env (deriv v a)) (eval env (deriv w b))))
+          (add
+            (mul (eval env (deriv w a)) (eval env (deriv v b)))
+            (mul (eval env a) (eval env (deriv v (deriv w b)))))
+          (add
+            (mul (eval env (deriv w a)) (eval env (deriv v b)))
+            (mul (eval env a) (eval env (deriv w (deriv v b)))))
+          (cong
+            Nat
+            Nat
+            (mul (eval env (deriv v (deriv w a))) (eval env b))
+            (mul (eval env (deriv w (deriv v a))) (eval env b))
+            (λt. add t (mul (eval env (deriv v a)) (eval env (deriv w b))))
+            (cong
+              Nat
+              Nat
+              (eval env (deriv v (deriv w a)))
+              (eval env (deriv w (deriv v a)))
+              (λt. mul t (eval env b))
+              (deriv_commute v w a env)))
+          (cong
+            Nat
+            Nat
+            (mul (eval env a) (eval env (deriv v (deriv w b))))
+            (mul (eval env a) (eval env (deriv w (deriv v b))))
+            (λt. add (mul (eval env (deriv w a)) (eval env (deriv v b))) t)
+            (cong
+              Nat
+              Nat
+              (eval env (deriv v (deriv w b)))
+              (eval env (deriv w (deriv v b)))
+              (λt. mul (eval env a) t)
+              (deriv_commute v w b env))))
+  }
 
 theorem expr_add_cong
       (a1 : Expr)
@@ -2223,6 +2319,14 @@ fn var_deriv (b : Bool) : Expr =
     False ↦ EConst Zero
   }
 
+theorem deriv_var_deriv_eval
+      (v : Nat) (b : Bool) (env : Nat → Nat)
+    : Equal Nat (eval env (deriv v (var_deriv b))) Zero =
+  match b {
+    True ↦ Proved;
+    False ↦ Proved
+  }
+
 fn bump_at (b : Bool) (x : Nat) (t : Nat) : Nat =
   match b {
     True ↦ add x t;
@@ -2536,8 +2640,14 @@ polynomial identities. Equal evaluations at the original and bumped
 environments cancel the base value and positive bump factor. Taking the bump
 larger than both derivative values lets `remainder_unique` identify those
 values. `poly_eq_deriv` applies this semantic result to `poly_eq_sound`, then
-uses `poly_eq_complete` for the decision. Neither law equates derivative
-expression trees or uses `canonicalize_complete` as a derivative theorem.
+uses `poly_eq_complete` for the decision. `deriv_commute` inducts on the
+expression: constants and twice-differentiated variables reduce to zero,
+sums lift both induction hypotheses, and the product case uses the private
+`add_interchange` proof to exchange the middle two summands before lifting
+the two induction hypotheses over the outer summands. Its private variable
+helper matches on the Boolean argument to `var_deriv`. None of these laws
+equates derivative expression trees or uses `canonicalize_complete` as a
+derivative theorem.
 
 ## 5. Design notes
 
@@ -2580,15 +2690,16 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–5 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–6 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
 [composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md),
-and [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md)
+[derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md),
+and [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md)
 specify the public surface and closed observations. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and sixteen checked theorems; Horner, substitution and differentiation expose
+and seventeen checked theorems; Horner, substitution and differentiation expose
 no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their

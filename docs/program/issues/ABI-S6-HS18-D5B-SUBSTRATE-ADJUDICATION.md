@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION
 title: "Adjudicate the D5b substrate port's judgment surface: every method where BOTH the port source and main moved since their common base b4c8df33a. Each row gets one of KEEP MAIN'S / TRANSPLANT / RECONCILE with the check-against-main SHOWN, on the template of dispatch_host_op_v1 -- which scored +770 lines in this bucket and is not owed at all, because main refactored it after the base and the source carries the pre-refactor shape. Split out of ABI-S6-HS18-D5B-SUBSTRATE-PORT so the mechanical bulk could run on a T2 seat; deferring these rows is compile-safe because an ADJUDICATE method already exists in main, so leaving main's body resolves and builds. Completion is ADJUDICATE = 0 under the three-way instrument with origin/main as the third tree."
-status: draft
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,16 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-17, authoring the recut the Architect asked for when re-ruling ABI-S6-HS18-D5B-SUBSTRATE-PORT (c) mis-sized (evt_7tx7a1n71qa9g). The re-rule's stated defect was that the WP had no criterion that could report its own completion, and its item 3 named ADJUDICATE as the human surface that should be sized separately from the three mechanical buckets. This node is that surface."
 ---
+
+> # CLOSED 2026-10-27: FOLDED INTO ABI-S6-HS18-D5B-SUBSTRATE-PORT.
+>
+> The Architect's re-measure on `df0b57c98` (`evt_5ca5b8sdx469t`) found that
+> deferring ADJUDICATE rows is not compile-safe: a 58-row "standalone" OWED
+> set fails `ken-runtime --lib` with 12 errors at 6 sites, through
+> main-moved signatures, an enum variant and struct fields. Judgment rows
+> are now the majority (about 218, 145 production). The boundary this node
+> was split on no longer exists, so its work moves into the single T1
+> SUBSTRATE-PORT node (Steward recut `evt_a6zz0v47y5s3`).
 
 > # DRAFT. Frame: `docs/program/wp/ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION.md`.
 >
