@@ -1161,9 +1161,14 @@ API.
    [hull/intersection seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersection.md)
    [inclusion seed](../../../../conformance/stdlib/numerical/seed-interval-inclusion.md)
    [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
-   and [inclusion-order seed](../../../../conformance/stdlib/numerical/seed-interval-inside-order.md)
+   [inclusion-order seed](../../../../conformance/stdlib/numerical/seed-interval-inside-order.md)
+   and [associativity seed](../../../../conformance/stdlib/numerical/seed-interval-associativity-inside.md)
    supply separately constructed positive values and false controls;
    those finite cases do not replace the generic checked proof bodies. The
    distributivity seed's accepting client and dropped-product refusal, and the
    inclusion-order seed's accepted client and two chain refusals, run in package
-   tests, not in an official conformance-runner or CI claim.
+   tests. The associativity seed's whole accepted client, including its two
+   closed `Refl` controls, and isolated false prefix-inclusion claim are checked
+   by the candidate's `cat_numeric_interval_associativity_inside` package test.
+   These package tests do not establish official conformance-runner execution,
+   CI, publication or landing.
