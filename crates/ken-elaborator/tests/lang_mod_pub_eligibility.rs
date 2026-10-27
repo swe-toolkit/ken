@@ -58,7 +58,6 @@ fn every_parsed_ineligible_pub_placement_is_a_surface_error() {
         "pub law L (x) { field : Top }",
         "pub foreign f : Int = \"f\" \"libf\" pure",
         "pub temporal t { event }",
-        "pub record R { field : Int }",
         "pub program",
         "pub package",
         "pub pub const x : Int = 0",

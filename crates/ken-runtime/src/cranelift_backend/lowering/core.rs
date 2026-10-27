@@ -8140,6 +8140,20 @@ impl<'a> Lowering<'a> {
             }
         };
         let join_plan = self.consumed_join_plan_token(join_origin)?;
+        // An ordinary Nat match selects one arm; only a computational frame
+        // folds. Each selected arm reaches the join in its planned
+        // representation, so a carried result needs no scalar pair.
+        if !computational {
+            return self.lower_bounded_nat_selection(
+                builder,
+                nat,
+                structural,
+                eliminator,
+                [zero_body, suc_body],
+                remaining,
+                &join_plan,
+            );
+        }
 
         let zero_value = builder.ins().iconst(types::I64, 0);
         let zero_nat = if structural {
@@ -8320,6 +8334,106 @@ impl<'a> Lowering<'a> {
                 payload: builder.block_params(done_block)[1],
             },
         )))
+    }
+
+    /// The ordinary-frame half of [`Self::lower_bounded_nat_computational`]:
+    /// branch on zero, bind the predecessor in the `Suc` arm, and jump each
+    /// continuing arm to the frame's planned join.
+    #[allow(clippy::too_many_arguments)]
+    fn lower_bounded_nat_selection(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        nat: BoundedNatV1,
+        structural: bool,
+        eliminator: EliminatorFrame<'_>,
+        [zero_body, suc_body]: [SourceOccurrence<'_>; 2],
+        remaining: &[EliminatorFrame<'_>],
+        join_plan: &JoinPlanToken,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let as_nat = |value| {
+            if structural {
+                Lowered::StructuralNat(StructuralNatV1 { value })
+            } else {
+                Lowered::BoundedNat(BoundedNatV1::derived_from_validated(value))
+            }
+        };
+        let zero_block = builder.create_block();
+        let suc_block = builder.create_block();
+        let merge = join_plan
+            .has_continuing_predecessor
+            .then(|| builder.create_block());
+        if let Some(merge) = merge {
+            self.append_planned_join_params(builder, merge, join_plan);
+        }
+        let is_zero = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            nat.value,
+            0,
+        );
+        builder.ins().brif(is_zero, zero_block, &[], suc_block, &[]);
+        let mut merge_kind = None;
+        let mut terminal_trap = None;
+        for (block, body, binds_predecessor) in
+            [(zero_block, zero_body, false), (suc_block, suc_body, true)]
+        {
+            builder.switch_to_block(block);
+            let mut arm_env = Vec::new();
+            if binds_predecessor {
+                let predecessor = nat.predecessor(builder);
+                arm_env.push(LoweringEnvironmentBinding::Value(
+                    LoweringOperand::Specialized(as_nat(predecessor.value)),
+                ));
+            }
+            let lowered =
+                match self.materialize_eliminator_frame_env(builder, eliminator, &as_nat(nat.value))? {
+                    Ok(frame_env) => {
+                        arm_env.extend(frame_env);
+                        if remaining.is_empty() {
+                            self.lower_expr(builder, body, &arm_env)?
+                        } else {
+                            self.lower_computational_producer_expr(
+                                builder, body, &arm_env, remaining,
+                            )?
+                        }
+                    }
+                    Err(trap) => LoweringOperand::Specialized(Lowered::Trap(trap)),
+                };
+            if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
+                terminal_trap.get_or_insert_with(|| trap.clone());
+            }
+            if self.seal_source_trap_branch(builder, &lowered)? {
+                continue;
+            }
+            let merge = merge.ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "join plan omitted a BoundedNat merge despite a continuing predecessor"
+                        .to_string(),
+                )
+            })?;
+            self.jump_planned_join_arm(
+                builder,
+                merge,
+                join_plan,
+                body.static_origin,
+                lowered,
+                &mut merge_kind,
+                "BoundedNat",
+            )?;
+        }
+        let Some(merge) = merge else {
+            let unreachable = builder.create_block();
+            builder.switch_to_block(unreachable);
+            let trap = terminal_trap.ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "BoundedNat join omitted both a continuing predecessor and a source trap"
+                        .to_string(),
+                )
+            })?;
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+        };
+        self.finish_planned_join(builder, merge, join_plan, merge_kind, "BoundedNat")
     }
 
     pub(super) fn materialize_eliminator_frame_env(
