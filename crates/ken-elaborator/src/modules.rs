@@ -8299,6 +8299,7 @@ mod namespace_effect_tests {
                     env.globals["M.C"]
                 });
                 assert_ne!(file_id, memory_id);
+                assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
                 env.elaborate_module_from_roots_strict(&roots, file_client)
                     .expect("file class's Bool marker accepts True");
                 if !memory_first {
@@ -8355,6 +8356,7 @@ mod namespace_effect_tests {
             .expect("distinct-path class has Nat field");
         let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
+        assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
         assert!(matches!(
             env.elaborate_module_from_roots_strict(&roots, "Wrong"),
             Err(ElabError::KernelRejected {
@@ -8400,6 +8402,7 @@ mod namespace_effect_tests {
             "module M { import P (Pick) pub data Foo = MkNewFoo instance Pick Foo { selected = False } const selected : Bool where Pick Foo = d.selected }",
         ).expect("new distinct-path head, dictionary and use in one scope");
         let new_head = env.globals["M.Foo"];
+        assert_eq!(env.globals.insert("A.Foo".into(), new_head), Some(old_head));
         let new_dictionary = env.class_env.instances_by_id[&(
             class_id,
             crate::classes::InstanceHeadKey::Global(new_head),
@@ -8456,6 +8459,7 @@ mod namespace_effect_tests {
             .expect("distinct-path class and dictionary checked");
         let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
+        assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
         let memory_dictionary = env.class_env.instances_by_id[&(
             memory_id, crate::classes::InstanceHeadKey::Global(nat_id)
         )].instance_id;
@@ -8493,6 +8497,7 @@ mod namespace_effect_tests {
             .expect("second Foo has a distinct lawful module path");
         let new_foo = env.globals["M.Foo"];
         assert_ne!(old_foo, new_foo);
+        assert_eq!(env.globals.insert("A.Foo".into(), new_foo), Some(old_foo));
         let result = env.elaborate_file(
             "import M (Foo as NewFoo)\nconst wrong : Bool where C (Pair NewFoo Nat) = d.marker",
         );
@@ -8521,6 +8526,7 @@ mod namespace_effect_tests {
             .expect("independent memory class declares ordinary field");
         let memory_id = env.globals["M.C"];
         assert_ne!(file_id, memory_id);
+        assert_eq!(env.globals.insert("A.C".into(), memory_id), Some(file_id));
         let refused = env.elaborate_module_from_roots_strict(&roots, "B");
         assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
             if reason.contains("false purity or effect escape") || reason.contains("EffectEscapes")),
@@ -8551,7 +8557,9 @@ mod namespace_effect_tests {
         let file_id = env.module_state.file_export_ids["A"]["A"]["C"];
         env.elaborate_file("module M { pub class C a { step : a -> a } }")
             .expect("distinct-path pure class checked");
-        assert_ne!(file_id, env.globals["M.C"]);
+        let decoy_id = env.globals["M.C"];
+        assert_ne!(file_id, decoy_id);
+        assert_eq!(env.globals.insert("A.C".into(), decoy_id), Some(file_id));
         let refused = env.elaborate_module_from_roots_strict(&roots, "B");
         assert!(matches!(refused, Err(ElabError::TypeMismatch { ref reason, .. })
             if reason.contains("Sink.step") && reason.contains("effectful")),
@@ -8634,6 +8642,8 @@ mod namespace_effect_tests {
         let memory_class = env.globals["M.Marker"];
         let memory_head = env.globals["M.Target"];
         assert_ne!((file_class, file_head), (memory_class, memory_head));
+        assert_eq!(env.globals.insert("A.Marker".into(), memory_class), Some(file_class));
+        assert_eq!(env.globals.insert("A.Target".into(), memory_head), Some(file_head));
         env.elaborate_module_from_roots_strict(&roots, "B")
             .expect("file derive uses file providers");
         env.elaborate_file("import M (Marker,Target)\nderive Marker for Target")
@@ -8726,17 +8736,18 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: a selective file A.leak binding and later independent
-    /// inline M.leak contest the SAME bare name with distinct checked IDs.
-    /// CLAIMED: ID inequality rejects true selective clashes, while a repeated
-    /// import of the SAME selected ID remains idempotent. THE GAP: a qualified
-    /// file-only use would not exercise this unqualified binding collision.
+    /// MEASURED: a repeated file A.leak selective binding is idempotent;
+    /// a foreign inline A cannot claim the same canonical path in either
+    /// order without an owner clash and no writes. CLAIMED: two selected
+    /// IDs under one canonical provider path are source-unreachable after
+    /// owner gating. THE GAP: distinct-path imports check bare-name clashes.
     #[test]
     fn selective_import_distinguishes_same_spelling_providers_and_same_idempotence() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
         let mut env = ElabEnv::new().expect("base environment");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
-            .expect("file provider checked");
+        let roots = [root.path().to_path_buf()];
+        env.elaborate_module_from_roots_strict(&roots, "A")
+            .expect("first file provider checked");
         let file_id = env.globals["A.leak"];
         env.elaborate_file("import A (leak)\nconst same : Nat = leak")
             .expect("selective file binding checked");
@@ -8749,14 +8760,13 @@ mod namespace_effect_tests {
                 other => panic!("{name} did not select file ID: {other:?}"),
             }
         }
-        env.elaborate_file("module M { pub const leak : Nat = Suc Zero }")
-            .expect("distinct-path in-memory provider checked");
-        assert_ne!(env.globals["M.leak"], file_id);
-        match env.elaborate_file("import M (leak)\nconst wrong : Nat = leak") {
-            Err(ElabError::AmbiguousReference { name, .. }) => assert_eq!(name, "leak"),
-            other => panic!("distinct IDs on one bare selective name must clash: {other:?}"),
-        }
-        assert!(!env.globals.contains_key("wrong"));
+        let inline = "module A { pub const leak : Nat = Suc Zero }";
+        assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+        assert_eq!(env.globals["A.leak"], file_id);
+        let mut memory_first = ElabEnv::new().expect("base environment");
+        memory_first.elaborate_file(inline).expect("first in-memory owner A");
+        assert_owner_clash_without_writes(&mut memory_first, "A", |env|
+            env.elaborate_module_from_roots_strict(&roots, "A"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
