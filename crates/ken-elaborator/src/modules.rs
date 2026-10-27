@@ -2244,7 +2244,9 @@ fn elaborate_module_from_roots_with_mode_v1(
 /// by `rewrite_rdecl`). Only decl kinds with a single ordinary declared
 /// name participate in module qualification. Class declarations are
 /// qualified like data, while remaining ordered barriers for class-registry
-/// side effects. Instances/laws/foreign/temporal/prove retain their own paths.
+/// side effects. Records, laws, foreign declarations and temporal obligations
+/// also qualify on their ordered barrier paths. Instances and prove declarations
+/// retain separate elaboration paths.
 fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
     match decl {
         Decl::ViewDecl {
