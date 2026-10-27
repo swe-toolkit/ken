@@ -217,7 +217,9 @@ failed at the missing public `graph_reachable_along_walk` import
 with names `spec-author-reach-{positive,false,base-values,base-laws}.log`.
 The overlay and scratch worktree were removed. The author reused a
 preexisting binary, not an independently built exact-base CLI.
-These closed checks do not prove the generic law. The §5 catalog
-export is absent from main. Neither the seed text nor scratch checking
-establishes shipped-seed execution, official conformance, CI,
+These earlier closed checks do not prove the generic law. The catalog
+candidate exports a checked proof, and its targeted package test now
+root-loads the whole accepted seed against that export, rejects the
+isolated end-to-start claim, and measures unchanged trusted GlobalIds.
+This is candidate package-test execution, not official conformance, CI,
 publication, landing or landed trust.

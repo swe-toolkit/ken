@@ -55,6 +55,7 @@ ken_diagnostic::define_error_codes! {
     Self::UnsupportedSpacePlacement { .. } => ("E0026", "elab.unsupported_space_placement"),
     Self::UnresolvedCon { .. } => ("E0027", "elab.unresolved_con"),
     Self::DeclarationIdentityCollision { .. } => ("E0028", "elab.declaration_identity_collision"),
+    Self::ModuleOwnerClash { .. } => ("E0086", "elab.module_owner_clash"),
     Self::DuplicateDefinition { .. } => ("E0029", "elab.duplicate_definition"),
     Self::DuplicateConstructorSpelling { .. } => ("E0030", "elab.duplicate_constructor_spelling"),
     Self::FixityTargetNotLocal { .. } => ("E0031", "elab.fixity_target_not_local"),
