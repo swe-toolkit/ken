@@ -2556,6 +2556,7 @@ fn tail_answers_directly(
                 plan.planned_occurrence_expr(callee)?,
                 RuntimeExpr::DeclarationRef { .. }
             ) && plan.declaration_call_target_class(callee).is_some();
+            let units = plan.emittable_units()?;
             let targets = plan
                 .emittable_call_edges()?
                 .into_iter()
@@ -2563,9 +2564,17 @@ fn tail_answers_directly(
                     edge.kind() == super::units::EmittableCallKind::Declaration
                         && edge.call_site_origin() == callee
                 })
-                .map(|edge| edge.callee_origin())
-                .collect::<Vec<_>>();
-            let ([body], true) = (targets.as_slice(), declared) else {
+                .map(|edge| {
+                    units
+                        .iter()
+                        .find(|unit| unit.function() == edge.callee())
+                        .map(|unit| unit.body_occurrence())
+                })
+                .collect::<Option<Vec<_>>>();
+            let (Some(targets), true) = (targets, declared) else {
+                return Ok(false);
+            };
+            let [body] = targets.as_slice() else {
                 return Ok(false);
             };
             if !visited.insert(*body) {
@@ -6065,6 +6074,107 @@ mod tests {
                 "a Construct ITree::{role} tail must not answer directly"
             );
         }
+    }
+
+    /// Promise class: durable invariant. MEASURED: a K that calls a declaration
+    /// with a ComputationalMatch body ending in ITree::Ret is refused by the
+    /// production tail walk. The distinct edge entry alone answers directly,
+    /// whereas the body does not. CLAIMED: declaration tail admission walks
+    /// the callee body,
+    /// not its scheduling entry. THE GAP: this RuntimeExpr fixture is not a
+    /// checked-source occurrence; it pins the specific entry/body split and
+    /// the planner's classification, not every computational-match body.
+    #[test]
+    fn rt_p1_tail_walk_computational_match_callee_uses_body_axis() {
+        let k_body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: "decl:fixture::probe".to_string(),
+            }),
+            args: vec![RuntimeExpr::Var(0)],
+        };
+        let probe = RuntimeDeclaration {
+            symbol: "decl:fixture::probe".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["x".to_string()],
+                    body: Box::new(RuntimeExpr::ComputationalMatch {
+                        scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Constructor {
+                            constructor: "ctor:fixture::N::Z".to_string(),
+                            args: Vec::new(),
+                        })),
+                        cases: vec![RuntimeComputationalMatchCase {
+                            constructor: "ctor:fixture::N::Z".to_string(),
+                            argument_binders: 0,
+                            recursive_positions: Vec::new(),
+                            body: RuntimeExpr::Construct {
+                                constructor: "ctor:fixture::ITree::Ret".to_string(),
+                                args: vec![RuntimeExpr::Var(0)],
+                            },
+                        }],
+                        default: trap(),
+                    }),
+                },
+            },
+            metadata: RuntimeSymbolMetadata::empty(),
+        };
+        let declarations = BTreeMap::from([(probe.symbol.as_str(), &probe)]);
+        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            .expect("the computational-match callee fixture plans");
+        let k_origin = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::Call { .. }))
+            .expect("K has a call occurrence")
+            .static_origin;
+        let callee = plan
+            .semantic
+            .child_origin(k_origin, 0)
+            .expect("K names a declaration call site");
+        let edges = plan
+            .emittable_call_edges()
+            .expect("the declaration call edges resolve")
+            .into_iter()
+            .filter(|edge| {
+                edge.kind() == super::super::units::EmittableCallKind::Declaration
+                    && edge.call_site_origin() == callee
+            })
+            .collect::<Vec<_>>();
+        let [edge] = edges.as_slice() else {
+            panic!("K must have exactly one declaration call edge");
+        };
+        let unit = plan
+            .emittable_units()
+            .expect("the declaration callee has a unit")
+            .into_iter()
+            .find(|unit| unit.function() == edge.callee())
+            .expect("the call edge resolves to the declaration callee's unit");
+        assert_eq!(edge.callee_origin(), unit.entry_origin());
+        assert_ne!(
+            edge.callee_origin(),
+            unit.body_occurrence(),
+            "the callee entry must be distinct from its ComputationalMatch body"
+        );
+        assert!(
+            tail_answers_directly(&plan, edge.callee_origin(), &mut BTreeSet::new(), true)
+                .expect("the callee's scheduling entry can be classified"),
+            "the wrong entry axis alone misses the ITree-form tail"
+        );
+        assert!(matches!(
+            plan.planned_occurrence_expr(unit.body_occurrence())
+                .expect("the callee body has a planned occurrence"),
+            RuntimeExpr::ComputationalMatch { .. }
+        ));
+        assert!(
+            !tail_answers_directly(&plan, unit.body_occurrence(), &mut BTreeSet::new(), true)
+                .expect("the ITree-form callee body is not direct-answering")
+        );
+        assert!(
+            !deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                .expect("K resolves its declaration callee"),
+            "the K call must be refused when its callee body constructs ITree::Ret"
+        );
     }
 
     /// Promise class: durable invariant. MEASURED: a K whose only tail exit
