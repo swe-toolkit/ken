@@ -5,8 +5,8 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base (increment A):** `origin/main` `b8fb28e3f7bde81ab44b05a4d1090b9a19aa1439` (the main the
-candidate `bdf0e4755` is cut from; moved 2026-10-27 by DOC-BUNDLE-304).
+**Base (increment A):** the candidate's merge-base with `origin/main`, as
+§4a-pin computes it (DOC-BUNDLE-306; was the literal `b8fb28e3f`).
 Increments B and C pin their own bases in §4a-pin. This header is A's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
@@ -182,7 +182,12 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=b8fb28e3f7bde81ab44b05a4d1090b9a19aa1439   # increment A's pinned base
+BASE=$(git merge-base HEAD origin/main)   # increment A's pin: the main the
+                                         # candidate is cut from (fetch first)
+# Steward 2026-10-27 (DOC-BUNDLE-306): A merges main without rebasing, so a
+# literal pin went stale at every merge (b8fb28e3f, then 12e91c41b). The pin
+# is the candidate's merge-base with a freshly fetched origin/main: always on
+# main, never a preserve/ ref. Report its value at each handoff and verdict.
 PATHS='-- crates/'                               # the domain, all three crates
 
 # THE PIN NEED NOT EQUAL THE CUT POINT -- requiring that regresses, because
