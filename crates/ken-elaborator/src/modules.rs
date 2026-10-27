@@ -6378,8 +6378,8 @@ mod namespace_effect_tests {
     /// collision refuses in both textual orders, including when `x` is not
     /// used. Isolated local and import controls both resolve to the intended
     /// checked ID. CLAIMED: a distinct-path local B.x cannot coalesce with
-    /// an imported A.x merely because both bind bare x. THE GAP: the
-    /// ambient-local same-ID control keeps true repeated routes idempotent.
+    /// imported A.x, even if globals["B.x"] holds the checked A.x decoy.
+    /// THE GAP: the same-ID control keeps true repeated routes idempotent.
     #[test]
     fn current_local_refuses_stale_same_spelling_import_in_either_order() {
         let prepared = || {
@@ -6423,6 +6423,7 @@ mod namespace_effect_tests {
         ] {
             let (mut env, _root, selected_id) = prepared();
             assert_eq!(env.globals["A.x"], selected_id);
+            assert_eq!(env.globals.insert("B.x".into(), selected_id), None);
             match env.elaborate_file(source) {
                 Err(ElabError::AmbiguousReference { name, sources, .. }) => {
                     assert_eq!(name, "x");
@@ -6463,10 +6464,9 @@ mod namespace_effect_tests {
     /// Promise class: durable invariant (spec 33 §3.3, 39 §6.1).
     ///
     /// MEASURED: Owner's imported dictionary and B's local generated
-    /// dictionary have the same bare spelling but distinct checked IDs. Both
-    /// declaration orders refuse an ambiguous import, while isolated file
-    /// and B clients select their checked dictionary. CLAIMED: a synthesized
-    /// producer cannot borrow an imported provider by bare spelling.
+    /// dictionary bind the same bare name, while globals at B's pending key
+    /// holds Owner's checked ID. Both orders refuse ambiguous imports.
+    /// CLAIMED: a pending synthesized producer cannot borrow ambient identity.
     /// THE GAP: the derive test below covers the other synthesis producer.
     #[test]
     fn generated_instance_import_refuses_stale_provider_in_either_order() {
@@ -6507,6 +6507,7 @@ mod namespace_effect_tests {
             "module B { class C a { marker : Nat } instance C Nat { marker = Zero } import P (C_instance_Nat) }",
         ] {
             let (mut env, _root, selected_id) = prepared();
+            assert_eq!(env.globals.insert("B.C_instance_Nat".into(), selected_id), None);
             let result = env.elaborate_file(source);
             assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
                 if name == "C_instance_Nat"),
@@ -6517,8 +6518,8 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §3.3, 5.6).
     ///
-    /// MEASURED: B's generated-name prebind cannot coalesce a pending
-    /// distinct-path derived dictionary with Owner's prior file dictionary.
+    /// MEASURED: B's derived prebind cannot coalesce with Owner's file
+    /// dictionary despite a checked Owner ID planted at B's pending key.
     /// Both orders reject; isolated local and imported derivations work.
     #[test]
     fn generated_derive_import_refuses_stale_provider_in_either_order() {
@@ -6559,6 +6560,7 @@ mod namespace_effect_tests {
             "module B { class Marker a { } data Head = MkLocalHead derive Marker for Head import P (Marker_instance_Head) }",
         ] {
             let (mut env, _root, selected_id) = prepared();
+            assert_eq!(env.globals.insert("B.Marker_instance_B.Head".into(), selected_id), None);
             let result = env.elaborate_file(source);
             assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
                 if name == "Marker_instance_Head"),
