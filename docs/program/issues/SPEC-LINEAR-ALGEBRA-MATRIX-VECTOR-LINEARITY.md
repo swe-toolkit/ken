@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY
 title: "Spec 65 states that matrix_vector distributes over a matrix sum, but no law says it is linear in its vector: additive over vector_add and homogeneous over vector_scale. Rule from a checked D0 at zero trust that both hold for every dimension, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
