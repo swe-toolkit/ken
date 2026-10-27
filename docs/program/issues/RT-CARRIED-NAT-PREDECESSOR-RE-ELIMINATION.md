@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-NAT-PREDECESSOR-RE-ELIMINATION
 title: "In a carried bounded-immediate Nat match, a nested match on the Suc arm's predecessor reaches merge_scalar_branch on a join the planner planned as a carrier word, so the native build fails at ObjectEmission with the internal 'carrier-result join reached a native-only scalar merge consumer' instead of running at parity or refusing typed. Make the planned representation and the reached consumer agree"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1

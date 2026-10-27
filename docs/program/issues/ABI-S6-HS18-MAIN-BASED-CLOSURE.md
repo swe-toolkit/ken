@@ -51,13 +51,27 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 >   on main, plus main's `rt_parity_native
 >   checked_ih_generated_entry_admission_population_is_total`. A's
 >   acceptance file stays AC-1e DEFERRED.
-> - AC-3: QA reverts one fn to A's whole body, choosing from the eight
->   with no absent token: `transfer_unit_result_into_carrier`,
->   `call_declared_unit_target`, `compile_expr_into_module_with_root_projection`,
->   `transfer_constructor_operands`, `verify_static_response_finished_body`,
->   `declare_owned_in_func`, `declare_response_context_call_in_func` and
->   `declare_context_calls_in_func`. The mutant must compile (RC 0 on the
->   test profile) before a named pin's reddening counts.
+> - AC-3 (amended per Architect `evt_3qbh84mhezt6x`): QA reverts one
+>   main-moved fn to A's whole body, adding only interface shims that
+>   supply no main-side behaviour: S1, an unused parameter main added; S2,
+>   a fixed `PlannerInvariant` refusal arm for a variant main added; S3,
+>   `None` for an Option field main added; S4, main's cause at an error
+>   constructor whose arity main changed. Anything else makes the row
+>   inadmissible. The designated mutant is `transfer_constructor_operands`
+>   (`local/architect-shared/main-based-closure/ac3-mutant/ac3-mutant.patch`,
+>   sha256 `dbaa29da…`), with pin `rt_parity_native
+>   generated_entry_capsule_outer_carried`. The mutant must compile (RC 0
+>   on the test profile), and the pin must be green on the unmutated tip
+>   and red on the mutant. `transfer_unit_result_into_carrier` is
+>   inadmissible.
+>
+> **Base and deferral (Steward `evt_3ssd5awf9p3v4`).** A's operative pin is
+> the main its candidate is cut from (`b8fb28e3f` at the `bdf0e4755`
+> handoff), adopted by §4a-pin's empty-`crates/`-diff condition at
+> handoff. The older pin literals below are stale. R1's per-mutation pairing
+> (`generated_result_path_proof_rejects_each_certificate_corruption`) lives
+> only in the AC-1e file, so it is deferred with AC-1e to the increment
+> that restores that file.
 >
 > The Architect reviews the per-fn adjudication of the 16 before the
 > implementer finishes them. Increments B and C are framed after A lands.

@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE
 title: "Spec 66 differentiates an Expr and states that the derivative respects evaluation and that two derivatives commute, but states no law for a variable the expression's value does not depend on. Rule from a checked D0 at zero trust that such a derivative evaluates to zero, and state it as a section 7 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
