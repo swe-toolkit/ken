@@ -2244,7 +2244,9 @@ fn elaborate_module_from_roots_with_mode_v1(
 /// by `rewrite_rdecl`). Only decl kinds with a single ordinary declared
 /// name participate in module qualification. Class declarations are
 /// qualified like data, while remaining ordered barriers for class-registry
-/// side effects. Instances/laws/foreign/temporal/prove retain their own paths.
+/// side effects. Records, laws, foreign declarations and temporal obligations
+/// also qualify on their ordered barrier paths. Instances and prove declarations
+/// retain separate elaboration paths.
 fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
     match decl {
         Decl::ViewDecl {
@@ -2366,6 +2368,45 @@ fn qualify_decl_name(decl: &Decl, prefix: &str) -> Decl {
         Decl::RecordDecl { name, fields, span } => Decl::RecordDecl {
             name: qualify(prefix, name),
             fields: fields.clone(),
+            span: span.clone(),
+        },
+        Decl::LawDecl {
+            name,
+            param,
+            fields,
+            span,
+        } => Decl::LawDecl {
+            name: qualify(prefix, name),
+            param: param.clone(),
+            fields: fields.clone(),
+            span: span.clone(),
+        },
+        Decl::ForeignDecl {
+            name,
+            ty,
+            symbol,
+            library,
+            is_pure,
+            visits,
+            span,
+        } => Decl::ForeignDecl {
+            name: qualify(prefix, name),
+            ty: ty.clone(),
+            symbol: symbol.clone(),
+            library: library.clone(),
+            is_pure: *is_pure,
+            visits: visits.clone(),
+            span: span.clone(),
+        },
+        Decl::TemporalDecl {
+            name,
+            formula,
+            source,
+            span,
+        } => Decl::TemporalDecl {
+            name: qualify(prefix, name),
+            formula: formula.clone(),
+            source: source.clone(),
             span: span.clone(),
         },
         Decl::PropDecl {
@@ -3449,6 +3490,9 @@ fn is_qualifiable(decl: &Decl) -> bool {
             | Decl::TypeAlias { .. }
             | Decl::RecordDecl { .. }
             | Decl::ClassDecl { .. }
+            | Decl::LawDecl { .. }
+            | Decl::ForeignDecl { .. }
+            | Decl::TemporalDecl { .. }
     )
 }
 
@@ -4419,6 +4463,17 @@ fn prebind_scope_declarations(
                     scope.checked_local_ids.remove(&ctor.name);
                     let qualified = qualify(prefix, &ctor.name);
                     scope.bind_local(&ctor.name, &qualified, &ctor.span)?;
+                }
+            }
+            Decl::LawDecl {
+                name, fields, span, ..
+            } => {
+                for (field, _) in fields {
+                    let bare = format!("{name}_{field}");
+                    scope.current_local_names.insert(bare.clone());
+                    scope.checked_local_ids.remove(&bare);
+                    let qualified = format!("{}_{field}", qualify(prefix, name));
+                    scope.bind_local(&bare, &qualified, span)?;
                 }
             }
             Decl::ExplicitDataDecl { ctors, .. } => {
@@ -5540,10 +5595,17 @@ fn expand_scope(
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
-                // Class and record declarations are qualifiable but remain
-                // ordered registry barriers; all other qualifiable kinds are nodes.
+                // Class, record, law, foreign and temporal declarations are
+                // qualifiable but remain ordered barriers; other kinds are nodes.
                 if is_qualifiable(inner)
-                    && !matches!(inner, Decl::ClassDecl { .. } | Decl::RecordDecl { .. })
+                    && !matches!(
+                        inner,
+                        Decl::ClassDecl { .. }
+                            | Decl::RecordDecl { .. }
+                            | Decl::LawDecl { .. }
+                            | Decl::ForeignDecl { .. }
+                            | Decl::TemporalDecl { .. }
+                    )
                 {
                     return Err(ElabError::Internal(format!(
                         "qualifiable declaration {:?} reached the barrier path",
@@ -5621,10 +5683,36 @@ fn expand_scope(
                             .binding_ids
                             .insert(inner.name().to_string(), result.def_id);
                     }
-                    if matches!(inner, Decl::RecordDecl { .. }) {
+                    if matches!(
+                        inner,
+                        Decl::RecordDecl { .. }
+                            | Decl::LawDecl { .. }
+                            | Decl::ForeignDecl { .. }
+                            | Decl::TemporalDecl { .. }
+                    ) {
                         record_checked_local(scope, inner.name(), &result.name, result.def_id);
                     }
-                    if is_pub && matches!(inner, Decl::ClassDecl { .. } | Decl::RecordDecl { .. }) {
+                    if let Decl::LawDecl { name, fields, .. } = inner {
+                        for (field, _) in fields {
+                            let bare = format!("{name}_{field}");
+                            if let Some(id) = elab
+                                .globals
+                                .get(&format!("{}_{field}", result.name))
+                                .copied()
+                            {
+                                let canonical = format!("{}_{field}", result.name);
+                                record_checked_local(scope, &bare, &canonical, id);
+                            }
+                        }
+                    }
+                    if is_pub
+                        && matches!(
+                            inner,
+                            Decl::ClassDecl { .. }
+                                | Decl::RecordDecl { .. }
+                                | Decl::ForeignDecl { .. }
+                        )
+                    {
                         publish_checked_identity(
                             scope,
                             &mut exports_here,

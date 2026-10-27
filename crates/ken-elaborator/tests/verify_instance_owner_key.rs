@@ -166,32 +166,46 @@ fn derive_and_explicit_instance_results_use_their_dictionary_identities() {
     }
 }
 
-/// Promise class: transition sentinel until module scoping admits these
-/// unqualified declaration kinds across different modules. MEASURED: these
-/// remaining same-spelling pairs hit `DuplicateDefinition` before `with_owner`.
-/// CLAIMED: these four kinds cannot produce an admitted shared owner; classes
-/// now qualify their owner; the two-provider selection is pinned by
-/// `lang_class_identity_checked_id::qualified_import_and_two_aliases_select_distinct_dictionaries`.
-/// THE GAP: when module scoping starts admitting such a pair, retire this
-/// refusal and give each admitted declaration its own qualified owner.
+/// Promise class: durable invariant (spec 33 §3–4). MEASURED: same-spelled
+/// law, foreign and temporal declarations in separate modules elaborate into
+/// distinct checked identities at the two qualified keys, without a bare key.
+/// CLAIMED: each of these kinds is owned by its module, not a flat global.
+/// THE GAP: one same-spelling declaration per module and kind is exercised;
+/// independent use and privacy are pinned by the module-scope tests.
 #[test]
-fn other_unqualified_kinds_refuse_same_spelling_in_two_modules() {
-    for (name, declaration) in [
-        ("L", "law L (v) { witness : Top }"),
-        ("f", "foreign f : Int -> Int = \"f\" \"fixture\" pure"),
-        ("t", "temporal t { always True }"),
-        ("p", "prove p : Top"),
+fn newly_qualified_kinds_have_distinct_module_owners() {
+    for (name, declaration, fields) in [
+        ("L", "law L (v) { witness : Top }", &["L_witness"][..]),
+        ("f", "foreign f : Int -> Int = \"f\" \"fixture\" pure", &[]),
+        ("t", "temporal t { always True }", &[]),
     ] {
         let source = format!("module M {{ {declaration} }}\nmodule N {{ {declaration} }}\n");
-        let error = ElabEnv::new()
-            .unwrap()
-            .elaborate_file_v1(&source)
-            .expect_err("same unqualified name must not be admitted twice");
-        assert!(
-            matches!(error, ElabError::DuplicateDefinition { name: ref duplicate, .. } if duplicate == name),
-            "{name}: {error:?}"
-        );
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_file_v1(&source)
+            .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        let left = env.globals[&format!("M.{name}")];
+        let right = env.globals[&format!("N.{name}")];
+        assert_ne!(left, right, "{name}: distinct module-owned identities");
+        assert!(!env.globals.contains_key(name), "{name}: no ambient key");
+        for field in fields {
+            let left_field = env.globals[&format!("M.{field}")];
+            let right_field = env.globals[&format!("N.{field}")];
+            assert_ne!(left_field, right_field);
+            assert!(!env.globals.contains_key(*field));
+        }
     }
+}
+
+/// Promise class: transition sentinel (spec 33 §3–4). ProveDecl still follows
+/// the bare barrier; LANG-PROVE-DECL-MODULE-IDENTITY retires this refusal after
+/// measuring and deciding its separate module-identity route.
+#[test]
+fn prove_decl_still_refuses_same_spelling_in_two_modules() {
+    let error = ElabEnv::new()
+        .unwrap()
+        .elaborate_file_v1("module M { prove p : Top }\nmodule N { prove p : Top }\n")
+        .expect_err("the out-of-scope prove form still has one bare key");
+    assert!(matches!(error, ElabError::DuplicateDefinition { name, .. } if name == "p"));
 }
 
 /// Promise class: durable invariant (33 §5 and 46 §3.2). MEASURED: the
