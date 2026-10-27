@@ -53,6 +53,19 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 /// both canonical observations. A `held.bin` seed file is present in the root.
 #[cfg(target_os = "linux")]
 fn differential(case: &str, source: &str) -> Differential {
+    differential_with_profile(
+        case,
+        source,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn differential_with_profile(
+    case: &str,
+    source: &str,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
 
@@ -67,7 +80,7 @@ fn differential(case: &str, source: &str) -> Differential {
                             ken_cli::SourceFormat::Ken,
                             &format!("rt_escape_{}", case.replace('-', "_")),
                             root.path(),
-                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                            profile,
                         )
                     })
                 })
@@ -600,6 +613,282 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
             diff.native.effect_trace, diff.interpreted.effect_trace,
             "FsHandle full effect events"
         );
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn escape_file_then_two_reads() -> String {
+    let first = "    (\\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let second = r"    (\outcome. bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\again. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let end = "(ResourceBodyOk Unit Unit MkUnit))";
+    assert_eq!(ESCAPE_FILE_THEN_READAT.matches(first).count(), 1);
+    assert_eq!(ESCAPE_FILE_THEN_READAT.matches(end).count(), 1);
+    let source = ESCAPE_FILE_THEN_READAT.replacen(first, second, 1).replacen(
+        end,
+        "(ResourceBodyOk Unit Unit MkUnit)))",
+        1,
+    );
+    assert_eq!(source.matches("(readAt AFull file_closed").count(), 2);
+    source
+}
+
+/// Promise class: normative compatibility vector for the declared invocation
+/// node limit. MEASURED: this checked, effect-bearing escape/read source with
+/// one extra read has a typed native Nodes(64→65) terminal and an interpreter
+/// effect prefix; changing only the node limit to 65 restores full parity.
+/// CLAIMED: generated allocation status reaches the owner-backed terminal.
+/// THE GAP: one witness does not cover other resources or every generated edge.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_escape_second_read_reports_typed_invocation_nodes() {
+    in_large_stack_thread("rt-region-capacity-fshandle", || {
+        let source = escape_file_then_two_reads();
+        let profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        assert_eq!(profile.invocation.nodes, 64);
+        let at_limit = differential_with_profile("region-node-64", &source, profile);
+        assert_eq!(at_limit.interpreted.exit_status, 0);
+        assert_eq!(
+            at_limit.native.terminal_error,
+            Some(ken_runtime::TerminalErrorV1::CapacityExhausted(
+                ken_runtime::CapacityExhaustedV1 {
+                    scope: ken_runtime::CapacityScopeV1::Invocation,
+                    resource: ken_runtime::CapacityResourceV1::Nodes,
+                    limit: 64,
+                    requested: 65,
+                }
+            ))
+        );
+        assert!(!at_limit.native.effect_trace.is_empty());
+        assert!(
+            at_limit
+                .interpreted
+                .effect_trace
+                .starts_with(&at_limit.native.effect_trace),
+            "native effects up to the refusal must be the interpreter prefix"
+        );
+
+        let mut roomy = profile;
+        roomy.invocation.nodes = 65;
+        let at_65 = differential_with_profile("region-node-65", &source, roomy);
+        assert_native_matches_interpreter("region-node-65", &at_65);
+        assert_eq!(at_65.native.stdout, at_65.interpreted.stdout);
+        assert_eq!(at_65.native.effect_trace, at_65.interpreted.effect_trace);
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn region_capacity_string_lookalike() -> String {
+    let source = include_str!("fixtures/rt_bracket_body_once_lookalike.ken");
+    assert_eq!(source.matches("held-0.bin").count(), 1);
+    source.replacen("held-0.bin", "held.bin", 1)
+}
+
+#[cfg(target_os = "linux")]
+fn assert_linked_region_capacity(
+    case: &str,
+    source: &str,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+    scope: ken_runtime::CapacityScopeV1,
+    resource: ken_runtime::CapacityResourceV1,
+    limit: u128,
+) {
+    let diff = differential_with_profile(case, source, profile);
+    assert_eq!(
+        diff.interpreted.exit_status, 0,
+        "{case}: interpreter control"
+    );
+    match diff.native.terminal_error {
+        Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) => {
+            assert_eq!(fault.scope, scope, "{case}: capacity scope");
+            assert_eq!(fault.resource, resource, "{case}: capacity resource");
+            assert_eq!(fault.limit, limit, "{case}: declared limit");
+            assert!(fault.requested > fault.limit, "{case}: actual exhaustion");
+        }
+        other => {
+            panic!("{case}: expected emitted {scope:?}/{resource:?} exhaustion, got {other:?}")
+        }
+    }
+}
+
+/// Promise class: normative compatibility vector for invocation child words.
+/// MEASURED: an unchanged checked two-read program with the words budget
+/// tightened but nodes ample reports a typed Words fault from linked code.
+/// CLAIMED: the alloc status distinguishes words from nodes on one owner.
+/// THE GAP: it does not independently measure the CLIF word counter; that is
+/// reconstructed by the recorder from the shared published region header.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_invocation_words_remains_distinct_from_nodes() {
+    in_large_stack_thread("rt-region-words-fshandle", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.invocation.words = 1;
+        assert_linked_region_capacity(
+            "region-words-1",
+            &escape_file_then_two_reads(),
+            profile,
+            ken_runtime::CapacityScopeV1::Invocation,
+            ken_runtime::CapacityResourceV1::Words,
+            1,
+        );
+    });
+}
+
+/// Promise class: normative compatibility vector for persistent node storage.
+/// MEASURED: a checked, linked run reaches its persistent node limit and
+/// reports the exact owner/resource without substituting invocation capacity.
+/// CLAIMED: alloc routes the persistent-band owner to the existing issuer.
+/// THE GAP: this fixture names one persistent allocation path, not all tags.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_nodes_are_owner_attributed() {
+    in_large_stack_thread("rt-region-persistent-nodes", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 1;
+        assert_linked_region_capacity(
+            "region-persistent-nodes-1",
+            &escape_file_then_two_reads(),
+            profile,
+            ken_runtime::CapacityScopeV1::Persistent,
+            ken_runtime::CapacityResourceV1::Nodes,
+            1,
+        );
+    });
+}
+
+/// Promise class: normative compatibility vector for persistent child words.
+/// MEASURED: a checked, linked run with ample persistent nodes exhausts its
+/// child words and reports the persistent owner and declared word limit.
+/// CLAIMED: Words and Nodes have distinct observed terminal identity.
+/// THE GAP: the recorder re-reads the region header after CLIF returns -6.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_words_are_not_nodes() {
+    in_large_stack_thread("rt-region-persistent-words", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 128;
+        profile.persistent.words = 1;
+        assert_linked_region_capacity(
+            "region-persistent-words-1",
+            &region_capacity_string_lookalike(),
+            profile,
+            ken_runtime::CapacityScopeV1::Persistent,
+            ken_runtime::CapacityResourceV1::Words,
+            1,
+        );
+    });
+}
+
+/// Promise class: normative compatibility vector for persistent data bytes.
+/// MEASURED: a checked, linked run with ample nodes/words reaches the byte
+/// table capacity and reports its owner/resource/limit as a typed terminal.
+/// CLAIMED: a stored literal's data status survives the generated call path.
+/// THE GAP: this fixture does not reach copied ResponseBytes, the other site.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_persistent_bytes_reach_typed_terminal() {
+    in_large_stack_thread("rt-region-persistent-bytes", || {
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 128;
+        profile.persistent.words = 512;
+        profile.persistent.data_bytes = 1;
+        assert_linked_region_capacity(
+            "region-persistent-bytes-1",
+            &region_capacity_string_lookalike(),
+            profile,
+            ken_runtime::CapacityScopeV1::Persistent,
+            ken_runtime::CapacityResourceV1::DataBytes,
+            1,
+        );
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn region_capacity_captured_wide_int_lookalike() -> String {
+    let mut source = region_capacity_string_lookalike();
+    for (before, after) in [
+        (
+            "proc lk_release (tag : String) (br : ResourceBodyResult Unit Unit)",
+            "proc lk_release (tag : String) (wide : Int) (br : ResourceBodyResult Unit Unit)",
+        ),
+        (
+            "(\\_u. lk_ret br)",
+            "(\\_u. match eq_int wide wide { True |-> lk_ret br; False |-> lk_ret br })",
+        ),
+        (
+            "proc lk_after_open (tag : String)",
+            "proc lk_after_open (tag : String) (wide : Int)",
+        ),
+        (
+            "(\\br. lk_release tag br)",
+            "(\\br. lk_release tag wide br)",
+        ),
+        (
+            "proc lk_bracket (open_tag : String) (close_tag : String)",
+            "proc lk_bracket (open_tag : String) (close_tag : String) (wide : Int)",
+        ),
+        (
+            "(\\u. lk_after_open close_tag body u)",
+            "(\\u. lk_after_open close_tag wide body u)",
+        ),
+        (
+            "(lk_bracket \"o1\" \"c1\" lk_leaf)",
+            "(lk_bracket \"o1\" \"c1\" (add_int 18446744073709551615 1) lk_leaf)",
+        ),
+    ] {
+        assert_eq!(
+            source.matches(before).count(),
+            1,
+            "source variant anchor: {before}"
+        );
+        source = source.replacen(before, after, 1);
+    }
+    source
+}
+
+/// Promise class: transition sentinel for the unresolved checked-program
+/// persistent limb gap. MEASURED: the closure-captured Int variant stays
+/// terminal-None at a persistent limb limit of 1, with parity at 64. A
+/// scratch Big-arm sentinel returned -59 if any emitted carrier took the Big
+/// marker, but this same source did not reach that arm. CLAIMED: neither
+/// tried checked source shows a Big carrier reaching `store_int_limbs`.
+/// THE GAP: this is not proof of global checked-program unreachability;
+/// retire this sentinel and add a positive capacity row if one reaches it.
+///
+/// Invocation NativeIntLimbs is structurally unreachable by this emitted
+/// path: the sole production `store_int_limbs` caller allocates a
+/// `PersistentGround` node; the invocation native-Int arena is separate from
+/// the boundary-region limb table, not charged to that profile cell.
+#[cfg(target_os = "linux")]
+#[test]
+fn region_capacity_captured_wide_int_limb_gap_transition() {
+    in_large_stack_thread("rt-region-persistent-limbs", || {
+        let source = region_capacity_captured_wide_int_lookalike();
+        let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+        profile.invocation.nodes = 128;
+        profile.persistent.nodes = 128;
+        profile.persistent.words = 512;
+        profile.persistent.native_int_limbs = 1;
+        let at_limit = differential_with_profile("region-limbs-1", &source, profile);
+        assert_eq!(at_limit.interpreted.exit_status, 0, "interpreter control");
+        // This is a measured gap, not the intended typed-fault contract:
+        // if a Big carrier begins reaching the limb site, review and replace
+        // this transition sentinel with an exact typed-capacity vector.
+        assert_native_matches_interpreter("region-limbs-1", &at_limit);
+        assert_eq!(at_limit.native.terminal_error, None, "measured limb gap");
+        let mut roomy = profile;
+        roomy.persistent.native_int_limbs = 64;
+        let at_64 = differential_with_profile("region-limbs-64", &source, roomy);
+        assert_native_matches_interpreter("region-limbs-64", &at_64);
+        assert_eq!(at_64.native.stdout, at_64.interpreted.stdout);
+        assert_eq!(at_64.native.effect_trace, at_64.interpreted.effect_trace);
     });
 }
 

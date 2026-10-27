@@ -12,7 +12,7 @@ const ONE_BUFFER_WITNESS: &str = include_str!("rt_one_buffer_residual_layout.ken
 #[cfg(target_os = "linux")]
 const PLAIN_MATCH_WITNESS: &str = include_str!("rt_plain_match_layout.ken");
 #[cfg(target_os = "linux")]
-const PLAIN_MATCH_C91_IR: &str = include_str!("rt_plain_match_layout.c91.clif");
+const PLAIN_MATCH_CAPACITY_IR: &str = include_str!("rt_plain_match_layout.region-capacity.clif");
 
 // Measured on this exact checked witness: a stated 2 MiB worker aborts from
 // stack overflow; 4 MiB completes the planner and reaches BoundaryCarrier.
@@ -74,7 +74,7 @@ fn one_bracket_retains_native_parity() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn ordinary_match_has_empty_residual_population_and_c91_identical_unit_ir() {
+fn ordinary_match_has_empty_residual_population_and_reviewed_capacity_ir() {
     std::thread::Builder::new()
         .name("rt-residual-plain-match".to_string())
         .stack_size(WITNESS_STACK_BYTES)
@@ -103,7 +103,33 @@ fn run_plain_recursive_match_census() {
                 )
             })
         });
-    compiled.expect("ordinary match builds natively");
+    let compiled = compiled.expect("ordinary match builds natively");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &compiled.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: output.path().to_owned(),
+            plan_hash: compiled.plan_transport_hash,
+        },
+    )
+    .expect("ordinary match executes natively");
+    let mut host = ken_interp::PosixHost::new_at(output.path());
+    // The linked process supplies argv0, so present the same nonempty argument
+    // shape explicitly to the interpreter for this Nil/Cons source match.
+    let interpreted = ken_cli::run_program_effect_observation(
+        PLAIN_MATCH_WITNESS,
+        ken_cli::SourceFormat::Ken,
+        &[b"native-program".to_vec()],
+        &[],
+        output.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("ordinary match executes in the interpreter");
+    assert_eq!(native.exit_status, 7, "{native:?}");
+    assert_eq!(native.terminal_error, None, "{native:?}");
+    assert_eq!(native.exit_status, interpreted.exit_status);
+    assert_eq!(native.effect_trace, interpreted.effect_trace);
     assert!(!plans.is_empty(), "the planner must report the actual context population");
     assert!(plans.iter().all(|plan| plan.parent_sites == 0 && plan.checked_s.is_empty()
         && plan.contexts.iter().all(|&(worker, captures, missing)|
@@ -112,14 +138,15 @@ fn run_plain_recursive_match_census() {
     assert!(!guards.is_empty(), "the emitted IR must contain ordinary match binders");
     assert!(guards.iter().all(|row| !row.planned_in_s && row.emitted_class_calls == 0),
         "empty S must emit zero ordinary match guards: {guards:?}");
-    // Promise class: transition sentinel for this exact-base WP. The fixture
-    // records the emitted checked unit bodies on c91, not repository prose.
-    // Cranelift's display appends a blank separator; line breaks after the
-    // final brace are display whitespace, not unit IR. Compare the body
-    // byte-for-byte so intentional codegen changes still require review.
+    // Promise class: transition sentinel for this emitted ordinary-match unit.
+    // The region-capacity route adds a recorder import and status-sensitive
+    // allocator branch even though this fixture does not exhaust its region.
+    // The checked zero-S invariant and linked native/interpreter parity above
+    // are independent of this post-route byte-level codegen snapshot. Ignore
+    // only Cranelift's trailing blank display separator when comparing IR.
     assert_eq!(emitted_ir.trim_end_matches('\n').as_bytes(),
-        PLAIN_MATCH_C91_IR.trim_end_matches('\n').as_bytes(),
-        "the measured zero-S native unit IR differs from c91");
+        PLAIN_MATCH_CAPACITY_IR.trim_end_matches('\n').as_bytes(),
+        "the measured zero-S native unit IR differs from reviewed capacity routing");
 }
 
 #[cfg(target_os = "linux")]

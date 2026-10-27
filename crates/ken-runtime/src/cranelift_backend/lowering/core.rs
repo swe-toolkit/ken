@@ -2798,6 +2798,21 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let selected_call_issue = module
         .declare_function("ken_selected_call_v1_issue", Linkage::Import, &ticket_sig)
         .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
+    let mut region_capacity_sig = module.make_signature();
+    region_capacity_sig
+        .params
+        .push(AbiParam::new(module.target_config().pointer_type()));
+    for _ in 0..3 {
+        region_capacity_sig.params.push(AbiParam::new(types::I64));
+    }
+    region_capacity_sig.returns.push(AbiParam::new(types::I64));
+    let record_region_capacity = module
+        .declare_function(
+            "ken_activation_v1_record_region_capacity",
+            Linkage::Import,
+            &region_capacity_sig,
+        )
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let mut consume_sig = module.make_signature();
     consume_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
     consume_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
@@ -2861,6 +2876,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         seed_material: &seed_material,
         host_dispatch,
         selected_call_issue,
+        record_region_capacity,
         selected_call_consume,
         native_int: &native_int,
         boundary_value_abi: &boundary_value_abi,
