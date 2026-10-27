@@ -78,6 +78,7 @@ pub(super) enum TrapCallerProtocolMutation {
     Exact,
     LeaveStaleTrap,
     ReadResultBeforeTrap,
+    LoadResultBeforeTrapGuard,
 }
 
 #[cfg(test)]
@@ -2341,7 +2342,8 @@ impl<'a> Lowering<'a> {
                                 builder.ins().iconst(types::I64, 1)
                             }
                             TrapCallerProtocolMutation::Exact
-                            | TrapCallerProtocolMutation::ReadResultBeforeTrap => {
+                            | TrapCallerProtocolMutation::ReadResultBeforeTrap
+                            | TrapCallerProtocolMutation::LoadResultBeforeTrapGuard => {
                                 builder.ins().iconst(types::I64, 0)
                             }
                         };
@@ -2352,9 +2354,11 @@ impl<'a> Lowering<'a> {
                     }
                     AbiSlotKind::Result => {
                         #[cfg(any(test, feature = "px8-ds-test-support"))]
-                        if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
-                            == TrapCallerProtocolMutation::ReadResultBeforeTrap
-                        {
+                        if matches!(
+                            TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get),
+                            TrapCallerProtocolMutation::ReadResultBeforeTrap
+                                | TrapCallerProtocolMutation::LoadResultBeforeTrapGuard
+                        ) {
                             let false_word = builder.ins().iconst(types::I64, 0);
                             builder.ins().stack_store(false_word, payload, offset);
                         }
@@ -2471,8 +2475,15 @@ impl<'a> Lowering<'a> {
                 backend_module(LoweringCause::PlannerInvariant, "callee frame declares no result slot".to_string())
             })?;
             #[cfg(any(test, feature = "px8-ds-test-support"))]
+            if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
+                == TrapCallerProtocolMutation::ReadResultBeforeTrap
+            {
+                let word = builder.ins().stack_load(types::I64, payload, result_offset);
+                return Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call));
+            }
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
             let early_result = (TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
-                == TrapCallerProtocolMutation::ReadResultBeforeTrap)
+                == TrapCallerProtocolMutation::LoadResultBeforeTrapGuard)
                 .then(|| builder.ins().stack_load(types::I64, payload, result_offset));
             let trap_word = builder.ins().stack_load(types::I64, payload, trap_offset);
             let cranelift_codegen::ir::ValueDef::Result(trap_load, _) =

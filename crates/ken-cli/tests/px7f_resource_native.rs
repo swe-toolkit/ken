@@ -731,6 +731,22 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
         .collect::<Vec<_>>();
     assert_eq!(ordinary.len(), 1, "this fixture has exactly one ordinary response owner");
     assert_eq!(ordinary[0].vis_origin, 618, "E4 observes the non-bracket owner");
+    // Promise class: durable invariant. MEASURED: the actual generated K
+    // context query returns None for the ordinary owner with no completed
+    // detached-return boundary. CLAIMED: the declared Result contract must
+    // not be minted from the response row alone. THE GAP: this E4 fixture
+    // has a response row and owner but no completed boundary; the companion
+    // fixed-product pin proves a completed boundary retains Some(Ret).
+    for plan in &plans {
+        for row in plan.all_static_response_rows.iter().filter(|row| row.vis_origin == 618) {
+            let contracts = plan.generated_context_result_contracts.iter()
+                .filter(|(context, _)| *context == row.k_context)
+                .collect::<Vec<_>>();
+            assert!(!contracts.is_empty(), "E4 must query the generated K context");
+            assert!(contracts.iter().all(|(_, contract)| contract.is_none()),
+                "E4 has no completed return boundary and must not demand Ret: {contracts:?}");
+        }
+    }
     assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
         .any(|row| row.vis_origin == 526), "the distinct bracket S remains plane-owned");
     assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)

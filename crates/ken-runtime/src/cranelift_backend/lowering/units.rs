@@ -5574,7 +5574,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                         == Some(StaticResponseOwnerBodyMutation::BypassTrapBeforeResult)
                     {
                         super::calls::set_trap_caller_protocol_mutation(
-                            super::calls::TrapCallerProtocolMutation::ReadResultBeforeTrap,
+                            super::calls::TrapCallerProtocolMutation::LoadResultBeforeTrapGuard,
                         );
                     }
                     let result = compiler.call_declared_unit_target(

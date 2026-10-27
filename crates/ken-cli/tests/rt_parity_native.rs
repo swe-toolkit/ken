@@ -1264,6 +1264,33 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
 
         let (read, read_roles) = compile("read", "rt_read_offset_stage");
         let (write, _) = compile("write", "rt_write_writable_stage");
+        // Promise class: durable invariant. MEASURED: a completed response
+        // boundary in the fixed context-demand product actually yields the
+        // declared Ret contract at the lowering query. CLAIMED: a needed
+        // generated-context Result contract cannot silently disappear. THE GAP:
+        // the response row alone does not prove a consumer exists; the separate
+        // completed-boundary and mutation controls establish that consumer.
+        let completed_context_contracts = [&read, &write]
+            .into_iter()
+            .flat_map(|plan| {
+                plan.all_static_response_rows.iter().flat_map(|row| {
+                    plan.generated_context_result_contracts
+                        .iter()
+                        .filter(move |(context, contract)| {
+                            *context == row.k_context
+                                && row.k_context == 0
+                                && contract.as_ref() == Some(&row.k_ret_identity)
+                        })
+                })
+            })
+            .count();
+        assert!(
+            completed_context_contracts > 0,
+            "the fixed response-demand product must retain a completed-boundary Ret contract: \
+             read={:?}, write={:?}",
+            read.generated_context_result_contracts,
+            write.generated_context_result_contracts
+        );
         // Structural totality for both products. The former read P2 population
         // belongs to marked Continuation regions, while the eligible write plane
         // specializes its transport sources. Each Specialized row owns one
