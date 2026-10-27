@@ -56,15 +56,23 @@ base, stop and report the mismatch.
 
 ## Acceptance
 
-- **AC-1.** Both nested witnesses (one-deep and two-deep) build and match
-  the interpreter on exit, stdout and the full `EffectEvent` vector at
-  budgets 1 and 6. If the ruling is a refusal instead, each is refused at
-  admission with a typed reason naming the nested predecessor match.
-- **AC-2 (control).** The seven single-level rows above and the
-  `rt_escape_second_resource_native` Nat fanout row keep their results;
+- **AC-1 (amended, Steward `evt_7w3hxajvamqj9`).** Parity was ruled
+  (Architect `evt_4vp6jf4hc71gc`). The one-deep witness at budgets 1 and
+  6, and the one-leaf two-deep witness `Suc m ↦ match m { Zero ↦ Ret;
+  Suc q ↦ match q { Zero ↦ readAt; Suc r ↦ Ret } }` at budgets 1, 2 and
+  6, build and match the interpreter on exit, stdout and the full
+  `EffectEvent` vector, with FsReadAt counts 2, 1, 1, 2 and 1.
+- **AC-1b (boundary).** The frame's original two-deep form has two
+  `readAt` leaves. It is refused at typed admission (`UnsupportedRouteEdge`)
+  on the base, not with the internal error. It stays a pinned build-only
+  row, unchanged by this WP.
+- **AC-2 (control).** The seven single-level rows above, the
+  `rt_escape_second_resource_native` Nat fanout row, and the four
+  `transfer_count_*` controls from the ruling keep their results;
   `rt_parity_native` is unchanged in CI.
-- **AC-3 (mutation, QA).** Reverting the repair returns the witnesses to
-  the ObjectEmission failure.
+- **AC-3 (mutation, QA).** Removing only the `if !computational`
+  dispatch returns the AC-1 witnesses to the ObjectEmission failure;
+  the AC-1b row and the controls do not move.
 
 ## Stop conditions
 
