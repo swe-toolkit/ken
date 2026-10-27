@@ -2141,7 +2141,8 @@ impl ComputationalIHTemplateCollector<'_> {
                 | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
                 | CheckedCoreBodyTerm::PrimitiveLiteral(_)
                 | CheckedCoreBodyTerm::ConstructorReference(_)
-                | CheckedCoreBodyTerm::ErasedConstructorArgument { .. },
+                | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+                | CheckedCoreBodyTerm::ErasedOmegaSubterm,
             ) => {}
             _ => {
                 return Err(Self::runtime_shape_mismatch(

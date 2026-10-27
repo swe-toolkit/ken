@@ -3,7 +3,8 @@
 > **Status: DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT §1;
 > SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2;
 > SPEC-GRAPHS-WALK-COMPOSITION-ORDER §3;
-> SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC §4).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC §4;
+> SPEC-GRAPHS-REACHABILITY-ALONG-WALK §5).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -12,8 +13,12 @@
 > fences are exercised in a package-owned test. Section 4's left-unit and
 > associativity laws now have checked catalog exports, and the closed §4
 > seed is exercised by a package-owned test. These package tests are not
-> official conformance-runner execution or CI. No kernel, trust, or
-> surface-syntax change or revision to §61 §2 is required.
+> official conformance-runner execution or CI. Section 5 specifies a
+> new generic reachability law and a closed seed. Its catalog export
+> is absent on this base; isolated D0 does not establish shipped §5
+> execution, official conformance, CI, publication, landing or landed
+> trust. No kernel, trust, or surface-syntax change or revision to
+> §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -510,3 +515,73 @@ test root-loads both names and exercises the §4 seed's accepted client
 and isolated refused route. This is a targeted package-test observation,
 not official conformance-runner execution, CI, publication, landing, or
 a landed trust measurement.
+
+## 5. Reachability carries back along a walk
+
+> **Section 5 status: DRAFT v0
+> (SPEC-GRAPHS-REACHABILITY-ALONG-WALK).** The Architect checked a
+> generic proof in an isolated D0 on landed base `454adf947`: the
+> package checked and formatted with rc 0, no `Axiom` was added,
+> two probes passed, and scratch `trusted_base()` GlobalIds remained
+> identical (114 → 114). The catalog does not yet export this law.
+> The separately authored closed seed does not establish execution
+> against a shipped §5 export, official conformance, CI, publication,
+> landing or landed trust.
+
+`Algorithm.Graphs.Dependency` must export this Transparent checked law,
+with its public name, argument order and result type exactly as follows:
+
+```ken
+pub theorem graph_reachable_along_walk
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (target : q → Bool)
+      (walk : Walk q g s t)
+    : Equal Bool (graph_reachable q fq g t target) True
+      → Equal Bool (graph_reachable q fq g s target) True
+```
+
+The `walk` is a **data argument**, not a second premise. The single
+premise says that `t` reaches a vertex satisfying `target`; the result
+says the same of `s`. For `walk = WalkHere`, `s` and `t` coincide, so
+the law is the identity on that premise. For a nonempty walk the
+conclusion holds regardless of its length or how the graph's finite
+vertex certificate enumerates vertices. This law complements §1.2's
+`graph_reachable_complete`: that theorem consumes a walk from the
+start to an already-targeted endpoint and a checked target hit;
+this theorem consumes a walk to a vertex **from which** some target
+is reachable. Neither reverses the direction of graph edges.
+
+The converse is false. A walk from `s` to `t` and reachability from
+`s` need not imply reachability from `t`. For instance, on the
+one-way chain `V0 → V1 → V2`, take `s = V0`, `t = V2`, the composed
+two-edge walk, and the target predicate "is `V0`": `V0` reaches
+itself by `WalkHere`, but `V2` cannot get back to `V0`. The seed's
+independent closed value checks confirm this asymmetry, and its
+isolated false claim refuses reachability from `V2` to `V0`.
+Neither a closed instance nor the false-converse refusal proves
+the generic forward law.
+
+The checked proof reuses the **existing private** `require_some` to
+extract a `ReachWitness q g t target` from §1.2's
+`graph_find_walk_some` result. The witness carries a walk from `t`
+to a target vertex `u`; §3's `walk_append` joins it to `walk`, then
+§1.2's `graph_reachable_complete` gives the result at `s`. This
+adds **no new private helper** and exports none of the existing
+private `require_some`, `walk_reachable`, or `edge_reach_trans`.
+All §1–§4 operations and laws remain unchanged. There is no new
+search, graph carrier, axiom, primitive, kernel rule, surface form,
+or trust entry.
+
+The Architect's D0 additionally checked the generic client including
+the `WalkHere` case and a three-vertex seed with independent closed
+`Proved` value controls. The sole proposed seed refusal, an end-to-start
+reachability claim on that chain, was kernel-rejected with
+`TypeMismatch` after the whole accepted client; an accepted
+same-shape `Proved` control and a checked `False` result isolate the
+false conclusion. Those are scratch checks of a proposed implementation,
+not shipped-export execution. Catalog delivery and shipped-seed
+measurement are separate work.

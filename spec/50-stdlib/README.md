@@ -251,7 +251,8 @@ The **Layer-3 graphs and dependency contract** is pinned in
 **`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT), §2
 (SPEC-GRAPHS-CYCLE-REFUTES-ORDER), §3
 (SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
-(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC), and §5
+(SPEC-GRAPHS-REACHABILITY-ALONG-WALK). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -265,11 +266,16 @@ specifies `walk_append` by recursion on the second walk and the checked
 only as scratch clients. Section 3's catalog exports and package-owned
 seed test are present, but this candidate does not execute them.
 Section 4 specifies generic left-unit and associativity laws for
-`walk_append` and authors a closed conformance seed. Its Architect D0
-checked the generic proofs on a scratch overlay with no trust delta;
-§4 exports and shipped-seed execution are not established by this
-spec/seed candidate. No CI, publication, landing or landed §4 trust
-measurement is claimed. No second fixed point is added.
+`walk_append`. Its catalog exports and package-owned seed test are on
+main; the latter is not official conformance execution or landed
+trust. Section 5 specifies a checked `graph_reachable_along_walk`
+law: reachability at a walk's endpoint carries back to its start.
+The Architect's isolated D0 checked the generic proof on `454adf947`
+with no new `Axiom` and identical scratch trusted GlobalIds
+(114 → 114). The §5 export is absent; the separately authored closed
+seed does not establish shipped §5 execution, official conformance,
+CI, publication, landing or landed trust. No second fixed point is
+added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
@@ -436,7 +442,8 @@ The **exact rational-interval contract** is pinned in
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
 SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
-SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER). The §1–2
+SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER;
+SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -464,11 +471,21 @@ swapped-operand inclusion for addition, multiplication, hull and
 intersection. Their converses follow by swapping the theorem's
 arguments, without structural `Equal Interval` or extra public
 laws. Architect checked five generic proofs in scratch with no
-new `Axiom` and unchanged trust identities (114 → 114); §5
-catalog exports are absent. Its authored closed seed is not
-shipped-seed execution, CI, publication, landing or landed trust.
-Signed arithmetic, division, `Float`, rounding, width and structural
-hull/intersection algebra remain deferred.
+new `Axiom` and unchanged scratch trust identities (114 → 114).
+The §5 catalog exports and a package-owned seed test are on main;
+that test is not official conformance execution, CI or landed trust.
+Section 6 specifies four premise-free laws for mutual endpoint-value
+inclusion under both addition and multiplication regroupings, in
+either nesting direction, even for inverted intervals. Closed
+regroupings coincide structurally by `Refl`; open regroupings are
+not definitionally convertible, and generic structural equality
+would need an out-of-scope Rational export. Architect's isolated
+D0 checked the four generic proofs without a new `Axiom` and with
+scratch trusted identities unchanged (114 → 114). The §6 exports
+are absent on this base; its authored closed seed is not shipped
+execution, official conformance, CI, publication, landing or landed
+trust. Signed arithmetic, division, `Float`, rounding, width and
+structural hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–6 (SPEC-TIME-EVENT-TRACE-CONTRACT;
