@@ -1069,6 +1069,235 @@ fn nat_fanout_reached_live_resource_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
+#[derive(Clone, Copy)]
+enum CarriedNatArm {
+    OneDeep,
+    OneLeafTwoDeep,
+    TwoLeafTwoDeep,
+    SingleLevel,
+}
+
+#[cfg(target_os = "linux")]
+fn carried_nat_predecessor_source(offset: i64, scrutinee: &str, arm: CarriedNatArm) -> String {
+    let read = "readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int))";
+    let eof = "Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)";
+    let suc = match arm {
+        CarriedNatArm::OneDeep => format!("Suc m |-> match m {{ Zero |-> {read}; Suc q |-> {eof} }}"),
+        CarriedNatArm::OneLeafTwoDeep => format!(
+            "Suc m |-> match m {{ Zero |-> {eof}; Suc q |-> match q {{ Zero |-> {read}; Suc r |-> {eof} }} }}"
+        ),
+        CarriedNatArm::TwoLeafTwoDeep => format!(
+            "Suc m |-> match m {{ Zero |-> {read}; Suc q |-> match q {{ Zero |-> {read}; Suc r |-> {eof} }} }}"
+        ),
+        CarriedNatArm::SingleLevel => format!("Suc m |-> {read}"),
+    };
+    // These are exactly the read-body offset, Nat arm and returned-tree
+    // continuation of the live-file fixture. Every substitution must land
+    // exactly once; the initial read in second_read is not this read_body.
+    let original_read = "(readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))\n    (\\outcome. after_read file buffer outcome)";
+    let replacement_read = format!(
+        "(readAt AFull file ({offset} : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))\n    (\\outcome. after_read file buffer outcome)"
+    );
+    let original_nat = "match buffer_span_budget span {\n            Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);\n            Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)\n          }";
+    let replacement_nat = format!(
+        "match {scrutinee} {{\n            Zero |-> {eof};\n            {suc}\n          }}"
+    );
+    let original_cont = "(\\_ignored. second_read file buffer)";
+    let replacement_cont = "(\\_ignored. Ret (Coproduct (FSOp AFull) AmbientOp)\n            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n            (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))";
+    let source = NAT_FANOUT_REACHED_LIVE_RESOURCE;
+    for old in [original_read, original_nat, original_cont] {
+        assert_eq!(
+            source.matches(old).count(),
+            1,
+            "the source edit must be unique"
+        );
+        // The three anchors are disjoint, so each is unique in the original.
+        // At offset zero, the read-body substitution intentionally leaves its
+        // original offset unchanged while the arm and continuation still move.
+    }
+    source
+        .replacen(original_read, &replacement_read, 1)
+        .replacen(original_nat, &replacement_nat, 1)
+        .replacen(original_cont, replacement_cont, 1)
+}
+
+#[cfg(target_os = "linux")]
+fn assert_carried_nat_case(
+    case: &str,
+    offset: i64,
+    scrutinee: &str,
+    arm: CarriedNatArm,
+    expected_reads: usize,
+) {
+    let source = carried_nat_predecessor_source(offset, scrutinee, arm);
+    let root = output_dir(case);
+    std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
+    let mut host = ken_interp::PosixHost::new_at(root.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("{case}: interpreter runs: {error:?}"));
+    assert_eq!(
+        interpreted
+            .effect_trace
+            .iter()
+            .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+            .count(),
+        expected_reads,
+        "{case}: selected Nat arm must perform the expected reads"
+    );
+    let diff = differential(case, &source);
+    assert_native_matches_interpreter(case, &diff);
+    assert_eq!(diff.interpreted.exit_status, 0, "{case}: reference exit");
+    assert_eq!(diff.native.exit_status, 0, "{case}: native exit");
+    assert_eq!(
+        diff.native.stdout, diff.interpreted.stdout,
+        "{case}: stdout"
+    );
+    assert_eq!(
+        diff.native.effect_trace, diff.interpreted.effect_trace,
+        "{case}: full trace"
+    );
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: durable native/interpreter differential. MEASURED: the one-
+// deep and one-leaf two-deep selected predecessor arms at budgets 1, 2 and 6
+// build, run, and agree on exit, stdout and full EffectEvent vectors; the
+// independent interpreter counts their FsReadAt events. CLAIMED: an ordinary
+// nested bounded Nat match selects one arm in the planned carrier shape.
+// THE GAP: these finite source shapes do not establish every nested Nat frame.
+// Rows retain the neighbouring 256 MiB stated-stack provision; this is not a
+// stack repair of an existing red row.
+#[test]
+fn carried_nat_predecessor_re_elimination_matches_interpreter() {
+    in_large_stack_thread("rt-carried-nat-pred", || {
+        for (case, offset, arm, expected_reads) in [
+            ("nat-reached-pred-one-b1", 12, CarriedNatArm::OneDeep, 2),
+            ("nat-reached-pred-one-b6", 0, CarriedNatArm::OneDeep, 1),
+            (
+                "nat-reached-pred-two-b1",
+                12,
+                CarriedNatArm::OneLeafTwoDeep,
+                1,
+            ),
+            (
+                "nat-reached-pred-two-b2",
+                11,
+                CarriedNatArm::OneLeafTwoDeep,
+                2,
+            ),
+            (
+                "nat-reached-pred-two-b6",
+                0,
+                CarriedNatArm::OneLeafTwoDeep,
+                1,
+            ),
+        ] {
+            assert_carried_nat_case(case, offset, "buffer_span_budget span", arm, expected_reads);
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: durable differential on single-level Nat producers.
+// MEASURED: both transfer_count projections at Zero and Suc results select
+// the matching host arm, and native agrees with interpreter on terminal and
+// full effects. CLAIMED: ordinary carried Nat selection does not disturb the
+// existing single-level route when its producer changes. THE GAP: these two
+// producers and two arm results do not enumerate all Nat-producing operations.
+#[test]
+fn carried_nat_single_level_controls_match_interpreter() {
+    in_large_stack_thread("rt-carried-nat-controls", || {
+        for (case, offset, scrutinee, expected_reads) in [
+            (
+                "nat-reached-remaining-zero",
+                0,
+                "transfer_count_remaining count",
+                1,
+            ),
+            (
+                "nat-reached-remaining-suc",
+                10,
+                "transfer_count_remaining count",
+                2,
+            ),
+            (
+                "nat-reached-predecessor-zero",
+                12,
+                "transfer_count_predecessor count",
+                1,
+            ),
+            (
+                "nat-reached-predecessor-suc",
+                0,
+                "transfer_count_predecessor count",
+                2,
+            ),
+        ] {
+            assert_carried_nat_case(
+                case,
+                offset,
+                scrutinee,
+                CarriedNatArm::SingleLevel,
+                expected_reads,
+            );
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: current boundary, until the selected-pending route admits
+// two Vis leaves with this non-marked continuation. MEASURED: a two-leaf
+// two-deep match refuses the native build with a typed Fragment cause and
+// PendingCallAdmission UnsupportedRouteEdge, not an ObjectEmission internal
+// error. CLAIMED: this WP does not widen pending-call admission. THE GAP: the
+// refusal says nothing about whether a later separately ruled route could
+// safely admit this shape.
+#[test]
+fn carried_nat_two_leaf_pending_route_stays_typed_unsupported() {
+    in_large_stack_thread("rt-carried-nat-two-leaf", || {
+        let source = carried_nat_predecessor_source(
+            12,
+            "buffer_span_budget span",
+            CarriedNatArm::TwoLeafTwoDeep,
+        );
+        let root = output_dir("nat-pred-two-leaf-refusal");
+        let error = ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            "rt_carried_nat_two_leaf",
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect_err("the two-leaf selected-pending route must refuse at admission");
+        let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = &error
+        else {
+            panic!("a typed native admission refusal is required: {error:?}");
+        };
+        assert_eq!(
+            packaging.stage,
+            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
+        );
+        assert_eq!(
+            packaging.source_cause,
+            Some(ken_runtime::LoweringCause::Fragment)
+        );
+        assert!(
+            packaging
+                .reason
+                .contains("PendingCallAdmission: refused pending call: UnsupportedRouteEdge"),
+            "wrong refusal route: {error:?}"
+        );
+    });
+}
+
+#[cfg(target_os = "linux")]
 // Promise class: durable differential for the reached prefix only. The
 // escaped file is already closed, so readAt returns Closed and the Nat match
 // is never reached; this active row cannot claim bounded-Nat fanout parity.
