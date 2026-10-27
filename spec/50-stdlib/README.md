@@ -388,10 +388,11 @@ official conformance, CI, publication, landing or landed trust for
 deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–6 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–7 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
 SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER;
-SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY;
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -429,9 +430,16 @@ structural `intersect_comm` and `hull_comm` in NatBox, including
 inverted boxes. Unlike rational interval endpoint swaps, Nat corners
 support structural `Equal Box`. Architect D0 checked all four generic
 proofs without a new `Axiom`, at equal scratch trust identities
-114 → 114. The §6 catalog exports remain absent at this base; its
-closed seed and D0 do not establish shipped §6 execution, official
-conformance, CI, publication, landing or landed trust.
+114 → 114. The §6 catalog exports and package-owned seed test are present on
+main; the test does not establish official conformance or landed trust.
+Section 7 specifies public `assoc for min` and `assoc for max` selectors
+and unconditional structural `intersect_assoc` and `hull_assoc` laws.
+Architect's isolated D0 checked the four generic proofs on `372a6a1a6`
+with no new `Axiom` and unchanged scratch trust identities 114 → 114.
+The §7 catalog exports are not landed on this base; its authored closed
+seed and D0 do not establish shipped §7 execution, official conformance,
+CI, publication, landing or landed trust. The existing box-congruence
+helpers remain private.
 Signed-coordinate geometry, Euclidean and floating-point distance,
 other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
