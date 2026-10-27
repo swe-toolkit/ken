@@ -15291,7 +15291,9 @@ mod generated_result_protocol_verifier {
     #[derive(Clone, Copy, Debug)]
     enum StoreForm {
         Full,
-        Narrow,
+        Narrow8,
+        Narrow16,
+        Narrow32,
         Atomic,
     }
 
@@ -15307,8 +15309,14 @@ mod generated_result_protocol_verifier {
             StoreForm::Full => {
                 builder.ins().store(flags, word, address, offset);
             }
-            StoreForm::Narrow => {
+            StoreForm::Narrow8 => {
                 builder.ins().istore8(flags, word, address, offset);
+            }
+            StoreForm::Narrow16 => {
+                builder.ins().istore16(flags, word, address, offset);
+            }
+            StoreForm::Narrow32 => {
+                builder.ins().istore32(flags, word, address, offset);
             }
             StoreForm::Atomic => {
                 let address = builder.ins().iadd_imm(address, i64::from(offset));
@@ -15324,14 +15332,21 @@ mod generated_result_protocol_verifier {
     }
 
     /// Promise class: durable invariant.
-    /// MEASURED: on one fixture, a full store establishes the exact word it
-    /// stores; a narrow store and an atomic exchange of the same word to the
-    /// same address leave the location Unknown.
+    /// MEASURED: on one fixture, a full store establishes the exact word;
+    /// istore8, istore16, istore32 and atomic exchange of the same word to the
+    /// same address leave the eight-byte location Unknown.
     /// CLAIMED: only a full-width store names the contents it leaves behind.
-    /// THE GAP: none for the store opcodes this Cranelift can emit.
+    /// THE GAP: other storing opcodes rely on the can_store fail-closed arm;
+    /// this fixture pins all three narrow stores and one atomic exchange.
     #[test]
     fn only_a_full_store_establishes_exact_contents() {
-        for form in [StoreForm::Full, StoreForm::Narrow, StoreForm::Atomic] {
+        for form in [
+            StoreForm::Full,
+            StoreForm::Narrow8,
+            StoreForm::Narrow16,
+            StoreForm::Narrow32,
+            StoreForm::Atomic,
+        ] {
             let mut func = Function::new();
             func.signature.call_conv = CallConv::SystemV;
             func.signature.returns.push(AbiParam::new(types::I64));
@@ -15362,7 +15377,10 @@ mod generated_result_protocol_verifier {
             .expect("reaching contents are decidable");
             let expected = match form {
                 StoreForm::Full => ReachingMemoryState::Exact(word),
-                StoreForm::Narrow | StoreForm::Atomic => ReachingMemoryState::Unknown,
+                StoreForm::Narrow8
+                | StoreForm::Narrow16
+                | StoreForm::Narrow32
+                | StoreForm::Atomic => ReachingMemoryState::Unknown,
             };
             assert_eq!(states, BTreeSet::from([expected]), "{form:?}");
         }
@@ -15372,8 +15390,9 @@ mod generated_result_protocol_verifier {
     /// MEASURED: an atomic exchange that stores a slot's address to a
     /// non-stack destination escapes the slot; exchanging an ordinary word
     /// through the same instruction does not.
-    /// CLAIMED: every storing opcode feeds the escape index.
-    /// THE GAP: none for the store opcodes this Cranelift can emit.
+    /// CLAIMED: an atomic exchange cannot hide a stored stack address from
+    /// the escape index. THE GAP: other storing opcodes rely on can_store;
+    /// this fixture pins the atomic exchange route.
     #[test]
     fn an_atomic_store_of_a_slot_address_escapes_it() {
         for store_address in [true, false] {
@@ -15461,25 +15480,29 @@ mod generated_result_protocol_verifier {
     }
 
     /// Promise class: durable invariant.
-    /// MEASURED: with full stores the Result and Trap certificates hold; a
-    /// narrow store of the same word refuses the Result certificate, and a
-    /// narrow Trap store whose low byte is zero leaves its terminal
-    /// uncertified.
+    /// MEASURED: with full stores the Result and Trap certificates hold; each
+    /// of istore8, istore16 and istore32 refuses a Result certificate and an
+    /// explicit-Trap terminal when substituted for the full store.
     /// CLAIMED: Result and Trap words are certified only from full stores.
-    /// THE GAP: none for the store opcodes this Cranelift can emit.
+    /// THE GAP: undecoded storing opcodes rely on the opcode guard; the
+    /// fixture independently pins all three narrow widths at both sites.
     #[test]
     fn result_and_trap_certificates_require_full_stores() {
         assert_eq!(certificate_refusal(StoreForm::Full, StoreForm::Full), None);
-        assert!(
-            certificate_refusal(StoreForm::Narrow, StoreForm::Full)
-                .expect("a narrow Result store is refused")
-                .contains("does not bind its exact word/frame/store")
-        );
-        assert!(
-            certificate_refusal(StoreForm::Full, StoreForm::Narrow)
-                .expect("a narrow Trap store is refused")
-                .contains("uncertified status-zero terminal")
-        );
+        for narrow in [StoreForm::Narrow8, StoreForm::Narrow16, StoreForm::Narrow32] {
+            let result = certificate_refusal(narrow, StoreForm::Full)
+                .expect("a narrow Result store is refused");
+            assert!(
+                result.contains("does not bind its exact word/frame/store"),
+                "unexpected {narrow:?} Result refusal: {result}"
+            );
+            let trap = certificate_refusal(StoreForm::Full, narrow)
+                .expect("a narrow Trap store is refused");
+            assert!(
+                trap.contains("uncertified status-zero terminal"),
+                "unexpected {narrow:?} Trap refusal: {trap}"
+            );
+        }
     }
 
     /// Promise class: durable invariant.
