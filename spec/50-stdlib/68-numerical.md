@@ -4,7 +4,8 @@
 > SPEC-NUMERICAL-INTERVAL-HULL §2;
 > SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3;
 > SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY §4;
-> SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER §5).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER §5;
+> SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -24,6 +25,13 @@
 > types, shipped seed's accepted client and two refused clients, with an exact
 > package-local trusted-identity delta of 114 → 114. This does not establish
 > official conformance-runner execution, CI, landing or a landed trust delta.
+> Section 6 specifies four new generic mutual-inclusion laws for addition
+> and multiplication regrouping. Architect checked their generic proofs
+> on an isolated D0 at `edc1da359` with no new `Axiom` and unchanged
+> scratch trusted GlobalIds (114 → 114). The §6 catalog exports are absent
+> from this base; the authored closed seed does not establish shipped
+> §6 execution, official conformance, CI, publication, landing or landed
+> trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -290,7 +298,8 @@ their intersection.
 These laws do **not** assert structural `Equal Interval` for
 commutativity, idempotence or associativity of either operation.
 The §5 endpoint-value swap inclusions do not strengthen this to
-structural equality. In particular,
+structural equality; §6 separately states arithmetic associativity
+by endpoint-value inclusion, not structural interval equality. In particular,
 the hull of the points at `half` and `two_quarters` stores
 `half` as its lower bound and `two_quarters` as its upper bound;
 swapping the arguments stores the reverse. Here `half = 1/2`
@@ -659,3 +668,84 @@ refused Ken clients against the roots-loaded package. The package test
 observes unchanged exact trusted-base identities (114 → 114), not a
 landed trust measurement. Neither the historical D0 nor the package
 test is official conformance-runner execution, CI or landing.
+
+## 6. Associativity by endpoint-value inclusion
+
+> **Section 6 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE).** Architect checked
+> four generic Transparent proof bodies in isolated D0 on `edc1da359`:
+> `ken check` and `ken fmt --check` rc 0, no new `Axiom`, scratch
+> `trusted_base()` GlobalIds identical at 114 → 114, and three probes
+> passed. These results do not deliver the §6 catalog exports or
+> establish shipped-seed execution, official conformance, CI,
+> publication, landing or landed trust.
+
+For every three intervals `i`, `j`, `k`, including inverted ones,
+`Algorithm.Numeric.RationalInterval` must export these **four**
+checked laws, with exactly these public names, argument orders, and
+result types:
+
+```ken
+pub theorem interval_add_assoc_inside (i : Interval) (j : Interval) (k : Interval)
+  : IsTrue (interval_inside (interval_add i (interval_add j k)) (interval_add (interval_add i j) k))
+
+pub theorem interval_add_assoc_rev_inside (i : Interval) (j : Interval) (k : Interval)
+  : IsTrue (interval_inside (interval_add (interval_add i j) k) (interval_add i (interval_add j k)))
+
+pub theorem interval_mul_assoc_inside (i : Interval) (j : Interval) (k : Interval)
+  : IsTrue (interval_inside (interval_mul i (interval_mul j k)) (interval_mul (interval_mul i j) k))
+
+pub theorem interval_mul_assoc_rev_inside (i : Interval) (j : Interval) (k : Interval)
+  : IsTrue (interval_inside (interval_mul (interval_mul i j) k) (interval_mul i (interval_mul j k)))
+```
+
+The plain `_assoc_inside` names follow §64's public `assoc for
+rational_add` and `assoc for rational_mul`: **right-nested inside
+left-nested**. The `_assoc_rev_inside` names give the reverse
+inclusion. Two laws per operation are required. Unlike §5's
+swapped-operand law, changing the three arguments of the forward
+law cannot reverse its nesting. Neither direction is merely an
+instance of the other; a client must not have to derive the missing
+public library law in its seed. Each theorem is premise-free and
+compares endpoint **values** using §3.1's `interval_inside`; it
+requires neither ordered endpoints nor a nonempty interval.
+
+Mutual inclusion means both corresponding lower endpoint values and
+both upper endpoint values compare in both directions. By §64's
+antisymmetry these values are `rational_equiv`, but this contract
+does not assert generic structural `Equal Interval`. The package's
+arithmetic-law vocabulary uses endpoint-value inclusion. A generic
+structural associativity theorem would need a new `Data.Numeric.Rational`
+export, excluded by this WP's stop condition. Closed regroupings
+**do** coincide structurally: their stored rational components are
+closed Nat arithmetic expressions and normalize to the same numerals,
+so the seed's `Equal Interval` claims accept by `Refl` for both
+operations. For open operands the regroupings are **not**
+definitionally convertible (`Refl` was refused in D0 for both);
+a closed computation therefore cannot stand in for these generic
+checked laws. Do not infer from §1.1's different-spelling examples
+that these particular **closed** regroupings have different spellings.
+
+The proofs destructure the three interval arguments and reuse the
+existing private `equiv_leq`, §64's public rational associativity
+proofs, their equivalence symmetry, and Boolean conjunction
+introduction. The lower and upper comparisons require opposite
+orientations of rational associativity; the reverse laws exchange
+those orientations. No new helper is added. The four public
+obligations belong directly after `interval_intersect_comm_inside`
+and before private `equiv_leq` in the catalog package; that placement
+is an obligation for the separate catalog half, not a catalog edit
+in this spec candidate. Sections 1–5's operations and laws are
+unchanged. There is no new Rational export, axiom, primitive,
+kernel or surface change, signed arithmetic or rounding.
+
+The authored closed seed applies all four laws to `[1/2,1]`,
+`[1/3,2]` and `[3/2,3]`, independently checks two direct inclusion
+values and both structural coincidences, and isolates the false
+claim that their three-operand sum lies inside the first two-operand
+sum. Its true `IsTrue (interval_inside _ (interval_add i j)) = Proved`
+control and independent `False` value establish that the refusal
+comes from the false endpoint comparison rather than the proof form.
+These closed checks are examples, not proofs of the generic laws.
+The Architect's D0 checks a proposed implementation only; delivery
+against shipped exports and official conformance remain separate.
