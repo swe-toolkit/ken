@@ -78,9 +78,10 @@ the sentinel row migrated to two admitted owners `M.p` and `N.p`.
   - removing `ProveDecl` from `is_qualifiable` turns the AC-1 in-module
     pin red in each mode. It leaves the duplicates admitted, so the
     sentinel alone does not catch it (Architect measurement);
-  - removing it from the `record_checked_local` list turns the AC-1
-    in-module pin red. This one is unmeasured, so QA reports what it
-    finds.
+  - the `record_checked_local` arm is unguarded parity (Architect
+    `evt_1tays25fx53yn`): no fixture can observe it while `pub prove` is
+    ineligible. The WP that admits `pub prove` must add the same-expansion
+    re-import pin that reddens it.
 
 ## Stop conditions
 
