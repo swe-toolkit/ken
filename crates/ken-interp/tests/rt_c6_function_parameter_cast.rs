@@ -27,6 +27,18 @@ impl Fixture {
             "axiom axTwin : Eq Type (CFn idN) (CFn succN)",
             "axiom axOp : Eq Type (CFn idN) (CFn wrapOp)",
             "axiom axDep : Eq Type (CDep idN) (CDep succN)",
+            "axiom axSuc : Eq Type (CFn idN) (CFn Suc)",
+            "data CB (g : Bool -> Bool) : Type where { MkCB : CB g }",
+            "data N2 : Type where { Z2 : N2; S2 : N2 -> N2; T2 : N2 -> N2 }",
+            "data CN (g : N2 -> N2) : Type where { MkCN : CN g }",
+            "axiom axST : Eq Type (CN S2) (CN T2)",
+            "data P2 : Type where { MkP : Nat -> Nat -> P2 }",
+            "data CP (g : Nat -> P2) : Type where { MkCP : CP g }",
+            "axiom axP : Eq Type (CP (MkP Zero)) (CP (MkP (Suc Zero)))",
+            "axiom axOpaque : Eq Type (CFn idN) (CFn idNop)",
+            "data WT : Type where { WLeaf : WT; WNode : (Nat -> WT) -> WT }",
+            "fn wtMotive (w : WT) : Type = Nat",
+            "fn cfnMotive (g : Nat -> Nat) (c : CFn g) : Type = Nat",
         ] {
             elab.elaborate_decl(declaration)
                 .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
@@ -336,4 +348,278 @@ fn opaque_closed_refl_is_rejected_but_j_axiom_pushes() {
         matches!(peel_app(&whnf(&f.elab.env, &Context::new(), &term)).0, Term::Constructor { id, .. } if id == f.id("MkCFn"))
     );
     assert!(matches!(f.eval(&term), EvalVal::Ctor { id, .. } if id == f.id("MkCFn")));
+}
+
+// RT-C6-NON-CLOSURE-FUNCTION-PARAMETER: every function-value representation.
+
+fn kind(value: &EvalVal) -> &'static str {
+    match value {
+        EvalVal::Closure { .. } => "Closure",
+        EvalVal::CtorPending { .. } => "CtorPending",
+        EvalVal::IhClosure { .. } => "IhClosure",
+        EvalVal::Unknown => "Unknown",
+        EvalVal::Neutral => "Neutral",
+        _ => "other",
+    }
+}
+
+impl Fixture {
+    fn suc(&self) -> Term {
+        Term::constructor(self.id("Suc"), vec![])
+    }
+
+    fn lam_suc(&self) -> Term {
+        Term::lam(
+            Term::indformer(self.id("Nat"), vec![]),
+            Term::app(self.suc(), Term::var(0)),
+        )
+    }
+
+    fn con(&self, name: &str) -> Term {
+        Term::constructor(self.id(name), vec![])
+    }
+
+    /// Kernel checks and re-heads; the interpreter re-heads at the target
+    /// parameter, observed by applying it to `input`.
+    fn pushed(
+        &mut self,
+        label: &str,
+        term: &Term,
+        ty: &Term,
+        constructor: &str,
+        input: Term,
+        expected: Term,
+    ) {
+        self.checked(term, ty);
+        let kernel = whnf(&self.elab.env, &Context::new(), term);
+        assert!(
+            matches!(peel_app(&kernel).0, Term::Constructor { id, .. } if id == self.id(constructor)),
+            "{label}: kernel constructor head"
+        );
+        let value = self.eval(term);
+        let EvalVal::Ctor { id, args, .. } = value else {
+            panic!("{label}: interpreter gave {value:?}, not a constructor");
+        };
+        assert_eq!(id, self.id(constructor), "{label}: head");
+        assert_eq!(args.len(), 1, "{label}: one parameter");
+        let ground = self.eval(&input);
+        let want = self.eval(&expected);
+        assert_eq!(
+            apply(args[0].clone(), ground, &self.elab.env, &mut self.store),
+            want,
+            "{label}: target parameter applied"
+        );
+    }
+}
+
+/// Promise: durable invariant. MEASURED: CFn Suc to CFn (λn. Suc n) by a
+/// checked refl re-heads to MkCFn, and the target parameter maps Zero to
+/// Suc Zero. CLAIMED: an unapplied constructor parameter is not refuted.
+/// THE GAP: one constructor and one input.
+#[test]
+fn nonclosure_refl_ctor_to_closure_computes() {
+    let mut f = Fixture::new();
+    let a = f.family("CFn", f.suc());
+    let b = f.family("CFn", f.lam_suc());
+    let term = f.cast(a, b.clone(), f.ctor("MkCFn", f.suc()));
+    let (zero, one) = (f.zero(), f.one());
+    f.pushed("ctor->closure", &term, &b, "MkCFn", zero, one);
+}
+
+/// Promise: durable invariant. MEASURED: the reverse cast re-heads, and the
+/// target Suc maps Zero to Suc Zero. CLAIMED: the mixed pair is tolerated
+/// in both orders. THE GAP: one constructor and one input.
+#[test]
+fn nonclosure_refl_closure_to_ctor_computes() {
+    let mut f = Fixture::new();
+    let a = f.family("CFn", f.lam_suc());
+    let b = f.family("CFn", f.suc());
+    let term = f.cast(a, b.clone(), f.ctor("MkCFn", f.lam_suc()));
+    let (zero, one) = (f.zero(), f.one());
+    f.pushed("closure->ctor", &term, &b, "MkCFn", zero, one);
+}
+
+/// Promise: durable invariant. MEASURED: tcast (CFn idN) (CFn Suc) under
+/// axSuc re-heads at the target Suc. CLAIMED: the J route reaches the same
+/// push. THE GAP: the axiom is a typed premise, not a consistent equality.
+#[test]
+fn nonclosure_j_axiom_closure_to_ctor_computes() {
+    let mut f = Fixture::new();
+    let a = f.family("CFn", f.constant("idN"));
+    let b = f.family("CFn", f.suc());
+    let term = f.via_j(
+        a,
+        b.clone(),
+        f.constant("axSuc"),
+        f.ctor("MkCFn", f.constant("idN")),
+    );
+    let (zero, one) = (f.zero(), f.one());
+    f.pushed("j idN->Suc", &term, &b, "MkCFn", zero, one);
+}
+
+/// Promise: durable invariant. MEASURED: the Suc to Suc and lambda to lambda
+/// controls re-head on the base and with the change. CLAIMED: the change
+/// leaves them computing. THE GAP: two controls, one input.
+#[test]
+fn nonclosure_same_representation_controls_compute() {
+    let mut f = Fixture::new();
+    for (label, p) in [("Suc->Suc", f.suc()), ("lam->lam", f.lam_suc())] {
+        let a = f.family("CFn", p.clone());
+        let term = f.cast(a.clone(), a.clone(), f.ctor("MkCFn", p));
+        let (zero, one) = (f.zero(), f.one());
+        f.pushed(label, &term, &a, "MkCFn", zero, one);
+    }
+}
+
+/// Promise: durable invariant. MEASURED: a partially applied primitive
+/// parameter (not_bool) and its eta-expansion re-head in both directions,
+/// and the rebuilt parameter has the target's representation. CLAIMED: a
+/// primitive CtorPending is a function value. THE GAP: the parameter is
+/// not applied here, since not_bool on the Bool constructors is Neutral at
+/// this layer on the base.
+#[test]
+fn nonclosure_refl_primitive_parameter_computes() {
+    let mut f = Fixture::new();
+    let bool_ty = Term::indformer(f.id("Bool"), vec![]);
+    let not = f.constant("not_bool");
+    let eta = Term::lam(bool_ty, Term::app(not.clone(), Term::var(0)));
+    for (label, source, target) in [
+        ("prim->closure", not.clone(), eta.clone()),
+        ("closure->prim", eta.clone(), not.clone()),
+    ] {
+        let a = f.family("CB", source.clone());
+        let b = f.family("CB", target.clone());
+        let term = f.cast(a, b.clone(), f.ctor("MkCB", source));
+        f.checked(&term, &b);
+        let kernel = whnf(&f.elab.env, &Context::new(), &term);
+        assert!(
+            matches!(peel_app(&kernel).0, Term::Constructor { id, .. } if id == f.id("MkCB")),
+            "{label}: kernel head"
+        );
+        let value = f.eval(&term);
+        let EvalVal::Ctor { id, args, .. } = value else {
+            panic!("{label}: interpreter gave {value:?}");
+        };
+        assert_eq!(id, f.id("MkCB"));
+        let want = f.eval(&target);
+        assert_eq!(
+            kind(&args[0]),
+            kind(&want),
+            "{label}: parameter read from target"
+        );
+    }
+}
+
+/// Promise: durable invariant. MEASURED: under axST, CN S2 to CN T2
+/// re-heads and the target parameter maps Z2 to T2 Z2. CLAIMED: distinct
+/// constructor ids are not compared; the parameter comes from the target.
+/// THE GAP: the axiom is a typed premise, not a consistent equality.
+#[test]
+fn nonclosure_j_distinct_constructor_ids_use_target() {
+    let mut f = Fixture::new();
+    let a = f.family("CN", f.con("S2"));
+    let b = f.family("CN", f.con("T2"));
+    let term = f.via_j(
+        a,
+        b.clone(),
+        f.constant("axST"),
+        f.ctor("MkCN", f.con("S2")),
+    );
+    let z2 = f.con("Z2");
+    let expected = Term::app(f.con("T2"), z2.clone());
+    f.pushed("j S2->T2", &term, &b, "MkCN", z2, expected);
+}
+
+/// Promise: durable invariant. MEASURED: under axP, CP (MkP Zero) to
+/// CP (MkP One) re-heads and the target maps Zero to MkP One Zero. CLAIMED:
+/// an equal-id CtorPending pair is tolerated, its arguments not compared.
+/// THE GAP: the axiom is a typed premise, not a consistent equality.
+#[test]
+fn nonclosure_j_equal_id_distinct_args_use_target() {
+    let mut f = Fixture::new();
+    let p0 = Term::app(f.con("MkP"), f.zero());
+    let p1 = Term::app(f.con("MkP"), f.one());
+    let a = f.family("CP", p0.clone());
+    let b = f.family("CP", p1.clone());
+    let term = f.via_j(a, b.clone(), f.constant("axP"), f.ctor("MkCP", p0));
+    let zero = f.zero();
+    let expected = Term::app(p1, zero.clone());
+    f.pushed("j MkP0->MkP1", &term, &b, "MkCP", zero, expected);
+}
+
+/// Promise: durable fail-closed invariant. MEASURED: an opaque function
+/// parameter (idNop, Unknown at this layer) keeps the cast Unknown while
+/// kernel whnf re-heads. CLAIMED: Unknown is not a function value. THE GAP:
+/// Unknown is a permitted refusal here, not the kernel's answer.
+#[test]
+fn nonclosure_opaque_parameter_stays_unknown() {
+    let mut f = Fixture::new();
+    let a = f.family("CFn", f.constant("idN"));
+    let b = f.family("CFn", f.constant("idNop"));
+    let term = f.via_j(
+        a,
+        b.clone(),
+        f.constant("axOpaque"),
+        f.ctor("MkCFn", f.constant("idN")),
+    );
+    f.checked(&term, &b);
+    assert!(
+        matches!(peel_app(&whnf(&f.elab.env, &Context::new(), &term)).0, Term::Constructor { id, .. } if id == f.id("MkCFn")),
+        "kernel re-heads the opaque parameter"
+    );
+    assert_eq!(f.eval(&term), EvalVal::Unknown);
+}
+
+/// Promise: durable invariant. MEASURED: inside a checked WT eliminator,
+/// casting CFn ih to CFn (λn. ih n) re-heads, so the closed term reduces to
+/// Suc Zero as in the kernel. CLAIMED: an unsaturated IhClosure is a
+/// function value. THE GAP: one W-shaped family, one branch.
+#[test]
+fn nonclosure_ih_closure_parameter_computes() {
+    let mut f = Fixture::new();
+    let nat = Term::indformer(f.id("Nat"), vec![]);
+    let wt = Term::indformer(f.id("WT"), vec![]);
+    // In the WNode method, context [k, ih]: ih = Var(0), k = Var(1).
+    let eta_ih = Term::lam(nat.clone(), Term::app(Term::var(1), Term::var(0)));
+    let src = f.family("CFn", Term::var(0));
+    let tgt = f.family("CFn", eta_ih.clone());
+    let cast = Term::Cast(
+        Box::new(src.clone()),
+        Box::new(tgt.clone()),
+        Box::new(Term::Refl(Box::new(src))),
+        Box::new(f.ctor("MkCFn", Term::var(0))),
+    );
+    let body = Term::Elim {
+        fam: f.id("CFn"),
+        level_args: vec![],
+        params: vec![eta_ih.clone()],
+        motive: Box::new(Term::app(f.constant("cfnMotive"), eta_ih.clone())),
+        methods: vec![f.one()],
+        indices: vec![],
+        scrut: Box::new(cast),
+    };
+    let node_method = Term::lam(
+        Term::pi(nat.clone(), wt.clone()),
+        Term::lam(Term::pi(nat.clone(), nat.clone()), body),
+    );
+    let scrut = Term::app(f.con("WNode"), Term::lam(nat.clone(), f.con("WLeaf")));
+    let term = Term::Elim {
+        fam: f.id("WT"),
+        level_args: vec![],
+        params: vec![],
+        motive: Box::new(f.constant("wtMotive")),
+        methods: vec![f.zero(), node_method],
+        indices: vec![],
+        scrut: Box::new(scrut),
+    };
+    f.checked(&term, &nat);
+    let kernel = whnf(&f.elab.env, &Context::new(), &term);
+    assert!(
+        matches!(peel_app(&kernel).0, Term::Constructor { id, .. } if id == f.id("Suc")),
+        "kernel reduces to Suc"
+    );
+    let value = f.eval(&term);
+    let one = f.one();
+    let expected = f.eval(&one);
+    assert_eq!(value, expected);
 }
