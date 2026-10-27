@@ -6530,7 +6530,10 @@ mod namespace_effect_tests {
             "module B { class C a { marker : Nat } instance C Nat { marker = Zero } import P (C_instance_Nat) }",
         ] {
             let (mut env, _root, selected_id) = prepared();
-            assert_eq!(env.globals.insert("B.C_instance_Nat".into(), selected_id), None);
+            assert_eq!(
+                env.globals.insert("B.C_instance_Nat".into(), selected_id),
+                None
+            );
             let result = env.elaborate_file(source);
             assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
                 if name == "C_instance_Nat"),
@@ -6583,7 +6586,11 @@ mod namespace_effect_tests {
             "module B { class Marker a { } data Head = MkLocalHead derive Marker for Head import P (Marker_instance_Head) }",
         ] {
             let (mut env, _root, selected_id) = prepared();
-            assert_eq!(env.globals.insert("B.Marker_instance_B.Head".into(), selected_id), None);
+            assert_eq!(
+                env.globals
+                    .insert("B.Marker_instance_B.Head".into(), selected_id),
+                None
+            );
             let result = env.elaborate_file(source);
             assert!(matches!(result, Err(ElabError::AmbiguousReference { ref name, .. })
                 if name == "Marker_instance_Head"),

@@ -683,7 +683,12 @@ impl fmt::Display for ElabError {
                 f,
                 "declaration identity collision for `{identity}`: `{first}` and `{second}`",
             ),
-            ElabError::ModuleOwnerClash { path, owner, claimant, span } => write!(
+            ElabError::ModuleOwnerClash {
+                path,
+                owner,
+                claimant,
+                span,
+            } => write!(
                 f,
                 "module path `{path}` at {}-{} is owned by {owner}; {claimant} cannot claim it",
                 span.start, span.end,
