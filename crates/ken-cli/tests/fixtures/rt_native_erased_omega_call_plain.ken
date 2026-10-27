@@ -1,0 +1,22 @@
+program capabilities FS APartial
+def AnyNat = { x : Nat | Top }
+fn classify (n : Nat) : ExitCode = match n {
+  Zero |-> Failure 100;
+  Suc a |-> match a {
+    Zero |-> Failure 1;
+    Suc b |-> match b {
+      Zero |-> Failure 2;
+      Suc c |-> match c {
+        Zero |-> Failure 3;
+        Suc d |-> match d {
+          Zero |-> Failure 4;
+          Suc _ |-> Failure 200
+        }
+      }
+    }
+  }
+}
+fn step (n : Nat) : Nat = match n { Zero |-> Zero ; Suc m |-> Suc (Suc (step m)) }
+fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  host_exit APartial (classify (step (Suc (Suc Zero))))
