@@ -1166,40 +1166,51 @@ fn assert_carried_nat_case(
 }
 
 #[cfg(target_os = "linux")]
-// Promise class: durable native/interpreter differential. MEASURED: the one-
-// deep and one-leaf two-deep selected predecessor arms at budgets 1, 2 and 6
-// build, run, and agree on exit, stdout and full EffectEvent vectors; the
-// independent interpreter counts their FsReadAt events. CLAIMED: an ordinary
-// nested bounded Nat match selects one arm in the planned carrier shape.
-// THE GAP: these finite source shapes do not establish every nested Nat frame.
-// Rows retain the neighbouring 256 MiB stated-stack provision; this is not a
-// stack repair of an existing red row.
+// Promise class: durable native/interpreter differential. MEASURED: a one-
+// deep selected predecessor arm at budgets 1 and 6 builds and agrees on exit,
+// stdout, and full EffectEvent vectors; the interpreter counts the reads.
+// CLAIMED: an ordinary bounded Nat frame selects its arm at the planned join.
+// THE GAP: one frame does not establish parity for deeper nested matches.
+// Rows retain the neighbouring 256 MiB stated-stack provision, not a repair.
 #[test]
-fn carried_nat_predecessor_re_elimination_matches_interpreter() {
-    in_large_stack_thread("rt-carried-nat-pred", || {
-        for (case, offset, arm, expected_reads) in [
-            ("nat-reached-pred-one-b1", 12, CarriedNatArm::OneDeep, 2),
-            ("nat-reached-pred-one-b6", 0, CarriedNatArm::OneDeep, 1),
-            (
-                "nat-reached-pred-two-b1",
-                12,
-                CarriedNatArm::OneLeafTwoDeep,
-                1,
-            ),
-            (
-                "nat-reached-pred-two-b2",
-                11,
-                CarriedNatArm::OneLeafTwoDeep,
-                2,
-            ),
-            (
-                "nat-reached-pred-two-b6",
-                0,
-                CarriedNatArm::OneLeafTwoDeep,
-                1,
-            ),
+fn carried_nat_predecessor_one_deep_matches_interpreter() {
+    in_large_stack_thread("rt-carried-nat-pred-one", || {
+        for (case, offset, expected_reads) in [
+            ("nat-reached-pred-one-b1", 12, 2),
+            ("nat-reached-pred-one-b6", 0, 1),
         ] {
-            assert_carried_nat_case(case, offset, "buffer_span_budget span", arm, expected_reads);
+            assert_carried_nat_case(
+                case,
+                offset,
+                "buffer_span_budget span",
+                CarriedNatArm::OneDeep,
+                expected_reads,
+            );
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: durable native/interpreter differential. MEASURED: a one-
+// leaf two-deep match at budgets 1, 2, and 6 builds and agrees on exit, stdout
+// and full EffectEvent vectors; the interpreter counts the reads. CLAIMED:
+// the second ordinary frame selects from the bound predecessor without a
+// scalar merge. THE GAP: deeper and computational frames are not measured.
+#[test]
+fn carried_nat_predecessor_two_deep_matches_interpreter() {
+    in_large_stack_thread("rt-carried-nat-pred-two", || {
+        for (case, offset, expected_reads) in [
+            ("nat-reached-pred-two-b1", 12, 1),
+            ("nat-reached-pred-two-b2", 11, 2),
+            ("nat-reached-pred-two-b6", 0, 1),
+        ] {
+            assert_carried_nat_case(
+                case,
+                offset,
+                "buffer_span_budget span",
+                CarriedNatArm::OneLeafTwoDeep,
+                expected_reads,
+            );
         }
     });
 }
