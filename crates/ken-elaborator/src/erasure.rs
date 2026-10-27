@@ -2912,8 +2912,9 @@ fn lower_body_term_with_plans(
             parent_oriented_frame,
         )?;
         let callee = lower_recursive_declaration_call(view, declarations, root)?;
+        let arguments = recursive_runtime_arguments(view, arguments, declarations, root)?;
         let mut args = Vec::with_capacity(arguments.len());
-        for (index, argument) in arguments.into_iter().enumerate() {
+        for (index, argument) in arguments {
             let mut child_path = path.to_vec();
             child_path.extend([10, index as u64]);
             args.push(lower_body_term_with_plans(
@@ -4204,9 +4205,8 @@ fn lower_checked_host_computation(
             })
             .transpose()?;
         let callee = lower_recursive_declaration_call(view, declarations, root)?;
-        let args = arguments
+        let args = recursive_runtime_arguments(view, arguments, declarations, root)?
             .into_iter()
-            .enumerate()
             .map(|(argument_index, argument)| {
                 let mut argument_path = path.to_vec();
                 argument_path.extend([5, argument_index as u64]);
@@ -5278,9 +5278,9 @@ fn lower_body_term_inner(
         if arguments.is_empty() {
             return Ok(callee);
         }
-        let args = arguments
+        let args = recursive_runtime_arguments(view, arguments, declarations, root_symbol)?
             .into_iter()
-            .map(|argument| {
+            .map(|(_, argument)| {
                 lower_body_term_inner(
                     argument,
                     declarations,
@@ -5911,6 +5911,137 @@ fn term_application_head(mut term: &CheckedCoreBodyTerm) -> &CheckedCoreBodyTerm
         term = function;
     }
     term
+}
+
+/// Runtime operands of a recursive call: an argument at a binder the callee's
+/// checked Ω plan erased must be the erased Ω subterm and is not passed, as the
+/// callee's native signature omits that parameter.
+fn recursive_runtime_arguments<'a>(
+    view: &checked_core::CheckedCoreRecursiveCallView,
+    arguments: Vec<&'a CheckedCoreBodyTerm>,
+    declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
+    root_symbol: &StableSymbol,
+) -> Result<Vec<(usize, &'a CheckedCoreBodyTerm)>, ErasureError> {
+    let mut erased_parameters = Vec::new();
+    if let Some(declaration) = declarations.get(&view.symbol) {
+        let mut body = &declaration.body;
+        while erased_parameters.len() < arguments.len() {
+            let CheckedCoreBodyTerm::Lambda {
+                body: inner,
+                erased_parameter,
+                ..
+            } = body
+            else {
+                break;
+            };
+            erased_parameters.push(*erased_parameter);
+            body = inner;
+        }
+    }
+    let mut runtime = Vec::with_capacity(arguments.len());
+    for (index, argument) in arguments.into_iter().enumerate() {
+        if erased_parameters.get(index).copied().unwrap_or(false) {
+            if !matches!(argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                return Err(expression_lowering_error(
+                    root_symbol,
+                    "erased_argument_not_omega",
+                    "erased binder has an executable argument",
+                ));
+            }
+            continue;
+        }
+        runtime.push((index, argument));
+    }
+    Ok(runtime)
+}
+
+#[cfg(test)]
+mod recursive_erased_omega_argument_tests {
+    use super::*;
+
+    /// Promise class: durable invariant. MEASURED: only a callee's checked
+    /// erased Lambda binder drops its matching Ω operand, preserving the
+    /// original indices of both surviving runtime operands. Without callee
+    /// evidence, none is dropped; an executable operand at an erased binder
+    /// is refused. CLAIMED: recursive runtime arity follows checked callee
+    /// binders and never silently consumes proof values. THE GAP: synthetic
+    /// checked-body views exercise the helper, not every production call arm.
+    #[test]
+    fn recursive_runtime_arguments_use_callee_binders_and_keep_original_indices() {
+        let symbol = StableSymbol::declaration("fixture", &[], "recursive");
+        let view = checked_core::CheckedCoreRecursiveCallView {
+            symbol: symbol.clone(),
+            level_args: Vec::new(),
+            group_symbol: symbol.clone(),
+            group_members: vec![symbol.clone()],
+            admission: checked_core::RecursionAdmission::AcceptedStructural,
+            scc_index: 0,
+            lowerability: LowerabilityStatus::Supported,
+        };
+        let declared = checked_core::CheckedCoreDeclarationBodyView {
+            symbol: symbol.clone(),
+            level_params: Vec::new(),
+            checked_type: Vec::new(),
+            body: CheckedCoreBodyTerm::Lambda {
+                parameter_type: Vec::new(),
+                erased_parameter: false,
+                body: Box::new(CheckedCoreBodyTerm::Lambda {
+                    parameter_type: Vec::new(),
+                    erased_parameter: true,
+                    body: Box::new(CheckedCoreBodyTerm::Lambda {
+                        parameter_type: Vec::new(),
+                        erased_parameter: false,
+                        body: Box::new(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 }),
+                    }),
+                }),
+            },
+        };
+        let declarations = BTreeMap::from([(symbol.clone(), declared)]);
+        let operands = [
+            CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 },
+            CheckedCoreBodyTerm::ErasedOmegaSubterm,
+            CheckedCoreBodyTerm::Variable { de_bruijn_index: 1 },
+        ];
+        let refs = || operands.iter().collect::<Vec<_>>();
+        let runtime = recursive_runtime_arguments(&view, refs(), &declarations, &symbol)
+            .expect("checked erased binder drops exactly its Ω argument");
+        assert_eq!(
+            runtime.iter().map(|(index, _)| *index).collect::<Vec<_>>(),
+            vec![0, 2]
+        );
+        assert!(std::ptr::eq(runtime[0].1, &operands[0]));
+        assert!(std::ptr::eq(runtime[1].1, &operands[2]));
+
+        let no_evidence = recursive_runtime_arguments(&view, refs(), &BTreeMap::new(), &symbol)
+            .expect("absent declaration must not invent erased binders");
+        assert_eq!(
+            no_evidence
+                .iter()
+                .map(|(index, _)| *index)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert!(matches!(
+            no_evidence[1].1,
+            CheckedCoreBodyTerm::ErasedOmegaSubterm
+        ));
+
+        let executable = CheckedCoreBodyTerm::Variable { de_bruijn_index: 1 };
+        let invalid = recursive_runtime_arguments(
+            &view,
+            vec![&operands[0], &executable, &operands[2]],
+            &declarations,
+            &symbol,
+        )
+        .expect_err("erased binder cannot silently consume a runtime argument");
+        assert!(matches!(
+            invalid,
+            ErasureError::ExpressionLowering {
+                lane: "erased_argument_not_omega",
+                ..
+            }
+        ));
+    }
 }
 
 fn recursive_application_spine(
