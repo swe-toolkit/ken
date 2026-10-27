@@ -377,9 +377,11 @@ fn run_dynamic_constructor_dispatch_fixture(
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
+            record_region_capacity: None,
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
+            ownerless_boundary_arena: false,
             native_int_arena: None,
             boundary_arena: None,
             native_int_binop: None,
@@ -2333,9 +2335,11 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
+            record_region_capacity: None,
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
+            ownerless_boundary_arena: false,
             native_int_arena: None,
             boundary_arena: None,
             native_int_binop: None,
@@ -2767,7 +2771,9 @@ fn ac_c7_try_compile_edge_with_operands<'src>(
         // `ARENA_NATIVE_INT` binding. ⛔ Setting both from one value would
         // reinstate the equality the Architect's ruling deletes; the native
         // field is left for the fixtures that bind one.
-        compiler.function_local.boundary_arena = Some(parameters[0]);
+        compiler
+            .function_local
+            .bind_ownerless_boundary_arena_for_tests(parameters[0]);
         let emitted_operands = if operands == 0 {
             compiler.function_local.trap_exit = None;
             compiler
@@ -2811,6 +2817,124 @@ fn ac_c7_try_compile_edge_with_operands<'src>(
     module.finalize_definitions().expect("jit finalizes");
     let code = module.get_finalized_function(func_id);
     Ok((module, code))
+}
+
+/// Promise class: durable non-capacity status control for the emitted check.
+/// MEASURED: one compiled body takes two non-capacity statuses to the old -1
+/// trap and OK to its continuation, while the recorder import is available.
+/// CLAIMED: unrelated boundary mismatches cannot manufacture typed capacity.
+/// THE GAP: these statuses are injected directly at the helper, not returned
+/// from a checked program's boundary allocation site.
+#[test]
+fn region_capacity_check_keeps_noncapacity_statuses_at_bare_trap() {
+    let fixture = ac_c7_ctor("Alpha");
+    let (plan, _) = planned_root_occurrence(&fixture);
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let mut compiler = bare_carrier_test_lowering(&seed_env, plan);
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static RECORDER_CALLS: AtomicUsize = AtomicUsize::new(0);
+    unsafe extern "C" fn forbidden_recorder(
+        _services: *const crate::activation_services::GeneratedActivationServicesV1,
+        _tag: u64,
+        _table: u64,
+        _need: u64,
+    ) -> i64 {
+        RECORDER_CALLS.fetch_add(1, Ordering::SeqCst);
+        ken_host::CAPACITY_EXHAUSTED_STATUS_V1
+    }
+    RECORDER_CALLS.store(0, Ordering::SeqCst);
+    let isa = native_isa().expect("native test ISA");
+    let mut jit =
+        cranelift_jit::JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+    jit.symbol(
+        "ken_activation_v1_record_region_capacity",
+        forbidden_recorder as *const u8,
+    );
+    let mut module = cranelift_jit::JITModule::new(jit);
+    let pointer = module.target_config().pointer_type();
+    let mut recorder_signature = module.make_signature();
+    recorder_signature.params.extend([
+        AbiParam::new(pointer),
+        AbiParam::new(types::I64),
+        AbiParam::new(types::I64),
+        AbiParam::new(types::I64),
+    ]);
+    recorder_signature.returns.push(AbiParam::new(types::I64));
+    let recorder = module
+        .declare_function(
+            "ken_activation_v1_record_region_capacity",
+            Linkage::Import,
+            &recorder_signature,
+        )
+        .expect("activation recorder imported");
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I64));
+    let func_id = module
+        .declare_function(
+            "region_capacity_noncapacity_control",
+            Linkage::Local,
+            &signature,
+        )
+        .expect("noncapacity probe declares");
+    let mut context = module.make_context();
+    context.func =
+        Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
+    compiler.function_local.record_region_capacity =
+        Some(module.declare_func_in_func(recorder, &mut context.func));
+    let mut function_context = FunctionBuilderContext::new();
+    {
+        let mut builder = FunctionBuilder::new(&mut context.func, &mut function_context);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        let status = builder.block_params(entry)[0];
+        // A token for the local stub, which must not be called for these
+        // statuses. If called, the stub returns -7 and increments the count.
+        compiler.function_local.services_pointer = Some(builder.ins().iconst(pointer, 1));
+        let tag = builder.ins().iconst(
+            types::I64,
+            crate::boundary_value::BoundaryTag::InvocationAggregate as i64,
+        );
+        let need = builder.ins().iconst(types::I64, 1);
+        compiler
+            .require_boundary_ok_or_capacity(
+                &mut builder,
+                status,
+                tag,
+                crate::activation_abi::KEN_REGION_CAPACITY_ALLOC,
+                need,
+            )
+            .expect("non-capacity status check emits");
+        let continued = builder.ins().iconst(types::I64, 17);
+        builder.ins().return_(&[continued]);
+        builder.seal_all_blocks();
+        builder.finalize();
+    }
+    module
+        .define_function(func_id, &mut context)
+        .expect("probe defines");
+    module.finalize_definitions().expect("JIT finalizes");
+    let code = module.get_finalized_function(func_id);
+    let run: extern "C" fn(i64) -> i64 = unsafe { std::mem::transmute(code) };
+    assert_eq!(run(BOUNDARY_OK), 17, "OK continues");
+    for non_capacity in [
+        crate::boundary_value::BOUNDARY_ERR_TAG,
+        crate::boundary_value::BOUNDARY_ERR_BOUNDS,
+        crate::boundary_value::BOUNDARY_ERR_FROZEN,
+    ] {
+        assert_eq!(
+            run(non_capacity),
+            -1,
+            "status {non_capacity} keeps the trap"
+        );
+    }
+    assert_eq!(
+        RECORDER_CALLS.load(Ordering::SeqCst),
+        0,
+        "non-capacity statuses cannot invoke the capacity recorder"
+    );
 }
 
 /// The expecting wrapper â every `AC-C7` row uses this, because there a
@@ -2904,7 +3028,9 @@ pub(super) fn c2_compile_edge_with_arg<'src>(
         let parameters = builder.block_params(entry).to_vec();
         // This rig receives the published boundary arena directly.  Its
         // carrier producer/consumer paths do not use native-Int services.
-        compiler.function_local.boundary_arena = Some(parameters[0]);
+        compiler
+            .function_local
+            .bind_ownerless_boundary_arena_for_tests(parameters[0]);
         bind_bare_test_trap_lane(&mut compiler, &mut builder);
         let result = emit(&mut compiler, &mut builder, parameters[1])
             .expect("the C2 carrier edge emits");

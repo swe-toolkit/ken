@@ -4,13 +4,15 @@
 > SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY §2;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4;
-> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5).** The §1–3 catalog operations,
-> checked laws, and seeds are present on main. Section 4's catalog
-> operations and checked laws are delivered alongside its authored seed.
-> Section 5 is specified from a checked Architect D0, with an authored
-> conformance seed in a separate source candidate. Its catalog exports
-> remain undelivered. D0 and seed authorship establish neither shipped
-> seed-harness execution nor CI.
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5;
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION §6).** The §1–5 catalog
+> operations and checked laws and their authored seeds are present on main.
+> Earlier scratch D0 and seed authorship do not by themselves establish
+> shipped seed-harness execution or CI. Section 6 specifies one checked
+> pointwise-evaluation law from Architect D0 on `2f78d45b8`; the §6
+> catalog export is absent on this base. Scratch trust 114 → 114 is not
+> a landed trust measurement or execution of the §6 seed against shipped
+> exports.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -556,12 +558,87 @@ reported the same 114 → 114 measurement but failed its subsequent
 new-export lookup, as those exports were not on the base; it was not
 a passing base-harness run.
 
-These are scratch development measurements, not catalog delivery,
-shipped conformance-seed execution, CI, publication, landing or a
-landed trust measurement. The §5 conformance seed is authored at
-`conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md`
-in this separate source candidate; the §5 catalog extension remains
-undelivered, so the seed was not executed against shipped exports.
+Those were scratch development measurements, not evidence of
+catalog delivery, shipped conformance-seed execution, CI or a landed
+trust measurement. The §5 conformance seed is authored at
+`conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md`;
+§5 catalog exports and seed are now present on main. Their presence
+alone does not establish official seed execution or landed trust.
 No `DecEq Expr`, function equality, derivative/substitution
 commutation, differentiation of signed or field coefficients, or
-analytic limit is claimed.
+analytic limit is claimed. Section 6 separately specifies semantic
+commutation of two derivatives, not either deferred structural law.
+
+## 6. Partial derivatives commute under evaluation
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export **one public
+Transparent theorem**, with a checked proof body and this exact type:
+
+```ken
+pub theorem deriv_commute (v : Nat) (w : Nat) (e : Expr) (env : Nat → Nat)
+  : Equal Nat (eval env (deriv v (deriv w e))) (eval env (deriv w (deriv v e)))
+```
+
+For every expression and **every** total `Nat → Nat` environment,
+the two orders of differentiation evaluate to the same natural
+number. The arguments are variables `v`, `w`, then expression `e`,
+then environment `env`. The law is pointwise `Equal Nat` of evaluated
+results, **not** structural `Equal Expr` of the two derivative trees,
+function equality or a restriction to one closed environment.
+It requires no ordering or distinctness premise on `v` and `w`.
+Neither the §5 definition of `deriv` nor any §1–5 operation or law
+changes.
+
+The checked proof proceeds by structural induction on `e`. Constants
+reduce to zero. A variable's first derivative is `var_deriv` of the
+private Boolean `nat_same`; differentiating either of its two
+constant branches evaluates to zero. The new **private** helper
+`deriv_var_deriv_eval` proves that fact by matching its Boolean
+*argument*, rather than matching a computed `nat_same` whose
+refinement would not carry through delta-unfolding. Sums use the
+existing private `add_cong`. For products, applying the fixed §5
+product rule twice gives four evaluated summands. The two orders
+swap the middle two summands; the existing private
+`add_interchange` performs that swap and the induction hypotheses,
+transported by `cong` and joined by `trans`, relate the outer
+summands. There is no new public proof helper, `Axiom`, primitive,
+or syntax form. The single new helper belongs beside the existing
+private `var_deriv`, and remains unimportable by clients.
+
+No `poly_eq` corollary is exported. A client that needs its `True`
+decision may apply §2's existing `poly_eq_complete` directly:
+
+```ken
+poly_eq_complete (deriv v (deriv w e)) (deriv w (deriv v e))
+  (λenv. deriv_commute v w e env)
+```
+
+That consequence has no hypothesis to transport. In contrast,
+§5.1's `poly_eq_deriv` transports a prior `True` answer to the
+derivatives. A consequence already expressible by one existing
+law application does not need a second public theorem.
+
+A closed discriminator uses `x = EVar Zero`, `y = EVar (Suc Zero)`
+and `xy = EMul x y`. Applying `deriv_commute Zero (Suc Zero) xy`
+to an arbitrary environment proves equality of evaluated second
+derivatives. At `env23 v = Suc (Suc v)`, each side independently
+evaluates to `Suc Zero`. The fixed-order §5 product rule nevertheless
+places the middle summands of the two resulting `Expr` trees in
+different positions: a structural `Equal Expr` claim between them
+must be refused. Reflexivity on the **same** left-hand derivative
+tree is an accepted `Equal Expr` control. Neither the closed values
+nor that refusal proves the generic theorem in isolation.
+
+On landed base `2f78d45b8`, Architect's isolated D0 checked the
+generic proof and its public Transparent owner, `ken check` and
+`ken fmt --check` rc 0, two probe tests passed, no new `Axiom`,
+and unchanged exact `trusted_base()` identities 114 → 114. Its
+client accepted the generic `xy` application, both computed-one
+controls and same-tree structural reflexivity; it refused the false
+cross-order structural equality. The §6 seed is authored at
+`conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md`.
+The §6 catalog export is **absent from this candidate's base**:
+D0 checks and authored seed are not execution against shipped §6
+exports, official conformance, CI, publication, landing or landed
+trust. No result for signed coefficients, fields, analytic limits,
+or derivative/substitution commutation follows from §6.

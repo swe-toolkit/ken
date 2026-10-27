@@ -1101,6 +1101,7 @@ struct ArtifactHelpers<'h> {
     seed_material: &'h seed_material::SeedMaterial,
     host_dispatch: Option<FuncId>,
     selected_call_issue: FuncId,
+    record_region_capacity: FuncId,
     selected_call_consume: FuncId,
     native_int: &'h crate::native_int_clif::NativeIntLocalFuncs,
     boundary_value_abi: &'h crate::boundary_value_clif::BoundaryLocalFuncs,
@@ -1128,11 +1129,18 @@ impl ArtifactHelpers<'_> {
                 .host_dispatch
                 .map(|id| module.declare_func_in_func(id, func)),
             selected_call_issue: Some(module.declare_func_in_func(self.selected_call_issue, func)),
-            selected_call_consume: Some(module.declare_func_in_func(self.selected_call_consume, func)),
+            record_region_capacity: Some(
+                module.declare_func_in_func(self.record_region_capacity, func),
+            ),
+            selected_call_consume: Some(
+                module.declare_func_in_func(self.selected_call_consume, func),
+            ),
             // ⛔ Dataflow results, not identities: `None` here is correct, and
             // each function derives its own from its entry block.
             host_dispatch_context: None,
             services_pointer: None,
+            #[cfg(test)]
+            ownerless_boundary_arena: false,
             native_int_arena: None,
             // ⛔ Sourced by the activation-services record, which the `S6`/`D6`
             // reland introduces. Fail closed until then.
@@ -1323,9 +1331,15 @@ struct FunctionLocalRefs {
     host_dispatch: Option<FuncRef>,
     /// Checked imported FFI helpers, resolved per generated function.
     selected_call_issue: Option<FuncRef>,
+    record_region_capacity: Option<FuncRef>,
     selected_call_consume: Option<FuncRef>,
     host_dispatch_context: Option<cranelift_codegen::ir::Value>,
     services_pointer: Option<cranelift_codegen::ir::Value>,
+    /// Test rigs only: the boundary arena was bound from a raw parameter with
+    /// no activation owner behind it, so a capacity status has no issuer to
+    /// record into and keeps the pre-route -1 trap.
+    #[cfg(test)]
+    ownerless_boundary_arena: bool,
     native_int_arena: Option<cranelift_codegen::ir::Value>,
     /// ⭐ **The BOUNDARY arena, and it is a different pointer from
     /// [`Self::native_int_arena`]** — Architect ruling via `evt_e300y2kjeb6k`.
@@ -1571,6 +1585,17 @@ struct FunctionLocalRefs {
     emission_reachable_match_cases: BTreeMap<StaticOriginId, BTreeSet<usize>>,
 }
 
+#[cfg(test)]
+impl FunctionLocalRefs {
+    /// The one way a rig binds an arena with no services behind it.
+    pub(super) fn bind_ownerless_boundary_arena_for_tests(
+        &mut self,
+        arena: cranelift_codegen::ir::Value,
+    ) {
+        self.boundary_arena = Some(arena);
+        self.ownerless_boundary_arena = true;
+    }
+}
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -14265,6 +14290,91 @@ impl<'a> Lowering<'a> {
         let failure = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[failure]);
         builder.switch_to_block(valid);
+    }
+
+    /// Propagate a boundary helper's capacity status only after the activation
+    /// owner records its typed fault. Other mismatches keep the existing -1
+    /// trap; a naked -7 is never authority to forge a capacity terminal.
+    fn require_boundary_ok_or_capacity(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        status: cranelift_codegen::ir::Value,
+        tag: cranelift_codegen::ir::Value,
+        table: u64,
+        need: cranelift_codegen::ir::Value,
+    ) -> Result<(), CraneliftBackendError> {
+        let ok = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            status,
+            BOUNDARY_OK,
+        );
+        let valid = builder.create_block();
+        let failed = builder.create_block();
+        builder.ins().brif(ok, valid, &[], failed, &[]);
+        builder.switch_to_block(failed);
+        #[cfg(test)]
+        if self.function_local.services_pointer.is_none()
+            && self.function_local.ownerless_boundary_arena
+        {
+            // No activation owner exists to record into: every non-OK
+            // status, capacity included, keeps the pre-route -1. Never -7.
+            let trap = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[trap]);
+            builder.seal_block(failed);
+            builder.switch_to_block(valid);
+            builder.seal_block(valid);
+            return Ok(());
+        }
+        let capacity = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            status,
+            crate::boundary_value::BOUNDARY_ERR_CAPACITY,
+        );
+        let record = builder.create_block();
+        let invalid = builder.create_block();
+        builder.ins().brif(capacity, record, &[], invalid, &[]);
+        builder.switch_to_block(record);
+        let services = self.function_local.services_pointer.ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "boundary capacity status has no published activation services".to_string(),
+            )
+        })?;
+        let recorder = self.function_local.record_region_capacity.ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "boundary capacity status has no owner-side recorder import".to_string(),
+            )
+        })?;
+        let table = builder.ins().iconst(types::I64, table as i64);
+        let call = builder.ins().call(recorder, &[services, tag, table, need]);
+        let [recorded] = builder.inst_results(call) else {
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                "boundary capacity recorder returned no status".to_string(),
+            ));
+        };
+        let recorded = *recorded;
+        let authentic = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            recorded,
+            ken_host::CAPACITY_EXHAUSTED_STATUS_V1,
+        );
+        let typed = builder.create_block();
+        builder.ins().brif(authentic, typed, &[], invalid, &[]);
+        builder.switch_to_block(typed);
+        builder.ins().return_(&[recorded]);
+        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+        builder.seal_block(typed);
+        builder.switch_to_block(invalid);
+        let trap = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[trap]);
+        builder.seal_block(invalid);
+        builder.seal_block(record);
+        builder.seal_block(failed);
+        builder.switch_to_block(valid);
+        builder.seal_block(valid);
+        Ok(())
     }
 
     fn require_one_of_i64(
