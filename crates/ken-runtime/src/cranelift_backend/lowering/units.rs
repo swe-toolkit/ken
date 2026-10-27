@@ -21,13 +21,13 @@
 //! ⛔ **not** because this module filters them out. There is deliberately no
 //! filter here to get wrong.
 
-use crate::cranelift_backend::surface::LoweringCause;
-use super::*;
 use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope, CheckedTokenFunctionScope};
+use super::*;
+use crate::cranelift_backend::surface::LoweringCause;
 // `close_host_effect_seat_ledger`'s own `#[cfg(test)]` mutation check reaches
 // these directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
 #[cfg(test)]
-use super::effects::{effect_seat_visit_mutation, EffectSeatVisitMutation};
+use super::effects::{EffectSeatVisitMutation, effect_seat_visit_mutation};
 use crate::cranelift_backend::planning::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization,
 };
@@ -65,11 +65,14 @@ fn admitted_capture_source(
 ) -> Result<StaticOriginId, CraneliftBackendError> {
     match source {
         ContinuationWorkerCaptureSource::Lexical(origin) => Ok(*origin),
-        ContinuationWorkerCaptureSource::Seed => Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "checked-IH captured environment: capture {ordinal} is a seed capture with no \
+        ContinuationWorkerCaptureSource::Seed => Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "checked-IH captured environment: capture {ordinal} is a seed capture with no \
              source occurrence, so its field identity cannot be admitted from the plan \
              and must not be invented",
-        ))),
+            ),
+        )),
     }
 }
 
@@ -93,37 +96,52 @@ fn validate_admitted_matches_role_sequence(
 ) -> Result<(), CraneliftBackendError> {
     let mut index = 0usize;
     for role in envelope {
-        let ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, source, .. } = role else {
+        let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+            ordinal, source, ..
+        } = role
+        else {
             continue;
         };
         let Some((admitted_ordinal, admitted_source)) = capture_sources.get(index) else {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "checked-IH captured environment: the envelope issues more worker captures \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "checked-IH captured environment: the envelope issues more worker captures \
                  than the admitted run holds, first missing at position {index}",
-            )));
+                ),
+            ));
         };
         if admitted_ordinal != ordinal {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "checked-IH captured environment: capture at position {index} was admitted \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "checked-IH captured environment: capture at position {index} was admitted \
                  with ordinal {admitted_ordinal}, but the plan issues ordinal {ordinal} there",
-            )));
+                ),
+            ));
         }
         let issued = admitted_capture_source(*ordinal, source)?;
         if *admitted_source != issued {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "checked-IH captured environment: capture {ordinal} was admitted with source \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "checked-IH captured environment: capture {ordinal} was admitted with source \
                  {admitted_source:?}, but the plan issues {issued:?} for it -- the admitted \
                  association is not the planner-issued one",
-            )));
+                ),
+            ));
         }
         index += 1;
     }
     if index != capture_sources.len() {
-        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "checked-IH captured environment: the admitted run holds {} captures but the \
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "checked-IH captured environment: the admitted run holds {} captures but the \
              envelope issues {index}",
-            capture_sources.len(),
-        )));
+                capture_sources.len(),
+            ),
+        ));
     }
     Ok(())
 }
@@ -140,38 +158,49 @@ fn validate_captured_environment_bijection(
     // does not mistake it for a live production guard and reason from its
     // reachability.
     if capture_sources.len() != capture_count {
-        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "checked-IH captured environment: {} sourced occurrences for {capture_count} \
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "checked-IH captured environment: {} sourced occurrences for {capture_count} \
              captures, so the admitted run is not a bijection",
-            capture_sources.len(),
-        )));
+                capture_sources.len(),
+            ),
+        ));
     }
     let mut seen_ordinals: Vec<u32> = Vec::with_capacity(capture_sources.len());
     let mut seen_sources: Vec<StaticOriginId> = Vec::with_capacity(capture_sources.len());
     for (index, (ordinal, source)) in capture_sources.iter().enumerate() {
         let expected = u32::try_from(index).map_err(|_| {
-            backend_module(LoweringCause::Capacity,
+            backend_module(
+                LoweringCause::Capacity,
                 "checked-IH captured environment: capture ordinal exceeds addressable range"
                     .to_string(),
             )
         })?;
         if *ordinal != expected {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "checked-IH captured environment: capture at position {index} carries ordinal \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "checked-IH captured environment: capture at position {index} carries ordinal \
                  {ordinal}, so the plan's capture ordinals are not the contiguous run this \
                  environment is admitted over",
-            )));
+                ),
+            ));
         }
         if seen_ordinals.contains(ordinal) {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "checked-IH captured environment: capture ordinal {ordinal} appears twice",
-            )));
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!("checked-IH captured environment: capture ordinal {ordinal} appears twice",),
+            ));
         }
         if seen_sources.contains(source) {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "checked-IH captured environment: source occurrence {source:?} is claimed by \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "checked-IH captured environment: source occurrence {source:?} is claimed by \
                  two captures, so the admitted mapping is not injective",
-            )));
+                ),
+            ));
         }
         seen_ordinals.push(*ordinal);
         seen_sources.push(*source);
@@ -346,10 +375,7 @@ impl UnitBundle {
         self.functions.get(&unit).copied()
     }
 
-    fn grafted_spine_scope(
-        &self,
-        function: FuncId,
-    ) -> Option<GraftedSpineFunctionScope> {
+    fn grafted_spine_scope(&self, function: FuncId) -> Option<GraftedSpineFunctionScope> {
         self.grafted_spine_scopes.get(&function).copied()
     }
 
@@ -432,12 +458,18 @@ impl Lowering<'_> {
     /// restricted to the member slot. No other store may address these slots.
     fn verify_pending_vis_slot_stores(&self, func: &Function) -> Result<(), CraneliftBackendError> {
         use cranelift_codegen::ir::{InstructionData, Opcode, ValueDef};
-        let error = |why: &str| backend_module(LoweringCause::FinishedCode, format!(
-            "pending-Vis record-store verifier: {why}",
-        ));
-        let capacity_error = |why: &str| backend_module(LoweringCause::Capacity, format!(
-            "pending-Vis record-store verifier: {why}",
-        ));
+        let error = |why: &str| {
+            backend_module(
+                LoweringCause::FinishedCode,
+                format!("pending-Vis record-store verifier: {why}",),
+            )
+        };
+        let capacity_error = |why: &str| {
+            backend_module(
+                LoweringCause::Capacity,
+                format!("pending-Vis record-store verifier: {why}",),
+            )
+        };
         let facts = &self.function_local.pending_vis_slot_stores;
         let sites = &self.function_local.pending_vis_copy_sites;
         let producers = &self.function_local.pending_vis_producer_sites;
@@ -454,7 +486,10 @@ impl Lowering<'_> {
         let mut copied = BTreeMap::new();
         for site in sites {
             if site.destination != frame.region
-                || copied.insert((site.call, site.copy_guard), BTreeSet::new()).is_some() {
+                || copied
+                    .insert((site.call, site.copy_guard), BTreeSet::new())
+                    .is_some()
+            {
                 return Err(error("a copy site has the wrong frame or repeats its call"));
             }
         }
@@ -463,16 +498,20 @@ impl Lowering<'_> {
                 return Err(error("a record store was recorded twice"));
             }
         }
-        let stack_word = |inst, slot, offset| matches!(
-            func.dfg.insts[inst],
-            InstructionData::StackLoad { opcode: Opcode::StackLoad,
-                stack_slot, offset: actual } if stack_slot == slot && i32::from(actual) == offset
-        );
+        let stack_word = |inst, slot, offset| {
+            matches!(
+                func.dfg.insts[inst],
+                InstructionData::StackLoad { opcode: Opcode::StackLoad,
+                    stack_slot, offset: actual } if stack_slot == slot && i32::from(actual) == offset
+            )
+        };
         let compare_nonzero = |guard, word| {
             if func.dfg.insts[guard].opcode() != Opcode::Brif {
                 return false;
             }
-            let Some(&condition) = func.dfg.inst_args(guard).first() else { return false };
+            let Some(&condition) = func.dfg.inst_args(guard).first() else {
+                return false;
+            };
             let ValueDef::Result(compare, _) = func.dfg.value_def(condition) else {
                 return false;
             };
@@ -481,31 +520,40 @@ impl Lowering<'_> {
                 if arg == word && imm.bits() == 0
                     && cond == cranelift_codegen::ir::condcodes::IntCC::NotEqual)
         };
-        for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+        for inst in func
+            .layout
+            .blocks()
+            .flat_map(|block| func.layout.block_insts(block))
+        {
             let args = func.dfg.inst_args(inst);
             if !args.contains(&frame.slots) {
                 continue;
             }
             match func.dfg.insts[inst] {
                 InstructionData::Load { .. } => continue,
-                InstructionData::Store { offset, .. }
-                    if args.get(1) == Some(&frame.slots) => {
+                InstructionData::Store { offset, .. } if args.get(1) == Some(&frame.slots) => {
                     let offset = i32::from(offset);
                     if offset < frame.region.discriminant
-                        || i64::from(offset) >= i64::from(frame.region.frame_bytes) {
+                        || i64::from(offset) >= i64::from(frame.region.frame_bytes)
+                    {
                         continue;
                     }
-                    let fact = expected.remove(&inst).ok_or_else(||
-                        error("an unaccounted store addresses a pending record slot"))?;
+                    let fact = expected.remove(&inst).ok_or_else(|| {
+                        error("an unaccounted store addresses a pending record slot")
+                    })?;
                     if fact.offset != offset {
                         return Err(error("a recorded store moved to a different record slot"));
                     }
-                    let stored = args.first().copied().ok_or_else(||
-                        error("a pending record store has no value"))?;
+                    let stored = args
+                        .first()
+                        .copied()
+                        .ok_or_else(|| error("a pending record store has no value"))?;
                     match fact.source {
                         PendingVisStoreSource::Captured(word) => {
                             if offset == frame.region.discriminant || stored != word {
-                                return Err(error("a capture slot did not store the helper result"));
+                                return Err(error(
+                                    "a capture slot did not store the helper result",
+                                ));
                             }
                         }
                         PendingVisStoreSource::Member(row) => {
@@ -516,7 +564,8 @@ impl Lowering<'_> {
                             if offset != frame.region.discriminant
                                 || !matches!(func.dfg.insts[mint],
                                     InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
-                                    if imm.bits() == exact) {
+                                    if imm.bits() == exact)
+                            {
                                 return Err(error("a member is not its producer's exact row"));
                             }
                         }
@@ -527,22 +576,36 @@ impl Lowering<'_> {
                             if offset != frame.region.discriminant
                                 || !matches!(func.dfg.insts[mint],
                                     InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
-                                    if imm.bits() == 0) {
+                                    if imm.bits() == 0)
+                            {
                                 return Err(error("a consumed member is not cleared to zero"));
                             }
                         }
                         PendingVisStoreSource::Copied {
-                            load, source, source_region, source_offset,
-                            call, status_guard, trap_guard, trap_load, trap_offset,
-                            member_load, member_offset, copy_guard,
+                            load,
+                            source,
+                            source_region,
+                            source_offset,
+                            call,
+                            status_guard,
+                            trap_guard,
+                            trap_load,
+                            trap_offset,
+                            member_load,
+                            member_offset,
+                            copy_guard,
                         } => {
-                            let positions = copied.get_mut(&(call, copy_guard))
+                            let positions = copied
+                                .get_mut(&(call, copy_guard))
                                 .ok_or_else(|| error("a copy store has no declared call site"))?;
-                            let site = sites.iter().find(|site|
-                                site.call == call && site.copy_guard == copy_guard)
+                            let site = sites
+                                .iter()
+                                .find(|site| site.call == call && site.copy_guard == copy_guard)
                                 .ok_or_else(|| error("a copy store has no declared call site"))?;
                             if site.source != source_region || !positions.insert(offset) {
-                                return Err(error("a copy store repeats a field or changes its source region"));
+                                return Err(error(
+                                    "a copy store repeats a field or changes its source region",
+                                ));
                             }
                             // Position correspondence is checked against the
                             // two planner regions, not the emitter's recorded
@@ -551,14 +614,14 @@ impl Lowering<'_> {
                             let expected_source = if offset == frame.region.discriminant {
                                 Some(source_region.discriminant)
                             } else if offset < frame.region.continuation_inputs {
-                                (offset - frame.region.captures)
-                                    .checked_add(source_region.captures)
+                                (offset - frame.region.captures).checked_add(source_region.captures)
                             } else {
                                 (offset - frame.region.continuation_inputs)
                                     .checked_add(source_region.continuation_inputs)
                             };
                             if expected_source != Some(source_offset)
-                                || member_offset != source_region.discriminant {
+                                || member_offset != source_region.discriminant
+                            {
                                 return Err(error("copy-up changed a record field's position"));
                             }
                             let word = func.dfg.inst_results(load).first().copied();
@@ -571,18 +634,21 @@ impl Lowering<'_> {
                             if !stack_word(load, source, source_offset)
                                 || !stack_word(trap_load, source, trap_offset)
                                 || !stack_word(member_load, source, member_offset)
-                                || word != Some(stored) {
-                                return Err(error("a copy store did not use its callee-frame load"));
+                                || word != Some(stored)
+                            {
+                                return Err(error(
+                                    "a copy store did not use its callee-frame load",
+                                ));
                             }
-                            if !status.is_some_and(|status|
-                                compare_nonzero(status_guard, status))
-                                || !trap.is_some_and(|trap|
-                                    compare_nonzero(trap_guard, trap))
-                                || !member.is_some_and(|member|
-                                    compare_nonzero(copy_guard, member))
+                            if !status.is_some_and(|status| compare_nonzero(status_guard, status))
+                                || !trap.is_some_and(|trap| compare_nonzero(trap_guard, trap))
+                                || !member.is_some_and(|member| compare_nonzero(copy_guard, member))
                                 || !matches!(func.dfg.value_def(status.unwrap()),
-                                    ValueDef::Result(producer, 0) if producer == call) {
-                                return Err(error("copy-up lacks an exact status, Trap or member check"));
+                                    ValueDef::Result(producer, 0) if producer == call)
+                            {
+                                return Err(error(
+                                    "copy-up lacks an exact status, Trap or member check",
+                                ));
                             }
                             if !dom.dominates(call, status_guard, &func.layout)
                                 || !dom.dominates(status_guard, trap_guard, &func.layout)
@@ -591,8 +657,11 @@ impl Lowering<'_> {
                                 || !dom.dominates(member_load, copy_guard, &func.layout)
                                 || (load != member_load
                                     && !dom.dominates(copy_guard, load, &func.layout))
-                                || !dom.dominates(copy_guard, inst, &func.layout) {
-                                return Err(error("a copy store bypassed its checked callee result"));
+                                || !dom.dominates(copy_guard, inst, &func.layout)
+                            {
+                                return Err(error(
+                                    "a copy store bypassed its checked callee result",
+                                ));
                             }
                             let status_edges = func.dfg.insts[status_guard]
                                 .branch_destination(&func.dfg.jump_tables);
@@ -600,16 +669,28 @@ impl Lowering<'_> {
                                 .branch_destination(&func.dfg.jump_tables);
                             let copy_edges = func.dfg.insts[copy_guard]
                                 .branch_destination(&func.dfg.jump_tables);
-                            if status_edges.get(1).is_none_or(|edge|
-                                !dom.dominates(edge.block(&func.dfg.value_lists), trap_load,
-                                    &func.layout))
-                                || trap_edges.get(1).is_none_or(|edge|
-                                    !dom.dominates(edge.block(&func.dfg.value_lists), member_load,
-                                        &func.layout))
-                                || copy_edges.first().is_none_or(|edge|
-                                    !dom.dominates(edge.block(&func.dfg.value_lists), inst,
-                                        &func.layout)) {
-                                return Err(error("copy-up took a failed status, Trap or member branch"));
+                            if status_edges.get(1).is_none_or(|edge| {
+                                !dom.dominates(
+                                    edge.block(&func.dfg.value_lists),
+                                    trap_load,
+                                    &func.layout,
+                                )
+                            }) || trap_edges.get(1).is_none_or(|edge| {
+                                !dom.dominates(
+                                    edge.block(&func.dfg.value_lists),
+                                    member_load,
+                                    &func.layout,
+                                )
+                            }) || copy_edges.first().is_none_or(|edge| {
+                                !dom.dominates(
+                                    edge.block(&func.dfg.value_lists),
+                                    inst,
+                                    &func.layout,
+                                )
+                            }) {
+                                return Err(error(
+                                    "copy-up took a failed status, Trap or member branch",
+                                ));
                             }
                         }
                     }
@@ -625,33 +706,42 @@ impl Lowering<'_> {
         // A ledger of stores alone cannot detect omitting both a store and
         // its fact. Start from each call site, then demand every common field
         // of its two distinct planner regions plus the member discriminant.
-        let positions = |start: i32, bytes: i32|
-            -> Result<BTreeSet<i32>, CraneliftBackendError> {
+        let positions = |start: i32, bytes: i32| -> Result<BTreeSet<i32>, CraneliftBackendError> {
             if bytes < 0 || bytes % 8 != 0 {
                 return Err(error("a copy site has an invalid record width"));
             }
-            (0..bytes / 8).map(|index| {
-                start.checked_add(index * 8)
-                    .ok_or_else(|| capacity_error("a copy site offset exhausted"))
-            }).collect()
+            (0..bytes / 8)
+                .map(|index| {
+                    start
+                        .checked_add(index * 8)
+                        .ok_or_else(|| capacity_error("a copy site offset exhausted"))
+                })
+                .collect()
         };
         for site in sites {
             let source_end = i32::try_from(site.source.frame_bytes)
                 .map_err(|_| capacity_error("a copy source frame exceeds addressable range"))?;
-            let dest_end = i32::try_from(site.destination.frame_bytes)
-                .map_err(|_| capacity_error("a copy destination frame exceeds addressable range"))?;
+            let dest_end = i32::try_from(site.destination.frame_bytes).map_err(|_| {
+                capacity_error("a copy destination frame exceeds addressable range")
+            })?;
             let mut required = BTreeSet::from([site.destination.discriminant]);
-            required.extend(positions(site.destination.captures,
+            required.extend(positions(
+                site.destination.captures,
                 (site.source.continuation_inputs - site.source.captures)
-                    .min(site.destination.continuation_inputs - site.destination.captures))?);
-            required.extend(positions(site.destination.continuation_inputs,
+                    .min(site.destination.continuation_inputs - site.destination.captures),
+            )?);
+            required.extend(positions(
+                site.destination.continuation_inputs,
                 (source_end - site.source.continuation_inputs)
-                    .min(dest_end - site.destination.continuation_inputs))?);
+                    .min(dest_end - site.destination.continuation_inputs),
+            )?);
             if copied.get(&(site.call, site.copy_guard)) != Some(&required) {
                 return Err(error("copy-up omitted or added a planned record field"));
             }
         }
-        let protocol = self.pending_vis_record_protocol.as_ref()
+        let protocol = self
+            .pending_vis_record_protocol
+            .as_ref()
             .ok_or_else(|| error("a producer has no checked returned-Vis plan"))?;
         let mut seen_members = BTreeSet::new();
         for site in producers {
@@ -659,36 +749,57 @@ impl Lowering<'_> {
                 return Err(error("a producer's member store was recorded twice"));
             }
             let mut rows = protocol.members.values().filter(|row| row.id() == site.row);
-            let row = rows.next().ok_or_else(|| error("a producer has no exact successor row"))?;
+            let row = rows
+                .next()
+                .ok_or_else(|| error("a producer has no exact successor row"))?;
             if rows.next().is_some() {
                 return Err(error("a producer's successor row is ambiguous"));
             }
-            let member = facts.iter().find(|fact| fact.inst == site.member)
+            let member = facts
+                .iter()
+                .find(|fact| fact.inst == site.member)
                 .ok_or_else(|| error("a producer omitted its member store"))?;
             if member.offset != frame.region.discriminant
-                || !matches!(member.source, PendingVisStoreSource::Member(id) if id == site.row) {
+                || !matches!(member.source, PendingVisStoreSource::Member(id) if id == site.row)
+            {
                 return Err(error("a producer changed its member store"));
             }
-            let capture_offsets = row.captures().iter().enumerate().map(|(index, _)|
-                (frame.region.captures, index))
-                .chain(row.continuation_inputs().iter().enumerate().map(|(index, _)|
-                    (frame.region.continuation_inputs, index)))
+            let capture_offsets = row
+                .captures()
+                .iter()
+                .enumerate()
+                .map(|(index, _)| (frame.region.captures, index))
+                .chain(
+                    row.continuation_inputs()
+                        .iter()
+                        .enumerate()
+                        .map(|(index, _)| (frame.region.continuation_inputs, index)),
+                )
                 .map(|(start, index)| {
-                    let delta = index.checked_mul(8).and_then(|value| i32::try_from(value).ok())
+                    let delta = index
+                        .checked_mul(8)
+                        .and_then(|value| i32::try_from(value).ok())
                         .ok_or_else(|| error("a producer capture offset exhausted"))?;
-                    start.checked_add(delta)
+                    start
+                        .checked_add(delta)
                         .ok_or_else(|| error("a producer capture offset exhausted"))
-                }).collect::<Result<Vec<_>, _>>()?;
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             if site.capture_stores.len() != capture_offsets.len() {
                 return Err(error("a producer omitted a planned record field"));
             }
             for (&inst, expected_offset) in site.capture_stores.iter().zip(capture_offsets) {
-                let fact = facts.iter().find(|fact| fact.inst == inst)
+                let fact = facts
+                    .iter()
+                    .find(|fact| fact.inst == inst)
                     .ok_or_else(|| error("a producer omitted a planned record field"))?;
                 if fact.offset != expected_offset
                     || !matches!(fact.source, PendingVisStoreSource::Captured(_))
-                    || !dom.dominates(inst, site.member, &func.layout) {
-                    return Err(error("a producer changed a planned field or wrote after its member"));
+                    || !dom.dominates(inst, site.member, &func.layout)
+                {
+                    return Err(error(
+                        "a producer changed a planned field or wrote after its member",
+                    ));
                 }
             }
         }
@@ -702,7 +813,8 @@ impl Lowering<'_> {
     ) -> Result<(), CraneliftBackendError> {
         self.verify_pending_vis_slot_stores(function)?;
         let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a generated unit finished without a typed grafted-spine scope".to_string(),
             )
         })?;
@@ -711,7 +823,8 @@ impl Lowering<'_> {
         self.grafted_spine_builder
             .as_mut()
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant,
+                backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a generated unit finished after its grafted-spine builder closed".to_string(),
                 )
             })?
@@ -724,7 +837,10 @@ impl Lowering<'_> {
         &mut self,
     ) -> Result<(), CraneliftBackendError> {
         let builder = self.grafted_spine_builder.take().ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "the grafted-spine builder was already closed".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the grafted-spine builder was already closed".to_string(),
+            )
         })?;
         let (graph, validation_inputs) = builder.finish()?;
         #[cfg(any(test, feature = "px8-ds-test-support"))]
@@ -935,14 +1051,15 @@ pub fn with_static_response_caller_retarget_mutation<T>(
     STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(|count| count.set(0));
     let _restore = Restore;
     let result = operation();
-    let applications =
-        STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
-    STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
+    STATIC_RESPONSE_CALLER_RETARGET_MUTATION
+        .with(std::cell::Cell::get)
+        .is_none()
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -961,11 +1078,14 @@ thread_local! {
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn with_relay_owner_coverage_refusal_observations<T>(operation: impl FnOnce() -> T)
-    -> (T, Vec<RelayOwnerCoverageRefusalObservation>)
-{
+pub fn with_relay_owner_coverage_refusal_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<RelayOwnerCoverageRefusalObservation>) {
     RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
-        assert!(slot.borrow().is_none(), "relay coverage observations cannot nest");
+        assert!(
+            slot.borrow().is_none(),
+            "relay coverage observations cannot nest"
+        );
         *slot.borrow_mut() = Some(Vec::new());
     });
     let result = operation();
@@ -990,14 +1110,15 @@ pub fn with_static_response_owner_body_mutation<T>(
     STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.set(0));
     let _restore = Restore;
     let result = operation();
-    let applications =
-        STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_owner_body_mutation_is_exact() -> bool {
-    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
+    STATIC_RESPONSE_OWNER_BODY_MUTATION
+        .with(std::cell::Cell::get)
+        .is_none()
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1017,19 +1138,15 @@ pub fn with_pending_vis_nonmember_mutation<T>(
     PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.set(0));
     let _restore = Restore;
     let result = operation();
-    let applications = PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS
-        .with(std::cell::Cell::get);
+    let applications = PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-fn claim_pending_vis_nonmember_mutation(
-    eligible: bool,
-) -> Option<PendingVisNonmemberMutation> {
+fn claim_pending_vis_nonmember_mutation(eligible: bool) -> Option<PendingVisNonmemberMutation> {
     PENDING_VIS_NONMEMBER_MUTATION.with(|slot| {
         let mutation = slot.get()?;
-        if !eligible || PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS
-            .with(|count| count.get() != 0) {
+        if !eligible || PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.get() != 0) {
             return None;
         }
         PENDING_VIS_NONMEMBER_MUTATION_APPLICATIONS.with(|count| count.set(1));
@@ -1071,8 +1188,8 @@ fn claim_static_response_owner_body_mutation(
 ) -> Option<StaticResponseOwnerBodyMutation> {
     STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| {
         let mutation = slot.get()?;
-        let already_applied = STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS
-            .with(|count| count.get() != 0);
+        let already_applied =
+            STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.get() != 0);
         if already_applied || !predicate(mutation) {
             return None;
         }
@@ -1161,10 +1278,8 @@ pub(in crate::cranelift_backend) struct DeclaredUnitCall {
 }
 
 pub(in crate::cranelift_backend) struct DeclaredUnitCalls {
-    pub(in crate::cranelift_backend) static_bodies:
-        BTreeMap<StaticOriginId, DeclaredUnitCall>,
-    pub(in crate::cranelift_backend) declarations:
-        BTreeMap<StaticOriginId, DeclaredUnitCall>,
+    pub(in crate::cranelift_backend) static_bodies: BTreeMap<StaticOriginId, DeclaredUnitCall>,
+    pub(in crate::cranelift_backend) declarations: BTreeMap<StaticOriginId, DeclaredUnitCall>,
 }
 
 impl CallEdgeTargets {
@@ -1198,7 +1313,10 @@ impl CallEdgeTargets {
                 ),
             };
             if calls.insert(target.call_site_origin, call).is_some() {
-                return Err(backend_module(LoweringCause::PlannerInvariant, duplicate.to_string()));
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    duplicate.to_string(),
+                ));
             }
         }
         Ok(DeclaredUnitCalls {
@@ -1271,10 +1389,13 @@ impl CallEdgeTargets {
                 );
                 Ok(vec![unrelated])
             }
-            found => Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "retained-unit root control requires at most one unrelated legal static-body \
+            found => Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "retained-unit root control requires at most one unrelated legal static-body \
                  owner, found {found}"
-            ))),
+                ),
+            )),
         }
     }
 
@@ -1360,18 +1481,24 @@ impl CallEdgeTargets {
         let mut unique = BTreeMap::new();
         for claim in claims {
             if claim.body != claim.target.call_site_origin {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "a retained-body graph claim for {:?} resolved to a target bound to {:?}; a \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "a retained-body graph claim for {:?} resolved to a target bound to {:?}; a \
                      target for another body cannot satisfy this claim",
-                    claim.body, claim.target.call_site_origin
-                )));
+                        claim.body, claim.target.call_site_origin
+                    ),
+                ));
             }
             if unique.insert(claim.body, claim.target).is_some() {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "retained body {:?} has more than one graph-derived call target; choosing one \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "retained body {:?} has more than one graph-derived call target; choosing one \
                      by preference or iteration order is forbidden",
-                    claim.body
-                )));
+                        claim.body
+                    ),
+                ));
             }
         }
 
@@ -1543,21 +1670,21 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
     // remains. ⛔ The two populations are otherwise identical on a program with
     // no retarget, which is why this only became measurable at checkpoint 4.
     #[cfg(test)]
-    let template_population =
-        if crate::cranelift_backend::lowering::d5a_route_mutation()
-            == crate::cranelift_backend::lowering::D5aRouteMutation::DropSupersededWorkerTemplates
-        {
-            crate::cranelift_backend::lowering::record_d5a_route_application();
-            plan.executable_units()?
-        } else {
-            plan.emittable_units()?
-        };
+    let template_population = if crate::cranelift_backend::lowering::d5a_route_mutation()
+        == crate::cranelift_backend::lowering::D5aRouteMutation::DropSupersededWorkerTemplates
+    {
+        crate::cranelift_backend::lowering::record_d5a_route_application();
+        plan.executable_units()?
+    } else {
+        plan.emittable_units()?
+    };
     #[cfg(not(test))]
     let template_population = plan.emittable_units()?;
     for unit in template_population {
         let (offsets, frame_bytes) = unit.slot_offsets()?;
         if frame_bytes != unit.header().frame_bytes {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "worker template frame size disagrees with its slot run".to_string(),
             ));
         }
@@ -1575,7 +1702,8 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
             )
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two emittable units claim the same body origin, so no worker template could \
                  name either unambiguously"
                     .to_string(),
@@ -1585,14 +1713,16 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
     let mut by_origin: BTreeMap<StaticOriginId, ResolvedUnitTarget> = BTreeMap::new();
     for unit in plan.executable_units()? {
         let function = bundle.function(unit.function()).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a planned unit has no forward-declared function to project as a worker target"
                     .to_string(),
             )
         })?;
         let (offsets, frame_bytes) = unit.slot_offsets()?;
         if frame_bytes != unit.header().frame_bytes {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "worker target frame size disagrees with its slot run".to_string(),
             ));
         }
@@ -1693,7 +1823,8 @@ impl CheckedCallLedger {
         record: CheckedCallRecord,
     ) -> Result<(), CraneliftBackendError> {
         if self.emitted.insert(call_template_id, record).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "one checked recursive call template emitted more than one declaration-unit call"
                     .to_string(),
             ));
@@ -1714,9 +1845,12 @@ impl CheckedCallLedger {
             if *set != self.planned {
                 let missing = self.planned.difference(set).count();
                 let extra = set.difference(&self.planned).count();
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the {name} checked recursive call population does not equal the planned one:                      {missing} planned templates absent, {extra} unplanned templates present"
-                )));
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the {name} checked recursive call population does not equal the planned one:                      {missing} planned templates absent, {extra} unplanned templates present"
+                    ),
+                ));
             }
         }
         // Each emitted call's ACTUAL callee against its exact resolved target.
@@ -1725,11 +1859,14 @@ impl CheckedCallLedger {
         // did not resolve.
         for (call_template_id, record) in &self.emitted {
             if record.callee != record.resolved {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "checked recursive call template {call_template_id} emitted a call to \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "checked recursive call template {call_template_id} emitted a call to \
                      {:?} but the target resolved for occurrence {:?} is {:?} ({:?})",
-                    record.callee, record.reference, record.resolved, record.target
-                )));
+                        record.callee, record.reference, record.resolved, record.target
+                    ),
+                ));
             }
         }
         Ok(())
@@ -1758,21 +1895,31 @@ pub(in crate::cranelift_backend) fn resolve_call_edges(
     let mut edges = Vec::with_capacity(derived.len());
     for edge in derived {
         let target = bundle.function(edge.callee()).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "a call edge names a unit that was never forward-declared".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "a call edge names a unit that was never forward-declared".to_string(),
+            )
         })?;
         let unit = plan
             .emittable_units()?
             .into_iter()
             .find(|unit| unit.function() == edge.callee())
-            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "call edge callee has no abi descriptor".to_string()))?;
+            .ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "call edge callee has no abi descriptor".to_string(),
+                )
+            })?;
         if unit.entry_origin() != edge.callee_origin() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "call edge callee origin disagrees with its abi descriptor".to_string(),
             ));
         }
         let (offsets, frame_bytes) = unit.slot_offsets()?;
         if frame_bytes != unit.header().frame_bytes {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "call edge target frame size disagrees with its slot run".to_string(),
             ));
         }
@@ -1786,7 +1933,8 @@ pub(in crate::cranelift_backend) fn resolve_call_edges(
                     EmittableCallKind::StaticBody => *source_bindings
                         .get(&(edge.caller(), edge.callee_origin()))
                         .ok_or_else(|| {
-                            backend_module(LoweringCause::PlannerInvariant,
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "a static body call edge has no D1b source-body binding"
                                     .to_string(),
                             )
@@ -1869,9 +2017,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
         match mutation {
             D5DeclaredCallMutation::Exact => {}
             D5DeclaredCallMutation::Carrier => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.carrier = match slot.carrier {
                         AbiCarrier::ValueWord => AbiCarrier::GroundValueCarrier,
                         _ => AbiCarrier::ValueWord,
@@ -1879,9 +2029,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
                 }
             }
             D5DeclaredCallMutation::Ownership => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.ownership = match slot.ownership {
                         AbiOwnership::OwnedByFrame => AbiOwnership::BorrowedForActivation,
                         _ => AbiOwnership::OwnedByFrame,
@@ -1889,9 +2041,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
                 }
             }
             D5DeclaredCallMutation::StorageOwner => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.storage_owner = match slot.storage_owner {
                         AbiStorageOwner::ActivationFrame => AbiStorageOwner::PersistentStore,
                         _ => AbiStorageOwner::ActivationFrame,
@@ -1899,9 +2053,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
                 }
             }
             D5DeclaredCallMutation::Ordinal => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.ordinal = slot.ordinal.wrapping_add(1);
                 }
             }
@@ -1995,7 +2151,8 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             .insert(id, GraftedSpineFunctionScope::Predeclared(unit.function()))
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two predeclared units share one module function target".to_string(),
             ));
         }
@@ -2005,7 +2162,8 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             // the plane disagrees with that invariant, and silently keeping the
             // last one would emit a bundle whose call edges resolve to the
             // wrong body.
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two abi descriptors claim one predeclared function unit".to_string(),
             ));
         }
@@ -2021,7 +2179,11 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     // executable/template split above exists to prevent, arriving by a second
     // route.
     let mut continuations = BTreeMap::new();
-    for (ordinal, unit) in plan.ordinary_continuation_targets()?.into_iter().enumerate() {
+    for (ordinal, unit) in plan
+        .ordinary_continuation_targets()?
+        .into_iter()
+        .enumerate()
+    {
         let name = format!("ken_continuation_{ordinal}");
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
@@ -2030,12 +2192,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             .insert(id, GraftedSpineFunctionScope::Continuation(unit))
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two continuation units share one module function target".to_string(),
             ));
         }
         if continuations.insert(unit, id).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two continuation descriptors claim one planned specialization".to_string(),
             ));
         }
@@ -2046,11 +2210,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     let response_owners = plan
         .static_response_owner_specializations()?
         .map_err(|infeasible| {
-            backend_module(LoweringCause::Fragment, format!(
-                "compile-time response specialization is infeasible at {:?}: {}",
-                infeasible.vis_origin(),
-                infeasible.reason(),
-            ))
+            backend_module(
+                LoweringCause::Fragment,
+                format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ),
+            )
         })?;
     let mut responses = BTreeMap::new();
     for owner in &response_owners {
@@ -2062,12 +2229,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             .insert(id, GraftedSpineFunctionScope::Response(owner.id()))
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two response owners share one module function target".to_string(),
             ));
         }
         if responses.insert(owner.id(), id).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two response-owner descriptors claim one response-owner identity".to_string(),
             ));
         }
@@ -2089,12 +2258,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             )
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two continuation contexts share one module function target".to_string(),
             ));
         }
         if contexts.insert(context.id(), id).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two generated context descriptors claim one planned context".to_string(),
             ));
         }
@@ -2119,12 +2290,14 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             .insert(id, GraftedSpineFunctionScope::Fusion(fusion.id()))
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two fusion regions share one module function target".to_string(),
             ));
         }
         if fusions.insert(fusion.id(), id).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two static continuation fusion descriptors claim one installed region".to_string(),
             ));
         }
@@ -2160,10 +2333,13 @@ fn selected_response_owner_target(
     match plan.resolved_continuation_callee(identity)? {
         ResolvedContinuationCallee::StaticResponseOwner(owner) => bundle
             .response(owner)
-            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                "a selected response caller names an owner that was never forward-declared"
-                    .to_string(),
-            ))
+            .ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "a selected response caller names an owner that was never forward-declared"
+                        .to_string(),
+                )
+            })
             .map(Some),
         ResolvedContinuationCallee::OrdinarySpecialization(_) => Ok(None),
     }
@@ -2176,34 +2352,30 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
 ) -> Result<FuncId, CraneliftBackendError> {
     if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
         #[cfg(feature = "px8-ds-test-support")]
-        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
-            .with(std::cell::Cell::get)
+        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get)
         {
             if mutation == StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget
-                && !plan.has_pre_schema_relay_promotion(
-                    identity.producer_construct_origin(), identity,
-                )
+                && !plan
+                    .has_pre_schema_relay_promotion(identity.producer_construct_origin(), identity)
             {
                 return Ok(response);
             }
-            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
-                .with(|count| count.set(count.get() + 1));
+            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(|count| count.set(count.get() + 1));
             return match mutation {
                 StaticResponseCallerRetargetMutation::RestoreSelectedKTarget
-                | StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget => bundle
-                    .continuation(identity.target())
-                    .ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
+                | StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget => {
+                    bundle.continuation(identity.target()).ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
                             "the response-caller mutation found no original K declaration"
                                 .to_string(),
                         )
-                    }),
-                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "the response-caller mutation removed one selected incoming caller"
-                            .to_string(),
-                    ),
-                ),
+                    })
+                }
+                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "the response-caller mutation removed one selected incoming caller".to_string(),
+                )),
                 StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
                     let owners = plan
                         .static_response_owner_specializations()?
@@ -2218,13 +2390,15 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
                         .iter()
                         .find(|owner| owner.selected_caller() != identity)
                         .ok_or_else(|| {
-                            backend_module(LoweringCause::PlannerInvariant,
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "the response-caller retarget control found no different owner"
                                     .to_string(),
                             )
                         })?;
                     bundle.response(substitute.id()).ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
                             "the response-caller retarget control found no declared substitute"
                                 .to_string(),
                         )
@@ -2235,7 +2409,8 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
         return Ok(response);
     }
     bundle.continuation(identity.target()).ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant,
+        backend_module(
+            LoweringCause::PlannerInvariant,
             "a projected causal identity names a continuation specialization that was never \
              forward-declared"
                 .to_string(),
@@ -2275,7 +2450,8 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     for identity in plan.ordinary_continuation_call_identities()? {
         let target = resolved_continuation_call_target(plan, bundle, &identity)?;
         if resolved.insert(identity, target).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "two projected causal identities collide; the planner mints one call token per \
                  ruled recursive position, so this is a key-arity defect rather than a \
                  double-resolution"
@@ -2400,22 +2576,29 @@ pub(super) fn continuation_case_binder_run(
 ) -> Result<Vec<ContinuationCaseBinderSource>, CraneliftBackendError> {
     for position in recursive_positions.iter().copied() {
         if position >= argument_binders {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "the selected case names a recursive position {position} outside its own \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "the selected case names a recursive position {position} outside its own \
                  {argument_binders}-binder run"
-            )));
+                ),
+            ));
         }
     }
     let worker_position = usize::try_from(worker_recursive_position).map_err(|_| {
-        backend_module(LoweringCause::Capacity,
+        backend_module(
+            LoweringCause::Capacity,
             "the ruled recursive position exceeds this platform's index width".to_string(),
         )
     })?;
     if !recursive_positions.contains(&worker_position) {
-        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "the ruled recursive position {worker_position} is not among the selected case's \
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "the ruled recursive position {worker_position} is not among the selected case's \
              recursive positions, so the projected worker stands for no induction hypothesis"
-        )));
+            ),
+        ));
     }
 
     // **`D6c` — THE CHECKED TOTAL, computed ONCE and reused.**
@@ -2474,11 +2657,14 @@ pub(super) fn continuation_case_binder_run(
 
     for position in recursive_positions.iter().rev().copied() {
         if position != worker_position {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "the selected case has a recursive position {position} that the continuation \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "the selected case has a recursive position {position} that the continuation \
                  specialization projects no worker for, so its induction-hypothesis prefix cannot \
                  be built"
-            )));
+                ),
+            ));
         }
         run.push(ContinuationCaseBinderSource::InductionHypothesis);
     }
@@ -2502,7 +2688,8 @@ pub(super) fn continuation_case_binder_run(
     // later binder shifted down one slot.
     for position in 0..argument_binders {
         let source_position = u32::try_from(position).map_err(|_| {
-            backend_module(LoweringCause::Capacity,
+            backend_module(
+                LoweringCause::Capacity,
                 "a continuation case binder position exceeds the planner's field width".to_string(),
             )
         })?;
@@ -2558,10 +2745,13 @@ pub(super) fn continuation_case_binder_run(
                 )
             })
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the ordinary envelope has no nonrecursive field at source position \
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the ordinary envelope has no nonrecursive field at source position \
                      {source_position}, so the selected case's binder run cannot be built"
-                ))
+                    ),
+                )
             })?;
         run.push(ContinuationCaseBinderSource::Ordinary(index));
     }
@@ -2577,9 +2767,7 @@ pub(super) fn continuation_case_binder_run(
     {
         let hypotheses = run
             .iter()
-            .filter(|source| {
-                matches!(source, ContinuationCaseBinderSource::InductionHypothesis)
-            })
+            .filter(|source| matches!(source, ContinuationCaseBinderSource::InductionHypothesis))
             .count();
         if hypotheses > 0 && hypotheses < run.len() {
             crate::cranelift_backend::lowering::record_d6c_selection_application();
@@ -2618,13 +2806,16 @@ pub(super) fn continuation_case_binder_run(
     // the envelope may be laid out however the planner chose.
     let hypotheses = recursive_positions.len();
     if run.len() != sealed_total {
-        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "the sealed binder run holds {} members, but this case seals {hypotheses} induction \
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "the sealed binder run holds {} members, but this case seals {hypotheses} induction \
              hypotheses + {argument_binders} constructor arguments + {continuation_inputs} \
              continuation inputs = {sealed_total}. A run of the wrong length shifts every later \
              binder, which is a wrong program rather than a refused one",
-            run.len()
-        )));
+                run.len()
+            ),
+        ));
     }
 
     // Segment 1's exact extent. ⛔ Both directions: a non-hypothesis inside the
@@ -2641,12 +2832,15 @@ pub(super) fn continuation_case_binder_run(
             ContinuationCaseBinderSource::SelectedRecursiveArgument { .. }
             | ContinuationCaseBinderSource::Ordinary(_)
             | ContinuationCaseBinderSource::ContinuationInput(_) => {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the sealed binder run holds {source:?} at position {position}, inside the \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the sealed binder run holds {source:?} at position {position}, inside the \
                      {hypotheses}-member induction-hypothesis prefix. The IH prefix leads the run \
                      and the constructor arguments follow it; a member of another kind here is \
                      the two segments permuted"
-                )));
+                    ),
+                ));
             }
         }
     }
@@ -2658,7 +2852,8 @@ pub(super) fn continuation_case_binder_run(
     for position in 0..argument_binders {
         let index = hypotheses + position;
         let source_position = u32::try_from(position).map_err(|_| {
-            backend_module(LoweringCause::Capacity,
+            backend_module(
+                LoweringCause::Capacity,
                 "a continuation case binder position exceeds the planner's field width".to_string(),
             )
         })?;
@@ -2668,62 +2863,83 @@ pub(super) fn continuation_case_binder_run(
                 source_position: named,
             } => {
                 if !recursive {
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the sealed binder run names a selected recursive argument at run \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the sealed binder run names a selected recursive argument at run \
                          position {index} for source position {source_position}, which this case \
                          does not list as recursive"
-                    )));
+                        ),
+                    ));
                 }
                 if *named != source_position {
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the sealed binder run's argument segment holds a selected recursive \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the sealed binder run's argument segment holds a selected recursive \
                          argument for source position {named} at the slot belonging to source \
                          position {source_position}"
-                    )));
+                        ),
+                    ));
                 }
                 if position != worker_position {
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the sealed binder run names a selected recursive argument at source \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the sealed binder run names a selected recursive argument at source \
                          position {source_position}, but this specialization projects a worker \
                          for position {worker_position}"
-                    )));
+                        ),
+                    ));
                 }
             }
             ContinuationCaseBinderSource::Ordinary(role_index) => {
                 if recursive {
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the sealed binder run takes source position {source_position} from the \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the sealed binder run takes source position {source_position} from the \
                          ordinary envelope, but this case lists it as recursive -- the recursive \
                          field is a compiler-only member and has no envelope operand"
-                    )));
+                        ),
+                    ));
                 }
                 // ⚠ The ROLE the index names, never the index's own value. This
                 // is what keeps a lawful envelope permutation lawful.
                 let role = envelope.get(*role_index).ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the sealed binder run points at ordinary-envelope index {role_index}, \
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the sealed binder run points at ordinary-envelope index {role_index}, \
                          which this frame's {}-role envelope does not hold",
-                        envelope.len()
-                    ))
+                            envelope.len()
+                        ),
+                    )
                 })?;
                 match role {
                     ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
                         source_position: candidate,
                     } if *candidate == source_position => {}
                     other => {
-                        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                            "the sealed binder run takes source position {source_position} from \
+                        return Err(backend_module(
+                            LoweringCause::PlannerInvariant,
+                            format!(
+                                "the sealed binder run takes source position {source_position} from \
                              ordinary-envelope index {role_index}, which names {other:?} instead"
-                        )));
+                            ),
+                        ));
                     }
                 }
             }
             other @ (ContinuationCaseBinderSource::InductionHypothesis
             | ContinuationCaseBinderSource::ContinuationInput(_)) => {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the sealed binder run holds {other:?} at run position {index}, inside the \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the sealed binder run holds {other:?} at run position {index}, inside the \
                      constructor-argument segment for source position {source_position}"
-                )));
+                    ),
+                ));
             }
         }
     }
@@ -2737,19 +2953,25 @@ pub(super) fn continuation_case_binder_run(
         match &run[index] {
             ContinuationCaseBinderSource::ContinuationInput(named) => {
                 if *named != ordinal {
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the sealed binder run holds continuation input {named} at run position \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the sealed binder run holds continuation input {named} at run position \
                          {index}, where this frame's continuation input {ordinal} belongs"
-                    )));
+                        ),
+                    ));
                 }
             }
             source @ (ContinuationCaseBinderSource::InductionHypothesis
             | ContinuationCaseBinderSource::SelectedRecursiveArgument { .. }
             | ContinuationCaseBinderSource::Ordinary(_)) => {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the sealed binder run holds {source:?} at run position {index}, where this \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the sealed binder run holds {source:?} at run position {index}, where this \
                      frame's continuation input {ordinal} belongs"
-                )));
+                    ),
+                ));
             }
         }
     }
@@ -2847,7 +3069,8 @@ pub(super) fn lower_continuation_selected_case_body(
     validate_captured_environment_bijection(&capture_sources, worker_captures.len())?;
     validate_admitted_matches_role_sequence(envelope, &capture_sources)?;
     if worker_captures.len() != facts.worker_capture_count {
-        return Err(backend_module(LoweringCause::PlannerInvariant,
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
             "the ordinary envelope's worker-capture segment disagrees with the selected \
              worker's capture count"
                 .to_string(),
@@ -3024,25 +3247,22 @@ pub(super) fn lower_continuation_selected_case_body(
 
     // Exact body recovery: the selected case of the computational
     // frame this continuation belongs to, by its own alternative.
-    let frame_occurrence =
-        compiler.retained_body_occurrence(facts.continuation_origin)?;
+    let frame_occurrence = compiler.retained_body_occurrence(facts.continuation_origin)?;
     let RuntimeExpr::ComputationalMatch { cases, .. } = frame_occurrence.expr else {
-        return Err(backend_module(LoweringCause::PlannerInvariant,
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
             "a continuation origin does not resolve to a computational frame".to_string(),
         ));
     };
     let alternative = facts.producer_alternative as usize;
     let case = cases.get(alternative).ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant,
-            "the projected producer alternative is outside the frame's case run"
-                .to_string(),
+        backend_module(
+            LoweringCause::PlannerInvariant,
+            "the projected producer alternative is outside the frame's case run".to_string(),
         )
     })?;
-    let body = compiler.case_body_occurrence(
-        frame_occurrence.static_origin,
-        alternative,
-        &case.body,
-    )?;
+    let body =
+        compiler.case_body_occurrence(frame_occurrence.static_origin, alternative, &case.body)?;
     // The semantic case environment, through the sole binding
     // authority, in the order `continuation_case_binder_run` states:
     // the IH prefix, then ALL the constructor arguments in source
@@ -3065,26 +3285,28 @@ pub(super) fn lower_continuation_selected_case_body(
             ContinuationCaseBinderSource::InductionHypothesis => {
                 LoweringEnvironmentBinding::StaticWorker(worker.clone())
             }
-            ContinuationCaseBinderSource::SelectedRecursiveArgument {
-                source_position,
-            } => {
+            ContinuationCaseBinderSource::SelectedRecursiveArgument { source_position } => {
                 // The plan only ever names the ruled position here;
                 // segment 1 hard-stops on any other. Re-checking it is
                 // what keeps that a fact this site verifies rather than
                 // one it inherits.
                 if source_position != facts.recursive_position {
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the binder run names a selected recursive argument at source \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the binder run names a selected recursive argument at source \
                          position {source_position}, but this specialization projects a \
                          worker for position {}",
-                        facts.recursive_position
-                    )));
+                            facts.recursive_position
+                        ),
+                    ));
                 }
                 LoweringEnvironmentBinding::StaticWorker(recursive_argument.clone())
             }
             ContinuationCaseBinderSource::Ordinary(index) => {
                 let operand = ordinary.get(index).ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the binder run names an ordinary-envelope index this frame loaded \
                          no operand for"
                             .to_string(),
@@ -3094,7 +3316,8 @@ pub(super) fn lower_continuation_selected_case_body(
             }
             ContinuationCaseBinderSource::ContinuationInput(ordinal) => {
                 let operand = carried_inputs.get(ordinal).ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the binder run names a continuation input ordinal this frame \
                          loaded no operand for"
                             .to_string(),
@@ -3135,8 +3358,7 @@ pub(super) fn lower_continuation_selected_case_body(
                     LoweringEnvironmentBinding::StaticWorker(worker) => {
                         Some((position, worker.route, worker.body_origin))
                     }
-                    LoweringEnvironmentBinding::Value(_)
-                    => None,
+                    LoweringEnvironmentBinding::Value(_) => None,
                 })
                 .collect(),
         },
@@ -3166,15 +3388,11 @@ pub(super) fn lower_continuation_selected_case_body(
             .map(|binding| match binding {
                 LoweringEnvironmentBinding::StaticWorker(worker) => match worker.route {
                     StaticWorkerCallRoute::RawWorker => "StaticWorker(RawWorker)",
-                    StaticWorkerCallRoute::GeneratedContext =>
-                        "StaticWorker(GeneratedContext)",
+                    StaticWorkerCallRoute::GeneratedContext => "StaticWorker(GeneratedContext)",
                 },
-                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) =>
-                    "Carried",
-                LoweringEnvironmentBinding::Value(LoweringOperand::Residual(_)) =>
-                    "Residual",
-                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
-                    "Specialized",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) => "Carried",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Residual(_)) => "Residual",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) => "Specialized",
             })
             .collect::<Vec<_>>()
             .join(", ")
@@ -3185,15 +3403,21 @@ pub(super) fn lower_continuation_selected_case_body(
     // body beside the carried owner's trapped branch at the same origin.
     #[cfg(feature = "px8-ds-test-support")]
     if case.constructor.ends_with("::ITree::Vis")
-        && compiler.static_transition_plan
+        && compiler
+            .static_transition_plan
             .pending_result_validated_owner(frame_occurrence.static_origin)?
     {
-        let owner = compiler.defining_emission_owner.ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-            "a Vis continuation has no defining emission owner".to_string(),
-        ))?;
-        if compiler.static_transition_plan
+        let owner = compiler.defining_emission_owner.ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "a Vis continuation has no defining emission owner".to_string(),
+            )
+        })?;
+        if compiler
+            .static_transition_plan
             .pending_match_has_reentering_calls(frame_occurrence.static_origin, owner)?
-            && compiler.static_transition_plan
+            && compiler
+                .static_transition_plan
                 .owner_fed_match_population(frame_occurrence.static_origin, Some(owner))?
                 .is_none()
         {
@@ -3241,17 +3465,22 @@ pub(super) fn lower_static_response_effect(
     frame_inputs: &BTreeMap<StaticResponseFrameSource, LoweringOperand>,
 ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst), CraneliftBackendError> {
     let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
-        frame_inputs.get(&binding.frame_source()).cloned().ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, format!(
-                "the response environment source {:?} names absent frame input {:?}",
-                binding.source(), binding.frame_source(),
-            ))
-        })
+        frame_inputs
+            .get(&binding.frame_source())
+            .cloned()
+            .ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the response environment source {:?} names absent frame input {:?}",
+                        binding.source(),
+                        binding.frame_source(),
+                    ),
+                )
+            })
     };
     let mut lowered_arguments = BTreeMap::new();
-    let mut effect_environment = Vec::with_capacity(
-        row.effect_environment().len(),
-    );
+    let mut effect_environment = Vec::with_capacity(row.effect_environment().len());
     for input in row.effect_environment() {
         let operand = match input {
             StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
@@ -3271,8 +3500,7 @@ pub(super) fn lower_static_response_effect(
                     let argument_environment = environment
                         .iter()
                         .map(|binding| {
-                            frame_operand(binding)
-                                .map(LoweringEnvironmentBinding::Value)
+                            frame_operand(binding).map(LoweringEnvironmentBinding::Value)
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     let lowered = compiler.lower_expr(
@@ -3284,7 +3512,8 @@ pub(super) fn lower_static_response_effect(
                         &argument_environment,
                     )?;
                     if lowered_arguments.insert(*origin, lowered.clone()).is_some() {
-                        return Err(backend_module(LoweringCause::PlannerInvariant,
+                        return Err(backend_module(
+                            LoweringCause::PlannerInvariant,
                             "one response operation argument was lowered twice".to_string(),
                         ));
                     }
@@ -3304,13 +3533,17 @@ pub(super) fn lower_static_response_effect(
         &effect_environment,
     )?;
     if !static_response_shape_matches(row.operation(), &response) {
-        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "a specialized response owner did not materialize the exact {:?} response",
-            row.operation(),
-        )));
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "a specialized response owner did not materialize the exact {:?} response",
+                row.operation(),
+            ),
+        ));
     }
     let host_validation_block = builder.current_block().ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant,
+        backend_module(
+            LoweringCause::PlannerInvariant,
             "host response validation left no active response-owner block".to_string(),
         )
     })?;
@@ -3319,7 +3552,8 @@ pub(super) fn lower_static_response_effect(
         .layout
         .last_inst(host_validation_block)
         .ok_or_else(|| {
-            backend_module(LoweringCause::FinishedCode,
+            backend_module(
+                LoweringCause::FinishedCode,
                 "host response validation emitted no finished instruction".to_string(),
             )
         })?;
@@ -3380,37 +3614,54 @@ fn emit_pending_vis_owner_loop(
     successor_contexts: &BTreeMap<StaticResponseContinuationId, FuncId>,
     result_offset: i32,
     placeholder_offset: i32,
-    #[cfg(feature = "px8-ds-test-support")]
-    raw_host_result_escape: Option<CarriedBoundaryWord>,
+    #[cfg(feature = "px8-ds-test-support")] raw_host_result_escape: Option<CarriedBoundaryWord>,
     force_unknown_member: bool,
     bypass_unknown_to_c2: bool,
 ) -> Result<PendingVisFinishedBody, CraneliftBackendError> {
     if successors.is_empty() {
-        return Err(backend_module(LoweringCause::PlannerInvariant, "a pending-Vis owner has no successor set".to_string()));
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            "a pending-Vis owner has no successor set".to_string(),
+        ));
     }
     // Retain malformed 0/2 initial-call controls through emission. The
     // issued-call handles belong to this same function as the successor loop;
     // the finished-body verifier checks them after the CLIF is finalized.
     let initial_ret_identity = initial.k_ret_identity().tag_abi_word()?;
-    let mut calls = initial_calls.first().map(|&call| vec![PendingVisOwnerCall {
-        row: initial.id(), call, expected_context: initial_context,
-        host_validation_end: initial_validation,
-        ret_identity: initial_ret_identity,
-    }]).unwrap_or_default();
+    let mut calls = initial_calls
+        .first()
+        .map(|&call| {
+            vec![PendingVisOwnerCall {
+                row: initial.id(),
+                call,
+                expected_context: initial_context,
+                host_validation_end: initial_validation,
+                ret_identity: initial_ret_identity,
+            }]
+        })
+        .unwrap_or_default();
     let result = builder.create_block();
     builder.append_block_param(result, types::I64);
     builder.append_block_param(result, types::I64);
-    let first_ret = i64::try_from(initial_ret_abi_word)
-        .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis initial Ret tag exceeds range".to_string()))?;
+    let first_ret = i64::try_from(initial_ret_abi_word).map_err(|_| {
+        backend_module(
+            LoweringCause::Capacity,
+            "pending-Vis initial Ret tag exceeds range".to_string(),
+        )
+    })?;
     let first_ret = builder.ins().iconst(types::I64, first_ret);
     builder.ins().jump(result, &[returned.word, first_ret]);
     builder.switch_to_block(result);
     let returned_word = builder.block_params(result)[0];
     let expected_ret = builder.block_params(result)[1];
-    let returned = CarriedBoundaryWord { word: returned_word };
+    let returned = CarriedBoundaryWord {
+        word: returned_word,
+    };
     let actual_tag = compiler.emit_carrier_tag(builder, returned)?;
     let is_ret = builder.ins().icmp(
-        cranelift_codegen::ir::condcodes::IntCC::Equal, actual_tag, expected_ret,
+        cranelift_codegen::ir::condcodes::IntCC::Equal,
+        actual_tag,
+        expected_ret,
     );
     let ret = builder.create_block();
     let vis = builder.create_block();
@@ -3422,19 +3673,30 @@ fn emit_pending_vis_owner_loop(
     let stored_word = raw_host_result_escape.map_or(returned_word, |word| word.word);
     #[cfg(not(feature = "px8-ds-test-support"))]
     let stored_word = returned_word;
-    let result_store = builder.ins().store(MemFlags::trusted(), stored_word, frame, result_offset);
+    let result_store = builder
+        .ins()
+        .store(MemFlags::trusted(), stored_word, frame, result_offset);
     let success = builder.ins().iconst(types::I64, 0);
     let return_inst = builder.ins().return_(&[success]);
     compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
     builder.switch_to_block(vis);
-    let member = builder.ins().load(types::I64, MemFlags::trusted(), frame, region.discriminant);
-    let cranelift_codegen::ir::ValueDef::Result(member_load, _) = builder.func.dfg.value_def(member) else {
-        return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis member is not a finished load".to_string()));
+    let member = builder
+        .ins()
+        .load(types::I64, MemFlags::trusted(), frame, region.discriminant);
+    let cranelift_codegen::ir::ValueDef::Result(member_load, _) =
+        builder.func.dfg.value_def(member)
+    else {
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            "pending-Vis member is not a finished load".to_string(),
+        ));
     };
     #[cfg(feature = "px8-ds-test-support")]
     let member = if force_unknown_member {
         builder.ins().iconst(types::I64, -99)
-    } else { member };
+    } else {
+        member
+    };
     #[cfg(not(feature = "px8-ds-test-support"))]
     let _ = (force_unknown_member, bypass_unknown_to_c2);
     let mut member_branches = Vec::new();
@@ -3445,7 +3707,9 @@ fn emit_pending_vis_owner_loop(
         let next = builder.create_block();
         let expected = i64::from(successor.row.id().ordinal()) + 1;
         let matches = builder.ins().icmp_imm(
-            cranelift_codegen::ir::condcodes::IntCC::Equal, member, expected,
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            member,
+            expected,
         );
         member_branches.push(builder.ins().brif(matches, selected, &[], next, &[]));
         member_ids.push(successor.row.id());
@@ -3456,7 +3720,9 @@ fn emit_pending_vis_owner_loop(
     if bypass_unknown_to_c2 {
         // Test-only: deliberately cross the exact unknown-member exit with
         // the non-member Vis. The C2 match must trap on this owner-fed value.
-        builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
+        builder
+            .ins()
+            .store(MemFlags::trusted(), returned_word, frame, result_offset);
         let success = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[success]);
         compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
@@ -3470,11 +3736,21 @@ fn emit_pending_vis_owner_loop(
         builder.ins().return_(&[invalid]);
     }
     let offset_at = |start: i32, ordinal: usize| -> Result<i32, CraneliftBackendError> {
-        let delta = ordinal.checked_mul(8).and_then(|bytes| i32::try_from(bytes).ok())
-            .ok_or_else(|| backend_module(LoweringCause::Capacity, "pending-Vis owner payload offset exhausted".to_string()))?;
-        start.checked_add(delta).ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-            "pending-Vis owner payload exceeds its activation frame".to_string(),
-        ))
+        let delta = ordinal
+            .checked_mul(8)
+            .and_then(|bytes| i32::try_from(bytes).ok())
+            .ok_or_else(|| {
+                backend_module(
+                    LoweringCause::Capacity,
+                    "pending-Vis owner payload offset exhausted".to_string(),
+                )
+            })?;
+        start.checked_add(delta).ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "pending-Vis owner payload exceeds its activation frame".to_string(),
+            )
+        })
     };
     let selected_blocks = member_blocks.clone();
     let mut payload_loads = Vec::new();
@@ -3484,109 +3760,212 @@ fn emit_pending_vis_owner_loop(
         let row = &successor.row;
         // A stale record for an unrelated non-Ret constructor is never an
         // effect permission. Both the member and its exact Vis identity hold.
-        let vis_identity = compiler.static_transition_plan
-            .constructor_symbol_identity(row.vis_origin())?.tag_abi_word()?;
-        let vis_identity = i64::try_from(vis_identity)
-            .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis constructor tag exceeds range".to_string()))?;
+        let vis_identity = compiler
+            .static_transition_plan
+            .constructor_symbol_identity(row.vis_origin())?
+            .tag_abi_word()?;
+        let vis_identity = i64::try_from(vis_identity).map_err(|_| {
+            backend_module(
+                LoweringCause::Capacity,
+                "pending-Vis constructor tag exceeds range".to_string(),
+            )
+        })?;
         Lowering::require_i64(builder, actual_tag, vis_identity);
         let fields = compiler.emit_carrier_field_count(builder, returned)?;
         Lowering::require_i64(builder, fields, 2);
         let mut inputs = BTreeMap::new();
-        let target = successor_targets.get(&row.id()).ok_or_else(||
-            backend_module(LoweringCause::PlannerInvariant, "a pending-Vis successor K context was not declared".to_string()))?;
+        let target = successor_targets.get(&row.id()).ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "a pending-Vis successor K context was not declared".to_string(),
+            )
+        })?;
         if target.header.parameters as usize != row.captures().len() + 1
-            || target.header.captures as usize != row.continuation_inputs().len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            || target.header.captures as usize != row.continuation_inputs().len()
+        {
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a pending-Vis successor disagrees with its K-context ABI".to_string(),
             ));
         }
         for (index, capture) in row.captures().iter().enumerate() {
             if capture.ordinal() as usize != index {
-                return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis capture ordinals are not dense".to_string()));
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "pending-Vis capture ordinals are not dense".to_string(),
+                ));
             }
-            let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
-                offset_at(region.captures, index)?);
-            if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
+            let word = builder.ins().load(
+                types::I64,
+                MemFlags::trusted(),
+                frame,
+                offset_at(region.captures, index)?,
+            );
+            if let cranelift_codegen::ir::ValueDef::Result(inst, _) =
+                builder.func.dfg.value_def(word)
+            {
                 row_loads.push(inst);
             }
-            if inputs.insert(StaticResponseFrameSource::Parameter(capture.producer_abi_slot()),
-                LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
-                return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis capture source repeats a destination slot".to_string()));
+            if inputs
+                .insert(
+                    StaticResponseFrameSource::Parameter(capture.producer_abi_slot()),
+                    LoweringOperand::Carried(CarriedBoundaryWord { word }),
+                )
+                .is_some()
+            {
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "pending-Vis capture source repeats a destination slot".to_string(),
+                ));
             }
         }
         for (index, (ordinal, _, abi_position)) in row.continuation_inputs().iter().enumerate() {
-            if *ordinal as usize != index || !target.slots.get(*abi_position as usize)
-                .is_some_and(|slot| slot.kind == AbiSlotKind::Capture && slot.ordinal == *ordinal) {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+            if *ordinal as usize != index
+                || !target
+                    .slots
+                    .get(*abi_position as usize)
+                    .is_some_and(|slot| {
+                        slot.kind == AbiSlotKind::Capture && slot.ordinal == *ordinal
+                    })
+            {
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "pending-Vis continuation input disagrees with the successor ABI".to_string(),
                 ));
             }
-            let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
-                offset_at(region.continuation_inputs, index)?);
-            if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
+            let word = builder.ins().load(
+                types::I64,
+                MemFlags::trusted(),
+                frame,
+                offset_at(region.continuation_inputs, index)?,
+            );
+            if let cranelift_codegen::ir::ValueDef::Result(inst, _) =
+                builder.func.dfg.value_def(word)
+            {
                 row_loads.push(inst);
             }
-            if inputs.insert(StaticResponseFrameSource::Capture(*ordinal),
-                LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
-                return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis continuation input repeats a slot".to_string()));
+            if inputs
+                .insert(
+                    StaticResponseFrameSource::Capture(*ordinal),
+                    LoweringOperand::Carried(CarriedBoundaryWord { word }),
+                )
+                .is_some()
+            {
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "pending-Vis continuation input repeats a slot".to_string(),
+                ));
             }
         }
         // Single-use record: the next K call starts with no pending member.
         // Its callee's newly minted member is copied up only after Trap checks.
         let zero = builder.ins().iconst(types::I64, 0);
-        let cleared = builder.ins().store(MemFlags::trusted(), zero, frame, region.discriminant);
-        compiler.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
-            inst: cleared, offset: region.discriminant, source: PendingVisStoreSource::Cleared,
-        });
-        let nested = AmbientBodyAuthority::bind(
-            compiler, row.base_owner(), row.effect_source_owner(),
-        );
+        let cleared = builder
+            .ins()
+            .store(MemFlags::trusted(), zero, frame, region.discriminant);
+        compiler
+            .function_local
+            .pending_vis_slot_stores
+            .push(PendingVisSlotStore {
+                inst: cleared,
+                offset: region.discriminant,
+                source: PendingVisStoreSource::Cleared,
+            });
+        let nested =
+            AmbientBodyAuthority::bind(compiler, row.base_owner(), row.effect_source_owner());
         let effect = lower_static_response_effect(
-            compiler, builder, row, &successor.effect,
-            &successor.operation_arguments, &inputs,
+            compiler,
+            builder,
+            row,
+            &successor.effect,
+            &successor.operation_arguments,
+            &inputs,
         );
         nested.release(compiler);
         let (response, host_validation_end) = effect?;
         let mut call_inputs = vec![response];
         for capture in row.captures() {
-            call_inputs.push(inputs.get(&StaticResponseFrameSource::Parameter(
-                capture.producer_abi_slot(),
-            )).cloned().ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                "pending-Vis K capture has no recorded parameter".to_string(),
-            ))?);
+            call_inputs.push(
+                inputs
+                    .get(&StaticResponseFrameSource::Parameter(
+                        capture.producer_abi_slot(),
+                    ))
+                    .cloned()
+                    .ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "pending-Vis K capture has no recorded parameter".to_string(),
+                        )
+                    })?,
+            );
         }
         for (ordinal, _, _) in row.continuation_inputs() {
-            call_inputs.push(inputs.get(&StaticResponseFrameSource::Capture(*ordinal))
-                .cloned().ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                    "pending-Vis K continuation input has no recorded capture".to_string(),
-                ))?);
+            call_inputs.push(
+                inputs
+                    .get(&StaticResponseFrameSource::Capture(*ordinal))
+                    .cloned()
+                    .ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "pending-Vis K continuation input has no recorded capture".to_string(),
+                        )
+                    })?,
+            );
         }
         let (next_result, call) = compiler.call_declared_unit_target(
-            builder, target.clone(), &call_inputs, None,
-            #[cfg(test)] None,
+            builder,
+            target.clone(),
+            &call_inputs,
+            None,
+            #[cfg(test)]
+            None,
         )?;
         let LoweringOperand::Carried(next_result) = next_result else {
-            return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis successor K returned a template".to_string()));
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                "pending-Vis successor K returned a template".to_string(),
+            ));
         };
-        let expected_context = successor_contexts.get(&row.id()).copied().ok_or_else(||
-            backend_module(LoweringCause::PlannerInvariant, "pending-Vis successor has no exact generated K target".to_string()))?;
+        let expected_context = successor_contexts.get(&row.id()).copied().ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "pending-Vis successor has no exact generated K target".to_string(),
+            )
+        })?;
         calls.push(PendingVisOwnerCall {
-            row: row.id(), call, expected_context, host_validation_end,
+            row: row.id(),
+            call,
+            expected_context,
+            host_validation_end,
             ret_identity: row.k_ret_identity().tag_abi_word()?,
         });
-        let expected_ret = i64::try_from(row.k_ret_identity().tag_abi_word()?)
-            .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis successor Ret tag exceeds range".to_string()))?;
+        let expected_ret = i64::try_from(row.k_ret_identity().tag_abi_word()?).map_err(|_| {
+            backend_module(
+                LoweringCause::Capacity,
+                "pending-Vis successor Ret tag exceeds range".to_string(),
+            )
+        })?;
         let expected_ret = builder.ins().iconst(types::I64, expected_ret);
-        builder.ins().jump(result, &[next_result.word, expected_ret]);
+        builder
+            .ins()
+            .jump(result, &[next_result.word, expected_ret]);
         payload_loads.push(row_loads);
     }
     Ok(PendingVisFinishedBody {
         return_inst,
         initial_context_calls: initial_calls.len(),
         initial_response_is_current_host_result,
-        calls, result_store, result_offset, returned_word, member_load, member_branches,
-        member_ids, selected_blocks, payload_loads,
-        placeholder_offset, input_frame: frame,
+        calls,
+        result_store,
+        result_offset,
+        returned_word,
+        member_load,
+        member_branches,
+        member_ids,
+        selected_blocks,
+        payload_loads,
+        placeholder_offset,
+        input_frame: frame,
         record_discriminant_offset: region.discriminant,
     })
 }
@@ -3629,14 +4008,20 @@ fn verify_pending_vis_finished_body(
     region: PendingVisFrameRegion,
 ) -> Result<(), CraneliftBackendError> {
     use cranelift_codegen::ir::{InstructionData, Opcode, ValueDef};
-    let error = |reason: &str| backend_module(LoweringCause::FinishedCode, format!(
-        "pending-Vis finished-body verifier: {reason}",
-    ));
+    let error = |reason: &str| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            format!("pending-Vis finished-body verifier: {reason}",),
+        )
+    };
     if facts.initial_context_calls != 1 {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a response owner emitted {} K calls instead of exactly one",
-            facts.initial_context_calls,
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a response owner emitted {} K calls instead of exactly one",
+                facts.initial_context_calls,
+            ),
+        ));
     }
     if facts.calls.len() != successors.len() + 1
         || facts.member_branches.len() != successors.len()
@@ -3646,13 +4031,21 @@ fn verify_pending_vis_finished_body(
         || facts.calls[0].row != initial.id()
         || facts.calls[0].ret_identity != initial.k_ret_identity().tag_abi_word()?
     {
-        return Err(error("the returned successor set or initial K call is incomplete"));
+        return Err(error(
+            "the returned successor set or initial K call is incomplete",
+        ));
     }
-    for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+    for inst in func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+    {
         if let InstructionData::Load { offset, .. } = func.dfg.insts[inst] {
             if i32::from(offset) == facts.placeholder_offset
-                && func.dfg.inst_args(inst).first() == Some(&facts.input_frame) {
-                return Err(backend_module(LoweringCause::FinishedCode,
+                && func.dfg.inst_args(inst).first() == Some(&facts.input_frame)
+            {
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
                     "a response owner loaded its deferred parameter-zero placeholder".to_string(),
                 ));
             }
@@ -3670,12 +4063,18 @@ fn verify_pending_vis_finished_body(
         return Err(error("member load has no word"));
     };
     let ValueDef::Param(result_block, 0) = func.dfg.value_def(facts.returned_word) else {
-        return Err(error("the returned K word is not the result join's first parameter"));
+        return Err(error(
+            "the returned K word is not the result join's first parameter",
+        ));
     };
     if func.dfg.inst_args(facts.result_store).first() != Some(&facts.returned_word)
-        || !matches!(func.dfg.insts[facts.result_store], InstructionData::Store { .. })
+        || !matches!(
+            func.dfg.insts[facts.result_store],
+            InstructionData::Store { .. }
+        )
     {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a response owner let a raw HostResult or non-K value escape to Result".to_string(),
         ));
     }
@@ -3684,13 +4083,19 @@ fn verify_pending_vis_finished_body(
     dom.compute(func, &cfg);
     // Neither the owner nor a malformed initial K may collapse Result before
     // the first checked call. Read the actual finished stores, not a test flag.
-    if func.layout.blocks().flat_map(|block| func.layout.block_insts(block)).any(|inst| {
-        matches!(func.dfg.insts[inst], InstructionData::Store { offset, .. }
+    if func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+        .any(|inst| {
+            matches!(func.dfg.insts[inst], InstructionData::Store { offset, .. }
             if i32::from(offset) == facts.result_offset)
-            && func.dfg.inst_args(inst).get(1) == Some(&facts.input_frame)
-            && dom.dominates(inst, facts.calls[0].call, &func.layout)
-    }) {
-        return Err(backend_module(LoweringCause::FinishedCode,
+                && func.dfg.inst_args(inst).get(1) == Some(&facts.input_frame)
+                && dom.dominates(inst, facts.calls[0].call, &func.layout)
+        })
+    {
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a response owner called K after its answer was already collapsed".to_string(),
         ));
     }
@@ -3701,20 +4106,30 @@ fn verify_pending_vis_finished_body(
     }
     let incoming = cfg.pred_iter(result_block).collect::<Vec<_>>();
     if incoming.len() != facts.calls.len() {
-        return Err(error("a K result reached the join without a selected-row call"));
+        return Err(error(
+            "a K result reached the join without a selected-row call",
+        ));
     }
     let mut reached = BTreeSet::new();
     for edge in incoming {
         if func.dfg.insts[edge.inst].opcode() != Opcode::Jump {
             return Err(error("a K result join has a non-call predecessor"));
         }
-        let dominating = facts.calls.iter().filter(|candidate|
-            dom.dominates(candidate.call, edge.inst, &func.layout)
-        ).collect::<Vec<_>>();
-        let selected = dominating.iter().copied().find(|candidate|
-            dominating.iter().all(|other| other.call == candidate.call
-                || dom.dominates(other.call, candidate.call, &func.layout))
-        ).ok_or_else(|| error("a K result predecessor has no unique latest call"))?;
+        let dominating = facts
+            .calls
+            .iter()
+            .filter(|candidate| dom.dominates(candidate.call, edge.inst, &func.layout))
+            .collect::<Vec<_>>();
+        let selected = dominating
+            .iter()
+            .copied()
+            .find(|candidate| {
+                dominating.iter().all(|other| {
+                    other.call == candidate.call
+                        || dom.dominates(other.call, candidate.call, &func.layout)
+                })
+            })
+            .ok_or_else(|| error("a K result predecessor has no unique latest call"))?;
         if !reached.insert(selected.row) {
             return Err(error("one response row entered the K join twice"));
         }
@@ -3724,25 +4139,38 @@ fn verify_pending_vis_finished_body(
                     "a response owner called a context or raw worker other than its exact K context".to_string(),
                 ));
             }
-            return Err(error("a selected response row called a non-exact K context"));
+            return Err(error(
+                "a selected response row called a non-exact K context",
+            ));
         }
-        let positions = func.layout.blocks()
+        let positions = func
+            .layout
+            .blocks()
             .flat_map(|block| func.layout.block_insts(block))
-            .enumerate().map(|(index, inst)| (inst, index))
+            .enumerate()
+            .map(|(index, inst)| (inst, index))
             .collect::<BTreeMap<_, _>>();
         if positions[&selected.call] <= positions[&selected.host_validation_end] {
             if selected.row == initial.id() {
-                return Err(backend_module(LoweringCause::FinishedCode,
-                    "a response owner called K before host response validation completed".to_string(),
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
+                    "a response owner called K before host response validation completed"
+                        .to_string(),
                 ));
             }
-            return Err(error("a selected K was called before its host effect validation"));
+            return Err(error(
+                "a selected K was called before its host effect validation",
+            ));
         }
-        let guards = positions.iter().filter(|(inst, _)| {
-            func.dfg.insts[**inst].opcode() == Opcode::Brif
-                && dom.dominates(selected.call, **inst, &func.layout)
-                && dom.dominates(**inst, edge.inst, &func.layout)
-        }).map(|(inst, _)| *inst).collect::<Vec<_>>();
+        let guards = positions
+            .iter()
+            .filter(|(inst, _)| {
+                func.dfg.insts[**inst].opcode() == Opcode::Brif
+                    && dom.dominates(selected.call, **inst, &func.layout)
+                    && dom.dominates(**inst, edge.inst, &func.layout)
+            })
+            .map(|(inst, _)| *inst)
+            .collect::<Vec<_>>();
         if guards.len() < 2 {
             if selected.row == initial.id() {
                 return Err(response_k_missing_status_trap_refusal());
@@ -3754,32 +4182,52 @@ fn verify_pending_vis_finished_body(
             return Err(error("a K result predecessor has no join destination"));
         };
         if destination.block(&func.dfg.value_lists) != result_block {
-            return Err(error("a K result predecessor jumps outside the checked join"));
+            return Err(error(
+                "a K result predecessor jumps outside the checked join",
+            ));
         }
         let args = destination.args_slice(&func.dfg.value_lists);
         let Some((&word, &expected)) = args.first().zip(args.get(1)) else {
-            return Err(error("a K result join is missing its result or exact Ret identity"));
+            return Err(error(
+                "a K result join is missing its result or exact Ret identity",
+            ));
         };
         let ValueDef::Result(word_load, _) = func.dfg.value_def(word) else {
             return Err(error("a K result was not read from its callee frame"));
         };
         if func.dfg.insts[word_load].opcode() != Opcode::StackLoad
-            || !guards.iter().all(|guard| dom.dominates(*guard, word_load, &func.layout)) {
-            return Err(error("a K ResultWord was read before the status/Trap checks"));
+            || !guards
+                .iter()
+                .all(|guard| dom.dominates(*guard, word_load, &func.layout))
+        {
+            return Err(error(
+                "a K ResultWord was read before the status/Trap checks",
+            ));
         }
         let ValueDef::Result(expected_inst, _) = func.dfg.value_def(expected) else {
             return Err(error("a K Ret identity was not minted for its exact row"));
         };
-        let InstructionData::UnaryImm { opcode: Opcode::Iconst, imm } = func.dfg.insts[expected_inst] else {
+        let InstructionData::UnaryImm {
+            opcode: Opcode::Iconst,
+            imm,
+        } = func.dfg.insts[expected_inst]
+        else {
             return Err(error("a K Ret identity is not a literal from its row"));
         };
-        if imm.bits() != i64::try_from(selected.ret_identity)
-            .map_err(|_| backend_module(LoweringCause::Capacity,
-                "pending-Vis finished-body verifier: a K Ret identity exceeds the word range"
-                    .to_string()))? {
+        if imm.bits()
+            != i64::try_from(selected.ret_identity).map_err(|_| {
+                backend_module(
+                    LoweringCause::Capacity,
+                    "pending-Vis finished-body verifier: a K Ret identity exceeds the word range"
+                        .to_string(),
+                )
+            })?
+        {
             if selected.row == initial.id() {
-                return Err(backend_module(LoweringCause::FinishedCode,
-                    "a response owner validated a Ret identity other than its exact K Ret".to_string(),
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
+                    "a response owner validated a Ret identity other than its exact K Ret"
+                        .to_string(),
                 ));
             }
             return Err(error("a K Ret identity disagrees with the selected row"));
@@ -3803,9 +4251,14 @@ fn verify_pending_vis_finished_body(
         }
         let branch = facts.member_branches[index];
         let destinations = func.dfg.insts[branch].branch_destination(&func.dfg.jump_tables);
-        if destinations.first().map(|dest| dest.block(&func.dfg.value_lists))
-            != Some(facts.selected_blocks[index]) {
-            return Err(error("a member check does not select its recorded successor block"));
+        if destinations
+            .first()
+            .map(|dest| dest.block(&func.dfg.value_lists))
+            != Some(facts.selected_blocks[index])
+        {
+            return Err(error(
+                "a member check does not select its recorded successor block",
+            ));
         }
         let Some(&condition) = func.dfg.inst_args(branch).first() else {
             return Err(error("a successor branch has no condition"));
@@ -3813,35 +4266,57 @@ fn verify_pending_vis_finished_body(
         let ValueDef::Result(compare, _) = func.dfg.value_def(condition) else {
             return Err(error("a successor branch does not compare the member"));
         };
-        let InstructionData::IntCompareImm { opcode: Opcode::IcmpImm, arg, imm, cond } =
-            func.dfg.insts[compare] else {
-            return Err(error("a successor branch is not an exact member comparison"));
+        let InstructionData::IntCompareImm {
+            opcode: Opcode::IcmpImm,
+            arg,
+            imm,
+            cond,
+        } = func.dfg.insts[compare]
+        else {
+            return Err(error(
+                "a successor branch is not an exact member comparison",
+            ));
         };
-        if arg != member_word || cond != cranelift_codegen::ir::condcodes::IntCC::Equal
-            || imm.bits() != i64::from(row.id().ordinal()) + 1 {
-            return Err(error("a successor branch did not check its exact nonzero member"));
+        if arg != member_word
+            || cond != cranelift_codegen::ir::condcodes::IntCC::Equal
+            || imm.bits() != i64::from(row.id().ordinal()) + 1
+        {
+            return Err(error(
+                "a successor branch did not check its exact nonzero member",
+            ));
         }
         if facts.payload_loads[index].len()
-            != row.captures().len() + row.continuation_inputs().len() {
-            return Err(error("a successor did not read its complete capture payload"));
+            != row.captures().len() + row.continuation_inputs().len()
+        {
+            return Err(error(
+                "a successor did not read its complete capture payload",
+            ));
         }
         for (position, load) in facts.payload_loads[index].iter().enumerate() {
             if !dom.dominates(branch, *load, &func.layout)
-                || !dom.dominates(facts.selected_blocks[index], *load, &func.layout) {
+                || !dom.dominates(facts.selected_blocks[index], *load, &func.layout)
+            {
                 return Err(error("a payload read bypassed its member check"));
             }
             let base = if position < row.captures().len() {
-                region.captures + i32::try_from(position * 8).map_err(|_| error("capture offset exhausted"))?
+                region.captures
+                    + i32::try_from(position * 8).map_err(|_| error("capture offset exhausted"))?
             } else {
-                region.continuation_inputs + i32::try_from((position - row.captures().len()) * 8)
-                    .map_err(|_| error("continuation input offset exhausted"))?
+                region.continuation_inputs
+                    + i32::try_from((position - row.captures().len()) * 8)
+                        .map_err(|_| error("continuation input offset exhausted"))?
             };
             let InstructionData::Load { offset, .. } = func.dfg.insts[*load] else {
-                return Err(error("a successor payload did not come from its activation frame"));
+                return Err(error(
+                    "a successor payload did not come from its activation frame",
+                ));
             };
             if i32::from(offset) != base
-                || func.dfg.inst_args(*load).first() != Some(&facts.input_frame) {
-                return Err(error("a successor payload load names an unplanned record slot"));
+                || func.dfg.inst_args(*load).first() != Some(&facts.input_frame)
+            {
+                return Err(error(
+                    "a successor payload load names an unplanned record slot",
+                ));
             }
         }
     }
@@ -3863,27 +4338,37 @@ fn verify_static_response_finished_body(
     call_obligations: &[PendingCallResultObligation],
 ) -> Result<(), CraneliftBackendError> {
     if facts.context_calls.len() != 1 {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a response owner emitted {} K calls instead of exactly one",
-            facts.context_calls.len(),
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a response owner emitted {} K calls instead of exactly one",
+                facts.context_calls.len(),
+            ),
+        ));
     }
     let call = facts.context_calls[0];
     // Parameter zero is an inert placeholder, not a K input. Check the
     // finished function, not only the source-side frame_inputs construction:
     // any direct load of that exact input-frame slot could flow into K.
-    for inst in func.layout.blocks().flat_map(|block| func.layout.block_insts(block)) {
+    for inst in func
+        .layout
+        .blocks()
+        .flat_map(|block| func.layout.block_insts(block))
+    {
         if let cranelift_codegen::ir::InstructionData::Load { offset, .. } = func.dfg.insts[inst] {
             if i32::from(offset) == facts.placeholder_offset
-                && func.dfg.inst_args(inst).first() == Some(&facts.input_frame) {
-                return Err(backend_module(LoweringCause::FinishedCode,
+                && func.dfg.inst_args(inst).first() == Some(&facts.input_frame)
+            {
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
                     "a response owner loaded its deferred parameter-zero placeholder".to_string(),
                 ));
             }
         }
     }
     if Lowering::decode_direct_callee(func, call)? != expected_context {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a response owner called a context or raw worker other than its exact K context"
                 .to_string(),
         ));
@@ -3900,9 +4385,12 @@ fn verify_static_response_finished_body(
         })
         .count();
     if finished_exact_calls != 1 {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "finished CLIF contains {finished_exact_calls} exact K-context calls instead of one",
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "finished CLIF contains {finished_exact_calls} exact K-context calls instead of one",
+            ),
+        ));
     }
     verify_all_paths_after_instruction(
         func,
@@ -3923,26 +4411,30 @@ fn verify_static_response_finished_body(
         })
         .collect::<Vec<_>>();
     let [call_obligation] = matching_obligations.as_slice() else {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a response K call has {} matching finished Result obligations instead of exactly one",
-            matching_obligations.len(),
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a response K call has {} matching finished Result obligations instead of exactly one",
+                matching_obligations.len(),
+            ),
+        ));
     };
-    verify_call_result_obligation(func, call_obligation, expected_context).map_err(|error| {
-        backend_module(LoweringCause::FinishedCode, format!(
-            "a response K call read Result without the status then Trap-before-Result branches: {error:?}"
-        ))
-    })?;
+    verify_call_result_obligation(func, call_obligation, expected_context)
+        .map_err(|_| response_k_missing_status_trap_refusal())?;
     let stored = func
         .dfg
         .inst_args(facts.result_store)
         .first()
         .copied()
         .ok_or_else(|| {
-            backend_module(LoweringCause::FinishedCode, "a response-owner Result store has no value operand".to_string())
+            backend_module(
+                LoweringCause::FinishedCode,
+                "a response-owner Result store has no value operand".to_string(),
+            )
         })?;
     if stored != facts.returned_word {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a response owner let a raw HostResult or non-K value escape to Result".to_string(),
         ));
     }
@@ -3953,7 +4445,8 @@ fn verify_static_response_finished_body(
         ));
     }
     if facts.ret_abi_word != expected_ret_abi_word {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a response owner validated a Ret identity other than its exact K Ret".to_string(),
         ));
     }
@@ -3963,7 +4456,8 @@ fn verify_static_response_finished_body(
                 && args[1] == facts.frame
                 && i32::from(*offset) == facts.result_offset => {}
         _ => {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a response owner does not publish the validated word to its exact Result frame"
                     .to_string(),
             ));
@@ -3977,7 +4471,8 @@ fn verify_static_response_finished_body(
             .and_then(|word| iconst_value(func, *word))
             != Some(0)
     {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a response owner's certified Result publication does not return status zero"
                 .to_string(),
         ));
@@ -3987,17 +4482,22 @@ fn verify_static_response_finished_body(
         .filter(|query| query.word == facts.returned_word)
         .collect::<Vec<_>>();
     let [tag_query] = tag_queries.as_slice() else {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a response owner has {} exact returned-word tag queries instead of one",
-            tag_queries.len()
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a response owner has {} exact returned-word tag queries instead of one",
+                tag_queries.len()
+            ),
+        ));
     };
     verify_exact_value_guard(
         func,
         tag_query.output,
         i64::try_from(expected_ret_abi_word).map_err(|_| {
-            backend_module(LoweringCause::FinishedCode,
-                "response Ret identity exceeds the runtime tag word".to_string())
+            backend_module(
+                LoweringCause::FinishedCode,
+                "response Ret identity exceeds the runtime tag word".to_string(),
+            )
         })?,
         facts.result_store,
     )?;
@@ -4006,34 +4506,48 @@ fn verify_static_response_finished_body(
         .filter(|query| query.word == facts.returned_word)
         .collect::<Vec<_>>();
     let [field_query] = field_queries.as_slice() else {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a response owner has {} exact returned-word field-count queries instead of one",
-            field_queries.len()
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a response owner has {} exact returned-word field-count queries instead of one",
+                field_queries.len()
+            ),
+        ));
     };
     verify_exact_value_guard(func, field_query.output, 1, facts.result_store)?;
     verify_all_paths_after_instruction(
-        func, tag_query.call, field_query.call,
+        func,
+        tag_query.call,
+        field_query.call,
         "a response owner's tag/arity proofs do not precede Result publication in order",
     )?;
     verify_all_paths_after_instruction(
-        func, field_query.call, facts.result_store,
+        func,
+        field_query.call,
+        facts.result_store,
         "a response owner's tag/arity proofs do not precede Result publication in order",
     )?;
     let returned_inst = match func.dfg.value_def(facts.returned_word) {
         cranelift_codegen::ir::ValueDef::Result(inst, _) => inst,
         _ => {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a response K Result is not defined by one finished CLIF instruction".to_string(),
             ));
         }
     };
     verify_all_paths_after_instruction(
-        func, call, returned_inst, "a response K call Result producer",
+        func,
+        call,
+        returned_inst,
+        "a response K call Result producer",
     )?;
     verify_carrier_fact_current(
         func,
-        &[CarrierFactGround { producer: returned_inst, guard: None }],
+        &[CarrierFactGround {
+            producer: returned_inst,
+            guard: None,
+        }],
         boundary_arena,
         &BTreeSet::from([facts.returned_word]),
         &BTreeSet::from([tag_helper, field_count_helper]),
@@ -4049,13 +4563,15 @@ fn verify_call_result_obligation(
     certified_target: FuncId,
 ) -> Result<(), CraneliftBackendError> {
     if Lowering::decode_direct_callee(func, obligation.call)? != certified_target {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's finished direct callee disagrees with its certificate"
                 .to_string(),
         ));
     }
     if func.dfg.inst_results(obligation.call) != [obligation.status] {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation does not bind the call's exact status result".to_string(),
         ));
     }
@@ -4067,12 +4583,14 @@ fn verify_call_result_obligation(
         ));
     };
     let Some((header_slot, header_base)) = resolve_stack_address(func, *actual_header)? else {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's actual header is not a finalized stack address".to_string(),
         ));
     };
     if header_base != 0 {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's actual header does not begin at its frame base".to_string(),
         ));
     }
@@ -4082,7 +4600,8 @@ fn verify_call_result_obligation(
             .expect("the unit-call header size fits u32")
         || header.align_shift != 3
     {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's actual header allocation disagrees with UnitBundle layout"
                 .to_string(),
         ));
@@ -4099,14 +4618,16 @@ fn verify_call_result_obligation(
         "a call-result obligation's header payload pointer",
     )?;
     if resolve_stack_address(func, actual_payload)? != Some((obligation.payload, 0)) {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's actual call header points to a foreign payload".to_string(),
         ));
     }
 
     let payload_slot = &func.sized_stack_slots[obligation.payload];
     if payload_slot.size != obligation.frame_bytes || payload_slot.align_shift != 3 {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's actual frame allocation disagrees with its descriptor"
                 .to_string(),
         ));
@@ -4128,7 +4649,8 @@ fn verify_call_result_obligation(
         "a call-result obligation's Trap initializer",
     )?;
     if iconst_value(func, initialized_trap) != Some(0) {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation does not initialize Trap to zero on every reaching path"
                 .to_string(),
         ));
@@ -4141,7 +4663,8 @@ fn verify_call_result_obligation(
         cranelift_codegen::ir::condcodes::IntCC::NotEqual,
         0,
     ) {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation lacks its exact status-nonzero comparison".to_string(),
         ));
     }
@@ -4151,12 +4674,14 @@ fn verify_call_result_obligation(
         ..
     } = &func.dfg.insts[obligation.status_branch]
     else {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's status locator is not a branch".to_string(),
         ));
     };
     if *status_arg != obligation.status_compare {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's status branch uses another predicate".to_string(),
         ));
     }
@@ -4167,14 +4692,16 @@ fn verify_call_result_obligation(
     };
 
     let (trap_load, actual_trap_location) = loaded_stack_location(func, obligation.trap_word)?
-    .ok_or_else(|| {
-        backend_module(LoweringCause::FinishedCode,
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::FinishedCode,
                 "a call-result obligation's Trap word is not an exact stack-location load"
                     .to_string(),
-        )
-    })?;
+            )
+        })?;
     if actual_trap_location != trap_location {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation reads Trap from another frame or offset".to_string(),
         ));
     }
@@ -4200,7 +4727,8 @@ fn verify_call_result_obligation(
         cranelift_codegen::ir::condcodes::IntCC::NotEqual,
         0,
     ) {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation lacks its exact Trap-nonzero comparison".to_string(),
         ));
     }
@@ -4210,12 +4738,14 @@ fn verify_call_result_obligation(
         ..
     } = &func.dfg.insts[obligation.trap_branch]
     else {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's Trap locator is not a branch".to_string(),
         ));
     };
     if *trap_arg != obligation.trap_compare {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation's Trap branch uses another predicate".to_string(),
         ));
     }
@@ -4227,13 +4757,15 @@ fn verify_call_result_obligation(
 
     let (result_load, actual_result_location) =
         loaded_stack_location(func, obligation.result_word)?.ok_or_else(|| {
-        backend_module(LoweringCause::FinishedCode,
+            backend_module(
+                LoweringCause::FinishedCode,
                 "a call-result obligation's Result word is not an exact stack-location load"
                     .to_string(),
-        )
-    })?;
+            )
+        })?;
     if actual_result_location != result_location {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a call-result obligation reads Result from another frame or offset".to_string(),
         ));
     }
@@ -4272,24 +4804,31 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         .static_transition_plan
         .static_response_feasibility_ledger_all()?
         .map_err(|infeasible| {
-            backend_module(LoweringCause::Fragment, format!(
-                "compile-time response specialization is infeasible at {:?}: {}",
-                infeasible.vis_origin(),
-                infeasible.reason(),
-            ))
+            backend_module(
+                LoweringCause::Fragment,
+                format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ),
+            )
         })?;
     let owners = compiler
         .static_transition_plan
         .static_response_owner_specializations()?
         .map_err(|infeasible| {
-            backend_module(LoweringCause::Fragment, format!(
-                "compile-time response specialization is infeasible at {:?}: {}",
-                infeasible.vis_origin(),
-                infeasible.reason(),
-            ))
+            backend_module(
+                LoweringCause::Fragment,
+                format!(
+                    "compile-time response specialization is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ),
+            )
         })?;
     if owners.len() != rows.len() {
-        return Err(backend_module(LoweringCause::PlannerInvariant,
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
             "the response-owner definition population disagrees with the validated response rows"
                 .to_string(),
         ));
@@ -4310,9 +4849,9 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             || owner.selected_caller() != row.k_identity()
             || owner.k_context() != row.k_context()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
-                "a response-owner definition disagrees with its validated response row"
-                    .to_string(),
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                "a response-owner definition disagrees with its validated response row".to_string(),
             ));
         }
         let effect = compiler
@@ -4320,37 +4859,51 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             .expr
             .clone();
         let RuntimeExpr::Effect { operation, .. } = &effect else {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a static response row's effect origin no longer names an Effect".to_string(),
             ));
         };
         if *operation != row.operation() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a static response row's effect occurrence changed operation".to_string(),
             ));
         }
         let mut operation_arguments = BTreeMap::new();
         for input in row.effect_environment() {
             if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
-                operation_arguments.entry(*origin).or_insert(
-                    compiler
-                        .retained_body_occurrence(*origin)?
-                        .expr
-                        .clone(),
-                );
+                operation_arguments
+                    .entry(*origin)
+                    .or_insert(compiler.retained_body_occurrence(*origin)?.expr.clone());
             }
         }
-        let successors = compiler.pending_vis_record_protocol.as_ref()
+        let successors = compiler
+            .pending_vis_record_protocol
+            .as_ref()
             .and_then(|protocol| protocol.owners.get(&row.id()))
             .map(|protocol| {
-                protocol.contexts.iter().flat_map(|context| &context.members)
-                    .map(|member| member.successor.as_ref().ok_or_else(||
-                        backend_module(LoweringCause::PlannerInvariant, "a pending-Vis member has no derived response row".to_string())))
+                protocol
+                    .contexts
+                    .iter()
+                    .flat_map(|context| &context.members)
+                    .map(|member| {
+                        member.successor.as_ref().ok_or_else(|| {
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
+                                "a pending-Vis member has no derived response row".to_string(),
+                            )
+                        })
+                    })
                     .collect::<Result<Vec<_>, _>>()
-            }).transpose()?.unwrap_or_default();
+            })
+            .transpose()?
+            .unwrap_or_default();
         let mut distinct_successors = BTreeMap::new();
         for successor in successors {
-            distinct_successors.entry(successor.id()).or_insert_with(|| (*successor).clone());
+            distinct_successors
+                .entry(successor.id())
+                .or_insert_with(|| (*successor).clone());
         }
         let successors = distinct_successors.into_values().map(|row| {
             let effect = compiler.retained_body_occurrence(row.effect_origin())?.expr.clone();
@@ -4369,7 +4922,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let (offsets, frame_bytes) = owner.slot_offsets()?;
         if frame_bytes != owner.header().frame_bytes {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a response-owner frame size disagrees with its slot run".to_string(),
             ));
         }
@@ -4397,16 +4951,22 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             }))
         {
             required.extend(
-                compiler.static_transition_plan.source_join_origins_in_owner_subtree(root)?,
+                compiler
+                    .static_transition_plan
+                    .source_join_origins_in_owner_subtree(root)?,
             );
         }
         let id = bundle.response(emission.owner.id()).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "a response owner was never forward-declared".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "a response owner was never forward-declared".to_string(),
+            )
         })?;
         let slots = emission.owner.slots();
         let offsets = emission.offsets.as_slice();
         if slots.len() != offsets.len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a response-owner slot run disagrees with its offset walk".to_string(),
             ));
         }
@@ -4434,34 +4994,48 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "response-owner frame declares no result slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "response-owner frame declares no result slot".to_string(),
+                )
             })?;
-        let placeholder_offset = slots.iter().zip(offsets)
+        let placeholder_offset = slots
+            .iter()
+            .zip(offsets)
             .find(|(slot, _)| slot.kind == AbiSlotKind::Parameter && slot.ordinal == 0)
             .map(|(_, offset)| i32::try_from(*offset))
-            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "response owner has no parameter-zero placeholder slot".to_string()))?
-            .map_err(|_| backend_module(LoweringCause::Capacity, "response-owner placeholder slot offset exceeds range".to_string()))?;
+            .ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "response owner has no parameter-zero placeholder slot".to_string(),
+                )
+            })?
+            .map_err(|_| {
+                backend_module(
+                    LoweringCause::Capacity,
+                    "response-owner placeholder slot offset exceeds range".to_string(),
+                )
+            })?;
         let trap_offset = slots
             .iter()
             .zip(offsets)
             .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "response-owner frame declares no trap slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "response-owner frame declares no trap slot".to_string(),
+                )
             })?;
 
         compiler.open_aggregate_events(id)?;
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(5, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
-        function_local.grafted_spine_scope = Some(GraftedSpineFunctionScope::Response(
-            emission.owner.id(),
-        ));
-        let declared_calls = call_edges.declare_in_func(
-            emission.row.operation_source_owner(),
-            module,
-            &mut func,
-        )?;
+        function_local.grafted_spine_scope =
+            Some(GraftedSpineFunctionScope::Response(emission.owner.id()));
+        let declared_calls =
+            call_edges.declare_in_func(emission.row.operation_source_owner(), module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
         call_edges.declare_retained_body_targets_in_func(
             emission.row.operation_source_owner(),
@@ -4472,26 +5046,35 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         function_local.declaration_calls = declared_calls.declarations;
         for successor in &emission.successors {
             let declared = call_edges.declare_in_func(
-                successor.row.operation_source_owner(), module, &mut func,
+                successor.row.operation_source_owner(),
+                module,
+                &mut func,
             )?;
             for (site, call) in declared.static_bodies {
                 if let Some(previous) = function_local.unit_calls.insert(site, call.clone()) {
                     if previous.origin != call.origin || previous.header != call.header {
-                        return Err(backend_module(LoweringCause::PlannerInvariant,
-                            "two pending-Vis effect owners disagree on one generated call target".to_string(),
+                        return Err(backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "two pending-Vis effect owners disagree on one generated call target"
+                                .to_string(),
                         ));
                     }
                 }
             }
             call_edges.declare_retained_body_targets_in_func(
-                successor.row.operation_source_owner(), module, &mut func,
+                successor.row.operation_source_owner(),
+                module,
+                &mut func,
                 &mut function_local.unit_calls,
             )?;
             for (site, call) in declared.declarations {
-                if let Some(previous) = function_local.declaration_calls.insert(site, call.clone()) {
+                if let Some(previous) = function_local.declaration_calls.insert(site, call.clone())
+                {
                     if previous.origin != call.origin || previous.header != call.header {
-                        return Err(backend_module(LoweringCause::PlannerInvariant,
-                            "two pending-Vis effect owners disagree on one declaration target".to_string(),
+                        return Err(backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "two pending-Vis effect owners disagree on one declaration target"
+                                .to_string(),
                         ));
                     }
                 }
@@ -4500,37 +5083,38 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         function_local.raw_worker_calls = function_local.worker_calls.clone();
         function_local.worker_templates = worker_targets.templates().clone();
-        let expected_context_target = bundle
-            .context(emission.owner.k_context())
-            .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "a response owner's exact K context was never declared".to_string())
+        let expected_context_target =
+            bundle.context(emission.owner.k_context()).ok_or_else(|| {
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "a response owner's exact K context was never declared".to_string(),
+                )
             })?;
         #[cfg(feature = "px8-ds-test-support")]
-        let pending_vis_owner = compiler.static_transition_plan
-            .selected_pending_response_at_vis(emission.row.vis_origin())?.is_some();
+        let pending_vis_owner = compiler
+            .static_transition_plan
+            .selected_pending_response_at_vis(emission.row.vis_origin())?
+            .is_some();
         #[cfg(feature = "px8-ds-test-support")]
-        let body_mutation = claim_static_response_owner_body_mutation(
-            |mutation| match mutation {
-                StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis =>
-                    pending_vis_owner,
-                StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
-                    .static_transition_plan
-                    .continuation_contexts()
-                    .is_ok_and(|contexts| {
-                        contexts.first().is_some_and(|context| {
-                            context.id() != emission.owner.k_context()
-                        })
-                    }),
-                StaticResponseOwnerBodyMutation::ResponseWithPriorResponse => {
-                    emission.owner.id().ordinal() > 0
-                }
-                StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment => {
-                    emission.row.operation() == crate::HostOpV1::BufferAllocate
-                        && emission.owner.header().parameters > 1
-                }
-                _ => true,
-            },
-        );
+        let body_mutation = claim_static_response_owner_body_mutation(|mutation| match mutation {
+            StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis => pending_vis_owner,
+            StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
+                .static_transition_plan
+                .continuation_contexts()
+                .is_ok_and(|contexts| {
+                    contexts
+                        .first()
+                        .is_some_and(|context| context.id() != emission.owner.k_context())
+                }),
+            StaticResponseOwnerBodyMutation::ResponseWithPriorResponse => {
+                emission.owner.id().ordinal() > 0
+            }
+            StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment => {
+                emission.row.operation() == crate::HostOpV1::BufferAllocate
+                    && emission.owner.header().parameters > 1
+            }
+            _ => true,
+        });
         #[cfg(feature = "px8-ds-test-support")]
         let selected_context = match body_mutation {
             Some(StaticResponseOwnerBodyMutation::SubstituteContextZero) => {
@@ -4540,13 +5124,15 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     .first()
                     .map(|context| context.id())
                     .ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
                             "the context-zero response mutation found no installed context"
                                 .to_string(),
                         )
                     })?;
                 let target = bundle.context(first).ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the context-zero response mutation found no declared target".to_string(),
                     )
                 })?;
@@ -4564,7 +5150,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 let target = bundle
                     .continuation(emission.row.k_specialization())
                     .ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
                             "the raw-worker response mutation found no K worker declaration"
                                 .to_string(),
                         )
@@ -4601,19 +5188,36 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         function_local
             .context_calls
             .insert(emission.owner.k_context(), selected_context.clone());
-        let successor_contexts = emission.successors.iter().map(|successor| {
-            let context = bundle.context(successor.row.k_context()).ok_or_else(||
-                backend_module(LoweringCause::PlannerInvariant, "a pending-Vis successor K context was never generated".to_string()))?;
-            Ok((successor.row.id(), context))
-        }).collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
-        let successor_targets = emission.successors.iter().map(|successor| {
-            let target = declare_response_context_call_in_func(
-                module, &mut func, &compiler.static_transition_plan, bundle,
-                successor.row.k_context(),
-            )?;
-            function_local.context_calls.insert(successor.row.k_context(), target.clone());
-            Ok((successor.row.id(), target))
-        }).collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
+        let successor_contexts = emission
+            .successors
+            .iter()
+            .map(|successor| {
+                let context = bundle.context(successor.row.k_context()).ok_or_else(|| {
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a pending-Vis successor K context was never generated".to_string(),
+                    )
+                })?;
+                Ok((successor.row.id(), context))
+            })
+            .collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
+        let successor_targets = emission
+            .successors
+            .iter()
+            .map(|successor| {
+                let target = declare_response_context_call_in_func(
+                    module,
+                    &mut func,
+                    &compiler.static_transition_plan,
+                    bundle,
+                    successor.row.k_context(),
+                )?;
+                function_local
+                    .context_calls
+                    .insert(successor.row.k_context(), target.clone());
+                Ok((successor.row.id(), target))
+            })
+            .collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
         let token_scope = CheckedTokenFunctionScope::open(compiler)?;
         let ambient = AmbientBodyAuthority::bind(
@@ -4664,7 +5268,10 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             function_local.bind_unit_trap_frame(
                 frame,
                 i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "response-owner trap slot offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "response-owner trap slot offset exceeds range".to_string(),
+                    )
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
@@ -4675,8 +5282,10 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             )?;
             #[cfg(feature = "px8-ds-test-support")]
             record_pending_vis_owner_frame_observation(
-                emission.row.id(), emission.row.vis_origin(),
-                emission.owner.header().frame_bytes, function_local.pending_vis_frame,
+                emission.row.id(),
+                emission.row.vis_origin(),
+                emission.owner.header().frame_bytes,
+                function_local.pending_vis_frame,
             );
 
             let mut frame_inputs = BTreeMap::new();
@@ -4697,13 +5306,19 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     continue;
                 };
                 let offset = i32::try_from(*offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "response-owner input slot offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "response-owner input slot offset exceeds range".to_string(),
+                    )
                 })?;
                 let operand = LoweringOperand::Carried(CarriedBoundaryWord {
-                    word: builder.ins().load(types::I64, MemFlags::trusted(), frame, offset),
+                    word: builder
+                        .ins()
+                        .load(types::I64, MemFlags::trusted(), frame, offset),
                 });
                 if frame_inputs.insert(frame_source, operand.clone()).is_some() {
-                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
                         "a response-owner frame repeats one typed input slot".to_string(),
                     ));
                 }
@@ -4714,8 +5329,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             compiler.function_local = function_local;
 
             let mut context_suffix = Vec::with_capacity(
-                emission.row.captures().len()
-                    + emission.row.continuation_inputs().len(),
+                emission.row.captures().len() + emission.row.continuation_inputs().len(),
             );
             for capture in emission.row.captures() {
                 context_suffix.push(
@@ -4725,7 +5339,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                         ))
                         .cloned()
                         .ok_or_else(|| {
-                            backend_module(LoweringCause::PlannerInvariant,
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "a response K capture names an absent owner Parameter slot"
                                     .to_string(),
                             )
@@ -4734,15 +5349,23 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 #[cfg(feature = "px8-ds-test-support")]
                 if RT_SEED_RESPONSE_OBSERVING.with(std::cell::Cell::get) {
                     if let ContinuationSourceCoordinate::EntryAbi {
-                        source_owner, source_abi_position, ..
-                    } = capture.source() {
-                        let source = compiler.static_transition_plan.emittable_units()?
+                        source_owner,
+                        source_abi_position,
+                        ..
+                    } = capture.source()
+                    {
+                        let source = compiler
+                            .static_transition_plan
+                            .emittable_units()?
                             .into_iter()
                             .find(|unit| unit.function() == source_owner)
                             .expect("response EntryAbi source has an emittable owner");
                         if source.header().parameters >= 2
-                            && source_abi_position < source.header().parameters {
-                            let source_slot = source.slots().get(source_abi_position as usize)
+                            && source_abi_position < source.header().parameters
+                        {
+                            let source_slot = source
+                                .slots()
+                                .get(source_abi_position as usize)
                                 .expect("source parameter has a descriptor slot");
                             assert_eq!(source_slot.kind, AbiSlotKind::Parameter);
                             let word = match context_suffix.last().expect("just appended capture") {
@@ -4750,32 +5373,54 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                                 _ => panic!("response K capture was not an emitted word"),
                             };
                             let cranelift_codegen::ir::ValueDef::Result(inst, _) =
-                                builder.func.dfg.value_def(word) else {
-                                    panic!("response capture word has no emitted Load");
-                                };
+                                builder.func.dfg.value_def(word)
+                            else {
+                                panic!("response capture word has no emitted Load");
+                            };
                             let cranelift_codegen::ir::InstructionData::Load { offset, .. } =
-                                builder.func.dfg.insts[inst] else {
-                                    panic!("response capture word was not loaded from its frame");
-                                };
+                                builder.func.dfg.insts[inst]
+                            else {
+                                panic!("response capture word was not loaded from its frame");
+                            };
                             let emitted_offset = i32::from(offset);
-                            let response_slot = slots.iter().zip(offsets)
-                                .find(|(_, offset)| i32::try_from(**offset).ok() == Some(emitted_offset))
+                            let response_slot = slots
+                                .iter()
+                                .zip(offsets)
+                                .find(|(_, offset)| {
+                                    i32::try_from(**offset).ok() == Some(emitted_offset)
+                                })
                                 .map(|(slot, _)| slot)
                                 .expect("emitted response Load offset names a descriptor slot");
                             assert_eq!(response_slot.kind, AbiSlotKind::Parameter);
-                            assert_eq!(response_slot.ordinal, capture.producer_abi_slot(),
-                                "response capture must read by producer's index-keyed frame slot");
-                            assert_eq!(response_slot.carrier, source_slot.carrier,
-                                "response M: emitter-loaded slot and source descriptor carrier disagree");
-                            assert_eq!(response_slot.ownership, source_slot.ownership,
-                                "response M: emitter-loaded slot and source descriptor ownership disagree");
-                            assert_eq!(response_slot.storage_owner, source_slot.storage_owner,
-                                "response M: emitter-loaded slot and source descriptor storage owner disagree");
-                            assert_eq!(response_slot.carrier, AbiCarrier::ValueWord,
-                                "response M: ValueWord referent affinity must be revisited with a new parameter carrier");
-                            RT_SEED_RESPONSE_PAIRS.with(|pairs| pairs.borrow_mut().push((
-                                source_abi_position, response_slot.ordinal, emitted_offset,
-                            )));
+                            assert_eq!(
+                                response_slot.ordinal,
+                                capture.producer_abi_slot(),
+                                "response capture must read by producer's index-keyed frame slot"
+                            );
+                            assert_eq!(
+                                response_slot.carrier, source_slot.carrier,
+                                "response M: emitter-loaded slot and source descriptor carrier disagree"
+                            );
+                            assert_eq!(
+                                response_slot.ownership, source_slot.ownership,
+                                "response M: emitter-loaded slot and source descriptor ownership disagree"
+                            );
+                            assert_eq!(
+                                response_slot.storage_owner, source_slot.storage_owner,
+                                "response M: emitter-loaded slot and source descriptor storage owner disagree"
+                            );
+                            assert_eq!(
+                                response_slot.carrier,
+                                AbiCarrier::ValueWord,
+                                "response M: ValueWord referent affinity must be revisited with a new parameter carrier"
+                            );
+                            RT_SEED_RESPONSE_PAIRS.with(|pairs| {
+                                pairs.borrow_mut().push((
+                                    source_abi_position,
+                                    response_slot.ordinal,
+                                    emitted_offset,
+                                ))
+                            });
                         }
                     }
                 }
@@ -4786,7 +5431,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                         .get(&StaticResponseFrameSource::Capture(*ordinal))
                         .cloned()
                         .ok_or_else(|| {
-                            backend_module(LoweringCause::PlannerInvariant,
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "a response continuation input names an absent owner Capture slot"
                                     .to_string(),
                             )
@@ -4796,9 +5442,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             let mut context_calls = Vec::new();
             let mut early_returned = None;
             #[cfg(feature = "px8-ds-test-support")]
-            if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation)
-            {
+            if body_mutation == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation) {
                 let mut inputs = Vec::with_capacity(1 + context_suffix.len());
                 // The call-before-validation mutation must reach the finished
                 // body verifier, not be intercepted by the sole placeholder mint.
@@ -4819,24 +5463,27 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             }
 
             let (response, host_validation_end) = lower_static_response_effect(
-                compiler, &mut builder, &emission.row, &emission.effect,
-                &emission.operation_arguments, &frame_inputs,
+                compiler,
+                &mut builder,
+                &emission.row,
+                &emission.effect,
+                &emission.operation_arguments,
+                &frame_inputs,
             )?;
             #[cfg(feature = "px8-ds-test-support")]
-            let raw_host_result_escape = if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape)
-            {
-                let LoweringOperand::Specialized(value) = &response else {
-                    unreachable!("the HostResult shape was checked above")
+            let raw_host_result_escape =
+                if body_mutation == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape) {
+                    let LoweringOperand::Specialized(value) = &response else {
+                        unreachable!("the HostResult shape was checked above")
+                    };
+                    Some(compiler.transfer_unit_result_into_carrier(
+                        &mut builder,
+                        emission.row.effect_origin(),
+                        value,
+                    )?)
+                } else {
+                    None
                 };
-                Some(compiler.transfer_unit_result_into_carrier(
-                    &mut builder,
-                    emission.row.effect_origin(),
-                    value,
-                )?)
-            } else {
-                None
-            };
 
             let mut response_input = response;
             let mut response_is_current_host_result = true;
@@ -4854,12 +5501,11 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 Some(StaticResponseOwnerBodyMutation::ResponseWithPriorResponse) => {
                     response_input = frame_inputs
                         .iter()
-                        .find(|(source, _)| {
-                            matches!(source, StaticResponseFrameSource::Capture(_))
-                        })
+                        .find(|(source, _)| matches!(source, StaticResponseFrameSource::Capture(_)))
                         .map(|(_, operand)| operand.clone())
                         .ok_or_else(|| {
-                            backend_module(LoweringCause::PlannerInvariant,
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "the prior-response substitution found no carried prior lane"
                                     .to_string(),
                             )
@@ -4871,7 +5517,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                         .get(&StaticResponseFrameSource::Parameter(1))
                         .cloned()
                         .ok_or_else(|| {
-                            backend_module(LoweringCause::PlannerInvariant,
+                            backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "the application-environment substitution found no app capture"
                                     .to_string(),
                             )
@@ -4888,18 +5535,22 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             if body_mutation == Some(StaticResponseOwnerBodyMutation::LoadPlaceholderIntoK) {
                 context_inputs[0] = LoweringOperand::Carried(CarriedBoundaryWord {
                     word: builder.ins().load(
-                        types::I64, MemFlags::trusted(), frame, placeholder_offset,
+                        types::I64,
+                        MemFlags::trusted(),
+                        frame,
+                        placeholder_offset,
                     ),
                 });
             }
             let result_offset = i32::try_from(result_offset).map_err(|_| {
-                backend_module(LoweringCause::Capacity, "response-owner result slot offset exceeds range".to_string())
+                backend_module(
+                    LoweringCause::Capacity,
+                    "response-owner result slot offset exceeds range".to_string(),
+                )
             })?;
             let mut result_store = None;
             #[cfg(feature = "px8-ds-test-support")]
-            if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::CallAfterAnswerCollapse)
-            {
+            if body_mutation == Some(StaticResponseOwnerBodyMutation::CallAfterAnswerCollapse) {
                 let collapsed = builder.ins().iconst(types::I64, 0);
                 result_store = Some(builder.ins().store(
                     MemFlags::trusted(),
@@ -4945,8 +5596,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     context_calls.push(call);
                     #[cfg(feature = "px8-ds-test-support")]
                     if body_mutation == Some(StaticResponseOwnerBodyMutation::DuplicateKCall) {
-                        let (_duplicate_result, duplicate_call) =
-                            compiler.call_declared_unit_target(
+                        let (_duplicate_result, duplicate_call) = compiler
+                            .call_declared_unit_target(
                                 &mut builder,
                                 selected_context.clone(),
                                 &context_inputs,
@@ -4979,7 +5630,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_residual_abi_decode();
                     compiler.decode_residual_child(&mut builder, residual)?
-                },
+                }
                 LoweringOperand::Specialized(_) => {
                     return Err(backend_module(LoweringCause::PlannerInvariant,
                         "a response K context returned a specialized template instead of its Trap-checked runtime Result"
@@ -5000,38 +5651,61 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 let vis_origin = emission.row.vis_origin();
                 let vis_expr = compiler.retained_body_occurrence(vis_origin)?.expr.clone();
                 let RuntimeExpr::Construct { constructor, args } = vis_expr else {
-                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the test-only owner bypass lost its source Vis constructor".to_string(),
                     ));
                 };
                 if !constructor.ends_with("::ITree::Vis") || args.len() != 2 {
-                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the test-only owner bypass needs a binary Vis constructor".to_string(),
                     ));
                 }
                 compiler.transfer_constructor_operands(
-                    &mut builder, vis_origin, &constructor,
-                    &[LoweringOperand::Carried(returned), LoweringOperand::Carried(returned)],
+                    &mut builder,
+                    vis_origin,
+                    &constructor,
+                    &[
+                        LoweringOperand::Carried(returned),
+                        LoweringOperand::Carried(returned),
+                    ],
                     None,
                 )?
             } else {
                 returned
             };
-            if compiler.response_bracket_exits.contains_key(&emission.row.id()) {
+            if compiler
+                .response_bracket_exits
+                .contains_key(&emission.row.id())
+            {
                 compiler.bracket_ledger.close_owner(emission.row.id())?;
             }
-            let pending_vis_owner = match compiler.response_owner_settlements.get(&emission.row.id()) {
+            let pending_vis_owner = match compiler
+                .response_owner_settlements
+                .get(&emission.row.id())
+            {
                 Some(ResponseOwnerSettlement::Protocol) if !emission.successors.is_empty() => true,
                 Some(ResponseOwnerSettlement::RetOnly) if emission.successors.is_empty() => false,
                 // Baseline emission: the former pending-Vis protocol dropped
                 // excluded owners, so these took the Ret-only arm. The
                 // successor determines whether the handler-owned drive settles
                 // a returned Vis or this route traps.
-                Some(ResponseOwnerSettlement::Excluded { .. }) if emission.successors.is_empty() => false,
-                other => return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "response owner {:?} reached emission with settlement {other:?} and {} successors",
-                    emission.row.id(), emission.successors.len(),
-                ))),
+                Some(ResponseOwnerSettlement::Excluded { .. })
+                    if emission.successors.is_empty() =>
+                {
+                    false
+                }
+                other => {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "response owner {:?} reached emission with settlement {other:?} and {} successors",
+                            emission.row.id(),
+                            emission.successors.len(),
+                        ),
+                    ));
+                }
             };
             if let Some(obligation) = compiler
                 .function_local
@@ -5047,11 +5721,12 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             let exact_ret_identity = emission.row.k_ret_identity();
             let exact_ret_abi_word = exact_ret_identity.tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
-            let ret_abi_word = if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::VaryRet)
-            {
+            let ret_abi_word = if body_mutation == Some(StaticResponseOwnerBodyMutation::VaryRet) {
                 exact_ret_abi_word.checked_add(1).ok_or_else(|| {
-                    backend_module(LoweringCause::Capacity, "the response Ret mutation exhausted the ABI word".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "the response Ret mutation exhausted the ABI word".to_string(),
+                    )
                 })?
             } else {
                 exact_ret_abi_word
@@ -5059,95 +5734,121 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             #[cfg(not(feature = "px8-ds-test-support"))]
             let ret_abi_word = exact_ret_abi_word;
             if pending_vis_owner {
-                let pending = compiler.function_local.pending_vis_frame.ok_or_else(||
-                    backend_module(LoweringCause::PlannerInvariant, "a pending-Vis owner has no caller-owned record".to_string()))?;
+                let pending = compiler.function_local.pending_vis_frame.ok_or_else(|| {
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a pending-Vis owner has no caller-owned record".to_string(),
+                    )
+                })?;
                 #[cfg(feature = "px8-ds-test-support")]
                 let nonmember_mode = claim_pending_vis_nonmember_mutation(bypass_ret_validation);
                 let (force_unknown_member, bypass_unknown_to_c2) = {
                     #[cfg(feature = "px8-ds-test-support")]
-                    { (nonmember_mode.is_some(),
-                        nonmember_mode == Some(PendingVisNonmemberMutation::BypassToC2)) }
+                    {
+                        (
+                            nonmember_mode.is_some(),
+                            nonmember_mode == Some(PendingVisNonmemberMutation::BypassToC2),
+                        )
+                    }
                     #[cfg(not(feature = "px8-ds-test-support"))]
-                    { (false, false) }
+                    {
+                        (false, false)
+                    }
                 };
                 pending_finished = Some(emit_pending_vis_owner_loop(
-                    compiler, &mut builder, frame, pending.region,
-                    &emission.row, ret_abi_word, &context_calls, expected_context_target,
-                    host_validation_end, response_is_current_host_result,
-                    returned, &emission.successors,
-                    &successor_targets, &successor_contexts,
-                    result_offset, placeholder_offset,
+                    compiler,
+                    &mut builder,
+                    frame,
+                    pending.region,
+                    &emission.row,
+                    ret_abi_word,
+                    &context_calls,
+                    expected_context_target,
+                    host_validation_end,
+                    response_is_current_host_result,
+                    returned,
+                    &emission.successors,
+                    &successor_targets,
+                    &successor_contexts,
+                    result_offset,
+                    placeholder_offset,
                     #[cfg(feature = "px8-ds-test-support")]
                     raw_host_result_escape,
-                    force_unknown_member, bypass_unknown_to_c2,
+                    force_unknown_member,
+                    bypass_unknown_to_c2,
                 )?);
             } else {
-            let ret_tag = compiler.emit_carrier_tag(&mut builder, returned)?;
-            let expected_ret = i64::try_from(ret_abi_word).map_err(|_| {
-                backend_module(LoweringCause::Capacity, "response Ret identity exceeds the runtime tag word".to_string())
-            })?;
-            #[cfg(feature = "px8-ds-test-support")]
-            if !bypass_ret_validation {
-                Lowering::require_i64(&mut builder, ret_tag, expected_ret);
-            }
-            #[cfg(not(feature = "px8-ds-test-support"))]
-            Lowering::require_i64(&mut builder, ret_tag, expected_ret);
-            let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
-            #[cfg(feature = "px8-ds-test-support")]
-            if !bypass_ret_validation {
-                Lowering::require_i64(&mut builder, ret_fields, 1);
-            }
-            #[cfg(not(feature = "px8-ds-test-support"))]
-            Lowering::require_i64(&mut builder, ret_fields, 1);
-            let ret_validation_end = builder
-                .func
-                .layout
-                .blocks()
-                .filter_map(|block| builder.func.layout.last_inst(block))
-                .last()
-                .ok_or_else(|| {
-                    backend_module(LoweringCause::FinishedCode, "response Ret validation emitted no instruction".to_string())
-                })?;
-            let application = CheckedIhApplicationResult::from_declared_call(
-                LoweringOperand::Carried(returned),
-            )?;
-            let result_store = match result_store {
-                Some(store) => store,
-                None => {
-                    #[cfg(feature = "px8-ds-test-support")]
-                    let result_word = raw_host_result_escape
-                        .map_or(application.word.word, |word| word.word);
-                    #[cfg(not(feature = "px8-ds-test-support"))]
-                    let result_word = application.word.word;
-                    builder.ins().store(
-                        MemFlags::trusted(),
-                        result_word,
-                        frame,
-                        result_offset,
+                let ret_tag = compiler.emit_carrier_tag(&mut builder, returned)?;
+                let expected_ret = i64::try_from(ret_abi_word).map_err(|_| {
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "response Ret identity exceeds the runtime tag word".to_string(),
                     )
+                })?;
+                #[cfg(feature = "px8-ds-test-support")]
+                if !bypass_ret_validation {
+                    Lowering::require_i64(&mut builder, ret_tag, expected_ret);
                 }
-            };
-            let zero = builder.ins().iconst(types::I64, 0);
-            let return_inst = builder.ins().return_(&[zero]);
-            compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
-            finished_body = Some(StaticResponseFinishedBody {
-                input_frame: frame,
-                placeholder_offset,
-                context_calls,
-                host_validation_end,
-                ret_validation_end,
-                result_store,
-                returned_word: application.word.word,
-                return_inst,
-                frame,
-                result_offset,
-                trap_offset: i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity,
-                        "response-owner trap slot offset exceeds range".to_string())
-                })?,
-                response_is_current_host_result,
-                ret_abi_word,
-            });
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                Lowering::require_i64(&mut builder, ret_tag, expected_ret);
+                let ret_fields = compiler.emit_carrier_field_count(&mut builder, returned)?;
+                #[cfg(feature = "px8-ds-test-support")]
+                if !bypass_ret_validation {
+                    Lowering::require_i64(&mut builder, ret_fields, 1);
+                }
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                Lowering::require_i64(&mut builder, ret_fields, 1);
+                let ret_validation_end = builder
+                    .func
+                    .layout
+                    .blocks()
+                    .filter_map(|block| builder.func.layout.last_inst(block))
+                    .last()
+                    .ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::FinishedCode,
+                            "response Ret validation emitted no instruction".to_string(),
+                        )
+                    })?;
+                let application = CheckedIhApplicationResult::from_declared_call(
+                    LoweringOperand::Carried(returned),
+                )?;
+                let result_store = match result_store {
+                    Some(store) => store,
+                    None => {
+                        #[cfg(feature = "px8-ds-test-support")]
+                        let result_word =
+                            raw_host_result_escape.map_or(application.word.word, |word| word.word);
+                        #[cfg(not(feature = "px8-ds-test-support"))]
+                        let result_word = application.word.word;
+                        builder
+                            .ins()
+                            .store(MemFlags::trusted(), result_word, frame, result_offset)
+                    }
+                };
+                let zero = builder.ins().iconst(types::I64, 0);
+                let return_inst = builder.ins().return_(&[zero]);
+                compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
+                finished_body = Some(StaticResponseFinishedBody {
+                    input_frame: frame,
+                    placeholder_offset,
+                    context_calls,
+                    host_validation_end,
+                    ret_validation_end,
+                    result_store,
+                    returned_word: application.word.word,
+                    return_inst,
+                    frame,
+                    result_offset,
+                    trap_offset: i32::try_from(trap_offset).map_err(|_| {
+                        backend_module(
+                            LoweringCause::Capacity,
+                            "response-owner trap slot offset exceeds range".to_string(),
+                        )
+                    })?,
+                    response_is_current_host_result,
+                    ret_abi_word,
+                });
             }
             compiler.validate_response_join_plan_consumption(&required)?;
             builder.seal_all_blocks();
@@ -5164,28 +5865,50 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         // predicate; every owner still runs its exact finished-body verifier.
         let verify_finished_body = || -> Result<(), CraneliftBackendError> {
             if let Some(pending) = pending_finished.as_ref() {
-                let region = compiler.pending_vis_record_protocol.as_ref()
-                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "the pending-Vis verifier lost the closed plan".to_string()))?
+                let region = compiler
+                    .pending_vis_record_protocol
+                    .as_ref()
+                    .ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "the pending-Vis verifier lost the closed plan".to_string(),
+                        )
+                    })?
                     .frame_region(
                         PendingVisFrameOwner::ResponseOwner(emission.row.id()),
                         emission.owner.header().frame_bytes,
                     )?
-                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "a pending-Vis owner has no planned record tail".to_string()))?;
+                    .ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "a pending-Vis owner has no planned record tail".to_string(),
+                        )
+                    })?;
                 verify_pending_vis_finished_body(
-                    &func, pending, &emission.row, &emission.successors, region,
+                    &func,
+                    pending,
+                    &emission.row,
+                    &emission.successors,
+                    region,
                 )?;
             } else {
-                let ret_only = finished_body.as_ref().ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                    "a Ret-only response owner has no finished-body facts".to_string(),
-                ))?;
+                let ret_only = finished_body.as_ref().ok_or_else(|| {
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a Ret-only response owner has no finished-body facts".to_string(),
+                    )
+                })?;
                 verify_static_response_finished_body(
-                    &func, expected_context_target,
+                    &func,
+                    expected_context_target,
                     emission.row.k_ret_identity().tag_abi_word()?,
                     helpers.boundary_value_abi.tag,
                     helpers.boundary_value_abi.field_count,
                     compiler.function_local.boundary_arena.ok_or_else(|| {
-                        backend_module(LoweringCause::FinishedCode,
-                            "a response-owner finished proof has no boundary arena".to_string())
+                        backend_module(
+                            LoweringCause::FinishedCode,
+                            "a response-owner finished proof has no boundary arena".to_string(),
+                        )
                     })?,
                     ret_only,
                     &compiler.function_local.pending_call_result_obligations,
@@ -5215,15 +5938,19 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             }
         } else {
             let pending = pending_finished.as_ref().ok_or_else(|| {
-                backend_module(LoweringCause::FinishedCode,
-                    "a response owner has no finished Result publication".to_string())
+                backend_module(
+                    LoweringCause::FinishedCode,
+                    "a response owner has no finished Result publication".to_string(),
+                )
             })?;
             FunctionResultPublication {
                 frame: pending.input_frame,
                 result_offset: pending.result_offset,
                 trap_offset: i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity,
-                        "pending-Vis response-owner trap offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "pending-Vis response-owner trap offset exceeds range".to_string(),
+                    )
                 })?,
                 result_store: pending.result_store,
                 returned_word: pending.returned_word,
@@ -5301,7 +6028,9 @@ pub(super) fn stage_continuation_bodies<M: Module>(
     // made elsewhere about what this loop does would agree with itself; this is
     // the loop's own decision, and if it ever stopped omitting, the recorded set
     // would shrink and the range equality would say so.
-    let ordinary_targets = compiler.static_transition_plan.ordinary_continuation_targets()?;
+    let ordinary_targets = compiler
+        .static_transition_plan
+        .ordinary_continuation_targets()?;
     for omitted in compiler
         .static_transition_plan
         .continuation_units()?
@@ -5314,7 +6043,8 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             .fusion_compositions
             .as_mut()
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant,
+                backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a fusion-local continuation target was omitted from the definition pass \
                      with no composition ledger open to record it; the omission would then be \
                      invisible to the range equality that is the only thing requiring it"
@@ -5386,12 +6116,16 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         .collect();
 
     let mut staged = Vec::new();
-    #[cfg_attr(not(test), expect(unused_mut, reason = "only the D7 control mutates it"))]
+    #[cfg_attr(
+        not(test),
+        expect(unused_mut, reason = "only the D7 control mutates it")
+    )]
     for mut unit in emissions {
         // Resolve the EXACT target first; the control below perturbs only what
         // the definition is handed.
         let exact_id = bundle.continuation(unit.id).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a planned continuation specialization was never forward-declared".to_string(),
             )
         })?;
@@ -5416,7 +6150,8 @@ pub(super) fn stage_continuation_bodies<M: Module>(
                 .find(|(_, origin)| *origin == unit.worker_body_origin)
                 .map(|(shape, _)| *shape)
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the D7 definition-binding control could not read the exact worker \
                          body's declared arity and capture count; a control that cannot \
                          establish the shape it matches on must refuse rather than bind an \
@@ -5426,12 +6161,11 @@ pub(super) fn stage_continuation_bodies<M: Module>(
                 })?;
             let substitute = d7_callable_index
                 .iter()
-                .find(|(shape, origin)| {
-                    *shape == exact_shape && *origin != unit.worker_body_origin
-                })
+                .find(|(shape, origin)| *shape == exact_shape && *origin != unit.worker_body_origin)
                 .map(|(_, origin)| *origin)
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "the D7 definition-binding control found no distinct same-shaped \
                          callable body to bind under this declared function; that is a \
                          missing fixture precondition, not a discharge"
@@ -5447,7 +6181,8 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         let inputs = &unit.inputs;
         let slots = unit.slots.as_slice();
         if slots.len() != offsets.len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a continuation slot run disagrees with its own offset walk".to_string(),
             ));
         }
@@ -5466,18 +6201,21 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             .filter(|(slot, _)| slot.kind == AbiSlotKind::Capture)
             .collect();
         if parameter_slots.len() != envelope.len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "the ruled ordinary envelope does not cover the Parameter slot run".to_string(),
             ));
         }
         if capture_slots.len() != inputs.len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "the projected continuation inputs do not cover the Capture slot run".to_string(),
             ));
         }
         for (position, input) in inputs.iter().enumerate() {
             if input.ordinal as usize != position {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "continuation inputs are not dense in ordinal order".to_string(),
                 ));
             }
@@ -5487,7 +6225,8 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         for role in envelope.iter() {
             if let ContinuationOrdinaryEnvelopeRole::WorkerCapture { closure_origin, .. } = role {
                 if *closure_origin != unit.worker_closure_origin {
-                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
                         "an ordinary-envelope worker capture names a different closure than the \
                          selected worker"
                             .to_string(),
@@ -5498,8 +6237,7 @@ pub(super) fn stage_continuation_bodies<M: Module>(
 
         compiler.open_aggregate_events(id)?;
         let sig = unit_signature(module);
-        let mut func =
-            Function::with_name_signature(UserFuncName::user(0, id.as_u32()), sig);
+        let mut func = Function::with_name_signature(UserFuncName::user(0, id.as_u32()), sig);
         // Set by the retarget below; `None` means this specialization calls the
         // raw worker unit directly, which is every pre-`D5a` case.
         let mut retargeted_worker_body: Option<StaticOriginId> = None;
@@ -5509,7 +6247,10 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "continuation frame declares no result slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "continuation frame declares no result slot".to_string(),
+                )
             })?;
         let trap_offset = slots
             .iter()
@@ -5517,13 +6258,14 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "continuation frame declares no trap slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "continuation frame declares no trap slot".to_string(),
+                )
             })?;
 
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
-        function_local.grafted_spine_scope = Some(
-            GraftedSpineFunctionScope::Continuation(unit.id),
-        );
+        function_local.grafted_spine_scope = Some(GraftedSpineFunctionScope::Continuation(unit.id));
         // ONE lawful declaration per continuation `Function`, retained whole
         // and seated in BOTH existing roles. The worker constructor validates
         // through `unit_calls`; the later callee-only consumer resolves
@@ -5620,26 +6362,33 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             // ruling's transplanted-binding stop had nothing to name. These two
             // comparisons cost nothing and turn it into a fact the code checks.
             if context.enclosing_specialization() != unit.id {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the retarget resolved generated context {:?}, whose enclosing specialization \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the retarget resolved generated context {:?}, whose enclosing specialization \
                      is {:?} and not the {:?} now being defined; a context executes on behalf of \
                      the one identity that owns it, so this call would transfer another \
                      specialization's captures across this one's worker execution",
-                    context.id(),
-                    context.enclosing_specialization(),
-                    unit.id,
-                )));
+                        context.id(),
+                        context.enclosing_specialization(),
+                        unit.id,
+                    ),
+                ));
             }
             if context.worker_body_origin() != unit.worker_body_origin {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the retarget resolved a generated context executing body {:?}, but this \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the retarget resolved a generated context executing body {:?}, but this \
                      specialization selected worker body {:?}",
-                    context.worker_body_origin(),
-                    unit.worker_body_origin,
-                )));
+                        context.worker_body_origin(),
+                        unit.worker_body_origin,
+                    ),
+                ));
             }
             let target = bundle.context(context.id()).ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant,
+                backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a planned generated context was never forward-declared".to_string(),
                 )
             })?;
@@ -5750,12 +6499,17 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             function_local.bind_unit_trap_frame(
                 frame,
                 i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "continuation trap slot offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "continuation trap slot offset exceeds range".to_string(),
+                    )
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
                 compiler.pending_vis_record_protocol.as_ref(),
-                PendingVisFrameOwner::Continuation(unit.id), frame, unit.frame_bytes,
+                PendingVisFrameOwner::Continuation(unit.id),
+                frame,
+                unit.frame_bytes,
             )?;
             compiler.function_local = function_local;
 
@@ -5763,10 +6517,15 @@ pub(super) fn stage_continuation_bodies<M: Module>(
             // descriptor assigns it, and from nowhere else.
             let load_at = |builder: &mut FunctionBuilder<'_>, offset: u32| {
                 let offset = i32::try_from(offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "continuation slot offset exceeds addressable range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "continuation slot offset exceeds addressable range".to_string(),
+                    )
                 })?;
                 Ok::<_, CraneliftBackendError>(LoweringOperand::Carried(CarriedBoundaryWord {
-                    word: builder.ins().load(types::I64, MemFlags::trusted(), frame, offset),
+                    word: builder
+                        .ins()
+                        .load(types::I64, MemFlags::trusted(), frame, offset),
                 }))
             };
 
@@ -5832,13 +6591,14 @@ pub(super) fn stage_continuation_bodies<M: Module>(
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_residual_abi_decode();
                     compiler.decode_residual_child(&mut builder, residual)?.word
-                },
-                LoweringOperand::Specialized(value) => {
-                    compiler.emit_result(&mut builder, value)?.0
                 }
+                LoweringOperand::Specialized(value) => compiler.emit_result(&mut builder, value)?.0,
             };
             let result_offset = i32::try_from(result_offset).map_err(|_| {
-                backend_module(LoweringCause::Capacity, "continuation result slot offset exceeds range".to_string())
+                backend_module(
+                    LoweringCause::Capacity,
+                    "continuation result slot offset exceeds range".to_string(),
+                )
             })?;
             let result_store = builder
                 .ins()
@@ -5849,8 +6609,10 @@ pub(super) fn stage_continuation_bodies<M: Module>(
                 frame,
                 result_offset,
                 trap_offset: i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity,
-                        "continuation trap slot offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "continuation trap slot offset exceeds range".to_string(),
+                    )
                 })?,
                 result_store,
                 returned_word: word,
@@ -5900,20 +6662,32 @@ pub(in crate::cranelift_backend) fn generated_context_source_environment<T>(
     converts_source_parameters: bool,
 ) -> Result<Vec<T>, CraneliftBackendError> {
     let raw_parameters = usize::try_from(raw_parameters).map_err(|_| {
-        backend_module(LoweringCause::Capacity, "generated-context raw parameter count exceeds this platform".to_string())
+        backend_module(
+            LoweringCause::Capacity,
+            "generated-context raw parameter count exceeds this platform".to_string(),
+        )
     })?;
     let raw_captures = usize::try_from(raw_captures).map_err(|_| {
-        backend_module(LoweringCause::Capacity, "generated-context raw capture count exceeds this platform".to_string())
+        backend_module(
+            LoweringCause::Capacity,
+            "generated-context raw capture count exceeds this platform".to_string(),
+        )
     })?;
     let expected = raw_parameters.checked_add(raw_captures).ok_or_else(|| {
-        backend_module(LoweringCause::Capacity, "generated-context raw input count overflowed".to_string())
+        backend_module(
+            LoweringCause::Capacity,
+            "generated-context raw input count overflowed".to_string(),
+        )
     })?;
     if combined_parameters.len() != expected {
-        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-            "a generated context's Parameter run holds {} operands, but its raw owner declares \
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
+            format!(
+                "a generated context's Parameter run holds {} operands, but its raw owner declares \
              {raw_parameters} parameters plus {raw_captures} captures",
-            combined_parameters.len()
-        )));
+                combined_parameters.len()
+            ),
+        ));
     }
 
     let mut captures = combined_parameters.split_off(raw_parameters);
@@ -6023,7 +6797,8 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
                 .find(|(function, _, _)| *function == raw_owner)
                 .map(|(_, definition, header)| (*definition, *header))
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "a generated context's raw owner has no ABI descriptor".to_string(),
                     )
                 })?;
@@ -6049,19 +6824,13 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
                         Mutation::WrongDestinationOwner => {
                             Some(ProjectionMutation::DestinationOwner)
                         }
-                        Mutation::WrongDestinationBody => {
-                            Some(ProjectionMutation::DestinationBody)
-                        }
+                        Mutation::WrongDestinationBody => Some(ProjectionMutation::DestinationBody),
                         Mutation::WrongBinding => Some(ProjectionMutation::BindingFrame),
                         Mutation::WrongLocatorInvocation => {
                             Some(ProjectionMutation::LocatorInvocation)
                         }
-                        Mutation::WrongLocatorCallee => {
-                            Some(ProjectionMutation::LocatorCallee)
-                        }
-                        Mutation::WrongLocatorDomain => {
-                            Some(ProjectionMutation::LocatorDomain)
-                        }
+                        Mutation::WrongLocatorCallee => Some(ProjectionMutation::LocatorCallee),
+                        Mutation::WrongLocatorDomain => Some(ProjectionMutation::LocatorDomain),
                         Mutation::WrongLocatorIndex => Some(ProjectionMutation::LocatorIndex),
                         _ => None,
                     };
@@ -6123,14 +6892,16 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
     let mut staged = Vec::new();
     for context in contexts {
         let id = bundle.context(context.id).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a planned generated context was never forward-declared".to_string(),
             )
         })?;
         let slots = context.slots.as_slice();
         let offsets = context.offsets.as_slice();
         if slots.len() != offsets.len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a generated context slot run disagrees with its own offset walk".to_string(),
             ));
         }
@@ -6148,7 +6919,8 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
         if u32::try_from(parameter_count).ok() != Some(context.header_parameters)
             || u32::try_from(capture_count).ok() != Some(context.header_captures)
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a generated context's slot run disagrees with its declared frame header"
                     .to_string(),
             ));
@@ -6159,7 +6931,10 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "generated context frame declares no result slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "generated context frame declares no result slot".to_string(),
+                )
             })?;
         let trap_offset = slots
             .iter()
@@ -6167,15 +6942,17 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "generated context frame declares no trap slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "generated context frame declares no trap slot".to_string(),
+                )
             })?;
 
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(3, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
-        function_local.grafted_spine_scope = Some(
-            GraftedSpineFunctionScope::ContinuationContext(context.id),
-        );
+        function_local.grafted_spine_scope =
+            Some(GraftedSpineFunctionScope::ContinuationContext(context.id));
         // The raw body's OWN call edges, declared into this function. They are
         // the raw owner's edges because the body is the raw owner's body; what
         // this context changes is the environment, never which callees the
@@ -6278,12 +7055,17 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             function_local.bind_unit_trap_frame(
                 frame,
                 i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "generated context trap slot offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "generated context trap slot offset exceeds range".to_string(),
+                    )
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
                 compiler.pending_vis_record_protocol.as_ref(),
-                PendingVisFrameOwner::Context(context.id), frame, context.frame_bytes,
+                PendingVisFrameOwner::Context(context.id),
+                frame,
+                context.frame_bytes,
             )?;
             if let Some(access) = &context.checked_ih_generated_entry_access {
                 if access.context() != context.id
@@ -6339,7 +7121,8 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
                     continue;
                 }
                 let offset = i32::try_from(*offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity,
+                    backend_module(
+                        LoweringCause::Capacity,
                         "generated context slot offset exceeds addressable range".to_string(),
                     )
                 })?;
@@ -6501,34 +7284,40 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_residual_abi_decode();
                     Some(compiler.decode_residual_child(&mut builder, residual)?.word)
-                },
+                }
             };
             let result_offset = i32::try_from(result_offset).map_err(|_| {
-                backend_module(LoweringCause::Capacity,
-                    "generated context result slot offset exceeds range".to_string())
+                backend_module(
+                    LoweringCause::Capacity,
+                    "generated context result slot offset exceeds range".to_string(),
+                )
             })?;
             let trap_offset = i32::try_from(trap_offset).map_err(|_| {
-                backend_module(LoweringCause::Capacity,
-                    "generated context trap slot offset exceeds range".to_string())
+                backend_module(
+                    LoweringCause::Capacity,
+                    "generated context trap slot offset exceeds range".to_string(),
+                )
             })?;
             let pending_publication = if let Some(word) = word {
                 if let Some(contract) = context.result_contract {
                     // Runtime validation remains defence in depth. It is not
                     // compiler authority: the staged finished proof below must
                     // establish the word before this function can be defined.
-                    let actual = compiler.emit_carrier_tag(
-                        &mut builder, CarriedBoundaryWord { word },
-                    )?;
+                    let actual =
+                        compiler.emit_carrier_tag(&mut builder, CarriedBoundaryWord { word })?;
                     let expected = i64::try_from(contract.tag_abi_word()?).map_err(|_| {
-                        backend_module(LoweringCause::Capacity,
+                        backend_module(
+                            LoweringCause::Capacity,
                             "generated context Result identity exceeds the runtime tag word"
-                                .to_string())
+                                .to_string(),
+                        )
                     })?;
                     Lowering::require_i64(&mut builder, actual, expected);
                 }
-                let result_store = builder.ins().store(
-                    MemFlags::trusted(), word, frame, result_offset,
-                );
+                let result_store =
+                    builder
+                        .ins()
+                        .store(MemFlags::trusted(), word, frame, result_offset);
                 Some((result_store, word))
             } else {
                 None
@@ -6575,21 +7364,21 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
         let response_owner_calls = verified_response_owner_calls(
             &compiler.static_transition_plan,
             bundle,
-            compiler
-                .function_local
-                .continuation_emissions
-                .keys()
-                .chain(
-                    compiler
-                        .function_local
-                        .checked_ih_transport_emissions
-                        .iter()
-                        .map(|(transport, _)| transport.source_call_identity()),
-                ),
+            compiler.function_local.continuation_emissions.keys().chain(
+                compiler
+                    .function_local
+                    .checked_ih_transport_emissions
+                    .iter()
+                    .map(|(transport, _)| transport.source_call_identity()),
+            ),
         )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
-                compiler.function_local.continuation_emissions.keys().cloned(),
+                compiler
+                    .function_local
+                    .continuation_emissions
+                    .keys()
+                    .cloned(),
             )?;
             ledger.record_response_owner_calls(response_owner_calls);
         }
@@ -6734,7 +7523,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 let claim = claims
                     .and_then(|ledger| ledger.claim(fusion.id()))
                     .ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
                             "an installed static continuation fusion has no outstanding region \
                              claim, so its definition would take over a suffix nothing admitted"
                                 .to_string(),
@@ -6767,14 +7557,16 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
     let mut defined = 0usize;
     for fusion in fusions {
         let id = bundle.fusion(fusion.id).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "an installed static continuation fusion was never forward-declared".to_string(),
             )
         })?;
         let slots = fusion.slots.as_slice();
         let offsets = fusion.offsets.as_slice();
         if slots.len() != offsets.len() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fused region slot run disagrees with its own offset walk".to_string(),
             ));
         }
@@ -6792,7 +7584,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         if u32::try_from(parameter_count).ok() != Some(fusion.header_parameters)
             || u32::try_from(capture_count).ok() != Some(fusion.header_captures)
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fused region's slot run disagrees with its declared frame header".to_string(),
             ));
         }
@@ -6802,7 +7595,10 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "fused region frame declares no result slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "fused region frame declares no result slot".to_string(),
+                )
             })?;
         let trap_offset = slots
             .iter()
@@ -6810,21 +7606,23 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
             .map(|(_, offset)| *offset)
             .ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant, "fused region frame declares no trap slot".to_string())
+                backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "fused region frame declares no trap slot".to_string(),
+                )
             })?;
 
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(4, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
-        function_local.grafted_spine_scope = Some(
-            GraftedSpineFunctionScope::Fusion(fusion.id),
-        );
+        function_local.grafted_spine_scope = Some(GraftedSpineFunctionScope::Fusion(fusion.id));
         // The PRODUCER's own call edges, declared into this function. This is
         // what carries the inherited producer edge: the producer's body still
         // names the callees the source named, and it is only its *host* that
         // changed. Not the consumer's edges — the consumer's redirected
         // invocation is the edge that reaches this function, not one inside it.
-        let declared_calls = call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
+        let declared_calls =
+            call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE DEFINITION-LOCAL
         // ---- FUSION-RECURSIVE SELF EDGE (Architect, via `evt_6fzg11hpvfp4w`).
@@ -6903,7 +7701,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // planner, and `ih_bindings` and `SemanticIr::child_origin` are
         // planner-private precisely so that cannot happen quietly.
         if fusion.redirect_callee != fusion.producer_body {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fused region's redirect names a producer entry other than the claim's producer \
                  body, so the definition-local recursive edge would target a body this claim \
                  never admitted"
@@ -6934,7 +7733,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             .insert(self_edge_body, self_edge)
             .is_some()
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fused definition already holds a call target for the body it owns, so its \
                  recursive suffix edge would be one of two answers to the same lookup"
                     .to_string(),
@@ -7038,12 +7838,17 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             function_local.bind_unit_trap_frame(
                 frame,
                 i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "fused region trap slot offset exceeds range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "fused region trap slot offset exceeds range".to_string(),
+                    )
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
                 compiler.pending_vis_record_protocol.as_ref(),
-                PendingVisFrameOwner::Fusion(fusion.id), frame, fusion.header.frame_bytes,
+                PendingVisFrameOwner::Fusion(fusion.id),
+                frame,
+                fusion.header.frame_bytes,
             )?;
             compiler.function_local = function_local;
             compiler.open_aggregate_events(id)?;
@@ -7064,7 +7869,10 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     continue;
                 }
                 let offset = i32::try_from(*offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "fused region slot offset exceeds addressable range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "fused region slot offset exceeds addressable range".to_string(),
+                    )
                 })?;
                 let word = builder
                     .ins()
@@ -7142,10 +7950,9 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 // held on the way out rather than cleared, for the same reason
                 // `AmbientBodyAuthority` restores: a nested definition pass must
                 // not be handed `None` when its caller held a key.
-                let enclosing_switch = compiler.fused_consumer_authority.replace((
-                    fusion.continuation_origin,
-                    fusion.consumer_owner,
-                ));
+                let enclosing_switch = compiler
+                    .fused_consumer_authority
+                    .replace((fusion.continuation_origin, fusion.consumer_owner));
                 let lowered = fuse_producer_through_consumer_suffix(
                     compiler,
                     &mut builder,
@@ -7186,7 +7993,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_residual_abi_decode();
                     Some(compiler.decode_residual_child(&mut builder, residual)?.word)
-                },
+                }
             };
             if let Some(word) = word {
                 builder.ins().store(
@@ -7194,7 +8001,10 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     word,
                     frame,
                     i32::try_from(result_offset).map_err(|_| {
-                        backend_module(LoweringCause::Capacity, "fused region result slot offset exceeds range".to_string())
+                        backend_module(
+                            LoweringCause::Capacity,
+                            "fused region result slot offset exceeds range".to_string(),
+                        )
                     })?,
                 );
             }
@@ -7221,21 +8031,21 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         let response_owner_calls = verified_response_owner_calls(
             &compiler.static_transition_plan,
             bundle,
-            compiler
-                .function_local
-                .continuation_emissions
-                .keys()
-                .chain(
-                    compiler
-                        .function_local
-                        .checked_ih_transport_emissions
-                        .iter()
-                        .map(|(transport, _)| transport.source_call_identity()),
-                ),
+            compiler.function_local.continuation_emissions.keys().chain(
+                compiler
+                    .function_local
+                    .checked_ih_transport_emissions
+                    .iter()
+                    .map(|(transport, _)| transport.source_call_identity()),
+            ),
         )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
-                compiler.function_local.continuation_emissions.keys().cloned(),
+                compiler
+                    .function_local
+                    .continuation_emissions
+                    .keys()
+                    .cloned(),
             )?;
             ledger.record_response_owner_calls(response_owner_calls);
         }
@@ -7273,7 +8083,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 .fusion_compositions
                 .as_mut()
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "a fusion-owned body realized an outer identity with no composition \
                          ledger open to record it, so the realization would be unaccounted"
                             .to_string(),
@@ -7313,7 +8124,8 @@ fn fuse_producer_through_consumer_suffix(
 ) -> Result<LoweringOperand, CraneliftBackendError> {
     let suffix = compiler.retained_body_occurrence(continuation_origin)?;
     let RuntimeExpr::ComputationalMatch { cases, default, .. } = suffix.expr else {
-        return Err(unsupported(LoweringCause::PlannerInvariant,
+        return Err(unsupported(
+            LoweringCause::PlannerInvariant,
             "StaticContinuationFusion",
             "the claimed consumer continuation is not a computational match, so the fused region \
              has no suffix to run",
@@ -7374,7 +8186,12 @@ fn redirect_fused_producer_invocations<M: Module>(
             .into_iter()
             .map(|fusion| {
                 let (offsets, _frame_bytes) = fusion.slot_offsets()?;
-                Ok((fusion.id(), fusion.header(), fusion.slots().to_vec(), offsets))
+                Ok((
+                    fusion.id(),
+                    fusion.header(),
+                    fusion.slots().to_vec(),
+                    offsets,
+                ))
             })
             .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let mut redirects = Vec::new();
@@ -7390,7 +8207,8 @@ fn redirect_fused_producer_invocations<M: Module>(
                 continue;
             }
             let target = bundle.fusion(*fusion).ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant,
+                backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a claimed fused region has no forward-declared target to redirect to"
                         .to_string(),
                 )
@@ -7399,7 +8217,8 @@ fn redirect_fused_producer_invocations<M: Module>(
                 .iter()
                 .find(|(id, ..)| id == fusion)
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
                         "a claimed fused region has no installed frame contract".to_string(),
                     )
                 })?;
@@ -7432,7 +8251,8 @@ fn redirect_fused_producer_invocations<M: Module>(
         // producer is still reachable by its standalone route and the redirect
         // would be one of two answers to the same lookup.
         if unit_calls.insert(seat, call).is_some() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fused region's redirected seat still holds a standalone producer call target, \
                  so the producer's body would remain reachable beside its fused definition"
                     .to_string(),
@@ -7457,11 +8277,15 @@ pub(super) fn define_root_adapter<M: Module>(
     compiler.open_aggregate_events(adapter_id)?;
     let root = compiler.static_transition_plan.root_emittable_unit()?;
     let root_id = bundle.function(root.function()).ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant, "the recorded root unit was never forward-declared".to_string())
+        backend_module(
+            LoweringCause::PlannerInvariant,
+            "the recorded root unit was never forward-declared".to_string(),
+        )
     })?;
     let (offsets, frame_bytes) = root.slot_offsets()?;
     if frame_bytes != root.header().frame_bytes {
-        return Err(backend_module(LoweringCause::PlannerInvariant,
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
             "root adapter target frame size disagrees with its slot run".to_string(),
         ));
     }
@@ -7474,14 +8298,16 @@ pub(super) fn define_root_adapter<M: Module>(
                 .static_transition_plan
                 .process_parameter_slot(role)?
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant, "process root has no declared role-keyed ingress slot".to_string())
+                    backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "process root has no declared role-keyed ingress slot".to_string(),
+                    )
                 })?;
         }
     }
 
     let sig = unit_signature(module);
-    let mut func =
-        Function::with_name_signature(UserFuncName::user(0, adapter_id.as_u32()), sig);
+    let mut func = Function::with_name_signature(UserFuncName::user(0, adapter_id.as_u32()), sig);
     let mut function_local = helpers.declare_in_func(
         module,
         &mut func,
@@ -7560,11 +8386,9 @@ pub(super) fn define_root_adapter<M: Module>(
                 crate::boundary_activation::ROOT_INGRESS_CAPABILITY,
             );
             function_local.host_dispatch_context = Some(host_dispatch_context);
-            inputs.push(LoweringOperand::Specialized(
-                Lowered::BorrowedNativeValue {
-                    pointer: process_input,
-                },
-            ));
+            inputs.push(LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
+                pointer: process_input,
+            }));
             inputs.push(LoweringOperand::Specialized(Lowered::CapabilityToken {
                 value: capability,
             }));
@@ -7581,8 +8405,7 @@ pub(super) fn define_root_adapter<M: Module>(
                 }
             });
         } else {
-            function_local.host_dispatch_context =
-                Some(builder.ins().iconst(pointer_type, 0));
+            function_local.host_dispatch_context = Some(builder.ins().iconst(pointer_type, 0));
         }
 
         compiler.function_local = function_local;
@@ -7594,7 +8417,8 @@ pub(super) fn define_root_adapter<M: Module>(
             Some(ingress),
         )?;
         let LoweringOperand::Carried(result) = result else {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "the internal root call did not return its result word".to_string(),
             ));
         };
@@ -8014,15 +8838,21 @@ impl ContinuationCandidateLedger {
         disposition: CandidateDisposition,
     ) -> Result<(), CraneliftBackendError> {
         if !self.candidates.contains(identity) {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "lowering settled a disposition for an identity the planner never minted a                  binding candidate for, so the candidate population and the settling seats                  disagree about which edges exist: {disposition:?}"
-            )));
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "lowering settled a disposition for an identity the planner never minted a                  binding candidate for, so the candidate population and the settling seats                  disagree about which edges exist: {disposition:?}"
+                ),
+            ));
         }
         if let Some(existing) = self.settled.get(identity) {
             if *existing != disposition {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "one binding candidate was settled twice, as {existing:?} and then as                      {disposition:?}; a candidate has exactly one disposition"
-                )));
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "one binding candidate was settled twice, as {existing:?} and then as                      {disposition:?}; a candidate has exactly one disposition"
+                    ),
+                ));
             }
             // Two exclusive arms may settle the same disposition. The
             // function-local token lattice decides whether both can run.
@@ -8059,27 +8889,30 @@ impl ContinuationCandidateLedger {
                 .entry(identity.clone())
                 .or_insert(CandidateDisposition::TransportDormant);
         }
-        let unsettled = self.candidates.difference(
-            &self.settled.keys().cloned().collect::<BTreeSet<_>>(),
-        ).count();
+        let unsettled = self
+            .candidates
+            .difference(&self.settled.keys().cloned().collect::<BTreeSet<_>>())
+            .count();
         if unsettled > 0 {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "{unsettled} binding candidates reached the artifact closeout without a \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "{unsettled} binding candidates reached the artifact closeout without a \
                  disposition; every candidate is settled exactly once by the seat that observed \
                  its event, so an unsettled candidate means a consumption path exists that no \
                  seat reports"
-            )));
+                ),
+            ));
         }
         // The call-obligation subset. `InlineNoCall` is deliberately absent: it
         // is not a discharge and never enters the equality below.
         Ok(self
             .settled
             .into_iter()
-            .filter(|(_, disposition)| {
-                match disposition {
-                    CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
-                    CandidateDisposition::InlineNoCall
-                    | CandidateDisposition::TransportDormant => false,
+            .filter(|(_, disposition)| match disposition {
+                CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
+                CandidateDisposition::InlineNoCall | CandidateDisposition::TransportDormant => {
+                    false
                 }
             })
             .map(|(identity, _)| identity)
@@ -8105,7 +8938,11 @@ impl ContinuationClaimLedger {
         bundle: &UnitBundle,
     ) -> Result<Self, CraneliftBackendError> {
         let resolved = resolve_continuation_targets(plan, bundle)?;
-        let claims = resolved.keys().cloned().map(|identity| (identity, None)).collect();
+        let claims = resolved
+            .keys()
+            .cloned()
+            .map(|identity| (identity, None))
+            .collect();
         // The PLANNED set, taken from the plan's causal call projection rather
         // than from `resolved`. ⚠ Honest note: `resolve_continuation_targets`
         // walks the same projection, so planned == resolved is structural today
@@ -8137,7 +8974,8 @@ impl ContinuationClaimLedger {
     ) -> Result<(), CraneliftBackendError> {
         for identity in declared {
             if !self.declared.insert(identity) {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a causal token was declared into more than one generated function".to_string(),
                 ));
             }
@@ -8157,7 +8995,8 @@ impl ContinuationClaimLedger {
     ) -> Result<(), CraneliftBackendError> {
         for identity in emitted {
             if !self.emitted.insert(identity) {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a causal token emitted a direct call from more than one generated function"
                         .to_string(),
                 ));
@@ -8198,29 +9037,35 @@ impl ContinuationClaimLedger {
     ) -> Result<(), CraneliftBackendError> {
         for identity in discharged {
             if identity.emission_owner() != defining {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a composed source continuation was discharged by a function that is not its \
                      emission owner"
                         .to_string(),
                 ));
             }
             let consumed = self.claims.get_mut(&identity).ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant,
+                backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a composed source continuation discharged a causal token this ledger never \
                      planned"
                         .to_string(),
                 )
             })?;
             if let Some(previous) = consumed {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "a causal token was claimed twice, first by {previous:?} and then by a \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "a causal token was claimed twice, first by {previous:?} and then by a \
                      composed source continuation; one causal obligation is discharged by one \
                      form, never by both"
-                )));
+                    ),
+                ));
             }
             *consumed = Some(defining);
             if !self.composed.insert(identity) {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a causal token was discharged by a composed source continuation in more \
                      than one generated function"
                         .to_string(),
@@ -8250,11 +9095,18 @@ impl ContinuationClaimLedger {
         // `call_declared_unit_target` consumes. Reusing it is what keeps this
         // on the existing unit-call ABI instead of inventing a second one.
         let units = plan.continuation_units()?;
-        let response_owners = plan.static_response_owner_specializations()?
-            .map_err(|infeasible| backend_module(LoweringCause::Fragment, format!(
-                "compile-time response specialization is infeasible at {:?}: {}",
-                infeasible.vis_origin(), infeasible.reason(),
-            )))?;
+        let response_owners =
+            plan.static_response_owner_specializations()?
+                .map_err(|infeasible| {
+                    backend_module(
+                        LoweringCause::Fragment,
+                        format!(
+                            "compile-time response specialization is infeasible at {:?}: {}",
+                            infeasible.vis_origin(),
+                            infeasible.reason(),
+                        ),
+                    )
+                })?;
         let transported = plan
             .checked_ih_environment_transports_owned_by(defining)
             .into_iter()
@@ -8270,7 +9122,8 @@ impl ContinuationClaimLedger {
                     .iter()
                     .find(|unit| unit.id() == identity.target())
                     .ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
                             "a resolved causal identity names a specialization with no projected \
                              unit"
                                 .to_string(),
@@ -8283,11 +9136,13 @@ impl ContinuationClaimLedger {
                 // pending-Vis frame region. Read the same planner-selected
                 // identity used to resolve the FuncId, never the destination
                 // ABI slot or an emitter-local ordinal.
-                let frame_owner = if let Some(owner) = response_owners.iter()
+                let frame_owner = if let Some(owner) = response_owners
+                    .iter()
                     .find(|owner| owner.selected_caller() == identity)
                 {
                     if owner.header() != unit.header() || owner.slots() != unit.slots() {
-                        return Err(backend_module(LoweringCause::PlannerInvariant,
+                        return Err(backend_module(
+                            LoweringCause::PlannerInvariant,
                             "a selected response owner changed its caller's activation ABI"
                                 .to_string(),
                         ));
@@ -8338,7 +9193,8 @@ impl ContinuationClaimLedger {
         defining: ContinuationEmissionOwner,
     ) -> Result<FuncId, CraneliftBackendError> {
         if identity.emission_owner() != defining {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "a continuation call token was claimed by a context that is not its emission \
                  owner; note this compares the EMISSION owner, not the raw source-occurrence \
                  provenance owner beside it"
@@ -8346,7 +9202,8 @@ impl ContinuationClaimLedger {
             ));
         }
         let consumed = self.claims.get_mut(identity).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a continuation call token was claimed that this ledger never planned".to_string(),
             )
         })?;
@@ -8354,7 +9211,10 @@ impl ContinuationClaimLedger {
         // The whole-artifact set still records which planned identity was claimed.
         *consumed = Some(defining);
         self.resolved.get(identity).copied().ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "a claimed causal token has no resolved target".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "a claimed causal token has no resolved target".to_string(),
+            )
         })
     }
 
@@ -8409,33 +9269,48 @@ impl ContinuationClaimLedger {
         let owners = plan
             .static_response_owner_specializations()?
             .map_err(|infeasible| {
-                backend_module(LoweringCause::Fragment, format!(
-                    "compile-time response specialization is infeasible at {:?}: {}",
-                    infeasible.vis_origin(),
-                    infeasible.reason(),
-                ))
+                backend_module(
+                    LoweringCause::Fragment,
+                    format!(
+                        "compile-time response specialization is infeasible at {:?}: {}",
+                        infeasible.vis_origin(),
+                        infeasible.reason(),
+                    ),
+                )
             })?;
-        let response_rows = plan
-            .static_response_feasibility_ledger_all()?
-            .map_err(|infeasible| {
-                backend_module(LoweringCause::Fragment, format!(
-                    "compile-time response specialization is infeasible at {:?}: {}",
-                    infeasible.vis_origin(),
-                    infeasible.reason(),
-                ))
-            })?;
-        let required_new_contexts = response_rows.iter()
+        let response_rows =
+            plan.static_response_feasibility_ledger_all()?
+                .map_err(|infeasible| {
+                    backend_module(
+                        LoweringCause::Fragment,
+                        format!(
+                            "compile-time response specialization is infeasible at {:?}: {}",
+                            infeasible.vis_origin(),
+                            infeasible.reason(),
+                        ),
+                    )
+                })?;
+        let required_new_contexts = response_rows
+            .iter()
             .filter(|row| !row.context_was_preexisting())
             .map(|row| row.k_context())
             .collect::<BTreeSet<_>>();
         let mut called_new_contexts = BTreeSet::new();
         for owner in owners {
-            if !self.response_owner_calls.contains_key(owner.selected_caller()) {
-                let source = response_rows.iter()
+            if !self
+                .response_owner_calls
+                .contains_key(owner.selected_caller())
+            {
+                let source = response_rows
+                    .iter()
                     .find(|row| row.id() == owner.response())
                     .map(|row| row.vis_origin())
-                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                        "response owner has no installed response row".to_string()))?;
+                    .ok_or_else(|| {
+                        backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "response owner has no installed response row".to_string(),
+                        )
+                    })?;
                 // Only a relay-promoted owner may be unentered, and only when
                 // no evaluator lowered its source Construct in ANY Function.
                 // `disposition=None` alone proves neither of those facts.
@@ -8454,13 +9329,19 @@ impl ContinuationClaimLedger {
                             }
                         });
                     }
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "a forward-declared response owner has no verified selected incoming call: \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "a forward-declared response owner has no verified selected incoming call: \
                          owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}, source_lowered={}",
-                        owner.id(), owner.k_context(), owner.context_was_preexisting(),
-                        owner.selected_caller(), dispositions.get(owner.selected_caller()),
-                        lowered_construct_origins.contains(&source),
-                    )));
+                            owner.id(),
+                            owner.k_context(),
+                            owner.context_was_preexisting(),
+                            owner.selected_caller(),
+                            dispositions.get(owner.selected_caller()),
+                            lowered_construct_origins.contains(&source),
+                        ),
+                    ));
                 }
             }
             if self.composed.contains(owner.selected_caller()) {
@@ -8491,16 +9372,22 @@ impl ContinuationClaimLedger {
         // declared population stays equal to planned even where the discharge
         // took the composed form.
         for (name, set) in [
-            ("resolved", self.resolved.keys().cloned().collect::<BTreeSet<_>>()),
+            (
+                "resolved",
+                self.resolved.keys().cloned().collect::<BTreeSet<_>>(),
+            ),
             ("declared", self.declared.clone()),
         ] {
             if set != self.planned {
                 let missing = self.planned.difference(&set).count();
                 let extra = set.difference(&self.planned).count();
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "the {name} continuation call population does not equal the planned one: \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "the {name} continuation call population does not equal the planned one: \
                      {missing} planned tokens absent, {extra} unplanned tokens present"
-                )));
+                    ),
+                ));
             }
         }
         // **`D8k` -- THE PARTITION**, since `D2` over the derived subset:
@@ -8525,12 +9412,15 @@ impl ContinuationClaimLedger {
             .cloned()
             .collect::<BTreeSet<_>>();
         if !both.is_empty() {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "{} causal tokens were discharged BOTH by a decoded direct emission and by a \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "{} causal tokens were discharged BOTH by a decoded direct emission and by a \
                  verified composed consumption; the two forms partition the call-obligation \
                  population and an identity in both means one obligation was answered twice",
-                both.len()
-            )));
+                    both.len()
+                ),
+            ));
         }
         let discharged = self
             .emitted
@@ -8543,14 +9433,17 @@ impl ContinuationClaimLedger {
         if discharged != *call_obligations {
             let missing = call_obligations.difference(&discharged).count();
             let extra = discharged.difference(call_obligations).count();
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "the discharged continuation call population is not the call-obligation one: \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "the discharged continuation call population is not the call-obligation one: \
                  {missing} call obligations were neither directly emitted nor compositionally \
                  consumed, and {extra} discharged tokens are not call obligations. Direct: {}, \
                  composed: {}",
-                self.emitted.len(),
-                self.composed.len()
-            )));
+                    self.emitted.len(),
+                    self.composed.len()
+                ),
+            ));
         }
         // `D2` — the claim law, as EXACT SET EQUALITY over the same derived
         // subset, not as a count of unclaimed slots.
@@ -8570,11 +9463,14 @@ impl ContinuationClaimLedger {
         if claimed != *call_obligations {
             let missing = call_obligations.difference(&claimed).count();
             let extra = claimed.difference(call_obligations).count();
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "the claimed continuation call population is not the call-obligation one: \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "the claimed continuation call population is not the call-obligation one: \
                  {missing} call obligations were never claimed by the unit that owns them, and \
                  {extra} claims were made for identities that are not call obligations"
-            )));
+                ),
+            ));
         }
         // Owner agreement, asserted on the RECORDED consumer, over the
         // claimed/call-obligation members.
@@ -8590,7 +9486,8 @@ impl ContinuationClaimLedger {
             .filter(|(identity, _)| call_obligations.contains(*identity))
         {
             if *consumed != Some(identity.emission_owner()) {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a continuation call token was claimed by a unit that does not own it"
                         .to_string(),
                 ));
@@ -8743,9 +9640,16 @@ impl FusionCompositionLedger {
     ) -> Result<Self, CraneliftBackendError> {
         let planned = plan.fusion_composed_edges().clone();
         let planned_outer = plan.fusion_outer_realizations().clone();
-        let consumed = planned.keys().cloned().map(|identity| (identity, None)).collect();
-        let realized_outer =
-            planned_outer.keys().cloned().map(|identity| (identity, None)).collect();
+        let consumed = planned
+            .keys()
+            .cloned()
+            .map(|identity| (identity, None))
+            .collect();
+        let realized_outer = planned_outer
+            .keys()
+            .cloned()
+            .map(|identity| (identity, None))
+            .collect();
         let classes = fusion_target_classes(&planned, &planned_outer);
         let declaration_omitted = plan
             .continuation_units()?
@@ -8790,38 +9694,49 @@ impl FusionCompositionLedger {
         target: ContinuationSpecializationId,
     ) -> Result<(), CraneliftBackendError> {
         let planned = self.planned_outer.get(identity).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fusion-owned body realized an outer identity the planner never recorded, so \
                  the realization is not one the R relation authorized"
                     .to_string(),
             )
         })?;
         if planned.fusion() != fusion {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "a fusion-owned outer identity planned for {:?} was realized by {fusion:?}; one \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "a fusion-owned outer identity planned for {:?} was realized by {fusion:?}; one \
                  region realizes its own outer identity and never another's",
-                planned.fusion()
-            )));
+                    planned.fusion()
+                ),
+            ));
         }
         if planned.target() != target {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "a fusion-owned outer identity planned for target {:?} was realized against \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "a fusion-owned outer identity planned for target {:?} was realized against \
                  {target:?}, so the body emitted is not the one the identity names",
-                planned.target()
-            )));
+                    planned.target()
+                ),
+            ));
         }
         let realized = self.realized_outer.get_mut(identity).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a planned outer realization has no realization slot; the two maps are built from \
                  one population and disagreeing means one was rebuilt"
                     .to_string(),
             )
         })?;
         if let Some(previous) = realized {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "a fusion-owned outer identity was realized twice, first by {previous:?}; one \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "a fusion-owned outer identity was realized twice, first by {previous:?}; one \
                  owned body emits its selected body once"
-            )));
+                ),
+            ));
         }
         *realized = Some(fusion);
         Ok(())
@@ -8844,7 +9759,8 @@ impl FusionCompositionLedger {
         target: ContinuationSpecializationId,
     ) -> Result<(StaticContinuationFusionId, FusionCompositionLayer), CraneliftBackendError> {
         let edge = self.planned.get(identity).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fusion-local composition was consumed for an identity the planner never \
                  composed; a composition seat reached for an unplanned identity is a lowering \
                  that decided for itself which edges are local"
@@ -8852,37 +9768,47 @@ impl FusionCompositionLedger {
             )
         })?;
         if edge.emission_owner() != defining {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "a fusion-local composition planned for emission owner {:?} was consumed while \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "a fusion-local composition planned for emission owner {:?} was consumed while \
                  defining {defining:?}; the composition is lowered into the consumer's own \
                  function and a foreign one would place the producer's body in a frame that \
                  never held its operands",
-                edge.emission_owner()
-            )));
+                    edge.emission_owner()
+                ),
+            ));
         }
         if edge.target() != target {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "a fusion-local composition planned for target {:?} was consumed against {target:?}; \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "a fusion-local composition planned for target {:?} was consumed against {target:?}; \
                  the composed edge names the exact specialization whose selected body is lowered \
                  locally, and another one is another body",
-                edge.target()
-            )));
+                    edge.target()
+                ),
+            ));
         }
         let fusion = edge.fusion();
         let layer = edge.layer();
         let consumed = self.consumed.get_mut(identity).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a fusion-local composition has a planned edge but no consumption slot; the two \
                  maps are built from one population and disagreeing means one was rebuilt"
                     .to_string(),
             )
         })?;
         if let Some(previous) = consumed {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "a fusion-local composition was consumed twice, first by {previous:?}; one \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "a fusion-local composition was consumed twice, first by {previous:?}; one \
                  composed call edge is realized once, and a second consumption is a replay \
                  whether it happens in this function or another"
-            )));
+                ),
+            ));
         }
         *consumed = Some(defining);
         Ok((fusion, layer))
@@ -8907,12 +9833,15 @@ impl FusionCompositionLedger {
         if consumed != planned {
             let missing = planned.difference(&consumed).count();
             let extra = consumed.difference(&planned).count();
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "the consumed fusion-local composition population is not the planned one: \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "the consumed fusion-local composition population is not the planned one: \
                  {missing} planned compositions were never realized, and {extra} realizations \
                  name identities that were never planned. An unrealized composition is the case \
                  that reads as success because nothing was emitted for it"
-            )));
+                ),
+            ));
         }
         // `I_t` and `R_t` — the two target ranges, closed SEPARATELY against
         // what each pass actually omitted, so one class cannot satisfy the
@@ -8943,12 +9872,15 @@ impl FusionCompositionLedger {
                 if actual != *expected {
                     let missing = expected.difference(&actual).count();
                     let extra = actual.difference(expected).count();
-                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                        "the {pass} pass's omitted {name} population is not the planned one: \
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        format!(
+                            "the {pass} pass's omitted {name} population is not the planned one: \
                          {missing} were still {pass}ed, and {extra} were omitted without \
                          belonging to that class. A fusion-local target that keeps its standalone \
                          Function is a second realization of one edge"
-                    )));
+                        ),
+                    ));
                 }
             }
         }
@@ -8962,14 +9894,16 @@ impl FusionCompositionLedger {
         let mut inner_per_fusion: BTreeMap<StaticContinuationFusionId, usize> = BTreeMap::new();
         for identity in &consumed {
             let edge = self.planned.get(identity).ok_or_else(|| {
-                backend_module(LoweringCause::PlannerInvariant,
+                backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a consumed fusion-local composition has no planned edge at close; \
                      consumption cannot record an identity the planned map does not hold"
                         .to_string(),
                 )
             })?;
             if edge.layer() != FusionCompositionLayer::Inner {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "a composition ledger member is not at the Inner layer; the Outer layer is \
                      realized by the fusion-owned body and must never be consumed as a local \
                      composition"
@@ -8980,10 +9914,13 @@ impl FusionCompositionLedger {
         }
         for (fusion, count) in &inner_per_fusion {
             if *count != 1 {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "static continuation fusion {fusion:?} consumed {count} local compositions; \
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "static continuation fusion {fusion:?} consumed {count} local compositions; \
                      exactly one Inner identity per fusion is composed at its call edge"
-                )));
+                    ),
+                ));
             }
         }
 
@@ -8999,11 +9936,14 @@ impl FusionCompositionLedger {
         if realized_outer != planned_outer {
             let missing = planned_outer.difference(&realized_outer).count();
             let extra = realized_outer.difference(&planned_outer).count();
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "the realized fusion-owned outer population is not the planned one: {missing} \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "the realized fusion-owned outer population is not the planned one: {missing} \
                  planned outer identities were never realized by an emitted owned body, and \
                  {extra} realizations name identities that were never planned"
-            )));
+                ),
+            ));
         }
 
         // THE DISJOINTNESS, against what the ordinary ledger RECORDED.
@@ -9019,11 +9959,14 @@ impl FusionCompositionLedger {
             .intersection(ordinary_touched)
             .count();
         if both > 0 {
-            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "{both} continuation call identities were realized both as a fusion-local \
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "{both} continuation call identities were realized both as a fusion-local \
                  composition and in an ordinary role; one call edge is realized exactly once, \
                  and an identity in both ledgers has been emitted twice under one obligation"
-            )));
+                ),
+            ));
         }
         Ok(())
     }
@@ -9089,8 +10032,9 @@ pub(super) fn open_continuation_claim_ledger(
     // has exactly one of it, and every pass settles into it. Sharing the
     // lifetime is what makes it a sibling in front of the claim ledger rather
     // than a widening of it.
-    compiler.continuation_candidates =
-        Some(ContinuationCandidateLedger::open(&compiler.static_transition_plan)?);
+    compiler.continuation_candidates = Some(ContinuationCandidateLedger::open(
+        &compiler.static_transition_plan,
+    )?);
     // `D7` — the aggregate allocation relation opens on the same boundary and
     // for the same reason: one artifact has exactly one relation, and every
     // body's events commit into it.
@@ -9119,23 +10063,30 @@ pub(super) fn close_continuation_claim_ledger(
     // and `D2` closes it FIRST: totality, then the derived subset, then the
     // claim ledger's exact laws over that subset.
     let candidates = compiler.continuation_candidates.take().ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant, "the continuation candidate ledger went missing".to_string())
+        backend_module(
+            LoweringCause::PlannerInvariant,
+            "the continuation candidate ledger went missing".to_string(),
+        )
     })?;
     #[cfg(test)]
     D1_LAST_DISPOSITIONS.with(|cell| {
-        *cell.borrow_mut() = candidates
-            .dispositions()
-            .values()
-            .copied()
-            .fold(std::collections::BTreeMap::new(), |mut acc, d| {
+        *cell.borrow_mut() = candidates.dispositions().values().copied().fold(
+            std::collections::BTreeMap::new(),
+            |mut acc, d| {
                 *acc.entry(d).or_insert(0usize) += 1;
                 acc
-            });
+            },
+        );
     });
     compiler
         .continuation_claims
         .as_ref()
-        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "the continuation claim ledger went missing".to_string()))?
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the continuation claim ledger went missing".to_string(),
+            )
+        })?
         .validate_response_owner_call_coverage(
             &compiler.static_transition_plan,
             &candidates.settled,
@@ -9156,19 +10107,32 @@ pub(super) fn close_continuation_claim_ledger(
     let ordinary_touched = compiler
         .continuation_claims
         .as_ref()
-        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "the continuation claim ledger went missing".to_string()))?
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the continuation claim ledger went missing".to_string(),
+            )
+        })?
         .touched_identities();
     compiler
         .fusion_compositions
         .take()
         .ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "the fusion-local composition ledger went missing".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the fusion-local composition ledger went missing".to_string(),
+            )
         })?
         .close(&ordinary_touched)?;
     compiler
         .continuation_claims
         .take()
-        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "the continuation claim ledger went missing".to_string()))?
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the continuation claim ledger went missing".to_string(),
+            )
+        })?
         .close(&call_obligations)
 }
 
@@ -9184,12 +10148,17 @@ pub(super) fn close_continuation_claim_ledger(
 pub(super) fn close_aggregate_allocation_ledger(
     compiler: &mut Lowering<'_>,
 ) -> Result<AggregateRelationClosure, CraneliftBackendError> {
-    let planned = compiler.static_transition_plan.aggregate_ownership_records();
+    let planned = compiler
+        .static_transition_plan
+        .aggregate_ownership_records();
     compiler
         .aggregate_allocations
         .take()
         .ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "the aggregate allocation ledger went missing".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the aggregate allocation ledger went missing".to_string(),
+            )
         })?
         .close(planned)
 }
@@ -9218,8 +10187,7 @@ pub(super) fn close_host_effect_seat_ledger(
         .host_effect_seat_records()
         .to_vec();
     #[cfg(test)]
-    if effect_seat_visit_mutation()
-        == EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose
+    if effect_seat_visit_mutation() == EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose
     {
         if let Some(ledger) = compiler.host_effect_seats.as_mut() {
             ledger.drop_one_committed_group_for_tests();
@@ -9228,7 +10196,12 @@ pub(super) fn close_host_effect_seat_ledger(
     let closure = compiler
         .host_effect_seats
         .take()
-        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "the host effect seat ledger went missing".to_string()))?
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the host effect seat ledger went missing".to_string(),
+            )
+        })?
         .close(&planned)?;
     #[cfg(test)]
     LAST_EFFECT_SEAT_CLOSURE.with(|cell| *cell.borrow_mut() = Some(closure.clone()));
@@ -9295,12 +10268,16 @@ fn declare_response_context_call_in_func<M: Module>(
         .into_iter()
         .find(|context| context.id() == id)
         .ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a response owner names no installed continuation context".to_string(),
             )
         })?;
     let target = bundle.context(id).ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant, "a response context was never forward-declared".to_string())
+        backend_module(
+            LoweringCause::PlannerInvariant,
+            "a response context was never forward-declared".to_string(),
+        )
     })?;
     let (offsets, _frame_bytes) = context.slot_offsets()?;
     Ok(DeclaredUnitCall {
@@ -9326,7 +10303,8 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
     let mut calls = BTreeMap::new();
     for context in plan.continuation_contexts()? {
         let target = bundle.context(context.id()).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant,
+            backend_module(
+                LoweringCause::PlannerInvariant,
                 "a planned generated context was never forward-declared".to_string(),
             )
         })?;
@@ -9360,7 +10338,10 @@ pub(super) fn define_unit_bodies<M: Module>(
     call_edges: &CallEdgeTargets,
     staged_root_value: Option<&RuntimeValue>,
 ) -> Result<RootUnitResult, CraneliftBackendError> {
-    let root = compiler.static_transition_plan.root_emittable_unit()?.function();
+    let root = compiler
+        .static_transition_plan
+        .root_emittable_unit()?
+        .function();
     // `D4`: projected once, declared afresh into each generated function below.
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
     // `RT-DECL-CLOSURE-PORT` `D5` — opened here because this bundle pass is the
@@ -9392,7 +10373,10 @@ pub(super) fn define_unit_bodies<M: Module>(
         .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
     for unit in emissions {
         let id = bundle.function(unit.function).ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, "a planned unit was never forward-declared".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "a planned unit was never forward-declared".to_string(),
+            )
         })?;
         let is_root = root == unit.function;
         let outcome = define_unit_body(
@@ -9409,7 +10393,8 @@ pub(super) fn define_unit_bodies<M: Module>(
         )?;
         if let Some(outcome) = outcome {
             if root_result.replace(outcome).is_some() {
-                return Err(backend_module(LoweringCause::PlannerInvariant,
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
                     "more than one emitted unit claimed root result authority".to_string(),
                 ));
             }
@@ -9426,10 +10411,18 @@ pub(super) fn define_unit_bodies<M: Module>(
     compiler
         .checked_call_ledger
         .take()
-        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "the checked call ledger went missing".to_string()))?
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the checked call ledger went missing".to_string(),
+            )
+        })?
         .close(&compiler.consumed_recursive_call_templates)?;
     root_result.ok_or_else(|| {
-        backend_module(LoweringCause::PlannerInvariant, "the emitted unit bundle did not define its recorded root".to_string())
+        backend_module(
+            LoweringCause::PlannerInvariant,
+            "the emitted unit bundle did not define its recorded root".to_string(),
+        )
     })
 }
 
@@ -9532,15 +10525,13 @@ thread_local! {
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn srcbody_parameter_loads_take()
--> Vec<SrcbodyParameterLoad> {
+pub(in crate::cranelift_backend) fn srcbody_parameter_loads_take() -> Vec<SrcbodyParameterLoad> {
     SRCBODY_PARAMETER_LOADS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
 }
 
 /// Drains every environment built on this thread since the last take.
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn srcbody_bind_order_take()
--> Vec<SrcbodyBindOrderObservation> {
+pub(in crate::cranelift_backend) fn srcbody_bind_order_take() -> Vec<SrcbodyBindOrderObservation> {
     SRCBODY_BIND_ORDER.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
 }
 
@@ -9565,7 +10556,8 @@ pub(in crate::cranelift_backend) fn source_body_binding_order(
         AbiUnitDefinition::SchedulingEntry { .. }
         | AbiUnitDefinition::ContinuationSpecialization { .. } => false,
         AbiUnitDefinition::StaticContinuationFusion { .. } => {
-            return Err(unsupported(LoweringCause::PlannerInvariant,
+            return Err(unsupported(
+                LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a static continuation fusion unit reached environment construction, but its \
                  source-body binding order is the emitter's to establish and no generated \
@@ -9592,7 +10584,8 @@ fn define_unit_body<M: Module>(
     // walk by construction (`abi::slot_offsets` totals for both), so this
     // rejects a corrupted descriptor rather than a divergent derivation.
     if unit.frame_bytes != unit.header.frame_bytes {
-        return Err(backend_module(LoweringCause::PlannerInvariant,
+        return Err(backend_module(
+            LoweringCause::PlannerInvariant,
             "abi frame size disagrees with its own slot run".to_string(),
         ));
     }
@@ -9606,7 +10599,10 @@ fn define_unit_body<M: Module>(
             // ⛔ Fails closed. `CONVENTION_SLOTS` puts a `Result` slot in every
             // unit, so its absence means the descriptor is not the one `B2R`
             // built, and returning a default word would fabricate a result.
-            backend_module(LoweringCause::PlannerInvariant, "unit frame declares no result slot".to_string())
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "unit frame declares no result slot".to_string(),
+            )
         })?;
     let trap_offset = unit
         .slots
@@ -9614,7 +10610,12 @@ fn define_unit_body<M: Module>(
         .zip(&unit.offsets)
         .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
         .map(|(_, offset)| *offset)
-        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "unit frame declares no trap slot".to_string()))?;
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "unit frame declares no trap slot".to_string(),
+            )
+        })?;
 
     let sig = unit_signature(module);
     let mut func = Function::with_name_signature(UserFuncName::user(2, id.as_u32()), sig);
@@ -9628,23 +10629,18 @@ fn define_unit_body<M: Module>(
     // ordinal, no name parsing and no dynamic lookup anywhere on the path. ⚠ An
     // emitted `call` is not claimed and no control here asserts one.
     #[cfg(test)]
-    let unit_trap_authority =
-        match TRAP_FRAME_BINDING_MUTATION.with(std::cell::Cell::get) {
-            TrapFrameBindingMutation::MisclassifyUnitAsRoot => Some(TrapExitAuthority::Root {
-                process_sentinel: false,
-                source_authorized: false,
-            }),
-            TrapFrameBindingMutation::Exact | TrapFrameBindingMutation::DeleteUnitLane => {
-                None
-            }
-        };
+    let unit_trap_authority = match TRAP_FRAME_BINDING_MUTATION.with(std::cell::Cell::get) {
+        TrapFrameBindingMutation::MisclassifyUnitAsRoot => Some(TrapExitAuthority::Root {
+            process_sentinel: false,
+            source_authorized: false,
+        }),
+        TrapFrameBindingMutation::Exact | TrapFrameBindingMutation::DeleteUnitLane => None,
+    };
     #[cfg(not(test))]
     let unit_trap_authority = None;
-    let mut function_local =
-        helpers.declare_in_func(module, &mut func, unit_trap_authority);
-    function_local.grafted_spine_scope = Some(
-        GraftedSpineFunctionScope::Predeclared(unit.function),
-    );
+    let mut function_local = helpers.declare_in_func(module, &mut func, unit_trap_authority);
+    function_local.grafted_spine_scope =
+        Some(GraftedSpineFunctionScope::Predeclared(unit.function));
     let declared_calls = call_edges.declare_in_func(unit.function, module, &mut func)?;
     // `D3` — this ordinary Function declares its OWN `FuncRef` for every causal
     // token it owns, keyed by the four-field identity. Minted here, into this
@@ -9711,7 +10707,14 @@ fn define_unit_body<M: Module>(
     // its ABI arena are the authority the frame contract below is checked
     // against, and mutating them would leave both sides agreeing and prove
     // nothing.
-    redirect_fused_producer_invocations(module, &mut func, compiler, bundle, unit.function, &mut function_local.unit_calls)?;
+    redirect_fused_producer_invocations(
+        module,
+        &mut func,
+        compiler,
+        bundle,
+        unit.function,
+        &mut function_local.unit_calls,
+    )?;
     // `RT-DECL-CLOSURE-PORT` `D5` — the causal control on the ABI half.
     //
     // ⛔⛔ **Injected HERE, on the function-local COPY, and never on the plan's
@@ -9732,12 +10735,8 @@ fn define_unit_body<M: Module>(
     // and deliberately not derived from them.
     function_local.worker_templates = worker_targets.templates().clone();
     // `D5a` checkpoint 4 step 1: this function's own context call targets.
-    function_local.context_calls = declare_context_calls_in_func(
-        module,
-        &mut func,
-        &compiler.static_transition_plan,
-        bundle,
-    )?;
+    function_local.context_calls =
+        declare_context_calls_in_func(module, &mut func, &compiler.static_transition_plan, bundle)?;
     // `D8n` — this generated Function's own checked-frame consumption
     // transaction, spanning the ordinary unit body exactly. ⛔ Opened before the builder and
     // closed after it, so every branch scope inside nests within it.
@@ -9793,12 +10792,17 @@ fn define_unit_body<M: Module>(
             function_local.bind_unit_trap_frame(
                 slots,
                 i32::try_from(trap_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "abi trap slot offset exceeds addressable range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "abi trap slot offset exceeds addressable range".to_string(),
+                    )
                 })?,
             )?;
             function_local.bind_pending_vis_frame(
                 compiler.pending_vis_record_protocol.as_ref(),
-                PendingVisFrameOwner::Unit(unit.function), slots, unit.frame_bytes,
+                PendingVisFrameOwner::Unit(unit.function),
+                slots,
+                unit.frame_bytes,
             )?;
         }
         compiler.function_local = function_local;
@@ -9807,7 +10811,8 @@ fn define_unit_body<M: Module>(
             && PROCESS_SLOT_MUTATION.with(std::cell::Cell::get)
                 == ProcessSlotMutation::AttemptFixedContextOffsets
         {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "fixed host-dispatch context is not semantic process-pair storage".to_string(),
             ));
         }
@@ -9849,7 +10854,8 @@ fn define_unit_body<M: Module>(
                         0 => crate::boundary_activation::ROOT_INGRESS_PROCESS_INPUT,
                         1 => crate::boundary_activation::ROOT_INGRESS_CAPABILITY,
                         _ => {
-                            return Err(backend_module(LoweringCause::PlannerInvariant,
+                            return Err(backend_module(
+                                LoweringCause::PlannerInvariant,
                                 "the process-root mutation found an unknown parameter role"
                                     .to_string(),
                             ));
@@ -9864,7 +10870,8 @@ fn define_unit_body<M: Module>(
                     (
                         slots,
                         i32::try_from(*offset).map_err(|_| {
-                            backend_module(LoweringCause::Capacity,
+                            backend_module(
+                                LoweringCause::Capacity,
                                 "abi input slot offset exceeds addressable range".to_string(),
                             )
                         })?,
@@ -9874,15 +10881,15 @@ fn define_unit_body<M: Module>(
                 let (base, offset) = (
                     slots,
                     i32::try_from(*offset).map_err(|_| {
-                        backend_module(LoweringCause::Capacity, "abi input slot offset exceeds addressable range".to_string())
+                        backend_module(
+                            LoweringCause::Capacity,
+                            "abi input slot offset exceeds addressable range".to_string(),
+                        )
                     })?,
                 );
-                let word = builder.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    base,
-                    offset,
-                );
+                let word = builder
+                    .ins()
+                    .load(types::I64, MemFlags::trusted(), base, offset);
                 #[cfg(test)]
                 if slot.kind == AbiSlotKind::Parameter {
                     parameter_loads.push((slot.ordinal, word));
@@ -9892,35 +10899,28 @@ fn define_unit_body<M: Module>(
                 // roles, not generic ValueWord inputs. Recovering them here
                 // prevents a borrowed process-input body from being emitted
                 // twice behind a runtime carried-representation split.
-                let operand = if is_root
-                    && compiler.process_object
-                    && slot.kind == AbiSlotKind::Parameter
-                {
-                    let value = compiler.emit_carrier_scalar(&mut builder, carried)?;
-                    match slot.ordinal {
-                        ordinal
-                            if ordinal == AbiProcessParameter::ProcessInput.ordinal() =>
-                        {
-                            LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
-                                pointer: value,
-                            })
+                let operand =
+                    if is_root && compiler.process_object && slot.kind == AbiSlotKind::Parameter {
+                        let value = compiler.emit_carrier_scalar(&mut builder, carried)?;
+                        match slot.ordinal {
+                            ordinal if ordinal == AbiProcessParameter::ProcessInput.ordinal() => {
+                                LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
+                                    pointer: value,
+                                })
+                            }
+                            ordinal if ordinal == AbiProcessParameter::Capability.ordinal() => {
+                                LoweringOperand::Specialized(Lowered::CapabilityToken { value })
+                            }
+                            _ => {
+                                return Err(backend_module(
+                                    LoweringCause::PlannerInvariant,
+                                    "the process root has an unknown parameter role".to_string(),
+                                ));
+                            }
                         }
-                        ordinal
-                            if ordinal == AbiProcessParameter::Capability.ordinal() =>
-                        {
-                            LoweringOperand::Specialized(Lowered::CapabilityToken {
-                                value,
-                            })
-                        }
-                        _ => {
-                            return Err(backend_module(LoweringCause::PlannerInvariant,
-                                "the process root has an unknown parameter role".to_string(),
-                            ));
-                        }
-                    }
-                } else {
-                    LoweringOperand::Carried(carried)
-                };
+                    } else {
+                        LoweringOperand::Carried(carried)
+                    };
                 // `D5a` checkpoint 4 step 1b: the SAME operand, recorded by ABI
                 // position. Taken from this one walk rather than rebuilt, so
                 // "index i is ABI position i" holds by construction instead of
@@ -10009,19 +11009,26 @@ fn define_unit_body<M: Module>(
                 .expect("source binder ordinal was loaded from the declared parameter run")
                 .1;
             let offset = match builder.func.dfg.value_def(word) {
-                cranelift_codegen::ir::ValueDef::Result(inst, _) =>
+                cranelift_codegen::ir::ValueDef::Result(inst, _) => {
                     match builder.func.dfg.insts[inst] {
-                        cranelift_codegen::ir::InstructionData::Load { offset, .. } => i32::from(offset),
+                        cranelift_codegen::ir::InstructionData::Load { offset, .. } => {
+                            i32::from(offset)
+                        }
                         ref other => panic!("a source binder has no emitted Load: {other:?}"),
-                    },
-                other => panic!("a source binder is not defined by an emitted instruction: {other:?}"),
+                    }
+                }
+                other => {
+                    panic!("a source binder is not defined by an emitted instruction: {other:?}")
+                }
             };
-            SRCBODY_PARAMETER_LOADS.with(|cell| cell.borrow_mut().push(SrcbodyParameterLoad {
-                body_origin,
-                abi_ordinal: ordinal,
-                word,
-                emitted_load_offset: offset,
-            }));
+            SRCBODY_PARAMETER_LOADS.with(|cell| {
+                cell.borrow_mut().push(SrcbodyParameterLoad {
+                    body_origin,
+                    abi_ordinal: ordinal,
+                    word,
+                    emitted_load_offset: offset,
+                })
+            });
         }
         #[cfg(test)]
         srcbody_bind_order_record(SrcbodyBindOrderObservation {
@@ -10052,10 +11059,9 @@ fn define_unit_body<M: Module>(
                     }),
                 ),
                 LoweringOperand::Carried(word) => {
-                    let tag = builder.ins().band_imm(
-                        word.word,
-                        crate::boundary_value::BOUNDARY_TAG_MASK as i64,
-                    );
+                    let tag = builder
+                        .ins()
+                        .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
                     let immediate = builder.create_block();
                     let persistent = builder.create_block();
                     let decoded = builder.create_block();
@@ -10065,7 +11071,9 @@ fn define_unit_body<M: Module>(
                         tag,
                         BoundaryTag::ImmediateExitStatus as i64,
                     );
-                    builder.ins().brif(is_immediate, immediate, &[], persistent, &[]);
+                    builder
+                        .ins()
+                        .brif(is_immediate, immediate, &[], persistent, &[]);
 
                     builder.switch_to_block(immediate);
                     let status = compiler.emit_carrier_scalar(&mut builder, word)?;
@@ -10081,12 +11089,16 @@ fn define_unit_body<M: Module>(
                     // Only the checked process root projects that carried ExitCode.
                     let constructor = compiler.emit_carrier_tag(&mut builder, word)?;
                     let fields = compiler.emit_carrier_field_count(&mut builder, word)?;
-                    let success_identity = compiler.static_transition_plan.synthesized_constructor_identity(
-                        SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::ExitSuccess),
-                    )?;
-                    let failure_identity = compiler.static_transition_plan.synthesized_constructor_identity(
-                        SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::ExitFailure),
-                    )?;
+                    let success_identity = compiler
+                        .static_transition_plan
+                        .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
+                            SynthesizedFixedConstructorRole::ExitSuccess,
+                        ))?;
+                    let failure_identity = compiler
+                        .static_transition_plan
+                        .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
+                            SynthesizedFixedConstructorRole::ExitFailure,
+                        ))?;
                     let success_tag = Lowering::carrier_identity_immediate(
                         &mut builder,
                         success_identity.tag_abi_word()?,
@@ -10118,11 +11130,14 @@ fn define_unit_body<M: Module>(
                     Lowering::require_i64(&mut builder, is_failure, 1);
                     Lowering::require_i64(&mut builder, fields, 1);
                     let field = compiler.emit_carrier_field(&mut builder, word, 0)?;
-                    let field_tag = builder.ins().band_imm(
-                        field.word,
-                        crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                    let field_tag = builder
+                        .ins()
+                        .band_imm(field.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+                    Lowering::require_i64(
+                        &mut builder,
+                        field_tag,
+                        BoundaryTag::ImmediateInt as i64,
                     );
-                    Lowering::require_i64(&mut builder, field_tag, BoundaryTag::ImmediateInt as i64);
                     let code = compiler.emit_carrier_scalar(&mut builder, field)?;
                     let small = Lowering::carrier_small_marker(&mut builder);
                     compiler.function_local.native_int_tags.insert(code, small);
@@ -10153,9 +11168,7 @@ fn define_unit_body<M: Module>(
                     #[cfg(test)]
                     if compiler.process_object {
                         px8tr_record_trap_provenance(
-                            Px8trTrapProvenanceEvent::FinalProcessObjectTrap {
-                                trap: trap.clone(),
-                            },
+                            Px8trTrapProvenanceEvent::FinalProcessObjectTrap { trap: trap.clone() },
                         );
                     }
                     compiler.emit_current_trap(&mut builder, &trap)?;
@@ -10177,7 +11190,9 @@ fn define_unit_body<M: Module>(
                         }),
                     )
                 }
-                LoweringOperand::Residual(_) => unreachable!("root R was decoded before result dispatch"),
+                LoweringOperand::Residual(_) => {
+                    unreachable!("root R was decoded before result dispatch")
+                }
             }
         } else {
             // `RT-DECL-CLOSURE-PORT` `D5a` — THE DETACHED-RESULT SEAT.
@@ -10218,7 +11233,7 @@ fn define_unit_body<M: Module>(
                     #[cfg(any(test, feature = "px8-ds-test-support"))]
                     record_residual_abi_decode();
                     Some(compiler.decode_residual_child(&mut builder, residual)?.word)
-                },
+                }
             };
             (word, None)
         };
@@ -10229,7 +11244,10 @@ fn define_unit_body<M: Module>(
                 result,
                 slots,
                 i32::try_from(result_offset).map_err(|_| {
-                    backend_module(LoweringCause::Capacity, "abi result slot offset exceeds addressable range".to_string())
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "abi result slot offset exceeds addressable range".to_string(),
+                    )
                 })?,
             );
         }
@@ -10244,7 +11262,9 @@ fn define_unit_body<M: Module>(
     #[cfg(test)]
     d5a_trace(format!(
         "UNIT-BODY done function={:?} origin={:?} root={:?}",
-        unit.function, unit.body_occurrence, root_outcome.as_ref().map(|_| "root")
+        unit.function,
+        unit.body_occurrence,
+        root_outcome.as_ref().map(|_| "root")
     ));
     compiler.validate_materialized_dead_join_cfg(unit.function, unit.body_occurrence, &func)?;
     // `4b` -- the emission-seam equality gate, on the FINISHED function and
@@ -10279,21 +11299,23 @@ fn define_unit_body<M: Module>(
     let response_owner_calls = verified_response_owner_calls(
         &compiler.static_transition_plan,
         bundle,
-        compiler
-            .function_local
-            .continuation_emissions
-            .keys()
-            .chain(
-                compiler
-                    .function_local
-                    .checked_ih_transport_emissions
-                    .iter()
-                    .map(|(transport, _)| transport.source_call_identity()),
-            ),
+        compiler.function_local.continuation_emissions.keys().chain(
+            compiler
+                .function_local
+                .checked_ih_transport_emissions
+                .iter()
+                .map(|(transport, _)| transport.source_call_identity()),
+        ),
     )?;
     if let Some(ledger) = compiler.continuation_claims.as_mut() {
         if accumulate {
-            ledger.record_emitted(compiler.function_local.continuation_emissions.keys().cloned())?;
+            ledger.record_emitted(
+                compiler
+                    .function_local
+                    .continuation_emissions
+                    .keys()
+                    .cloned(),
+            )?;
         }
         ledger.record_response_owner_calls(response_owner_calls);
     }
@@ -10538,7 +11560,6 @@ mod admitted_matches_role_sequence {
     }
 }
 
-
 #[derive(Clone, Copy)]
 struct FunctionResultPublication {
     frame: cranelift_codegen::ir::Value,
@@ -10548,7 +11569,6 @@ struct FunctionResultPublication {
     returned_word: cranelift_codegen::ir::Value,
     return_inst: cranelift_codegen::ir::Inst,
 }
-
 
 /// The existing typed UnitBundle identity whose already-declared function is
 /// staged. This is proof provenance over the bundle's three disjoint maps, not
@@ -10560,7 +11580,6 @@ enum ExistingResultUnitIdentity {
     Response(StaticResponseOwnerId),
 }
 
-
 #[derive(Default)]
 struct ForwardingProof {
     valid: bool,
@@ -10568,13 +11587,11 @@ struct ForwardingProof {
     sources: BTreeSet<cranelift_codegen::ir::Value>,
 }
 
-
 #[derive(Clone, Copy)]
 struct FinishedUnitResultRealization {
     unit: ExistingResultUnitIdentity,
     target: FuncId,
 }
-
 
 #[derive(Clone, Copy)]
 struct FinishedUnitResultContract {
@@ -10583,14 +11600,12 @@ struct FinishedUnitResultContract {
     identity: ConstructorIdentity,
 }
 
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct CertifiedInfeasibleEdge {
     terminator: cranelift_codegen::ir::Inst,
     destination_ordinal: u8,
     target: cranelift_codegen::ir::Block,
 }
-
 
 #[derive(Clone, Debug)]
 struct CertifiedCutProvenance {
@@ -10606,13 +11621,11 @@ struct CertifiedCutProvenance {
     dependencies: BTreeSet<CertifiedInfeasibleEdge>,
 }
 
-
 #[derive(Default)]
 struct CertifiedCuts {
     edges: BTreeSet<CertifiedInfeasibleEdge>,
     provenance: BTreeMap<CertifiedInfeasibleEdge, CertifiedCutProvenance>,
 }
-
 
 #[derive(Clone, Debug)]
 struct VerifiedCarrierQuery {
@@ -10621,14 +11634,12 @@ struct VerifiedCarrierQuery {
     output: cranelift_codegen::ir::Value,
 }
 
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct StackMemoryLocation {
     slot: cranelift_codegen::ir::StackSlot,
     offset: i64,
     bytes: u32,
 }
-
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct ExactProtocolGuard {
@@ -10637,14 +11648,12 @@ struct ExactProtocolGuard {
     success_target: Block,
 }
 
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum ProtocolFactState {
     Absent,
     Produced,
     Guarded,
 }
-
 
 #[derive(Clone, Copy, Debug)]
 enum StackWriteEffect {
@@ -10656,12 +11665,10 @@ enum StackWriteEffect {
     Unknown,
 }
 
-
 struct LocationAccess {
     containers: BTreeSet<cranelift_codegen::ir::StackSlot>,
     escaped: bool,
 }
-
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum ReachingMemoryState {
@@ -10670,13 +11677,11 @@ enum ReachingMemoryState {
     Unknown,
 }
 
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum MemoryFlowState {
     Absent,
     Current,
 }
-
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct CarrierFactGround {
@@ -10684,14 +11689,12 @@ struct CarrierFactGround {
     guard: Option<ExactProtocolGuard>,
 }
 
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum CarrierFlowState {
     Absent,
     Pending(u16),
     Current,
 }
-
 
 /// A finalized CLIF body held outside the object until its pending Result
 /// obligations close. `target` and `unit` are the two existing identities
@@ -10708,58 +11711,48 @@ pub(super) struct StagedResultBody {
     independent_contract: Option<ConstructorIdentity>,
 }
 
-
 fn address_depends_on_slots(
     func: &Function,
     value: cranelift_codegen::ir::Value,
     slots: &BTreeSet<cranelift_codegen::ir::StackSlot>,
-    visiting: &mut BTreeSet<cranelift_codegen::ir::Value>,
 ) -> Result<bool, CraneliftBackendError> {
-    let value = func.dfg.resolve_aliases(value);
-    if !visiting.insert(value) {
-        return Ok(false);
-    }
-    if resolve_stack_address(func, value)?.is_some_and(|(slot, _)| slots.contains(&slot)) {
-        visiting.remove(&value);
-        return Ok(true);
-    }
-    let depends = match func.dfg.value_def(value) {
-        cranelift_codegen::ir::ValueDef::Result(inst, _) => {
-            let mut any = false;
-            for argument in func.dfg.inst_args(inst) {
-                any |= address_depends_on_slots(func, *argument, slots, visiting)?;
-            }
-            any
+    let cfg = ControlFlowGraph::with_function(func);
+    let entry = func.layout.entry_block();
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        let value = func.dfg.resolve_aliases(value);
+        if !seen.insert(value) {
+            continue;
         }
-        cranelift_codegen::ir::ValueDef::Param(block, index) => {
-            if func.layout.entry_block() == Some(block) {
-                false
-            } else {
-                let cfg = ControlFlowGraph::with_function(func);
-                let mut any = false;
-                for predecessor in cfg.pred_iter(block) {
-                    for incoming in incoming_arguments_with_cuts(
-                        func,
-                        predecessor.inst,
-                        block,
-                        index,
-                        &BTreeSet::new(),
-                    )? {
-                        any |= address_depends_on_slots(func, incoming, slots, visiting)?;
+        if resolve_stack_address(func, value)?.is_some_and(|(slot, _)| slots.contains(&slot)) {
+            return Ok(true);
+        }
+        match func.dfg.value_def(value) {
+            cranelift_codegen::ir::ValueDef::Result(inst, _) => {
+                pending.extend(func.dfg.inst_args(inst).iter().copied());
+            }
+            cranelift_codegen::ir::ValueDef::Param(block, index) => {
+                if entry != Some(block) {
+                    for predecessor in cfg.pred_iter(block) {
+                        pending.extend(incoming_arguments_with_cuts(
+                            func,
+                            predecessor.inst,
+                            block,
+                            index,
+                            &BTreeSet::new(),
+                        )?);
                     }
                 }
-                any
+            }
+            cranelift_codegen::ir::ValueDef::Union(left, right) => {
+                pending.push(left);
+                pending.push(right);
             }
         }
-        cranelift_codegen::ir::ValueDef::Union(left, right) => {
-            address_depends_on_slots(func, left, slots, visiting)?
-                || address_depends_on_slots(func, right, slots, visiting)?
-        }
-    };
-    visiting.remove(&value);
-    Ok(depends)
+    }
+    Ok(false)
 }
-
 
 fn call_may_access_location(
     func: &Function,
@@ -10775,7 +11768,6 @@ fn call_may_access_location(
     }
     Ok(false)
 }
-
 
 pub(super) fn close_and_define_staged_result_bodies<M: Module>(
     module: &mut M,
@@ -10848,7 +11840,6 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 &reachable,
                 &realized_call_words,
                 publication.returned_word,
-                &mut BTreeSet::new(),
             )?;
             if valid && grounded {
                 realizations.push(FinishedUnitResultRealization {
@@ -10906,10 +11897,13 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     })
             })
             .collect::<Vec<_>>();
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "the finished generated-Result realization graph is not closed: \
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "the finished generated-Result realization graph is not closed: \
              missing={missing_realizations:?}, details={details:?}"
-        )));
+            ),
+        ));
     }
 
     let mut required = Vec::<(FuncId, ConstructorIdentity)>::new();
@@ -10980,7 +11974,8 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     let certified_target =
                         certificate.map_or(target, |certificate| certificate.target);
                     if certified_target != target {
-                        return Err(backend_module(LoweringCause::FinishedCode,
+                        return Err(backend_module(
+                            LoweringCause::FinishedCode,
                             "a call-result certificate changed the already-verified direct target"
                                 .to_string(),
                         ));
@@ -10990,7 +11985,8 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                             .insert(obligation.result_word, certificate.identity)
                             .is_some()
                         {
-                            return Err(backend_module(LoweringCause::FinishedCode,
+                            return Err(backend_module(
+                                LoweringCause::FinishedCode,
                                 "two call-result obligations claim one function-local SSA word"
                                     .to_string(),
                             ));
@@ -11027,7 +12023,6 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                         &call_seeds,
                         identity,
                         publication.returned_word,
-                        &mut BTreeSet::new(),
                     )?;
                     proof.valid && proof.grounded
                 };
@@ -11070,11 +12065,14 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 continue;
             };
             if actual.identity != *demanded {
-                return Err(backend_module(LoweringCause::FinishedCode, format!(
-                    "finished target {target:?} publishes actual constructor identity {:?} at \
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
+                    format!(
+                        "finished target {target:?} publishes actual constructor identity {:?} at \
                      {:?}, but its pending Result obligation demands {demanded:?}",
-                    actual.identity, publication.returned_word,
-                )));
+                        actual.identity, publication.returned_word,
+                    ),
+                ));
             }
         }
         let details = missing
@@ -11116,10 +12114,13 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     })
             })
             .collect::<Vec<_>>();
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "the finished generated-Result proof graph is not closed: \
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "the finished generated-Result proof graph is not closed: \
              missing={missing:?}, details={details:?}"
-        )));
+            ),
+        ));
     }
     for body in &staged {
         if let Some(identity) = body.required_contract {
@@ -11128,7 +12129,8 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     && certificate.target == body.target
                     && certificate.identity == identity
             }) {
-                return Err(backend_module(LoweringCause::FinishedCode,
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
                     "a generated context's terminal Result contract lacks a finished certificate"
                         .to_string(),
                 ));
@@ -11140,11 +12142,10 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         std::mem::swap(&mut ctx.func, &mut body.func);
         module
             .define_function(body.target, &mut ctx)
-            .map_err(|error| backend_module(LoweringCause::FinishedCode, error.to_string()))?;
+            .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     }
     Ok(())
 }
-
 
 fn compare_imm_is(
     func: &Function,
@@ -11169,7 +12170,6 @@ fn compare_imm_is(
             && imm.bits() == immediate
     )
 }
-
 
 fn comparison_with_constant(
     func: &Function,
@@ -11201,7 +12201,6 @@ fn comparison_with_constant(
         _ => None,
     }
 }
-
 
 fn derive_certified_cuts(
     body: &StagedResultBody,
@@ -11318,7 +12317,6 @@ fn derive_certified_cuts(
                 proof_call_seeds,
                 identity,
                 tag_query.word,
-                &mut BTreeSet::new(),
             )?;
             if !proof.valid || !proof.grounded {
                 continue;
@@ -11343,7 +12341,7 @@ fn derive_certified_cuts(
                     if authority.identity != identity || authority.word != *source {
                         grounds.clear();
                         break;
-                }
+                    }
                     let Some(ground) = authority_grounds.get(source).copied() else {
                         grounds.clear();
                         break;
@@ -11351,11 +12349,11 @@ fn derive_certified_cuts(
                     grounds.push(ground);
                 } else if proof_call_seeds.get(source) == Some(&identity) {
                     let cranelift_codegen::ir::ValueDef::Result(producer, _) =
-                    body.func.dfg.value_def(*source)
-                else {
+                        body.func.dfg.value_def(*source)
+                    else {
                         grounds.clear();
                         break;
-                };
+                    };
                     grounds.push(CarrierFactGround {
                         producer,
                         guard: None,
@@ -11364,7 +12362,7 @@ fn derive_certified_cuts(
                     grounds.clear();
                     break;
                 }
-                        }
+            }
             if grounds.is_empty() {
                 continue;
             }
@@ -11376,7 +12374,7 @@ fn derive_certified_cuts(
                 &tag_preserving_helpers,
                 tag_query.call,
                 "a certified tag query",
-                        )
+            )
             .is_err()
             {
                 continue;
@@ -11403,7 +12401,8 @@ fn derive_certified_cuts(
                 };
                 let mut expected_constant =
                     i64::try_from(identity.tag_abi_word()?).map_err(|_| {
-                        backend_module(LoweringCause::FinishedCode,
+                        backend_module(
+                            LoweringCause::FinishedCode,
                             "a certified Result identity exceeds the runtime tag word".to_string(),
                         )
                     })?;
@@ -11443,11 +12442,11 @@ fn derive_certified_cuts(
                             .map(|(load, _)| load);
                         query.word == tag_query.word
                             && verify_all_paths_after_instruction(
-                    &body.func,
+                                &body.func,
                                 tag_output_load,
                                 query.call,
                                 "a certified field-count query",
-                    )
+                            )
                             .is_ok()
                             && field_output_load.is_some_and(|load| {
                                 verify_all_paths_after_instruction(
@@ -11455,7 +12454,7 @@ fn derive_certified_cuts(
                                     load,
                                     comparison_inst,
                                     "a certified field-count query",
-                            )
+                                )
                                 .is_ok()
                             })
                     })
@@ -11473,7 +12472,7 @@ fn derive_certified_cuts(
                     "a certified tag comparison",
                 )
                 .is_err()
-                        {
+                {
                     continue;
                 }
 
@@ -11530,7 +12529,8 @@ fn derive_certified_cuts(
                         },
                     );
                     if prior.is_some() {
-                        return Err(backend_module(LoweringCause::FinishedCode,
+                        return Err(backend_module(
+                            LoweringCause::FinishedCode,
                             "one certified edge acquired two proof provenances".to_string(),
                         ));
                     }
@@ -11546,13 +12546,15 @@ fn derive_certified_cuts(
     Ok(cuts)
 }
 
-
 fn exact_guard_edge(
     func: &Function,
     guard: ExactProtocolGuard,
 ) -> Result<(), CraneliftBackendError> {
     let block = func.layout.inst_block(guard.branch).ok_or_else(|| {
-        backend_module(LoweringCause::FinishedCode, "a protocol guard branch is absent from finalized CLIF".to_string())
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a protocol guard branch is absent from finalized CLIF".to_string(),
+        )
     })?;
     let edges = successor_edges(func, block)?;
     if edges.iter().any(|(terminator, ordinal, target)| {
@@ -11562,12 +12564,12 @@ fn exact_guard_edge(
     }) {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode,
+        Err(backend_module(
+            LoweringCause::FinishedCode,
             "a protocol guard's success edge disagrees with finalized CLIF".to_string(),
         ))
     }
 }
-
 
 fn exact_staged_unit(
     staged: &[StagedResultBody],
@@ -11580,15 +12582,16 @@ fn exact_staged_unit(
         .collect::<Vec<_>>();
     match matches.as_slice() {
         [unit] => Ok(*unit),
-        [] => Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a generated-Result proof dependency targets unstaged function {target:?}"
-        ))),
-        _ => Err(backend_module(LoweringCause::FinishedCode, format!(
-            "more than one typed unit is staged under function {target:?}"
-        ))),
+        [] => Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("a generated-Result proof dependency targets unstaged function {target:?}"),
+        )),
+        _ => Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("more than one typed unit is staged under function {target:?}"),
+        )),
     }
 }
-
 
 fn iconst_value(func: &Function, value: cranelift_codegen::ir::Value) -> Option<i64> {
     let cranelift_codegen::ir::ValueDef::Result(inst, 0) = func.dfg.value_def(value) else {
@@ -11600,7 +12603,6 @@ fn iconst_value(func: &Function, value: cranelift_codegen::ir::Value) -> Option<
     };
     (*opcode == cranelift_codegen::ir::Opcode::Iconst).then(|| imm.bits())
 }
-
 
 fn incoming_arguments_with_cuts(
     func: &Function,
@@ -11626,7 +12628,8 @@ fn incoming_arguments_with_cuts(
                 .get(index)
                 .copied()
                 .ok_or_else(|| {
-                    backend_module(LoweringCause::FinishedCode,
+                    backend_module(
+                        LoweringCause::FinishedCode,
                         "a certified Result forwarding edge omits its block argument".to_string(),
                     )
                 })?,
@@ -11635,11 +12638,12 @@ fn incoming_arguments_with_cuts(
     };
     let data = &func.dfg.insts[inst];
     if !data.opcode().is_branch() {
-            return Err(backend_module(LoweringCause::FinishedCode,
-                "a certified Result block parameter has an unsupported incoming control edge"
-                    .to_string(),
-            ));
-        }
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            "a certified Result block parameter has an unsupported incoming control edge"
+                .to_string(),
+        ));
+    }
     for (ordinal, destination) in data
         .branch_destination(&func.dfg.jump_tables)
         .iter()
@@ -11647,7 +12651,8 @@ fn incoming_arguments_with_cuts(
     {
         append(
             u8::try_from(ordinal).map_err(|_| {
-                backend_module(LoweringCause::FinishedCode,
+                backend_module(
+                    LoweringCause::FinishedCode,
                     "a certified Result incoming branch has more than 256 successors".to_string(),
                 )
             })?,
@@ -11656,7 +12661,6 @@ fn incoming_arguments_with_cuts(
     }
     Ok(incoming)
 }
-
 
 fn instruction_clobbers_location(
     func: &Function,
@@ -11676,7 +12680,6 @@ fn instruction_clobbers_location(
     }
     Ok(false)
 }
-
 
 fn loaded_stack_location(
     func: &Function,
@@ -11725,7 +12728,6 @@ fn loaded_stack_location(
     Ok(location.map(|location| (inst, location)))
 }
 
-
 fn location_access(
     func: &Function,
     location: StackMemoryLocation,
@@ -11772,7 +12774,6 @@ fn location_access(
     })
 }
 
-
 fn locations_overlap(left: StackMemoryLocation, right: StackMemoryLocation) -> bool {
     if left.slot != right.slot {
         return false;
@@ -11781,7 +12782,6 @@ fn locations_overlap(left: StackMemoryLocation, right: StackMemoryLocation) -> b
     let right_end = right.offset.saturating_add(i64::from(right.bytes));
     left.offset < right_end && right.offset < left_end
 }
-
 
 fn prove_forwarded_value(
     func: &Function,
@@ -11792,106 +12792,60 @@ fn prove_forwarded_value(
     call_seeds: &BTreeMap<cranelift_codegen::ir::Value, ConstructorIdentity>,
     identity: ConstructorIdentity,
     value: cranelift_codegen::ir::Value,
-    visiting: &mut BTreeSet<cranelift_codegen::ir::Value>,
 ) -> Result<ForwardingProof, CraneliftBackendError> {
-    if authorities
-        .get(&value)
-        .is_some_and(|authority| authority.identity == identity && authority.word == value)
-        || call_seeds.get(&value) == Some(&identity)
-    {
-        return Ok(ForwardingProof {
-            valid: true,
-            grounded: true,
-            sources: BTreeSet::from([value]),
-        });
-    }
-    if !visiting.insert(value) {
-        return Ok(ForwardingProof {
-            valid: true,
-            grounded: false,
-            sources: BTreeSet::new(),
-        });
-    }
-    let mut proof = match func.dfg.value_def(value) {
-        cranelift_codegen::ir::ValueDef::Param(block, index) => {
-            let predecessors = cfg
-                .pred_iter(block)
-                .filter(|predecessor| reachable.contains(&predecessor.block))
-                .collect::<Vec<_>>();
-            if predecessors.is_empty() {
-                ForwardingProof::default()
-            } else {
-                let mut result = ForwardingProof {
-                    valid: true,
-                    grounded: false,
-                    sources: BTreeSet::new(),
-                };
-                for predecessor in predecessors {
-                    let incoming =
-                        incoming_arguments_with_cuts(func, predecessor.inst, block, index, cuts)?;
-                    if incoming.is_empty() {
-                        continue;
-                    }
-                    for incoming in incoming {
-                        let next = prove_forwarded_value(
-                            func,
-                            cfg,
-                            reachable,
-                            cuts,
-                            authorities,
-                            call_seeds,
-                            identity,
-                            incoming,
-                            visiting,
-                        )?;
-                        result.valid &= next.valid;
-                        result.grounded |= next.grounded;
-                        result.sources.extend(next.sources);
-                    }
-                }
-                result
-            }
-        }
-        cranelift_codegen::ir::ValueDef::Union(left, right) => {
-            let left = prove_forwarded_value(
-                func,
-                cfg,
-                reachable,
-                cuts,
-                authorities,
-                call_seeds,
-                identity,
-                left,
-                visiting,
-            )?;
-            let right = prove_forwarded_value(
-                func,
-                cfg,
-                reachable,
-                cuts,
-                authorities,
-                call_seeds,
-                identity,
-                right,
-                visiting,
-            )?;
-            let mut sources = left.sources;
-            sources.extend(right.sources);
-            ForwardingProof {
-                valid: left.valid && right.valid,
-                grounded: left.grounded || right.grounded,
-                sources,
-            }
-        }
-        cranelift_codegen::ir::ValueDef::Result(_, _) => ForwardingProof::default(),
+    // Leaf validity, groundedness and sources depend on the reachable leaf set,
+    // not on the path through a reconvergent block-param chain.
+    let mut proof = ForwardingProof {
+        valid: true,
+        grounded: false,
+        sources: BTreeSet::new(),
     };
-    visiting.remove(&value);
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        if !seen.insert(value) {
+            continue;
+        }
+        if authorities
+            .get(&value)
+            .is_some_and(|authority| authority.identity == identity && authority.word == value)
+            || call_seeds.get(&value) == Some(&identity)
+        {
+            proof.grounded = true;
+            proof.sources.insert(value);
+            continue;
+        }
+        match func.dfg.value_def(value) {
+            cranelift_codegen::ir::ValueDef::Param(block, index) => {
+                let predecessors = cfg
+                    .pred_iter(block)
+                    .filter(|predecessor| reachable.contains(&predecessor.block))
+                    .collect::<Vec<_>>();
+                if predecessors.is_empty() {
+                    proof.valid = false;
+                }
+                for predecessor in predecessors {
+                    pending.extend(incoming_arguments_with_cuts(
+                        func,
+                        predecessor.inst,
+                        block,
+                        index,
+                        cuts,
+                    )?);
+                }
+            }
+            cranelift_codegen::ir::ValueDef::Union(left, right) => {
+                pending.push(left);
+                pending.push(right);
+            }
+            cranelift_codegen::ir::ValueDef::Result(_, _) => proof.valid = false,
+        }
+    }
     if !proof.valid {
         proof.grounded = false;
     }
     Ok(proof)
 }
-
 
 fn prove_realized_value(
     body: &StagedResultBody,
@@ -11899,88 +12853,76 @@ fn prove_realized_value(
     reachable: &BTreeSet<Block>,
     realized_call_words: &BTreeSet<cranelift_codegen::ir::Value>,
     value: cranelift_codegen::ir::Value,
-    visiting: &mut BTreeSet<cranelift_codegen::ir::Value>,
 ) -> Result<(bool, bool), CraneliftBackendError> {
-    if body.authorities.contains_key(&value) || realized_call_words.contains(&value) {
-        return Ok((true, true));
-    }
-    if !visiting.insert(value) {
-        return Ok((true, false));
-    }
-    let entry =
-        body.func.layout.entry_block().ok_or_else(|| {
-            backend_module(LoweringCause::FinishedCode, "a staged Result function has no entry block".to_string())
-        })?;
-    let result = match body.func.dfg.value_def(value) {
-        cranelift_codegen::ir::ValueDef::Param(block, index) if block == entry => (true, true),
-        cranelift_codegen::ir::ValueDef::Param(block, index) => {
-            let predecessors = cfg
-                .pred_iter(block)
-                .filter(|predecessor| reachable.contains(&predecessor.block))
-                .collect::<Vec<_>>();
-            if predecessors.is_empty() {
-                (false, false)
-            } else {
-                let mut valid = true;
-                let mut grounded = false;
+    // Validity and groundedness depend only on the backward-reachable leaves.
+    let entry = body.func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a staged Result function has no entry block".to_string(),
+        )
+    })?;
+    let mut valid = true;
+    let mut grounded = false;
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        if !seen.insert(value) {
+            continue;
+        }
+        if body.authorities.contains_key(&value) || realized_call_words.contains(&value) {
+            grounded = true;
+            continue;
+        }
+        match body.func.dfg.value_def(value) {
+            cranelift_codegen::ir::ValueDef::Param(block, _) if block == entry => grounded = true,
+            cranelift_codegen::ir::ValueDef::Param(block, index) => {
+                let predecessors = cfg
+                    .pred_iter(block)
+                    .filter(|predecessor| reachable.contains(&predecessor.block))
+                    .collect::<Vec<_>>();
+                if predecessors.is_empty() {
+                    valid = false;
+                }
                 for predecessor in predecessors {
-                    for incoming in incoming_arguments_with_cuts(
+                    pending.extend(incoming_arguments_with_cuts(
                         &body.func,
                         predecessor.inst,
                         block,
                         index,
                         &BTreeSet::new(),
-                    )? {
-                        let (next_valid, next_grounded) = prove_realized_value(
-                            body,
-                            cfg,
-                            reachable,
-                            realized_call_words,
-                            incoming,
-                            visiting,
-                        )?;
-                        valid &= next_valid;
-                        grounded |= next_grounded;
-                    }
+                    )?);
                 }
-                (valid, grounded)
+            }
+            cranelift_codegen::ir::ValueDef::Union(left, right) => {
+                pending.push(left);
+                pending.push(right);
+            }
+            cranelift_codegen::ir::ValueDef::Result(_, _) => {
+                if body
+                    .call_obligations
+                    .iter()
+                    .any(|obligation| obligation.result_word == value)
+                {
+                    valid = false;
+                } else {
+                    grounded = true;
+                }
             }
         }
-        cranelift_codegen::ir::ValueDef::Union(left, right) => {
-            let left =
-                prove_realized_value(body, cfg, reachable, realized_call_words, left, visiting)?;
-            let right =
-                prove_realized_value(body, cfg, reachable, realized_call_words, right, visiting)?;
-            (left.0 && right.0, left.1 || right.1)
-        }
-        cranelift_codegen::ir::ValueDef::Result(_, _) => {
-            if body
-                .call_obligations
-                .iter()
-                .any(|obligation| obligation.result_word == value)
-            {
-                (false, false)
-            } else {
-                // Ordinary SSA instruction results and non-call frame/helper
-                // loads are initialized by their instruction. Exact identity
-                // remains a separate proof and is not inferred here.
-                (true, true)
-            }
-        }
-    };
-    visiting.remove(&value);
-    Ok(result)
+    }
+    Ok((valid, grounded))
 }
-
 
 fn reachable_with_cuts(
     func: &Function,
     cuts: &BTreeSet<CertifiedInfeasibleEdge>,
 ) -> Result<BTreeSet<Block>, CraneliftBackendError> {
-    let entry = func
-        .layout
-        .entry_block()
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a staged Result function has no entry block".to_string()))?;
+    let entry = func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a staged Result function has no entry block".to_string(),
+        )
+    })?;
     let mut reachable = BTreeSet::from([entry]);
     let mut pending = vec![entry];
     while let Some(block) = pending.pop() {
@@ -12000,16 +12942,17 @@ fn reachable_with_cuts(
     Ok(reachable)
 }
 
-
 fn reaching_memory_states_before(
     func: &Function,
     location: StackMemoryLocation,
     dependent: cranelift_codegen::ir::Inst,
 ) -> Result<BTreeSet<ReachingMemoryState>, CraneliftBackendError> {
-    let entry = func
-        .layout
-        .entry_block()
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a memory proof has no entry block".to_string()))?;
+    let entry = func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a memory proof has no entry block".to_string(),
+        )
+    })?;
     let access = location_access(func, location)?;
     let mut pending = vec![(entry, ReachingMemoryState::Uninitialized)];
     let mut reached = BTreeSet::new();
@@ -12056,13 +12999,13 @@ fn reaching_memory_states_before(
         }
     }
     if observations.is_empty() {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a memory proof's dependent instruction is unreachable".to_string(),
         ));
     }
     Ok(observations)
 }
-
 
 fn resolve_stack_address(
     func: &Function,
@@ -12094,9 +13037,8 @@ fn resolve_stack_address(
         return Ok(None);
     }
     let cfg = ControlFlowGraph::with_function(func);
-    resolve_stack_address_inner(func, &cfg, value, &mut BTreeSet::new())
+    resolve_stack_address_inner(func, &cfg, value, &mut StackAddressSearch::default())
 }
-
 
 fn resolve_stack_address_direct(
     func: &Function,
@@ -12144,17 +13086,45 @@ fn resolve_stack_address_direct(
     result
 }
 
+#[derive(Default)]
+struct StackAddressSearch {
+    visiting: BTreeSet<cranelift_codegen::ir::Value>,
+    resolved:
+        BTreeMap<cranelift_codegen::ir::Value, Option<(cranelift_codegen::ir::StackSlot, i64)>>,
+    cycle_cut: bool,
+}
 
 fn resolve_stack_address_inner(
     func: &Function,
     cfg: &ControlFlowGraph,
     value: cranelift_codegen::ir::Value,
-    visiting: &mut BTreeSet<cranelift_codegen::ir::Value>,
+    search: &mut StackAddressSearch,
 ) -> Result<Option<(cranelift_codegen::ir::StackSlot, i64)>, CraneliftBackendError> {
     let value = func.dfg.resolve_aliases(value);
-    if !visiting.insert(value) {
+    if let Some(resolved) = search.resolved.get(&value) {
+        return Ok(*resolved);
+    }
+    if !search.visiting.insert(value) {
+        search.cycle_cut = true;
         return Ok(None);
     }
+    let outer_cut = std::mem::replace(&mut search.cycle_cut, false);
+    let resolved = resolve_stack_address_uncached(func, cfg, value, search);
+    search.visiting.remove(&value);
+    let resolved = resolved?;
+    if !search.cycle_cut {
+        search.resolved.insert(value, resolved);
+    }
+    search.cycle_cut |= outer_cut;
+    Ok(resolved)
+}
+
+fn resolve_stack_address_uncached(
+    func: &Function,
+    cfg: &ControlFlowGraph,
+    value: cranelift_codegen::ir::Value,
+    search: &mut StackAddressSearch,
+) -> Result<Option<(cranelift_codegen::ir::StackSlot, i64)>, CraneliftBackendError> {
     let resolved = match func.dfg.value_def(value) {
         cranelift_codegen::ir::ValueDef::Result(inst, 0) => match &func.dfg.insts[inst] {
             cranelift_codegen::ir::InstructionData::StackLoad {
@@ -12167,18 +13137,18 @@ fn resolve_stack_address_inner(
             cranelift_codegen::ir::InstructionData::BinaryImm64 { opcode, arg, imm }
                 if *opcode == cranelift_codegen::ir::Opcode::IaddImm =>
             {
-                resolve_stack_address_inner(func, cfg, *arg, visiting)?.and_then(
-                    |(slot, offset)| offset.checked_add(imm.bits()).map(|offset| (slot, offset)),
-                )
+                resolve_stack_address_inner(func, cfg, *arg, search)?.and_then(|(slot, offset)| {
+                    offset.checked_add(imm.bits()).map(|offset| (slot, offset))
+                })
             }
             cranelift_codegen::ir::InstructionData::Binary { opcode, args }
                 if *opcode == cranelift_codegen::ir::Opcode::Iadd =>
             {
                 if let Some(offset) = iconst_value(func, args[1]) {
-                    resolve_stack_address_inner(func, cfg, args[0], visiting)?
+                    resolve_stack_address_inner(func, cfg, args[0], search)?
                         .and_then(|(slot, base)| base.checked_add(offset).map(|sum| (slot, sum)))
                 } else if let Some(offset) = iconst_value(func, args[0]) {
-                    resolve_stack_address_inner(func, cfg, args[1], visiting)?
+                    resolve_stack_address_inner(func, cfg, args[1], search)?
                         .and_then(|(slot, base)| base.checked_add(offset).map(|sum| (slot, sum)))
                 } else {
                     None
@@ -12188,7 +13158,6 @@ fn resolve_stack_address_inner(
         },
         cranelift_codegen::ir::ValueDef::Param(block, index) => {
             let Some(entry) = func.layout.entry_block() else {
-                visiting.remove(&value);
                 return Ok(None);
             };
             if block == entry {
@@ -12205,18 +13174,15 @@ fn resolve_stack_address_inner(
                         &BTreeSet::new(),
                     )?;
                     if incoming.is_empty() {
-                        visiting.remove(&value);
                         return Ok(None);
                     }
                     for incoming in incoming {
-                        let next = resolve_stack_address_inner(func, cfg, incoming, visiting)?;
+                        let next = resolve_stack_address_inner(func, cfg, incoming, search)?;
                         let Some(next) = next else {
-                            visiting.remove(&value);
                             return Ok(None);
                         };
                         grounded = true;
                         if candidate.is_some_and(|held| held != next) {
-                            visiting.remove(&value);
                             return Ok(None);
                         }
                         candidate = Some(next);
@@ -12226,16 +13192,14 @@ fn resolve_stack_address_inner(
             }
         }
         cranelift_codegen::ir::ValueDef::Union(left, right) => {
-            let left = resolve_stack_address_inner(func, cfg, left, visiting)?;
-            let right = resolve_stack_address_inner(func, cfg, right, visiting)?;
+            let left = resolve_stack_address_inner(func, cfg, left, search)?;
+            let right = resolve_stack_address_inner(func, cfg, right, search)?;
             (left.is_some() && left == right).then_some(left).flatten()
         }
         cranelift_codegen::ir::ValueDef::Result(_, _) => None,
     };
-    visiting.remove(&value);
     Ok(resolved)
 }
-
 
 fn stack_write_effect(
     func: &Function,
@@ -12312,7 +13276,6 @@ fn stack_write_effect(
     Ok(effect)
 }
 
-
 fn status_zero_guards(
     func: &Function,
     status: cranelift_codegen::ir::Value,
@@ -12355,7 +13318,8 @@ fn status_zero_guards(
         }
     }
     if guards.is_empty() {
-        Err(backend_module(LoweringCause::FinishedCode,
+        Err(backend_module(
+            LoweringCause::FinishedCode,
             "a helper result has no exact status-zero guard".to_string(),
         ))
     } else {
@@ -12363,15 +13327,16 @@ fn status_zero_guards(
     }
 }
 
-
 fn successor_edges(
     func: &Function,
     block: Block,
 ) -> Result<Vec<(cranelift_codegen::ir::Inst, u8, Block)>, CraneliftBackendError> {
-    let terminator = func
-        .layout
-        .last_inst(block)
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a staged Result CFG block has no terminator".to_string()))?;
+    let terminator = func.layout.last_inst(block).ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a staged Result CFG block has no terminator".to_string(),
+        )
+    })?;
     let data = &func.dfg.insts[terminator];
     if data.opcode().is_branch() {
         return data
@@ -12382,9 +13347,10 @@ fn successor_edges(
                 Ok((
                     terminator,
                     u8::try_from(ordinal).map_err(|_| {
-                        backend_module(LoweringCause::FinishedCode,
+                        backend_module(
+                            LoweringCause::FinishedCode,
                             "a staged Result branch has more than 256 successors".to_string(),
-                )
+                        )
                     })?,
                     destination.block(&func.dfg.value_lists),
                 ))
@@ -12394,12 +13360,14 @@ fn successor_edges(
     if data.opcode().is_terminator() {
         return Ok(Vec::new());
     }
-    Err(backend_module(LoweringCause::FinishedCode, format!(
-        "a staged Result CFG block ends in unsupported non-terminator {:?}",
-        data.opcode()
-    )))
+    Err(backend_module(
+        LoweringCause::FinishedCode,
+        format!(
+            "a staged Result CFG block ends in unsupported non-terminator {:?}",
+            data.opcode()
+        ),
+    ))
 }
-
 
 fn unknown_write_may_alias(
     func: &Function,
@@ -12416,10 +13384,8 @@ fn unknown_write_may_alias(
     let Some(address) = address else {
         return Ok(true);
     };
-    Ok(access.escaped
-        || address_depends_on_slots(func, address, &access.containers, &mut BTreeSet::new())?)
+    Ok(access.escaped || address_depends_on_slots(func, address, &access.containers)?)
 }
-
 
 fn value_is_guarded_nonzero_at_inst(
     func: &Function,
@@ -12471,12 +13437,11 @@ fn value_is_guarded_nonzero_at_inst(
                             },
                             dependent,
                             "a nonzero guarded terminal",
-                    )
+                        )
                         .is_ok()
                 })
         })
 }
-
 
 fn value_is_provably_nonzero(func: &Function, value: cranelift_codegen::ir::Value) -> bool {
     if iconst_value(func, value).is_some_and(|constant| constant != 0) {
@@ -12500,7 +13465,6 @@ fn value_is_provably_nonzero(func: &Function, value: cranelift_codegen::ir::Valu
     }
 }
 
-
 fn verify_all_paths_after_instruction(
     func: &Function,
     producer: cranelift_codegen::ir::Inst,
@@ -12508,7 +13472,10 @@ fn verify_all_paths_after_instruction(
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
     let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(LoweringCause::FinishedCode, "an instruction-order proof has no entry block".to_string())
+        backend_module(
+            LoweringCause::FinishedCode,
+            "an instruction-order proof has no entry block".to_string(),
+        )
     })?;
     let mut pending = vec![(entry, false)];
     let mut reached = BTreeSet::new();
@@ -12525,9 +13492,10 @@ fn verify_all_paths_after_instruction(
             if inst == dependent {
                 observed = true;
                 if !current {
-                    return Err(backend_module(LoweringCause::FinishedCode, format!(
-                        "{label} is reachable before its required finalized instruction"
-                    )));
+                    return Err(backend_module(
+                        LoweringCause::FinishedCode,
+                        format!("{label} is reachable before its required finalized instruction"),
+                    ));
                 }
             }
             if func.dfg.insts[inst].opcode().is_terminator() {
@@ -12541,12 +13509,12 @@ fn verify_all_paths_after_instruction(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} is not reachable from the finalized function entry"
-        )))
+        Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} is not reachable from the finalized function entry"),
+        ))
     }
 }
-
 
 fn verify_all_paths_guarded(
     func: &Function,
@@ -12556,10 +13524,12 @@ fn verify_all_paths_guarded(
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
     exact_guard_edge(func, guard)?;
-    let entry = func
-        .layout
-        .entry_block()
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a protocol proof has no entry block".to_string()))?;
+    let entry = func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a protocol proof has no entry block".to_string(),
+        )
+    })?;
     let mut pending = vec![(entry, ProtocolFactState::Absent)];
     let mut reached = BTreeSet::new();
     let mut observed = false;
@@ -12576,9 +13546,12 @@ fn verify_all_paths_guarded(
             if inst == dependent {
                 observed = true;
                 if state != ProtocolFactState::Guarded {
-                    return Err(backend_module(LoweringCause::FinishedCode, format!(
-                        "{label} is reachable without traversing its current successful guard"
-                    )));
+                    return Err(backend_module(
+                        LoweringCause::FinishedCode,
+                        format!(
+                            "{label} is reachable without traversing its current successful guard"
+                        ),
+                    ));
                 }
             }
             if func.dfg.insts[inst].opcode().is_terminator() {
@@ -12604,20 +13577,21 @@ fn verify_all_paths_guarded(
             }
         }
         if !terminated {
-            return Err(backend_module(LoweringCause::FinishedCode, format!(
-                "{label} reaches a CFG block without a supported terminator"
-            )));
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
+                format!("{label} reaches a CFG block without a supported terminator"),
+            ));
         }
     }
     if observed {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} is not reachable from the finalized function entry"
-        )))
+        Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} is not reachable from the finalized function entry"),
+        ))
     }
 }
-
 
 fn verify_all_paths_memory_current(
     func: &Function,
@@ -12626,10 +13600,12 @@ fn verify_all_paths_memory_current(
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
-    let entry = func
-        .layout
-        .entry_block()
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a memory-flow proof has no entry block".to_string()))?;
+    let entry = func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a memory-flow proof has no entry block".to_string(),
+        )
+    })?;
     let access = location_access(func, location)?;
     let mut pending = vec![(entry, MemoryFlowState::Absent)];
     let mut reached = BTreeSet::new();
@@ -12648,9 +13624,12 @@ fn verify_all_paths_memory_current(
             if inst == dependent {
                 observed = true;
                 if state != MemoryFlowState::Current {
-                    return Err(backend_module(LoweringCause::FinishedCode, format!(
-                        "{label} is reachable without the current producer or after a clobber"
-                    )));
+                    return Err(backend_module(
+                        LoweringCause::FinishedCode,
+                        format!(
+                            "{label} is reachable without the current producer or after a clobber"
+                        ),
+                    ));
                 }
             }
             if func.dfg.insts[inst].opcode().is_terminator() {
@@ -12664,12 +13643,12 @@ fn verify_all_paths_memory_current(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} is not reachable from the finalized function entry"
-        )))
+        Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} is not reachable from the finalized function entry"),
+        ))
     }
 }
-
 
 fn verify_carrier_fact_current(
     func: &Function,
@@ -12681,12 +13660,17 @@ fn verify_carrier_fact_current(
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
     if grounds.is_empty() {
-        return Err(backend_module(LoweringCause::FinishedCode, format!("{label} has no finalized ground")));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} has no finalized ground"),
+        ));
     }
-    let entry = func
-        .layout
-        .entry_block()
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a carrier-flow proof has no entry block".to_string()))?;
+    let entry = func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a carrier-flow proof has no entry block".to_string(),
+        )
+    })?;
     let mut pending = vec![(entry, CarrierFlowState::Absent)];
     let mut reached = BTreeSet::new();
     let mut observed = false;
@@ -12700,7 +13684,10 @@ fn verify_carrier_fact_current(
             if let Some(index) = ground_index {
                 state = if grounds[index].guard.is_some() {
                     CarrierFlowState::Pending(u16::try_from(index).map_err(|_| {
-                        backend_module(LoweringCause::FinishedCode, "a carrier proof has more than 65536 grounds".to_string())
+                        backend_module(
+                            LoweringCause::FinishedCode,
+                            "a carrier proof has more than 65536 grounds".to_string(),
+                        )
                     })?)
                 } else {
                     CarrierFlowState::Current
@@ -12721,9 +13708,12 @@ fn verify_carrier_fact_current(
             if inst == dependent {
                 observed = true;
                 if state != CarrierFlowState::Current {
-                    return Err(backend_module(LoweringCause::FinishedCode, format!(
-                        "{label} is reachable without a current finalized constructor fact"
-                    )));
+                    return Err(backend_module(
+                        LoweringCause::FinishedCode,
+                        format!(
+                            "{label} is reachable without a current finalized constructor fact"
+                        ),
+                    ));
                 }
             }
             if func.dfg.insts[inst].opcode().is_terminator() {
@@ -12738,7 +13728,8 @@ fn verify_carrier_fact_current(
                         }
                         let pending_index =
                             CarrierFlowState::Pending(u16::try_from(index).map_err(|_| {
-                                backend_module(LoweringCause::FinishedCode,
+                                backend_module(
+                                    LoweringCause::FinishedCode,
                                     "a carrier proof has more than 65536 grounds".to_string(),
                                 )
                             })?);
@@ -12760,12 +13751,12 @@ fn verify_carrier_fact_current(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} is not reachable from the finalized function entry"
-        )))
+        Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} is not reachable from the finalized function entry"),
+        ))
     }
 }
-
 
 fn verify_carrier_queries(
     func: &Function,
@@ -12783,23 +13774,27 @@ fn verify_carrier_queries(
             continue;
         }
         let [actual_arena, word, out] = func.dfg.inst_args(call) else {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified carrier query does not have exactly arena, word and out operands"
                     .to_string(),
             ));
         };
         if *actual_arena != arena {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified carrier query uses a different boundary arena".to_string(),
             ));
         }
         let Some((output_slot, output_offset)) = resolve_stack_address(func, *out)? else {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified carrier query's out operand is not an exact stack address".to_string(),
             ));
         };
         if output_offset != 0 {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified carrier query's out address is not the start of its slot".to_string(),
             ));
         }
@@ -12809,7 +13804,8 @@ fn verify_carrier_queries(
             bytes: 8,
         };
         let [status] = func.dfg.inst_results(call) else {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified carrier query does not return exactly one status".to_string(),
             ));
         };
@@ -12842,10 +13838,13 @@ fn verify_carrier_queries(
                     })
                     .collect::<Vec<_>>();
                 if applicable.len() != 1 {
-                    return Err(backend_module(LoweringCause::FinishedCode, format!(
-                        "a certified carrier query output load has {} all-path status guards instead of one",
-                        applicable.len()
-                    )));
+                    return Err(backend_module(
+                        LoweringCause::FinishedCode,
+                        format!(
+                            "a certified carrier query output load has {} all-path status guards instead of one",
+                            applicable.len()
+                        ),
+                    ));
                 }
                 verify_all_paths_memory_current(
                     func,
@@ -12858,10 +13857,13 @@ fn verify_carrier_queries(
             }
         }
         let [output] = outputs.as_slice() else {
-            return Err(backend_module(LoweringCause::FinishedCode, format!(
-                "a certified carrier query has {} all-path guarded output loads instead of one",
-                outputs.len()
-            )));
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
+                format!(
+                    "a certified carrier query has {} all-path guarded output loads instead of one",
+                    outputs.len()
+                ),
+            ));
         };
         verified.push(VerifiedCarrierQuery {
             call,
@@ -12872,18 +13874,21 @@ fn verify_carrier_queries(
     Ok(verified)
 }
 
-
 fn verify_constructor_authority_ground(
     body: &StagedResultBody,
     authority: &GeneratedConstructorAuthority,
     helpers: &crate::boundary_value_clif::BoundaryLocalFuncs,
 ) -> Result<CarrierFactGround, CraneliftBackendError> {
     let arena = body.boundary_arena.ok_or_else(|| {
-        backend_module(LoweringCause::FinishedCode, "a generated constructor authority has no boundary arena".to_string())
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a generated constructor authority has no boundary arena".to_string(),
+        )
     })?;
     let (word_load, word_location) = loaded_stack_location(&body.func, authority.word)?
         .ok_or_else(|| {
-            backend_module(LoweringCause::FinishedCode,
+            backend_module(
+                LoweringCause::FinishedCode,
                 "a generated constructor authority's word is not an actual helper-output load"
                     .to_string(),
             )
@@ -12939,14 +13944,20 @@ fn verify_constructor_authority_ground(
         }
     }
     if allocation_calls.len() != 1 {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a generated constructor authority has {} exact finalized allocation producers instead of one",
-            allocation_calls.len()
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a generated constructor authority has {} exact finalized allocation producers instead of one",
+                allocation_calls.len()
+            ),
+        ));
     }
 
     let expected_tag = i64::try_from(authority.identity.tag_abi_word()?).map_err(|_| {
-        backend_module(LoweringCause::FinishedCode, "a generated constructor identity exceeds the runtime tag word".to_string())
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a generated constructor identity exceeds the runtime tag word".to_string(),
+        )
     })?;
     let mut tag_grounds = Vec::new();
     for call in body
@@ -12986,14 +13997,16 @@ fn verify_constructor_authority_ground(
         }
     }
     let [ground] = tag_grounds.as_slice() else {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a generated constructor authority has {} exact finalized tag-store guards instead of one",
-            tag_grounds.len()
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a generated constructor authority has {} exact finalized tag-store guards instead of one",
+                tag_grounds.len()
+            ),
+        ));
     };
     Ok(*ground)
 }
-
 
 fn verify_cut_provenance(
     body: &StagedResultBody,
@@ -13005,7 +14018,8 @@ fn verify_cut_provenance(
             .iter()
             .any(|edge| !cuts.provenance.contains_key(edge))
     {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "the certified cut edge set disagrees with its proof provenance".to_string(),
         ));
     }
@@ -13019,7 +14033,8 @@ fn verify_cut_provenance(
                 .iter()
                 .any(|dependency| !cuts.provenance.contains_key(dependency))
         {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified cut carries foreign, empty, circular, or missing provenance"
                     .to_string(),
             ));
@@ -13039,7 +14054,8 @@ fn verify_cut_provenance(
             edge.terminator,
         ] {
             if body.func.layout.inst_block(inst).is_none() {
-                return Err(backend_module(LoweringCause::FinishedCode,
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
                     "a certified cut proof names an instruction absent from finalized CLIF"
                         .to_string(),
                 ));
@@ -13048,18 +14064,23 @@ fn verify_cut_provenance(
         let cranelift_codegen::ir::InstructionData::Brif { arg, .. } =
             &body.func.dfg.insts[edge.terminator]
         else {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified cut terminator is not its finalized conditional branch".to_string(),
             ));
         };
         let Some((condition, compared, constant)) = comparison_with_constant(&body.func, *arg)
         else {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified cut no longer has its exact tag comparison".to_string(),
             ));
         };
         let expected = i64::try_from(proof.identity.tag_abi_word()?).map_err(|_| {
-            backend_module(LoweringCause::FinishedCode, "a certified cut identity exceeds the runtime tag word".to_string())
+            backend_module(
+                LoweringCause::FinishedCode,
+                "a certified cut identity exceeds the runtime tag word".to_string(),
+            )
         })?;
         let expected_infeasible_ordinal = match condition {
             cranelift_codegen::ir::condcodes::IntCC::Equal => 1,
@@ -13078,7 +14099,8 @@ fn verify_cut_provenance(
                 .copied()
                 != Some(proof.queried_word)
         {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified cut's finalized word/query/comparison provenance disagrees"
                     .to_string(),
             ));
@@ -13111,14 +14133,14 @@ fn verify_cut_provenance(
     let mut done = BTreeSet::new();
     for edge in &cuts.edges {
         if !visit(*edge, cuts, &mut BTreeSet::new(), &mut done) {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a certified cut proof contains a pruning dependency cycle".to_string(),
             ));
         }
     }
     Ok(())
 }
-
 
 fn verify_definite_stored_value(
     func: &Function,
@@ -13128,18 +14150,19 @@ fn verify_definite_stored_value(
 ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
     let states = reaching_memory_states_before(func, location, dependent)?;
     if states.len() != 1 {
-        return Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} has no single reaching initialized value on every path: {states:?}"
-        )));
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} has no single reaching initialized value on every path: {states:?}"),
+        ));
     }
     match states.iter().next().copied() {
         Some(ReachingMemoryState::Exact(value)) => Ok(value),
-        _ => Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} has no single reaching initialized value on every path: {states:?}"
-        ))),
+        _ => Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} has no single reaching initialized value on every path: {states:?}"),
+        )),
     }
 }
-
 
 fn verify_exact_value_guard(
     func: &Function,
@@ -13149,7 +14172,8 @@ fn verify_exact_value_guard(
 ) -> Result<(), CraneliftBackendError> {
     let value = func.dfg.resolve_aliases(value);
     let cranelift_codegen::ir::ValueDef::Result(producer, 0) = func.dfg.value_def(value) else {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "an exact-value proof's observed word has no finalized producer instruction"
                 .to_string(),
         ));
@@ -13206,12 +14230,14 @@ fn verify_exact_value_guard(
     if applicable == 1 {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode, format!(
-            "a finished Result publication has {applicable} all-path exact guards for expected word {expected} instead of one"
-        )))
+        Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!(
+                "a finished Result publication has {applicable} all-path exact guards for expected word {expected} instead of one"
+            ),
+        ))
     }
 }
-
 
 fn verify_no_memory_effect_after_instruction(
     func: &Function,
@@ -13219,10 +14245,12 @@ fn verify_no_memory_effect_after_instruction(
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
-    let entry = func
-        .layout
-        .entry_block()
-        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a publication proof has no entry block".to_string()))?;
+    let entry = func.layout.entry_block().ok_or_else(|| {
+        backend_module(
+            LoweringCause::FinishedCode,
+            "a publication proof has no entry block".to_string(),
+        )
+    })?;
     let mut pending = vec![(entry, false)];
     let mut reached = BTreeSet::new();
     let mut observed = false;
@@ -13243,9 +14271,10 @@ fn verify_no_memory_effect_after_instruction(
             if inst == dependent {
                 observed = true;
                 if !current {
-                    return Err(backend_module(LoweringCause::FinishedCode, format!(
-                        "{label} is reachable after an intervening memory effect"
-                    )));
+                    return Err(backend_module(
+                        LoweringCause::FinishedCode,
+                        format!("{label} is reachable after an intervening memory effect"),
+                    ));
                 }
             }
             if func.dfg.insts[inst].opcode().is_terminator() {
@@ -13259,12 +14288,12 @@ fn verify_no_memory_effect_after_instruction(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(LoweringCause::FinishedCode, format!(
-            "{label} is not reachable from the finalized function entry"
-        )))
+        Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} is not reachable from the finalized function entry"),
+        ))
     }
 }
-
 
 fn verify_publication_and_terminals(
     body: &StagedResultBody,
@@ -13277,7 +14306,8 @@ fn verify_publication_and_terminals(
                 && args[1] == publication.frame
                 && i32::from(*offset) == publication.result_offset => {}
         _ => {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a finished Result certificate does not bind its exact word/frame/store"
                     .to_string(),
             ));
@@ -13305,7 +14335,8 @@ fn verify_publication_and_terminals(
             .and_then(|word| iconst_value(&body.func, *word))
             != Some(0)
     {
-        return Err(backend_module(LoweringCause::FinishedCode,
+        return Err(backend_module(
+            LoweringCause::FinishedCode,
             "a finished Result publication does not return status zero".to_string(),
         ));
     }
@@ -13320,7 +14351,8 @@ fn verify_publication_and_terminals(
             continue;
         }
         let Some(returned) = body.func.dfg.inst_args(return_inst).first().copied() else {
-            return Err(backend_module(LoweringCause::FinishedCode,
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
                 "a finished Result function has a terminal with no status".to_string(),
             ));
         };
@@ -13328,7 +14360,10 @@ fn verify_publication_and_terminals(
             continue;
         }
         let return_block = body.func.layout.inst_block(return_inst).ok_or_else(|| {
-            backend_module(LoweringCause::FinishedCode, "a finished Result terminal is absent from the layout".to_string())
+            backend_module(
+                LoweringCause::FinishedCode,
+                "a finished Result terminal is absent from the layout".to_string(),
+            )
         })?;
         if value_is_guarded_nonzero_at_inst(&body.func, returned, return_inst) {
             continue;
@@ -13341,15 +14376,15 @@ fn verify_publication_and_terminals(
                     return false;
                 };
                 args[1] == publication.frame
-                            && i32::from(*offset) == publication.trap_offset
-                            && (value_is_provably_nonzero(&body.func, args[0])
+                    && i32::from(*offset) == publication.trap_offset
+                    && (value_is_provably_nonzero(&body.func, args[0])
                         || value_is_guarded_nonzero_at_inst(&body.func, args[0], inst))
                     && verify_all_paths_after_instruction(
-                                    &body.func,
+                        &body.func,
                         inst,
                         return_inst,
                         "a finished Result Trap publication",
-                )
+                    )
                     .is_ok()
             });
         if !explicit_trap {
@@ -13364,29 +14399,31 @@ fn verify_publication_and_terminals(
                 .block_insts(block)
                 .map(|inst| format!("{inst:?}:{:?}", body.func.dfg.insts[inst]))
                 .collect::<Vec<_>>();
-            return Err(backend_module(LoweringCause::FinishedCode, format!(
-                "a finished Result function has an uncertified status-zero terminal \
+            return Err(backend_module(
+                LoweringCause::FinishedCode,
+                format!(
+                    "a finished Result function has an uncertified status-zero terminal \
                  {return_inst:?} in {block:?}, returned={returned:?}, \
                  definition={:?}, producer={:?}: {instructions:?}",
-                body.func.dfg.value_def(returned),
-                match body.func.dfg.value_def(returned) {
-                    cranelift_codegen::ir::ValueDef::Result(inst, _) =>
-                        Some(&body.func.dfg.insts[inst]),
-                    _ => None,
-                },
-            )));
+                    body.func.dfg.value_def(returned),
+                    match body.func.dfg.value_def(returned) {
+                        cranelift_codegen::ir::ValueDef::Result(inst, _) =>
+                            Some(&body.func.dfg.insts[inst]),
+                        _ => None,
+                    },
+                ),
+            ));
         }
     }
     Ok(())
 }
 
-
 #[cfg(test)]
 mod generated_result_protocol_verifier {
     use super::*;
     use cranelift_codegen::ir::{
-        condcodes::IntCC, AbiParam, BlockCall, ExtFuncData, ExternalName, JumpTableData, Signature,
-        UserExternalName,
+        AbiParam, BlockCall, ExtFuncData, ExternalName, JumpTableData, Signature, UserExternalName,
+        condcodes::IntCC,
     };
     use cranelift_codegen::isa::CallConv;
 
@@ -13788,10 +14825,14 @@ mod generated_result_protocol_verifier {
         let (func, obligation, target) = call_protocol_fixture(CallProtocolMutation::Exact);
         verify_call_result_obligation(&func, &obligation, target)
             .expect("the exact call protocol is certified");
-        assert!(call_refusal(CallProtocolMutation::TrapStatusBypass)
-            .contains("Trap load is reachable without traversing"));
-        assert!(call_refusal(CallProtocolMutation::ResultTrapBypass)
-            .contains("Result load is reachable without traversing"));
+        assert!(
+            call_refusal(CallProtocolMutation::TrapStatusBypass)
+                .contains("Trap load is reachable without traversing")
+        );
+        assert!(
+            call_refusal(CallProtocolMutation::ResultTrapBypass)
+                .contains("Result load is reachable without traversing")
+        );
     }
 
     /// Promise class: durable invariant.
@@ -13832,25 +14873,29 @@ mod generated_result_protocol_verifier {
             .expect("the exact store reaches return unclobbered");
 
         let (bypass, store, returned) = publication_fixture(PublicationMutation::Bypass);
-        assert!(format!(
-            "{:?}",
-            verify_all_paths_after_instruction(&bypass, store, returned, "bypass publication")
-                .expect_err("the return bypasses publication")
-        )
-        .contains("before its required finalized instruction"));
+        assert!(
+            format!(
+                "{:?}",
+                verify_all_paths_after_instruction(&bypass, store, returned, "bypass publication")
+                    .expect_err("the return bypasses publication")
+            )
+            .contains("before its required finalized instruction")
+        );
 
         let (clobber, store, returned) = publication_fixture(PublicationMutation::Clobber);
-        assert!(format!(
-            "{:?}",
-            verify_no_memory_effect_after_instruction(
-                &clobber,
-                store,
-                returned,
-                "clobbered publication",
+        assert!(
+            format!(
+                "{:?}",
+                verify_no_memory_effect_after_instruction(
+                    &clobber,
+                    store,
+                    returned,
+                    "clobbered publication",
+                )
+                .expect_err("the later store clobbers publication")
             )
-            .expect_err("the later store clobbers publication")
-        )
-        .contains("intervening memory effect"));
+            .contains("intervening memory effect")
+        );
     }
 
     /// Promise class: durable invariant.
