@@ -15285,10 +15285,12 @@ mod generated_result_protocol_verifier {
         assert!(call_refusal(CallProtocolMutation::RawResultClobber).contains("after a clobber"));
     }
 
-    /// Promise class: durable invariant. A callee may retain a stack address
-    /// it receives, so a later call can write through it without passing the
-    /// address again. A call that runs before the retaining call cannot, and
-    /// passing an ordinary word retains nothing.
+    /// Promise class: durable invariant.
+    /// MEASURED: a retained stack address reaches later zero-argument calls
+    /// both in the same block and a successor block, but not an earlier call;
+    /// an ordinary word retains no address on either path.
+    /// CLAIMED: call aliasing respects the retaining call's program order.
+    /// THE GAP: non-stack-destination store retention is a separate obligation.
     #[test]
     fn retained_call_argument_reaches_only_later_calls() {
         fn fixture(
@@ -15296,6 +15298,7 @@ mod generated_result_protocol_verifier {
         ) -> (
             Function,
             cranelift_codegen::ir::StackSlot,
+            cranelift_codegen::ir::Inst,
             cranelift_codegen::ir::Inst,
             cranelift_codegen::ir::Inst,
         ) {
@@ -15319,6 +15322,7 @@ mod generated_result_protocol_verifier {
                 builder.ins().iconst(types::I64, 0)
             };
             builder.ins().call(exposure, &[argument]);
+            let same_block_later_call = builder.ins().call(other, &[]);
             builder.ins().jump(after, &[]);
             builder.switch_to_block(after);
             builder.seal_block(after);
@@ -15326,10 +15330,10 @@ mod generated_result_protocol_verifier {
             let zero = builder.ins().iconst(types::I64, 0);
             finish_return(&mut builder, zero);
             builder.finalize();
-            (func, slot, earlier_call, later_call)
+            (func, slot, earlier_call, same_block_later_call, later_call)
         }
         for exposed in [true, false] {
-            let (func, slot, earlier, later) = fixture(exposed);
+            let (func, slot, earlier, same_block_later, later) = fixture(exposed);
             let indexed = IndexedFunction::new(&func);
             let access = location_access(
                 &indexed,
@@ -15341,8 +15345,14 @@ mod generated_result_protocol_verifier {
             )
             .expect("slot retention is decidable from the finished call operands");
             assert_eq!(
+                call_may_access_location(&indexed, same_block_later, &access)
+                    .expect("same-block call aliasing is decidable"),
+                exposed,
+                "a later call in the retaining call's block can use its pointer"
+            );
+            assert_eq!(
                 call_may_access_location(&indexed, later, &access)
-                    .expect("later call aliasing is decidable"),
+                    .expect("successor-block call aliasing is decidable"),
                 exposed,
                 "a call need not pass the retained pointer again to write through it"
             );
