@@ -515,21 +515,9 @@ The gate must compare against the base the merge will actually land on."
   git worktree add --detach "$gate_wt" "$checked_base" >/dev/null 2>&1 ||
     die "publisher gate: could not create a worktree at origin/main"
 
-  # ⛔ Give the SCRATCH WORKTREE its own identity, once, rather than passing
-  #    `-c user.*` to the operations we happen to know need it.
-  #
-  #    Measured: `git merge --squash` needs a committer identity too, but ONLY
-  #    when the merge is not a fast-forward -- i.e. exactly when origin/main has
-  #    advanced past the candidate's base, which is the case this gate exists
-  #    for. A first fix that covered only `git commit` passed the fast-forward
-  #    probe and failed the advanced-base one. Enumerating the calls observed to
-  #    fail is how that happened; this sets it for every git operation in the
-  #    worktree instead, so the class cannot recur as new operations are added.
-  #
-  #    This repository configures user.email PER-REPO, not globally, so a gate
-  #    that inherits ambient identity is silently environment-sensitive.
-  git -C "$gate_wt" config user.email 'publisher-gate@swe-toolkit.local' >/dev/null 2>&1 || true
-  git -C "$gate_wt" config user.name  'ken publisher gate'             >/dev/null 2>&1 || true
+  # The probe commit uses the repository's default identity; who authored it
+  # does not matter (operator, 2026-10-27). Setting one here wrote it into the
+  # shared .git/config, which every worktree then committed under.
 
   # ⛔ `git merge --squash` STAGES without COMMITTING, so HEAD would still be
   #    origin/main and a checker that compares a recorded revision against HEAD

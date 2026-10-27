@@ -184,6 +184,28 @@ pub theorem graph_find_walk_some
       (selected_is_some q fq g s target (graph_find_word q fq g s target) Refl)
       reachable_true
 
+pub theorem graph_reachable_along_walk
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (target : q → Bool)
+      (walk : Walk q g s t)
+    : Equal Bool (graph_reachable q fq g t target) True
+      → Equal Bool (graph_reachable q fq g s target) True =
+  λreach_t.
+    let witness =
+      require_some
+        (ReachWitness q g t target)
+        (graph_find_walk q fq g t target)
+        (graph_find_walk_some q fq g t target reach_t)
+    in
+      match witness {
+        MkReach u hit suffix ↦
+          graph_reachable_complete q fq g s u target (walk_append q g s t u walk suffix) hit
+      }
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -2232,7 +2254,7 @@ checks left unit, three positions of `WalkHere` in associativity, the
 same-route control, and the other-route refusal in a package-owned test.
 The public API is the graph, path and certificate types, their constructors,
 the walk-append operation, the predicate-reachability decision and witness,
-the dependency-order operation, five list/order predicates, and thirteen
+the dependency-order operation, five list/order predicates, and fourteen
 kernel-checked laws. Every other helper is private to this package.
 
 | Reader task | Section |

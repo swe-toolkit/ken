@@ -338,12 +338,13 @@ publication, landing or landed trust. No rational or `Float` tier is
 claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–6 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–7 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE;
-SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION). The §1
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION;
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -381,11 +382,18 @@ environment, not their `Expr` structure. `poly_eq_complete` gives a
 `True` decision as a client consequence without a new exported
 corollary. The only new proof helper remains private. Architect D0
 checked the generic proof with no new `Axiom` and unchanged scratch
-trusted identities 114 → 114; the §6 export is absent on this base.
-The authored §6 seed and D0 do not establish shipped-seed execution,
-official conformance, CI, publication, landing or landed trust for
-§6. A sorted-list normal form and signed/field arithmetic remain
-deferred.
+trusted identities 114 → 114. The §6 export and package-owned seed
+test are on main; neither establishes official conformance or landed
+trust. Section 7 specifies the public `deriv_independent` law: if
+changing every variable except `v` leaves the value of `e` unchanged,
+its derivative in `v` evaluates to zero at the given environment.
+The premise is semantic, even when `v` occurs in a zero-valued product.
+Architect D0 checked the generic proof on `9e1d6e9cd` with no new
+`Axiom` and unchanged scratch trusted identities 114 → 114. This
+candidate adds the checked catalog export and a same-input accepted
+and refused seed; author-local checks do not establish official
+conformance, CI, publication, landing or landed trust. A sorted-list
+normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–6 (SPEC-GEOMETRY-EXACT-CONTRACT;
@@ -488,9 +496,10 @@ trust. Signed arithmetic, division, `Float`, rounding, width and
 structural hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–5 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–6 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
-SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION).
+SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION;
+SPEC-TIME-MERGE-ASSOCIATIVITY).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -510,25 +519,41 @@ conformance or a landed trust measurement. A private one-way
 window-of-merge membership consequence adds no public law.
 Section 5 specifies one unconditional structural equality for nested
 windows at intersected `max`/`min` bounds and two empty-merge unit
-laws. It promotes §3's existing private `trace_merge_nil_right`
-proof without duplicating it. Seven new window-composition proof
-tools stay private. Architect's isolated D0 checked the three
-public proofs with unchanged scratch trusted identities 114 → 114;
-§5 catalog exports remain absent at this base. Its authored closed
-seed and D0 do not establish shipped-seed execution, official
-conformance, CI, publication, landing or landed trust. Clock effects,
-durations, causality, infinite streams, premise-free structural
-window/merge distribution and k-way merge remain deferred.
+laws. The catalog promotes §3's original private
+`trace_merge_nil_right` proof without duplicating it. Seven new
+window-composition proof tools stay private. Architect's isolated
+D0 checked the three public proofs with unchanged scratch trusted
+identities 114 → 114; §5 catalog exports and a targeted package-owned
+seed test are now present on main. This does not establish official
+conformance, CI or a landed trust measurement. Section 6
+specifies premise-free structural associativity of `trace_merge` on
+arbitrary lists, including unordered inputs. The candidate carries
+the catalog law with seven private helpers and a closed seed that
+separates an outer-operand swap by a cross-input time-4 tie. Architect
+D0 checked the generic proof with no new `Axiom` and equal scratch
+trusted identities (114 → 114); candidate-local checks do not claim
+official conformance, CI, publication, landing or landed trust. Clock
+effects, durations, causality, infinite streams, premise-free
+structural window/merge distribution and k-way merge remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
-SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4) and §3
+SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
+SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5) and §3
 (SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).
 The landed `Algorithm.Optimization.Argmin` selects the earliest minimum
 or greatest `Nat`-cost member of `NonEmpty a` with no `DecEq a`; the
 seven `argmin` and seven `argmax` laws and both seeds are present on
 main. Section 1.4's `argmin_option` and four laws are also landed.
-Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
+Section 1.5 specifies the public `argmin_cost_order_invariant`:
+a transform preserving and reflecting every strict `Nat` cost
+comparison leaves the selected candidate unchanged, ties included.
+Architect's isolated D0 checked its generic proof with no new
+`Axiom` and equal scratch trusted identities 114 → 114. This
+spec-and-seed candidate does not deliver the catalog export;
+local seed checks are not official conformance execution, CI,
+publication, landing or landed trust. Section 3.4 specifies
+`argmax_option` on a possibly empty `List a`:
 `Nil` yields `None`, and `Cons` yields `Some` of `argmax` over
 `nonempty_cons`. Four laws give the two equations and direct-to-`List`
 membership and greatest-cost consequences for an observed `Some`.
@@ -556,9 +581,9 @@ remains at the larger bound. `leq_suc_not_leq_same` stays private;
 there is no `None`-stability law, since a larger range can contain a
 first hit. Architect's D0 checked the generic proof with no new
 `Axiom` and equal scratch trusted identities 114 → 114. The §2.4
-catalog export is absent from this base; its authored closed seed
-and D0 are not shipped §2.4 execution, official conformance, CI,
-publication, landing or landed trust. The `List`-input Option
+catalog export, seed and package-owned test are now on main; the
+test and earlier D0 do not establish official conformance or a
+landed trust measurement. The `List`-input Option
 selector is specified in §1.4, not §2.
 
 ## 4. I/O, effects, serialization

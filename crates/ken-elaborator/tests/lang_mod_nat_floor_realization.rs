@@ -780,7 +780,7 @@ const BINDING_ROUTE_CASES: &[BindingRouteCase] = &[
         label: "law",
         collision_template: "law {name} (x) { field : Bool }",
         renamed_source: "law LocalLaw (x) { field : Bool }",
-        renamed_identity: "LocalLaw",
+        renamed_identity: "Entry.LocalLaw",
     },
     BindingRouteCase {
         label: "type-alias",
@@ -804,13 +804,13 @@ const BINDING_ROUTE_CASES: &[BindingRouteCase] = &[
         label: "foreign",
         collision_template: "foreign {name} : Int = \"floor_probe\" \"libc.so\" pure",
         renamed_source: "foreign LocalForeign : Int = \"floor_probe\" \"libc.so\" pure",
-        renamed_identity: "LocalForeign",
+        renamed_identity: "Entry.LocalForeign",
     },
     BindingRouteCase {
         label: "temporal",
         collision_template: "temporal {name} { always True }",
         renamed_source: "temporal LocalTemporal { always True }",
-        renamed_identity: "LocalTemporal",
+        renamed_identity: "Entry.LocalTemporal",
     },
 ];
 

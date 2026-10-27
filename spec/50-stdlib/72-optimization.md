@@ -2,22 +2,27 @@
 
 > **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT §1;
 > SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
+> SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** Section 1 specifies the
-> non-empty least-cost selector and seven laws; its catalog module and
-> seed are present on main. Section 1.4's Option selector, four laws
-> and seed are also present on main. Section 2's catalog module and
+> non-empty least-cost selector and seven initial laws; its catalog
+> module and seed are present on main. Section 1.4's Option selector,
+> four laws and seed are also present on main. Section 1.5 specifies
+> one additional checked law preserving the selected candidate under
+> cost transforms that preserve and reflect strict Nat order. Its
+> catalog export belongs to a separate Foundation WP, not this
+> spec-and-seed candidate. Section 2's catalog module and
 > seed are present on main. Section 3's greatest-cost selector and
 > seven laws are landed; §3.4 specifies the Option-returning extension
 > and its four laws from Architect-checked D0. The §3.4 catalog exports,
 > seed and package test are now present on main; the package test is not
 > official conformance-runner execution or a landed `trusted_base()`
-> measurement. The §2.4 catalog candidate now exports the checked law;
-> its package test runs the authored seed against the roots-loaded
-> export. This is not official conformance-runner execution, CI,
-> publication, landing or a landed trust measurement.
+> measurement. The §2.4 checked catalog law and package-owned seed test
+> are also on main; the test runs the authored seed against the export.
+> This is not official conformance-runner execution, CI, publication,
+> landing or a landed trust measurement.
 
 ## 1. Least-cost candidate
 
@@ -265,13 +270,81 @@ conformance-runner execution nor CI, publication or landing. The extension
 keeps the helpers private and adds no ambient name outside the existing
 module imports.
 
+### 1.5 Invariance under a strict-order-preserving cost transform
+
+`Algorithm.Optimization.Argmin` must export one further public
+Transparent theorem with a checked body, not a postulate, with the
+following exact type and argument order:
+
+```ken
+pub theorem argmin_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : NonEmpty a)
+    : Equal a (argmin a (comp a Nat Nat f cost) xs) (argmin a cost xs)
+```
+
+The premise says that `f` preserves **and reflects** every strict
+comparison of natural costs. It is in public names only: `lt_nat`,
+`Equal Bool` and the two natural inputs. In particular, when two
+original costs tie, neither strict comparison becomes true after
+`f`, so §1.1's earlier tied candidate remains selected. A strictly
+increasing transformation may change the numeric costs and need
+not be surjective; it cannot change the chosen input value. The
+conclusion is structural `Equal a` on the selected candidate,
+not equality of costs, a new optimization operation, or a claim
+about runtime complexity. It applies to every candidate type,
+nonempty input and total cost function without `DecEq a`.
+
+`comp` is the existing public `Core.Function.Combinators.comp`;
+`comp a Nat Nat f cost x` computes `f (cost x)`. A lambda used as
+an argument inside this public theorem's type is not accepted by
+Ken's type-position syntax. A public client may use `f` directly
+and discharge `same_order` by any checked proof. For
+`f c = add c three`, both sides of the order equality reduce to
+the same Boolean, so `Refl` checks on open `i` and `j`. This is
+an instance, not a second generic law.
+
+Order equality fixes every Boolean comparison the existing
+right-fold selector makes on a tail result and its current head.
+The private `select_from_cost_order` inducts over the tail and
+transports the induction hypothesis through the head choice;
+`choose_cost_order` transports the Boolean comparison with `J`.
+Both helpers remain private, and the seven §1.2 laws and the
+§1.4 selector and laws retain their existing types and bodies.
+This explains Architect's checked D0 route, not a prescribed
+implementation strategy.
+
+The premise cannot be omitted. On labelled candidates
+`[0, 1, 2, 3]` with respective costs `[5, 2, 7, 2]`, both
+`cost` and `add three ∘ cost` select label `1`, the earliest of
+two minima away from the head. The constant transform
+`f c = Zero` instead ties every candidate and selects head `0`;
+claiming it selects the original minimum `1` is false. The
+closed seed independently checks each accepted selection and
+the flattened transform's actual head result before refusing
+the false equality on the **same input**. These instances do
+not prove the universally quantified theorem.
+
+Architect's isolated AC-0 on `12e91c41b` checked the generic
+proof with `ken check` rc 0, `ken fmt --check` rc 0, no new
+`Axiom`, owner-local Transparent status, private helper import
+refusals, and unchanged exact scratch `trusted_base()` identities
+114 → 114. It also checked the four-label client and its false
+flattened-cost claim. The catalog proof is reserved for the
+separate Foundation WP. The present spec-and-seed candidate does
+not deliver that export or establish shipped-seed execution,
+official conformance, CI, publication, landing or landed trust.
+
 ## 2. Least witness below a finite bound
 
 > **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4).** The
 > original three general laws, catalog module and seed are present on
 > main. Section 2.4's fourth law was checked in Architect D0; its
-> catalog candidate now exports the checked law. A roots-loaded package
+> catalog export and package-owned test are on main. The roots-loaded
 > test checks the authored seed, the complete public type, and the
 > rejected `None` counterpart. These local tests do not establish
 > official conformance-runner execution, CI or landed trust.
@@ -437,8 +510,8 @@ The finite instance checks the boundary but does not prove the
 generic theorem. Architect's isolated D0 at landed base `0bb872591`
 checked the generic body (`ken check` and `ken fmt --check` rc 0), two
 probe tests, no new `Axiom`, and identical scratch `trusted_base()`
-GlobalId sets 114 → 114. The §2.4 catalog candidate now exports the
-checked law, and a roots-loaded package test checks its full generic
+GlobalId sets 114 → 114. The §2.4 catalog export and a roots-loaded
+package test are now on main; that test checks its full generic
 interface, the seed's accepted client, and refusal of the same-premise
 false `None` claim. The test measures identical exact `trusted_base()`
 GlobalId sets before and after loading (114 → 114), and refuses selective

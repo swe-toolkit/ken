@@ -1019,6 +1019,44 @@ pub theorem deriv_commute
               (deriv_commute v w b env))))
   }
 
+pub theorem deriv_independent
+      (v : Nat)
+      (e : Expr)
+      (env : Nat → Nat)
+      (h : (env2 : Nat → Nat)
+        → ((w : Nat) → (Equal Nat v w → Bottom) → Equal Nat (env2 w) (env w))
+        → Equal
+        Nat
+        (eval env2 e)
+        (eval env e))
+    : Equal Nat (eval env (deriv v e)) Zero =
+  let
+    a : Nat = eval env e;
+    d : Nat = eval env (deriv v e);
+    t : Nat = Suc d;
+    r : Nat = taylor_rem v t env e;
+    bumped : Nat → Nat = bump_env v t env
+  in
+    deriv_extract
+      a
+      a
+      t
+      d
+      Zero
+      r
+      Zero
+      Proved
+      ((proof refl for leq_nat) d)
+      Proved
+      Refl
+      (trans
+        Nat
+        (add a (mul t (add d (mul t r))))
+        (eval bumped e)
+        a
+        (sym Nat (eval bumped e) (add a (mul t (add d (mul t r)))) (deriv_taylor v t env e))
+        (h bumped (λw. λhw. bump_env_off v t env w hw)))
+
 theorem expr_add_cong
       (a1 : Expr)
       (a2 : Expr)
@@ -2335,6 +2373,26 @@ fn bump_at (b : Bool) (x : Nat) (t : Nat) : Nat =
 
 fn bump_env (v : Nat) (t : Nat) (env : Nat → Nat) (w : Nat) : Nat =
   bump_at (nat_same v w) (env w) t
+
+theorem nat_same_sound (a : Nat) (b : Nat) (h : IsTrue (nat_same a b)) : Equal Nat a b =
+  (proof antisym for leq_nat)
+    a
+    b
+    ((proof left for bool_and) (leq_nat a b) (leq_nat b a) h)
+    ((proof right for bool_and) (leq_nat a b) (leq_nat b a) h)
+
+theorem bump_at_off
+      (b : Bool) (x : Nat) (t : Nat)
+    : (IsTrue b → Bottom) → Equal Nat (bump_at b x t) x =
+  match b {
+    True ↦ λhb. absurd (hb Proved);
+    False ↦ λhb. Refl
+  }
+
+theorem bump_env_off
+      (v : Nat) (t : Nat) (env : Nat → Nat) (w : Nat) (hw : Equal Nat v w → Bottom)
+    : Equal Nat (bump_env v t env w) (env w) =
+  bump_at_off (nat_same v w) (env w) t (λhs. hw (nat_same_sound v w hs))
 
 fn taylor_rem (v : Nat) (t : Nat) (env : Nat → Nat) (e : Expr) : Nat =
   match e {

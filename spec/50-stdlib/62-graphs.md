@@ -519,14 +519,13 @@ a landed trust measurement.
 ## 5. Reachability carries back along a walk
 
 > **Section 5 status: DRAFT v0
-> (SPEC-GRAPHS-REACHABILITY-ALONG-WALK).** The Architect checked a
-> generic proof in an isolated D0 on landed base `454adf947`: the
-> package checked and formatted with rc 0, no `Axiom` was added,
-> two probes passed, and scratch `trusted_base()` GlobalIds remained
-> identical (114 → 114). The catalog does not yet export this law.
-> The separately authored closed seed does not establish execution
-> against a shipped §5 export, official conformance, CI, publication,
-> landing or landed trust.
+> (SPEC-GRAPHS-REACHABILITY-ALONG-WALK).** The Architect's isolated D0
+> checked the generic proof on `454adf947` without a new `Axiom` or
+> trusted GlobalId. The catalog candidate now exports the checked law:
+> its targeted package test root-loads the generic client and the whole
+> accepted §5 seed, rejects the isolated false claim, and measures no
+> local trust delta. This is candidate package-test evidence, not
+> official conformance, CI, publication, landing or landed trust.
 
 `Algorithm.Graphs.Dependency` must export this Transparent checked law,
 with its public name, argument order and result type exactly as follows:
@@ -582,6 +581,6 @@ the `WalkHere` case and a three-vertex seed with independent closed
 reachability claim on that chain, was kernel-rejected with
 `TypeMismatch` after the whole accepted client; an accepted
 same-shape `Proved` control and a checked `False` result isolate the
-false conclusion. Those are scratch checks of a proposed implementation,
-not shipped-export execution. Catalog delivery and shipped-seed
-measurement are separate work.
+false conclusion. Those earlier checks used an isolated proposed implementation. The
+catalog candidate's package test now checks the landed seed against its
+export; neither observation is official conformance or landed trust.
