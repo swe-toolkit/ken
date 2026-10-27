@@ -3,11 +3,12 @@
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/72-optimization.md` §2.4.
 
-This seed targets the ruled public `find_below_stable` interface, not
-a catalog export already present on the candidate base. Architect
-checked the general proof in isolated D0; the closed examples below
-are clients, not proofs of its quantifiers. There is one refused
-proposition, appended to a fresh full positive prefix.
+This seed targets the public `find_below_stable` interface. Architect
+checked the general proof in isolated D0; the catalog candidate now
+roots-loads the checked law and exercises these clients in a package
+test. The closed examples do not prove its quantifiers. There is one
+refused proposition, appended to a fresh full positive prefix. Package
+tests are not official conformance-runner execution or a landing claim.
 
 ## Accepted client
 
@@ -139,6 +140,15 @@ client plus only `seed_neg` returned rc 1/K0004 `KernelRejected`
 `TypeMismatch`, span 938–1108 wholly inside the appended theorem
 starting at byte 938. Logs:
 `/tmp/spec-author-bound-stability-{Positive,NoneRefusal}.log`.
-These are **D0-overlay** checks, not checks against shipped §2.4
-exports, official conformance, CI, publication, landing or landed
-trust.
+These are historical D0-overlay checks, not tests of the catalog
+candidate. The candidate's package test roots-loads the checked §2.4
+law and accepts the full positive client, including the observed
+`Some three` results, the true `None` premise and the same-premise,
+same-proof-form `Some three` control. It checks that the refused
+proposition claims `None` at ten for that same predicate and premise,
+then observes `KernelRejected TypeMismatch` within its own theorem.
+A separate arbitrary-argument client consumes the full public type;
+exact `trusted_base()` GlobalId sets agree before and after loading
+(114 → 114), and the private helper refuses selective import. This
+is local package-test evidence, **not** official conformance-runner
+execution, CI, publication, landing or landed trust.
