@@ -157,30 +157,40 @@ Architect's full accepted seed checked; appending only this false
 claim kernel-refused, while removing the tie by moving `c0` to
 time 3 admitted the swapped claim.
 
-This candidate carries the catalog export. The author checked its
-literate package with `ken check` rc 0 and `ken fmt --check` rc 0.
-The seed's accepted Ken fence was formatted mechanically without
-changing its token stream; its complete positive client checked
-rc 0 and a **fresh complete** positive prefix plus only the
-negative fence failed rc 1/E0038 `TypeMismatch` on the appended
-`Refl` (bytes 1938–1942). `ken fmt --check` on the formatted
-positive client returned rc 0. A separate no-tie control moved
-`c0` alone to time 3, updated the expected literal list and direct
-comparison to remain true, and admitted the swapped claim (rc 0).
-On an untouched `df0b57c98` worktree, the independent closed
-value controls without the absent law import/application checked
-rc 0; the full client failed rc 1/E0012 `UnboundName` on the missing
-`trace_merge_assoc` import. Scratch worktree and temporary Ken files
-were removed. The preexisting shared CLI was not independently built
-on the exact detached base. Logs under `/workspaces/ken/local/`:
-`spec-author-time-assoc-catalog-check.log`,
-`spec-author-time-assoc-catalog-fmt.log`,
-`spec-author-time-assoc-seed-fmt.log`,
+The pre-merge author check on `a4d1662df` accepted the complete
+positive prefix and refused the sole appended false `Refl` at bytes
+1938–1942 (rc 1/E0038 `TypeMismatch`). Its formatted positive
+client passed `ken fmt --check`. A separate pre-merge no-tie
+control moved `c0` alone to time 3, updated the expected literal
+list and comparison, and admitted the swap (rc 0). On untouched
+`df0b57c98`, independent value controls passed without the absent
+law import/application; the full client failed rc 1/E0012
+`UnboundName` at the missing `trace_merge_assoc` import. These
+historical logs under `/workspaces/ken/local/` are
 `spec-author-time-assoc-seed-positive.log`,
 `spec-author-time-assoc-seed-negative.log`,
 `spec-author-time-assoc-SpecTimeAssocNoTie.log`,
-`spec-author-time-assoc-base-values.log`, and
-`spec-author-time-assoc-base-laws.log`.
+`spec-author-time-assoc-base-values.log` and
+`spec-author-time-assoc-base-laws.log`. The preexisting CLI used
+there was not independently built on the detached base.
+
+After CAT-TIME landed, the author rebuilt `ken-cli` on the merged
+candidate through `scripts/ken-cargo build -p ken-cli --bin ken`
+(rc 0). The merged EventTrace package passed `ken check` and
+`ken fmt --check` (both rc 0). A temporary extraction of the
+seed's complete accepted Ken fence was formatted mechanically;
+its check and `ken fmt --check` both passed (rc 0). A fresh
+complete positive prefix plus only the refused fence failed
+rc 1/E0038 `TypeMismatch` at the appended `Refl`, now bytes
+1944–1948. Temporary clients were removed. The refreshed logs
+under `/workspaces/ken/local/` are
+`spec-author-time-assoc-refresh-cli-build.log`,
+`spec-author-time-assoc-refresh-catalog-check.log`,
+`spec-author-time-assoc-refresh-catalog-fmt.log`,
+`spec-author-time-assoc-refresh-seed-format.log`,
+`spec-author-time-assoc-refresh-seed-positive.log`,
+`spec-author-time-assoc-refresh-seed-fmt.log` and
+`spec-author-time-assoc-refresh-seed-negative.log`.
 These candidate-local checks do not prove the generic law from closed
 instances or establish official conformance-runner execution, CI,
 publication, landing or landed trust.
