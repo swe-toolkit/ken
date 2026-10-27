@@ -1,9 +1,10 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. Six box-and-distance laws, two metric laws, seven
-corner-wise containment laws, three inclusion-order laws, and three area
-laws carry kernel-checked generic proofs.
+geometry operations. Six box-and-distance laws, two structural
+commutativity laws, two metric laws, seven corner-wise containment laws,
+three inclusion-order laws, and three area laws carry kernel-checked
+generic proofs.
 
 ## Contents
 
@@ -27,10 +28,11 @@ point set is empty.
 
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
-box-and-distance laws lead the definition; two metric laws follow. The
-corner-wise `inside` operation and its seven laws come next, then the three
-inclusion-order laws, followed by `area` and its three laws. Per-axis proof
-helpers and distance helpers stay private.
+box-and-distance laws lead the definition; the two structural
+commutativity laws follow the intersection and hull laws, ahead of the
+two metric laws. The corner-wise `inside` operation and its seven laws
+come next, then the three inclusion-order laws, followed by `area` and
+its three laws. Per-axis proof helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -374,6 +376,84 @@ pub theorem hull_contains_right
                                       (axis_contains cly chy py)
                                       hc))
                           }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem intersect_comm (b : Box) (c : Box) : Equal Box (intersect b c) (intersect c b) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          box_equal
+                            (MkPoint (max blx clx) (max bly cly))
+                            (MkPoint (max clx blx) (max cly bly))
+                            (MkPoint (min bhx chx) (min bhy chy))
+                            (MkPoint (min chx bhx) (min chy bhy))
+                            (point_equal
+                              (max blx clx)
+                              (max clx blx)
+                              (max bly cly)
+                              (max cly bly)
+                              ((proof comm for max) blx clx)
+                              ((proof comm for max) bly cly))
+                            (point_equal
+                              (min bhx chx)
+                              (min chx bhx)
+                              (min bhy chy)
+                              (min chy bhy)
+                              ((proof comm for min) bhx chx)
+                              ((proof comm for min) bhy chy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem hull_comm (b : Box) (c : Box) : Equal Box (hull b c) (hull c b) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          box_equal
+                            (MkPoint (min blx clx) (min bly cly))
+                            (MkPoint (min clx blx) (min cly bly))
+                            (MkPoint (max bhx chx) (max bhy chy))
+                            (MkPoint (max chx bhx) (max chy bhy))
+                            (point_equal
+                              (min blx clx)
+                              (min clx blx)
+                              (min bly cly)
+                              (min cly bly)
+                              ((proof comm for min) blx clx)
+                              ((proof comm for min) bly cly))
+                            (point_equal
+                              (max bhx chx)
+                              (max chx bhx)
+                              (max bhy chy)
+                              (max chy bhy)
+                              ((proof comm for max) bhx chx)
+                              ((proof comm for max) bhy chy))
                       }
                   }
               }
@@ -815,6 +895,23 @@ theorem point_equal
         (MkPoint x2 y2)
         (cong Nat Point x1 x2 (point_with_y y1) hx)
         (cong Nat Point y1 y2 (point_with_x x2) hy)
+
+fn box_with_lo (hi : Point) (lo : Point) : Box = MkBox lo hi
+
+fn box_with_hi (lo : Point) (hi : Point) : Box = MkBox lo hi
+
+theorem box_equal
+      (lo1 : Point) (lo2 : Point) (hi1 : Point) (hi2 : Point)
+    : Equal Point lo1 lo2 → Equal Point hi1 hi2 → Equal Box (MkBox lo1 hi1) (MkBox lo2 hi2) =
+  λhl.
+    λhh.
+      trans
+        Box
+        (MkBox lo1 hi1)
+        (MkBox lo2 hi1)
+        (MkBox lo2 hi2)
+        (cong Point Box lo1 lo2 (box_with_lo hi1) hl)
+        (cong Point Box hi1 hi2 (box_with_hi lo2) hh)
 ```
 
 ```ken
@@ -1843,19 +1940,21 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–5](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and twenty-one public proof types.
+1. **Contract.** [Exact geometry, §§1–6](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and twenty-three public proof types.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
-   `manhattan_symm`, `manhattan_self`, `manhattan_triangle`,
-   `manhattan_zero_equal`, `inside`, `inside_sound`, `inside_refl`,
-   `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`,
-   `inside_hull_right`, `inside_complete`, `inside_trans`,
-   `intersect_greatest`, `hull_least`, `area`, `area_inside`,
-   `area_inverted_x`, and `area_inverted_y`. `axis_within`, `axis_span`,
-   generic subtraction and multiplication bounds, per-axis lemmas and
-   proof transport helpers remain private.
+   `intersect_comm`, `hull_comm`, `manhattan_symm`, `manhattan_self`,
+   `manhattan_triangle`, `manhattan_zero_equal`, `inside`,
+   `inside_sound`, `inside_refl`, `intersect_inside_left`,
+   `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
+   `inside_complete`, `inside_trans`, `intersect_greatest`,
+   `hull_least`, `area`, `area_inside`, `area_inverted_x`,
+   and `area_inverted_y`. `axis_within`, `axis_span`, `box_with_lo`,
+   `box_with_hi`, `box_equal`, generic subtraction and
+   multiplication bounds, per-axis lemmas and proof transport helpers
+   remain private.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
    closed examples and generic metric, containment, inclusion order and area
@@ -1885,6 +1984,8 @@ this interface.
    checks an inverted transitive chain, an overlapping meet and a hull with an
    inverted operand, followed by three isolated false reverse inclusions.
    Its package test root-loads the catalog and checks the accepted client and
-   each refusal. This does not claim official conformance-runner execution,
-   CI, publication or landing. All five seeds supplement rather than replace
-   the checked law bodies.
+   each refusal. The [commutativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-commutativity.md)
+   checks both public Nat Order selectors, overlapping Box swaps, and a false
+   hull-versus-intersection claim in a roots-loaded package test. These tests
+   are not official conformance-runner execution, CI, publication or landing.
+   All six seeds supplement rather than replace the checked law bodies.

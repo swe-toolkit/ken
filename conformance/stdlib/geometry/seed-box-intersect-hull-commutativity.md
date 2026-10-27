@@ -5,11 +5,12 @@ Spec: `spec/50-stdlib/67-geometry.md` §6.
 
 This seed exercises the two ruled public `NatBox` laws on overlapping,
 unequal boxes **and** both public `Data.Numeric.Nat.Order` selectors.
-It is an authored client for a later catalog delivery, not evidence
-that the §6 exports are shipped on the candidate base. Independent
-Nat and Box value observations ground the swaps. The sole refusal
-appends a false Box equality to a fresh copy of the complete accepted
-client.
+The catalog candidate's package test roots-loads those four checked
+exports and exercises this authored client. The seed alone does not
+prove the generic statements. Independent Nat and Box value observations
+ground the swaps. The sole refusal appends a false Box equality to a
+fresh copy of the complete accepted client. This package-test execution
+is not official conformance-runner execution or a landing claim.
 
 ## Accepted client
 
@@ -171,5 +172,14 @@ inside the appended theorem starting at byte 1202. Logs are saved
 under `/workspaces/ken/local/spec-author/box-comm-d0/` as
 `spec-author-box-comm-{RespinPositive,RespinFalseEquality}.log`;
 the positive log is empty because rc 0 produced no diagnostic.
-These are **D0-overlay** checks, not shipped §6 export execution,
-official conformance, CI, publication, landing or landed trust.
+These are historical **D0-overlay** checks, not tests of the catalog
+candidate. The candidate's package test roots-loads Order and NatBox,
+checks the entire accepted seed client including `nat-extrema-commute`
+and the same-form `hull_swapped_closed` control, and pins `seed_neg` to
+the false hull-versus-intersection proposition on the same pair before
+observing `TypeMismatch` at its own `Refl`. A separate generic client
+consumes the four public checked types; selective imports of the three
+private helpers are refused, and exact `trusted_base()` GlobalId sets
+agree before and after loading (114 → 114). This is **local package-test
+evidence**, not official conformance-runner execution, CI, publication,
+landing or landed trust.
