@@ -4,7 +4,8 @@
 > SPEC-TIME-WINDOW-MEMBERSHIP §2;
 > SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3;
 > SPEC-TIME-MERGE-MEMBERSHIP §4;
-> SPEC-TIME-WINDOW-COMPOSITION §5).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-COMPOSITION §5;
+> SPEC-TIME-MERGE-ASSOCIATIVITY §6).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -24,6 +25,12 @@
 > Section 5 is spec and seed only on this base: its catalog exports
 > are absent, and D0 is not execution of the authored seed against
 > shipped exports, official conformance, CI or landed trust.
+> Section 6 specifies one unconditional structural merge-associativity
+> law. This candidate also carries its catalog export and seven private
+> proof helpers: the Architect's isolated D0 checked it without a new
+> `Axiom` and with equal scratch trusted GlobalIds (114 → 114).
+> Candidate-local catalog and seed checks are not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -156,10 +163,12 @@ the interfaces, not establish their quantifiers.
 
 These three §1 claims do not include window membership or structural
 window/merge distribution; §2 separately states the two membership
-laws, and §3 states distribution under ordered-input premises. No
-unconditional structural list equality for unordered merged traces
-follows. The count law alone does not choose an order for equal
-timestamps; left-biased output is fixed by §1.2's definition.
+laws, and §3 states distribution under ordered-input premises. They
+do not give structural window/merge distribution on unordered inputs.
+Section 6 separately states unconditional structural **merge
+associativity**, which is a different law. The count law alone does
+not choose an order for equal timestamps; left-biased output is fixed
+by §1.2's definition.
 
 ### 1.4 Derivation, trust and deferred scope
 
@@ -540,3 +549,67 @@ The §5 catalog delivery must separately promote
 expecting its import to fail. No shipped-seed or official conformance
 execution, CI, publication, landing or landed trust follows from
 this spec-and-seed candidate.
+
+## 6. Structural associativity of left-biased trace merge
+
+> **Section 6 status: DRAFT v0 (SPEC-TIME-MERGE-ASSOCIATIVITY).**
+> Architect checked the generic proof in isolated D0 on `df0b57c98`,
+> with `ken check` and `ken fmt --check` rc 0, no added `Axiom`,
+> two targeted tests passing, and identical scratch `trusted_base()`
+> GlobalIds (114 → 114). This candidate carries the checked catalog
+> export and its closed seed, rather than deferring the export to a
+> separate catalog node. Its candidate-local checks do not establish
+> official conformance-runner execution, CI, publication, landing or
+> landed trust.
+
+`Data.Time.EventTrace` must export one Transparent checked theorem,
+with exactly this name, binder order and structural list equality:
+
+```ken
+pub theorem trace_merge_assoc
+      (p : Type) (xs : List (Event p)) (ys : List (Event p)) (zs : List (Event p))
+    : Equal (List (Event p))
+        (trace_merge p (trace_merge p xs ys) zs)
+        (trace_merge p xs (trace_merge p ys zs))
+```
+
+The law holds for **every** payload type and all three finite event
+lists, including unordered inputs. It has **no `time_ordered` premise**;
+that premise belongs to the different §3 structural
+**window/merge-distribution** law. `trace_merge` does not first sort
+or reject an unordered input. At each comparison, both groupings
+select the same event as the next head by §1.2's total natural-time
+order and left-biased tie rule, retaining each event and its payload
+without respelling it. This is equality of the resulting **lists of
+stored events in order**, not mere membership, count, or equality
+of timestamps. It neither asserts commutativity nor licenses
+swapping the two operands of an outer merge.
+
+The public theorem leads seven **private** proof helpers in the
+catalog module: `trace_merge_assoc_cons`,
+`trace_merge_assoc_cons_cons`, `trace_merge_assoc_step`,
+`trace_merge_assoc_left_first`, `trace_merge_assoc_right_first`,
+`trace_merge_assoc_right_last`, and `event_before_skip`. They reuse
+the existing private `trace_merge_nil_right`,
+`trace_merge_cons_left`, `trace_merge_cons_right`,
+`trace_merge_starts_after`, `trace_head_after_decide`,
+`event_before_trans` and `event_before_flip`. The dependent case
+splits bind each Boolean comparison result and its equality before
+matching, rather than assuming a computed comparison refines a
+convertible expression. There is no new import, Rational or Nat
+export, axiom, primitive, kernel or surface rule. All §1–§5 laws
+and operations retain their signatures and bodies.
+
+The closed seed uses three interleaved two-event traces. Two events
+from different inputs, `a1` and `c0`, tie at time 4. Both groupings
+reduce independently to the exact list
+`[a0, b0, a1, c0, b1, c1]`, and applying the public theorem yields
+their equality. Swapping the operands of the **outer** merge instead
+puts `c0` before `a1`, so the single isolated false equality refuses.
+The same fixture with only `c0`'s timestamp changed to 3 admits
+that swapped equality; this D0 no-tie control shows that the
+time-4 tie is the discriminating axis, not a generic `Refl` refusal.
+Neither closed calculation nor that refusal establishes the generic
+law; the checked proof body is the catalog obligation. The
+Architect's scratch checks and this candidate's local checks remain
+distinct from shipped and official evidence.

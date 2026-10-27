@@ -28,8 +28,9 @@ Neither operation reads a clock or sorts unordered input.
 
 The public carrier, operations and the first five generic laws lead the
 checked source, followed by their private recursive merge helper and proof
-lemmas. The window/merge distribution law and the three merge membership
-laws each lead their own private lemmas later in the source.
+lemmas. The window/merge distribution law, the three merge membership laws
+and the merge-associativity law each lead their own private lemmas later
+in the source.
 Windowing includes the lower bound but excludes the upper; a merge tie favors
 the left input without examining payloads. Membership uses Ω-valued `list_elem`,
 so neither a payload equality decision nor an ordering premise is needed.
@@ -1610,6 +1611,586 @@ theorem trace_window_merge_member_sound
           (Equal Bool (leq_nat lo (event_time p e)) True)
           (Equal Bool (lt_nat (event_time p e) hi) True))
         (trace_window_member_sound p lo hi (trace_merge p xs ys) e member))
+
+pub theorem trace_merge_assoc
+      (p : Type) (xs : List (Event p)) (ys : List (Event p)) (zs : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p xs ys) zs)
+        (trace_merge p xs (trace_merge p ys zs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons x a ↦ trace_merge_assoc_cons p x a (λvs. λws. trace_merge_assoc p a vs ws) ys zs
+  }
+
+theorem trace_merge_assoc_cons
+      (p : Type)
+      (x : Event p)
+      (a : List (Event p))
+      (ih_a : (vs : List (Event p))
+        → (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p a vs) ws)
+        (trace_merge p a (trace_merge p vs ws)))
+      (ys : List (Event p))
+      (zs : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) ys) zs)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p ys zs)) =
+  match ys {
+    Nil ↦ Refl;
+    Cons y b ↦
+      trace_merge_assoc_cons_cons
+        p
+        x
+        a
+        ih_a
+        y
+        b
+        (λws. trace_merge_assoc_cons p x a ih_a b ws)
+        zs
+  }
+
+theorem trace_merge_assoc_cons_cons
+      (p : Type)
+      (x : Event p)
+      (a : List (Event p))
+      (ih_a : (vs : List (Event p))
+        → (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p a vs) ws)
+        (trace_merge p a (trace_merge p vs ws)))
+      (y : Event p)
+      (b : List (Event p))
+      (ih_b : (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) b) ws)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p b ws)))
+      (zs : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) zs)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) zs)) =
+  match zs {
+    Nil ↦ trace_merge_nil_right p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b));
+    Cons z c ↦
+      trace_merge_assoc_step
+        p
+        x
+        a
+        ih_a
+        y
+        b
+        ih_b
+        z
+        c
+        (trace_merge_assoc_cons_cons p x a ih_a y b ih_b c)
+        (event_before p x y)
+        Refl
+  }
+
+theorem trace_merge_assoc_step
+      (p : Type)
+      (x : Event p)
+      (a : List (Event p))
+      (ih_a : (vs : List (Event p))
+        → (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p a vs) ws)
+        (trace_merge p a (trace_merge p vs ws)))
+      (y : Event p)
+      (b : List (Event p))
+      (ih_b : (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) b) ws)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p b ws)))
+      (z : Event p)
+      (c : List (Event p))
+      (ih_c : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → Equal
+        (List (Event p))
+        (trace_merge
+          p
+          (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+          (Cons (Event p) z c))
+        (trace_merge
+          p
+          (Cons (Event p) x a)
+          (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))) =
+  match decision {
+    True ↦
+      λxy. trace_merge_assoc_left_first p x a ih_a y b z c ih_c xy (event_before p x z) Refl;
+    False ↦
+      λxy. trace_merge_assoc_right_first p x a y b ih_b z c ih_c xy (event_before p y z) Refl
+  }
+
+theorem trace_merge_assoc_left_first
+      (p : Type)
+      (x : Event p)
+      (a : List (Event p))
+      (ih_a : (vs : List (Event p))
+        → (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p a vs) ws)
+        (trace_merge p a (trace_merge p vs ws)))
+      (y : Event p)
+      (b : List (Event p))
+      (z : Event p)
+      (c : List (Event p))
+      (ih_c : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+      (xy : Equal Bool (event_before p x y) True)
+      (decision : Bool)
+    : Equal Bool (event_before p x z) decision
+      → Equal
+        (List (Event p))
+        (trace_merge
+          p
+          (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+          (Cons (Event p) z c))
+        (trace_merge
+          p
+          (Cons (Event p) x a)
+          (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))) =
+  match decision {
+    True ↦
+      λxz.
+        trans
+          (List (Event p))
+          (trace_merge
+            p
+            (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+            (Cons (Event p) z c))
+          (Cons
+            (Event p)
+            x
+            (trace_merge p a (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))))
+          (trace_merge
+            p
+            (Cons (Event p) x a)
+            (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+          (trans
+            (List (Event p))
+            (trace_merge
+              p
+              (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+              (Cons (Event p) z c))
+            (Cons
+              (Event p)
+              x
+              (trace_merge p (trace_merge p a (Cons (Event p) y b)) (Cons (Event p) z c)))
+            (Cons
+              (Event p)
+              x
+              (trace_merge p a (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))))
+            (trans
+              (List (Event p))
+              (trace_merge
+                p
+                (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+                (Cons (Event p) z c))
+              (trace_merge
+                p
+                (Cons (Event p) x (trace_merge p a (Cons (Event p) y b)))
+                (Cons (Event p) z c))
+              (Cons
+                (Event p)
+                x
+                (trace_merge p (trace_merge p a (Cons (Event p) y b)) (Cons (Event p) z c)))
+              (cong
+                (List (Event p))
+                (List (Event p))
+                (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+                (Cons (Event p) x (trace_merge p a (Cons (Event p) y b)))
+                (λleft. trace_merge p left (Cons (Event p) z c))
+                (trace_merge_cons_left p x a (Cons (Event p) y b) xy))
+              (trace_merge_cons_left
+                p
+                x
+                (trace_merge p a (Cons (Event p) y b))
+                (Cons (Event p) z c)
+                xz))
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_merge p (trace_merge p a (Cons (Event p) y b)) (Cons (Event p) z c))
+              (trace_merge p a (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+              (λtail. Cons (Event p) x tail)
+              (ih_a (Cons (Event p) y b) (Cons (Event p) z c))))
+          (sym
+            (List (Event p))
+            (trace_merge
+              p
+              (Cons (Event p) x a)
+              (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+            (Cons
+              (Event p)
+              x
+              (trace_merge p a (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))))
+            (trace_merge_cons_left
+              p
+              x
+              a
+              (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))
+              (trace_merge_starts_after p x (Cons (Event p) y b) (Cons (Event p) z c) xy xz)));
+    False ↦
+      λxz.
+        trace_merge_assoc_right_last
+          p
+          x
+          a
+          y
+          b
+          z
+          c
+          ih_c
+          (Cons (Event p) x (trace_merge p a (Cons (Event p) y b)))
+          (trace_merge_cons_left p x a (Cons (Event p) y b) xy)
+          (trace_merge_cons_right
+            p
+            (Cons (Event p) x (trace_merge p a (Cons (Event p) y b)))
+            z
+            c
+            xz)
+          (trace_head_after_decide p x z y xy xz (event_before p y z) Refl)
+          xz
+  }
+
+theorem trace_merge_assoc_right_first
+      (p : Type)
+      (x : Event p)
+      (a : List (Event p))
+      (y : Event p)
+      (b : List (Event p))
+      (ih_b : (ws : List (Event p))
+        → Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) b) ws)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p b ws)))
+      (z : Event p)
+      (c : List (Event p))
+      (ih_c : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+      (xy : Equal Bool (event_before p x y) False)
+      (decision : Bool)
+    : Equal Bool (event_before p y z) decision
+      → Equal
+        (List (Event p))
+        (trace_merge
+          p
+          (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+          (Cons (Event p) z c))
+        (trace_merge
+          p
+          (Cons (Event p) x a)
+          (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))) =
+  match decision {
+    True ↦
+      λyz.
+        trans
+          (List (Event p))
+          (trace_merge
+            p
+            (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+            (Cons (Event p) z c))
+          (Cons
+            (Event p)
+            y
+            (trace_merge p (Cons (Event p) x a) (trace_merge p b (Cons (Event p) z c))))
+          (trace_merge
+            p
+            (Cons (Event p) x a)
+            (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+          (trans
+            (List (Event p))
+            (trace_merge
+              p
+              (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+              (Cons (Event p) z c))
+            (Cons
+              (Event p)
+              y
+              (trace_merge p (trace_merge p (Cons (Event p) x a) b) (Cons (Event p) z c)))
+            (Cons
+              (Event p)
+              y
+              (trace_merge p (Cons (Event p) x a) (trace_merge p b (Cons (Event p) z c))))
+            (trans
+              (List (Event p))
+              (trace_merge
+                p
+                (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+                (Cons (Event p) z c))
+              (trace_merge
+                p
+                (Cons (Event p) y (trace_merge p (Cons (Event p) x a) b))
+                (Cons (Event p) z c))
+              (Cons
+                (Event p)
+                y
+                (trace_merge p (trace_merge p (Cons (Event p) x a) b) (Cons (Event p) z c)))
+              (cong
+                (List (Event p))
+                (List (Event p))
+                (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+                (Cons (Event p) y (trace_merge p (Cons (Event p) x a) b))
+                (λleft. trace_merge p left (Cons (Event p) z c))
+                (trace_merge_cons_right p (Cons (Event p) x a) y b xy))
+              (trace_merge_cons_left
+                p
+                y
+                (trace_merge p (Cons (Event p) x a) b)
+                (Cons (Event p) z c)
+                yz))
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_merge p (trace_merge p (Cons (Event p) x a) b) (Cons (Event p) z c))
+              (trace_merge p (Cons (Event p) x a) (trace_merge p b (Cons (Event p) z c)))
+              (λtail. Cons (Event p) y tail)
+              (ih_b (Cons (Event p) z c))))
+          (sym
+            (List (Event p))
+            (trace_merge
+              p
+              (Cons (Event p) x a)
+              (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+            (Cons
+              (Event p)
+              y
+              (trace_merge p (Cons (Event p) x a) (trace_merge p b (Cons (Event p) z c))))
+            (trans
+              (List (Event p))
+              (trace_merge
+                p
+                (Cons (Event p) x a)
+                (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+              (trace_merge
+                p
+                (Cons (Event p) x a)
+                (Cons (Event p) y (trace_merge p b (Cons (Event p) z c))))
+              (Cons
+                (Event p)
+                y
+                (trace_merge p (Cons (Event p) x a) (trace_merge p b (Cons (Event p) z c))))
+              (cong
+                (List (Event p))
+                (List (Event p))
+                (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))
+                (Cons (Event p) y (trace_merge p b (Cons (Event p) z c)))
+                (λright. trace_merge p (Cons (Event p) x a) right)
+                (trace_merge_cons_left p y b (Cons (Event p) z c) yz))
+              (trace_merge_cons_right
+                p
+                (Cons (Event p) x a)
+                y
+                (trace_merge p b (Cons (Event p) z c))
+                xy)));
+    False ↦
+      λyz.
+        trace_merge_assoc_right_last
+          p
+          x
+          a
+          y
+          b
+          z
+          c
+          ih_c
+          (Cons (Event p) y (trace_merge p (Cons (Event p) x a) b))
+          (trace_merge_cons_right p (Cons (Event p) x a) y b xy)
+          (trace_merge_cons_right
+            p
+            (Cons (Event p) y (trace_merge p (Cons (Event p) x a) b))
+            z
+            c
+            yz)
+          yz
+          (event_before_skip p x y z xy (event_before_flip p y z yz) (event_before p x z) Refl)
+  }
+
+theorem trace_merge_assoc_right_last
+      (p : Type)
+      (x : Event p)
+      (a : List (Event p))
+      (y : Event p)
+      (b : List (Event p))
+      (z : Event p)
+      (c : List (Event p))
+      (ih_c : Equal
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+      (unfolded : List (Event p))
+      (merged_unfolds : Equal
+        (List (Event p))
+        (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+        unfolded)
+      (unfolded_right : Equal
+        (List (Event p))
+        (trace_merge p unfolded (Cons (Event p) z c))
+        (Cons (Event p) z (trace_merge p unfolded c)))
+      (yz : Equal Bool (event_before p y z) False)
+      (xz : Equal Bool (event_before p x z) False)
+    : Equal
+        (List (Event p))
+        (trace_merge
+          p
+          (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+          (Cons (Event p) z c))
+        (trace_merge
+          p
+          (Cons (Event p) x a)
+          (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))) =
+  trans
+    (List (Event p))
+    (trace_merge
+      p
+      (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+      (Cons (Event p) z c))
+    (Cons
+      (Event p)
+      z
+      (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+    (trace_merge
+      p
+      (Cons (Event p) x a)
+      (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+    (trans
+      (List (Event p))
+      (trace_merge
+        p
+        (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+        (Cons (Event p) z c))
+      (Cons
+        (Event p)
+        z
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c))
+      (Cons
+        (Event p)
+        z
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+      (trans
+        (List (Event p))
+        (trace_merge
+          p
+          (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+          (Cons (Event p) z c))
+        (trace_merge p unfolded (Cons (Event p) z c))
+        (Cons
+          (Event p)
+          z
+          (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c))
+        (cong
+          (List (Event p))
+          (List (Event p))
+          (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+          unfolded
+          (λleft. trace_merge p left (Cons (Event p) z c))
+          merged_unfolds)
+        (trans
+          (List (Event p))
+          (trace_merge p unfolded (Cons (Event p) z c))
+          (Cons (Event p) z (trace_merge p unfolded c))
+          (Cons
+            (Event p)
+            z
+            (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c))
+          unfolded_right
+          (cong
+            (List (Event p))
+            (List (Event p))
+            unfolded
+            (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+            (λleft. Cons (Event p) z (trace_merge p left c))
+            (sym
+              (List (Event p))
+              (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b))
+              unfolded
+              merged_unfolds))))
+      (cong
+        (List (Event p))
+        (List (Event p))
+        (trace_merge p (trace_merge p (Cons (Event p) x a) (Cons (Event p) y b)) c)
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c))
+        (λtail. Cons (Event p) z tail)
+        ih_c))
+    (sym
+      (List (Event p))
+      (trace_merge
+        p
+        (Cons (Event p) x a)
+        (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+      (Cons
+        (Event p)
+        z
+        (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+      (trans
+        (List (Event p))
+        (trace_merge
+          p
+          (Cons (Event p) x a)
+          (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c)))
+        (trace_merge
+          p
+          (Cons (Event p) x a)
+          (Cons (Event p) z (trace_merge p (Cons (Event p) y b) c)))
+        (Cons
+          (Event p)
+          z
+          (trace_merge p (Cons (Event p) x a) (trace_merge p (Cons (Event p) y b) c)))
+        (cong
+          (List (Event p))
+          (List (Event p))
+          (trace_merge p (Cons (Event p) y b) (Cons (Event p) z c))
+          (Cons (Event p) z (trace_merge p (Cons (Event p) y b) c))
+          (λright. trace_merge p (Cons (Event p) x a) right)
+          (trace_merge_cons_right p (Cons (Event p) y b) z c yz))
+        (trace_merge_cons_right
+          p
+          (Cons (Event p) x a)
+          z
+          (trace_merge p (Cons (Event p) y b) c)
+          xz)))
+
+theorem event_before_skip
+      (p : Type)
+      (x : Event p)
+      (y : Event p)
+      (z : Event p)
+      (beyond : Equal Bool (event_before p x y) False)
+      (zy : Equal Bool (event_before p z y) True)
+      (decision : Bool)
+    : Equal Bool (event_before p x z) decision → Equal Bool (event_before p x z) False =
+  match decision {
+    True ↦
+      λxz.
+        absurd
+          (trans
+            Bool
+            True
+            (event_before p x y)
+            False
+            (sym Bool (event_before p x y) True (event_before_trans p x z y xz zy))
+            beyond);
+    False ↦ λxz. xz
+  }
 ```
 
 ## 3. Using it
@@ -1677,6 +2258,15 @@ window-membership soundness with merge-membership soundness: a windowed-merge
 member came from at least one input. It does not equate windowed lists for
 unordered inputs or count duplicate occurrences.
 
+Merge associativity holds as structural equality for arbitrary traces,
+not just `time_ordered` inputs. The proof compares current heads by
+`event_before` and reuses the existing private merge head and order
+lemmas; its seven new support theorems are private. For the cases in
+which neither of two heads leads, natural-time totality and
+transitivity determine the same first event under either grouping.
+A timestamp tie is taken from the left input in both groupings, so
+the final list retains the same stored events in the same order.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -1698,7 +2288,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and nine checked law contracts.
+  — the carrier, half-open boundary, left-bias and ten checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -1707,7 +2297,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the nine laws form the package surface.
+   `trace_merge`, and the ten laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -1720,15 +2310,18 @@ merging, not window multiplicity.
    the public filtered-head-order proof from the collections provider.
    Merge membership reuses `list_elem_later` and ordinary truncated `Or`;
    the one-way window-of-merge consequence composes the two checked soundness
-   laws and remains private.
-4. **Trusted-base delta.** Zero: all nine exported laws have checked proof
+   laws and remains private. Merge associativity uses the existing private
+   head-selection and timestamp-order lemmas and seven new private support
+   theorems; it needs no ordered-input premise.
+4. **Trusted-base delta.** Zero: all ten exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
    [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md),
    [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md),
    [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md)
-   and [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md)
+   [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md)
+   and [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md)
    supply independent closed values and refused claims; these clients
    complement, not replace, the generic proofs. A package test runs the
    merge-membership seed, including its pinned refusal; this is not an
