@@ -7312,8 +7312,8 @@ mod namespace_effect_tests {
     /// Promise class: durable invariant (spec 33 §3.3 per-unit closure).
     ///
     /// MEASURED: a cold A.ken refuses P's premature import of later N in
-    /// both class replay modes. A preloaded foreign A.N now clashes before
-    /// it could authorize that edge, in both claim orders with no writes.
+    /// both class replay modes. An ordered file-owned A.N and a foreign
+    /// preloaded A.N cannot coexist, regardless of their disjoint members.
     /// CLAIMED: ordered same-unit authority cannot be borrowed from a
     /// separately owned module path. THE GAP: earlier N is a positive control.
     #[test]
@@ -7324,13 +7324,24 @@ mod namespace_effect_tests {
                          import N\ninstance Marker Nat {}\n\
                          pub const bound : Nat = N.decoy }\n\
                          module N { pub const x : Nat = Zero }\n";
+        const ORDERED: &str = "module N { pub const x : Nat = Zero }\n\
+                               module P { import N\npub const bound : Nat = N.x }\n";
+        const ORDERED_WITH_REPLAY: &str = "module N { pub const x : Nat = Zero }\n\
+                                           module P { class Marker a {}\nimport N\n\
+                                           instance Marker Nat {}\n\
+                                           pub const bound : Nat = N.x }\n";
         let root = inline_owner_root(A);
         let roots = [root.path().to_path_buf()];
         let inline = "module A.N { pub const decoy : Nat = Suc Zero }";
         for (preload_inline, with_replay) in
             [(false, false), (true, false), (false, true), (true, true)]
         {
-            let source = if with_replay { A_WITH_REPLAY } else { A };
+            let source = match (preload_inline, with_replay) {
+                (false, false) => A,
+                (false, true) => A_WITH_REPLAY,
+                (true, false) => ORDERED,
+                (true, true) => ORDERED_WITH_REPLAY,
+            };
             fs::write(root.path().join("A.ken"), source).expect("write A unit for replay arm");
             let mut env = ElabEnv::new().expect("base environment");
             if preload_inline {
