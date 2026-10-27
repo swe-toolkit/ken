@@ -141,7 +141,6 @@ fn generic_window_merge_is_package_owned_checked_and_zero_trust() {
         "trace_window_merge_left_head",
         "trace_window_merge_right_head",
         "trace_head_after",
-        "trace_merge_nil_right",
         "trace_merge_cons_left",
         "trace_merge_cons_right",
         "trace_window_head_after",

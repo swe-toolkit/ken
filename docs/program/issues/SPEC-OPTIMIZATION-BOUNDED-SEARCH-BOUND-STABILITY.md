@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY
 title: "Spec 72 section 2 states that find_below is sound, least and complete at one bound, but no law relates two bounds. Rule from a checked D0 at zero trust that a witness found below a bound is the one found below every larger bound, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

@@ -4,14 +4,15 @@
 > SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 > SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY §3;
 > SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY §4;
-> SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC §5).** Sections 1–4 and their
-> fourteen public checked laws are present in the catalog. The §4
-> package-owned test checks its sum seed and measures unchanged
-> trusted identities (109 → 109), not official conformance-runner
-> execution. This candidate adds §5's four generic checked laws and a
-> package test that checks the authored seed against root-loaded exports.
-> These tests do not establish official conformance-runner execution,
-> CI, publication, landing or a landed §5 trust measurement.
+> SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC §5;
+> SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY §6).** Sections 1–5
+> and their eighteen public checked laws are present in the catalog.
+> The §4–5 package-owned tests check their authored seeds against
+> root-loaded exports; they are not official conformance-runner runs.
+> This candidate specifies §6's two new generic laws and a closed seed.
+> Its §6 catalog exports are absent, and neither isolated D0 checks nor
+> this seed establish shipped §6 execution, official conformance, CI,
+> publication, landing or landed §6 trust.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -159,11 +160,11 @@ The checked catalog module introduces no `Axiom`. The historical §3
 D0 measured `trusted_base()` as 109 before and after its scratch
 package; that measurement does not establish a landed §3 trust delta.
 The historical §4 D0 is separately measured in §4.3. Section 5's
-four sum laws have checked generic bodies in this candidate's catalog,
-and the package test checks its authored seed. Architect's isolated D0
-measured unchanged `trusted_base()` identities (114 → 114); that scratch
-measurement is not landed trust. No statement in this chapter adds a
-kernel form, syntax, primitive, or `Float` support. A package test is
+four sum laws now have checked catalog bodies and a package-owned seed
+test. Architect's isolated §5 D0 measured unchanged `trusted_base()`
+identities (114 → 114); that scratch measurement is not landed trust.
+No statement in this chapter adds a kernel form, syntax, primitive,
+or `Float` support. A package test is
 not official conformance-runner execution.
 
 Signed scalars, a relation-parametric semiring abstraction and a
@@ -373,7 +374,7 @@ Every law is a generic equality of indexed values, not a comparison
 of unchecked shapes or of only closed numerals. Zero dimensions and
 non-square matrices are included. The section does not specify
 `matrix_vector` distributivity over a sum in its **vector** argument:
-that is a different orientation, neither requested nor measured.
+that is a different orientation, specified separately in §6.
 
 ### 4.3 Private proof boundary and evidence
 
@@ -428,11 +429,11 @@ subtraction, are not implied by these natural-number laws.
 > **Section 5 status: DRAFT v1
 > (SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC).** Architect checked four
 > generic indexed proofs in an isolated D0 on `4e7cf78a6`, with no
-> new `Axiom` and identical `trusted_base()` sets (114 → 114). This
-> candidate adds the four §5 catalog exports and a roots-loaded package
-> test of the authored seed's positive client and isolated refusals.
-> That does not establish official conformance-runner execution, CI,
-> publication, landing or landed trust.
+> new `Axiom` and identical `trusted_base()` sets (114 → 114). The four
+> §5 catalog exports and a roots-loaded package test of the authored
+> seed's positive client and isolated refusals are on main. That test
+> does not establish official conformance-runner execution or landed
+> trust.
 
 ### 5.1 Four public checked-law obligations
 
@@ -512,7 +513,85 @@ and changed-component refusals. `ken check` and `ken fmt --check`
 returned rc 0; after loading its four providers and again after
 loading NatMatrix, `trusted_base()` contained the same 114 GlobalIds.
 Those measurements belong to the D0 scratch package, not this candidate.
-The package test now checks the authored §5 seed against root-loaded
-exports and separately measures its trusted-identity set. Neither
-record establishes official conformance-runner execution, CI,
-publication, landing or a landed trust delta.
+The package test checks the authored §5 seed against root-loaded
+exports and separately measures its trusted-identity set. Its result
+is not official conformance-runner execution or a landed trust delta.
+
+## 6. Linearity of matrix-vector application in its vector
+
+> **Section 6 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY).** Architect's
+> isolated D0 on `aa6370449` checked both generic proofs with no new
+> `Axiom` and identical scratch `trusted_base()` GlobalIds (109 → 109).
+> The two catalog exports are absent on this base. The closed seed
+> below is authored separately from those exports: neither D0 nor the
+> seed establishes shipped §6 execution, official conformance, CI,
+> publication, landing or landed trust.
+
+### 6.1 Two public checked-law obligations
+
+`Algorithm.LinearAlgebra.NatMatrix` must export both Transparent
+checked theorems. The `m × n` matrix acts on the **vector** operand:
+additivity compares its image of `vector_add n x y` with addition of
+its two images, while homogeneity compares its image of a scaled
+vector with scaling its image by the same natural `factor`. These
+are structural `Equal (Vec Nat m)` claims, not a numerical
+approximation or a new vector equality relation.
+
+```ken
+pub theorem matrix_vector_additive
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat n)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m n a (vector_add n x y))
+        (vector_add m (matrix_vector m n a x) (matrix_vector m n a y))
+
+pub theorem matrix_vector_homogeneous
+      (m : Nat) (n : Nat) (factor : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m n a (vector_scale n factor x))
+        (vector_scale m factor (matrix_vector m n a x))
+```
+
+Both laws have no side premise and apply to every natural `m`, `n`
+and `factor`, including zero dimensions. The dimensions and operand
+order are explicit: a length-`n` vector is mapped to length `m`;
+there is no implicit resizing. This is not §4.2's public
+`matrix_vector_distrib`, which adds the **matrices** at fixed `x`.
+Neither a finite closed equality nor only checking the displayed
+types supplies the required generic proof.
+
+### 6.2 Private proof boundary and evidence
+
+Additivity reuses §4.3's private `dot_distrib_right`, obtained from
+public `dot_comm` and `dot_distrib`. For homogeneity the private
+second-position sibling `dot_scale_right` follows from public
+`dot_comm` and `dot_scale`; it is not another public law:
+
+```ken
+theorem dot_scale_right
+      (n : Nat) (factor : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    : Equal Nat (dot n xs (vector_scale n factor ys)) (mul factor (dot n xs ys))
+```
+
+Both matrix-vector proofs descend over the matrix rows. A row step
+transports the dot-product head with its corresponding private law,
+then transports the ordered tail with the induction hypothesis using
+`cong` and `trans`. The existing vector and matrix operations and all
+§1–5 public laws are unchanged. No axiom, new Nat law, kernel rule,
+surface form, or additional import is required. The helper remains
+private even though its first-position sibling `dot_scale` is public.
+
+The Architect's detached D0 checked the two generic proof bodies and
+a client on `aa6370449`: `ken check` and `ken fmt --check` returned
+rc 0, two probe tests passed, no `Axiom` was added, and the scratch
+trusted GlobalId set stayed 109 → 109 after loading the existing
+providers and NatMatrix. Selective imports of both private dot
+helpers were refused. The separately authored seed has independent
+closed `Refl` value oracles for a non-square `2 × 3` matrix, direct
+applications of both new public laws, and one false equation after
+a fresh accepted prefix; its closed instances do not prove generic
+linearity. This D0 checks proposed proofs, not exports on main. The
+§6 catalog implementation and shipped-seed execution are separate
+work; official conformance, CI and landed trust remain unmeasured.

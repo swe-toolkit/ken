@@ -1,9 +1,9 @@
 # Finite event traces
 
 Finite events with natural-number times support half-open windows and a
-left-biased two-list merge with checked ordering, count, membership and
-window/merge distribution laws. Merge membership holds even for unordered
-inputs.
+left-biased two-list merge with checked ordering, count, membership,
+window/merge distribution and window-composition laws. Merge membership
+holds even for unordered inputs.
 
 ## Contents
 
@@ -28,11 +28,10 @@ Neither operation reads a clock or sorts unordered input.
 
 The public carrier, operations and the first five generic laws lead the
 checked source, followed by their private recursive merge helper and proof
-lemmas. The window/merge distribution law, the three merge membership laws
-and the merge-associativity law each lead their own private lemmas later
-in the source.
-Windowing includes the lower bound but excludes the upper; a merge tie favors
-the left input without examining payloads. Membership uses Ω-valued `list_elem`,
+lemmas. The window/merge distribution and composition laws, the three merge
+membership laws and merge associativity each lead their private lemmas later
+in the source. Windowing includes the lower bound but excludes the upper;
+a merge tie favors the left input without examining payloads. Membership uses Ω-valued `list_elem`,
 so neither a payload equality decision nor an ordering premise is needed.
 
 ```ken
@@ -46,7 +45,7 @@ import Core.Logic.Or (Or, Inl, Inr)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
-import Data.Numeric.Nat.Order (lt_nat)
+import Data.Numeric.Nat.Order (lt_nat, max, min)
 
 import Data.Collections.Derived (is_sorted)
 
@@ -226,6 +225,25 @@ pub theorem trace_merge_count
           (λzs. trace_merge_count p eqf q xt zs)
           ys
   }
+
+pub theorem trace_window_window
+      (p : Type) (lo1 : Nat) (hi1 : Nat) (lo2 : Nat) (hi2 : Nat) (tr : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo2 hi2 (trace_window p lo1 hi1 tr))
+        (trace_window p (max lo1 lo2) (min hi1 hi2) tr) =
+  window_filter_fuse
+    (Event p)
+    (event_in_window p lo1 hi1)
+    (event_in_window p lo2 hi2)
+    (event_in_window p (max lo1 lo2) (min hi1 hi2))
+    (λe. event_in_window_inter p lo1 hi1 lo2 hi2 e)
+    tr
+
+pub theorem trace_merge_nil_left
+      (p : Type) (ys : List (Event p))
+    : Equal (List (Event p)) (trace_merge p (Nil (Event p)) ys) ys =
+  Refl
 
 fn trace_merge_into
       (p : Type)
@@ -954,7 +972,7 @@ fn trace_head_after (p : Type) (y : Event p) (zs : List (Event p)) : Prop =
     Cons z zt ↦ Equal Bool (event_before p z y) False
   }
 
-theorem trace_merge_nil_right
+pub theorem trace_merge_nil_right
       (p : Type) (xs : List (Event p))
     : Equal (List (Event p)) (trace_merge p xs (Nil (Event p))) xs =
   match xs {
@@ -2191,6 +2209,232 @@ theorem event_before_skip
             beyond);
     False ↦ λxz. xz
   }
+
+theorem leq_nat_max_split
+      (a : Nat) (b : Nat) (t : Nat)
+    : Equal Bool (leq_nat (max a b) t) (bool_and (leq_nat a t) (leq_nat b t)) =
+  match a {
+    Zero ↦ Refl;
+    Suc a2 ↦
+      match b {
+        Zero ↦
+          match t {
+            Zero ↦ Proved;
+            Suc t2 ↦
+              sym
+                Bool
+                (bool_and (leq_nat a2 t2) True)
+                (leq_nat a2 t2)
+                ((proof right_identity for bool_and) (leq_nat a2 t2))
+          };
+        Suc b2 ↦
+          match t {
+            Zero ↦ Proved;
+            Suc t2 ↦ leq_nat_max_split a2 b2 t2
+          }
+      }
+  }
+
+theorem lt_nat_min_split
+      (a : Nat) (b : Nat) (t : Nat)
+    : Equal Bool (lt_nat t (min a b)) (bool_and (lt_nat t a) (lt_nat t b)) =
+  match a {
+    Zero ↦ Proved;
+    Suc a2 ↦
+      match b {
+        Zero ↦
+          match t {
+            Zero ↦ Proved;
+            Suc t2 ↦
+              sym
+                Bool
+                (bool_and (lt_nat t2 a2) False)
+                False
+                ((proof comm for bool_and) (lt_nat t2 a2) False)
+          };
+        Suc b2 ↦
+          match t {
+            Zero ↦ Proved;
+            Suc t2 ↦ lt_nat_min_split a2 b2 t2
+          }
+      }
+  }
+
+theorem bool_and_interchange
+      (a : Bool) (b : Bool) (c : Bool) (d : Bool)
+    : Equal Bool
+        (bool_and (bool_and a b) (bool_and c d))
+        (bool_and (bool_and a c) (bool_and b d)) =
+  match a {
+    True ↦
+      match b {
+        True ↦
+          match c {
+            True ↦ Refl;
+            False ↦ Proved
+          };
+        False ↦
+          match c {
+            True ↦
+              match d {
+                True ↦ Proved;
+                False ↦ Proved
+              };
+            False ↦ Proved
+          }
+      };
+    False ↦ Proved
+  }
+
+theorem event_in_window_inter
+      (p : Type) (lo1 : Nat) (hi1 : Nat) (lo2 : Nat) (hi2 : Nat) (e : Event p)
+    : Equal Bool
+        (bool_and (event_in_window p lo1 hi1 e) (event_in_window p lo2 hi2 e))
+        (event_in_window p (max lo1 lo2) (min hi1 hi2) e) =
+  match e {
+    MkEvent t x ↦
+      trans
+        Bool
+        (bool_and
+          (bool_and (leq_nat lo1 t) (lt_nat t hi1))
+          (bool_and (leq_nat lo2 t) (lt_nat t hi2)))
+        (bool_and
+          (bool_and (leq_nat lo1 t) (leq_nat lo2 t))
+          (bool_and (lt_nat t hi1) (lt_nat t hi2)))
+        (bool_and (leq_nat (max lo1 lo2) t) (lt_nat t (min hi1 hi2)))
+        (bool_and_interchange (leq_nat lo1 t) (lt_nat t hi1) (leq_nat lo2 t) (lt_nat t hi2))
+        (trans
+          Bool
+          (bool_and
+            (bool_and (leq_nat lo1 t) (leq_nat lo2 t))
+            (bool_and (lt_nat t hi1) (lt_nat t hi2)))
+          (bool_and (leq_nat (max lo1 lo2) t) (bool_and (lt_nat t hi1) (lt_nat t hi2)))
+          (bool_and (leq_nat (max lo1 lo2) t) (lt_nat t (min hi1 hi2)))
+          (cong
+            Bool
+            Bool
+            (bool_and (leq_nat lo1 t) (leq_nat lo2 t))
+            (leq_nat (max lo1 lo2) t)
+            (λlower. bool_and lower (bool_and (lt_nat t hi1) (lt_nat t hi2)))
+            (sym
+              Bool
+              (leq_nat (max lo1 lo2) t)
+              (bool_and (leq_nat lo1 t) (leq_nat lo2 t))
+              (leq_nat_max_split lo1 lo2 t)))
+          (cong
+            Bool
+            Bool
+            (bool_and (lt_nat t hi1) (lt_nat t hi2))
+            (lt_nat t (min hi1 hi2))
+            (λupper. bool_and (leq_nat (max lo1 lo2) t) upper)
+            (sym
+              Bool
+              (lt_nat t (min hi1 hi2))
+              (bool_and (lt_nat t hi1) (lt_nat t hi2))
+              (lt_nat_min_split hi1 hi2 t))))
+  }
+
+fn window_keep (a : Type) (h : a) (rest : List a) (decision : Bool) : List a =
+  match decision {
+    True ↦ Cons a h rest;
+    False ↦ rest
+  }
+
+theorem window_filter_fuse_cons
+      (a : Type)
+      (r : a → Bool)
+      (q : a → Bool)
+      (s : a → Bool)
+      (h : a)
+      (t : List a)
+      (ih : Equal (List a) (filter a q (filter a r t)) (filter a s t))
+      (dr : Bool)
+      (dq : Bool)
+      (ds : Bool)
+    : Equal Bool (q h) dq
+      → Equal Bool (bool_and dr dq) ds
+      → Equal
+        (List a)
+        (filter a q (window_keep a h (filter a r t) dr))
+        (window_keep a h (filter a s t) ds) =
+  match dr {
+    True ↦
+      match dq {
+        True ↦
+          match ds {
+            True ↦
+              λkept.
+                λjoined.
+                  J
+                    (λchoice _.
+                      Equal
+                        (List a)
+                        (match choice {
+                          True ↦ Cons a h (filter a q (filter a r t));
+                          False ↦ filter a q (filter a r t)
+                        })
+                        (Cons a h (filter a s t)))
+                    (cong
+                      (List a)
+                      (List a)
+                      (filter a q (filter a r t))
+                      (filter a s t)
+                      (λtail. Cons a h tail)
+                      ih)
+                    (sym Bool (q h) True kept);
+            False ↦ λkept. λjoined. absurd (sym Bool True False joined)
+          };
+        False ↦
+          match ds {
+            True ↦ λkept. λjoined. absurd joined;
+            False ↦
+              λkept.
+                λjoined.
+                  J
+                    (λchoice _.
+                      Equal
+                        (List a)
+                        (match choice {
+                          True ↦ Cons a h (filter a q (filter a r t));
+                          False ↦ filter a q (filter a r t)
+                        })
+                        (filter a s t))
+                    ih
+                    (sym Bool (q h) False kept)
+          }
+      };
+    False ↦
+      match ds {
+        True ↦ λkept. λjoined. absurd joined;
+        False ↦ λkept. λjoined. ih
+      }
+  }
+
+theorem window_filter_fuse
+      (a : Type)
+      (r : a → Bool)
+      (q : a → Bool)
+      (s : a → Bool)
+      (joined : (x : a) → Equal Bool (bool_and (r x) (q x)) (s x))
+      (xs : List a)
+    : Equal (List a) (filter a q (filter a r xs)) (filter a s xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      window_filter_fuse_cons
+        a
+        r
+        q
+        s
+        h
+        t
+        (window_filter_fuse a r q s joined t)
+        (r h)
+        (q h)
+        (s h)
+        Refl
+        (joined h)
+  }
 ```
 
 ## 3. Using it
@@ -2258,12 +2502,20 @@ window-membership soundness with merge-membership soundness: a windowed-merge
 member came from at least one input. It does not equate windowed lists for
 unordered inputs or count duplicate occurrences.
 
+Window composition combines two half-open predicates using the private
+natural-order splits for `max` and `min`, then fuses the two filters over the
+same input list. It needs neither ordering premises nor valid bounds. The
+left empty-merge unit closes by reduction; the right unit exports the
+existing checked induction rather than adding a second proof. The filter
+fusion and natural-order split helpers remain private to this package.
+
 Merge associativity holds as structural equality for arbitrary traces,
 not just `time_ordered` inputs. The proof compares current heads by
-`event_before` and reuses the existing private merge head and order
-lemmas; its seven new support theorems are private. For the cases in
-which neither of two heads leads, natural-time totality and
-transitivity determine the same first event under either grouping.
+`event_before` and reuses the now-public `trace_merge_nil_right` plus
+three private lemmas: `trace_merge_cons_left`, `trace_merge_cons_right`
+and `trace_head_after_decide`. Its seven new support theorems are private.
+For the cases in which neither of two heads leads, natural-time totality
+and transitivity determine the same first event under either grouping.
 A timestamp tie is taken from the left input in both groupings, so
 the final list retains the same stored events in the same order.
 
@@ -2288,7 +2540,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and ten checked law contracts.
+  — the carrier, half-open boundary, left-bias and thirteen checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -2297,7 +2549,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the ten laws form the package surface.
+   `trace_merge`, and the thirteen laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -2310,19 +2562,23 @@ merging, not window multiplicity.
    the public filtered-head-order proof from the collections provider.
    Merge membership reuses `list_elem_later` and ordinary truncated `Or`;
    the one-way window-of-merge consequence composes the two checked soundness
-   laws and remains private. Merge associativity uses the existing private
-   head-selection and timestamp-order lemmas and seven new private support
-   theorems; it needs no ordered-input premise.
-4. **Trusted-base delta.** Zero: all ten exported laws have checked proof
+   laws and remains private. Window composition reuses checked natural-order
+   `max`/`min` bounds and structurally fuses generic list filters. Both merge
+   units use the original merge operation; the right unit reuses its existing
+   induction, now public under the same name. Merge associativity uses that
+   public right unit and the three private head-selection lemmas, with seven
+   new private support theorems; it needs no ordered-input premise.
+4. **Trusted-base delta.** Zero: all thirteen exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
    [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md),
    [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md),
-   [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md)
-   [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md)
+   [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md),
+   [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md),
+   [composition seed](../../../../conformance/stdlib/time-and-events/seed-window-composition.md)
    and [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md)
    supply independent closed values and refused claims; these clients
-   complement, not replace, the generic proofs. A package test runs the
-   merge-membership seed, including its pinned refusal; this is not an
-   official conformance-runner or CI claim.
+   complement, not replace, the generic proofs. Package tests run the
+   merge-membership and composition seeds, including their pinned refusals;
+   this is not an official conformance-runner or CI claim.

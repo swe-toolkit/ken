@@ -22,9 +22,12 @@
 > and two merge-empty unit laws. Architect's D0 on `98970bde7`
 > checked all three generic proofs, owned Transparent exports and
 > scratch trusted identities 114 → 114 without a new `Axiom`.
-> Section 5 is spec and seed only on this base: its catalog exports
-> are absent, and D0 is not execution of the authored seed against
-> shipped exports, official conformance, CI or landed trust.
+> Section 5's three generic proofs are checked catalog exports on
+> main. A targeted package test runs the authored accepted
+> client and paired refused union-bounds claim against those exports;
+> the exact package-local trusted identity set stays 114 → 114.
+> This does not establish official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
 > Section 6 specifies one unconditional structural merge-associativity
 > law. This candidate also carries its catalog export and seven private
 > proof helpers: the Architect's isolated D0 checked it without a new
@@ -543,12 +546,15 @@ window over events at times 1, 4 and 7, yielding only the time-4
 event on both sides, and both merge-unit instances. They rejected
 the union-bounds proposition over that same trace while accepting
 closed exact-value controls. That is **scratch D0** evidence, not
-execution of the authored §5 seed or of shipped §5 catalog exports.
-The §5 catalog delivery must separately promote
-`trace_merge_nil_right` without leaving a privacy-pin consumer
-expecting its import to fail. No shipped-seed or official conformance
-execution, CI, publication, landing or landed trust follows from
-this spec-and-seed candidate.
+execution of the authored §5 seed or of checked catalog exports.
+The landed catalog promotes the original `trace_merge_nil_right` proof and
+updates its privacy-pin consumer. Its package test root-loads all three
+owner-local Transparent exports, checks their quantified types, and runs
+the authored accepted client and same-input union-bounds refusal. The
+exact trusted-identity set is equal before and after loading EventTrace
+(114 → 114); its imported providers retain their inherited trust.
+The package test is not official conformance-runner execution, CI,
+publication, landing or a landed trust measurement.
 
 ## 6. Structural associativity of left-biased trace merge
 
@@ -590,10 +596,11 @@ catalog module: `trace_merge_assoc_cons`,
 `trace_merge_assoc_cons_cons`, `trace_merge_assoc_step`,
 `trace_merge_assoc_left_first`, `trace_merge_assoc_right_first`,
 `trace_merge_assoc_right_last`, and `event_before_skip`. They reuse
-the existing private `trace_merge_nil_right`,
-`trace_merge_cons_left`, `trace_merge_cons_right`,
-`trace_merge_starts_after`, `trace_head_after_decide`,
-`event_before_trans` and `event_before_flip`. The dependent case
+the now-public `trace_merge_nil_right` plus three private lemmas:
+`trace_merge_cons_left`, `trace_merge_cons_right` and
+`trace_head_after_decide`. The other private order lemmas
+`trace_merge_starts_after`, `event_before_trans` and
+`event_before_flip` remain available to their proofs. The dependent case
 splits bind each Boolean comparison result and its equality before
 matching, rather than assuming a computed comparison refines a
 convertible expression. There is no new import, Rational or Nat
