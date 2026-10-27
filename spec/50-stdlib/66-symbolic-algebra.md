@@ -637,8 +637,13 @@ client accepted the generic `xy` application, both computed-one
 controls and same-tree structural reflexivity; it refused the false
 cross-order structural equality. The §6 seed is authored at
 `conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md`.
-The §6 catalog export is **absent from this candidate's base**:
-D0 checks and authored seed are not execution against shipped §6
-exports, official conformance, CI, publication, landing or landed
-trust. No result for signed coefficients, fields, analytic limits,
-or derivative/substitution commutation follows from §6.
+The §6 catalog candidate now exports this checked law. Its roots-loaded
+package test checks an arbitrary-argument client of the full public type,
+checks the accepted seed including both closed values and same-tree `Refl`,
+and rejects the seed's false cross-order `Equal Expr` theorem at its own
+`Refl`. The test measures identical exact `trusted_base()` identities
+before and after loading (114 → 114) and refuses selective import of the
+private helper. This is package-test execution on the candidate, **not**
+official conformance-runner execution, CI, publication, landing or a
+landed trust measurement. No result for signed coefficients, fields,
+analytic limits, or derivative/substitution commutation follows from §6.
