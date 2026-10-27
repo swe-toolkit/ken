@@ -500,15 +500,15 @@ Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
 `nonempty_cons`. Four laws give the two equations and direct-to-`List`
 membership and greatest-cost consequences for an observed `Some`.
 Architect's D0 checked these laws at 114→114 trusted identities. The
-§3.4 catalog exports are not yet delivered; the new seed is authored
-and checked only on an isolated D0 overlay, not shipped exports or the
-official conformance runner. No CI, publication, landing or landed
-trust measurement follows from the scratch checks. Continuous or
+§3.4 catalog exports, seed and package-owned seed test are now on
+main; its checks are distinct from official conformance execution.
+Earlier D0 alone established no CI or landed trust measurement. Continuous or
 implicit search, heuristics, approximation, arbitrary-order or
 multi-objective costs, top-k and complexity claims remain deferred.
 
 The **finite bounded-search contract** is pinned in
-**`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).
+**`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
+SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4).
 `Algorithm.Optimization.BoundedSearch.find_below` takes a Boolean
 predicate over `Nat` and a finite bound, returning `Some` with the
 least satisfying index below it or `None` when none exists. Three
@@ -517,7 +517,16 @@ completeness. No search direction, predicate-call count, recursion
 shape or complexity guarantee is normative. The §2 catalog module
 and seed are present on main; its D0 scratch checks alone establish
 neither shipped-seed execution, CI nor a landed trust measurement.
-The `List`-input Option selector is specified in §1.4, not §2.
+Section 2.4 adds one public `find_below_stable` law: if the result is
+`Some n` and `leq_nat bound larger = True`, that **same** `Some n`
+remains at the larger bound. `leq_suc_not_leq_same` stays private;
+there is no `None`-stability law, since a larger range can contain a
+first hit. Architect's D0 checked the generic proof with no new
+`Axiom` and equal scratch trusted identities 114 → 114. The §2.4
+catalog export is absent from this base; its authored closed seed
+and D0 are not shipped §2.4 execution, official conformance, CI,
+publication, landing or landed trust. The `List`-input Option
+selector is specified in §1.4, not §2.
 
 ## 4. I/O, effects, serialization
 
