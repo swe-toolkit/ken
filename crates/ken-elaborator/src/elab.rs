@@ -9316,6 +9316,13 @@ fn method_has_variable_side_leaves(
     else {
         return Ok(false);
     };
+    // A dependent index (its domain names a prior index) has no premise in
+    // `pairs`, so elimination cannot rebuild its equation, and the alias of its
+    // outer binder would cross outside the method. The alias rule solves such a
+    // method, as on the parent, so the whole method stays there.
+    if pairs.len() != ind.indices.len() {
+        return Ok(false);
+    }
     // A field solved by one leaf and mentioned by another leaf's target leaves
     // a residual equation between outer terms. Only the alias rule rewrites
     // outer indices, so a non-linear field keeps the whole method there.
