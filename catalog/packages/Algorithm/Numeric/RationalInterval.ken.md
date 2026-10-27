@@ -37,7 +37,8 @@ proofs; neither the operation nor its laws assumes sorted endpoints. Four
 further checked laws establish distributivity and factoring by endpoint-value
 inclusion on both sides of multiplication. Five more checked laws establish
 transitivity of inclusion and operand-swap inclusion for addition,
-multiplication, hull and intersection.
+multiplication, hull and intersection. Four further checked laws establish
+both regroupings of addition and multiplication by mutual inclusion.
 
 ```ken
 import Core.Logic.Conjunction (And, and_intro)
@@ -836,6 +837,142 @@ pub theorem interval_intersect_comm_inside
       }
   }
 
+pub theorem interval_add_assoc_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_add i (interval_add j k))
+          (interval_add (interval_add i j) k)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_add (rational_add a c) e)
+                  (rational_add a (rational_add c e)))
+                (rational_leq
+                  (rational_add b (rational_add d f))
+                  (rational_add (rational_add b d) f))
+                (equiv_leq
+                  (rational_add (rational_add a c) e)
+                  (rational_add a (rational_add c e))
+                  ((proof sym for rational_equiv)
+                    (rational_add a (rational_add c e))
+                    (rational_add (rational_add a c) e)
+                    ((proof assoc for rational_add) a c e)))
+                (equiv_leq
+                  (rational_add b (rational_add d f))
+                  (rational_add (rational_add b d) f)
+                  ((proof assoc for rational_add) b d f))
+          }
+      }
+  }
+
+pub theorem interval_add_assoc_rev_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_add (interval_add i j) k)
+          (interval_add i (interval_add j k))) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_add a (rational_add c e))
+                  (rational_add (rational_add a c) e))
+                (rational_leq
+                  (rational_add (rational_add b d) f)
+                  (rational_add b (rational_add d f)))
+                (equiv_leq
+                  (rational_add a (rational_add c e))
+                  (rational_add (rational_add a c) e)
+                  ((proof assoc for rational_add) a c e))
+                (equiv_leq
+                  (rational_add (rational_add b d) f)
+                  (rational_add b (rational_add d f))
+                  ((proof sym for rational_equiv)
+                    (rational_add b (rational_add d f))
+                    (rational_add (rational_add b d) f)
+                    ((proof assoc for rational_add) b d f)))
+          }
+      }
+  }
+
+pub theorem interval_mul_assoc_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_mul i (interval_mul j k))
+          (interval_mul (interval_mul i j) k)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_mul (rational_mul a c) e)
+                  (rational_mul a (rational_mul c e)))
+                (rational_leq
+                  (rational_mul b (rational_mul d f))
+                  (rational_mul (rational_mul b d) f))
+                (equiv_leq
+                  (rational_mul (rational_mul a c) e)
+                  (rational_mul a (rational_mul c e))
+                  ((proof sym for rational_equiv)
+                    (rational_mul a (rational_mul c e))
+                    (rational_mul (rational_mul a c) e)
+                    ((proof assoc for rational_mul) a c e)))
+                (equiv_leq
+                  (rational_mul b (rational_mul d f))
+                  (rational_mul (rational_mul b d) f)
+                  ((proof assoc for rational_mul) b d f))
+          }
+      }
+  }
+
+pub theorem interval_mul_assoc_rev_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_mul (interval_mul i j) k)
+          (interval_mul i (interval_mul j k))) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_mul a (rational_mul c e))
+                  (rational_mul (rational_mul a c) e))
+                (rational_leq
+                  (rational_mul (rational_mul b d) f)
+                  (rational_mul b (rational_mul d f)))
+                (equiv_leq
+                  (rational_mul a (rational_mul c e))
+                  (rational_mul (rational_mul a c) e)
+                  ((proof assoc for rational_mul) a c e))
+                (equiv_leq
+                  (rational_mul (rational_mul b d) f)
+                  (rational_mul b (rational_mul d f))
+                  ((proof sym for rational_equiv)
+                    (rational_mul b (rational_mul d f))
+                    (rational_mul (rational_mul b d) f)
+                    ((proof assoc for rational_mul) b d f)))
+          }
+      }
+  }
+
 theorem equiv_leq
       (x : Rational) (y : Rational)
     : rational_equiv x y → IsTrue (rational_leq x y) =
@@ -948,6 +1085,13 @@ private `equiv_leq` proof. Hull and intersection swaps use the checked Rational
 min/max bounds. Applying a swap law in each argument order gives mutual
 endpoint-value inclusion, not structural equality of stored intervals.
 
+The associativity laws split three intervals, then use Rational's checked
+addition or multiplication associativity in opposite directions for the low
+and high endpoints. The private `equiv_leq` bridges value equivalence into
+the corresponding order comparisons. Each operation has a law in both
+grouping directions, including on inverted intervals; no new Rational
+export or structural interval equality is assumed.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -963,9 +1107,12 @@ need not imply structural equality. The result of arithmetic on an empty
 interval is defined by its endpoint formula; no result-emptiness law is
 claimed. Intersection of disjoint operands returns an inverted interval;
 hull may retain a bound from an empty operand. Neither operation normalizes
-equivalent rational spellings, so structural commutativity, idempotence and
-associativity are not claimed. Inclusion does not equate empty intervals or
-normalize rational spellings; its converse requires an actual inner member.
+equivalent rational spellings, so structural commutativity and idempotence
+are not claimed. The associativity laws give mutual inclusion by endpoint
+value, not a generic structural `Equal Interval` claim. Closed regroupings
+can coincide in stored spelling even though open regroupings are not
+convertible. Inclusion does not equate empty intervals or normalize rational
+spellings; its converse requires an actual inner member.
 Both distributive directions hold for inverted inputs without asserting
 structural `Equal Interval`: different endpoint spellings may denote equal
 Rational values. Subtraction, signed arithmetic, division near zero,
@@ -988,7 +1135,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and twenty-eight checked interval
+   `interval_intersect`, `interval_inside` and thirty-two checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1006,7 +1153,7 @@ API.
    `comm` laws through two private proof stages. Inclusion transitivity reuses
    Rational order transitivity; the four swap inclusions reuse Rational
    commutativity or public min/max bounds without a new helper.
-4. **Trusted-base delta.** Zero: all twenty-eight laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all thirty-two laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
