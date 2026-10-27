@@ -14,8 +14,10 @@
 > and its four laws from Architect-checked D0. The §3.4 catalog exports,
 > seed and package test are now present on main; the package test is not
 > official conformance-runner execution or a landed `trusted_base()`
-> measurement. This §2.4 spec/seed candidate delivers no catalog export,
-> CI, publication or landing.
+> measurement. The §2.4 catalog candidate now exports the checked law;
+> its package test runs the authored seed against the roots-loaded
+> export. This is not official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
 
 ## 1. Least-cost candidate
 
@@ -269,8 +271,10 @@ module imports.
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4).** The
 > original three general laws, catalog module and seed are present on
 > main. Section 2.4's fourth law was checked in Architect D0; its
-> catalog export is absent on this base. The new seed and D0 do not
-> establish shipped §2.4 execution, CI or landed trust.
+> catalog candidate now exports the checked law. A roots-loaded package
+> test checks the authored seed, the complete public type, and the
+> rejected `None` counterpart. These local tests do not establish
+> official conformance-runner execution, CI or landed trust.
 
 ### 2.1 Carrier and result
 
@@ -433,10 +437,14 @@ The finite instance checks the boundary but does not prove the
 generic theorem. Architect's isolated D0 at landed base `0bb872591`
 checked the generic body (`ken check` and `ken fmt --check` rc 0), two
 probe tests, no new `Axiom`, and identical scratch `trusted_base()`
-GlobalId sets 114 → 114. This spec/seed candidate does **not** deliver
-the §2.4 catalog export. D0 and authored-seed checks do not establish
-execution against shipped §2.4 exports, official conformance, CI,
-publication, landing or landed trust.
+GlobalId sets 114 → 114. The §2.4 catalog candidate now exports the
+checked law, and a roots-loaded package test checks its full generic
+interface, the seed's accepted client, and refusal of the same-premise
+false `None` claim. The test measures identical exact `trusted_base()`
+GlobalId sets before and after loading (114 → 114), and refuses selective
+import of the private helper. These local checks are **not** official
+conformance-runner execution, CI, publication, landing or a landed trust
+measurement.
 
 ## 3. Greatest-cost candidate
 

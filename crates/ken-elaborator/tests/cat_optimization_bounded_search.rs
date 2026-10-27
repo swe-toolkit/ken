@@ -2,7 +2,7 @@
 //! Source: conformance/stdlib/optimization/seed-bounded-search.md.
 //! Promise class: durable invariant. Independent least-hit, missing-hit and
 //! strict-bound fixtures distinguish false search results; generic clients
-//! restate each of the three public law interfaces.
+//! restate all four public law interfaces.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -40,11 +40,11 @@ fn seed_programs() -> Vec<&'static str> {
 
 /// SOURCE: spec/50-stdlib/72-optimization.md §2.2.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: the package's four public globals have transparent kernel-checked
-/// bodies, the exact trusted GlobalId set is unchanged after its two imports load,
-/// and an arbitrary predicate/bound/n client checks all three theorem types.
+/// MEASURED: the package's five public globals have transparent kernel-checked
+/// bodies, the exact trusted GlobalId set is unchanged after its imports load,
+/// and arbitrary-argument clients check all four theorem types.
 /// Every private operation and proof helper refuses selective import.
-/// CLAIMED: bounded selection's three general contracts add no trust.
+/// CLAIMED: bounded selection's four general contracts add no trust.
 /// THE GAP: the existing provider assumptions are inherited; concrete search
 /// results are distinguished separately by the closed conformance fixtures.
 #[test]
@@ -70,13 +70,14 @@ fn generic_laws_check_without_added_trust() {
         "find_below_sound",
         "find_below_least",
         "find_below_complete",
+        "find_below_stable",
     ] {
         let id = env.globals[&format!("{PACKAGE}.{name}")];
         assert!(package_owned.contains(&id), "{name} must be package-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
     env.elaborate_file(GENERIC_CLIENT)
-        .expect("all three §2.2 generic law interfaces check from a client");
+        .expect("all four §2 generic law interfaces check from a client");
     for private in [
         "find_next",
         "found_at",
@@ -88,6 +89,7 @@ fn generic_laws_check_without_added_trust() {
         "find_next_correct",
         "found_at_correct",
         "lt_suc_not_lt_same",
+        "leq_suc_not_leq_same",
     ] {
         match env.elaborate_file(&format!("import {PACKAGE} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
@@ -100,8 +102,8 @@ fn generic_laws_check_without_added_trust() {
 
 const GENERIC_CLIENT: &str = r#"
 import Algorithm.Optimization.BoundedSearch
-  (find_below, find_below_sound, find_below_least, find_below_complete)
-import Data.Numeric.Nat.Order (lt_nat)
+  (find_below, find_below_sound, find_below_least, find_below_complete, find_below_stable)
+import Data.Numeric.Nat.Order (leq_nat, lt_nat)
 
 theorem client_sound (p : Nat → Bool) (bound : Nat) (n : Nat) :
   Equal (Option Nat) (find_below p bound) (Some Nat n) →
@@ -117,6 +119,12 @@ theorem client_complete (p : Nat → Bool) (bound : Nat) :
   Equal (Option Nat) (find_below p bound) (None Nat) →
   (m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False =
   find_below_complete p bound
+
+theorem client_stable (p : Nat → Bool) (bound : Nat) (larger : Nat) (n : Nat) :
+  Equal Bool (leq_nat bound larger) True →
+  Equal (Option Nat) (find_below p bound) (Some Nat n) →
+  Equal (Option Nat) (find_below p larger) (Some Nat n) =
+  find_below_stable p bound larger n
 "#;
 
 /// SOURCE: conformance/stdlib/optimization/seed-bounded-search.md positives.
