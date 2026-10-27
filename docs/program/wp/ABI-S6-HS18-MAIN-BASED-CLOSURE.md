@@ -795,8 +795,10 @@ the candidate, per the prior ruling — not new work)."*
   write through a pointer an earlier callee retained), **or argue it
   unreachable**, before landing.
 
-**They attach to increment A**, which is the increment carrying the verifier
-substance they are residuals of. A Steward ruling that put them at the top of
+**R2 attaches to increment A**, which is the increment carrying the verifier
+substance it is a residual of. **R1 attaches to the increment that restores
+the AC-1e file**, where its test lives. Neither is independent work. A Steward
+ruling that put them at the top of
 the queue as independent work was **withdrawn** — it quoted the ruling and
 dropped its qualifier.
 
