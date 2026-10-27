@@ -1157,6 +1157,7 @@ pub(in crate::cranelift_backend) struct DeclaredUnitCall {
     pub(in crate::cranelift_backend) header: AbiFrameHeader,
     pub(in crate::cranelift_backend) slots: Vec<AbiSlot>,
     pub(in crate::cranelift_backend) offsets: Vec<u32>,
+    pub(in crate::cranelift_backend) result_contract: Option<DeclaredResultContract>,
 }
 
 pub(in crate::cranelift_backend) struct DeclaredUnitCalls {
@@ -1184,6 +1185,7 @@ impl CallEdgeTargets {
                 header: target.header,
                 slots: target.slots.clone(),
                 offsets: target.offsets.clone(),
+                result_contract: None,
             };
             let (calls, duplicate) = match target.kind {
                 EmittableCallKind::StaticBody => (
@@ -1387,6 +1389,7 @@ impl CallEdgeTargets {
                     header: target.header,
                     slots: target.slots,
                     offsets: target.offsets,
+                    result_contract: None,
                 },
             );
         }
@@ -1509,6 +1512,7 @@ impl WorkerTargets {
                         header: target.header,
                         slots: target.slots.clone(),
                         offsets: target.offsets.clone(),
+                        result_contract: None,
                     },
                 )
             })
@@ -3337,6 +3341,7 @@ struct PendingVisOwnerCall {
 }
 
 struct PendingVisFinishedBody {
+    return_inst: cranelift_codegen::ir::Inst,
     initial_context_calls: usize,
     initial_response_is_current_host_result: bool,
     calls: Vec<PendingVisOwnerCall>,
@@ -3419,7 +3424,7 @@ fn emit_pending_vis_owner_loop(
     let stored_word = returned_word;
     let result_store = builder.ins().store(MemFlags::trusted(), stored_word, frame, result_offset);
     let success = builder.ins().iconst(types::I64, 0);
-    builder.ins().return_(&[success]);
+    let return_inst = builder.ins().return_(&[success]);
     compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
     builder.switch_to_block(vis);
     let member = builder.ins().load(types::I64, MemFlags::trusted(), frame, region.discriminant);
@@ -3576,6 +3581,7 @@ fn emit_pending_vis_owner_loop(
         payload_loads.push(row_loads);
     }
     Ok(PendingVisFinishedBody {
+        return_inst,
         initial_context_calls: initial_calls.len(),
         initial_response_is_current_host_result,
         calls, result_store, result_offset, returned_word, member_load, member_branches,
@@ -3594,6 +3600,11 @@ struct StaticResponseFinishedBody {
     result_store: cranelift_codegen::ir::Inst,
     returned_word: cranelift_codegen::ir::Value,
     return_inst: cranelift_codegen::ir::Inst,
+    frame: cranelift_codegen::ir::Value,
+    result_offset: i32,
+    trap_offset: i32,
+    response_is_current_host_result: bool,
+    ret_abi_word: u64,
 }
 
 // Both response-owner verifiers reject this finished-code violation through
@@ -3845,23 +3856,12 @@ fn verify_static_response_finished_body(
     func: &Function,
     expected_context: FuncId,
     expected_ret_abi_word: u64,
+    tag_helper: FuncId,
+    field_count_helper: FuncId,
+    boundary_arena: cranelift_codegen::ir::Value,
     facts: &StaticResponseFinishedBody,
+    call_obligations: &[PendingCallResultObligation],
 ) -> Result<(), CraneliftBackendError> {
-    let positions = func
-        .layout
-        .blocks()
-        .flat_map(|block| func.layout.block_insts(block))
-        .enumerate()
-        .map(|(position, inst)| (inst, position))
-        .collect::<BTreeMap<_, _>>();
-    let position = |inst| {
-        positions.get(&inst).copied().ok_or_else(|| {
-            backend_module(LoweringCause::FinishedCode,
-                "a response-owner finished-body witness names no finished CLIF instruction"
-                    .to_string(),
-            )
-        })
-    };
     if facts.context_calls.len() != 1 {
         return Err(backend_module(LoweringCause::FinishedCode, format!(
             "a response owner emitted {} K calls instead of exactly one",
@@ -3904,24 +3904,35 @@ fn verify_static_response_finished_body(
             "finished CLIF contains {finished_exact_calls} exact K-context calls instead of one",
         )));
     }
-    let call_position = position(call)?;
-    if call_position <= position(facts.host_validation_end)? {
-        return Err(backend_module(LoweringCause::FinishedCode,
-            "a response owner called K before host response validation completed".to_string(),
-        ));
-    }
-    let result_store_position = position(facts.result_store)?;
-    if call_position >= result_store_position {
-        return Err(backend_module(LoweringCause::FinishedCode,
-            "a response owner called K after its answer was already collapsed".to_string(),
-        ));
-    }
-    if result_store_position <= position(facts.ret_validation_end)? {
-        return Err(backend_module(LoweringCause::FinishedCode,
-            "a response owner collapsed its answer before exact Ret validation completed"
-                .to_string(),
-        ));
-    }
+    verify_all_paths_after_instruction(
+        func,
+        facts.host_validation_end,
+        call,
+        "a response owner called K before host response validation completed",
+    )?;
+    verify_all_paths_after_instruction(
+        func,
+        call,
+        facts.result_store,
+        "a response owner called K after its answer was already collapsed",
+    )?;
+    let matching_obligations = call_obligations
+        .iter()
+        .filter(|obligation| {
+            obligation.call == call && obligation.result_word == facts.returned_word
+        })
+        .collect::<Vec<_>>();
+    let [call_obligation] = matching_obligations.as_slice() else {
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
+            "a response K call has {} matching finished Result obligations instead of exactly one",
+            matching_obligations.len(),
+        )));
+    };
+    verify_call_result_obligation(func, call_obligation, expected_context).map_err(|error| {
+        backend_module(LoweringCause::FinishedCode, format!(
+            "a response K call read Result without the status then Trap-before-Result branches: {error:?}"
+        ))
+    })?;
     let stored = func
         .dfg
         .inst_args(facts.result_store)
@@ -3946,6 +3957,69 @@ fn verify_static_response_finished_body(
             "a response owner validated a Ret identity other than its exact K Ret".to_string(),
         ));
     }
+    match &func.dfg.insts[facts.result_store] {
+        cranelift_codegen::ir::InstructionData::Store { args, offset, .. }
+            if args[0] == facts.returned_word
+                && args[1] == facts.frame
+                && i32::from(*offset) == facts.result_offset => {}
+        _ => {
+            return Err(backend_module(LoweringCause::FinishedCode,
+                "a response owner does not publish the validated word to its exact Result frame"
+                    .to_string(),
+            ));
+        }
+    }
+    if func.dfg.insts[facts.return_inst].opcode() != cranelift_codegen::ir::Opcode::Return
+        || func
+            .dfg
+            .inst_args(facts.return_inst)
+            .first()
+            .and_then(|word| iconst_value(func, *word))
+            != Some(0)
+    {
+        return Err(backend_module(LoweringCause::FinishedCode,
+            "a response owner's certified Result publication does not return status zero"
+                .to_string(),
+        ));
+    }
+    let tag_queries = verify_carrier_queries(func, tag_helper, boundary_arena)?
+        .into_iter()
+        .filter(|query| query.word == facts.returned_word)
+        .collect::<Vec<_>>();
+    let [tag_query] = tag_queries.as_slice() else {
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
+            "a response owner has {} exact returned-word tag queries instead of one",
+            tag_queries.len()
+        )));
+    };
+    verify_exact_value_guard(
+        func,
+        tag_query.output,
+        i64::try_from(expected_ret_abi_word).map_err(|_| {
+            backend_module(LoweringCause::FinishedCode,
+                "response Ret identity exceeds the runtime tag word".to_string())
+        })?,
+        facts.result_store,
+    )?;
+    let field_queries = verify_carrier_queries(func, field_count_helper, boundary_arena)?
+        .into_iter()
+        .filter(|query| query.word == facts.returned_word)
+        .collect::<Vec<_>>();
+    let [field_query] = field_queries.as_slice() else {
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
+            "a response owner has {} exact returned-word field-count queries instead of one",
+            field_queries.len()
+        )));
+    };
+    verify_exact_value_guard(func, field_query.output, 1, facts.result_store)?;
+    verify_all_paths_after_instruction(
+        func, tag_query.call, field_query.call,
+        "a response owner's tag/arity proofs do not precede Result publication in order",
+    )?;
+    verify_all_paths_after_instruction(
+        func, field_query.call, facts.result_store,
+        "a response owner's tag/arity proofs do not precede Result publication in order",
+    )?;
     let returned_inst = match func.dfg.value_def(facts.returned_word) {
         cranelift_codegen::ir::ValueDef::Result(inst, _) => inst,
         _ => {
@@ -3954,21 +4028,18 @@ fn verify_static_response_finished_body(
             ));
         }
     };
-    let returned_position = position(returned_inst)?;
-    let trap_branches = func
-        .layout
-        .blocks()
-        .flat_map(|block| func.layout.block_insts(block))
-        .filter(|inst| {
-            let p = positions[inst];
-            p > call_position
-                && p < returned_position
-                && func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Brif
-        })
-        .count();
-    if trap_branches < 2 {
-        return Err(response_k_missing_status_trap_refusal());
-    }
+    verify_all_paths_after_instruction(
+        func, call, returned_inst, "a response K call Result producer",
+    )?;
+    verify_carrier_fact_current(
+        func,
+        &[CarrierFactGround { producer: returned_inst, guard: None }],
+        boundary_arena,
+        &BTreeSet::from([facts.returned_word]),
+        &BTreeSet::from([tag_helper, field_count_helper]),
+        facts.result_store,
+        "a response owner's returned constructor word",
+    )?;
     Ok(())
 }
 
@@ -3978,30 +4049,30 @@ fn verify_call_result_obligation(
     certified_target: FuncId,
 ) -> Result<(), CraneliftBackendError> {
     if Lowering::decode_direct_callee(func, obligation.call)? != certified_target {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's finished direct callee disagrees with its certificate"
                 .to_string(),
         ));
     }
     if func.dfg.inst_results(obligation.call) != [obligation.status] {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation does not bind the call's exact status result".to_string(),
         ));
     }
     let call_args = func.dfg.inst_args(obligation.call);
     let [actual_header, _services] = call_args else {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's actual call does not carry the exact header and services arguments"
                 .to_string(),
         ));
     };
     let Some((header_slot, header_base)) = resolve_stack_address(func, *actual_header)? else {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's actual header is not a finalized stack address".to_string(),
         ));
     };
     if header_base != 0 {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's actual header does not begin at its frame base".to_string(),
         ));
     }
@@ -4011,7 +4082,7 @@ fn verify_call_result_obligation(
             .expect("the unit-call header size fits u32")
         || header.align_shift != 3
     {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's actual header allocation disagrees with UnitBundle layout"
                 .to_string(),
         ));
@@ -4028,14 +4099,14 @@ fn verify_call_result_obligation(
         "a call-result obligation's header payload pointer",
     )?;
     if resolve_stack_address(func, actual_payload)? != Some((obligation.payload, 0)) {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's actual call header points to a foreign payload".to_string(),
         ));
     }
 
     let payload_slot = &func.sized_stack_slots[obligation.payload];
     if payload_slot.size != obligation.frame_bytes || payload_slot.align_shift != 3 {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's actual frame allocation disagrees with its descriptor"
                 .to_string(),
         ));
@@ -4057,7 +4128,7 @@ fn verify_call_result_obligation(
         "a call-result obligation's Trap initializer",
     )?;
     if iconst_value(func, initialized_trap) != Some(0) {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation does not initialize Trap to zero on every reaching path"
                 .to_string(),
         ));
@@ -4070,7 +4141,7 @@ fn verify_call_result_obligation(
         cranelift_codegen::ir::condcodes::IntCC::NotEqual,
         0,
     ) {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation lacks its exact status-nonzero comparison".to_string(),
         ));
     }
@@ -4080,12 +4151,12 @@ fn verify_call_result_obligation(
         ..
     } = &func.dfg.insts[obligation.status_branch]
     else {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's status locator is not a branch".to_string(),
         ));
     };
     if *status_arg != obligation.status_compare {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's status branch uses another predicate".to_string(),
         ));
     }
@@ -4097,13 +4168,13 @@ fn verify_call_result_obligation(
 
     let (trap_load, actual_trap_location) = loaded_stack_location(func, obligation.trap_word)?
     .ok_or_else(|| {
-        backend_module(
+        backend_module(LoweringCause::FinishedCode,
                 "a call-result obligation's Trap word is not an exact stack-location load"
                     .to_string(),
         )
     })?;
     if actual_trap_location != trap_location {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation reads Trap from another frame or offset".to_string(),
         ));
     }
@@ -4129,7 +4200,7 @@ fn verify_call_result_obligation(
         cranelift_codegen::ir::condcodes::IntCC::NotEqual,
         0,
     ) {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation lacks its exact Trap-nonzero comparison".to_string(),
         ));
     }
@@ -4139,12 +4210,12 @@ fn verify_call_result_obligation(
         ..
     } = &func.dfg.insts[obligation.trap_branch]
     else {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's Trap locator is not a branch".to_string(),
         ));
     };
     if *trap_arg != obligation.trap_compare {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation's Trap branch uses another predicate".to_string(),
         ));
     }
@@ -4156,13 +4227,13 @@ fn verify_call_result_obligation(
 
     let (result_load, actual_result_location) =
         loaded_stack_location(func, obligation.result_word)?.ok_or_else(|| {
-        backend_module(
+        backend_module(LoweringCause::FinishedCode,
                 "a call-result obligation's Result word is not an exact stack-location load"
                     .to_string(),
         )
     })?;
     if actual_result_location != result_location {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a call-result obligation reads Result from another frame or offset".to_string(),
         ));
     }
@@ -4508,6 +4579,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     header: emission.owner.header(),
                     slots: emission.owner.slots().to_vec(),
                     offsets: emission.offsets.clone(),
+                    result_contract: None,
                 }
             }
             _ => declare_response_context_call_in_func(
@@ -4961,7 +5033,19 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     emission.row.id(), emission.successors.len(),
                 ))),
             };
-            let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
+            if let Some(obligation) = compiler
+                .function_local
+                .pending_call_result_obligations
+                .iter_mut()
+                .find(|obligation| obligation.result_word == returned.word)
+            {
+                obligation.realization_required = true;
+                // The exact tag and arity guards below refine the realized
+                // word; a declared K target is not a constructor-identity proof.
+                obligation.identity = None;
+            }
+            let exact_ret_identity = emission.row.k_ret_identity();
+            let exact_ret_abi_word = exact_ret_identity.tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
             let ret_abi_word = if body_mutation
                 == Some(StaticResponseOwnerBodyMutation::VaryRet)
@@ -5044,7 +5128,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 }
             };
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().return_(&[zero]);
+            let return_inst = builder.ins().return_(&[zero]);
             compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             finished_body = Some(StaticResponseFinishedBody {
                 input_frame: frame,
@@ -5058,7 +5142,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 frame,
                 result_offset,
                 trap_offset: i32::try_from(trap_offset).map_err(|_| {
-                    backend_module("response-owner trap slot offset exceeds range".to_string())
+                    backend_module(LoweringCause::Capacity,
+                        "response-owner trap slot offset exceeds range".to_string())
                 })?,
                 response_is_current_host_result,
                 ret_abi_word,
@@ -5095,7 +5180,15 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 ))?;
                 verify_static_response_finished_body(
                     &func, expected_context_target,
-                    emission.row.k_ret_identity().tag_abi_word()?, ret_only,
+                    emission.row.k_ret_identity().tag_abi_word()?,
+                    helpers.boundary_value_abi.tag,
+                    helpers.boundary_value_abi.field_count,
+                    compiler.function_local.boundary_arena.ok_or_else(|| {
+                        backend_module(LoweringCause::FinishedCode,
+                            "a response-owner finished proof has no boundary arena".to_string())
+                    })?,
+                    ret_only,
+                    &compiler.function_local.pending_call_result_obligations,
                 )?;
             }
             Ok(())
@@ -5111,12 +5204,41 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
             continue;
         }
-        let mut ctx = module.make_context();
-        std::mem::swap(&mut ctx.func, &mut func);
-        module
-            .define_function(id, &mut ctx)
-            .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
-        defined += 1;
+        let publication = if let Some(ret) = finished_body.as_ref() {
+            FunctionResultPublication {
+                frame: ret.frame,
+                result_offset: ret.result_offset,
+                trap_offset: ret.trap_offset,
+                result_store: ret.result_store,
+                returned_word: ret.returned_word,
+                return_inst: ret.return_inst,
+            }
+        } else {
+            let pending = pending_finished.as_ref().ok_or_else(|| {
+                backend_module(LoweringCause::FinishedCode,
+                    "a response owner has no finished Result publication".to_string())
+            })?;
+            FunctionResultPublication {
+                frame: pending.input_frame,
+                result_offset: pending.result_offset,
+                trap_offset: i32::try_from(trap_offset).map_err(|_| {
+                    backend_module(LoweringCause::Capacity,
+                        "pending-Vis response-owner trap offset exceeds range".to_string())
+                })?,
+                result_store: pending.result_store,
+                returned_word: pending.returned_word,
+                return_inst: pending.return_inst,
+            }
+        };
+        staged.push(stage_result_body(
+            compiler,
+            ExistingResultUnitIdentity::Response(emission.owner.id()),
+            id,
+            func,
+            Some(publication),
+            None,
+            Some(emission.row.k_ret_identity()),
+        ));
     }
     Ok(staged)
 }
@@ -5263,7 +5385,7 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         })
         .collect();
 
-    let mut defined = 0usize;
+    let mut staged = Vec::new();
     #[cfg_attr(not(test), expect(unused_mut, reason = "only the D7 control mutates it"))]
     for mut unit in emissions {
         // Resolve the EXACT target first; the control below perturbs only what
@@ -5537,6 +5659,10 @@ pub(super) fn stage_continuation_bodies<M: Module>(
                     header: context.header(),
                     slots: context.slots().to_vec(),
                     offsets: context_offsets,
+                    result_contract: compiler
+                        .static_transition_plan
+                        .checked_ih_generated_context_result_contract(context.id())?
+                        .map(DeclaredResultContract::new),
                 },
             );
             retargeted_worker_body = Some(unit.worker_body_origin);
@@ -5718,7 +5844,18 @@ pub(super) fn stage_continuation_bodies<M: Module>(
                 .ins()
                 .store(MemFlags::trusted(), word, frame, result_offset);
             let zero = builder.ins().iconst(types::I64, 0);
-            builder.ins().return_(&[zero]);
+            let return_inst = builder.ins().return_(&[zero]);
+            publication = FunctionResultPublication {
+                frame,
+                result_offset,
+                trap_offset: i32::try_from(trap_offset).map_err(|_| {
+                    backend_module(LoweringCause::Capacity,
+                        "continuation trap slot offset exceeds range".to_string())
+                })?,
+                result_store,
+                returned_word: word,
+                return_inst,
+            };
             compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             builder.seal_all_blocks();
             builder.finalize();
@@ -5727,16 +5864,17 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         frame_scope.close(compiler, &func)?;
         token_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
-        // Verify, then define THIS function -- a fresh context here would
-        // define an empty body and silently discard everything emitted above.
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
-        let mut ctx = module.make_context();
-        std::mem::swap(&mut ctx.func, &mut func);
-        module
-            .define_function(id, &mut ctx)
-            .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
-        defined += 1;
+        staged.push(stage_result_body(
+            compiler,
+            ExistingResultUnitIdentity::Continuation(unit.id),
+            id,
+            func,
+            Some(publication),
+            None,
+            None,
+        ));
     }
     Ok(staged)
 }
@@ -5860,6 +5998,7 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
         header_captures: u32,
         frame_bytes: u32,
         checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
+        result_contract: Option<ConstructorIdentity>,
     }
     // Own every projected fact before the loop: the projection borrows the plan
     // and definition below needs the compiler mutably.
@@ -5973,6 +6112,9 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
                 header_captures: context.header().captures,
                 frame_bytes,
                 checked_ih_generated_entry_access,
+                result_contract: compiler
+                    .static_transition_plan
+                    .checked_ih_generated_context_result_contract(context.id())?,
             })
         })
         .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
@@ -6361,20 +6503,48 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
                     Some(compiler.decode_residual_child(&mut builder, residual)?.word)
                 },
             };
-            if let Some(word) = word {
-                builder.ins().store(
-                    MemFlags::trusted(),
-                    word,
-                    frame,
-                    i32::try_from(result_offset).map_err(|_| {
+            let result_offset = i32::try_from(result_offset).map_err(|_| {
+                backend_module(LoweringCause::Capacity,
+                    "generated context result slot offset exceeds range".to_string())
+            })?;
+            let trap_offset = i32::try_from(trap_offset).map_err(|_| {
+                backend_module(LoweringCause::Capacity,
+                    "generated context trap slot offset exceeds range".to_string())
+            })?;
+            let pending_publication = if let Some(word) = word {
+                if let Some(contract) = context.result_contract {
+                    // Runtime validation remains defence in depth. It is not
+                    // compiler authority: the staged finished proof below must
+                    // establish the word before this function can be defined.
+                    let actual = compiler.emit_carrier_tag(
+                        &mut builder, CarriedBoundaryWord { word },
+                    )?;
+                    let expected = i64::try_from(contract.tag_abi_word()?).map_err(|_| {
                         backend_module(LoweringCause::Capacity,
-                            "generated context result slot offset exceeds range".to_string(),
-                        )
-                    })?,
+                            "generated context Result identity exceeds the runtime tag word"
+                                .to_string())
+                    })?;
+                    Lowering::require_i64(&mut builder, actual, expected);
+                }
+                let result_store = builder.ins().store(
+                    MemFlags::trusted(), word, frame, result_offset,
                 );
-            }
+                Some((result_store, word))
+            } else {
+                None
+            };
             let status = builder.ins().iconst(types::I64, 0);
-            builder.ins().return_(&[status]);
+            let return_inst = builder.ins().return_(&[status]);
+            publication = pending_publication.map(|(result_store, returned_word)| {
+                FunctionResultPublication {
+                    frame,
+                    result_offset,
+                    trap_offset,
+                    result_store,
+                    returned_word,
+                    return_inst,
+                }
+            });
             compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
             builder.seal_all_blocks();
             builder.finalize();
@@ -6426,12 +6596,15 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
-        let mut ctx = module.make_context();
-        std::mem::swap(&mut ctx.func, &mut func);
-        module
-            .define_function(id, &mut ctx)
-            .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
-        defined += 1;
+        staged.push(stage_result_body(
+            compiler,
+            ExistingResultUnitIdentity::Context(context.id),
+            id,
+            func,
+            publication,
+            context.result_contract,
+            None,
+        ));
     }
     Ok(staged)
 }
@@ -6750,6 +6923,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             header: fusion.header,
             slots: slots.to_vec(),
             offsets: offsets.to_vec(),
+            result_contract: None,
         };
         // INSERTED, and its absence beforehand is required rather than assumed —
         // the producer's inherited edges must not already answer for this body,
@@ -7250,6 +7424,7 @@ fn redirect_fused_producer_invocations<M: Module>(
             header,
             slots,
             offsets,
+            result_contract: None,
         };
         // The entry is INSERTED, and its absence beforehand is required rather
         // than assumed. Installing body ownership removed this seat's edge from
@@ -7331,6 +7506,7 @@ pub(super) fn define_root_adapter<M: Module>(
             header: root.header(),
             slots: root.slots().to_vec(),
             offsets,
+            result_contract: None,
         },
     );
 
@@ -8130,6 +8306,9 @@ impl ContinuationClaimLedger {
                         header: unit.header(),
                         slots: unit.slots().to_vec(),
                         offsets,
+                        result_contract: plan
+                            .static_response_forwarded_result_identity(identity)?
+                            .map(DeclaredResultContract::new),
                     },
                 ))
             })
@@ -9132,6 +9311,9 @@ fn declare_response_context_call_in_func<M: Module>(
         header: context.header(),
         slots: context.slots().to_vec(),
         offsets,
+        result_contract: plan
+            .checked_ih_generated_context_result_contract(id)?
+            .map(DeclaredResultContract::new),
     })
 }
 
@@ -9161,6 +9343,9 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
                 header: context.header(),
                 slots: context.slots().to_vec(),
                 offsets,
+                result_contract: plan
+                    .checked_ih_generated_context_result_contract(context.id())?
+                    .map(DeclaredResultContract::new),
             },
         );
     }
@@ -10721,7 +10906,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     })
             })
             .collect::<Vec<_>>();
-        return Err(backend_module(format!(
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
             "the finished generated-Result realization graph is not closed: \
              missing={missing_realizations:?}, details={details:?}"
         )));
@@ -10795,7 +10980,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     let certified_target =
                         certificate.map_or(target, |certificate| certificate.target);
                     if certified_target != target {
-                        return Err(backend_module(
+                        return Err(backend_module(LoweringCause::FinishedCode,
                             "a call-result certificate changed the already-verified direct target"
                                 .to_string(),
                         ));
@@ -10805,7 +10990,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                             .insert(obligation.result_word, certificate.identity)
                             .is_some()
                         {
-                            return Err(backend_module(
+                            return Err(backend_module(LoweringCause::FinishedCode,
                                 "two call-result obligations claim one function-local SSA word"
                                     .to_string(),
                             ));
@@ -10885,7 +11070,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 continue;
             };
             if actual.identity != *demanded {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::FinishedCode, format!(
                     "finished target {target:?} publishes actual constructor identity {:?} at \
                      {:?}, but its pending Result obligation demands {demanded:?}",
                     actual.identity, publication.returned_word,
@@ -10931,7 +11116,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     })
             })
             .collect::<Vec<_>>();
-        return Err(backend_module(format!(
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
             "the finished generated-Result proof graph is not closed: \
              missing={missing:?}, details={details:?}"
         )));
@@ -10943,7 +11128,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     && certificate.target == body.target
                     && certificate.identity == identity
             }) {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "a generated context's terminal Result contract lacks a finished certificate"
                         .to_string(),
                 ));
@@ -10955,7 +11140,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         std::mem::swap(&mut ctx.func, &mut body.func);
         module
             .define_function(body.target, &mut ctx)
-            .map_err(|error| backend_module(error.to_string()))?;
+            .map_err(|error| backend_module(LoweringCause::FinishedCode, error.to_string()))?;
     }
     Ok(())
 }
@@ -11218,7 +11403,7 @@ fn derive_certified_cuts(
                 };
                 let mut expected_constant =
                     i64::try_from(identity.tag_abi_word()?).map_err(|_| {
-                        backend_module(
+                        backend_module(LoweringCause::FinishedCode,
                             "a certified Result identity exceeds the runtime tag word".to_string(),
                         )
                     })?;
@@ -11345,7 +11530,7 @@ fn derive_certified_cuts(
                         },
                     );
                     if prior.is_some() {
-                        return Err(backend_module(
+                        return Err(backend_module(LoweringCause::FinishedCode,
                             "one certified edge acquired two proof provenances".to_string(),
                         ));
                     }
@@ -11367,7 +11552,7 @@ fn exact_guard_edge(
     guard: ExactProtocolGuard,
 ) -> Result<(), CraneliftBackendError> {
     let block = func.layout.inst_block(guard.branch).ok_or_else(|| {
-        backend_module("a protocol guard branch is absent from finalized CLIF".to_string())
+        backend_module(LoweringCause::FinishedCode, "a protocol guard branch is absent from finalized CLIF".to_string())
     })?;
     let edges = successor_edges(func, block)?;
     if edges.iter().any(|(terminator, ordinal, target)| {
@@ -11377,7 +11562,7 @@ fn exact_guard_edge(
     }) {
         Ok(())
     } else {
-        Err(backend_module(
+        Err(backend_module(LoweringCause::FinishedCode,
             "a protocol guard's success edge disagrees with finalized CLIF".to_string(),
         ))
     }
@@ -11395,10 +11580,10 @@ fn exact_staged_unit(
         .collect::<Vec<_>>();
     match matches.as_slice() {
         [unit] => Ok(*unit),
-        [] => Err(backend_module(format!(
+        [] => Err(backend_module(LoweringCause::FinishedCode, format!(
             "a generated-Result proof dependency targets unstaged function {target:?}"
         ))),
-        _ => Err(backend_module(format!(
+        _ => Err(backend_module(LoweringCause::FinishedCode, format!(
             "more than one typed unit is staged under function {target:?}"
         ))),
     }
@@ -11441,7 +11626,7 @@ fn incoming_arguments_with_cuts(
                 .get(index)
                 .copied()
                 .ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::FinishedCode,
                         "a certified Result forwarding edge omits its block argument".to_string(),
                     )
                 })?,
@@ -11450,7 +11635,7 @@ fn incoming_arguments_with_cuts(
     };
     let data = &func.dfg.insts[inst];
     if !data.opcode().is_branch() {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified Result block parameter has an unsupported incoming control edge"
                     .to_string(),
             ));
@@ -11462,7 +11647,7 @@ fn incoming_arguments_with_cuts(
     {
         append(
             u8::try_from(ordinal).map_err(|_| {
-                backend_module(
+                backend_module(LoweringCause::FinishedCode,
                     "a certified Result incoming branch has more than 256 successors".to_string(),
                 )
             })?,
@@ -11724,7 +11909,7 @@ fn prove_realized_value(
     }
     let entry =
         body.func.layout.entry_block().ok_or_else(|| {
-            backend_module("a staged Result function has no entry block".to_string())
+            backend_module(LoweringCause::FinishedCode, "a staged Result function has no entry block".to_string())
         })?;
     let result = match body.func.dfg.value_def(value) {
         cranelift_codegen::ir::ValueDef::Param(block, index) if block == entry => (true, true),
@@ -11795,7 +11980,7 @@ fn reachable_with_cuts(
     let entry = func
         .layout
         .entry_block()
-        .ok_or_else(|| backend_module("a staged Result function has no entry block".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a staged Result function has no entry block".to_string()))?;
     let mut reachable = BTreeSet::from([entry]);
     let mut pending = vec![entry];
     while let Some(block) = pending.pop() {
@@ -11824,7 +12009,7 @@ fn reaching_memory_states_before(
     let entry = func
         .layout
         .entry_block()
-        .ok_or_else(|| backend_module("a memory proof has no entry block".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a memory proof has no entry block".to_string()))?;
     let access = location_access(func, location)?;
     let mut pending = vec![(entry, ReachingMemoryState::Uninitialized)];
     let mut reached = BTreeSet::new();
@@ -11871,7 +12056,7 @@ fn reaching_memory_states_before(
         }
     }
     if observations.is_empty() {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a memory proof's dependent instruction is unreachable".to_string(),
         ));
     }
@@ -12170,7 +12355,7 @@ fn status_zero_guards(
         }
     }
     if guards.is_empty() {
-        Err(backend_module(
+        Err(backend_module(LoweringCause::FinishedCode,
             "a helper result has no exact status-zero guard".to_string(),
         ))
     } else {
@@ -12186,7 +12371,7 @@ fn successor_edges(
     let terminator = func
         .layout
         .last_inst(block)
-        .ok_or_else(|| backend_module("a staged Result CFG block has no terminator".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a staged Result CFG block has no terminator".to_string()))?;
     let data = &func.dfg.insts[terminator];
     if data.opcode().is_branch() {
         return data
@@ -12197,7 +12382,7 @@ fn successor_edges(
                 Ok((
                     terminator,
                     u8::try_from(ordinal).map_err(|_| {
-                        backend_module(
+                        backend_module(LoweringCause::FinishedCode,
                             "a staged Result branch has more than 256 successors".to_string(),
                 )
                     })?,
@@ -12209,7 +12394,7 @@ fn successor_edges(
     if data.opcode().is_terminator() {
         return Ok(Vec::new());
     }
-    Err(backend_module(format!(
+    Err(backend_module(LoweringCause::FinishedCode, format!(
         "a staged Result CFG block ends in unsupported non-terminator {:?}",
         data.opcode()
     )))
@@ -12252,13 +12437,18 @@ fn value_is_guarded_nonzero_at_inst(
             let [comparison] = func.dfg.inst_results(comparison_inst) else {
                 return false;
             };
-            if !compare_imm_is(
+            let nonzero_guard = compare_imm_is(
                 func,
                 *comparison,
                 value,
                 cranelift_codegen::ir::condcodes::IntCC::NotEqual,
                 0,
-            ) {
+            ) || matches!(
+                comparison_with_constant(func, *comparison),
+                Some((cranelift_codegen::ir::condcodes::IntCC::Equal, operand, constant))
+                    if func.dfg.resolve_aliases(operand) == value && constant != 0
+            );
+            if !nonzero_guard {
                 return false;
             }
             func.layout
@@ -12318,7 +12508,7 @@ fn verify_all_paths_after_instruction(
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
     let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module("an instruction-order proof has no entry block".to_string())
+        backend_module(LoweringCause::FinishedCode, "an instruction-order proof has no entry block".to_string())
     })?;
     let mut pending = vec![(entry, false)];
     let mut reached = BTreeSet::new();
@@ -12335,7 +12525,7 @@ fn verify_all_paths_after_instruction(
             if inst == dependent {
                 observed = true;
                 if !current {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "{label} is reachable before its required finalized instruction"
                     )));
                 }
@@ -12351,7 +12541,7 @@ fn verify_all_paths_after_instruction(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(format!(
+        Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} is not reachable from the finalized function entry"
         )))
     }
@@ -12369,7 +12559,7 @@ fn verify_all_paths_guarded(
     let entry = func
         .layout
         .entry_block()
-        .ok_or_else(|| backend_module("a protocol proof has no entry block".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a protocol proof has no entry block".to_string()))?;
     let mut pending = vec![(entry, ProtocolFactState::Absent)];
     let mut reached = BTreeSet::new();
     let mut observed = false;
@@ -12386,7 +12576,7 @@ fn verify_all_paths_guarded(
             if inst == dependent {
                 observed = true;
                 if state != ProtocolFactState::Guarded {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "{label} is reachable without traversing its current successful guard"
                     )));
                 }
@@ -12414,7 +12604,7 @@ fn verify_all_paths_guarded(
             }
         }
         if !terminated {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::FinishedCode, format!(
                 "{label} reaches a CFG block without a supported terminator"
             )));
         }
@@ -12422,7 +12612,7 @@ fn verify_all_paths_guarded(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(format!(
+        Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} is not reachable from the finalized function entry"
         )))
     }
@@ -12439,7 +12629,7 @@ fn verify_all_paths_memory_current(
     let entry = func
         .layout
         .entry_block()
-        .ok_or_else(|| backend_module("a memory-flow proof has no entry block".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a memory-flow proof has no entry block".to_string()))?;
     let access = location_access(func, location)?;
     let mut pending = vec![(entry, MemoryFlowState::Absent)];
     let mut reached = BTreeSet::new();
@@ -12458,7 +12648,7 @@ fn verify_all_paths_memory_current(
             if inst == dependent {
                 observed = true;
                 if state != MemoryFlowState::Current {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "{label} is reachable without the current producer or after a clobber"
                     )));
                 }
@@ -12474,7 +12664,7 @@ fn verify_all_paths_memory_current(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(format!(
+        Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} is not reachable from the finalized function entry"
         )))
     }
@@ -12491,12 +12681,12 @@ fn verify_carrier_fact_current(
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
     if grounds.is_empty() {
-        return Err(backend_module(format!("{label} has no finalized ground")));
+        return Err(backend_module(LoweringCause::FinishedCode, format!("{label} has no finalized ground")));
     }
     let entry = func
         .layout
         .entry_block()
-        .ok_or_else(|| backend_module("a carrier-flow proof has no entry block".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a carrier-flow proof has no entry block".to_string()))?;
     let mut pending = vec![(entry, CarrierFlowState::Absent)];
     let mut reached = BTreeSet::new();
     let mut observed = false;
@@ -12510,7 +12700,7 @@ fn verify_carrier_fact_current(
             if let Some(index) = ground_index {
                 state = if grounds[index].guard.is_some() {
                     CarrierFlowState::Pending(u16::try_from(index).map_err(|_| {
-                        backend_module("a carrier proof has more than 65536 grounds".to_string())
+                        backend_module(LoweringCause::FinishedCode, "a carrier proof has more than 65536 grounds".to_string())
                     })?)
                 } else {
                     CarrierFlowState::Current
@@ -12531,7 +12721,7 @@ fn verify_carrier_fact_current(
             if inst == dependent {
                 observed = true;
                 if state != CarrierFlowState::Current {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "{label} is reachable without a current finalized constructor fact"
                     )));
                 }
@@ -12548,7 +12738,7 @@ fn verify_carrier_fact_current(
                         }
                         let pending_index =
                             CarrierFlowState::Pending(u16::try_from(index).map_err(|_| {
-                                backend_module(
+                                backend_module(LoweringCause::FinishedCode,
                                     "a carrier proof has more than 65536 grounds".to_string(),
                                 )
                             })?);
@@ -12570,7 +12760,7 @@ fn verify_carrier_fact_current(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(format!(
+        Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} is not reachable from the finalized function entry"
         )))
     }
@@ -12593,23 +12783,23 @@ fn verify_carrier_queries(
             continue;
         }
         let [actual_arena, word, out] = func.dfg.inst_args(call) else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified carrier query does not have exactly arena, word and out operands"
                     .to_string(),
             ));
         };
         if *actual_arena != arena {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified carrier query uses a different boundary arena".to_string(),
             ));
         }
         let Some((output_slot, output_offset)) = resolve_stack_address(func, *out)? else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified carrier query's out operand is not an exact stack address".to_string(),
             ));
         };
         if output_offset != 0 {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified carrier query's out address is not the start of its slot".to_string(),
             ));
         }
@@ -12619,7 +12809,7 @@ fn verify_carrier_queries(
             bytes: 8,
         };
         let [status] = func.dfg.inst_results(call) else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified carrier query does not return exactly one status".to_string(),
             ));
         };
@@ -12652,7 +12842,7 @@ fn verify_carrier_queries(
                     })
                     .collect::<Vec<_>>();
                 if applicable.len() != 1 {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "a certified carrier query output load has {} all-path status guards instead of one",
                         applicable.len()
                     )));
@@ -12668,7 +12858,7 @@ fn verify_carrier_queries(
             }
         }
         let [output] = outputs.as_slice() else {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::FinishedCode, format!(
                 "a certified carrier query has {} all-path guarded output loads instead of one",
                 outputs.len()
             )));
@@ -12689,11 +12879,11 @@ fn verify_constructor_authority_ground(
     helpers: &crate::boundary_value_clif::BoundaryLocalFuncs,
 ) -> Result<CarrierFactGround, CraneliftBackendError> {
     let arena = body.boundary_arena.ok_or_else(|| {
-        backend_module("a generated constructor authority has no boundary arena".to_string())
+        backend_module(LoweringCause::FinishedCode, "a generated constructor authority has no boundary arena".to_string())
     })?;
     let (word_load, word_location) = loaded_stack_location(&body.func, authority.word)?
         .ok_or_else(|| {
-            backend_module(
+            backend_module(LoweringCause::FinishedCode,
                 "a generated constructor authority's word is not an actual helper-output load"
                     .to_string(),
             )
@@ -12749,14 +12939,14 @@ fn verify_constructor_authority_ground(
         }
     }
     if allocation_calls.len() != 1 {
-        return Err(backend_module(format!(
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
             "a generated constructor authority has {} exact finalized allocation producers instead of one",
             allocation_calls.len()
         )));
     }
 
     let expected_tag = i64::try_from(authority.identity.tag_abi_word()?).map_err(|_| {
-        backend_module("a generated constructor identity exceeds the runtime tag word".to_string())
+        backend_module(LoweringCause::FinishedCode, "a generated constructor identity exceeds the runtime tag word".to_string())
     })?;
     let mut tag_grounds = Vec::new();
     for call in body
@@ -12796,7 +12986,7 @@ fn verify_constructor_authority_ground(
         }
     }
     let [ground] = tag_grounds.as_slice() else {
-        return Err(backend_module(format!(
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
             "a generated constructor authority has {} exact finalized tag-store guards instead of one",
             tag_grounds.len()
         )));
@@ -12815,7 +13005,7 @@ fn verify_cut_provenance(
             .iter()
             .any(|edge| !cuts.provenance.contains_key(edge))
     {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "the certified cut edge set disagrees with its proof provenance".to_string(),
         ));
     }
@@ -12829,7 +13019,7 @@ fn verify_cut_provenance(
                 .iter()
                 .any(|dependency| !cuts.provenance.contains_key(dependency))
         {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified cut carries foreign, empty, circular, or missing provenance"
                     .to_string(),
             ));
@@ -12849,7 +13039,7 @@ fn verify_cut_provenance(
             edge.terminator,
         ] {
             if body.func.layout.inst_block(inst).is_none() {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "a certified cut proof names an instruction absent from finalized CLIF"
                         .to_string(),
                 ));
@@ -12858,18 +13048,18 @@ fn verify_cut_provenance(
         let cranelift_codegen::ir::InstructionData::Brif { arg, .. } =
             &body.func.dfg.insts[edge.terminator]
         else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified cut terminator is not its finalized conditional branch".to_string(),
             ));
         };
         let Some((condition, compared, constant)) = comparison_with_constant(&body.func, *arg)
         else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified cut no longer has its exact tag comparison".to_string(),
             ));
         };
         let expected = i64::try_from(proof.identity.tag_abi_word()?).map_err(|_| {
-            backend_module("a certified cut identity exceeds the runtime tag word".to_string())
+            backend_module(LoweringCause::FinishedCode, "a certified cut identity exceeds the runtime tag word".to_string())
         })?;
         let expected_infeasible_ordinal = match condition {
             cranelift_codegen::ir::condcodes::IntCC::Equal => 1,
@@ -12888,7 +13078,7 @@ fn verify_cut_provenance(
                 .copied()
                 != Some(proof.queried_word)
         {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified cut's finalized word/query/comparison provenance disagrees"
                     .to_string(),
             ));
@@ -12921,7 +13111,7 @@ fn verify_cut_provenance(
     let mut done = BTreeSet::new();
     for edge in &cuts.edges {
         if !visit(*edge, cuts, &mut BTreeSet::new(), &mut done) {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a certified cut proof contains a pruning dependency cycle".to_string(),
             ));
         }
@@ -12938,13 +13128,13 @@ fn verify_definite_stored_value(
 ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
     let states = reaching_memory_states_before(func, location, dependent)?;
     if states.len() != 1 {
-        return Err(backend_module(format!(
+        return Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} has no single reaching initialized value on every path: {states:?}"
         )));
     }
     match states.iter().next().copied() {
         Some(ReachingMemoryState::Exact(value)) => Ok(value),
-        _ => Err(backend_module(format!(
+        _ => Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} has no single reaching initialized value on every path: {states:?}"
         ))),
     }
@@ -12959,7 +13149,7 @@ fn verify_exact_value_guard(
 ) -> Result<(), CraneliftBackendError> {
     let value = func.dfg.resolve_aliases(value);
     let cranelift_codegen::ir::ValueDef::Result(producer, 0) = func.dfg.value_def(value) else {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "an exact-value proof's observed word has no finalized producer instruction"
                 .to_string(),
         ));
@@ -13016,7 +13206,7 @@ fn verify_exact_value_guard(
     if applicable == 1 {
         Ok(())
     } else {
-        Err(backend_module(format!(
+        Err(backend_module(LoweringCause::FinishedCode, format!(
             "a finished Result publication has {applicable} all-path exact guards for expected word {expected} instead of one"
         )))
     }
@@ -13032,7 +13222,7 @@ fn verify_no_memory_effect_after_instruction(
     let entry = func
         .layout
         .entry_block()
-        .ok_or_else(|| backend_module("a publication proof has no entry block".to_string()))?;
+        .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "a publication proof has no entry block".to_string()))?;
     let mut pending = vec![(entry, false)];
     let mut reached = BTreeSet::new();
     let mut observed = false;
@@ -13053,7 +13243,7 @@ fn verify_no_memory_effect_after_instruction(
             if inst == dependent {
                 observed = true;
                 if !current {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "{label} is reachable after an intervening memory effect"
                     )));
                 }
@@ -13069,7 +13259,7 @@ fn verify_no_memory_effect_after_instruction(
     if observed {
         Ok(())
     } else {
-        Err(backend_module(format!(
+        Err(backend_module(LoweringCause::FinishedCode, format!(
             "{label} is not reachable from the finalized function entry"
         )))
     }
@@ -13087,7 +13277,7 @@ fn verify_publication_and_terminals(
                 && args[1] == publication.frame
                 && i32::from(*offset) == publication.result_offset => {}
         _ => {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a finished Result certificate does not bind its exact word/frame/store"
                     .to_string(),
             ));
@@ -13115,7 +13305,7 @@ fn verify_publication_and_terminals(
             .and_then(|word| iconst_value(&body.func, *word))
             != Some(0)
     {
-        return Err(backend_module(
+        return Err(backend_module(LoweringCause::FinishedCode,
             "a finished Result publication does not return status zero".to_string(),
         ));
     }
@@ -13130,7 +13320,7 @@ fn verify_publication_and_terminals(
             continue;
         }
         let Some(returned) = body.func.dfg.inst_args(return_inst).first().copied() else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::FinishedCode,
                 "a finished Result function has a terminal with no status".to_string(),
             ));
         };
@@ -13138,7 +13328,7 @@ fn verify_publication_and_terminals(
             continue;
         }
         let return_block = body.func.layout.inst_block(return_inst).ok_or_else(|| {
-            backend_module("a finished Result terminal is absent from the layout".to_string())
+            backend_module(LoweringCause::FinishedCode, "a finished Result terminal is absent from the layout".to_string())
         })?;
         if value_is_guarded_nonzero_at_inst(&body.func, returned, return_inst) {
             continue;
@@ -13174,7 +13364,7 @@ fn verify_publication_and_terminals(
                 .block_insts(block)
                 .map(|inst| format!("{inst:?}:{:?}", body.func.dfg.insts[inst]))
                 .collect::<Vec<_>>();
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::FinishedCode, format!(
                 "a finished Result function has an uncertified status-zero terminal \
                  {return_inst:?} in {block:?}, returned={returned:?}, \
                  definition={:?}, producer={:?}: {instructions:?}",
@@ -13743,5 +13933,29 @@ mod generated_result_protocol_verifier {
                 1
             );
         }
+    }
+}
+
+fn stage_result_body(
+    compiler: &mut Lowering<'_>,
+    unit: ExistingResultUnitIdentity,
+    target: FuncId,
+    func: Function,
+    publication: Option<FunctionResultPublication>,
+    required_contract: Option<ConstructorIdentity>,
+    independent_contract: Option<ConstructorIdentity>,
+) -> StagedResultBody {
+    StagedResultBody {
+        unit,
+        target,
+        func,
+        authorities: std::mem::take(&mut compiler.function_local.generated_constructor_authorities),
+        call_obligations: std::mem::take(
+            &mut compiler.function_local.pending_call_result_obligations,
+        ),
+        boundary_arena: compiler.function_local.boundary_arena,
+        publication,
+        required_contract,
+        independent_contract,
     }
 }

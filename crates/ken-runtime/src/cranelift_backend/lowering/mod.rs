@@ -1177,6 +1177,8 @@ impl ArtifactHelpers<'_> {
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
+            generated_constructor_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
@@ -1491,6 +1493,11 @@ struct FunctionLocalRefs {
     /// context function. Source identities, retarget callers, transports, and
     /// derivation ancestry are absent from its type.
     checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
+    /// The exact emitted constructor identity for each function-local SSA word.
+    generated_constructor_authorities:
+        BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    /// Each generated call's exact finished status/Trap/Result obligation.
+    pending_call_result_obligations: Vec<PendingCallResultObligation>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
@@ -15082,6 +15089,7 @@ impl Lowering<'_> {
                 return Ok(());
             }
             return Err(backend_module(
+                LoweringCause::PlannerInvariant,
                 "one generated-context Result word acquired incompatible terminal authorities"
                     .to_string(),
             ));

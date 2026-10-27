@@ -374,6 +374,8 @@ fn run_dynamic_constructor_dispatch_fixture(
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
+            generated_constructor_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
@@ -2332,6 +2334,8 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
+            generated_constructor_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
@@ -7368,6 +7372,7 @@ fn worker_call_target(template: units::WorkerTemplate) -> units::DeclaredUnitCal
         header: template.header,
         slots: template.slots,
         offsets: template.offsets,
+        result_contract: None,
     }
 }
 

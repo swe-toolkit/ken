@@ -3081,26 +3081,22 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                     super::units::close_aggregate_allocation_ledger(&mut compiler)?;
                 let _effect_seats = super::units::close_host_effect_seat_ledger(&mut compiler)?;
             }
-            // `RT-CONTSPEC-ACTIVATE` `D2` — define each declared continuation
-            // target from its own projected contract, after the ordinary
-            // bodies and before the root adapter.
-            super::units::define_continuation_bodies(
+            // Stage every generated Result participant before certifying any
+            // publication. A declaration or partially emitted function is not
+            // a finished authority for another generated caller.
+            let mut staged_result_bodies = super::units::stage_continuation_bodies(
                 &mut module,
                 &mut compiler,
                 helpers,
                 unit_bundle,
             )?;
-            // `RT-DECL-CLOSURE-PORT` `D5a` — define each generated producer
-            // execution context, after the specializations that call them.
-            // Declaration already happened in the one up-front bundle pass, so
-            // this ordering is a readability choice, not a linking constraint.
-            super::units::define_continuation_context_bodies(
+            staged_result_bodies.extend(super::units::stage_continuation_context_bodies(
                 &mut module,
                 &mut compiler,
                 helpers,
                 unit_bundle,
                 call_edges,
-            )?;
+            )?);
             let expected_response_owners = compiler
                 .static_transition_plan
                 .static_response_owner_specializations()?
@@ -3112,20 +3108,26 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                     ))
                 })?
                 .len();
-            let defined_response_owners =
-                super::units::define_static_response_owner_bodies(
-                    &mut module,
-                    &mut compiler,
-                    helpers,
-                    unit_bundle,
-                    call_edges,
-                )?;
-            if defined_response_owners != expected_response_owners {
+            let staged_response_owners = super::units::stage_static_response_owner_bodies(
+                &mut module,
+                &mut compiler,
+                helpers,
+                unit_bundle,
+                call_edges,
+            )?;
+            if staged_response_owners.len() != expected_response_owners {
                 return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "the response-owner body population is incomplete: expected \
-                     {expected_response_owners}, defined {defined_response_owners}",
+                     {expected_response_owners}, defined {}",
+                    staged_response_owners.len(),
                 )));
             }
+            staged_result_bodies.extend(staged_response_owners);
+            super::units::close_and_define_staged_result_bodies(
+                &mut module,
+                helpers,
+                staged_result_bodies,
+            )?;
             compiler.finish_grafted_spine_control_graph()?;
             compiler.require_complete_join_plan_consumption()?;
             compiler.require_complete_dynamic_splice_edge_consumption()?;
@@ -14465,6 +14467,7 @@ impl<'a> Lowering<'a> {
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
         }
+        self.register_generated_constructor_authority(constructor_identity, word)?;
         Ok(word)
     }
 

@@ -1731,16 +1731,27 @@ impl<'a> Lowering<'a> {
                         if constructor == &self.process_symbols.exit_success
                             || constructor == &self.process_symbols.exit_failure
                 );
-            if process_exit {
+            let result_identity = match value {
+                Lowered::Constructor {
+                    synthesized_identity: Some(identity),
+                    ..
+                } => Some(*identity),
+                _ => None,
+            };
+            let word = if process_exit {
                 let status = self.emit_process_exit_status(builder, value.clone());
-                self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)
+                self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)?
             } else {
                 // The ordinary boundary walk remains fail-closed for every
                 // closure. This exact unit-result seam has the planner-issued
                 // environment identity needed to replace an authorized closure
                 // (including one nested in a result aggregate) before emission.
-                self.transfer_represented_boundary_value(builder, origin, value)
+                self.transfer_represented_boundary_value(builder, origin, value)?
+            };
+            if let Some(identity) = result_identity {
+                self.register_generated_constructor_authority(identity, word)?;
             }
+            Ok(word)
         }
 }
 
@@ -2189,9 +2200,11 @@ impl<'a> Lowering<'a> {
                     protocol.frame_region(frame, target.header.frame_bytes))
                 .transpose()?
                 .flatten();
+            let payload_bytes =
+                pending_region.map_or(target.header.frame_bytes, |region| region.frame_bytes);
             let payload = builder.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
-                pending_region.map_or(target.header.frame_bytes, |region| region.frame_bytes),
+                payload_bytes,
                 3,
             ));
             #[cfg(feature = "px8-ds-test-support")]
@@ -2458,12 +2471,9 @@ impl<'a> Lowering<'a> {
                 backend_module(LoweringCause::PlannerInvariant, "callee frame declares no result slot".to_string())
             })?;
             #[cfg(any(test, feature = "px8-ds-test-support"))]
-            if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
-                == TrapCallerProtocolMutation::ReadResultBeforeTrap
-            {
-                let word = builder.ins().stack_load(types::I64, payload, result_offset);
-                return Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call));
-            }
+            let early_result = (TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
+                == TrapCallerProtocolMutation::ReadResultBeforeTrap)
+                .then(|| builder.ins().stack_load(types::I64, payload, result_offset));
             let trap_word = builder.ins().stack_load(types::I64, payload, trap_offset);
             let cranelift_codegen::ir::ValueDef::Result(trap_load, _) =
                 builder.func.dfg.value_def(trap_word) else {
@@ -2636,7 +2646,28 @@ impl<'a> Lowering<'a> {
                 builder.switch_to_block(ready);
                 builder.seal_block(ready);
             }
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            let word = early_result.unwrap_or_else(|| {
+                builder.ins().stack_load(types::I64, payload, result_offset)
+            });
+            #[cfg(not(any(test, feature = "px8-ds-test-support")))]
             let word = builder.ins().stack_load(types::I64, payload, result_offset);
+            self.function_local.pending_call_result_obligations.push(PendingCallResultObligation {
+                identity: target.result_contract.map(units::DeclaredResultContract::identity),
+                realization_required: target.result_contract.is_some(),
+                call,
+                payload,
+                status: unit_status,
+                status_compare: failed,
+                status_branch: status_guard,
+                trap_word,
+                trap_compare: trapped,
+                trap_branch: trap_guard,
+                result_word: word,
+                frame_bytes: payload_bytes,
+                trap_offset,
+                result_offset,
+            });
             if let Some(environment) = boundary_closure {
                 let environment_word = CarriedBoundaryWord { word };
                 self.refuse_private_recursive_residual(builder, environment_word)?;
