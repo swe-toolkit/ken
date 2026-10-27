@@ -787,6 +787,10 @@ the candidate, per the prior ruling — not new work)."*
   the widened four-way disjunction to the per-mutation-substring pairing
   already used by
   `generated_result_owner_certificate_rejects_each_finished_body_corruption`.
+  **Deferred with AC-1e** (Steward `evt_3ssd5awf9p3v4`): the test lives only
+  in `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`, the AC-1e
+  file that increment A excludes. R1 binds the increment that restores that
+  file, not A (Runtime QA `evt_19p4mvqjz62pb`).
 - **R2:** close the `location_access` escaped-via-call-argument gap (a later
   write through a pointer an earlier callee retained), **or argue it
   unreachable**, before landing.
@@ -836,7 +840,8 @@ Every AC below binds **each** increment, cut from the `main` of its own moment.
   targeted build for D0-2.
 - **AC-AMENDMENT-8-CONTROLS.** §6b's five, each reported by name with its
   measurement. Controls 2 and 3 are **stops**, not warnings.
-- **AC-R1-R2.** §7, on increment A.
+- **AC-R1-R2.** §7: R2 on increment A; R1 on the increment that restores the
+  AC-1e file.
 - **No-regression means GREEN IN CI**, never a local `--workspace` run
   (`COORDINATION §12`). Local work is `scripts/ken-cargo` scoped to the crate
   touched.
