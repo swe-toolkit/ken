@@ -5685,8 +5685,35 @@ impl<'a> Lowering<'a> {
         let selected_origin = self
             .static_transition_plan
             .child_static_origin(operation_origin, 0)?;
-        let (selected_source, selected_origin) =
+        let (mut selected_source, mut selected_origin) =
             self.selected_operation_source(selected_source, selected_origin)?;
+        // P3: an operation can sit under nested coproduct injections. Descend
+        // only along the planner's own route selection: each wrapper is a
+        // one-field Construct on the path to the row's selected operation
+        // leaf, and the leaf itself is never unwrapped.
+        let mut wrapper_origins = Vec::new();
+        while selected_origin != row.selected_operation_origin() {
+            let RuntimeExpr::Construct { args, .. } = selected_source else {
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "StaticResponseDeferred",
+                    "a unit-less response operation path leaves its constructor spine before the selected leaf",
+                ));
+            };
+            let [inner_source] = args.as_slice() else {
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "StaticResponseDeferred",
+                    "a unit-less response wrapper above the selected leaf does not have one field",
+                ));
+            };
+            wrapper_origins.push(selected_origin);
+            let inner_origin = self
+                .static_transition_plan
+                .child_static_origin(selected_origin, 0)?;
+            (selected_source, selected_origin) =
+                self.selected_operation_source(inner_source, inner_origin)?;
+        }
         let RuntimeExpr::Construct {
             args: selected_fields,
             ..
@@ -5773,7 +5800,24 @@ impl<'a> Lowering<'a> {
         Self::require_i64(builder, operation_matches, 1);
         let operation_arity = self.emit_carrier_field_count(builder, operation)?;
         Self::require_i64(builder, operation_arity, 1);
-        let selected = self.emit_carrier_field(builder, operation, 0)?;
+        let mut selected = self.emit_carrier_field(builder, operation, 0)?;
+        for wrapper_origin in wrapper_origins {
+            let wrapper_tag = self.emit_carrier_tag(builder, selected)?;
+            let expected_wrapper = self
+                .static_transition_plan
+                .constructor_symbol_identity(wrapper_origin)?
+                .tag_abi_word()?;
+            let expected_wrapper = Self::carrier_identity_immediate(builder, expected_wrapper);
+            let wrapper_matches = builder.ins().icmp(
+                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                wrapper_tag,
+                expected_wrapper,
+            );
+            Self::require_i64(builder, wrapper_matches, 1);
+            let wrapper_arity = self.emit_carrier_field_count(builder, selected)?;
+            Self::require_i64(builder, wrapper_arity, 1);
+            selected = self.emit_carrier_field(builder, selected, 0)?;
+        }
 
         let selected_tag = self.emit_carrier_tag(builder, selected)?;
         let expected_selected = self
@@ -5833,13 +5877,10 @@ impl<'a> Lowering<'a> {
             effect.static_origin,
             &effect_env,
         )?;
-        if !matches!(
-            response,
-            LoweringOperand::Specialized(Lowered::HostResult { .. })
-        ) {
+        if !super::units::static_response_shape_matches(*effect_operation, &response) {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
-                "a unit-less response effect did not produce a HostResult",
+                "a unit-less response effect did not produce its operation's response shape",
             ));
         }
 
@@ -6502,6 +6543,7 @@ impl<'a> Lowering<'a> {
                         route_control,
                         *first,
                         local_remaining,
+                        CarriedRetSinkAuthority::DriveFedCheckedAnswer,
                     );
                 }
                 self.lower_computational_match_value_composed(
@@ -15586,6 +15628,7 @@ impl<'a> Lowering<'a> {
             route_control,
             eliminator,
             remaining_eliminators,
+            CarriedRetSinkAuthority::Assessed,
         );
         let popped = self.active_carried_computational_eliminations.pop();
         debug_assert_eq!(
@@ -15603,6 +15646,7 @@ impl<'a> Lowering<'a> {
         route_control: cranelift_codegen::ir::Value,
         eliminator: ComputationalEliminatorFrame<'_>,
         remaining_eliminators: &[EliminatorFrame<'_>],
+        sink_authority: CarriedRetSinkAuthority,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         if let Some(header) = self
             .active_carried_computational_eliminations
@@ -15643,6 +15687,7 @@ impl<'a> Lowering<'a> {
             route_control,
             eliminator,
             remaining_eliminators,
+            sink_authority,
         );
         let popped = self.active_carried_computational_eliminations.pop();
         debug_assert_eq!(
@@ -15660,6 +15705,7 @@ impl<'a> Lowering<'a> {
         route_control: cranelift_codegen::ir::Value,
         eliminator: ComputationalEliminatorFrame<'_>,
         remaining_eliminators: &[EliminatorFrame<'_>],
+        sink_authority: CarriedRetSinkAuthority,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         #[cfg(test)]
         record_d6a_route_event(D6aRouteEvent::CarriedEliminationEntered {
@@ -15705,7 +15751,13 @@ impl<'a> Lowering<'a> {
                 record_composed_return_ret_assessment(eliminator.static_origin, assessment.status);
             }
             assessment
-                .filter(|assessment| assessment.status == StrictRetSinkStatus::Ready)
+                .filter(|assessment| match assessment.status {
+                    StrictRetSinkStatus::Ready => true,
+                    StrictRetSinkStatus::PendingCheckedControl => {
+                        sink_authority == CarriedRetSinkAuthority::DriveFedCheckedAnswer
+                    }
+                    StrictRetSinkStatus::PendingTopology => false,
+                })
                 .map(|assessment| {
                     let return_case = eliminator.cases.get(assessment.ret_case_index).ok_or_else(|| {
                         unsupported(LoweringCause::PlannerInvariant, "ComposedReturnRetSink", "the Ready Ret case index is absent at emission")
