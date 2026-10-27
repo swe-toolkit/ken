@@ -375,9 +375,10 @@ official conformance, CI, publication, landing or landed trust for
 deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–5 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–6 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
-SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER).
+SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER;
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -407,12 +408,20 @@ older scratch D0 was not itself shipped-seed execution. Section 5
 adds unconditional public transitivity, greatest-intersection and
 least-hull laws for corner-wise `inside`, including inverted boxes.
 Architect checked them in scratch with unchanged 114 → 114 trusted
-identities, but the §5 exports are absent at this base. Its authored
-seed and scratch checks do not establish shipped-seed execution, CI,
-publication, landing or landed trust for §5. The new per-axis proof
-helpers stay private. Signed-coordinate geometry, Euclidean and
-floating-point distance, other dimensions, canonical empty boxes and
-point-set equality remain outside scope.
+identities; §5 exports, seed and package-owned test are now on main.
+The package test does not establish official conformance execution or
+landed trust. The per-axis order helpers stay private. Section 6 adds
+public `comm for min` and `comm for max` selectors in Nat Order and
+structural `intersect_comm` and `hull_comm` in NatBox, including
+inverted boxes. Unlike rational interval endpoint swaps, Nat corners
+support structural `Equal Box`. Architect D0 checked all four generic
+proofs without a new `Axiom`, at equal scratch trust identities
+114 → 114. The §6 catalog exports remain absent at this base; its
+closed seed and D0 do not establish shipped §6 execution, official
+conformance, CI, publication, landing or landed trust.
+Signed-coordinate geometry, Euclidean and floating-point distance,
+other dimensions, canonical empty boxes and point-set equality remain
+outside scope.
 
 The **exact rational-interval contract** is pinned in
 **`68-numerical.md`** §§1–5
@@ -511,15 +520,15 @@ Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
 `nonempty_cons`. Four laws give the two equations and direct-to-`List`
 membership and greatest-cost consequences for an observed `Some`.
 Architect's D0 checked these laws at 114→114 trusted identities. The
-§3.4 catalog exports are not yet delivered; the new seed is authored
-and checked only on an isolated D0 overlay, not shipped exports or the
-official conformance runner. No CI, publication, landing or landed
-trust measurement follows from the scratch checks. Continuous or
+§3.4 catalog exports, seed and package-owned seed test are now on
+main; its checks are distinct from official conformance execution.
+Earlier D0 alone established no CI or landed trust measurement. Continuous or
 implicit search, heuristics, approximation, arbitrary-order or
 multi-objective costs, top-k and complexity claims remain deferred.
 
 The **finite bounded-search contract** is pinned in
-**`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).
+**`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
+SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4).
 `Algorithm.Optimization.BoundedSearch.find_below` takes a Boolean
 predicate over `Nat` and a finite bound, returning `Some` with the
 least satisfying index below it or `None` when none exists. Three
@@ -528,7 +537,16 @@ completeness. No search direction, predicate-call count, recursion
 shape or complexity guarantee is normative. The §2 catalog module
 and seed are present on main; its D0 scratch checks alone establish
 neither shipped-seed execution, CI nor a landed trust measurement.
-The `List`-input Option selector is specified in §1.4, not §2.
+Section 2.4 adds one public `find_below_stable` law: if the result is
+`Some n` and `leq_nat bound larger = True`, that **same** `Some n`
+remains at the larger bound. `leq_suc_not_leq_same` stays private;
+there is no `None`-stability law, since a larger range can contain a
+first hit. Architect's D0 checked the generic proof with no new
+`Axiom` and equal scratch trusted identities 114 → 114. The §2.4
+catalog export is absent from this base; its authored closed seed
+and D0 are not shipped §2.4 execution, official conformance, CI,
+publication, landing or landed trust. The `List`-input Option
+selector is specified in §1.4, not §2.
 
 ## 4. I/O, effects, serialization
 

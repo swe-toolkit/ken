@@ -31,8 +31,13 @@ by `interval_inside`, for every interval, including inverted ones.
   operand swaps. `68-numerical.md:290` and the package prose at
   `RationalInterval.ken.md:967` say associativity is not claimed as
   structural `Equal Interval`, and no section states it by inclusion.
-- **Why inclusion, not equality.** The same reason as §5's swaps:
-  §64 operations keep distinct spellings of equal values.
+- **Why inclusion, not equality.** The package states arithmetic laws
+  by endpoint-value inclusion, and a structural `Equal Interval` law
+  would need a new `Data.Numeric.Rational` export, which the stop
+  conditions exclude. Closed regroupings coincide structurally, since
+  closed Nat arithmetic associates exactly; open ones are not
+  convertible, which is why the laws are needed (amended per Architect
+  AC-0 `evt_1yd2w28b5exdv`, Steward `evt_4b8jdb01qbht0`).
   `Data.Numeric.Rational` exports `proof assoc for rational_add` and
   `for rational_mul` as `rational_equiv` (`Rational.ken.md:260`,
   `:403`), and the private `equiv_leq` turns those into `rational_leq`.
@@ -60,10 +65,13 @@ lines changed in the same candidate.
 - **AC-1.** The new section states each ruled law by its public type.
   The Spec leader and CV review it, with a Decision.
 - **AC-2.** The seed's accepted client applies every ruled law to three
-  closed intervals with distinct endpoints, where the two regroupings
-  have different stored spellings. Its refused block is pinned to one
-  false inclusion on the same inputs. One example is the regrouped sum
-  inside the sum of the first two operands alone.
+  closed intervals with distinct endpoints. It also checks by `Refl`
+  that the closed regroupings coincide structurally, and says so, so no
+  reader takes a closed instance as evidence of the generic law. Its
+  refused block is pinned to one false inclusion on the same inputs:
+  the regrouped sum inside the sum of the first two operands alone,
+  with an accepted same-shape control and an independent `False`
+  value.
 
 ## Stop conditions
 
