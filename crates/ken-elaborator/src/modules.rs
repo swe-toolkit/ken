@@ -8026,10 +8026,12 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
     ///
-    /// MEASURED: an explicit export before B.leak's declaration selects its
-    /// newly checked ID even while globals["B.leak"] names an independent
-    /// checked decoy. CLAIMED: forward prebindings pair only after check.
-    /// THE GAP: the decoy differs, so eager ambient lookup fails the ID pin.
+    /// MEASURED: a file A and a foreign inline A cannot both own A.leak in
+    /// either order; a legal B forward export still selects its checked local.
+    /// CLAIMED: the original same-canonical two-owner collision is unreachable.
+    /// THE GAP: a forged globals["B.leak"] decoy does not redden eager lookup
+    /// because export is applied after B.leak is checked. The forward export
+    /// success remains a control, not an AC-2 identity-mutation claim.
     #[test]
     fn forward_local_export_waits_for_its_checked_id() {
         let root = inline_owner_root("pub const leak : Nat = Zero\n");
@@ -8037,6 +8039,12 @@ mod namespace_effect_tests {
         env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
             .expect("file provider checked");
         let old = env.globals["A.leak"];
+        let inline = "module A { export leak\nconst leak : Nat = Suc Zero }";
+        assert_owner_clash_without_writes(&mut env, "A", |env| env.elaborate_file(inline));
+        let mut memory_first = ElabEnv::new().expect("base environment");
+        memory_first.elaborate_file(inline).expect("first inline owner A");
+        assert_owner_clash_without_writes(&mut memory_first, "A", |env|
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A"));
         env.elaborate_file("module Decoy { pub const leak : Nat = Zero }")
             .expect("independent checked decoy");
         let decoy = env.globals["Decoy.leak"];
