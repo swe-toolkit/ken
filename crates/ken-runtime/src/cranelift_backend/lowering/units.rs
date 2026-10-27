@@ -4337,6 +4337,7 @@ fn verify_static_response_finished_body(
     facts: &StaticResponseFinishedBody,
     call_obligations: &[PendingCallResultObligation],
 ) -> Result<(), CraneliftBackendError> {
+    let func = &IndexedFunction::new(func);
     if facts.context_calls.len() != 1 {
         return Err(backend_module(
             LoweringCause::FinishedCode,
@@ -4558,7 +4559,7 @@ fn verify_static_response_finished_body(
 }
 
 fn verify_call_result_obligation(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     obligation: &PendingCallResultObligation,
     certified_target: FuncId,
 ) -> Result<(), CraneliftBackendError> {
@@ -11696,6 +11697,390 @@ enum CarrierFlowState {
     Current,
 }
 
+/// One finalized function plus the facts every staged-Result proof query
+/// reads. Each fact is a pure function of the borrowed CLIF and is built at
+/// its first use; the shared borrow keeps every cached fact current. With it a
+/// query costs its own backward slice and lookups, never a rescan of the whole
+/// function, so verification stays near-linear in body size.
+struct IndexedFunction<'f> {
+    func: &'f Function,
+    cfg: std::cell::OnceCell<ControlFlowGraph>,
+    edges: std::cell::OnceCell<ReachableEdges>,
+    stack_addresses: std::cell::RefCell<StackAddressCache>,
+    stored_slots: std::cell::OnceCell<
+        BTreeMap<cranelift_codegen::ir::StackSlot, Vec<Option<cranelift_codegen::ir::StackSlot>>>,
+    >,
+    calls: std::cell::OnceCell<Vec<(cranelift_codegen::ir::Inst, Option<FuncId>)>>,
+    comparisons:
+        std::cell::OnceCell<BTreeMap<cranelift_codegen::ir::Value, Vec<ConstantComparison>>>,
+    branches_on: std::cell::OnceCell<
+        BTreeMap<cranelift_codegen::ir::Value, Vec<cranelift_codegen::ir::Inst>>,
+    >,
+    branches_comparing: std::cell::OnceCell<
+        BTreeMap<cranelift_codegen::ir::Value, Vec<cranelift_codegen::ir::Inst>>,
+    >,
+    loads: std::cell::OnceCell<
+        BTreeMap<
+            StackMemoryLocation,
+            Vec<(cranelift_codegen::ir::Inst, cranelift_codegen::ir::Value)>,
+        >,
+    >,
+}
+
+/// The finalized CFG restricted to blocks reachable from the entry, with each
+/// block's incoming edges in `successor_edges` form.
+struct ReachableEdges {
+    entry: Block,
+    reachable: BTreeSet<Block>,
+    predecessors: BTreeMap<Block, Vec<(cranelift_codegen::ir::Inst, u8, Block)>>,
+}
+
+#[derive(Default)]
+struct StackAddressCache {
+    roots: BTreeMap<cranelift_codegen::ir::Value, Option<(cranelift_codegen::ir::StackSlot, i64)>>,
+    cut_free:
+        BTreeMap<cranelift_codegen::ir::Value, Option<(cranelift_codegen::ir::StackSlot, i64)>>,
+}
+
+/// One single-result comparison against a constant, as
+/// `comparison_with_constant` reads it. `immediate` marks the `icmp_imm` form
+/// that `compare_imm_is` also accepts.
+#[derive(Clone, Copy, Debug)]
+struct ConstantComparison {
+    comparison: cranelift_codegen::ir::Value,
+    operand: cranelift_codegen::ir::Value,
+    condition: cranelift_codegen::ir::condcodes::IntCC,
+    constant: i64,
+    immediate: bool,
+}
+
+impl std::ops::Deref for IndexedFunction<'_> {
+    type Target = Function;
+
+    fn deref(&self) -> &Function {
+        self.func
+    }
+}
+
+impl<'f> IndexedFunction<'f> {
+    fn new(func: &'f Function) -> Self {
+        Self {
+            func,
+            cfg: std::cell::OnceCell::new(),
+            edges: std::cell::OnceCell::new(),
+            stack_addresses: std::cell::RefCell::default(),
+            stored_slots: std::cell::OnceCell::new(),
+            calls: std::cell::OnceCell::new(),
+            comparisons: std::cell::OnceCell::new(),
+            branches_on: std::cell::OnceCell::new(),
+            branches_comparing: std::cell::OnceCell::new(),
+            loads: std::cell::OnceCell::new(),
+        }
+    }
+
+    fn insts(&self) -> impl Iterator<Item = cranelift_codegen::ir::Inst> + '_ {
+        self.func
+            .layout
+            .blocks()
+            .flat_map(|block| self.func.layout.block_insts(block))
+    }
+
+    fn cfg(&self) -> &ControlFlowGraph {
+        self.cfg
+            .get_or_init(|| ControlFlowGraph::with_function(self.func))
+    }
+
+    fn edges(&self) -> Result<&ReachableEdges, CraneliftBackendError> {
+        if let Some(edges) = self.edges.get() {
+            return Ok(edges);
+        }
+        let func = self.func;
+        let entry = func.layout.entry_block().ok_or_else(|| {
+            backend_module(
+                LoweringCause::FinishedCode,
+                "a staged Result function has no entry block".to_string(),
+            )
+        })?;
+        let mut reachable = BTreeSet::from([entry]);
+        let mut predecessors = BTreeMap::<Block, Vec<_>>::new();
+        let mut pending = vec![entry];
+        while let Some(block) = pending.pop() {
+            if !func
+                .layout
+                .block_insts(block)
+                .any(|inst| func.dfg.insts[inst].opcode().is_terminator())
+            {
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
+                    "a staged Result proof reaches a CFG block without a supported terminator"
+                        .to_string(),
+                ));
+            }
+            for (terminator, ordinal, target) in successor_edges(func, block)? {
+                predecessors
+                    .entry(target)
+                    .or_default()
+                    .push((terminator, ordinal, block));
+                if reachable.insert(target) {
+                    pending.push(target);
+                }
+            }
+        }
+        Ok(self.edges.get_or_init(|| ReachableEdges {
+            entry,
+            reachable,
+            predecessors,
+        }))
+    }
+
+    fn calls(&self) -> &[(cranelift_codegen::ir::Inst, Option<FuncId>)] {
+        self.calls.get_or_init(|| {
+            self.insts()
+                .filter(|inst| {
+                    self.func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Call
+                })
+                .map(|call| (call, Lowering::decode_direct_callee(self.func, call).ok()))
+                .collect()
+        })
+    }
+
+    /// Constant comparisons whose compared operand resolves to `operand`.
+    fn comparisons_of(&self, operand: cranelift_codegen::ir::Value) -> &[ConstantComparison] {
+        self.comparisons
+            .get_or_init(|| {
+                let mut comparisons = BTreeMap::<_, Vec<_>>::new();
+                for inst in self.insts() {
+                    let [comparison] = self.func.dfg.inst_results(inst) else {
+                        continue;
+                    };
+                    let Some((condition, operand, constant)) =
+                        comparison_with_constant(self.func, *comparison)
+                    else {
+                        continue;
+                    };
+                    comparisons
+                        .entry(self.func.dfg.resolve_aliases(operand))
+                        .or_default()
+                        .push(ConstantComparison {
+                            comparison: *comparison,
+                            operand,
+                            condition,
+                            constant,
+                            immediate: matches!(
+                                &self.func.dfg.insts[inst],
+                                cranelift_codegen::ir::InstructionData::IntCompareImm { opcode, .. }
+                                    if *opcode == cranelift_codegen::ir::Opcode::IcmpImm
+                            ),
+                        });
+                }
+                comparisons
+            })
+            .get(&operand)
+            .map_or(&[], Vec::as_slice)
+    }
+
+    /// `brif` instructions whose condition is exactly `condition`.
+    fn branches_on(
+        &self,
+        condition: cranelift_codegen::ir::Value,
+    ) -> &[cranelift_codegen::ir::Inst] {
+        self.branches_on
+            .get_or_init(|| {
+                let mut branches = BTreeMap::<_, Vec<_>>::new();
+                for inst in self.insts() {
+                    if let cranelift_codegen::ir::InstructionData::Brif { arg, .. } =
+                        &self.func.dfg.insts[inst]
+                    {
+                        branches.entry(*arg).or_default().push(inst);
+                    }
+                }
+                branches
+            })
+            .get(&condition)
+            .map_or(&[], Vec::as_slice)
+    }
+
+    /// `brif` instructions whose condition compares exactly `compared` with a
+    /// constant.
+    fn branches_comparing(
+        &self,
+        compared: cranelift_codegen::ir::Value,
+    ) -> &[cranelift_codegen::ir::Inst] {
+        self.branches_comparing
+            .get_or_init(|| {
+                let mut branches = BTreeMap::<_, Vec<_>>::new();
+                for inst in self.insts() {
+                    if let cranelift_codegen::ir::InstructionData::Brif { arg, .. } =
+                        &self.func.dfg.insts[inst]
+                    {
+                        if let Some((_, compared, _)) = comparison_with_constant(self.func, *arg) {
+                            branches.entry(compared).or_default().push(inst);
+                        }
+                    }
+                }
+                branches
+            })
+            .get(&compared)
+            .map_or(&[], Vec::as_slice)
+    }
+
+    /// Every load result that reads exactly `location`, in layout order.
+    fn loads_of(
+        &self,
+        location: StackMemoryLocation,
+    ) -> Result<&[(cranelift_codegen::ir::Inst, cranelift_codegen::ir::Value)], CraneliftBackendError>
+    {
+        if self.loads.get().is_none() {
+            let mut loads = BTreeMap::<_, Vec<_>>::new();
+            for inst in self.insts() {
+                for output in self.func.dfg.inst_results(inst) {
+                    if let Some((load, location)) = loaded_stack_location(self, *output)? {
+                        loads.entry(location).or_default().push((load, *output));
+                    }
+                }
+            }
+            let _ = self.loads.set(loads);
+        }
+        Ok(self
+            .loads
+            .get()
+            .and_then(|loads| loads.get(&location))
+            .map_or(&[], Vec::as_slice))
+    }
+
+    /// For each stack slot whose address is stored, the slot of each store's
+    /// destination (`None` when the destination is not an exact stack
+    /// address).
+    fn stored_slots(
+        &self,
+    ) -> Result<
+        &BTreeMap<cranelift_codegen::ir::StackSlot, Vec<Option<cranelift_codegen::ir::StackSlot>>>,
+        CraneliftBackendError,
+    > {
+        if let Some(stored) = self.stored_slots.get() {
+            return Ok(stored);
+        }
+        let mut stored_slots = BTreeMap::<_, Vec<_>>::new();
+        for inst in self.insts() {
+            let (stored, destination) = match &self.func.dfg.insts[inst] {
+                cranelift_codegen::ir::InstructionData::StackStore {
+                    arg, stack_slot, ..
+                } => (*arg, Some(*stack_slot)),
+                cranelift_codegen::ir::InstructionData::Store { args, .. }
+                | cranelift_codegen::ir::InstructionData::StoreNoOffset { args, .. } => (
+                    args[0],
+                    resolve_stack_address(self, args[1])?.map(|(slot, _)| slot),
+                ),
+                _ => continue,
+            };
+            let Some((stored_slot, _)) = resolve_stack_address(self, stored)? else {
+                continue;
+            };
+            stored_slots
+                .entry(stored_slot)
+                .or_default()
+                .push(destination);
+        }
+        Ok(self.stored_slots.get_or_init(|| stored_slots))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AllPathsVerdict {
+    Holds,
+    Violated,
+    Unreachable,
+}
+
+/// Decides whether every finalized path from the entry to `dependent` leaves
+/// a forward state machine in `accepted` just after `dependent` executes. The
+/// machine starts in `entry_state` and has the finite state set `states`;
+/// `through_inst` and `through_edge` are its transfer functions.
+///
+/// The walk runs backward from `dependent`, replacing the set of acceptable
+/// states by its preimage at each instruction and edge. A path is settled once
+/// every state is acceptable (no earlier history can matter) and violated once
+/// none is, or when it reaches the entry with `entry_state` unacceptable. A
+/// violating forward path exists exactly when this walk finds one, so the
+/// verdict equals a forward all-paths walk from the entry, while each query
+/// visits only the blocks between `dependent` and its deciding events.
+fn verify_all_paths_backward<S: Copy + Ord>(
+    func: &IndexedFunction<'_>,
+    states: &[S],
+    entry_state: S,
+    dependent: cranelift_codegen::ir::Inst,
+    accepted: S,
+    mut through_inst: impl FnMut(S, cranelift_codegen::ir::Inst) -> Result<S, CraneliftBackendError>,
+    mut through_edge: impl FnMut(
+        S,
+        cranelift_codegen::ir::Inst,
+        u8,
+        Block,
+    ) -> Result<S, CraneliftBackendError>,
+) -> Result<AllPathsVerdict, CraneliftBackendError> {
+    let edges = func.edges()?;
+    let Some(block) = func
+        .layout
+        .inst_block(dependent)
+        .filter(|block| edges.reachable.contains(block))
+    else {
+        return Ok(AllPathsVerdict::Unreachable);
+    };
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![(block, Some(dependent), BTreeSet::from([accepted]))];
+    'paths: while let Some((block, mut cursor, mut acceptable)) = pending.pop() {
+        while let Some(inst) = cursor {
+            let mut preimage = BTreeSet::new();
+            for state in states {
+                if acceptable.contains(&through_inst(*state, inst)?) {
+                    preimage.insert(*state);
+                }
+            }
+            if preimage.is_empty() {
+                return Ok(AllPathsVerdict::Violated);
+            }
+            if preimage.len() == states.len() {
+                continue 'paths;
+            }
+            acceptable = preimage;
+            cursor = func.layout.prev_inst(inst);
+        }
+        if block == edges.entry && !acceptable.contains(&entry_state) {
+            return Ok(AllPathsVerdict::Violated);
+        }
+        for &(terminator, ordinal, source) in edges.predecessors.get(&block).into_iter().flatten() {
+            let mut preimage = BTreeSet::new();
+            for state in states {
+                if acceptable.contains(&through_edge(*state, terminator, ordinal, block)?) {
+                    preimage.insert(*state);
+                }
+            }
+            if preimage.is_empty() {
+                return Ok(AllPathsVerdict::Violated);
+            }
+            if preimage.len() != states.len() && seen.insert((source, preimage.clone())) {
+                pending.push((source, func.layout.last_inst(source), preimage));
+            }
+        }
+    }
+    Ok(AllPathsVerdict::Holds)
+}
+
+fn all_paths_result(
+    verdict: AllPathsVerdict,
+    label: &str,
+    violation: impl FnOnce() -> String,
+) -> Result<(), CraneliftBackendError> {
+    match verdict {
+        AllPathsVerdict::Holds => Ok(()),
+        AllPathsVerdict::Violated => Err(backend_module(LoweringCause::FinishedCode, violation())),
+        AllPathsVerdict::Unreachable => Err(backend_module(
+            LoweringCause::FinishedCode,
+            format!("{label} is not reachable from the finalized function entry"),
+        )),
+    }
+}
+
 /// A finalized CLIF body held outside the object until its pending Result
 /// obligations close. `target` and `unit` are the two existing identities
 /// already joined by UnitBundle at the typed definition pass.
@@ -11712,11 +12097,11 @@ pub(super) struct StagedResultBody {
 }
 
 fn address_depends_on_slots(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     value: cranelift_codegen::ir::Value,
     slots: &BTreeSet<cranelift_codegen::ir::StackSlot>,
 ) -> Result<bool, CraneliftBackendError> {
-    let cfg = ControlFlowGraph::with_function(func);
+    let cfg = func.cfg();
     let entry = func.layout.entry_block();
     let mut seen = BTreeSet::new();
     let mut pending = vec![value];
@@ -11755,7 +12140,7 @@ fn address_depends_on_slots(
 }
 
 fn call_may_access_location(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     call: cranelift_codegen::ir::Inst,
     access: &LocationAccess,
 ) -> Result<bool, CraneliftBackendError> {
@@ -11787,24 +12172,30 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             }
         }
     }
+    // One analysis per finalized body, shared by every proof query on it; the
+    // borrow ends before definition moves the functions out.
+    let indexed = staged
+        .iter()
+        .map(|body| IndexedFunction::new(&body.func))
+        .collect::<Vec<_>>();
     // Protocol verification depends only on finalized CLIF and the exact typed
     // call target, not on fixed-point certificate availability. Verify each
     // call/publication once before either graph iteration so a later SCC pass
     // can consume only already-audited locators without re-running the CFG and
     // memory analyses for every dependency round.
-    for body in &staged {
+    for (body, func) in staged.iter().zip(&indexed) {
         for obligation in &body.call_obligations {
-            let target = Lowering::decode_direct_callee(&body.func, obligation.call)?;
-            verify_call_result_obligation(&body.func, obligation, target)?;
+            let target = Lowering::decode_direct_callee(func, obligation.call)?;
+            verify_call_result_obligation(func, obligation, target)?;
         }
         if let Some(publication) = body.publication {
-            verify_publication_and_terminals(body, publication, true)?;
+            verify_publication_and_terminals(func, publication, true)?;
         }
     }
     let mut realizations = Vec::<FinishedUnitResultRealization>::new();
     loop {
         let mut progress = false;
-        for body in &staged {
+        for (body, func) in staged.iter().zip(&indexed) {
             if realizations
                 .iter()
                 .any(|realization| realization.target == body.target)
@@ -11817,7 +12208,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             let mut realized_call_words = BTreeSet::new();
             let mut dependencies_ready = true;
             for obligation in &body.call_obligations {
-                let target = Lowering::decode_direct_callee(&body.func, obligation.call)?;
+                let target = Lowering::decode_direct_callee(func, obligation.call)?;
                 if obligation.realization_required {
                     let target_unit = exact_staged_unit(&staged, target)?;
                     if !realizations.iter().any(|realization| {
@@ -11832,10 +12223,11 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             if !dependencies_ready {
                 continue;
             }
-            let reachable = reachable_with_cuts(&body.func, &BTreeSet::new())?;
-            let cfg = ControlFlowGraph::with_function(&body.func);
+            let reachable = reachable_with_cuts(func, &BTreeSet::new())?;
+            let cfg = func.cfg();
             let (valid, grounded) = prove_realized_value(
                 body,
+                func,
                 &cfg,
                 &reachable,
                 &realized_call_words,
@@ -11907,7 +12299,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
     }
 
     let mut required = Vec::<(FuncId, ConstructorIdentity)>::new();
-    for body in &staged {
+    for (body, func) in staged.iter().zip(&indexed) {
         if let Some(identity) = body.required_contract {
             if !required.contains(&(body.target, identity)) {
                 required.push((body.target, identity));
@@ -11917,7 +12309,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             let Some(identity) = obligation.identity else {
                 continue;
             };
-            let target = Lowering::decode_direct_callee(&body.func, obligation.call)?;
+            let target = Lowering::decode_direct_callee(func, obligation.call)?;
             let _typed_target = exact_staged_unit(&staged, target)?;
             if !required.contains(&(target, identity)) {
                 required.push((target, identity));
@@ -11927,7 +12319,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
     let mut finished = Vec::<FinishedUnitResultContract>::new();
     loop {
         let mut progress = false;
-        for body in &staged {
+        for (body, func) in staged.iter().zip(&indexed) {
             let demanded = required
                 .iter()
                 .filter(|(target, _)| *target == body.target)
@@ -11945,7 +12337,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 let mut realized_call_words = BTreeSet::new();
                 let mut all_calls_finished = true;
                 for obligation in &body.call_obligations {
-                    let target = Lowering::decode_direct_callee(&body.func, obligation.call)?;
+                    let target = Lowering::decode_direct_callee(func, obligation.call)?;
                     if obligation.realization_required {
                         let target_unit = exact_staged_unit(&staged, target)?;
                         if !realizations.iter().any(|realization| {
@@ -12008,14 +12400,15 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 } else {
                     let cuts = derive_certified_cuts(
                         body,
+                        func,
                         identity,
                         &call_seeds,
                         helpers.boundary_value_abi,
                     )?;
-                    let reachable = reachable_with_cuts(&body.func, &cuts.edges)?;
-                    let cfg = ControlFlowGraph::with_function(&body.func);
+                    let reachable = reachable_with_cuts(func, &cuts.edges)?;
+                    let cfg = func.cfg();
                     let proof = prove_forwarded_value(
-                        &body.func,
+                        func,
                         &cfg,
                         &reachable,
                         &cuts.edges,
@@ -12137,6 +12530,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             }
         }
     }
+    drop(indexed);
     for mut body in staged.drain(..) {
         let mut ctx = module.make_context();
         std::mem::swap(&mut ctx.func, &mut body.func);
@@ -12204,6 +12598,7 @@ fn comparison_with_constant(
 
 fn derive_certified_cuts(
     body: &StagedResultBody,
+    func: &IndexedFunction<'_>,
     identity: ConstructorIdentity,
     call_seeds: &BTreeMap<cranelift_codegen::ir::Value, ConstructorIdentity>,
     helpers: &crate::boundary_value_clif::BoundaryLocalFuncs,
@@ -12249,8 +12644,8 @@ fn derive_certified_cuts(
         };
     #[cfg(not(feature = "px8-ds-test-support"))]
     let selected_tag_helper = helpers.tag;
-    let mut tag_queries = verify_carrier_queries(&body.func, selected_tag_helper, query_arena)?;
-    let field_queries = verify_carrier_queries(&body.func, helpers.field_count, arena)?;
+    let mut tag_queries = verify_carrier_queries(func, selected_tag_helper, query_arena)?;
+    let field_queries = verify_carrier_queries(func, helpers.field_count, arena)?;
     #[cfg(feature = "px8-ds-test-support")]
     if mutation == Some(GeneratedResultPathProofMutation::OmitHelperStatusCheck) {
         tag_queries.clear();
@@ -12298,18 +12693,18 @@ fn derive_certified_cuts(
         .iter()
         .filter(|(_, authority)| authority.identity == identity)
         .map(|(word, authority)| {
-            verify_constructor_authority_ground(body, authority, helpers)
+            verify_constructor_authority_ground(body, func, authority, helpers)
                 .map(|ground| (*word, ground))
         })
         .collect::<Result<BTreeMap<_, _>, _>>()?;
     let mut cuts = CertifiedCuts::default();
     loop {
-        let reachable = reachable_with_cuts(&body.func, &cuts.edges)?;
-        let cfg = ControlFlowGraph::with_function(&body.func);
+        let reachable = reachable_with_cuts(func, &cuts.edges)?;
+        let cfg = func.cfg();
         let mut added = false;
         for tag_query in &tag_queries {
             let proof = prove_forwarded_value(
-                &body.func,
+                func,
                 &cfg,
                 &reachable,
                 &cuts.edges,
@@ -12349,7 +12744,7 @@ fn derive_certified_cuts(
                     grounds.push(ground);
                 } else if proof_call_seeds.get(source) == Some(&identity) {
                     let cranelift_codegen::ir::ValueDef::Result(producer, _) =
-                        body.func.dfg.value_def(*source)
+                        func.dfg.value_def(*source)
                     else {
                         grounds.clear();
                         break;
@@ -12367,7 +12762,7 @@ fn derive_certified_cuts(
                 continue;
             }
             if verify_carrier_fact_current(
-                &body.func,
+                func,
                 &grounds,
                 arena,
                 &tracked_words,
@@ -12380,22 +12775,16 @@ fn derive_certified_cuts(
                 continue;
             }
 
-            for branch in body
-                .func
-                .layout
-                .blocks()
-                .flat_map(|block| body.func.layout.block_insts(block))
-            {
+            for &branch in func.branches_comparing(tag_query.output) {
                 let cranelift_codegen::ir::InstructionData::Brif { arg, blocks, .. } =
-                    &body.func.dfg.insts[branch]
+                    &func.dfg.insts[branch]
                 else {
                     continue;
                 };
                 if cuts.edges.iter().any(|cut| cut.terminator == branch) {
                     continue;
                 }
-                let Some((condition, compared, constant)) =
-                    comparison_with_constant(&body.func, *arg)
+                let Some((condition, compared, constant)) = comparison_with_constant(func, *arg)
                 else {
                     continue;
                 };
@@ -12414,17 +12803,16 @@ fn derive_certified_cuts(
                     continue;
                 }
                 let cranelift_codegen::ir::ValueDef::Result(comparison_inst, 0) =
-                    body.func.dfg.value_def(*arg)
+                    func.dfg.value_def(*arg)
                 else {
                     continue;
                 };
-                let Some((tag_output_load, _)) =
-                    loaded_stack_location(&body.func, tag_query.output)?
+                let Some((tag_output_load, _)) = loaded_stack_location(func, tag_query.output)?
                 else {
                     continue;
                 };
                 if verify_all_paths_after_instruction(
-                    &body.func,
+                    func,
                     tag_output_load,
                     comparison_inst,
                     "a certified tag comparison",
@@ -12436,13 +12824,13 @@ fn derive_certified_cuts(
                 let matching_field_queries = field_queries
                     .iter()
                     .filter(|query| {
-                        let field_output_load = loaded_stack_location(&body.func, query.output)
+                        let field_output_load = loaded_stack_location(func, query.output)
                             .ok()
                             .flatten()
                             .map(|(load, _)| load);
                         query.word == tag_query.word
                             && verify_all_paths_after_instruction(
-                                &body.func,
+                                func,
                                 tag_output_load,
                                 query.call,
                                 "a certified field-count query",
@@ -12450,7 +12838,7 @@ fn derive_certified_cuts(
                             .is_ok()
                             && field_output_load.is_some_and(|load| {
                                 verify_all_paths_after_instruction(
-                                    &body.func,
+                                    func,
                                     load,
                                     comparison_inst,
                                     "a certified field-count query",
@@ -12463,7 +12851,7 @@ fn derive_certified_cuts(
                     continue;
                 }
                 if verify_carrier_fact_current(
-                    &body.func,
+                    func,
                     &grounds,
                     arena,
                     &tracked_words,
@@ -12485,12 +12873,11 @@ fn derive_certified_cuts(
                 if mutation == Some(GeneratedResultPathProofMutation::ComparisonPolarity) {
                     destination_ordinal ^= 1;
                 }
-                let mut target =
-                    blocks[destination_ordinal as usize].block(&body.func.dfg.value_lists);
+                let mut target = blocks[destination_ordinal as usize].block(&func.dfg.value_lists);
                 #[cfg(feature = "px8-ds-test-support")]
                 if mutation == Some(GeneratedResultPathProofMutation::DestinationOrdinal) {
-                    target = blocks[(destination_ordinal ^ 1) as usize]
-                        .block(&body.func.dfg.value_lists);
+                    target =
+                        blocks[(destination_ordinal ^ 1) as usize].block(&func.dfg.value_lists);
                 }
                 let cut = CertifiedInfeasibleEdge {
                     terminator: branch,
@@ -12498,7 +12885,7 @@ fn derive_certified_cuts(
                     target,
                 };
                 exact_guard_edge(
-                    &body.func,
+                    func,
                     ExactProtocolGuard {
                         branch,
                         success_ordinal: destination_ordinal,
@@ -12542,7 +12929,7 @@ fn derive_certified_cuts(
             break;
         }
     }
-    verify_cut_provenance(body, &cuts)?;
+    verify_cut_provenance(body, func, &cuts)?;
     Ok(cuts)
 }
 
@@ -12663,7 +13050,7 @@ fn incoming_arguments_with_cuts(
 }
 
 fn instruction_clobbers_location(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     inst: cranelift_codegen::ir::Inst,
     location: StackMemoryLocation,
     access: &LocationAccess,
@@ -12682,7 +13069,7 @@ fn instruction_clobbers_location(
 }
 
 fn loaded_stack_location(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     value: cranelift_codegen::ir::Value,
 ) -> Result<Option<(cranelift_codegen::ir::Inst, StackMemoryLocation)>, CraneliftBackendError> {
     let value = func.dfg.resolve_aliases(value);
@@ -12729,43 +13116,25 @@ fn loaded_stack_location(
 }
 
 fn location_access(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     location: StackMemoryLocation,
 ) -> Result<LocationAccess, CraneliftBackendError> {
+    // The containers are the slots reachable from `location.slot` through
+    // "this slot's address is stored into that slot" edges.
+    let stored_slots = func.stored_slots()?;
     let mut containers = BTreeSet::from([location.slot]);
     let mut escaped = false;
-    loop {
-        let mut changed = false;
-        for inst in func
-            .layout
-            .blocks()
-            .flat_map(|block| func.layout.block_insts(block))
-        {
-            let (stored, destination) = match &func.dfg.insts[inst] {
-                cranelift_codegen::ir::InstructionData::StackStore {
-                    arg, stack_slot, ..
-                } => (*arg, Some(*stack_slot)),
-                cranelift_codegen::ir::InstructionData::Store { args, .. }
-                | cranelift_codegen::ir::InstructionData::StoreNoOffset { args, .. } => (
-                    args[0],
-                    resolve_stack_address(func, args[1])?.map(|(slot, _)| slot),
-                ),
-                _ => continue,
-            };
-            let Some((stored_slot, _)) = resolve_stack_address(func, stored)? else {
-                continue;
-            };
-            if !containers.contains(&stored_slot) {
-                continue;
+    let mut pending = vec![location.slot];
+    while let Some(slot) = pending.pop() {
+        for destination in stored_slots.get(&slot).into_iter().flatten() {
+            match destination {
+                Some(destination) => {
+                    if containers.insert(*destination) {
+                        pending.push(*destination);
+                    }
+                }
+                None => escaped = true,
             }
-            let Some(destination) = destination else {
-                escaped = true;
-                continue;
-            };
-            changed |= containers.insert(destination);
-        }
-        if !changed {
-            break;
         }
     }
     Ok(LocationAccess {
@@ -12849,13 +13218,14 @@ fn prove_forwarded_value(
 
 fn prove_realized_value(
     body: &StagedResultBody,
+    func: &IndexedFunction<'_>,
     cfg: &ControlFlowGraph,
     reachable: &BTreeSet<Block>,
     realized_call_words: &BTreeSet<cranelift_codegen::ir::Value>,
     value: cranelift_codegen::ir::Value,
 ) -> Result<(bool, bool), CraneliftBackendError> {
     // Validity and groundedness depend only on the backward-reachable leaves.
-    let entry = body.func.layout.entry_block().ok_or_else(|| {
+    let entry = func.layout.entry_block().ok_or_else(|| {
         backend_module(
             LoweringCause::FinishedCode,
             "a staged Result function has no entry block".to_string(),
@@ -12873,7 +13243,7 @@ fn prove_realized_value(
             grounded = true;
             continue;
         }
-        match body.func.dfg.value_def(value) {
+        match func.dfg.value_def(value) {
             cranelift_codegen::ir::ValueDef::Param(block, _) if block == entry => grounded = true,
             cranelift_codegen::ir::ValueDef::Param(block, index) => {
                 let predecessors = cfg
@@ -12885,7 +13255,7 @@ fn prove_realized_value(
                 }
                 for predecessor in predecessors {
                     pending.extend(incoming_arguments_with_cuts(
-                        &body.func,
+                        func,
                         predecessor.inst,
                         block,
                         index,
@@ -12942,73 +13312,84 @@ fn reachable_with_cuts(
     Ok(reachable)
 }
 
+/// The reaching state `inst` itself establishes for `location`, or `None`
+/// when `inst` leaves the incoming state unchanged.
+fn reaching_memory_effect(
+    func: &IndexedFunction<'_>,
+    inst: cranelift_codegen::ir::Inst,
+    location: StackMemoryLocation,
+    access: &LocationAccess,
+) -> Result<Option<ReachingMemoryState>, CraneliftBackendError> {
+    Ok(match stack_write_effect(func, inst)? {
+        StackWriteEffect::None => (func.dfg.insts[inst].opcode().is_call()
+            && call_may_access_location(func, inst, access)?)
+        .then_some(ReachingMemoryState::Unknown),
+        StackWriteEffect::Exact {
+            location: written,
+            value,
+        } if written == location => {
+            Some(ReachingMemoryState::Exact(func.dfg.resolve_aliases(value)))
+        }
+        StackWriteEffect::Exact {
+            location: written, ..
+        } if locations_overlap(location, written) => Some(ReachingMemoryState::Unknown),
+        StackWriteEffect::Unknown if unknown_write_may_alias(func, inst, access)? => {
+            Some(ReachingMemoryState::Unknown)
+        }
+        StackWriteEffect::Unknown | StackWriteEffect::Exact { .. } => None,
+    })
+}
+
 fn reaching_memory_states_before(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     location: StackMemoryLocation,
     dependent: cranelift_codegen::ir::Inst,
 ) -> Result<BTreeSet<ReachingMemoryState>, CraneliftBackendError> {
-    let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(
-            LoweringCause::FinishedCode,
-            "a memory proof has no entry block".to_string(),
-        )
-    })?;
+    // Each state is set outright by the last effect before `dependent`, so the
+    // states reaching it are the first effects met walking backward along
+    // every path, plus Uninitialized wherever a path reaches the entry first.
+    let edges = func.edges()?;
     let access = location_access(func, location)?;
-    let mut pending = vec![(entry, ReachingMemoryState::Uninitialized)];
-    let mut reached = BTreeSet::new();
+    let block = func
+        .layout
+        .inst_block(dependent)
+        .filter(|block| edges.reachable.contains(block))
+        .ok_or_else(|| {
+            backend_module(
+                LoweringCause::FinishedCode,
+                "a memory proof's dependent instruction is unreachable".to_string(),
+            )
+        })?;
     let mut observations = BTreeSet::new();
-    while let Some((block, incoming)) = pending.pop() {
-        if !reached.insert((block, incoming)) {
-            continue;
-        }
-        let mut state = incoming;
-        for inst in func.layout.block_insts(block) {
-            if inst == dependent {
-                observations.insert(state);
-            }
-            match stack_write_effect(func, inst)? {
-                StackWriteEffect::None => {
-                    if func.dfg.insts[inst].opcode().is_call()
-                        && call_may_access_location(func, inst, &access)?
-                    {
-                        state = ReachingMemoryState::Unknown;
-                    }
-                }
-                StackWriteEffect::Exact {
-                    location: written,
-                    value,
-                } if written == location => {
-                    state = ReachingMemoryState::Exact(func.dfg.resolve_aliases(value));
-                }
-                StackWriteEffect::Exact {
-                    location: written, ..
-                } if locations_overlap(location, written) => {
-                    state = ReachingMemoryState::Unknown;
-                }
-                StackWriteEffect::Unknown if unknown_write_may_alias(func, inst, &access)? => {
-                    state = ReachingMemoryState::Unknown;
-                }
-                StackWriteEffect::Unknown | StackWriteEffect::Exact { .. } => {}
-            }
-            if func.dfg.insts[inst].opcode().is_terminator() {
-                for (_, _, target) in successor_edges(func, block)? {
-                    pending.push((target, state));
-                }
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![(block, func.layout.prev_inst(dependent))];
+    while let Some((block, mut cursor)) = pending.pop() {
+        let mut decided = None;
+        while let Some(inst) = cursor {
+            decided = reaching_memory_effect(func, inst, location, &access)?;
+            if decided.is_some() {
                 break;
             }
+            cursor = func.layout.prev_inst(inst);
         }
-    }
-    if observations.is_empty() {
-        return Err(backend_module(
-            LoweringCause::FinishedCode,
-            "a memory proof's dependent instruction is unreachable".to_string(),
-        ));
+        if let Some(state) = decided {
+            observations.insert(state);
+            continue;
+        }
+        if block == edges.entry {
+            observations.insert(ReachingMemoryState::Uninitialized);
+        }
+        for &(_, _, source) in edges.predecessors.get(&block).into_iter().flatten() {
+            if seen.insert(source) {
+                pending.push((source, func.layout.last_inst(source)));
+            }
+        }
     }
     Ok(observations)
 }
 
 fn resolve_stack_address(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     value: cranelift_codegen::ir::Value,
 ) -> Result<Option<(cranelift_codegen::ir::StackSlot, i64)>, CraneliftBackendError> {
     if let Some(address) = resolve_stack_address_direct(func, value, &mut BTreeSet::new()) {
@@ -13036,8 +13417,21 @@ fn resolve_stack_address(
     if !needs_cfg {
         return Ok(None);
     }
-    let cfg = ControlFlowGraph::with_function(func);
-    resolve_stack_address_inner(func, &cfg, value, &mut StackAddressSearch::default())
+    if let Some(resolved) = func.stack_addresses.borrow().roots.get(&value) {
+        return Ok(*resolved);
+    }
+    // A result whose subtree hit no cycle cut is path-independent, so the
+    // memo of such results is shared by every query on this function.
+    let mut search = StackAddressSearch {
+        resolved: std::mem::take(&mut func.stack_addresses.borrow_mut().cut_free),
+        ..StackAddressSearch::default()
+    };
+    let resolved = resolve_stack_address_inner(func, func.cfg(), value, &mut search);
+    let mut cache = func.stack_addresses.borrow_mut();
+    cache.cut_free = search.resolved;
+    let resolved = resolved?;
+    cache.roots.insert(value, resolved);
+    Ok(resolved)
 }
 
 fn resolve_stack_address_direct(
@@ -13202,7 +13596,7 @@ fn resolve_stack_address_uncached(
 }
 
 fn stack_write_effect(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     inst: cranelift_codegen::ir::Inst,
 ) -> Result<StackWriteEffect, CraneliftBackendError> {
     let effect = match &func.dfg.insts[inst] {
@@ -13277,44 +13671,29 @@ fn stack_write_effect(
 }
 
 fn status_zero_guards(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     status: cranelift_codegen::ir::Value,
 ) -> Result<Vec<ExactProtocolGuard>, CraneliftBackendError> {
     let mut guards = Vec::new();
-    for comparison_inst in func
-        .layout
-        .blocks()
-        .flat_map(|block| func.layout.block_insts(block))
-    {
-        let [comparison] = func.dfg.inst_results(comparison_inst) else {
-            continue;
-        };
-        if !compare_imm_is(
-            func,
-            *comparison,
-            status,
-            cranelift_codegen::ir::condcodes::IntCC::Equal,
-            0,
-        ) {
+    for comparison in func.comparisons_of(func.dfg.resolve_aliases(status)) {
+        if !(comparison.immediate
+            && comparison.operand == status
+            && comparison.condition == cranelift_codegen::ir::condcodes::IntCC::Equal
+            && comparison.constant == 0)
+        {
             continue;
         }
-        for branch in func
-            .layout
-            .blocks()
-            .flat_map(|block| func.layout.block_insts(block))
-        {
-            let cranelift_codegen::ir::InstructionData::Brif { arg, blocks, .. } =
+        for &branch in func.branches_on(comparison.comparison) {
+            let cranelift_codegen::ir::InstructionData::Brif { blocks, .. } =
                 &func.dfg.insts[branch]
             else {
                 continue;
             };
-            if *arg == *comparison {
-                guards.push(ExactProtocolGuard {
-                    branch,
-                    success_ordinal: 0,
-                    success_target: blocks[0].block(&func.dfg.value_lists),
-                });
-            }
+            guards.push(ExactProtocolGuard {
+                branch,
+                success_ordinal: 0,
+                success_target: blocks[0].block(&func.dfg.value_lists),
+            });
         }
     }
     if guards.is_empty() {
@@ -13370,7 +13749,7 @@ fn successor_edges(
 }
 
 fn unknown_write_may_alias(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     inst: cranelift_codegen::ir::Inst,
     access: &LocationAccess,
 ) -> Result<bool, CraneliftBackendError> {
@@ -13388,7 +13767,7 @@ fn unknown_write_may_alias(
 }
 
 fn value_is_guarded_nonzero_at_inst(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     value: cranelift_codegen::ir::Value,
     dependent: cranelift_codegen::ir::Inst,
 ) -> bool {
@@ -13396,51 +13775,37 @@ fn value_is_guarded_nonzero_at_inst(
     let cranelift_codegen::ir::ValueDef::Result(producer, 0) = func.dfg.value_def(value) else {
         return false;
     };
-    func.layout
-        .blocks()
-        .flat_map(|candidate| func.layout.block_insts(candidate))
-        .any(|comparison_inst| {
-            let [comparison] = func.dfg.inst_results(comparison_inst) else {
-                return false;
-            };
-            let nonzero_guard = compare_imm_is(
-                func,
-                *comparison,
-                value,
-                cranelift_codegen::ir::condcodes::IntCC::NotEqual,
-                0,
-            ) || matches!(
-                comparison_with_constant(func, *comparison),
-                Some((cranelift_codegen::ir::condcodes::IntCC::Equal, operand, constant))
-                    if func.dfg.resolve_aliases(operand) == value && constant != 0
-            );
-            if !nonzero_guard {
-                return false;
-            }
-            func.layout
-                .blocks()
-                .flat_map(|candidate| func.layout.block_insts(candidate))
-                .any(|branch| {
-                    let cranelift_codegen::ir::InstructionData::Brif { arg, blocks, .. } =
+    func.comparisons_of(value).iter().any(|comparison| {
+        let nonzero_guard = (comparison.immediate
+            && comparison.operand == value
+            && comparison.condition == cranelift_codegen::ir::condcodes::IntCC::NotEqual
+            && comparison.constant == 0)
+            || (comparison.condition == cranelift_codegen::ir::condcodes::IntCC::Equal
+                && comparison.constant != 0);
+        nonzero_guard
+            && func
+                .branches_on(comparison.comparison)
+                .iter()
+                .any(|&branch| {
+                    let cranelift_codegen::ir::InstructionData::Brif { blocks, .. } =
                         &func.dfg.insts[branch]
                     else {
                         return false;
                     };
-                    *arg == *comparison
-                        && verify_all_paths_guarded(
-                            func,
-                            producer,
-                            ExactProtocolGuard {
-                                branch,
-                                success_ordinal: 0,
-                                success_target: blocks[0].block(&func.dfg.value_lists),
-                            },
-                            dependent,
-                            "a nonzero guarded terminal",
-                        )
-                        .is_ok()
+                    verify_all_paths_guarded(
+                        func,
+                        producer,
+                        ExactProtocolGuard {
+                            branch,
+                            success_ordinal: 0,
+                            success_target: blocks[0].block(&func.dfg.value_lists),
+                        },
+                        dependent,
+                        "a nonzero guarded terminal",
+                    )
+                    .is_ok()
                 })
-        })
+    })
 }
 
 fn value_is_provably_nonzero(func: &Function, value: cranelift_codegen::ir::Value) -> bool {
@@ -13466,192 +13831,123 @@ fn value_is_provably_nonzero(func: &Function, value: cranelift_codegen::ir::Valu
 }
 
 fn verify_all_paths_after_instruction(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     producer: cranelift_codegen::ir::Inst,
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
-    let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(
-            LoweringCause::FinishedCode,
-            "an instruction-order proof has no entry block".to_string(),
-        )
-    })?;
-    let mut pending = vec![(entry, false)];
-    let mut reached = BTreeSet::new();
-    let mut observed = false;
-    while let Some((block, incoming)) = pending.pop() {
-        if !reached.insert((block, incoming)) {
-            continue;
-        }
-        let mut current = incoming;
-        for inst in func.layout.block_insts(block) {
-            if inst == producer {
-                current = true;
-            }
-            if inst == dependent {
-                observed = true;
-                if !current {
-                    return Err(backend_module(
-                        LoweringCause::FinishedCode,
-                        format!("{label} is reachable before its required finalized instruction"),
-                    ));
-                }
-            }
-            if func.dfg.insts[inst].opcode().is_terminator() {
-                for (_, _, target) in successor_edges(func, block)? {
-                    pending.push((target, current));
-                }
-                break;
-            }
-        }
-    }
-    if observed {
-        Ok(())
-    } else {
-        Err(backend_module(
-            LoweringCause::FinishedCode,
-            format!("{label} is not reachable from the finalized function entry"),
-        ))
-    }
+    let verdict = verify_all_paths_backward(
+        func,
+        &[false, true],
+        false,
+        dependent,
+        true,
+        |current, inst| Ok(current || inst == producer),
+        |current, _, _, _| Ok(current),
+    )?;
+    all_paths_result(verdict, label, || {
+        format!("{label} is reachable before its required finalized instruction")
+    })
 }
 
 fn verify_all_paths_guarded(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     producer: cranelift_codegen::ir::Inst,
     guard: ExactProtocolGuard,
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
     exact_guard_edge(func, guard)?;
-    let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(
-            LoweringCause::FinishedCode,
-            "a protocol proof has no entry block".to_string(),
-        )
-    })?;
-    let mut pending = vec![(entry, ProtocolFactState::Absent)];
-    let mut reached = BTreeSet::new();
-    let mut observed = false;
-    while let Some((block, incoming)) = pending.pop() {
-        if !reached.insert((block, incoming)) {
-            continue;
-        }
-        let mut state = incoming;
-        let mut terminated = false;
-        for inst in func.layout.block_insts(block) {
-            if inst == producer {
-                state = ProtocolFactState::Produced;
-            }
-            if inst == dependent {
-                observed = true;
-                if state != ProtocolFactState::Guarded {
-                    return Err(backend_module(
-                        LoweringCause::FinishedCode,
-                        format!(
-                            "{label} is reachable without traversing its current successful guard"
-                        ),
-                    ));
+    let verdict = verify_all_paths_backward(
+        func,
+        &[
+            ProtocolFactState::Absent,
+            ProtocolFactState::Produced,
+            ProtocolFactState::Guarded,
+        ],
+        ProtocolFactState::Absent,
+        dependent,
+        ProtocolFactState::Guarded,
+        |state, inst| {
+            Ok(if inst == producer {
+                ProtocolFactState::Produced
+            } else {
+                state
+            })
+        },
+        |state, terminator, ordinal, target| {
+            Ok(if terminator != guard.branch {
+                state
+            } else if ordinal == guard.success_ordinal && target == guard.success_target {
+                match state {
+                    ProtocolFactState::Produced | ProtocolFactState::Guarded => {
+                        ProtocolFactState::Guarded
+                    }
+                    ProtocolFactState::Absent => ProtocolFactState::Absent,
                 }
-            }
-            if func.dfg.insts[inst].opcode().is_terminator() {
-                terminated = true;
-                for (terminator, ordinal, target) in successor_edges(func, block)? {
-                    let outgoing = if terminator == guard.branch {
-                        if ordinal == guard.success_ordinal && target == guard.success_target {
-                            match state {
-                                ProtocolFactState::Produced | ProtocolFactState::Guarded => {
-                                    ProtocolFactState::Guarded
-                                }
-                                ProtocolFactState::Absent => ProtocolFactState::Absent,
-                            }
-                        } else {
-                            ProtocolFactState::Absent
-                        }
-                    } else {
-                        state
-                    };
-                    pending.push((target, outgoing));
-                }
-                break;
-            }
-        }
-        if !terminated {
-            return Err(backend_module(
-                LoweringCause::FinishedCode,
-                format!("{label} reaches a CFG block without a supported terminator"),
-            ));
-        }
-    }
-    if observed {
-        Ok(())
-    } else {
-        Err(backend_module(
-            LoweringCause::FinishedCode,
-            format!("{label} is not reachable from the finalized function entry"),
-        ))
-    }
+            } else {
+                ProtocolFactState::Absent
+            })
+        },
+    )?;
+    all_paths_result(verdict, label, || {
+        format!("{label} is reachable without traversing its current successful guard")
+    })
 }
 
 fn verify_all_paths_memory_current(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     producer: cranelift_codegen::ir::Inst,
     location: StackMemoryLocation,
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
-    let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(
-            LoweringCause::FinishedCode,
-            "a memory-flow proof has no entry block".to_string(),
-        )
-    })?;
     let access = location_access(func, location)?;
-    let mut pending = vec![(entry, MemoryFlowState::Absent)];
-    let mut reached = BTreeSet::new();
-    let mut observed = false;
-    while let Some((block, incoming)) = pending.pop() {
-        if !reached.insert((block, incoming)) {
-            continue;
-        }
-        let mut state = incoming;
-        for inst in func.layout.block_insts(block) {
+    let mut clobbers = BTreeMap::new();
+    let verdict = verify_all_paths_backward(
+        func,
+        &[MemoryFlowState::Absent, MemoryFlowState::Current],
+        MemoryFlowState::Absent,
+        dependent,
+        MemoryFlowState::Current,
+        |state, inst| {
             if inst == producer {
-                state = MemoryFlowState::Current;
-            } else if instruction_clobbers_location(func, inst, location, &access)? {
-                state = MemoryFlowState::Absent;
+                return Ok(MemoryFlowState::Current);
             }
-            if inst == dependent {
-                observed = true;
-                if state != MemoryFlowState::Current {
-                    return Err(backend_module(
-                        LoweringCause::FinishedCode,
-                        format!(
-                            "{label} is reachable without the current producer or after a clobber"
-                        ),
-                    ));
+            let clobbered = match clobbers.get(&inst) {
+                Some(clobbered) => *clobbered,
+                None => {
+                    let clobbered = instruction_clobbers_location(func, inst, location, &access)?;
+                    clobbers.insert(inst, clobbered);
+                    clobbered
                 }
-            }
-            if func.dfg.insts[inst].opcode().is_terminator() {
-                for (_, _, target) in successor_edges(func, block)? {
-                    pending.push((target, state));
-                }
-                break;
-            }
-        }
-    }
-    if observed {
-        Ok(())
-    } else {
-        Err(backend_module(
-            LoweringCause::FinishedCode,
-            format!("{label} is not reachable from the finalized function entry"),
-        ))
-    }
+            };
+            Ok(if clobbered {
+                MemoryFlowState::Absent
+            } else {
+                state
+            })
+        },
+        |state, _, _, _| Ok(state),
+    )?;
+    all_paths_result(verdict, label, || {
+        format!("{label} is reachable without the current producer or after a clobber")
+    })
+}
+
+fn carrier_pending_state(index: usize) -> Result<CarrierFlowState, CraneliftBackendError> {
+    u16::try_from(index)
+        .map(CarrierFlowState::Pending)
+        .map_err(|_| {
+            backend_module(
+                LoweringCause::FinishedCode,
+                "a carrier proof has more than 65536 grounds".to_string(),
+            )
+        })
 }
 
 fn verify_carrier_fact_current(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     grounds: &[CarrierFactGround],
     arena: cranelift_codegen::ir::Value,
     tracked_words: &BTreeSet<cranelift_codegen::ir::Value>,
@@ -13665,112 +13961,79 @@ fn verify_carrier_fact_current(
             format!("{label} has no finalized ground"),
         ));
     }
-    let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(
-            LoweringCause::FinishedCode,
-            "a carrier-flow proof has no entry block".to_string(),
-        )
-    })?;
-    let mut pending = vec![(entry, CarrierFlowState::Absent)];
-    let mut reached = BTreeSet::new();
-    let mut observed = false;
-    while let Some((block, incoming)) = pending.pop() {
-        if !reached.insert((block, incoming)) {
-            continue;
-        }
-        let mut state = incoming;
-        for inst in func.layout.block_insts(block) {
-            let ground_index = grounds.iter().position(|ground| ground.producer == inst);
-            if let Some(index) = ground_index {
-                state = if grounds[index].guard.is_some() {
-                    CarrierFlowState::Pending(u16::try_from(index).map_err(|_| {
-                        backend_module(
-                            LoweringCause::FinishedCode,
-                            "a carrier proof has more than 65536 grounds".to_string(),
-                        )
-                    })?)
+    let mut states = vec![CarrierFlowState::Absent, CarrierFlowState::Current];
+    states.extend(
+        (0..=u16::MAX)
+            .take(grounds.len())
+            .map(CarrierFlowState::Pending),
+    );
+    let verdict = verify_all_paths_backward(
+        func,
+        &states,
+        CarrierFlowState::Absent,
+        dependent,
+        CarrierFlowState::Current,
+        |state, inst| {
+            if let Some(index) = grounds.iter().position(|ground| ground.producer == inst) {
+                return if grounds[index].guard.is_some() {
+                    carrier_pending_state(index)
                 } else {
-                    CarrierFlowState::Current
+                    Ok(CarrierFlowState::Current)
                 };
-            } else if func.dfg.insts[inst].opcode().is_call() {
-                let touches_carrier = func
+            }
+            if func.dfg.insts[inst].opcode().is_call()
+                && func
                     .dfg
                     .inst_args(inst)
                     .iter()
-                    .any(|argument| *argument == arena || tracked_words.contains(argument));
-                if touches_carrier {
-                    let target = Lowering::decode_direct_callee(func, inst).ok();
-                    if !target.is_some_and(|target| tag_preserving_helpers.contains(&target)) {
-                        state = CarrierFlowState::Absent;
-                    }
+                    .any(|argument| *argument == arena || tracked_words.contains(argument))
+            {
+                let target = Lowering::decode_direct_callee(func, inst).ok();
+                if !target.is_some_and(|target| tag_preserving_helpers.contains(&target)) {
+                    return Ok(CarrierFlowState::Absent);
                 }
             }
-            if inst == dependent {
-                observed = true;
-                if state != CarrierFlowState::Current {
-                    return Err(backend_module(
-                        LoweringCause::FinishedCode,
-                        format!(
-                            "{label} is reachable without a current finalized constructor fact"
-                        ),
-                    ));
+            Ok(state)
+        },
+        |state, terminator, ordinal, target| {
+            let mut outgoing = state;
+            for (index, ground) in grounds.iter().enumerate() {
+                let Some(guard) = ground.guard else {
+                    continue;
+                };
+                if guard.branch != terminator {
+                    continue;
+                }
+                let pending_index = carrier_pending_state(index)?;
+                if state == pending_index
+                    && ordinal == guard.success_ordinal
+                    && target == guard.success_target
+                {
+                    outgoing = CarrierFlowState::Current;
+                } else if state == pending_index {
+                    outgoing = CarrierFlowState::Absent;
                 }
             }
-            if func.dfg.insts[inst].opcode().is_terminator() {
-                for (terminator, ordinal, target) in successor_edges(func, block)? {
-                    let mut outgoing = state;
-                    for (index, ground) in grounds.iter().enumerate() {
-                        let Some(guard) = ground.guard else {
-                            continue;
-                        };
-                        if guard.branch != terminator {
-                            continue;
-                        }
-                        let pending_index =
-                            CarrierFlowState::Pending(u16::try_from(index).map_err(|_| {
-                                backend_module(
-                                    LoweringCause::FinishedCode,
-                                    "a carrier proof has more than 65536 grounds".to_string(),
-                                )
-                            })?);
-                        if state == pending_index
-                            && ordinal == guard.success_ordinal
-                            && target == guard.success_target
-                        {
-                            outgoing = CarrierFlowState::Current;
-                        } else if state == pending_index {
-                            outgoing = CarrierFlowState::Absent;
-                        }
-                    }
-                    pending.push((target, outgoing));
-                }
-                break;
-            }
-        }
-    }
-    if observed {
-        Ok(())
-    } else {
-        Err(backend_module(
-            LoweringCause::FinishedCode,
-            format!("{label} is not reachable from the finalized function entry"),
-        ))
-    }
+            Ok(outgoing)
+        },
+    )?;
+    all_paths_result(verdict, label, || {
+        format!("{label} is reachable without a current finalized constructor fact")
+    })
 }
 
 fn verify_carrier_queries(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     helper: FuncId,
     arena: cranelift_codegen::ir::Value,
 ) -> Result<Vec<VerifiedCarrierQuery>, CraneliftBackendError> {
     let mut verified = Vec::new();
-    for call in func
-        .layout
-        .blocks()
-        .flat_map(|block| func.layout.block_insts(block))
-        .filter(|inst| func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Call)
-    {
-        if Lowering::decode_direct_callee(func, call)? != helper {
+    for &(call, callee) in func.calls() {
+        let callee = match callee {
+            Some(callee) => callee,
+            None => Lowering::decode_direct_callee(func, call)?,
+        };
+        if callee != helper {
             continue;
         }
         let [actual_arena, word, out] = func.dfg.inst_args(call) else {
@@ -13811,50 +14074,38 @@ fn verify_carrier_queries(
         };
         let guards = status_zero_guards(func, *status)?;
         let mut outputs = Vec::new();
-        for inst in func
-            .layout
-            .blocks()
-            .flat_map(|block| func.layout.block_insts(block))
-        {
-            for output in func.dfg.inst_results(inst) {
-                let Some((load, location)) = loaded_stack_location(func, *output)? else {
-                    continue;
-                };
-                if location != output_location {
-                    continue;
-                }
-                let applicable = guards
-                    .iter()
-                    .copied()
-                    .filter(|guard| {
-                        verify_all_paths_guarded(
-                            func,
-                            call,
-                            *guard,
-                            load,
-                            "a certified carrier query output load",
-                        )
-                        .is_ok()
-                    })
-                    .collect::<Vec<_>>();
-                if applicable.len() != 1 {
-                    return Err(backend_module(
-                        LoweringCause::FinishedCode,
-                        format!(
-                            "a certified carrier query output load has {} all-path status guards instead of one",
-                            applicable.len()
-                        ),
-                    ));
-                }
-                verify_all_paths_memory_current(
-                    func,
-                    call,
-                    output_location,
-                    load,
-                    "a certified carrier query output load",
-                )?;
-                outputs.push(*output);
+        for &(load, output) in func.loads_of(output_location)? {
+            let applicable = guards
+                .iter()
+                .copied()
+                .filter(|guard| {
+                    verify_all_paths_guarded(
+                        func,
+                        call,
+                        *guard,
+                        load,
+                        "a certified carrier query output load",
+                    )
+                    .is_ok()
+                })
+                .collect::<Vec<_>>();
+            if applicable.len() != 1 {
+                return Err(backend_module(
+                    LoweringCause::FinishedCode,
+                    format!(
+                        "a certified carrier query output load has {} all-path status guards instead of one",
+                        applicable.len()
+                    ),
+                ));
             }
+            verify_all_paths_memory_current(
+                func,
+                call,
+                output_location,
+                load,
+                "a certified carrier query output load",
+            )?;
+            outputs.push(output);
         }
         let [output] = outputs.as_slice() else {
             return Err(backend_module(
@@ -13876,6 +14127,7 @@ fn verify_carrier_queries(
 
 fn verify_constructor_authority_ground(
     body: &StagedResultBody,
+    func: &IndexedFunction<'_>,
     authority: &GeneratedConstructorAuthority,
     helpers: &crate::boundary_value_clif::BoundaryLocalFuncs,
 ) -> Result<CarrierFactGround, CraneliftBackendError> {
@@ -13885,8 +14137,8 @@ fn verify_constructor_authority_ground(
             "a generated constructor authority has no boundary arena".to_string(),
         )
     })?;
-    let (word_load, word_location) = loaded_stack_location(&body.func, authority.word)?
-        .ok_or_else(|| {
+    let (word_load, word_location) =
+        loaded_stack_location(func, authority.word)?.ok_or_else(|| {
             backend_module(
                 LoweringCause::FinishedCode,
                 "a generated constructor authority's word is not an actual helper-output load"
@@ -13894,34 +14146,27 @@ fn verify_constructor_authority_ground(
             )
         })?;
     let mut allocation_calls = Vec::new();
-    for call in body
-        .func
-        .layout
-        .blocks()
-        .flat_map(|block| body.func.layout.block_insts(block))
-        .filter(|inst| body.func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Call)
-    {
-        if Lowering::decode_direct_callee(&body.func, call).ok() != Some(helpers.alloc) {
+    for &(call, callee) in func.calls() {
+        if callee != Some(helpers.alloc) {
             continue;
         }
-        let args = body.func.dfg.inst_args(call);
+        let args = func.dfg.inst_args(call);
         let Some(out) = args.last().copied() else {
             continue;
         };
         if args.first().copied() != Some(arena)
-            || resolve_stack_address(&body.func, out)?
-                != Some((word_location.slot, word_location.offset))
+            || resolve_stack_address(func, out)? != Some((word_location.slot, word_location.offset))
         {
             continue;
         }
-        let [status] = body.func.dfg.inst_results(call) else {
+        let [status] = func.dfg.inst_results(call) else {
             continue;
         };
-        let applicable = status_zero_guards(&body.func, *status)?
+        let applicable = status_zero_guards(func, *status)?
             .into_iter()
             .filter(|guard| {
                 verify_all_paths_guarded(
-                    &body.func,
+                    func,
                     call,
                     *guard,
                     word_load,
@@ -13932,7 +14177,7 @@ fn verify_constructor_authority_ground(
             .collect::<Vec<_>>();
         if applicable.len() == 1
             && verify_all_paths_memory_current(
-                &body.func,
+                func,
                 call,
                 word_location,
                 word_load,
@@ -13960,36 +14205,30 @@ fn verify_constructor_authority_ground(
         )
     })?;
     let mut tag_grounds = Vec::new();
-    for call in body
-        .func
-        .layout
-        .blocks()
-        .flat_map(|block| body.func.layout.block_insts(block))
-        .filter(|inst| body.func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Call)
-    {
-        if Lowering::decode_direct_callee(&body.func, call).ok() != Some(helpers.store_tag_id) {
+    for &(call, callee) in func.calls() {
+        if callee != Some(helpers.store_tag_id) {
             continue;
         }
-        let args = body.func.dfg.inst_args(call);
+        let args = func.dfg.inst_args(call);
         let [actual_arena, word, tag] = args else {
             continue;
         };
         if *actual_arena != arena
             || *word != authority.word
-            || iconst_value(&body.func, *tag) != Some(expected_tag)
+            || iconst_value(func, *tag) != Some(expected_tag)
         {
             continue;
         }
         verify_all_paths_after_instruction(
-            &body.func,
+            func,
             word_load,
             call,
             "a generated constructor tag store",
         )?;
-        let [status] = body.func.dfg.inst_results(call) else {
+        let [status] = func.dfg.inst_results(call) else {
             continue;
         };
-        for guard in status_zero_guards(&body.func, *status)? {
+        for guard in status_zero_guards(func, *status)? {
             tag_grounds.push(CarrierFactGround {
                 producer: call,
                 guard: Some(guard),
@@ -14010,6 +14249,7 @@ fn verify_constructor_authority_ground(
 
 fn verify_cut_provenance(
     body: &StagedResultBody,
+    func: &IndexedFunction<'_>,
     cuts: &CertifiedCuts,
 ) -> Result<(), CraneliftBackendError> {
     if cuts.edges.len() != cuts.provenance.len()
@@ -14040,7 +14280,7 @@ fn verify_cut_provenance(
             ));
         }
         exact_guard_edge(
-            &body.func,
+            func,
             ExactProtocolGuard {
                 branch: edge.terminator,
                 success_ordinal: edge.destination_ordinal,
@@ -14053,7 +14293,7 @@ fn verify_cut_provenance(
             proof.comparison,
             edge.terminator,
         ] {
-            if body.func.layout.inst_block(inst).is_none() {
+            if func.layout.inst_block(inst).is_none() {
                 return Err(backend_module(
                     LoweringCause::FinishedCode,
                     "a certified cut proof names an instruction absent from finalized CLIF"
@@ -14062,15 +14302,14 @@ fn verify_cut_provenance(
             }
         }
         let cranelift_codegen::ir::InstructionData::Brif { arg, .. } =
-            &body.func.dfg.insts[edge.terminator]
+            &func.dfg.insts[edge.terminator]
         else {
             return Err(backend_module(
                 LoweringCause::FinishedCode,
                 "a certified cut terminator is not its finalized conditional branch".to_string(),
             ));
         };
-        let Some((condition, compared, constant)) = comparison_with_constant(&body.func, *arg)
-        else {
+        let Some((condition, compared, constant)) = comparison_with_constant(func, *arg) else {
             return Err(backend_module(
                 LoweringCause::FinishedCode,
                 "a certified cut no longer has its exact tag comparison".to_string(),
@@ -14090,13 +14329,8 @@ fn verify_cut_provenance(
         if compared != proof.observed_tag
             || constant != expected
             || edge.destination_ordinal != expected_infeasible_ordinal
-            || body.func.dfg.inst_args(proof.query_call).get(1).copied() != Some(proof.queried_word)
-            || body
-                .func
-                .dfg
-                .inst_args(proof.field_count_call)
-                .get(1)
-                .copied()
+            || func.dfg.inst_args(proof.query_call).get(1).copied() != Some(proof.queried_word)
+            || func.dfg.inst_args(proof.field_count_call).get(1).copied()
                 != Some(proof.queried_word)
         {
             return Err(backend_module(
@@ -14143,7 +14377,7 @@ fn verify_cut_provenance(
 }
 
 fn verify_definite_stored_value(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     location: StackMemoryLocation,
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
@@ -14165,7 +14399,7 @@ fn verify_definite_stored_value(
 }
 
 fn verify_exact_value_guard(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     value: cranelift_codegen::ir::Value,
     expected: i64,
     dependent: cranelift_codegen::ir::Inst,
@@ -14179,36 +14413,20 @@ fn verify_exact_value_guard(
         ));
     };
     let mut applicable = 0usize;
-    for comparison_inst in func
-        .layout
-        .blocks()
-        .flat_map(|block| func.layout.block_insts(block))
-    {
-        let [comparison] = func.dfg.inst_results(comparison_inst) else {
-            continue;
-        };
-        if !compare_imm_is(
-            func,
-            *comparison,
-            value,
-            cranelift_codegen::ir::condcodes::IntCC::Equal,
-            expected,
-        ) {
+    for comparison in func.comparisons_of(value) {
+        if !(comparison.immediate
+            && comparison.operand == value
+            && comparison.condition == cranelift_codegen::ir::condcodes::IntCC::Equal
+            && comparison.constant == expected)
+        {
             continue;
         }
-        for branch in func
-            .layout
-            .blocks()
-            .flat_map(|block| func.layout.block_insts(block))
-        {
-            let cranelift_codegen::ir::InstructionData::Brif { arg, blocks, .. } =
+        for &branch in func.branches_on(comparison.comparison) {
+            let cranelift_codegen::ir::InstructionData::Brif { blocks, .. } =
                 &func.dfg.insts[branch]
             else {
                 continue;
             };
-            if *arg != *comparison {
-                continue;
-            }
             let guard = ExactProtocolGuard {
                 branch,
                 success_ordinal: 0,
@@ -14240,67 +14458,42 @@ fn verify_exact_value_guard(
 }
 
 fn verify_no_memory_effect_after_instruction(
-    func: &Function,
+    func: &IndexedFunction<'_>,
     producer: cranelift_codegen::ir::Inst,
     dependent: cranelift_codegen::ir::Inst,
     label: &str,
 ) -> Result<(), CraneliftBackendError> {
-    let entry = func.layout.entry_block().ok_or_else(|| {
-        backend_module(
-            LoweringCause::FinishedCode,
-            "a publication proof has no entry block".to_string(),
-        )
-    })?;
-    let mut pending = vec![(entry, false)];
-    let mut reached = BTreeSet::new();
-    let mut observed = false;
-    while let Some((block, incoming)) = pending.pop() {
-        if !reached.insert((block, incoming)) {
-            continue;
-        }
-        let mut current = incoming;
-        for inst in func.layout.block_insts(block) {
-            if inst == producer {
-                current = true;
+    let verdict = verify_all_paths_backward(
+        func,
+        &[false, true],
+        false,
+        dependent,
+        true,
+        |current, inst| {
+            Ok(if inst == producer {
+                true
             } else if current
                 && (func.dfg.insts[inst].opcode().is_call()
                     || !matches!(stack_write_effect(func, inst)?, StackWriteEffect::None))
             {
-                current = false;
-            }
-            if inst == dependent {
-                observed = true;
-                if !current {
-                    return Err(backend_module(
-                        LoweringCause::FinishedCode,
-                        format!("{label} is reachable after an intervening memory effect"),
-                    ));
-                }
-            }
-            if func.dfg.insts[inst].opcode().is_terminator() {
-                for (_, _, target) in successor_edges(func, block)? {
-                    pending.push((target, current));
-                }
-                break;
-            }
-        }
-    }
-    if observed {
-        Ok(())
-    } else {
-        Err(backend_module(
-            LoweringCause::FinishedCode,
-            format!("{label} is not reachable from the finalized function entry"),
-        ))
-    }
+                false
+            } else {
+                current
+            })
+        },
+        |current, _, _, _| Ok(current),
+    )?;
+    all_paths_result(verdict, label, || {
+        format!("{label} is reachable after an intervening memory effect")
+    })
 }
 
 fn verify_publication_and_terminals(
-    body: &StagedResultBody,
+    func: &IndexedFunction<'_>,
     publication: FunctionResultPublication,
     _call_obligations_verified: bool,
 ) -> Result<(), CraneliftBackendError> {
-    match &body.func.dfg.insts[publication.result_store] {
+    match &func.dfg.insts[publication.result_store] {
         cranelift_codegen::ir::InstructionData::Store { args, offset, .. }
             if args[0] == publication.returned_word
                 && args[1] == publication.frame
@@ -14314,25 +14507,23 @@ fn verify_publication_and_terminals(
         }
     }
     verify_all_paths_after_instruction(
-        &body.func,
+        func,
         publication.result_store,
         publication.return_inst,
         "a finished Result status-zero publication",
     )?;
     verify_no_memory_effect_after_instruction(
-        &body.func,
+        func,
         publication.result_store,
         publication.return_inst,
         "a finished Result status-zero publication",
     )?;
-    if body.func.dfg.insts[publication.return_inst].opcode()
-        != cranelift_codegen::ir::Opcode::Return
-        || body
-            .func
+    if func.dfg.insts[publication.return_inst].opcode() != cranelift_codegen::ir::Opcode::Return
+        || func
             .dfg
             .inst_args(publication.return_inst)
             .first()
-            .and_then(|word| iconst_value(&body.func, *word))
+            .and_then(|word| iconst_value(func, *word))
             != Some(0)
     {
         return Err(backend_module(
@@ -14340,47 +14531,46 @@ fn verify_publication_and_terminals(
             "a finished Result publication does not return status zero".to_string(),
         ));
     }
-    for return_inst in body
-        .func
+    for return_inst in func
         .layout
         .blocks()
-        .flat_map(|block| body.func.layout.block_insts(block))
-        .filter(|inst| body.func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Return)
+        .flat_map(|block| func.layout.block_insts(block))
+        .filter(|inst| func.dfg.insts[*inst].opcode() == cranelift_codegen::ir::Opcode::Return)
     {
         if return_inst == publication.return_inst {
             continue;
         }
-        let Some(returned) = body.func.dfg.inst_args(return_inst).first().copied() else {
+        let Some(returned) = func.dfg.inst_args(return_inst).first().copied() else {
             return Err(backend_module(
                 LoweringCause::FinishedCode,
                 "a finished Result function has a terminal with no status".to_string(),
             ));
         };
-        if value_is_provably_nonzero(&body.func, returned) {
+        if value_is_provably_nonzero(func, returned) {
             continue;
         }
-        let return_block = body.func.layout.inst_block(return_inst).ok_or_else(|| {
+        let return_block = func.layout.inst_block(return_inst).ok_or_else(|| {
             backend_module(
                 LoweringCause::FinishedCode,
                 "a finished Result terminal is absent from the layout".to_string(),
             )
         })?;
-        if value_is_guarded_nonzero_at_inst(&body.func, returned, return_inst) {
+        if value_is_guarded_nonzero_at_inst(func, returned, return_inst) {
             continue;
         }
-        let explicit_trap = iconst_value(&body.func, returned) == Some(0)
-            && body.func.layout.block_insts(return_block).any(|inst| {
+        let explicit_trap = iconst_value(func, returned) == Some(0)
+            && func.layout.block_insts(return_block).any(|inst| {
                 let cranelift_codegen::ir::InstructionData::Store { args, offset, .. } =
-                    &body.func.dfg.insts[inst]
+                    &func.dfg.insts[inst]
                 else {
                     return false;
                 };
                 args[1] == publication.frame
                     && i32::from(*offset) == publication.trap_offset
-                    && (value_is_provably_nonzero(&body.func, args[0])
-                        || value_is_guarded_nonzero_at_inst(&body.func, args[0], inst))
+                    && (value_is_provably_nonzero(func, args[0])
+                        || value_is_guarded_nonzero_at_inst(func, args[0], inst))
                     && verify_all_paths_after_instruction(
-                        &body.func,
+                        func,
                         inst,
                         return_inst,
                         "a finished Result Trap publication",
@@ -14388,16 +14578,14 @@ fn verify_publication_and_terminals(
                     .is_ok()
             });
         if !explicit_trap {
-            let block = body
-                .func
+            let block = func
                 .layout
                 .inst_block(return_inst)
                 .expect("the return block was checked above");
-            let instructions = body
-                .func
+            let instructions = func
                 .layout
                 .block_insts(block)
-                .map(|inst| format!("{inst:?}:{:?}", body.func.dfg.insts[inst]))
+                .map(|inst| format!("{inst:?}:{:?}", func.dfg.insts[inst]))
                 .collect::<Vec<_>>();
             return Err(backend_module(
                 LoweringCause::FinishedCode,
@@ -14405,10 +14593,10 @@ fn verify_publication_and_terminals(
                     "a finished Result function has an uncertified status-zero terminal \
                  {return_inst:?} in {block:?}, returned={returned:?}, \
                  definition={:?}, producer={:?}: {instructions:?}",
-                    body.func.dfg.value_def(returned),
-                    match body.func.dfg.value_def(returned) {
+                    func.dfg.value_def(returned),
+                    match func.dfg.value_def(returned) {
                         cranelift_codegen::ir::ValueDef::Result(inst, _) =>
-                            Some(&body.func.dfg.insts[inst]),
+                            Some(&func.dfg.insts[inst]),
                         _ => None,
                     },
                 ),
@@ -14810,7 +14998,7 @@ mod generated_result_protocol_verifier {
         let (func, obligation, target) = call_protocol_fixture(mutation);
         format!(
             "{:?}",
-            verify_call_result_obligation(&func, &obligation, target)
+            verify_call_result_obligation(&IndexedFunction::new(&func), &obligation, target)
                 .expect_err("the malformed call protocol must refuse")
         )
     }
@@ -14823,7 +15011,7 @@ mod generated_result_protocol_verifier {
     #[test]
     fn all_path_call_guards_reject_status_and_trap_bypasses() {
         let (func, obligation, target) = call_protocol_fixture(CallProtocolMutation::Exact);
-        verify_call_result_obligation(&func, &obligation, target)
+        verify_call_result_obligation(&IndexedFunction::new(&func), &obligation, target)
             .expect("the exact call protocol is certified");
         assert!(
             call_refusal(CallProtocolMutation::TrapStatusBypass)
@@ -14844,11 +15032,17 @@ mod generated_result_protocol_verifier {
     #[test]
     fn a_backedge_cannot_reuse_a_prior_successful_guard() {
         let (exact, producer, guard, dependent) = backedge_guard_fixture(false);
-        verify_all_paths_guarded(&exact, producer, guard, dependent, "exact loop control")
-            .expect("the one-pass exact control is guarded");
+        verify_all_paths_guarded(
+            &IndexedFunction::new(&exact),
+            producer,
+            guard,
+            dependent,
+            "exact loop control",
+        )
+        .expect("the one-pass exact control is guarded");
         let (stale, producer, guard, dependent) = backedge_guard_fixture(true);
         let refusal = verify_all_paths_guarded(
-            &stale,
+            &IndexedFunction::new(&stale),
             producer,
             guard,
             dependent,
@@ -14867,17 +15061,32 @@ mod generated_result_protocol_verifier {
     #[test]
     fn publication_requires_all_path_store_and_no_later_memory_effect() {
         let (exact, store, returned) = publication_fixture(PublicationMutation::Exact);
-        verify_all_paths_after_instruction(&exact, store, returned, "exact publication")
-            .expect("the exact store dominates its return");
-        verify_no_memory_effect_after_instruction(&exact, store, returned, "exact publication")
-            .expect("the exact store reaches return unclobbered");
+        verify_all_paths_after_instruction(
+            &IndexedFunction::new(&exact),
+            store,
+            returned,
+            "exact publication",
+        )
+        .expect("the exact store dominates its return");
+        verify_no_memory_effect_after_instruction(
+            &IndexedFunction::new(&exact),
+            store,
+            returned,
+            "exact publication",
+        )
+        .expect("the exact store reaches return unclobbered");
 
         let (bypass, store, returned) = publication_fixture(PublicationMutation::Bypass);
         assert!(
             format!(
                 "{:?}",
-                verify_all_paths_after_instruction(&bypass, store, returned, "bypass publication")
-                    .expect_err("the return bypasses publication")
+                verify_all_paths_after_instruction(
+                    &IndexedFunction::new(&bypass),
+                    store,
+                    returned,
+                    "bypass publication"
+                )
+                .expect_err("the return bypasses publication")
             )
             .contains("before its required finalized instruction")
         );
@@ -14887,7 +15096,7 @@ mod generated_result_protocol_verifier {
             format!(
                 "{:?}",
                 verify_no_memory_effect_after_instruction(
-                    &clobber,
+                    &IndexedFunction::new(&clobber),
                     store,
                     returned,
                     "clobbered publication",
@@ -14927,7 +15136,7 @@ mod generated_result_protocol_verifier {
         let (func, helper, arena) = query_fixture(mutation);
         format!(
             "{:?}",
-            verify_carrier_queries(&func, helper, arena)
+            verify_carrier_queries(&IndexedFunction::new(&func), helper, arena)
                 .expect_err("the malformed helper protocol must refuse")
         )
     }
@@ -14972,7 +15181,7 @@ mod generated_result_protocol_verifier {
         for mutation in [QueryMutation::Exact, QueryMutation::Subdivided] {
             let (func, helper, arena) = query_fixture(mutation);
             assert_eq!(
-                verify_carrier_queries(&func, helper, arena)
+                verify_carrier_queries(&IndexedFunction::new(&func), helper, arena)
                     .expect("layout-equivalent helper protocol must certify")
                     .len(),
                 1
