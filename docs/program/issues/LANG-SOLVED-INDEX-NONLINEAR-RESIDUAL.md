@@ -1,7 +1,7 @@
 ---
 id: LANG-SOLVED-INDEX-NONLINEAR-RESIDUAL
 title: "Since LANG-SOLVED-INDEX-EQUATION-UNIFIER (b7e85023e), a match on a family whose constructor repeats a field across index leaves, such as MkTwo : (u : Nat) -> Two u u against z : Two x y, fails with ElabError::Internal(\"solved premise does not reassemble\"). The parent accepts it. Restore the parent's verdict on these programs through the unifier's rules, never an internal error"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1
@@ -59,9 +59,9 @@ alias path. Then the repair, with the 15 rows pinned in
   theorem rows check. `trusted_base()` is unchanged.
 - **AC-2 (control).** The unifier WP's D-1 and D-2 rows and its
   depth-seven and ParamNest rows are unchanged. CI is green.
-- **AC-3 (mutation, QA).** Restoring the None arm for a residual that
-  mentions the eliminated variable makes the `Two u u` row Internal
-  again.
+- **AC-3 (mutation, QA).** Disabling the route-back (forcing
+  `nonlinear` false) makes the `Two u u` row Internal again (Architect
+  `evt_gnekdxnycg4r`).
 
 ## Stop conditions
 

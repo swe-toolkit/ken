@@ -1,7 +1,7 @@
 ---
 id: LANG-CLASS-FORWARD-REFERENCE-STALE-IDENTITY
 title: "A module that uses its own class before declaring it binds that use to a different class under the same key when one is already loaded: checked_class_id falls back to globals.get(name), so a file-loaded A.View answers a forward reference to the module's own View. The same source on a fresh environment is refused. Make the outcome depend on the module's scope, not on the global table's history"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T2

@@ -59,12 +59,16 @@ P1 to P3 and the Fork B sink authority as ruled, with the rows below.
 - **AC-2.** A planning pin on the original program: both P1 rows have
   `handler_owner` `Some(Specialization(0))`. RELAY's 36-row roster and
   the false-branch row are unchanged.
-- **AC-3a (mutation).** Reverting the admission to `ret_exits == 0`
-  returns AC-1 to the typed refusal at planning.
-- **AC-3b.** A unit row on the walk over the px8ds plane: true for the
-  copy K whose tail calls target body 28, false for
-  `tail_answers_directly(.., inside_callee=true)` on the ITree-form copy
-  body 659.
+- **AC-3a (mutation).** Reverting the admission guard to
+  `shape.ret_exits == 0` returns AC-1 to the base runtime failure:
+  native exit 1, `PatternMatchFailure` on the swapped program's
+  `ITree`, and one `ConsoleIsTerminal` before `ResourceRelease`
+  (Architect `evt_5m46wc7vm72z2`; there was never a planning refusal).
+- **AC-3b.** The walk's positive arm is carried on the real plane by
+  AC-1 with the AC-3a mutant. Its negative arm is a unit row on a
+  RuntimeExpr fixture shaped like the ITree-form copy, which reddens
+  when the walk's `Construct` arm returns `Ok(true)`. The row's doc
+  discloses that it is not the checked 659 occurrence.
 - **AC-4 (mutation, QA).** Passing `Assessed` at the drive arm reddens
   AC-1 with the ITree PatternMatchFailure.
 

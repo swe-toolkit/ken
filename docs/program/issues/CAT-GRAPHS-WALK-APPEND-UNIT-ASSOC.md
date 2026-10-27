@@ -1,7 +1,7 @@
 ---
 id: CAT-GRAPHS-WALK-APPEND-UNIT-ASSOC
 title: "Algorithm.Graphs.Dependency exports spec 62 section 4: walk_append_here_left and walk_append_assoc, proved at zero trust from the Architect's D0, with the section 4 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
