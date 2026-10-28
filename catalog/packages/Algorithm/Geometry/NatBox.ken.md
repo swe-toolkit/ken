@@ -1,10 +1,10 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. Six box-and-distance laws, two structural
-commutativity laws, two metric laws, seven corner-wise containment laws,
-three inclusion-order laws, and three area laws carry kernel-checked
-generic proofs.
+geometry operations. Six box-and-distance laws, four structural
+commutativity and associativity laws, two metric laws, seven corner-wise
+containment laws, three inclusion-order laws, and three area laws carry
+kernel-checked generic proofs.
 
 ## Contents
 
@@ -28,9 +28,9 @@ point set is empty.
 
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
-box-and-distance laws lead the definition; the two structural
-commutativity laws follow the intersection and hull laws, ahead of the
-two metric laws. The corner-wise `inside` operation and its seven laws
+box-and-distance laws lead the definition; the four structural
+commutativity and associativity laws follow intersection and hull, ahead
+of the two metric laws. The corner-wise `inside` operation and its seven laws
 come next, then the three inclusion-order laws, followed by `area` and
 its three laws. Per-axis proof helpers and distance helpers stay private.
 
@@ -454,6 +454,122 @@ pub theorem hull_comm (b : Box) (c : Box) : Equal Box (hull b c) (hull c b) =
                               (max chy bhy)
                               ((proof comm for max) bhx chx)
                               ((proof comm for max) bhy chy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem intersect_assoc
+      (a : Box) (b : Box) (c : Box)
+    : Equal Box (intersect (intersect a b) c) (intersect a (intersect b c)) =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match c {
+            MkBox clo chi ↦
+              match alo {
+                MkPoint alx aly ↦
+                  match ahi {
+                    MkPoint ahx ahy ↦
+                      match blo {
+                        MkPoint blx bly ↦
+                          match bhi {
+                            MkPoint bhx bhy ↦
+                              match clo {
+                                MkPoint clx cly ↦
+                                  match chi {
+                                    MkPoint chx chy ↦
+                                      box_equal
+                                        (MkPoint
+                                          (max (max alx blx) clx)
+                                          (max (max aly bly) cly))
+                                        (MkPoint
+                                          (max alx (max blx clx))
+                                          (max aly (max bly cly)))
+                                        (MkPoint
+                                          (min (min ahx bhx) chx)
+                                          (min (min ahy bhy) chy))
+                                        (MkPoint
+                                          (min ahx (min bhx chx))
+                                          (min ahy (min bhy chy)))
+                                        (point_equal
+                                          (max (max alx blx) clx)
+                                          (max alx (max blx clx))
+                                          (max (max aly bly) cly)
+                                          (max aly (max bly cly))
+                                          ((proof assoc for max) alx blx clx)
+                                          ((proof assoc for max) aly bly cly))
+                                        (point_equal
+                                          (min (min ahx bhx) chx)
+                                          (min ahx (min bhx chx))
+                                          (min (min ahy bhy) chy)
+                                          (min ahy (min bhy chy))
+                                          ((proof assoc for min) ahx bhx chx)
+                                          ((proof assoc for min) ahy bhy chy))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem hull_assoc
+      (a : Box) (b : Box) (c : Box)
+    : Equal Box (hull (hull a b) c) (hull a (hull b c)) =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match c {
+            MkBox clo chi ↦
+              match alo {
+                MkPoint alx aly ↦
+                  match ahi {
+                    MkPoint ahx ahy ↦
+                      match blo {
+                        MkPoint blx bly ↦
+                          match bhi {
+                            MkPoint bhx bhy ↦
+                              match clo {
+                                MkPoint clx cly ↦
+                                  match chi {
+                                    MkPoint chx chy ↦
+                                      box_equal
+                                        (MkPoint
+                                          (min (min alx blx) clx)
+                                          (min (min aly bly) cly))
+                                        (MkPoint
+                                          (min alx (min blx clx))
+                                          (min aly (min bly cly)))
+                                        (MkPoint
+                                          (max (max ahx bhx) chx)
+                                          (max (max ahy bhy) chy))
+                                        (MkPoint
+                                          (max ahx (max bhx chx))
+                                          (max ahy (max bhy chy)))
+                                        (point_equal
+                                          (min (min alx blx) clx)
+                                          (min alx (min blx clx))
+                                          (min (min aly bly) cly)
+                                          (min aly (min bly cly))
+                                          ((proof assoc for min) alx blx clx)
+                                          ((proof assoc for min) aly bly cly))
+                                        (point_equal
+                                          (max (max ahx bhx) chx)
+                                          (max ahx (max bhx chx))
+                                          (max (max ahy bhy) chy)
+                                          (max ahy (max bhy chy))
+                                          ((proof assoc for max) ahx bhx chx)
+                                          ((proof assoc for max) ahy bhy chy))
+                                  }
+                              }
+                          }
                       }
                   }
               }
@@ -1883,9 +1999,11 @@ addition to match the distance definition. `manhattan_zero_equal` splits
 a zero sum into zero per-axis distances, derives equality of both
 coordinates by induction, and lifts them into point equality with `cong`.
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
-arguments of the box laws explicit. All eighteen pre-area public laws are
-generic in their boxes or points, and none identifies boxes by their
-sets of members.
+arguments of the box laws explicit. The two associativity proofs reuse
+`max::assoc` on the lower corners and `min::assoc` on the upper corners
+for intersection, reversing those selectors for hull. `point_equal` and
+`box_equal` assemble structural box equality; none of the twenty-two
+pre-area public laws identifies boxes by their sets of members.
 
 `inside_sound` transports point membership along the four corner comparisons
 of `inside`; `inside_refl` uses checked order reflexivity, including for
@@ -1941,11 +2059,13 @@ this interface.
 ## 7. Trust & derivation
 
 1. **Contract.** [Exact geometry, §§1–6](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and twenty-three public proof types.
+   specifies the seven operations and twenty-three existing public proof types;
+   the queued §7 specifies the two additional structural associativity laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
-   `intersect_comm`, `hull_comm`, `manhattan_symm`, `manhattan_self`,
+   `intersect_comm`, `hull_comm`, `intersect_assoc`, `hull_assoc`,
+   `manhattan_symm`, `manhattan_self`,
    `manhattan_triangle`, `manhattan_zero_equal`, `inside`,
    `inside_sound`, `inside_refl`, `intersect_inside_left`,
    `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
