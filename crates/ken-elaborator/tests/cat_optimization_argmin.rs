@@ -1,7 +1,7 @@
 //! Least-cost candidate selection: spec/50-stdlib/72-optimization.md §1.
 //! Source: conformance/stdlib/optimization/seed-argmin.md.
 //! Promise class: durable invariant. Independent strict-minimum and earliest-
-//! tie vectors distinguish the operation; generic clients pin all seven laws.
+//! tie vectors distinguish the operation; generic clients pin all eight laws.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -52,10 +52,10 @@ fn seed_positive(source: &str) -> String {
 /// SOURCE: spec/50-stdlib/72-optimization.md §§1.2–1.3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: after explicit providers and two exported Order bridges load,
-/// the exact trusted-GlobalId set remains unchanged on loading Argmin; seven
+/// the exact trusted-GlobalId set remains unchanged on loading Argmin; eight
 /// package-owned law globals carry transparent checked bodies. An independent
 /// client restates each generic law at arbitrary values and cost functions.
-/// CLAIMED: selecting an input's earliest least-cost element obeys all seven
+/// CLAIMED: selecting an input's earliest least-cost element obeys all eight
 /// exported laws without an additional trusted assumption.
 /// THE GAP: provider assumptions remain inherited; the closed operational
 /// vectors below independently distinguish the two cost and tie directions.
@@ -113,20 +113,23 @@ fn generic_laws_and_nat_bridges_check_without_added_trust() {
         "argmin_singleton",
         "argmin_keeps_head",
         "argmin_takes_tail",
+        "argmin_cost_order_invariant",
     ] {
         let id = env.globals[&format!("{ARGMIN}.{law}")];
         assert!(argmin_owned.contains(&id), "{law} must be Argmin-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
     env.elaborate_file(GENERIC_CLIENT)
-        .expect("all seven §1.2 statements and both public order bridges check");
+        .expect("all seven §1.2 laws, §1.5 invariance, and two order bridges check");
 }
 
 const GENERIC_CLIENT: &str = r#"
 import Algorithm.Optimization.Argmin
   (argmin, argmin_member, argmin_least, argmin_no_cheaper,
-   argmin_head_on_tie, argmin_singleton, argmin_keeps_head, argmin_takes_tail)
+   argmin_head_on_tie, argmin_singleton, argmin_keeps_head, argmin_takes_tail,
+   argmin_cost_order_invariant)
 import Core.Classes.LawfulClasses (leq_nat)
+import Core.Function.Combinators (comp)
 import Data.Collections.Derived (list_elem)
 import Data.Collections.NonEmpty
   (NonEmpty, nonempty_cons, nonempty_singleton, nonempty_to_list)
@@ -173,6 +176,13 @@ theorem client_takes_tail (a : Type) (cost : a → Nat) (x : a) (y : a) (ys : Li
   Equal a (argmin a cost (nonempty_cons a x (Cons a y ys)))
     (argmin a cost (nonempty_cons a y ys)) =
   argmin_takes_tail a cost x y ys
+
+theorem client_cost_order_invariant
+    (a : Type) (cost : a → Nat) (f : Nat → Nat)
+    (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+    (xs : NonEmpty a) :
+  Equal a (argmin a (comp a Nat Nat f cost) xs) (argmin a cost xs) =
+  argmin_cost_order_invariant a cost f same_order xs
 "#;
 
 /// SOURCE: conformance/stdlib/optimization/seed-argmin.md positives.
