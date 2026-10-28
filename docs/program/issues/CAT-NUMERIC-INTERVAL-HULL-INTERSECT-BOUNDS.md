@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-INTERVAL-HULL-INTERSECT-BOUNDS
 title: "Algorithm.Numeric.RationalInterval exports spec 68 section 7: interval_hull_least and interval_intersect_greatest, proved at zero trust from the Architect's D0, with the section 7 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2

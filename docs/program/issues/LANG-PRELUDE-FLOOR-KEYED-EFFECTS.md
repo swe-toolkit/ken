@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-FLOOR-KEYED-EFFECTS
 title: "Admit Unit, Coproduct and Instant to the reserved strict prelude floor as the second keyed-additions slice, with Coproduct and Instant scoped to their checked constructor families and the spec roster, count and PRELUDE_FLOOR_NAMES changing together"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1
