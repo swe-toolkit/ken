@@ -34,10 +34,11 @@
 > conformance or landed trust. Section 7 specifies two endpoint-order
 > hull/intersection bounds laws. Architect's isolated D0 on `1363b09b4`
 > checked both generic proofs with no new `Axiom` and unchanged scratch
-> trusted GlobalIds (114 → 114). The §7 catalog exports are absent on
-> this base; the D0 client and separately owned seed do not establish
-> shipped §7 execution, official conformance, CI, publication, landing
-> or landed trust.
+> trusted GlobalIds (114 → 114). The §7 catalog exports were absent on
+> the spec author's base; this separate Foundation candidate adds both
+> checked laws and a package-owned test of the complete accepted seed
+> and isolated refusal. Candidate-local checks are not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -765,9 +766,11 @@ neither observation is official conformance or landed trust.
 > their public clients and closed controls, with no new `Axiom`,
 > `ken check` and `ken fmt --check` rc 0, and equal scratch
 > `trusted_base()` GlobalId sets (114 → 114). Neither §7 catalog
-> export is present on the authoring base. The D0 and the separately
-> owned conformance seed do not establish shipped §7 execution,
-> official conformance, CI, publication, landing or landed trust.
+> export was present on the spec author's base. The separate Foundation
+> candidate now exports both checked laws, root-loads them and tests the
+> complete accepted conformance seed and isolated false hull claim.
+> These package checks are not official conformance-runner execution,
+> CI, publication, landing or landed trust.
 
 ### 7.1 Two premise-bearing public laws
 
@@ -814,9 +817,9 @@ endpoint comparisons with the existing public
 intersection. They introduce no helper. The existing private
 `equiv_leq` and `rational_distrib_r` remain private, and all §1–§6
 operations and laws remain unchanged. The two checked bodies and
-package-owned tests belong to a separate Foundation catalog WP, not
-to this spec/status candidate. No new Rational export, axiom,
-postulate, kernel rule, surface feature, or trust entry is specified.
+package-owned test are now in the separate Foundation catalog candidate,
+not the spec author's original status candidate. No new Rational export,
+axiom, postulate, kernel rule, surface feature, or trust entry is specified.
 
 In Architect's D0 closed fixture, `low = [1/2,1]` and
 `high = [2,3]` both lie inside `outer = [0,4]`, and their hull
@@ -830,5 +833,6 @@ control and a separately computed `False` isolate the false claim
 that the hull of `low` and `high` lies inside `low`. The refusal
 cannot supply the missing inclusion premise. These finite checks
 illustrate the orientations, not proofs of the generic laws. The
-D0's scratch package and client are not shipped §7 execution or an
-official conformance-runner result; CV authors the seed separately.
+D0's scratch package and client were not shipped §7 execution. The
+separate Foundation candidate now checks the authored seed against its
+exports in a package-owned test, not an official conformance-runner result.
