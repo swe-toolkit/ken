@@ -5,14 +5,15 @@
 > SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY §3;
 > SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY §4;
 > SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC §5;
-> SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY §6).** Sections 1–5
-> and their eighteen public checked laws are present in the catalog.
-> The §4–5 package-owned tests check their authored seeds against
-> root-loaded exports; they are not official conformance-runner runs.
-> Section 6 specifies two generic laws and a closed seed. Both laws now have
-> candidate catalog proof bodies; a package test checks the seed against
-> root-loaded exports. That is distinct from the isolated D0, official
-> conformance-runner execution, CI, publication, landing and landed §6 trust.
+> SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY §6;
+> SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT §7).** Sections 1–6 and their
+> twenty public checked laws are present in the catalog. Package-owned
+> tests check the authored §4–6 seeds against root-loaded exports; they
+> are not official conformance-runner runs or landed trust measurements.
+> Section 7 specifies one additional generic law and a closed seed.
+> Architect's isolated D0 checked its proposed proof, but the §7 catalog
+> export is absent on this base; the seed does not establish shipped §7
+> execution, official conformance, CI, publication, landing or landed trust.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -523,10 +524,10 @@ is not official conformance-runner execution or a landed trust delta.
 > (SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY).** Architect's
 > isolated D0 on `aa6370449` checked both generic proofs with no new
 > `Axiom` and identical scratch `trusted_base()` GlobalIds (109 → 109).
-> The two catalog exports have candidate checked bodies, and a package
-> test checks the authored seed against root-loaded exports. The isolated
-> D0 and package test do not establish official conformance-runner execution,
-> CI, publication, landing or landed trust.
+> The two catalog exports have checked bodies on main, with a package
+> test of the authored seed against root-loaded exports. The isolated
+> D0 and that test do not establish official conformance-runner execution
+> or landed trust.
 
 ### 6.1 Two public checked-law obligations
 
@@ -592,7 +593,74 @@ helpers were refused. The separately authored seed has independent
 closed `Refl` value oracles for a non-square `2 × 3` matrix, direct
 applications of both new public laws, and one false equation after
 a fresh accepted prefix; its closed instances do not prove generic
-linearity. The D0 checked proposed proofs in isolation, not exports on main. The
-candidate catalog adds both checked exports and a root-loaded package test
-of the seed. Official conformance, CI, publication, landing and landed trust
-remain unmeasured.
+linearity. The D0 checked proposed proofs in isolation; both checked exports and a
+root-loaded package test of the seed have since landed on main. The D0
+and package test do not establish official conformance-runner execution
+or landed trust.
+
+## 7. Transpose is adjoint to matrix-vector application
+
+> **Section 7 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT).** Architect checked the
+> generic proof in an isolated D0 on `54f68d3cc` with no new `Axiom`,
+> `ken check` and `ken fmt --check` rc 0, and identical scratch
+> `trusted_base()` GlobalId sets (109 → 109). The §7 catalog export is
+> absent on this base. Its separately authored seed does not establish
+> shipped §7 execution, official conformance, CI, publication, landing
+> or landed trust.
+
+### 7.1 One premise-free public law
+
+`Algorithm.LinearAlgebra.NatMatrix` must export the following Transparent
+checked theorem. An `m × n` matrix acts on a length-`n` vector `x`;
+its length-`m` image is dotted with `y`. Transposing the matrix
+instead lets `y` act through an `n × m` matrix, and its length-`n`
+image is dotted with `x`. Both results are exact naturals.
+
+```ken
+pub theorem transpose_adjoint
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat m)
+    : Equal Nat
+        (dot m (matrix_vector m n a x) y)
+        (dot n x (matrix_vector n m (transpose m n a) y))
+```
+
+There is no premise or nonzero-dimension condition. The law holds for
+all `m` and `n`, including zero rows or zero columns, without reversing
+row order or exchanging `x` and `y`. It is an equality of the two
+natural dot results, not an equality of vectors or matrices. Its
+argument order is dimensions first, then `a`, `x`, `y`. A closed
+example cannot prove the universal theorem.
+
+### 7.2 Private proof boundary and evidence
+
+The new `dot_zero_columns` handles the zero-row base. The new
+`transpose_cons_image` identifies the transposed image after adding a
+row: the leading component of `y` scales that row and the tail acts
+through the remaining columns. Both are **private** proof helpers,
+not additional public laws. The proof reuses public `dot_comm` and
+Nat multiplication commutativity, plus existing private
+`dot_scale_right` and `dot_distrib_right` and Nat addition's zero law;
+`cong`, `sym`, and `trans` transport the equalities. Its public type
+has no added premise, import, operation, kernel rule, or scalar tier.
+The §1–6 operations, laws, and private helper visibility remain
+unchanged. A follow-on catalog WP, separate from this spec candidate,
+owns the §7 checked export and the corresponding package law count.
+
+The closed seed uses the non-square `2 × 3` matrix with rows
+`[1,2,3]` and `[4,0,1]`, `x = [2,1,3]`, and `y = [1,2]`. Separate
+closed calculations give both sides as 35; the theorem is also applied
+independently of those value controls. With only `y` replaced by
+`[2,1]` on the right, that side becomes 37 while the left stays 35.
+An isolated refused claim follows a fresh fully accepted prefix and
+uses the same `Proved` form as the accepted true `Equal Nat` value
+controls. `Refl` is not a proof of `Equal Nat` here, even for two
+closed equal naturals; it is appropriate for a structural `Vec`
+equality such as the closed transpose oracle. The refusal tests this
+false swapped-`y` equality, not a generic limit on the theorem.
+
+Architect's D0 established proof feasibility and isolated client
+behavior on a scratch catalog overlay. It is not a shipped §7 export
+or official seed execution. No result here asserts a new landed trust
+measurement or a rational, signed, semiring-general, or approximate
+matrix law.
