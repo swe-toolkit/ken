@@ -5,7 +5,8 @@
 > SPEC-GEOMETRY-BOX-CONTAINMENT §3;
 > SPEC-GEOMETRY-BOX-AREA §4;
 > SPEC-GEOMETRY-BOX-INSIDE-ORDER §5;
-> SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY §6).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY §6;
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY §7).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -15,10 +16,13 @@
 > are present on main. That test is not official conformance-runner
 > execution or a landed trust measurement. Section 6 specifies two
 > additional structural box equalities and two public Nat Order
-> selector laws. This catalog candidate exports all four checked proofs;
-> its package test roots-loads Order and NatBox and checks the authored
-> seed. These local checks are not official conformance-runner execution,
-> CI, publication, landing or a landed trust measurement.
+> selector laws. Its catalog exports and package-owned seed test are on
+> main; that test is not official conformance-runner execution or a
+> landed trust measurement. Section 7 specifies four more laws of
+> associativity. The separate Foundation catalog candidate exports the
+> four checked laws and runs the §7 seed in a package-owned test. That
+> test is not official conformance-runner execution, CI, publication,
+> landing or a landed trust measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -604,10 +608,10 @@ execution, CI, publication, landing or landed trust.
 > (SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).** Architect's
 > isolated D0 on `0bb872591` checked all four generic proofs, no new
 > `Axiom`, and equal `trusted_base()` identities 114 → 114. The catalog
-> candidate exports both Nat Order selectors and both NatBox laws, and
-> a package test checks the §6 seed against roots-loaded candidate
-> exports. The test is not official conformance-runner execution, CI,
-> publication, landing or a landed trust measurement.
+> catalog exports both Nat Order selectors and both NatBox laws on main;
+> its package test checks the §6 seed against roots-loaded exports.
+> That test is not official conformance-runner execution or a landed
+> trust measurement.
 
 ### 6.1 Two public selector laws in Nat Order
 
@@ -656,8 +660,8 @@ coordinate equalities give equality of both `Point` corners and then
 **structural `Equal Box`**. This includes inverted boxes: the
 coordinate formulas remain total and the proof does not infer
 identity from an empty set of members. It does not equate every
-representation of an empty box, or state idempotence, associativity,
-or a complement law.
+representation of an empty box, idempotence or a complement law.
+Section 7 separately states associativity for each operation.
 
 The private `point_equal` from the existing package stays private.
 The new `box_with_lo`, `box_with_hi` and `box_equal` are private
@@ -689,13 +693,107 @@ scratch `trusted_base()` GlobalId sets 114 → 114. The two Nat Order
 selectors and two box laws were owned Transparent globals; selective
 imports of the three new box helpers were refused. The new seed was
 accepted with an overlay of only that checked package patch, and its
-one false claim was refused there. The catalog candidate now exports
-all four checked laws. A roots-loaded package test accepts the entire
+one false claim was refused there. The landed catalog exports all
+four checked laws. A roots-loaded package test accepts the entire
 seed client, including both direct Order selectors, independent value
 checks and the same-form true `Equal Box` control; it pins the refused
 `seed_neg` proposition and observes `TypeMismatch` at its own `Refl`.
 The test separately checks the four generic public types and exact
 before/after `trusted_base()` GlobalId sets (114 → 114), and refuses
-selective imports of the three private helpers. These local checks
-are not official conformance-runner execution, CI, publication, landing
-or a landed trust measurement.
+selective imports of the three private helpers. The §6 exports and test
+are on main. These local checks are not official conformance-runner
+execution or a landed trust measurement.
+
+## 7. Associativity of box intersection and hull
+
+> **Section 7 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY).** Architect's
+> isolated D0 on `372a6a1a6` checked four generic proofs with no new
+> `Axiom` and identical scratch `trusted_base()` identities 114 → 114.
+> The earlier spec-and-seed candidate did not deliver the Nat Order or
+> NatBox catalog exports. The separate Foundation candidate exports all
+> four laws; its package test root-loads them and checks the complete
+> accepted seed and the isolated false claim. This is candidate-local
+> package-test evidence, not official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
+
+### 7.1 Associativity selectors in Nat Order
+
+`Data.Numeric.Nat.Order` must export these two further public Transparent
+checked proof selectors for its existing natural extrema. Each belongs
+directly after the corresponding §6.1 `comm for` selector, in that
+operation's proof family:
+
+```ken
+pub proof assoc for min
+    (k : Nat) (m : Nat) (n : Nat)
+  : Equal Nat (min (min k m) n) (min k (min m n))
+
+pub proof assoc for max
+    (k : Nat) (m : Nat) (n : Nat)
+  : Equal Nat (max (max k m) n) (max k (max m n))
+```
+
+Clients apply them as `(proof assoc for min) k m n` and
+`(proof assoc for max) k m n`. They equate the two parenthesizations
+for all natural arguments, including zero and repeated values, without
+an order premise. The §6 commutativity selectors are distinct: swapping
+two arguments or checking one closed value cannot replace a generic
+regrouping law. The D0 proves these selectors by structural recursion
+on the three arguments. The existing operations, Nat bounds and
+commutativity laws remain unchanged; no new primitive or postulate is
+needed.
+
+### 7.2 Structural box equalities
+
+`Algorithm.Geometry.NatBox` must export these two public Transparent
+checked theorems alongside the §6 box laws:
+
+```ken
+pub theorem intersect_assoc
+    (a : Box) (b : Box) (c : Box)
+  : Equal Box (intersect (intersect a b) c) (intersect a (intersect b c))
+
+pub theorem hull_assoc
+    (a : Box) (b : Box) (c : Box)
+  : Equal Box (hull (hull a b) c) (hull a (hull b c))
+```
+
+Both are unconditional for every three boxes, including inverted
+bounds and disjoint intersections. By §1.2, each corner coordinate
+of either grouping is a nested Nat extremum over the same three
+coordinates. Intersection uses `max` on lower corners and `min` on
+upper corners; hull reverses them. Section 7.1 equates each pair of
+nested coordinates, yielding equality of both stored corners and
+hence **structural `Equal Box`**. The argument does not identify
+differently represented empty boxes by their point sets. It does
+not imply that intersection distributes over hull, that hull
+distributes over intersection, or that a mixed regrouping is equal.
+
+The checked proof reuses existing private `point_equal` and
+`box_equal` and, through them, private `box_with_lo` and
+`box_with_hi`. There is **no new helper**, and none of these four
+becomes public. Earlier §1–§6 operations and law types are unchanged.
+The closed seed at
+`conformance/stdlib/geometry/seed-box-intersect-hull-associativity.md`
+uses three distinct pairwise overlapping boxes, independently
+computes both sides of both equations, and applies the public laws.
+A same-input mixed-operation equation is refused; these examples
+delimit, but cannot prove, the generic laws.
+
+On base `372a6a1a6`, Architect's D0 checked both package additions
+with `ken check` and `ken fmt --check` rc 0, four owned Transparent
+exports, no new `Axiom`, and unchanged scratch trusted GlobalId sets
+114 → 114. Selective imports of all four existing private helpers
+were refused with `UnboundName`. The D0 probe accepted closed
+three-box controls and refused the mixed equation with `TypeMismatch`;
+it did not run the CLI, official conformance runner or CI. Those
+scratch measurements do **not** establish a shipped §7 export or
+landed trust result. The separate Foundation catalog candidate exports
+all four checked laws. Its `cat_geometry_box_intersect_hull_associativity`
+package test root-loads them and checks the complete accepted seed and
+its isolated refused claim. These candidate-local checks are not
+an official conformance-runner run, CI, publication, landing or a
+landed trust measurement. No new box representation, point-set
+quotient, dimension, validity premise or runtime-cost guarantee is
+introduced here.

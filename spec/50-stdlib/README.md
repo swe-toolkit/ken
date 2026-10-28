@@ -305,13 +305,14 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–6
+**`65-linear-algebra.md`** §§1–7
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
 SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
 SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC;
-SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY).
+SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY;
+SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -332,10 +333,18 @@ or landed trust. Section 6 adds premise-free vector-argument
 additivity and homogeneity for `matrix_vector`, including zero
 dimensions. Architect D0 checked both generic proofs with no new
 `Axiom` and unchanged scratch trust identities (109 → 109). The §6
-catalog exports are absent; its authored closed seed and D0 do not
-establish shipped-seed execution, official conformance, CI,
-publication, landing or landed trust. No rational or `Float` tier is
-claimed.
+catalog exports and package-owned seed test are on main; neither
+establishes official conformance or landed trust. Section 7 states
+one premise-free Transparent `transpose_adjoint m n a x y` law: the
+natural dot of the matrix-vector image with `y` equals the dot of
+`x` with the transposed image of `y`, including zero dimensions.
+`dot_zero_columns` and `transpose_cons_image` stay private. Architect
+checked the generic proof in isolated D0 on `54f68d3cc` with no new
+`Axiom` and equal scratch trust identities (109 → 109). The §7
+catalog export is absent at this base; the separate closed seed and
+D0 overlay do not establish shipped §7 execution, official
+conformance, CI, publication, landing or landed trust. No rational
+or `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–7 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
@@ -396,10 +405,11 @@ conformance, CI, publication, landing or landed trust. A sorted-list
 normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–6 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–7 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
 SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER;
-SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY).
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY;
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -437,9 +447,16 @@ structural `intersect_comm` and `hull_comm` in NatBox, including
 inverted boxes. Unlike rational interval endpoint swaps, Nat corners
 support structural `Equal Box`. Architect D0 checked all four generic
 proofs without a new `Axiom`, at equal scratch trust identities
-114 → 114. The §6 catalog exports remain absent at this base; its
-closed seed and D0 do not establish shipped §6 execution, official
-conformance, CI, publication, landing or landed trust.
+114 → 114. The §6 catalog exports and package-owned seed test are present on
+main; the test does not establish official conformance or landed trust.
+Section 7 specifies public `assoc for min` and `assoc for max` selectors
+and unconditional structural `intersect_assoc` and `hull_assoc` laws.
+Architect's isolated D0 checked the four generic proofs on `372a6a1a6`
+with no new `Axiom` and unchanged scratch trust identities 114 → 114.
+The §7 catalog exports are not landed on this base; its authored closed
+seed and D0 do not establish shipped §7 execution, official conformance,
+CI, publication, landing or landed trust. The existing box-congruence
+helpers remain private.
 Signed-coordinate geometry, Euclidean and floating-point distance,
 other dimensions, canonical empty boxes and point-set equality remain
 outside scope.

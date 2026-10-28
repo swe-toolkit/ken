@@ -139,6 +139,8 @@ fn generic_public_geometry_laws_and_order_bounds_add_no_trust() {
         "hull_contains_right",
         "intersect_comm",
         "hull_comm",
+        "intersect_assoc",
+        "hull_assoc",
         "manhattan_symm",
         "manhattan_self",
     ] {

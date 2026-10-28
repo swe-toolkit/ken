@@ -117,6 +117,29 @@ pub proof comm for min (m : Nat) (n : Nat) : Equal Nat (min m n) (min n m) =
       }
   }
 
+pub proof assoc for min
+      (k : Nat) (m : Nat) (n : Nat)
+    : Equal Nat (min (min k m) n) (min k (min m n)) =
+  match k {
+    Zero ↦ Proved;
+    Suc k2 ↦
+      match m {
+        Zero ↦ Proved;
+        Suc m2 ↦
+          match n {
+            Zero ↦ Proved;
+            Suc n2 ↦
+              cong
+                Nat
+                Nat
+                (min (min k2 m2) n2)
+                (min k2 (min m2 n2))
+                Suc
+                ((proof assoc for min) k2 m2 n2)
+          }
+      }
+  }
+
 pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
@@ -180,6 +203,29 @@ pub proof comm for max (m : Nat) (n : Nat) : Equal Nat (max m n) (max n m) =
       match n {
         Zero ↦ Refl;
         Suc n2 ↦ cong Nat Nat (max m2 n2) (max n2 m2) Suc ((proof comm for max) m2 n2)
+      }
+  }
+
+pub proof assoc for max
+      (k : Nat) (m : Nat) (n : Nat)
+    : Equal Nat (max (max k m) n) (max k (max m n)) =
+  match k {
+    Zero ↦ Refl;
+    Suc k2 ↦
+      match m {
+        Zero ↦ Refl;
+        Suc m2 ↦
+          match n {
+            Zero ↦ Refl;
+            Suc n2 ↦
+              cong
+                Nat
+                Nat
+                (max (max k2 m2) n2)
+                (max k2 (max m2 n2))
+                Suc
+                ((proof assoc for max) k2 m2 n2)
+          }
       }
   }
 
@@ -861,7 +907,10 @@ The four `min`/`max` bounds use the same form. The two public tightness
 proofs complete these bounds: any common lower bound lies below `min`, and
 `max` lies below every common upper bound. The public `min::comm` and
 `max::comm` proofs swap the two Nat operands by structural recursion,
-without changing the operations. The private `compare` proofs
+without changing the operations. The public `min::assoc` and `max::assoc`
+proofs regroup three operands by structural recursion, reducing Zero
+arms with `Proved` for `min` and `Refl` for `max`. The private `compare`
+proofs
 establish the missing result directions: self-comparison is `Eq`, a strict
 left side gives `Lt`, and `Lt` reverses to `Gt`. The three public `compare`
 agreements return the forward order for `Lt`, propositional equality for `Eq`,
@@ -922,7 +971,8 @@ argument and its bridge exposes the canonical successor relation.
    facts; fourteen attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
    positive-right-multiplication order transports; the six `min`/`max` bounds
-   and their two `comm` selectors; the three `compare` agreements;
+   and their four selectors (`comm` and `assoc` for each); the three
+   `compare` agreements;
    and the five inductive `sub` proofs, including `sub::add_cancel`.
    `OrdResult` remains package-local.
 2. **Source map.**
@@ -948,8 +998,9 @@ argument and its bridge exposes the canonical successor relation.
    or postulate.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
    package's checked laws use structural recursion for the strict-order and
-   successor/weakening/addition bounds, `min`/`max` bounds, and subtraction
-   theory, including cancellation; and case analysis on the canonical relation
+   successor/weakening/addition bounds, `min`/`max` bounds and their
+   commutativity and associativity selectors, and subtraction theory,
+   including cancellation; and case analysis on the canonical relation
    for the `compare` agreements. The equality arm closes through
    `leq_nat::antisym`. The order-scaling family proves equality of Boolean
    comparisons by induction and transports it in both directions through
@@ -962,5 +1013,8 @@ argument and its bridge exposes the canonical successor relation.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
    controls check the carried dictionary, canonical relation and bridge
    identities, zero local registration, zero trust delta, examples, and
-   rejection fences. These controls are not Strict evidence; Strict closure and
-   the identity assertions rerun after `LANG-MOD-CANONICAL-PAIR-PACKAGE`.
+   rejection fences. The [geometry associativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-associativity.md)
+   applies both public `min` and `max` associativity selectors to the same
+   three natural arguments; its package test root-loads the checked laws.
+   These controls are not Strict evidence; Strict closure and the identity
+   assertions rerun after `LANG-MOD-CANONICAL-PAIR-PACKAGE`.

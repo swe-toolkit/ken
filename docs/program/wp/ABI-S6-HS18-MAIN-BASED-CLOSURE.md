@@ -5,8 +5,8 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base (increment A):** `origin/main` `9e5d4bc7d986616a1e8a27688edc2ea89beeb031` (the cut of
-`59b930cc9`; re-pinned 2026-10-27 by DOC-BUNDLE-309).
+**Base (increment A):** `origin/main` `c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811` (the cut of
+`5ec884387`; re-pinned 2026-10-28 by DOC-BUNDLE-315).
 Increments B and C pin their own bases in §4a-pin. This header is A's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
@@ -182,8 +182,8 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=9e5d4bc7d986616a1e8a27688edc2ea89beeb031   # increment A's pinned base
-# Re-pinned 2026-10-27 to the cut of 59b930cc9 (DOC-BUNDLE-309). A literal,
+BASE=c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811   # increment A's pinned base
+# Re-pinned 2026-10-28 to the cut of 5ec884387 (DOC-BUNDLE-315). A literal,
 # never a ref or merge-base(...): see §4b and §4f. When A merges main again,
 # its handoff reports the new cut point; the Steward re-pins it here, and QA
 # binds to the routed bundle that carries it.
@@ -802,6 +802,56 @@ ruling that put them at the top of
 the queue as independent work was **withdrawn** — it quoted the ruling and
 dropped its qualifier.
 
+### 7a. Increment A pins the `:9345` closeout by layer isolation
+
+Ruled by the Architect, `evt_181xm6jf0qmhq` (on `ee836f811`). This
+supersedes the earlier residual disclosure.
+
+**Why it needs a pin.** Both `:9345` disjuncts, relay and non-relay, are masked
+by the pending-Result-obligation check in
+`close_and_define_staged_result_bodies` (`!missing.is_empty()`), which runs
+first. That check cannot see two shapes `:9345` guards:
+- an owner left unentered because the caller resolves to another callee
+  that publishes the same identity;
+- a forward-declared owner that no call reaches.
+So `:9345` is not subsumed. Keep the guard, and do not reorder the earlier
+verifier.
+
+1. **Hook (test-only).** In ken-runtime `units.rs`, under
+   `#[cfg(any(test, feature = "px8-ds-test-support"))]`, in the style of
+   `TRAP_CALLER_PROTOCOL_MUTATION`:
+   - add a thread-local `ResultContractLayerMutation` with one variant,
+     `SuppressMissingContractRefusal`, and a
+     `with_result_contract_layer_mutation(variant, f)` wrapper that returns
+     `(f(), applications)`, with an `_is_exact()` restore check;
+   - consult it only at `if !missing.is_empty()`. When set, count an
+     application and skip that whole refusal block, leaving the obligation
+     and certificate bookkeeping untouched;
+   - leave production unchanged, and name every variant (no `_ =>`, §7b).
+2. **rt_parity `static_response_selected_caller_retarget_reaches_and_restores`.**
+   Keep `ee836f811`'s retarget-only restore-k arm exactly (the FinishedCode
+   identity refusal). Add the arm **restore-k-isolated**: RestoreSelectedKTarget
+   under suppression, expecting the original `:9345` text "a forward-declared
+   response owner has no verified selected incoming call", both application
+   counts > 0, the planner-ledger equality and the per-arm byte restore. The
+   remove arm is unchanged.
+3. **rt_branched `lowering_relay_source_without_entering_owner_refuses_coverage`.**
+   Split it into two arms on one source:
+   - **retarget only:** coverage 0 and the FinishedCode identity refusal, with
+     the two identities unequal;
+   - **retarget with suppression:** the original assertions, plus suppression
+     applications > 0.
+4. **Inertness control.** Each unmutated fixture, built under suppression
+   alone, compiles with 0 applications. rt_parity's must also be
+   byte-equal to the baseline.
+5. **Mutation (QA).** A compile-preserving no-op at `:9345` that keeps the
+   recorder push reddens both isolated arms. The retarget-only arms stay green.
+   Restore byte-identically.
+
+**Precommitted query, non-advancing.** If anything other than `:9345` refuses
+first under suppression, post that refusal verbatim. Do not add a second
+variant on your own.
+
 ---
 
 ## 8. Acceptance
@@ -844,6 +894,8 @@ Every AC below binds **each** increment, cut from the `main` of its own moment.
   measurement. Controls 2 and 3 are **stops**, not warnings.
 - **AC-R1-R2.** §7: R2 on increment A; R1 on the increment that restores the
   AC-1e file.
+  §7a's layer-isolation pins and inertness control are reported in
+  increment A's handoff.
 - **No-regression means GREEN IN CI**, never a local `--workspace` run
   (`COORDINATION §12`). Local work is `scripts/ken-cargo` scoped to the crate
   touched.

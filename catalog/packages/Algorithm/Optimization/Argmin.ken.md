@@ -26,7 +26,7 @@ tail. On a possibly empty `List`, each Option selector returns no value on
 
 ## Definition
 
-The minimum selector and its seven laws lead, followed by its Option selector
+The minimum selector and its eight laws lead, followed by its Option selector
 and four laws. The maximum selector and its seven laws follow, then its Option
 selector and four laws. Private shared selection helpers, inductive proofs and
 Option proof helpers close the definition. Two generic Nat-order facts come
@@ -34,6 +34,8 @@ from their canonical owner, `Data.Numeric.Nat.Order`.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, leq_nat)
+
+import Core.Function.Combinators (comp)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -125,6 +127,15 @@ pub theorem argmin_takes_tail
         (argmin a cost (nonempty_cons a x (Cons a y ys)))
         (argmin a cost (nonempty_cons a y ys)) =
   choose_yes a (lt_nat (cost (argmin_from a cost y ys)) (cost x)) (argmin_from a cost y ys) x
+
+pub theorem argmin_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : NonEmpty a)
+    : Equal a (argmin a (comp a Nat Nat f cost) xs) (argmin a cost xs) =
+  select_from_cost_order a cost f same_order (nonempty_head a xs) (nonempty_tail a xs)
 
 pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
   match xs {
@@ -395,6 +406,56 @@ theorem choose_yes
     False ↦ λh. absurd h
   }
 
+theorem select_from_cost_order
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (x : a)
+      (rest : List a)
+    : Equal a
+        (select_from a (comp a Nat Nat f cost) lt_nat x rest)
+        (select_from a cost lt_nat x rest) =
+  match rest {
+    Nil ↦ Refl;
+    Cons y ys ↦
+      J
+        (λr _.
+          Equal
+            a
+            (choose
+              a
+              (lt_nat
+                (f (cost (select_from a (comp a Nat Nat f cost) lt_nat y ys)))
+                (f (cost x)))
+              (select_from a (comp a Nat Nat f cost) lt_nat y ys)
+              x)
+            (choose a (lt_nat (cost r) (cost x)) r x))
+        (choose_cost_order
+          a
+          cost
+          f
+          same_order
+          (select_from a (comp a Nat Nat f cost) lt_nat y ys)
+          x)
+        (select_from_cost_order a cost f same_order y ys)
+  }
+
+theorem choose_cost_order
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (yes : a)
+      (no : a)
+    : Equal a
+        (choose a (lt_nat (f (cost yes)) (f (cost no))) yes no)
+        (choose a (lt_nat (cost yes) (cost no)) yes no) =
+  J
+    (λb _. Equal a (choose a (lt_nat (f (cost yes)) (f (cost no))) yes no) (choose a b yes no))
+    Refl
+    (same_order (cost yes) (cost no))
+
 theorem choose_le_no
       (a : Type) (cost : a → Nat) (yes : a) (no : a) (b : Bool)
     : Equal Bool (lt_nat (cost yes) (cost no)) b
@@ -567,8 +628,15 @@ canonical Nat-order bridge to rule out each strictly cheaper member.
 base case and both outcomes of strict comparison. The private selection
 proofs distinguish those outcomes by binding the comparison Boolean and its
 corresponding equality rather than assuming that an indirectly converted
-expression is refined by a match. The generic strict/non-strict order bridges
-are public proofs attached to `lt_nat` in `Data.Numeric.Nat.Order`, not
+expression is refined by a match. `argmin_cost_order_invariant` relates two
+costs: when `f` gives every strict Nat comparison its original Boolean, each
+step of the private selection compares the same way under
+`comp a Nat Nat f cost` as under `cost`, so the same candidate is chosen, ties
+included. The private `select_from_cost_order` inducts over the tail and
+transports the head comparison with `J`; the premise cannot be dropped, since
+a cost transform that merges two costs turns them into a tie that keeps the
+earlier candidate. The generic strict/non-strict order bridges are public
+proofs attached to `lt_nat` in `Data.Numeric.Nat.Order`, not
 additional optimization laws or duplicated local recursion.
 
 `argmin_option_nil` and `argmin_option_cons` reduce the selector on both list
@@ -616,7 +684,8 @@ an empty list by returning `None`, without another selection algorithm.
 
 ## Trust & derivation
 
-**Public API:** `argmin` and its seven §1.2 theorems; `argmin_option` and
+**Public API:** `argmin`, its seven §1.2 theorems and
+`argmin_cost_order_invariant`; `argmin_option` and
 its four §1.4 laws; `argmax` and the seven §3.2 laws `argmax_member`,
 `argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
 `argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`; and
@@ -636,15 +705,23 @@ Nat order retain their provider identities.
 **Derivation:** `NonEmpty` and its checked list-view equality are provided by
 `Data.Collections.NonEmpty`; `list_elem` and its introduction lemmas by
 `Data.Collections.Derived`; `IsTrue` and `leq_nat` by
-`Core.Classes.LawfulClasses`; and `lt_nat` with its two attached bridges by
-`Data.Numeric.Nat.Order`. The selectors add no axiom, primitive, postulate or
-opaque constant. `trusted_base()` must stay unchanged relative to the provider
-closure; this does not erase inherited assumptions.
+`Core.Classes.LawfulClasses`; `comp` by `Core.Function.Combinators`; and
+`lt_nat` with its two attached bridges by `Data.Numeric.Nat.Order`. The
+selectors add no axiom, primitive, postulate or opaque constant.
+`trusted_base()` must stay unchanged relative to the provider closure;
+this does not erase inherited assumptions.
 
 **Validation:** `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
 instances and false-result refusals. Its scoped acceptance target checks the
-client programs and the generic seven law types.
+client programs and the generic seven law types. The
+[§1.5 cost-order seed](../../../../conformance/stdlib/optimization/seed-argmin-cost-order-invariance.md)
+adds a four-label non-head earliest tie, an open strict-order proof,
+and a flattened-cost false result on the same input. The candidate's
+`cat_optimization_argmin_cost_order` package test root-loads the
+checked public law, checks the whole accepted seed client and refuses
+the isolated false claim. This is not official conformance-runner
+execution, CI, publication or landing.
 `conformance/stdlib/optimization/seed-argmin-option.md` adds empty,
 singleton and non-degenerate tie cases, instances of the four Option laws,
 and an isolated false `Some`-on-`Nil` refusal. The Option target root-loads
