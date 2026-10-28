@@ -124,24 +124,31 @@ unchanged kernel behavior.
 
 ### surface/modules/pair-floor-protected-name-bindings-reject
 
-- promise class: **durable invariant** — source cannot introduce a binding in B
+- promise class: **durable invariant** — source cannot introduce the four
+  Pair-family names at the listed declaration sites or the listed `pair_fst`
+  parameter site
 - stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §3.3`; `39 §2.0`
 - given: in independent Strict roots, attempt a top-level binding named `Pair`,
   `mk_pair`, `pair_fst`, or `pair_snd`, with a well-typed body or family. Also
   try `fn use_pair (pair_fst : Int) : Int = pair_fst`, paired with the same
-  function using the non-B binder `local_pair_fst`. Reuse `seed-modules.md`'s
-  protected-name matrix for the other floor types and bare constructors.
+  function using the non-B binder `local_pair_fst`. This case covers only those
+  four Pair-family top-level names and the explicitly listed `pair_fst`
+  parameter.
 - expect: each Pair-family top-level attempt and the `pair_fst` binder are hard
   surface errors at binding introduction; the diagnostic kind is not further
   specified here. The `local_pair_fst` control accepts. No local binding
-  replaces a floor identity. An ordinary local `data Pair a b = MkPair a b` is
-  included in the `Pair` row and cannot become the transparent floor family.
+  replaces a Pair-family floor identity. An ordinary local
+  `data Pair a b = MkPair a b` is included in the `Pair` row and cannot become
+  the transparent floor family.
 - controls: rename all four local declarations; they admit with fresh ids and
-  remain distinct from the floor declarations. The non-B binder accepts; the
-  separate `seed-modules.md` case covers ordinary lexical shadowing.
-- why: the prohibition covers declarations and binders in the floor type and
-  its companion-binding inventory; no binder can introduce a protected name.
+  remain distinct from the floor declarations. The `local_pair_fst` binder
+  control accepts.
+- why: these rows cover the Pair-family declarations and one local binder only.
+  Broader §33.3 name and binder coverage remains outside this case and is a
+  separate residual unless another named case discharges it. The
+  `prelude-protected-name-bindings-and-lookalike-matrix` case has its own
+  bounded scope; it does not discharge all of B.
 
 ### surface/modules/pair-reexport-is-identity-preserving-republication
 
