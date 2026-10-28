@@ -2264,8 +2264,17 @@ fn owner_body_control(
         format!("{error:?}").contains(expected),
         "{label}: wrong finished-body refusal: {error:?}"
     );
+    // The contract-query observation is from lowering, not the typed planner
+    // population: an intentionally malformed owner may stop before making
+    // every query. Compare all planner facts, and keep the full diagnostic
+    // (including query observations) in the restored-byte comparison below.
+    let mut baseline_planner = baseline_rows.clone();
+    let mut mutated_planner = diagnostics.clone();
+    for row in baseline_planner.iter_mut().chain(&mutated_planner) {
+        row.generated_context_result_contracts.clear();
+    }
     assert_eq!(
-        &diagnostics, &baseline_rows,
+        mutated_planner, baseline_planner,
         "{label}: body mutation changed the typed planner population"
     );
     assert!(ken_runtime::static_response_owner_body_mutation_is_exact());
