@@ -272,19 +272,19 @@ proc file_body (file : Resource ResourceKind.FsHandle)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 81);
+    Err error |-> host_exit AFull (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 83);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 84)
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 84)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
@@ -485,19 +485,19 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 81);
+    Err error |-> host_exit AFull (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 83);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 84)
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 84)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
@@ -618,19 +618,19 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 81);
+    Err error |-> host_exit AFull (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 83);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 84)
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 84)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
@@ -818,19 +818,19 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 81);
+    Err error |-> host_exit AFull (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 83);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 84)
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 84)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
@@ -1015,19 +1015,19 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 81);
+    Err error |-> host_exit AFull (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 83);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 84)
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 84)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
@@ -1098,24 +1098,24 @@ fn ok_code (code : ExitCode) : ResourceBodyResult Unit ExitCode =
 fn from_buffer_alloc (outcome : Result ResourceError (ResourceBracketResult Unit ExitCode))
   : ResourceBodyResult Unit ExitCode =
   match outcome {
-    Err error |-> ResourceBodyOk Unit ExitCode (Failure 80);
+    Err error |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 80);
     Ok bracket |-> match bracket {
       ResourceBracketOk code |-> ResourceBodyOk Unit ExitCode code;
-      ResourceBracketBodyError error |-> ResourceBodyOk Unit ExitCode (Failure 81);
-      ResourceBracketReleaseError error |-> ResourceBodyOk Unit ExitCode (Failure 82);
-      ResourceBracketBodyAndReleaseError be re |-> ResourceBodyOk Unit ExitCode (Failure 83)
+      ResourceBracketBodyError error |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 81);
+      ResourceBracketReleaseError error |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 82);
+      ResourceBracketBodyAndReleaseError be re |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 83)
     }
   }
 
 fn from_file_alloc (outcome : Result FileError (ResourceBracketResult Unit ExitCode))
   : ResourceBodyResult Unit ExitCode =
   match outcome {
-    Err error |-> ResourceBodyOk Unit ExitCode (Failure 84);
+    Err error |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 84);
     Ok bracket |-> match bracket {
       ResourceBracketOk code |-> ResourceBodyOk Unit ExitCode code;
-      ResourceBracketBodyError error |-> ResourceBodyOk Unit ExitCode (Failure 85);
-      ResourceBracketReleaseError error |-> ResourceBodyOk Unit ExitCode (Failure 86);
-      ResourceBracketBodyAndReleaseError be re |-> ResourceBodyOk Unit ExitCode (Failure 87)
+      ResourceBracketBodyError error |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 85);
+      ResourceBracketReleaseError error |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 86);
+      ResourceBracketBodyAndReleaseError be re |-> ResourceBodyOk Unit ExitCode (ExitCode.Failure 87)
     }
   }
 
@@ -1132,18 +1132,18 @@ proc verdict (dest : Resource ResourceKind.FsHandle) (buffer_b : BufferHandle) (
     (Result ResourceError WriteProgress) (ResourceBodyResult Unit ExitCode)
     (writeAt AFull dest (0 : Int) buffer_b span_a)
     (\valid. match valid {
-      Ok progress |-> ret_code (ok_code (Failure 71));
+      Ok progress |-> ret_code (ok_code (ExitCode.Failure 71));
       Err eb |-> match is_invalid_bounds eb {
-        False |-> ret_code (ok_code (Failure 73));
+        False |-> ret_code (ok_code (ExitCode.Failure 73));
         True |-> bind (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (Result ResourceError WriteProgress) (ResourceBodyResult Unit ExitCode)
           (writeAt AFull dest (sub_int 0 1) buffer_b span_a)
           (\neg. match neg {
-            Ok progress |-> ret_code (ok_code (Failure 72));
+            Ok progress |-> ret_code (ok_code (ExitCode.Failure 72));
             Err eo |-> match is_invalid_offset eo {
-              True |-> ret_code (ok_code Success);
-              False |-> ret_code (ok_code (Failure 74))
+              True |-> ret_code (ok_code ExitCode.Success);
+              False |-> ret_code (ok_code (ExitCode.Failure 74))
             }
           })
       }
@@ -1168,9 +1168,9 @@ proc a_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
     (Result ResourceError ReadProgress) (ResourceBodyResult Unit ExitCode)
     (readAt AFull source (0 : Int) buffer_a (MkBufferWindow (2 : Int) (4 : Int)))
     (\outcome. match outcome {
-      Err error |-> ret_code (ok_code (Failure 88));
+      Err error |-> ret_code (ok_code (ExitCode.Failure 88));
       Ok progress |-> match progress {
-        ReadEof |-> ret_code (ok_code (Failure 89));
+        ReadEof |-> ret_code (ok_code (ExitCode.Failure 89));
         ReadSome span_a count |-> a_after_read dest span_a
       }
     })
@@ -1194,19 +1194,19 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit ExitCode)) : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 96);
+    Err error |-> host_exit AFull (ExitCode.Failure 96);
     Ok bracket |-> match bracket {
       ResourceBracketOk code |-> host_exit AFull code;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 93);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 94);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 95)
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 93);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 94);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 95)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit ExitCode)) ExitCode

@@ -10,7 +10,7 @@ use ken_elaborator::compiler_driver::{
 
 const PKG: &str = "verify_boundary_header_order";
 const FULL: &str = "program capabilities FS AFull\n\
-    fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_exit AFull Success";
+    fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_exit AFull ExitCode.Success";
 const NONE: &str = "program capabilities FS ANone\nconst zz_other : Nat = Zero";
 const SAME: &str = "program capabilities FS AFull\nconst zz_other : Nat = Zero";
 const PACKAGE: &str = "package\nconst zz_other : Nat = Zero";

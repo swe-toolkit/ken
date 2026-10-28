@@ -38,14 +38,14 @@ fn liftSize (r : LiftRose) : Nat = match r {
 }
 
 fn exactNatThree (value : Nat) : ExitCode = match value {
-  Zero |-> Failure 30;
+  Zero |-> ExitCode.Failure 30;
   Suc one |-> match one {
-    Zero |-> Failure 31;
+    Zero |-> ExitCode.Failure 31;
     Suc two |-> match two {
-      Zero |-> Failure 32;
+      Zero |-> ExitCode.Failure 32;
       Suc three |-> match three {
-        Zero |-> Success;
-        Suc _ |-> Failure 34
+        Zero |-> ExitCode.Success;
+        Suc _ |-> ExitCode.Failure 34
       }
     }
   }

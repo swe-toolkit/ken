@@ -61,8 +61,8 @@ fn missing_and_duplicate_main_report_distinct_named_errors() {
         "duplicate",
         &format!(
             "{}{}",
-            abi_main("host_exit APartial Success"),
-            abi_main("host_exit APartial Success")
+            abi_main("host_exit APartial ExitCode.Success"),
+            abi_main("host_exit APartial ExitCode.Success")
         ),
         [],
     );
@@ -101,13 +101,13 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   match input {
     MkProcessInput arguments _environment _cwd |->
       match arguments {
-        Nil |-> host_exit APartial (Failure 2) ;
+        Nil |-> host_exit APartial (ExitCode.Failure 2) ;
         Cons bytes _rest |->
           match bytes_at bytes 0 {
-            None |-> host_exit APartial (Failure 3) ;
+            None |-> host_exit APartial (ExitCode.Failure 3) ;
             Some byte |-> match eq_int (uint8_to_int byte) 255 {
               True  |-> host_program APartial (print_line "raw-ok") ;
-              False |-> host_exit APartial (Failure 3)
+              False |-> host_exit APartial (ExitCode.Failure 3)
             }
           }
       }
@@ -120,7 +120,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
     let rejected = run(
         "pre-separator",
-        &abi_main("host_exit APartial Success"),
+        &abi_main("host_exit APartial ExitCode.Success"),
         [OsString::from("--unknown")],
     );
     assert_eq!(rejected.status.code(), Some(1));
@@ -134,10 +134,10 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 #[test]
 fn exit_code_mapping_covers_every_contract_arm() {
     for (name, value, expected) in [
-        ("success", "Success", 0),
-        ("failure-three", "Failure 3", 3),
-        ("failure-max", "Failure 255", 255),
-        ("failure-zero", "Failure 0", 1),
+        ("success", "ExitCode.Success", 0),
+        ("failure-three", "ExitCode.Failure 3", 3),
+        ("failure-max", "ExitCode.Failure 255", 255),
+        ("failure-zero", "ExitCode.Failure 0", 1),
     ] {
         let output = run(
             name,

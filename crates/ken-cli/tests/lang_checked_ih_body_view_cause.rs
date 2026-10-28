@@ -40,20 +40,20 @@ data D5Tree : Type where { D5Leaf : D5Tree ; D5Node : D5Tree -> Nat -> D5Tree ->
 fn add (x : Nat) (y : Nat) : Nat = match x { Zero |-> y ; Suc x2 |-> Suc (add x2 y) }
 
 fn classify (n : Nat) : ExitCode = match n {
-  Zero |-> Failure 100;
+  Zero |-> ExitCode.Failure 100;
   Suc a |-> match a {
-    Zero |-> Failure 1;
+    Zero |-> ExitCode.Failure 1;
     Suc b |-> match b {
-      Zero |-> Failure 2;
+      Zero |-> ExitCode.Failure 2;
       Suc c |-> match c {
-        Zero |-> Failure 3;
+        Zero |-> ExitCode.Failure 3;
         Suc d |-> match d {
-          Zero |-> Failure 4;
+          Zero |-> ExitCode.Failure 4;
           Suc e |-> match e {
-            Zero |-> Failure 5;
+            Zero |-> ExitCode.Failure 5;
             Suc f |-> match f {
-              Zero |-> Failure 6;
-              Suc _ |-> Failure 200
+              Zero |-> ExitCode.Failure 6;
+              Suc _ |-> ExitCode.Failure 200
             }
           }
         }

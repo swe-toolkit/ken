@@ -6291,7 +6291,7 @@ const rt_probe_span : BufferSpan = __RT_PARITY_SPAN__
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-MkProgramCaps cap |-> host_exit AFull Success
+ProgramCaps.MkProgramCaps cap |-> host_exit AFull ExitCode.Success
   }
 "#;
 

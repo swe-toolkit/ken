@@ -1791,13 +1791,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 20) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 20) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 21) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 21) ;
         Cons path more |-> match more {
-          Nil |-> host_exit AFull (Failure 22) ;
+          Nil |-> host_exit AFull (ExitCode.Failure 22) ;
           Cons contents _ |-> match caps {
-            MkProgramCaps cap |->
+            ProgramCaps.MkProgramCaps cap |->
               bind (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
                 (Result FileError Unit) ExitCode
@@ -1805,7 +1805,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                   (Result FileError Unit)
                   (writeFile cap path CreateNew contents))
                 (\written. match written {
-                  Err _ |-> host_exit AFull (Failure 23) ;
+                  Err _ |-> host_exit AFull (ExitCode.Failure 23) ;
                   Ok _ |->
                     bind (Coproduct (FSOp AFull) AmbientOp)
                       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -1813,7 +1813,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                         (Result FileError Bytes) (readFile AFull cap path))
                       (\read. match read {
-                        Err _ |-> host_exit AFull (Failure 24) ;
+                        Err _ |-> host_exit AFull (ExitCode.Failure 24) ;
                         Ok bytes |->
                           bind (Coproduct (FSOp AFull) AmbientOp)
                             (resp_coproduct (FSOp AFull) AmbientOp
@@ -1822,7 +1822,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                             (host_console AFull (Result IOError Unit)
                               (write Stdout bytes))
                             (\written_console. match written_console {
-                              Err _ |-> host_exit AFull (Failure 25) ;
+                              Err _ |-> host_exit AFull (ExitCode.Failure 25) ;
                               Ok _ |->
                                 bind (Coproduct (FSOp AFull) AmbientOp)
                                   (resp_coproduct (FSOp AFull) AmbientOp
@@ -1830,7 +1830,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                                   (Result IOError Unit) ExitCode
                                   (host_console AFull (Result IOError Unit) (flush Stdout))
                                   (\flushed. match flushed {
-                                    Err _ |-> host_exit AFull (Failure 26) ;
+                                    Err _ |-> host_exit AFull (ExitCode.Failure 26) ;
                                     Ok _ |->
                                       bind (Coproduct (FSOp AFull) AmbientOp)
                                         (resp_coproduct (FSOp AFull) AmbientOp
@@ -1838,8 +1838,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                                         Bool ExitCode
                                         (host_console AFull Bool (is_terminal Stdout))
                                         (\terminal. match terminal {
-                                          False |-> host_exit AFull Success ;
-                                          True |-> host_exit AFull (Failure 27)
+                                          False |-> host_exit AFull ExitCode.Success ;
+                                          True |-> host_exit AFull (ExitCode.Failure 27)
                                         })
                                   })
                             })
@@ -1870,12 +1870,12 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
           (\second . match second {
             MkInstant second_nanoseconds |->
               match leq_int 1600000000000000000 first_nanoseconds {
-                False |-> host_exit AFull (Failure 31) ;
+                False |-> host_exit AFull (ExitCode.Failure 31) ;
                 True |-> match leq_int first_nanoseconds second_nanoseconds {
-                  False |-> host_exit AFull (Failure 32) ;
+                  False |-> host_exit AFull (ExitCode.Failure 32) ;
                   True |-> match leq_int second_nanoseconds 4102444800000000000 {
-                    False |-> host_exit AFull (Failure 33) ;
-                    True |-> host_exit AFull Success
+                    False |-> host_exit AFull (ExitCode.Failure 33) ;
+                    True |-> host_exit AFull ExitCode.Success
                   }
                 }
               }
@@ -1892,12 +1892,12 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
        (Result IOError ReadResult) ExitCode
     (host_console AFull (Result IOError ReadResult) (read Stdin (2 : Int)))
     (\first. match first {
-      Err _ |-> host_exit AFull (Failure 41) ;
+      Err _ |-> host_exit AFull (ExitCode.Failure 41) ;
       Ok first_read |-> match first_read {
-        Eof |-> host_exit AFull (Failure 42) ;
+        Eof |-> host_exit AFull (ExitCode.Failure 42) ;
         Chunk first_bytes |->
           match eq_int (bytes_length first_bytes) 2 {
-            False |-> host_exit AFull (Failure 47) ;
+            False |-> host_exit AFull (ExitCode.Failure 47) ;
             True |->
               bind (Coproduct (FSOp AFull) AmbientOp)
                    (resp_coproduct (FSOp AFull) AmbientOp
@@ -1906,12 +1906,12 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
                 (host_console AFull (Result IOError ReadResult)
                   (read Stdin (4 : Int)))
                 (\second. match second {
-              Err _ |-> host_exit AFull (Failure 43) ;
+              Err _ |-> host_exit AFull (ExitCode.Failure 43) ;
               Ok second_read |-> match second_read {
-                Eof |-> host_exit AFull (Failure 44) ;
+                Eof |-> host_exit AFull (ExitCode.Failure 44) ;
                 Chunk second_bytes |->
                   match eq_int (bytes_length second_bytes) 1 {
-                    False |-> host_exit AFull (Failure 48) ;
+                    False |-> host_exit AFull (ExitCode.Failure 48) ;
                     True |->
                       bind (Coproduct (FSOp AFull) AmbientOp)
                            (resp_coproduct (FSOp AFull) AmbientOp
@@ -1920,10 +1920,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
                         (host_console AFull (Result IOError ReadResult)
                           (read Stdin (4 : Int)))
                         (\third. match third {
-                          Err _ |-> host_exit AFull (Failure 45) ;
+                          Err _ |-> host_exit AFull (ExitCode.Failure 45) ;
                           Ok third_read |-> match third_read {
-                            Chunk _ |-> host_exit AFull (Failure 46) ;
-                            Eof |-> host_exit AFull Success
+                            Chunk _ |-> host_exit AFull (ExitCode.Failure 46) ;
+                            Eof |-> host_exit AFull ExitCode.Success
                           }
                         })
                   }
@@ -1939,13 +1939,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 80) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 80) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 81) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 81) ;
         Cons path more |-> match more {
-          Nil |-> host_exit AFull (Failure 82) ;
+          Nil |-> host_exit AFull (ExitCode.Failure 82) ;
           Cons contents _ |-> match caps {
-            MkProgramCaps cap |->
+            ProgramCaps.MkProgramCaps cap |->
               bind (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp
                   (fs_resp AFull) ambient_resp)
@@ -1955,8 +1955,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                   (Result FileError Unit)
                   (append_file AFull cap path contents))
                 (\appended. match appended {
-                  Ok _ |-> host_exit AFull Success ;
-                  Err _ |-> host_exit AFull (Failure 84)
+                  Ok _ |-> host_exit AFull ExitCode.Success ;
+                  Err _ |-> host_exit AFull (ExitCode.Failure 84)
                 })
           }
         }
@@ -1970,13 +1970,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 90) ;
+      Nil |-> host_exit APartial (ExitCode.Failure 90) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (Failure 91) ;
+        Nil |-> host_exit APartial (ExitCode.Failure 91) ;
         Cons file_path more |-> match more {
-          Nil |-> host_exit APartial (Failure 92) ;
+          Nil |-> host_exit APartial (ExitCode.Failure 92) ;
           Cons directory_path _ |-> match caps {
-            MkProgramCaps cap |->
+            ProgramCaps.MkProgramCaps cap |->
               bind (Coproduct (FSOp APartial) AmbientOp)
                 (resp_coproduct (FSOp APartial) AmbientOp
                   (fs_resp APartial) ambient_resp)
@@ -1986,15 +1986,15 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                   (Result FileError FileMetadata)
                   (file_metadata APartial cap file_path))
                 (\file_result. match file_result {
-                  Err _ |-> host_exit APartial (Failure 94) ;
+                  Err _ |-> host_exit APartial (ExitCode.Failure 94) ;
                   Ok file_metadata_result |-> match file_metadata_result {
                     MkFileMetadata file_size file_kind |->
                       match eq_int file_size 5 {
-                        False |-> host_exit APartial (Failure 95) ;
+                        False |-> host_exit APartial (ExitCode.Failure 95) ;
                         True |-> match file_kind {
-                          KDirectory |-> host_exit APartial (Failure 96) ;
-                          KSymlink |-> host_exit APartial (Failure 97) ;
-                          KOther |-> host_exit APartial (Failure 98) ;
+                          KDirectory |-> host_exit APartial (ExitCode.Failure 96) ;
+                          KSymlink |-> host_exit APartial (ExitCode.Failure 97) ;
+                          KOther |-> host_exit APartial (ExitCode.Failure 98) ;
                           KFile |->
                             bind (Coproduct (FSOp APartial) AmbientOp)
                               (resp_coproduct (FSOp APartial) AmbientOp
@@ -2005,14 +2005,14 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                                 (Result FileError FileMetadata)
                                 (file_metadata APartial cap directory_path))
                               (\directory_result. match directory_result {
-                                Err _ |-> host_exit APartial (Failure 99) ;
+                                Err _ |-> host_exit APartial (ExitCode.Failure 99) ;
                                 Ok directory_metadata |-> match directory_metadata {
                                   MkFileMetadata _directory_size directory_kind |->
                                     match directory_kind {
-                                      KFile |-> host_exit APartial (Failure 100) ;
-                                      KSymlink |-> host_exit APartial (Failure 101) ;
-                                      KOther |-> host_exit APartial (Failure 102) ;
-                                      KDirectory |-> host_exit APartial Success
+                                      KFile |-> host_exit APartial (ExitCode.Failure 100) ;
+                                      KSymlink |-> host_exit APartial (ExitCode.Failure 101) ;
+                                      KOther |-> host_exit APartial (ExitCode.Failure 102) ;
+                                      KDirectory |-> host_exit APartial ExitCode.Success
                                     }
                                 }
                               })
@@ -2036,11 +2036,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 90) ;
+      Nil |-> host_exit APartial (ExitCode.Failure 90) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (Failure 91) ;
+        Nil |-> host_exit APartial (ExitCode.Failure 91) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp APartial) AmbientOp)
               (resp_coproduct (FSOp APartial) AmbientOp
                 (fs_resp APartial) ambient_resp)
@@ -2050,8 +2050,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                 (Result FileError FileMetadata)
                 (file_metadata APartial cap path))
               (\metadata_result. match metadata_result {
-                Err _ |-> host_exit APartial (Failure 94) ;
-                Ok _ |-> host_exit APartial Success
+                Err _ |-> host_exit APartial (ExitCode.Failure 94) ;
+                Ok _ |-> host_exit APartial ExitCode.Success
               })
         }
       }
@@ -2064,13 +2064,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 100) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 100) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 101) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 101) ;
         Cons source more |-> match more {
-          Nil |-> host_exit AFull (Failure 102) ;
+          Nil |-> host_exit AFull (ExitCode.Failure 102) ;
           Cons destination _ |-> match caps {
-            MkProgramCaps cap |->
+            ProgramCaps.MkProgramCaps cap |->
               bind (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp
                   (fs_resp AFull) ambient_resp)
@@ -2080,8 +2080,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                   (Result FileError Unit)
                   (rename_file AFull cap source destination))
                 (\renamed. match renamed {
-                  Ok _ |-> host_exit AFull Success ;
-                  Err _ |-> host_exit AFull (Failure 104)
+                  Ok _ |-> host_exit AFull ExitCode.Success ;
+                  Err _ |-> host_exit AFull (ExitCode.Failure 104)
                 })
           }
         }
@@ -2096,11 +2096,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 110) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 110) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 111) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 111) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError (List DirEntry)) ExitCode
@@ -2111,46 +2111,46 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpReadDirectory |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
-                      NotFound |-> host_exit AFull (Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (Failure 47) ;
-                      Interrupted |-> host_exit AFull (Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (Failure 49) ;
-                      InvalidInput |-> host_exit AFull (Failure 50) ;
-                      IsDirectory |-> host_exit AFull (Failure 51) ;
-                      NotDirectory |-> host_exit AFull (Failure 52) ;
-                      NotEmpty |-> host_exit AFull (Failure 53) ;
-                      Unsupported |-> host_exit AFull (Failure 54) ;
-                      Revoked |-> host_exit AFull (Failure 55) ;
-                      Other _ |-> host_exit AFull (Failure 56)
+                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (Failure 199) ;
-                    OpMetadata |-> host_exit AFull (Failure 199) ;
-                    OpCreateDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRemoveFile |-> host_exit AFull (Failure 199) ;
-                    OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199) ;
-                    OpSeek |-> host_exit AFull (Failure 199) ;
-                    OpSetLength |-> host_exit AFull (Failure 199) ;
-                    OpSync |-> host_exit AFull (Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (Failure 199)
+                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
                 Ok entries |-> match entries {
-                  Nil |-> host_exit AFull (Failure 112) ;
+                  Nil |-> host_exit AFull (ExitCode.Failure 112) ;
                   Cons _ rest1 |-> match rest1 {
-                    Nil |-> host_exit AFull (Failure 113) ;
+                    Nil |-> host_exit AFull (ExitCode.Failure 113) ;
                     Cons _ rest2 |-> match rest2 {
-                      Nil |-> host_exit AFull (Failure 114) ;
+                      Nil |-> host_exit AFull (ExitCode.Failure 114) ;
                       Cons _ rest3 |-> match rest3 {
-                        Nil |-> host_exit AFull Success ;
-                        Cons _ _ |-> host_exit AFull (Failure 115)
+                        Nil |-> host_exit AFull ExitCode.Success ;
+                        Cons _ _ |-> host_exit AFull (ExitCode.Failure 115)
                       }
                     }
                   }
@@ -2168,11 +2168,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 120) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 120) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 121) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 121) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
@@ -2183,38 +2183,38 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpCreateDirectory |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
-                      NotFound |-> host_exit AFull (Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (Failure 47) ;
-                      Interrupted |-> host_exit AFull (Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (Failure 49) ;
-                      InvalidInput |-> host_exit AFull (Failure 50) ;
-                      IsDirectory |-> host_exit AFull (Failure 51) ;
-                      NotDirectory |-> host_exit AFull (Failure 52) ;
-                      NotEmpty |-> host_exit AFull (Failure 53) ;
-                      Unsupported |-> host_exit AFull (Failure 54) ;
-                      Revoked |-> host_exit AFull (Failure 55) ;
-                      Other _ |-> host_exit AFull (Failure 56)
+                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (Failure 199) ;
-                    OpMetadata |-> host_exit AFull (Failure 199) ;
-                    OpReadDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRemoveFile |-> host_exit AFull (Failure 199) ;
-                    OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199) ;
-                    OpSeek |-> host_exit AFull (Failure 199) ;
-                    OpSetLength |-> host_exit AFull (Failure 199) ;
-                    OpSync |-> host_exit AFull (Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (Failure 199)
+                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
-                Ok _ |-> host_exit AFull Success
+                Ok _ |-> host_exit AFull ExitCode.Success
               })
         }
       }
@@ -2228,11 +2228,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 130) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 130) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 131) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 131) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
@@ -2242,38 +2242,38 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpRemoveFile |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
-                      NotFound |-> host_exit AFull (Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (Failure 47) ;
-                      Interrupted |-> host_exit AFull (Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (Failure 49) ;
-                      InvalidInput |-> host_exit AFull (Failure 50) ;
-                      IsDirectory |-> host_exit AFull (Failure 51) ;
-                      NotDirectory |-> host_exit AFull (Failure 52) ;
-                      NotEmpty |-> host_exit AFull (Failure 53) ;
-                      Unsupported |-> host_exit AFull (Failure 54) ;
-                      Revoked |-> host_exit AFull (Failure 55) ;
-                      Other _ |-> host_exit AFull (Failure 56)
+                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (Failure 199) ;
-                    OpMetadata |-> host_exit AFull (Failure 199) ;
-                    OpReadDirectory |-> host_exit AFull (Failure 199) ;
-                    OpCreateDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199) ;
-                    OpSeek |-> host_exit AFull (Failure 199) ;
-                    OpSetLength |-> host_exit AFull (Failure 199) ;
-                    OpSync |-> host_exit AFull (Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (Failure 199)
+                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
-                Ok _ |-> host_exit AFull Success
+                Ok _ |-> host_exit AFull ExitCode.Success
               })
         }
       }
@@ -2287,11 +2287,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 140) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 140) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 141) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 141) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
@@ -2302,38 +2302,38 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpRemoveDirectory |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
-                      NotFound |-> host_exit AFull (Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (Failure 47) ;
-                      Interrupted |-> host_exit AFull (Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (Failure 49) ;
-                      InvalidInput |-> host_exit AFull (Failure 50) ;
-                      IsDirectory |-> host_exit AFull (Failure 51) ;
-                      NotDirectory |-> host_exit AFull (Failure 52) ;
-                      NotEmpty |-> host_exit AFull (Failure 53) ;
-                      Unsupported |-> host_exit AFull (Failure 54) ;
-                      Revoked |-> host_exit AFull (Failure 55) ;
-                      Other _ |-> host_exit AFull (Failure 56)
+                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (Failure 199) ;
-                    OpMetadata |-> host_exit AFull (Failure 199) ;
-                    OpReadDirectory |-> host_exit AFull (Failure 199) ;
-                    OpCreateDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRemoveFile |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199) ;
-                    OpSeek |-> host_exit AFull (Failure 199) ;
-                    OpSetLength |-> host_exit AFull (Failure 199) ;
-                    OpSync |-> host_exit AFull (Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (Failure 199)
+                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
-                Ok _ |-> host_exit AFull Success
+                Ok _ |-> host_exit AFull ExitCode.Success
               })
         }
       }
@@ -2346,33 +2346,33 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 40) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 40) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 41) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 41) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
               (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                 (Result FileError Unit) (writeFile cap path CreateNew path))
               (\written. match written {
-                Ok _ |-> host_exit AFull (Failure 43) ;
+                Ok _ |-> host_exit AFull (ExitCode.Failure 43) ;
                 Err error |-> match error {
                   MkFileError _operation _path cause |-> match cause {
-                    CapabilityDenied |-> host_exit AFull (Failure 44) ;
-                    NotFound |-> host_exit AFull (Failure 45) ;
-                    PermissionDenied |-> host_exit AFull (Failure 46) ;
-                    BrokenPipe |-> host_exit AFull (Failure 47) ;
-                    Interrupted |-> host_exit AFull (Failure 48) ;
-                    AlreadyExists |-> host_exit AFull (Failure 49) ;
-                    InvalidInput |-> host_exit AFull (Failure 50) ;
-                    IsDirectory |-> host_exit AFull (Failure 51) ;
-                    NotDirectory |-> host_exit AFull (Failure 52) ;
-                    NotEmpty |-> host_exit AFull (Failure 53) ;
-                    Unsupported |-> host_exit AFull (Failure 54) ;
-                    Revoked |-> host_exit AFull (Failure 54) ;
-                    Other _ |-> host_exit AFull (Failure 55)
+                    CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                    NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                    PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                    BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                    Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                    AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                    InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                    IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                    NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                    NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                    Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                    Revoked |-> host_exit AFull (ExitCode.Failure 54) ;
+                    Other _ |-> host_exit AFull (ExitCode.Failure 55)
                   }
                 }
               })
@@ -2387,20 +2387,20 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 60) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 60) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 61) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 61) ;
         Cons raw_path more |-> match more {
-          Nil |-> host_exit AFull (Failure 62) ;
+          Nil |-> host_exit AFull (ExitCode.Failure 62) ;
           Cons normalized_path _ |-> match caps {
-            MkProgramCaps cap |->
+            ProgramCaps.MkProgramCaps cap |->
               bind (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
                 (Result FileError Bytes) ExitCode
                 (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                   (Result FileError Bytes) (readFile AFull cap raw_path))
                 (\first. match first {
-                  Err _ |-> host_exit AFull (Failure 63) ;
+                  Err _ |-> host_exit AFull (ExitCode.Failure 63) ;
                   Ok _ |->
                     bind (Coproduct (FSOp AFull) AmbientOp)
                       (resp_coproduct (FSOp AFull) AmbientOp
@@ -2409,8 +2409,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                         (Result FileError Bytes) (readFile AFull cap normalized_path))
                       (\second. match second {
-                        Err _ |-> host_exit AFull (Failure 64) ;
-                        Ok _ |-> host_exit AFull Success
+                        Err _ |-> host_exit AFull (ExitCode.Failure 64) ;
+                        Ok _ |-> host_exit AFull ExitCode.Success
                       })
                 })
           }
@@ -2425,11 +2425,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 70) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 70) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 71) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 71) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp
                 (fs_resp AFull) ambient_resp)
@@ -2439,8 +2439,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 (Result FileError Unit)
                 (change_mode AFull cap path 416))
               (\changed. match changed {
-                Err _ |-> host_exit AFull (Failure 72) ;
-                Ok _ |-> host_exit AFull Success
+                Err _ |-> host_exit AFull (ExitCode.Failure 72) ;
+                Ok _ |-> host_exit AFull ExitCode.Success
               })
         }
       }

@@ -22,13 +22,13 @@ __CHAIN__
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 91);
+    Err error |-> host_exit AFull (ExitCode.Failure 91);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 92);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 93);
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 92);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 93);
       ResourceBracketBodyAndReleaseError body_error release_error |->
-        host_exit AFull (Failure 94)
+        host_exit AFull (ExitCode.Failure 94)
     }
   }
 
@@ -44,7 +44,7 @@ proc stage (cap : Cap AFull)
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |-> stage cap
+    ProgramCaps.MkProgramCaps cap |-> stage cap
   }
 "#;
 

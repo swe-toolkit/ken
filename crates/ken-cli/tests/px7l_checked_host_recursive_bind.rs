@@ -27,7 +27,7 @@ proc delayed (body : Unit -> HostIO APartial Unit)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (flush Stdout))
-      (\_. host_exit APartial Success))
+      (\_. host_exit APartial ExitCode.Success))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =

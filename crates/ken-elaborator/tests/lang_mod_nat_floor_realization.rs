@@ -347,10 +347,22 @@ fn primitive_signature_inventory_is_executable_and_closed() {
     let mut observed_plus_internal_provision = observed.clone();
     assert!(observed_plus_internal_provision.insert(env.globals["Nat"]));
     assert!(observed_plus_internal_provision.insert(env.globals["Pair"]));
-    observed_plus_internal_provision
-        .extend(["Bottom", "Equal", "Prop", "Proved", "Top"].map(|name| env.globals[name]));
+    observed_plus_internal_provision.extend(
+        [
+            "Bottom",
+            "Equal",
+            "ExitCode",
+            "HostIO",
+            "ProcessInput",
+            "Prod",
+            "ProgramCaps",
+            "Prop",
+            "Proved",
+            "Top",
+        ]
+        .map(|name| env.globals[name]),
+    );
     assert_eq!(configured, observed_plus_internal_provision);
-    assert!(!configured.contains(&env.globals["Prod"]));
 
     env.elaborate_file("data Extra = MkExtra")
         .expect("positive-control type must be ordinary checked data");
@@ -442,7 +454,7 @@ fn strict_roots_accept_original_ten_canonical_families_and_constructors() {
 /// Promise class: durable invariant. Installing and exporting the configured
 /// floor is namespace bookkeeping only and adds no kernel declaration or trust.
 #[test]
-fn strict_floor_export_allocates_nothing_and_nonmember_prod_rejects() {
+fn strict_floor_export_allocates_nothing_and_nonmember_unit_rejects() {
     let root = FixtureRoot::new("zero-allocation");
     root.write("export Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error");
     let mut env = ElabEnv::new().expect("base environment");
@@ -458,14 +470,14 @@ fn strict_floor_export_allocates_nothing_and_nonmember_prod_rejects() {
     assert_eq!(env.env.trusted_base(), trusted_before);
 
     let nonmember = FixtureRoot::new("nonmember");
-    nonmember.write("const witness : Prod Bool Bool = MkProd Bool Bool True False");
+    nonmember.write("const witness : Unit = MkUnit");
     let error = ElabEnv::new()
         .expect("base environment")
         .elaborate_module_from_roots_strict(&[nonmember.0.clone()], "Entry")
-        .expect_err("pre-installed nonmember Prod must remain unavailable in strict roots");
+        .expect_err("pre-installed nonmember Unit must remain unavailable in strict roots");
     assert!(
-        matches!(error, ElabError::UnboundName { ref name, .. } if name == "Prod"),
-        "closed-floor rejection must name Prod, got {error:?}"
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == "Unit"),
+        "closed-floor rejection must name Unit, got {error:?}"
     );
 }
 

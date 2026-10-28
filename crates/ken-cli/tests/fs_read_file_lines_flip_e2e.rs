@@ -116,7 +116,7 @@ proc app (cap : Cap {auth}) : Compose (Result IOError Unit) visits [FS, Console]
 proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match caps {{
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp APartial) AmbientOp)
            (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
            (Result IOError Unit) ExitCode
@@ -125,21 +125,21 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
           match r {{
             Err e |->
               match e {{
-                NotFound |-> host_program_then APartial (print_line "NotFound") (Failure 1) ;
-                PermissionDenied |-> host_program_then APartial (print_line "PermissionDenied") (Failure 1) ;
-                CapabilityDenied |-> host_program_then APartial (print_line "CapabilityDenied") (Failure 1) ;
-                BrokenPipe |-> host_program_then APartial (print_line "BrokenPipe") (Failure 1) ;
-                Interrupted |-> host_program_then APartial (print_line "Interrupted") (Failure 1) ;
-                AlreadyExists |-> host_program_then APartial (print_line "AlreadyExists") (Failure 1) ;
-                InvalidInput |-> host_program_then APartial (print_line "InvalidInput") (Failure 1) ;
-                IsDirectory |-> host_program_then APartial (print_line "IsDirectory") (Failure 1) ;
-                NotDirectory |-> host_program_then APartial (print_line "NotDirectory") (Failure 1) ;
-                NotEmpty |-> host_program_then APartial (print_line "NotEmpty") (Failure 1) ;
-                Unsupported |-> host_program_then APartial (print_line "Unsupported") (Failure 1) ;
-                Revoked |-> host_program_then APartial (print_line "Revoked") (Failure 1) ;
-                Other errno |-> host_program_then APartial (print_line "Other") (Failure 1)
+                NotFound |-> host_program_then APartial (print_line "NotFound") (ExitCode.Failure 1) ;
+                PermissionDenied |-> host_program_then APartial (print_line "PermissionDenied") (ExitCode.Failure 1) ;
+                CapabilityDenied |-> host_program_then APartial (print_line "CapabilityDenied") (ExitCode.Failure 1) ;
+                BrokenPipe |-> host_program_then APartial (print_line "BrokenPipe") (ExitCode.Failure 1) ;
+                Interrupted |-> host_program_then APartial (print_line "Interrupted") (ExitCode.Failure 1) ;
+                AlreadyExists |-> host_program_then APartial (print_line "AlreadyExists") (ExitCode.Failure 1) ;
+                InvalidInput |-> host_program_then APartial (print_line "InvalidInput") (ExitCode.Failure 1) ;
+                IsDirectory |-> host_program_then APartial (print_line "IsDirectory") (ExitCode.Failure 1) ;
+                NotDirectory |-> host_program_then APartial (print_line "NotDirectory") (ExitCode.Failure 1) ;
+                NotEmpty |-> host_program_then APartial (print_line "NotEmpty") (ExitCode.Failure 1) ;
+                Unsupported |-> host_program_then APartial (print_line "Unsupported") (ExitCode.Failure 1) ;
+                Revoked |-> host_program_then APartial (print_line "Revoked") (ExitCode.Failure 1) ;
+                Other errno |-> host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               }} ;
-            Ok _ |-> host_exit APartial Success
+            Ok _ |-> host_exit APartial ExitCode.Success
           }})
   }}
 "#,

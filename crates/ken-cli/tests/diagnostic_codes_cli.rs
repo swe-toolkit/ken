@@ -84,7 +84,7 @@ fn main_source(exit: &str) -> String {
 #[test]
 fn cli_argument_and_file_failures_have_distinct_c_carriers() {
     let dir = tempfile::tempdir().expect("private temp directory");
-    let source = write_source(dir.path(), "app.ken", &main_source("Success"));
+    let source = write_source(dir.path(), "app.ken", &main_source("ExitCode.Success"));
     let missing = dir.path().join("missing.ken");
     let missing = missing.to_str().unwrap();
 
@@ -174,7 +174,11 @@ fn wrapped_carriers_keep_e_and_x_and_admitted_program_statuses_are_uncoded() {
     assert_eq!(non_failure.status.code(), Some(0));
     assert!(coded_lines(&non_failure).is_empty());
 
-    for (exit, status) in [("Success", 0), ("(Failure 1)", 1), ("(Failure 2)", 2)] {
+    for (exit, status) in [
+        ("ExitCode.Success", 0),
+        ("(ExitCode.Failure 1)", 1),
+        ("(ExitCode.Failure 2)", 2),
+    ] {
         let path = write_source(
             dir.path(),
             &format!("outcome-{status}.ken"),

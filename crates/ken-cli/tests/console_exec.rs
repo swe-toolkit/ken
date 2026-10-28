@@ -58,21 +58,21 @@ fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
                (write Stdout (bytes_encode \"{payload}\"))) \
              (\\r. match r {{ \
                Err e |-> match e {{ \
-                 BrokenPipe |-> host_exit APartial (Failure 17); \
-                 NotFound |-> host_exit APartial (Failure 18); \
-                 PermissionDenied |-> host_exit APartial (Failure 18); \
-                 CapabilityDenied |-> host_exit APartial (Failure 18); \
-                 Interrupted |-> host_exit APartial (Failure 18); \
-                 AlreadyExists |-> host_exit APartial (Failure 18); \
-                 InvalidInput |-> host_exit APartial (Failure 18); \
-                 IsDirectory |-> host_exit APartial (Failure 18); \
-                 NotDirectory |-> host_exit APartial (Failure 18); \
-                 NotEmpty |-> host_exit APartial (Failure 18); \
-                 Unsupported |-> host_exit APartial (Failure 18); \
-                 Revoked |-> host_exit APartial (Failure 18); \
-                 Other errno |-> host_exit APartial (Failure 18) \
+                 BrokenPipe |-> host_exit APartial (ExitCode.Failure 17); \
+                 NotFound |-> host_exit APartial (ExitCode.Failure 18); \
+                 PermissionDenied |-> host_exit APartial (ExitCode.Failure 18); \
+                 CapabilityDenied |-> host_exit APartial (ExitCode.Failure 18); \
+                 Interrupted |-> host_exit APartial (ExitCode.Failure 18); \
+                 AlreadyExists |-> host_exit APartial (ExitCode.Failure 18); \
+                 InvalidInput |-> host_exit APartial (ExitCode.Failure 18); \
+                 IsDirectory |-> host_exit APartial (ExitCode.Failure 18); \
+                 NotDirectory |-> host_exit APartial (ExitCode.Failure 18); \
+                 NotEmpty |-> host_exit APartial (ExitCode.Failure 18); \
+                 Unsupported |-> host_exit APartial (ExitCode.Failure 18); \
+                 Revoked |-> host_exit APartial (ExitCode.Failure 18); \
+                 Other errno |-> host_exit APartial (ExitCode.Failure 18) \
                }}; \
-               Ok _ |-> host_exit APartial Success \
+               Ok _ |-> host_exit APartial ExitCode.Success \
              }})\n"
     );
     std::fs::write(&program, source).expect("write broken-pipe Ken program");

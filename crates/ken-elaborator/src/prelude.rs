@@ -3413,6 +3413,19 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // survive any later shadowing declaration, which is the whole point.
     let runtime_roles = Box::new(CanonicalRuntimeRoles::capture(&elab.globals)?);
 
+    // The entrypoint ABI uses the checked constructor IDs captured above.
+    // Qualify the complete scoped families only after the prelude's own
+    // declarations have been checked against their original bindings.
+    for name in ["ExitCode", "ProgramCaps"] {
+        let parent_id = elab.globals[name];
+        elab.module_state.scope_constructor_family(
+            &elab.env,
+            &mut elab.globals,
+            parent_id,
+            name,
+        )?;
+    }
+
     // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
     // here, even though this is where the sibling role roster is captured.
     //

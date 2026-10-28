@@ -34,32 +34,32 @@ proc read_byte (cap : Cap APartial) (chosen : UInt8)
 
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
   match (match eq_int (uint8_to_int byte) 1 {
-    True |-> Success;
-    False |-> Failure 7
+    True |-> ExitCode.Success;
+    False |-> ExitCode.Failure 7
   }) {
-    Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
+    ExitCode.Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       Unit ExitCode
       (host_console APartial Unit (print_line "accepted"))
-      (\_. host_exit APartial Success);
-    Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
+      (\_. host_exit APartial ExitCode.Success);
+    ExitCode.Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       Unit ExitCode
       (host_console APartial Unit (print_line "rejected"))
-      (\_. host_exit APartial (Failure code))
+      (\_. host_exit APartial (ExitCode.Failure code))
   }
 
 proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 90);
+      Nil |-> host_exit APartial (ExitCode.Failure 90);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (Failure 91);
+        Nil |-> host_exit APartial (ExitCode.Failure 91);
         Cons argument _more |-> match bytes_at argument 0 {
-          None |-> host_exit APartial (Failure 92);
+          None |-> host_exit APartial (ExitCode.Failure 92);
           Some chosen |-> match caps {
-            MkProgramCaps cap |-> bind (Coproduct (FSOp APartial) AmbientOp)
+            ProgramCaps.MkProgramCaps cap |-> bind (Coproduct (FSOp APartial) AmbientOp)
               (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
               UInt8 ExitCode (read_byte cap chosen) (\byte. decide byte)
           }

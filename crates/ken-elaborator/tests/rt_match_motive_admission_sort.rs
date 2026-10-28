@@ -18,7 +18,7 @@ theorem proof_match (b : Bool) : Top =
   match b { True |-> Proved; False |-> Proved }
 
 fn exit_for (b : Bool) : ExitCode =
-  match b { True |-> Success; False |-> Failure 7 }
+  match b { True |-> ExitCode.Success; False |-> ExitCode.Failure 7 }
 
 fn input_flag (input : ProcessInput) : Bool =
   match input {
@@ -39,7 +39,7 @@ fn computational_prop (b : Bool) : Nat =
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   host_exit APartial (match computational_prop True {
-    Zero |-> Success; Suc _ |-> Failure 7
+    Zero |-> ExitCode.Success; Suc _ |-> ExitCode.Failure 7
   })
 "#;
 
@@ -53,7 +53,7 @@ fn dependent_type (b : Bool) : result_type b =
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
-  host_exit APartial Success
+  host_exit APartial ExitCode.Success
 "#;
 
 fn selected_package(

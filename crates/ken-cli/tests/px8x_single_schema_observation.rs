@@ -19,19 +19,19 @@ fn px8x_after
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err _ |-> host_exit AFull (Failure 41);
+    Err _ |-> host_exit AFull (ExitCode.Failure 41);
     Ok bracket |-> match bracket {
-      ResourceBracketOk _ |-> host_exit AFull Success;
-      ResourceBracketBodyError _ |-> host_exit AFull (Failure 42);
-      ResourceBracketReleaseError _ |-> host_exit AFull (Failure 43);
-      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (Failure 44)
+      ResourceBracketOk _ |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError _ |-> host_exit AFull (ExitCode.Failure 42);
+      ResourceBracketReleaseError _ |-> host_exit AFull (ExitCode.Failure 43);
+      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (ExitCode.Failure 44)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode

@@ -279,10 +279,15 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Bottom",
             "Char",
             "Equal",
+            "ExitCode",
+            "HostIO",
             "List",
             "Nat",
             "Option",
             "Pair",
+            "ProcessInput",
+            "Prod",
+            "ProgramCaps",
             "Prop",
             "Proved",
             "ResourceKind",
@@ -296,7 +301,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
         assert!(is_prelude_floor_name(name));
     }
     for name in [
-        "True", "Int", "Ordering", "And", "Prod", "mk_pair", "pair_fst", "pair_snd",
+        "True", "Int", "Ordering", "And", "Unit", "mk_pair", "pair_fst", "pair_snd",
     ] {
         assert!(!is_prelude_floor_name(name));
     }
@@ -403,7 +408,7 @@ fn expected_vector_strict_floor_names() -> Vec<String> {
 /// Promise class: transition sentinel for Vector's amended provider imports.
 /// Retire or rebaseline when a separately authorized Vector provider changes.
 /// MEASURED: strict roots loading of the real Vector module consumes no
-/// ambient conveniences after its checked provider closure and fifteen-member
+/// ambient conveniences after its checked provider closure and twenty-member
 /// floor load. CLAIMED: Vector enters the census's clean partition.
 /// THE GAP: this is one row, not a substitute for the full-corpus census in CI.
 #[test]
@@ -417,7 +422,7 @@ fn vector_strict_floor_provider_transition_sentinel() {
 }
 
 /// Transition sentinel for catalog migration: this is a behavioral census,
-/// not a source-text census. The fifteen-type floor intentionally removes its
+/// not a source-text census. The twenty-type floor intentionally removes its
 /// families and constructors from these residual dependency vectors; every
 /// remaining name still requires an explicit provider migration.
 #[test]
@@ -611,23 +616,14 @@ fn catalog_ambient_passthrough_migration_census() {
             // diagnostics, formatting, process-environment, lawful byte,
             // NonEmpty, and Validation dependencies. Its ordinary package
             // boundary loads while strict mode retains provider compiler
-            // conveniences and prelude companion bindings.
+            // conveniences; the entrypoint carriers are now floor members.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Application.Configuration.Decoder".to_string(),
-            [
-                "MkProcessInput",
-                "MkProd",
-                "ProcessInput",
-                "Prod",
-                "Unit",
-                "charToInt",
-                "eqChar",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["Unit", "charToInt", "eqChar", "leqChar"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Schema now declares its exact Formatting.Doc, Derived,
@@ -787,40 +783,12 @@ fn catalog_ambient_passthrough_migration_census() {
         (
             // Process.Arguments now declares its exact LawfulClasses, Derived,
             // and Cursor dependencies. Its ordinary package boundary loads
-            // while strict mode retains provider compiler conveniences plus
-            // the ProcessInput ABI carrier and constructor.
+            // while strict mode retains provider compiler conveniences.
+            // ProcessInput and MkProcessInput are now floor.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Process.Arguments".to_string(),
-            [
-                "MkProcessInput",
-                "ProcessInput",
-                "Unit",
-                "charToInt",
-                "eqChar",
-                "leqChar",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
-            "Capability.Process.Environment".to_string(),
-            ["MkProcessInput", "ProcessInput", "Prod"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        ),
-        (
-            "Capability.Process.Exit".to_string(),
-            ["ExitCode", "Failure", "Success"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        ),
-        (
-            "Capability.Process.WorkingDirectory".to_string(),
-            ["MkProcessInput", "ProcessInput"]
+            ["Unit", "charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -858,7 +826,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "InvalidInput",
                 "IsDirectory",
                 "MkFileError",
-                "MkProd",
                 "NotDirectory",
                 "NotEmpty",
                 "NotFound",
@@ -880,7 +847,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "OpWriteFile",
                 "Other",
                 "PermissionDenied",
-                "Prod",
                 "Revoked",
                 "Unsupported",
             ]
@@ -1162,6 +1128,9 @@ fn catalog_ambient_passthrough_migration_census() {
         .collect::<BTreeSet<_>>();
     let expected_clean = [
         "Algorithm.LinearAlgebra.NatMatrix",
+        "Capability.Process.Environment",
+        "Capability.Process.Exit",
+        "Capability.Process.WorkingDirectory",
         "Core.Function.Combinators",
         "Core.Logic.And",
         "Core.Logic.Compare",

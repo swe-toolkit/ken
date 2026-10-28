@@ -115,18 +115,18 @@ fn rt_bracket_done
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
-Ok bracket |-> host_exit AFull (Failure 51);
-Err error |-> host_exit AFull (Failure 52)
+Ok (ResourceBracketOk unit) |-> host_exit AFull ExitCode.Success;
+Ok bracket |-> host_exit AFull (ExitCode.Failure 51);
+Err error |-> host_exit AFull (ExitCode.Failure 52)
   }
 
 fn rt_buffer_bracket_done
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
-Ok bracket |-> host_exit AFull (Failure 53);
-Err error |-> host_exit AFull (Failure 54)
+Ok (ResourceBracketOk unit) |-> host_exit AFull ExitCode.Success;
+Ok bracket |-> host_exit AFull (ExitCode.Failure 53);
+Err error |-> host_exit AFull (ExitCode.Failure 54)
   }
 
 fn rt_inner_bracket_result
@@ -148,9 +148,9 @@ fn rt_allocate_done
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-Err InvalidBounds |-> host_exit AFull Success;
-Err error |-> host_exit AFull (Failure 41);
-Ok bracket |-> host_exit AFull (Failure 42)
+Err InvalidBounds |-> host_exit AFull ExitCode.Success;
+Err error |-> host_exit AFull (ExitCode.Failure 41);
+Ok bracket |-> host_exit AFull (ExitCode.Failure 42)
   }
 
 proc rt_allocate_stage (cap : Cap AFull)
@@ -469,13 +469,13 @@ proc rt_cap41_offset_out_of_range_stage (cap : Cap AFull)
 fn rt_uint64_checked_bounds_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode =
   match intToUInt64 18446744073709551615 {
-  None |-> host_exit AFull (Failure 61);
+  None |-> host_exit AFull (ExitCode.Failure 61);
   Some bounded |-> match intToUInt64
       (add_int 18446744073709551615 1) {
-    Some overflow |-> host_exit AFull (Failure 62);
+    Some overflow |-> host_exit AFull (ExitCode.Failure 62);
     None |-> match intToUInt64 (sub_int 0 1) {
-      Some negative |-> host_exit AFull (Failure 63);
-      None |-> host_exit AFull Success
+      Some negative |-> host_exit AFull (ExitCode.Failure 63);
+      None |-> host_exit AFull ExitCode.Success
       }
     }
   }
@@ -483,7 +483,7 @@ fn rt_uint64_checked_bounds_stage (_cap : Cap AFull)
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-MkProgramCaps cap |-> __RT_PARITY_ENTRY__ cap
+ProgramCaps.MkProgramCaps cap |-> __RT_PARITY_ENTRY__ cap
   }
 "#;
 

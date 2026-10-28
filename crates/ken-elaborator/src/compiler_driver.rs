@@ -6589,8 +6589,8 @@ proc main
 fn walk (fuel : Nat) (state : Bool) : HostIO APartial ExitCode =
   match fuel {
     Zero |-> match state {
-      False |-> host_exit APartial (Failure 7);
-      True |-> host_exit APartial Success
+      False |-> host_exit APartial (ExitCode.Failure 7);
+      True |-> host_exit APartial ExitCode.Success
     };
     Suc smaller |-> walk smaller (match state {
       False |-> True;
@@ -9141,7 +9141,7 @@ mod native_program_example_exclusion {
         ```ken example\nconst zz_ex : Bool = base\n```\n";
     const MAIN: &str = "program capabilities FS APartial\n\
         fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
-          : HostIO APartial ExitCode = host_exit APartial Success\n";
+          : HostIO APartial ExitCode = host_exit APartial ExitCode.Success\n";
 
     fn sources(first: &str, main: &str) -> Vec<CompilerSource> {
         vec![
@@ -9208,8 +9208,8 @@ mod native_program_example_exclusion {
     fn native_main_referencing_example_refuses_before_emit() {
         on_native_stack(|| {
             let main = MAIN.replace(
-                "host_exit APartial Success",
-                "host_exit APartial (match zz_ex { True |-> Success; False |-> Failure 1 })",
+                "host_exit APartial ExitCode.Success",
+                "host_exit APartial (match zz_ex { True |-> ExitCode.Success; False |-> ExitCode.Failure 1 })",
             );
             let error = prepare_native_program_sources(PKG, sources(WITH_EXAMPLE, &main))
                 .expect_err("a main cannot depend on an unshipped example");

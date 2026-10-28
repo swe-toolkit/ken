@@ -17,7 +17,7 @@ fn capability_program(header: &str) -> String {
          proc main (caps : ProgramCaps APartial) (path : Bytes)\n\
            : FS APartial (Result FileError Bytes) visits [FS] =\n\
            match caps {{\n\
-             MkProgramCaps cap ↦ capability_read APartial cap path\n\
+             ProgramCaps.MkProgramCaps cap ↦ capability_read APartial cap path\n\
            }}\n"
     )
 }

@@ -5917,7 +5917,7 @@ mod tests {
             .spawn(|| {
                 let source = "program capabilities FS APartial\n\
                     proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
-                      : HostIO APartial ExitCode visits [FS] = host_exit APartial Success";
+                      : HostIO APartial ExitCode visits [FS] = host_exit APartial ExitCode.Success";
                 let package_name = "rt_motive_prelude_proof";
                 let preparation = crate::compiler_driver::prepare_native_program_sources(
                     package_name,

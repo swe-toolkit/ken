@@ -45,7 +45,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit ExitCode inner (\_. host_exit APartial Success)
+    Unit ExitCode inner (\_. host_exit APartial ExitCode.Success)
 "#;
 
 fn output_dir(case: &str) -> std::path::PathBuf {

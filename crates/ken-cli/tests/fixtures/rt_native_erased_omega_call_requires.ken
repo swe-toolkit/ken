@@ -1,16 +1,16 @@
 program capabilities FS APartial
 def AnyNat = { x : Nat | Top }
 fn classify (n : Nat) : ExitCode = match n {
-  Zero |-> Failure 100;
+  Zero |-> ExitCode.Failure 100;
   Suc a |-> match a {
-    Zero |-> Failure 1;
+    Zero |-> ExitCode.Failure 1;
     Suc b |-> match b {
-      Zero |-> Failure 2;
+      Zero |-> ExitCode.Failure 2;
       Suc c |-> match c {
-        Zero |-> Failure 3;
+        Zero |-> ExitCode.Failure 3;
         Suc d |-> match d {
-          Zero |-> Failure 4;
-          Suc _ |-> Failure 200
+          Zero |-> ExitCode.Failure 4;
+          Suc _ |-> ExitCode.Failure 200
         }
       }
     }

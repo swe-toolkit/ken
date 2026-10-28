@@ -236,16 +236,21 @@ impl ModuleState {
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// `Nat` and `Pair` have separate internal-provision witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 15] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 20] = [
     "Auth",
     "Bool",
     "Bottom",
     "Char",
     "Equal",
+    "ExitCode",
+    "HostIO",
     "List",
     "Nat",
     "Option",
     "Pair",
+    "ProcessInput",
+    "Prod",
+    "ProgramCaps",
     "Prop",
     "Proved",
     "ResourceKind",
@@ -255,7 +260,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 15] = [
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
-/// These are not type-floor members and do not increase its fifteen-member count.
+/// These are not type-floor members and do not increase its twenty-member count.
 pub const PRELUDE_COMPANION_BINDING_NAMES: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
 
 pub fn is_prelude_floor_name(name: &str) -> bool {
@@ -342,15 +347,26 @@ impl ModuleState {
         parent_id: ken_kernel::GlobalId,
         parent_name: &str,
     ) -> Result<(), ElabError> {
-        let members = self.constructor_members.get(&parent_id).ok_or_else(|| {
-            ElabError::Internal(format!(
-                "scoped family `{parent_name}` has no checked members"
-            ))
-        })?;
         let family = env.inductive(parent_id).ok_or_else(|| {
             ElabError::Internal(format!("scoped family `{parent_name}` is not inductive"))
         })?;
         let checked: HashSet<_> = family.constructors.iter().map(|c| c.id).collect();
+        // Surface `data` populates constructor_members and root locals; a
+        // kernel-registered family such as ProgramCaps has neither. Discover
+        // its checked constructor IDs from the complete kernel family, never
+        // from a spelling alone, before moving its visible bindings.
+        let has_root_locals = self.constructor_members.contains_key(&parent_id);
+        let members = self
+            .constructor_members
+            .get(&parent_id)
+            .cloned()
+            .unwrap_or_else(|| {
+                globals
+                    .iter()
+                    .filter(|(_, id)| checked.contains(id))
+                    .map(|(name, id)| (name.clone(), *id))
+                    .collect()
+            });
         if members.len() != checked.len()
             || members.values().copied().collect::<HashSet<_>>() != checked
             || globals.get(parent_name) != Some(&parent_id)
@@ -359,18 +375,22 @@ impl ModuleState {
                 "scoped family `{parent_name}` is not its complete checked constructor family"
             )));
         }
-        for (leaf, id) in members {
+        for (leaf, id) in &members {
             if globals.get(leaf) != Some(id)
                 || globals.contains_key(&format!("{parent_name}.{leaf}"))
-                || self.root_scope.bindings.get(leaf).map(String::as_str) != Some(leaf)
-                || self.root_scope.checked_local_ids.get(leaf) != Some(id)
+                || (has_root_locals
+                    && (self.root_scope.bindings.get(leaf).map(String::as_str) != Some(leaf)
+                        || self.root_scope.checked_local_ids.get(leaf) != Some(id)))
+                || (!has_root_locals
+                    && (self.root_scope.bindings.contains_key(leaf)
+                        || self.root_scope.checked_local_ids.contains_key(leaf)))
             {
                 return Err(ElabError::Internal(format!(
                     "scoped family `{parent_name}` member `{leaf}` has an inconsistent binding"
                 )));
             }
         }
-        for (leaf, id) in members {
+        for (leaf, id) in &members {
             globals.remove(leaf);
             globals.insert(format!("{parent_name}.{leaf}"), *id);
             // The prelude's initial `data` admission also installed each
@@ -382,6 +402,7 @@ impl ModuleState {
             self.root_scope.current_local_names.remove(leaf);
             self.root_scope.locals.remove(leaf);
         }
+        self.constructor_members.insert(parent_id, members);
         self.scoped_constructor_types.insert(parent_id);
         Ok(())
     }

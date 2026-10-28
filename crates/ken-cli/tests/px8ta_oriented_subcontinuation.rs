@@ -65,9 +65,9 @@ fn finish_buffer
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO APartial ExitCode =
   match outcome {
-    Err _ |-> host_exit APartial (Failure 91);
-    Ok (ResourceBracketOk _) |-> host_exit APartial Success;
-    Ok _ |-> host_exit APartial (Failure 92)
+    Err _ |-> host_exit APartial (ExitCode.Failure 91);
+    Ok (ResourceBracketOk _) |-> host_exit APartial ExitCode.Success;
+    Ok _ |-> host_exit APartial (ExitCode.Failure 92)
   }
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)

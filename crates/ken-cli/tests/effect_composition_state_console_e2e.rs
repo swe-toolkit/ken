@@ -42,7 +42,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
        (Pair Unit Nat) ExitCode
     (host_console APartial (Pair Unit Nat) prog)
-    (\_ . host_exit APartial Success)
+    (\_ . host_exit APartial ExitCode.Success)
 "#;
 
 #[test]
