@@ -2270,7 +2270,7 @@ fn owner_body_control(
     // (including query observations) in the restored-byte comparison below.
     let mut baseline_planner = baseline_rows.clone();
     let mut mutated_planner = diagnostics.clone();
-    for row in baseline_planner.iter_mut().chain(&mutated_planner) {
+    for row in baseline_planner.iter_mut().chain(mutated_planner.iter_mut()) {
         row.generated_context_result_contracts.clear();
     }
     assert_eq!(
