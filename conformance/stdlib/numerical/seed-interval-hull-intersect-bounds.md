@@ -219,8 +219,13 @@ laws to rational-interval fixtures, computed the premises and results
 independently, checked an inverted interval, and rejected the false hull
 claim after the accepted client. The D0 patch digest is
 `e448b72cf4af08bdbcce99996842f94de3875e0c158a7719b2c0dd40285cebaa`.
-These are Architect-reported local scratch checks, not execution of this
-exact seed or shipped §7 exports. The §7 catalog laws are absent at this
-candidate's base; Foundation owns that separate catalog work. This authored
-seed is a conformance obligation and does not claim official conformance
-execution, CI, publication, landing, or landed trust.
+Those were Architect-reported local scratch checks, not execution of this
+exact seed or shipped §7 exports. The §7 catalog laws were absent on the
+spec-and-seed candidate's base. This separate Foundation candidate adds
+both checked exports and runs the complete accepted client and isolated
+false hull claim in the package-owned
+`cat_numeric_interval_hull_intersect_bounds` test. Its exact trusted
+GlobalId comparison and targeted RationalInterval ambient row are
+candidate-local measurements, not a full-corpus census or landed trust.
+This package test is not official conformance-runner execution, CI,
+publication or landing.
