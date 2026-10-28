@@ -561,6 +561,10 @@ jobs:
     if: needs.classify-paths.outputs.mode == 'full' && needs.classify-paths.outputs.z3_relevant != 'false'
     name: optional z3 process adapter
     runs-on: ubuntu-latest
+    # A hung z3 process otherwise holds the run open until GitHub's six-hour
+    # default (measured: 74 minutes with this job the only pending check, run
+    # 40615495110, then cancelled). A whole green run takes 30 to 48 minutes.
+    timeout-minutes: 60
     container: ghcr.io/swe-toolkit/ken/ci-z3@sha256:4043afa445489c19fa9b6628258134225953354e2bf1766d996558cdf73e38da
     steps:
       - uses: actions/checkout@v4
