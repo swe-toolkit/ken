@@ -19,10 +19,10 @@ proc write_then_exit (bytes : Bytes) (code : ExitCode)
 proc finish (outer : Result IOError (Result Bytes Bytes))
   : HostIO APartial ExitCode visits [Console] =
   match outer {
-    Err _ |-> write_then_exit (bytes_encode "outer-error") (Failure 91);
+    Err _ |-> write_then_exit (bytes_encode "outer-error") (ExitCode.Failure 91);
     Ok inner |-> match inner {
-      Err bytes |-> write_then_exit bytes (Failure 7);
-      Ok bytes |-> write_then_exit bytes Success
+      Err bytes |-> write_then_exit bytes (ExitCode.Failure 7);
+      Ok bytes |-> write_then_exit bytes ExitCode.Success
     }
   }
 
@@ -46,7 +46,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 99);
+      Nil |-> host_exit APartial (ExitCode.Failure 99);
       Cons _ tail |-> match tail {
         Nil |-> run_case True;
         Cons _ _ |-> run_case False
@@ -64,8 +64,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (host_console APartial (Result IOError Unit)
       (write Stdout (bytes_encode "ignored")))
     (\written. match written {
-      Err _ |-> host_exit APartial (Failure 3);
-      Ok _ |-> host_exit APartial Success
+      Err _ |-> host_exit APartial (ExitCode.Failure 3);
+      Ok _ |-> host_exit APartial ExitCode.Success
     })
 "#;
 

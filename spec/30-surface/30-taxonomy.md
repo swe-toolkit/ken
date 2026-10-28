@@ -157,14 +157,17 @@ generic name for a narrow intrinsic. A proposed generic name is renamed before
 admission; Spec owns the public spelling in `35`/`38` and the
 [ledger](30-intrinsic-ledger.md), and the rename lands atomically with the
 floor identity, roster/count, catalog callers, and fixtures. The current
-candidate spellings `NotFound`, `Other`, `Unsupported`, `Success`, `Failure`,
-`write`, `Stdout`, and `Instant` trigger that review, but this section chooses
-no replacement names. A per-type scoped-constructors choice supplies
-specificity structurally: `IOError.NotFound` is unambiguous without reserving
-bare `NotFound`. Type qualification is supported in expressions and patterns
-for every data type (`34 §1`), even when its constructors remain bare. The property changes only
-source visibility and the B inventory, never a constructor's checked identity
-or the fifteen-member type count.
+candidate spellings `NotFound`, `Other`, `Unsupported`, `write`,
+`Stdout`, and `Instant` trigger that review, but this section chooses no
+replacement names. `Success` and `Failure` have passed it as the
+qualified paths `ExitCode.Success` and `ExitCode.Failure`; neither bare
+spelling joins B. A per-type scoped-constructors choice supplies
+specificity structurally: `IOError.NotFound` is unambiguous without
+reserving bare `NotFound`. Type qualification is supported in expressions
+and patterns for every data type (`34 §1`), even when its constructors
+remain bare. The property changes only source visibility and the B
+inventory, never a constructor's checked identity or the number of floor
+identities.
 
 The prelude is a **second minimality target** — the same TB-Sound discipline
 (`is_prelude` is exactly `{Top, Bottom, tt}`, no catch-all) applied at the
@@ -197,19 +200,35 @@ computation); `Prop` is the surface-nameable alias for the proposition sort
 `Ω₀` (its own kernel type is `Type (suc 0)`, its body is `Ω₀`), present only
 because the surface grammar has no `Ω` token and used only in type-annotation
 position. Each is a kernel constant or a re-checked definition — **out** of
-`trusted_base()` exactly as the original ten, adding no entry. Thus the
-Ken-defined **type floor** is the closed fifteen-member set
-**`{Auth, Bool, Bottom, Char, Equal, List, Nat, Option, Pair, Prop, Proved,
-ResourceKind, Result, Top, Utf8Error}`**.
+`trusted_base()` exactly as the original ten, adding no entry.
 
-The type count is fifteen — the former ten plus the five kernel-machinery-keyed
-proposition/equality members — not ten. The definable `And`/`Dec`/`Yes`/`No`
-stay **out** (source-constructible, with a `Core/Logic` package home, and no
-internal-provision witness). The `Empty` needed by `space` desugaring is
-different: its identity must be fixed before source elaboration, but no surface
-contract independently requires source to name it. It belongs internally,
-not in the floor. The source name `Empty` is provided by the explicit-import
-catalog package `Core.Logic.EmptyDec`, not by the prelude; its checked identity
+The entrypoint-ABI contract (`33 §3.2.1`) adds five checked, pre-source
+identities under the same internal-provision arm: `ExitCode`,
+`ProcessInput`, `ProgramCaps`, `HostIO`, and `Prod`. The admission check
+constructs its expected `main` type from those exact identities;
+`ProcessInput`'s environment field contains `Prod Bytes Bytes`. A
+same-shaped source declaration cannot replace them. `HostIO` is a
+**type-level function** of the authority and result type, not an inductive
+family with a constructor. `Prod` is retained as a distinct inductive
+family, not retargeted to the existing `Pair`: its `MkProd` constructor
+is selected by native environment-pair consumers, whereas `Pair` is a
+kernel Sigma with no constructor ID. Retargeting that representation is
+outside this admission.
+
+Thus the closed **floor-identity roster** has twenty names:
+**`{Auth, Bool, Bottom, Char, Equal, ExitCode, HostIO, List, Nat, Option,
+Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceKind, Result,
+Top, Utf8Error}`**. The original fifteen remain; the five entrypoint
+identities add no postulate or `trusted_base()` entry. Constructor and
+companion closures are separate from this twenty-name count. The definable
+`And`/`Dec`/`Yes`/`No` stay **out** (source-constructible, with a
+`Core/Logic` package home, and no internal-provision witness). The
+`Empty` needed by `space` desugaring is different: its identity is
+captured before source elaboration and read by exact ID
+(`prelude.empty_id`), but no surface contract independently requires
+source to name it. It belongs internally, not in the floor. The
+source name `Empty` is provided by the explicit-import catalog package
+`Core.Logic.EmptyDec`, not by the prelude; its checked identity
 is distinct from the compiler's. `Pair`'s floor-binding closure contains the
 exact three companions `{mk_pair, pair_fst, pair_snd}`. They are operations,
 not type members. Their checked types reference the canonical
@@ -231,32 +250,38 @@ floor identity. Abstract or constructor-private visibility still applies
 (`33 §4.2`); qualification cannot expose a hidden constructor. The existing
 `ResourceKind` floor is scoped: `ResourceKind.FsHandle`,
 `ResourceKind.Buffer`, and `ResourceKind.Mapping` are the public constructor
-paths, not three additional bare names in B. `Char` and transparent `Pair`
-are constructor-free. A same-shaped
+paths, not three additional bare names in B. `ExitCode` is scoped:
+`ExitCode.Success` and `ExitCode.Failure` are available, not bare
+`Success`/`Failure`. `ProgramCaps` is scoped: its runner-minted
+`MkProgramCaps` has no bare reservation; when visible, it uses the
+qualified path `ProgramCaps.MkProgramCaps`. Its existing visibility is
+unchanged. `ProcessInput` and
+`Prod` are unscoped: their whole constructor families, respectively
+`MkProcessInput` and `MkProd`, are bare reserved names. `HostIO`, `Char`,
+and transparent `Pair` have no constructor family. A same-shaped
 source family or definition has a different identity and is not the floor
 member. Every floor type, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
 
-**Effect-surface and Program-I candidates are not yet floor members.** The
+**Other effect-surface and Program-I identities remain candidates.** The
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
-also holds. `Unit` and the Program-I input/exit families are candidates, not
-an automatic extension merely because the compiler registers them. A source
-wrapper over an ABI (for example `Capability/Process/Exit`'s
-`exit_with`/`exit_from_result`) does not become an intrinsic identity by using
-one. `elaborate_space_decl` uses `Empty` when it builds the `space` effect
-and state fold (`36 §4.1–4.2`). **Required:** this must be the identity fixed
-before source elaboration, retained for the desugarer by exact ID, not supplied
-by a source declaration. **Current implementation:** the reader instead looks
-up `elab.globals.get("Empty")` by spelling at each `space`; a same-program
-`data Empty` rebinds that map entry (`elab.rs:13450`, `data.rs:99`). The
-pre-source exact-ID capture is owed, not landed. The desugarer's use is internal
-output: no current source contract requires programs to name that exact
-identity. Source-level `Empty` is provided by the explicit-import
-`Core.Logic.EmptyDec` package with a distinct identity, not by this compiler
-identity. A future `36` contract requiring source to name the desugarer's exact
-`Empty` would be a separately gated source-contract change. Once keying and
-that independent source need both hold, the existing rule admits `Empty` to
+also holds. `Unit` remains a candidate, not an automatic extension merely
+because the compiler registers it. A source wrapper over an ABI (for example
+`Capability/Process/Exit`'s `exit_with`/`exit_from_result`) does not become
+an intrinsic identity by using one. `host_exit` is keyed but has no independent
+source-name requirement: it remains compiler-internal; an example using that
+name does not grant it floor membership. `elaborate_space_decl` uses
+`prelude.empty_id` when it builds the `space` effect and state fold
+(`36 §4.1–4.2`). The compiler captures that identity before source
+elaboration, and a same-program `data Empty` cannot replace the desugarer's
+exact ID. Its use is internal output: no current source contract requires
+programs to name that exact identity. Source-level `Empty` is provided
+by the explicit-import `Core.Logic.EmptyDec` package with a distinct
+identity, not by this compiler identity. A future `36` contract
+requiring source to name the desugarer's exact `Empty` would be a
+separately gated source-contract change. Once keying and that independent
+source need both hold, the existing rule admits `Empty` to
 the floor without per-name operator approval; the catalog `Empty` then retires,
 with the roster/count changed atomically. This
 contingency adds no present floor member.
@@ -272,8 +297,9 @@ information, not submitted for per-name permission. No compiler-provided
 intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
-Until D0 proves both witness clauses for a candidate, the floor remains the
-fifteen-member set above and the candidate has no new ambient availability.
+Until D0 proves both witness clauses for another candidate, the floor
+remains the twenty-identity set above and that candidate has no new ambient
+availability.
 A keyed identity without an independent source-name requirement stays
 compiler-internal; an unkeyed, promised definition belongs in an explicit
 package; an unkeyed, unpromised registration may be removed after its uses
@@ -289,16 +315,13 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the fifteen-type and
-three-companion target as the current floor; further effect-surface and
-entrypoint-ABI names join only after D0 supplies both witness clauses per
-name. After the dedicated L2 qualified-constructor-resolution and scoped-property
-slice, L2's floor-addition slice lands each warranted addition with the
-roster/count and per-type property before the one-mode strict flip. Until the
-floor-realization build captures and admits the four existing Pair-family
-identities, current Strict loading may still reject their bare names. That
-implementation gap is not a package boundary and does not authorize a second
-identity or fallback route.
+**Implementation staging.** The specification fixes the twenty-identity
+floor and Pair's three checked companions as the current target. The original
+fifteen and Pair companions are already realized; the five entrypoint-ABI
+identities join strict resolution in this floor-addition slice, atomically
+with the roster/count and scoped-constructor choices. Other candidates need
+both D0 witness clauses before admission. No implementation gap authorizes a
+second identity or fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 
@@ -314,8 +337,8 @@ canonical compiler-installed identities. The source-level `Empty` is provided
 by the `Core.Logic.EmptyDec` package with an identity distinct from the
 compiler's; `Either` is also a package. The `Empty` required by `space`
 desugaring is compiler-internal, not a package export. `Unit` is a candidate
-for the internal-provision arm, **not** a sixteenth floor member until both
-witness clauses are proven and §4's roster changes atomically. A same-shaped
+for the internal-provision arm, **not** a floor member until both witness
+clauses are proven and §4's roster changes atomically. A same-shaped
 source definition of `Pair` allocates a distinct identity; it neither replaces
 the floor family nor converts structural equality into floor provenance.
 

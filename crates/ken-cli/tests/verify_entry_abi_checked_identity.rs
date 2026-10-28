@@ -8,7 +8,7 @@ use std::process::{Command, Output};
 
 use tempfile::TempDir;
 
-const EXIT_MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone Success";
+const EXIT_MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success";
 const PRINT_MAIN: &str = "proc main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode visits [Console] = host_program ANone (print_line \"entered main\")";
 const PROFILE: &str = "{\"runtime\":{\"invocation_epochs\":1024},\"call_events\":{\"event_generations\":2048,\"live_pending_slots\":1024},\"invocation\":{\"nodes\":100000,\"words\":100000,\"data_bytes\":1000000,\"native_int_limbs\":100000},\"persistent\":{\"nodes\":100000,\"words\":100000,\"data_bytes\":1000000,\"native_int_limbs\":100000}}";
 
@@ -134,9 +134,10 @@ fn run_uses_captured_prelude_roles_for_every_reported_shadow() {
     assert_eq!(actual.stderr, expected.stderr);
 }
 
-/// Promise class: durable invariant. MEASURED: shadowing either constructor
-/// used to build the host-provided main arguments in a checked example or a
-/// plain fence leaves the same reference result as its unrelated control.
+/// Promise class: durable invariant. MEASURED: the scoped `MkProgramCaps`
+/// admits a local bare shadow without changing the runner's checked argument;
+/// the unscoped floor `MkProcessInput` rejects a same-spelling declaration in
+/// either fence rather than permitting a shadow to retarget the runner.
 /// CLAIMED: the runner cannot pass source-selected constructors to main.
 /// THE GAP: the other effect-harvester arms are exercised above and by their
 /// `&PreludeEnv` signature, not by this pair of constructor fixtures.
@@ -158,6 +159,15 @@ fn runner_main_arguments_use_checked_prelude_constructors() {
                 &fixture(EXIT_MAIN, fence, shadow),
             );
             let actual = run(&path);
+            if shadow == "MkProcessInput" {
+                assert!(
+                    !actual.status.success()
+                        && String::from_utf8_lossy(&actual.stderr)
+                            .contains("AmbiguousReference { name: \"MkProcessInput\""),
+                    "the unscoped floor must reject the constructor collision: {actual:?}"
+                );
+                continue;
+            }
             assert_eq!(
                 actual.status, expected.status,
                 "shadow {shadow}: {actual:?}"
@@ -241,13 +251,14 @@ fn native_admission_and_execution_keep_the_success_identity() {
     }
 }
 
-/// Promise class: durable invariant. MEASURED: reusing Success in the same
-/// plain fence as a main whose body names it remains a TypeMismatch at
-/// elaboration in both routes, unlike the unchanged unrelated control.
-/// CLAIMED: ABI identity repair does not weaken plain-source type checking.
-/// THE GAP: no runtime ABI reader is reached in this intentionally ill-typed row.
+/// Promise class: durable invariant. MEASURED: a source-local `Success : Nat`
+/// in the same plain fence leaves the qualified ExitCode.Success in main
+/// identical to an unrelated-shadow control for run and native execution.
+/// CLAIMED: scoped constructors cannot be retargeted through a local bare
+/// spelling. THE GAP: this row does not assert behavior of an unqualified use,
+/// which the floor's strict-and-legacy refusal rows cover separately.
 #[test]
-fn plain_success_named_by_main_stays_a_kernel_rejection() {
+fn plain_success_shadow_cannot_retarget_qualified_main() {
     let temp = TempDir::new().expect("fixture directory");
     let profile = temp.path().join("profile.json");
     fs::write(&profile, PROFILE).expect("native resource profile");
@@ -261,29 +272,21 @@ fn plain_success_named_by_main_stays_a_kernel_rejection() {
         "exit-plain-Success",
         &fixture(EXIT_MAIN, Fence::Plain, "Success"),
     );
-    assert!(run(&control).status.success(), "control must run");
-    let rejected = run(&shadow);
-    assert!(!rejected.status.success(), "shadow must fail elaboration");
+    let expected = run(&control);
+    let actual = run(&shadow);
+    assert!(expected.status.success(), "control must run: {expected:?}");
+    assert_eq!(actual.status, expected.status, "shadowed run: {actual:?}");
+    assert_eq!(actual.stdout, expected.stdout);
+    assert_eq!(actual.stderr, expected.stderr);
+    let native_expected = native_run(&control, &temp.path().join("native-control"), &profile);
+    let native_actual = native_run(&shadow, &temp.path().join("native-shadow"), &profile);
     assert!(
-        String::from_utf8_lossy(&rejected.stderr).contains("KernelRejected { error: TypeMismatch"),
-        "expected original typed elaboration error: {rejected:?}"
+        native_expected.status.success(),
+        "native control: {native_expected:?}"
     );
-    assert!(
-        native_build(&control, &temp.path().join("native-control"), &profile)
-            .status
-            .success(),
-        "native control must build"
-    );
-    let native = native_build(&shadow, &temp.path().join("native-shadow"), &profile);
-    assert!(
-        !native.status.success(),
-        "native shadow must fail elaboration"
-    );
-    assert!(
-        String::from_utf8_lossy(&native.stderr)
-            .contains("elaboration failed: KernelRejected { error: TypeMismatch"),
-        "expected same native elaboration error: {native:?}"
-    );
+    assert_eq!(native_actual.status, native_expected.status);
+    assert_eq!(native_actual.stdout, native_expected.stdout);
+    assert_eq!(native_actual.stderr, native_expected.stderr);
 }
 
 /// Promise class: durable invariant. MEASURED: a prelude constructor's

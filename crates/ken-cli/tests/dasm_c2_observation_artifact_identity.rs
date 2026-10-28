@@ -22,8 +22,8 @@ const EXPECTED_CONFIGURATION: &str = "KEN_DASM_C2_EXPECTED_CONFIGURATION";
 const IDENTITY_SOURCE: &str = r#"program capabilities FS APartial
 fn exit_for_input (input : ProcessInput) : ExitCode = match input {
   MkProcessInput arguments _environment _cwd |-> match arguments {
-    Nil |-> Success;
-    Cons _ _ |-> Failure 7
+    Nil |-> ExitCode.Success;
+    Cons _ _ |-> ExitCode.Failure 7
   }
 }
 fn main (input : ProcessInput) (_caps : ProgramCaps APartial)

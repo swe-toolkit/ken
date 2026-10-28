@@ -1,9 +1,9 @@
 use std::process::Command;
 
 const PURE_PROGRAM: &str = r#"program capabilities FS APartial
-fn unused_sibling (_input : ProcessInput) : ExitCode = Success
+fn unused_sibling (_input : ProcessInput) : ExitCode = ExitCode.Success
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
-  : HostIO APartial ExitCode = host_exit APartial Success
+  : HostIO APartial ExitCode = host_exit APartial ExitCode.Success
 "#;
 
 const PROCESS_BYTES_PROGRAM: &str = r#"program capabilities FS APartial
@@ -53,7 +53,7 @@ fn process_discriminator (input : ProcessInput) : UInt8 =
   }
 fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (Failure (process_discriminator input))
+  host_exit APartial (ExitCode.Failure (process_discriminator input))
 "#;
 
 struct ScratchDir(tempfile::TempDir);
@@ -89,7 +89,7 @@ fn linked_home_root_uses_only_production_account_database_boundary() {
     let dir = output_dir("px16-home-root");
     let source = r#"program capabilities FS APartial "~/", RootExecution Allow
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
-  : HostIO APartial ExitCode = host_exit APartial Success
+  : HostIO APartial ExitCode = host_exit APartial ExitCode.Success
 "#;
     let output = ken_cli::build_native_program(
         source,
@@ -332,7 +332,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (bind ConsoleOp console_resp Unit Unit
       (print_line "one")
       (\_. print_line "two"))
-    Success
+    ExitCode.Success
 "#;
     let output = ken_cli::build_native_program(
         source,
@@ -434,8 +434,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     Bool ExitCode
     (host_console APartial Bool (is_terminal Stdout))
     (\terminal. match terminal {
-      False |-> host_exit APartial (Failure 23) ;
-      True |-> host_exit APartial (Failure 24)
+      False |-> host_exit APartial (ExitCode.Failure 23) ;
+      True |-> host_exit APartial (ExitCode.Failure 24)
     })
 "#;
     let output = ken_cli::build_native_program(
@@ -472,9 +472,9 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 60) ;
+      Nil |-> host_exit APartial (ExitCode.Failure 60) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (Failure 60) ;
+        Nil |-> host_exit APartial (ExitCode.Failure 60) ;
         Cons payload _ |->
           bind (Coproduct (FSOp APartial) AmbientOp)
             (resp_coproduct (FSOp APartial) AmbientOp
@@ -482,21 +482,21 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
             (Result IOError Unit) ExitCode
             (host_console APartial (Result IOError Unit) (write Stdout payload))
             (\written. match written {
-              Ok _ |-> host_exit APartial (Failure 62) ;
+              Ok _ |-> host_exit APartial (ExitCode.Failure 62) ;
               Err error |-> match error {
-                CapabilityDenied |-> host_exit APartial (Failure 63) ;
-                BrokenPipe |-> host_exit APartial (Failure 61) ;
-                NotFound |-> host_exit APartial (Failure 63) ;
-                PermissionDenied |-> host_exit APartial (Failure 63) ;
-                Interrupted |-> host_exit APartial (Failure 63) ;
-                AlreadyExists |-> host_exit APartial (Failure 63) ;
-                InvalidInput |-> host_exit APartial (Failure 63) ;
-                IsDirectory |-> host_exit APartial (Failure 63) ;
-                NotDirectory |-> host_exit APartial (Failure 63) ;
-                NotEmpty |-> host_exit APartial (Failure 63) ;
-                Unsupported |-> host_exit APartial (Failure 63) ;
-                Revoked |-> host_exit APartial (Failure 63) ;
-                Other _ |-> host_exit APartial (Failure 63)
+                CapabilityDenied |-> host_exit APartial (ExitCode.Failure 63) ;
+                BrokenPipe |-> host_exit APartial (ExitCode.Failure 61) ;
+                NotFound |-> host_exit APartial (ExitCode.Failure 63) ;
+                PermissionDenied |-> host_exit APartial (ExitCode.Failure 63) ;
+                Interrupted |-> host_exit APartial (ExitCode.Failure 63) ;
+                AlreadyExists |-> host_exit APartial (ExitCode.Failure 63) ;
+                InvalidInput |-> host_exit APartial (ExitCode.Failure 63) ;
+                IsDirectory |-> host_exit APartial (ExitCode.Failure 63) ;
+                NotDirectory |-> host_exit APartial (ExitCode.Failure 63) ;
+                NotEmpty |-> host_exit APartial (ExitCode.Failure 63) ;
+                Unsupported |-> host_exit APartial (ExitCode.Failure 63) ;
+                Revoked |-> host_exit APartial (ExitCode.Failure 63) ;
+                Other _ |-> host_exit APartial (ExitCode.Failure 63)
               }
             })
       }
@@ -555,13 +555,13 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 30) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 30) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 31) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 31) ;
         Cons path more |-> match more {
-          Nil |-> host_exit AFull (Failure 32) ;
+          Nil |-> host_exit AFull (ExitCode.Failure 32) ;
           Cons contents _ |-> match caps {
-            MkProgramCaps cap |->
+            ProgramCaps.MkProgramCaps cap |->
               bind (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
                 (Result FileError Unit) ExitCode
@@ -569,7 +569,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                   (Result FileError Unit)
                   (writeFile cap path CreateNew contents))
                 (\written. match written {
-                  Err _ |-> host_exit AFull (Failure 34) ;
+                  Err _ |-> host_exit AFull (ExitCode.Failure 34) ;
                   Ok _ |->
                     bind (Coproduct (FSOp AFull) AmbientOp)
                       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -577,7 +577,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                         (Result FileError Bytes) (readFile AFull cap path))
                       (\read. match read {
-                        Err _ |-> host_exit AFull (Failure 35) ;
+                        Err _ |-> host_exit AFull (ExitCode.Failure 35) ;
                         Ok bytes |->
                           bind (Coproduct (FSOp AFull) AmbientOp)
                             (resp_coproduct (FSOp AFull) AmbientOp
@@ -585,8 +585,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                             (Result IOError Unit) ExitCode
                             (host_console AFull (Result IOError Unit) (flush Stdout))
                             (\_. match bytes_at bytes 0 {
-                              None |-> host_exit AFull (Failure 36) ;
-                              Some byte |-> host_exit AFull (Failure byte)
+                              None |-> host_exit AFull (ExitCode.Failure 36) ;
+                              Some byte |-> host_exit AFull (ExitCode.Failure byte)
                             })
                       })
                 })
@@ -669,11 +669,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 40) ;
+      Nil |-> host_exit APartial (ExitCode.Failure 40) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (Failure 41) ;
+        Nil |-> host_exit APartial (ExitCode.Failure 41) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp APartial) AmbientOp)
               (resp_coproduct (FSOp APartial) AmbientOp
                 (fs_resp APartial) ambient_resp)
@@ -682,10 +682,10 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                 (fs_resp APartial) ambient_resp
                 (Result FileError Bytes) (readFile APartial cap path))
               (\read. match read {
-                Err _ |-> host_exit APartial (Failure 42) ;
+                Err _ |-> host_exit APartial (ExitCode.Failure 42) ;
                 Ok bytes |-> match bytes_at bytes 0 {
-                  None |-> host_exit APartial (Failure 43) ;
-                  Some byte |-> host_exit APartial (Failure byte)
+                  None |-> host_exit APartial (ExitCode.Failure 43) ;
+                  Some byte |-> host_exit APartial (ExitCode.Failure byte)
                 }
               })
         }
@@ -777,33 +777,33 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit AFull (Failure 40) ;
+      Nil |-> host_exit AFull (ExitCode.Failure 40) ;
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit AFull (Failure 41) ;
+        Nil |-> host_exit AFull (ExitCode.Failure 41) ;
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
               (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                 (Result FileError Unit) (writeFile cap path CreateNew path))
               (\written. match written {
-                Ok _ |-> host_exit AFull (Failure 43) ;
+                Ok _ |-> host_exit AFull (ExitCode.Failure 43) ;
                 Err error |-> match error {
                   MkFileError _operation _path cause |-> match cause {
-                    CapabilityDenied |-> host_exit AFull (Failure 44) ;
-                    NotFound |-> host_exit AFull (Failure 45) ;
-                    PermissionDenied |-> host_exit AFull (Failure 46) ;
-                    BrokenPipe |-> host_exit AFull (Failure 47) ;
-                    Interrupted |-> host_exit AFull (Failure 48) ;
-                    AlreadyExists |-> host_exit AFull (Failure 49) ;
-                    InvalidInput |-> host_exit AFull (Failure 50) ;
-                    IsDirectory |-> host_exit AFull (Failure 51) ;
-                    NotDirectory |-> host_exit AFull (Failure 52) ;
-                    NotEmpty |-> host_exit AFull (Failure 53) ;
-                    Unsupported |-> host_exit AFull (Failure 54) ;
-                    Revoked |-> host_exit AFull (Failure 54) ;
-                    Other _ |-> host_exit AFull (Failure 55)
+                    CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                    NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                    PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                    BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                    Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                    AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                    InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                    IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                    NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                    NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                    Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                    Revoked |-> host_exit AFull (ExitCode.Failure 54) ;
+                    Other _ |-> host_exit AFull (ExitCode.Failure 55)
                   }
                 }
               })

@@ -125,7 +125,7 @@ const C2_MIXED_SOURCE: &str = "program capabilities FS APartial\n\
       } \
     }\n\
     fn sizeExit (n : Nat) : ExitCode = match n { \
-      Zero |-> Success ; Suc _ |-> Failure 7 \
+      Zero |-> ExitCode.Success ; Suc _ |-> ExitCode.Failure 7 \
     }\n\
     fn main (input : ProcessInput) (_caps : ProgramCaps APartial) \
       : HostIO APartial ExitCode = \
@@ -499,9 +499,9 @@ fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
 
 const R3_4B_ARTIFACT_OUTPUT: &str = "KEN_R3_4B_ARTIFACT_OUTPUT";
 const R3_4B_IDENTITY_SOURCE: &str = r#"program capabilities FS APartial
-fn unused_sibling (_input : ProcessInput) : ExitCode = Success
+fn unused_sibling (_input : ProcessInput) : ExitCode = ExitCode.Success
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
-  : HostIO APartial ExitCode = host_exit APartial Success
+  : HostIO APartial ExitCode = host_exit APartial ExitCode.Success
 "#;
 
 /// Nested-compilation worker for the artifact-identity control below.

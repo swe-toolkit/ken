@@ -13,10 +13,10 @@ use ken_elaborator::ElabEnv;
 use ken_interp::PosixHost;
 use tempfile::tempdir;
 
-const MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone Success";
+const MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success";
 // This is the exact AC-0 source: the first fence has a valid program boundary
 // but no main, and only the checked example declares main.
-const EXAMPLE_ONLY: &str = "# Example-only entry point\n\n```ken\nprogram capabilities FS ANone\nconst plain_probe : Bool = True\n```\n\n```ken example\nfn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone Success\n```\n";
+const EXAMPLE_ONLY: &str = "# Example-only entry point\n\n```ken\nprogram capabilities FS ANone\nconst plain_probe : Bool = True\n```\n\n```ken example\nfn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success\n```\n";
 
 fn with_program_main(example: Option<&str>) -> String {
     let mut source = format!("```ken\nprogram capabilities FS ANone\n{MAIN}\n```\n");

@@ -20,7 +20,7 @@ proc send_pair (left : Bytes) (right : Bytes)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         (Result IOError Unit) ExitCode
         (host_console APartial (Result IOError Unit) (write Stdout right))
-        (\_. host_exit APartial Success)))
+        (\_. host_exit APartial ExitCode.Success)))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
@@ -43,7 +43,7 @@ proc send_and_exit (bytes : Bytes) (code : ExitCode)
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  send_and_exit (bytes_encode "mixed") (Failure 47)
+  send_and_exit (bytes_encode "mixed") (ExitCode.Failure 47)
 "#;
 
 fn assert_direct_source(source: &str, label: &str, expected_stdout: &[u8], exit: i32) {

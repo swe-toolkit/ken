@@ -48,24 +48,24 @@ proc after_file_escape (file_closed : Resource ResourceKind.FsHandle)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withBuffer AFull Unit Unit (6 : Int) (read_body file_closed))
-    (\outcome. host_exit AFull Success)
+    (\outcome. host_exit AFull ExitCode.Success)
 
 proc handle_outer (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
   : HostIO AFull ExitCode visits [FS] =
   match outcome {
-    Err open_error |-> host_exit AFull (Failure 96);
+    Err open_error |-> host_exit AFull (ExitCode.Failure 96);
     Ok bracket |-> match bracket {
       ResourceBracketOk file_closed |-> after_file_escape file_closed;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 93);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 94);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 95)
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 93);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 94);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 95)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode

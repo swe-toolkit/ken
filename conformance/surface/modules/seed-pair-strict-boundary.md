@@ -1,7 +1,8 @@
 # Compiler-origin Pair floor-provider boundary
 
 Format: `../../README.md`. These cases pin the general internal-provision arm,
-the ten-type floor, and its first compiler-origin member (`spec/30-surface/30
+the historical ten-type Pair slice (now part of the twenty-type floor), and
+its first compiler-origin member (`spec/30-surface/30
 §4`, `33 §3.3`, `34 §"Canonical non-dependent pair floor family"`, `39 §2.0`).
 They supersede this seed's former exact-nine, bare-name rejection, and future
 package-provider contract.
@@ -13,12 +14,14 @@ are distinct from kernel `Term::Sigma`/`Term::Pair`/`Term::Proj1`/
 `Term::Proj2`, runtime `EvalVal::Pair`, and any same-shaped source declaration.
 Kernel and runtime forms carry no provider `GlobalId`.
 
-The acceptance rows below are **RED-UNTIL
-`LANG-MOD-CANONICAL-PAIR-PACKAGE`**, the redirected floor-realization build WP.
-That build must reuse the four existing compiler-installed identities. RED-UNTIL
-is not an accepted failure and does not authorize a package, alias, registry, or
-ambient fallback. The representation-only transparent-Sigma controls execute
-now and remain evidence for the unchanged kernel behavior.
+The Pair floor required by the acceptance rows below was realized by
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` and included in the fifteen-name floor
+landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The rows describe
+Pair behavior; their status does not certify this candidate's five new
+entrypoint identities. The Pair landing authorizes no package, alias,
+registry, or ambient fallback. The representation-only transparent-Sigma
+controls continue to execute and remain evidence for the unchanged kernel
+behavior.
 
 ## AC1 — the four existing Pair-family identities become Strict floor bindings
 
@@ -26,7 +29,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — a witnessed closed floor reuses its
   pre-source declarations rather than searching or reallocating
-- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `30 §4`; `33 §3.3`; `34 §"Canonical non-dependent pair floor family"`;
   `39 §2.0` steps 4–6
 - given: create a fresh environment before source elaboration and record the
@@ -40,7 +43,7 @@ now and remain evidence for the unchanged kernel behavior.
   floor binding whose checked type references that exact `Pair` id. No run
   declares or imports a replacement, advances the allocator because of floor
   installation, or changes `trusted_base()`.
-- controls: an otherwise identical bare `Prod` row rejects as unbound even
+- controls: an otherwise identical bare `Unit` row rejects as unbound even
   though the compiler global map contains it. A separately registered unrelated
   transparent global also remains unbound without an import. Remove one
   companion from the configured closed inventory while leaving its compiler
@@ -48,14 +51,14 @@ now and remain evidence for the unchanged kernel behavior.
   the ambient global.
 - why: successful checking alone cannot distinguish reuse from re-declaration or
   ambient lookup. The exact-id and accounting assertions pin the floor path.
-  `Prod` separates the general internal-provision arm from arbitrary compiler
+  `Unit` separates the general internal-provision arm from arbitrary compiler
   convenience exposure.
 
 ### surface/modules/pair-floor-remains-available-after-unrelated-loads
 
 - promise class: **durable invariant** — per-unit loading neither supplies nor
   masks an always-present floor binding
-- stage: **RED-UNTIL floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §3.3`; `39 §2.0` steps 2, 4, and 5
 - given: strict-load an unrelated provider and an unrelated re-export facade,
   then load entries that use each bare Pair-family name without imports.
@@ -67,7 +70,7 @@ now and remain evidence for the unchanged kernel behavior.
 - why: Pair acceptance must be attributable to the closed floor, not to cached
   globals or a hidden import leak.
 
-## AC2 — the floor is exactly ten types plus three Pair companions
+## AC2 — the current floor is twenty types plus three Pair companions
 
 ### surface/taxonomy/prelude-internal-provision-inventory-is-executable-and-closed
 
@@ -81,18 +84,17 @@ now and remain evidence for the unchanged kernel behavior.
   from the admitted type contract and checked identity references.
 - expect: the signature inventory is exactly
   `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`; the
-  internal-provision type inventory is exactly `{Nat, Pair}`, with `Nat` marked
-  kernel-origin and `Pair` marked compiler-bootstrap-origin; their union is the
-  exact ten-type floor
-  `{Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result,
-  Utf8Error}`. Pair's companion inventory is exactly
-  `{mk_pair, pair_fst, pair_snd}`. The floor count is ten: companions are
-  bindings, not type formers.
-- controls: add `Prod` only to the configured type inventory; exact equality
+  internal-provision type inventory is exactly `{Nat, Pair, Equal, ExitCode,
+  HostIO, ProcessInput, Prod, ProgramCaps, Prop, Proved, Top, Bottom}`. `Nat`
+  is kernel-origin and `Pair` is compiler-bootstrap-origin. Their union is
+  the exact twenty-type floor recorded in `minimality.md`. Pair's companion
+  inventory is exactly `{mk_pair, pair_fst, pair_snd}`. The floor count is
+  twenty: companions are bindings, not type formers.
+- controls: add `Unit` only to the configured type inventory; exact equality
   fails with one extra type. Move a Pair companion into the type inventory;
   the type-count and kind assertions fail. Delete either internal witness or
   substitute a same-shaped fresh id; exact identity equality fails closed.
-- why: a hard-coded ten-name list does not prove derivation. Independent arm,
+- why: a hard-coded twenty-name list does not prove derivation. Independent arm,
   origin, identity, kind, and companion assertions prevent both under-inclusion
   and compiler-global-map widening.
 
@@ -119,7 +121,7 @@ now and remain evidence for the unchanged kernel behavior.
 ### surface/modules/pair-floor-protected-name-bindings-reject
 
 - promise class: **durable invariant** — source cannot introduce a binding in B
-- stage: **RED-UNTIL floor realization for the four Pair-family rows**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §3.3`; `39 §2.0`
 - given: in independent Strict roots, attempt a top-level binding named `Pair`,
   `mk_pair`, `pair_fst`, or `pair_snd`, with a well-typed body or family. Also
@@ -141,7 +143,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — a re-export creates a public path, not
   a provider or source owner
-- stage: **RED-UNTIL floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §4.3`; `34 §"Canonical non-dependent pair floor family"`
 - given: record all four floor ids, then load one module that explicitly
   re-exports the four bindings and a consumer of that facade.
@@ -178,7 +180,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **normative compatibility vector** — downstream proofs use
   conversion, not an imported theorem
-- stage: **RED-UNTIL floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `34 §"Canonical non-dependent pair floor family"`; `13 §2`/`§6`
 - given: with no Pair import, check
   `pair_fst Bool Bool (mk_pair Bool Bool True False) = True` with `Proved`,
@@ -205,7 +207,7 @@ now and remain evidence for the unchanged kernel behavior.
   spelling allow-list, determines positivity
 - shape: **soundness/completeness pair** — each positive orientation is paired
   with the corresponding inner-arrow negative
-- stage: **RED-UNTIL floor realization for the named Pair instantiation**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `14 §8.3`/`§8.5`; `34 §"Canonical non-dependent pair floor family"`
 - given: through the ordinary inductive admission path submit
   `data Good1 = MkGood1 (Pair Good1 Unit)` and
@@ -234,7 +236,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — available evidence bounds every
   identity and closure inference
-- stage: **current pre-floor-realization evidence frontier**
+- stage: **historical pre-Pair-floor evidence frontier**
 - spec: `30 §4`; `33 §3.3`; `39 §2.0`
 - given: enumerate the census subjects `Core.Logic.Compare`,
   `Core.Classes.LawfulClasses`, `Data.Collections.Derived`,
@@ -259,7 +261,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — target closure comes from fresh Strict
   execution and exact floor identities, never projected staging
-- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `30 §4`; `33 §3.3`; `39 §2.0`
 - given: after floor realization, record the four canonical ids before source
   loads. Re-run the census subjects and any coupled catalog population through
@@ -327,25 +329,28 @@ now and remain evidence for the unchanged kernel behavior.
   checked-transparent `Pair = g232`, `mk_pair = g233`, `pair_fst = g234`, and
   `pair_snd = g235`; all are outside `trusted_base()`, every helper type names
   `g232`, and the bodies are non-dependent Sigma, pair introduction, first
-  projection, and second projection. The current configured floor still has
-  nine type names. Across all 48 catalog `.ken.md` leaves, no source declaration
-  defines `Pair`; catalog occurrences are consumers under the current Legacy
-  route.
+  projection, and second projection. At that base, the configured floor still
+  had nine type names. Across all 48 catalog `.ken.md` leaves at that base, no
+  source declaration defined `Pair`; catalog occurrences were consumers under
+  that base's Legacy route.
 - **CHECKED now:** the representation-only transparent-Sigma positivity controls
   execute through both components and reject both inner-arrow negatives.
-- **CLAIMED until the build lands:** the ten-type floor, exact three companions,
-  four Strict accepts on the existing ids, collision behavior at the new
-  bindings, and fresh Strict catalog closure.
-- **THE GAP:** the floor-realization build has not yet admitted the four existing
-  ids through the closed Strict inventory. Spec text alone does not make a
-  current Strict run green.
+- **CLAIMED at the historical spec base:** the ten-type Pair floor, exact
+  three companions, four Strict accepts on existing ids, collision behavior,
+  and fresh Strict catalog closure. The Pair floor landed at
+  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e` as part of the fifteen-name
+  roster; those rows do not by themselves prove this candidate's twenty-name
+  entrypoint additions.
+- **THE GAP for this candidate:** exact entrypoint-ABI identity, constructor
+  scope, census deletion, and unchanged trust require their own executable
+  evidence, stated in `minimality.md` and `seed-modules.md`.
 
 ## Consistency and realization boundary
 
-- The type floor is exactly
-  `{Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result,
-  Utf8Error}`. The internal-provision inventory is exactly `{Nat, Pair}`. Pair's
-  companion bindings are exactly `{mk_pair, pair_fst, pair_snd}`.
+- The current type floor is exactly the twenty-name roster in `minimality.md`;
+  its internal-provision arm includes the independently source-required
+  entrypoint-ABI family. Pair's companion bindings remain exactly
+  `{mk_pair, pair_fst, pair_snd}`.
 - The four names reuse one compiler-installed transparent declaration family.
   There is no package Pair, second identity, alias, registry, owner map, or
   convenience-global fallback.
@@ -354,4 +359,5 @@ now and remain evidence for the unchanged kernel behavior.
   identity evidence.
 - Kernel formers, runtime pair values, and local declarations named Pair remain
   outside the provider question.
-- `Prod` remains the non-floor compiler-convenience negative control.
+- `Prod` is now a distinct checked floor inductive with bare `MkProd`;
+  `Unit` remains the non-floor compiler-convenience negative control.

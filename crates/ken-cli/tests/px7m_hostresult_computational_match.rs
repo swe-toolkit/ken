@@ -36,7 +36,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit ExitCode inner (\_. host_exit APartial Success)
+    Unit ExitCode inner (\_. host_exit APartial ExitCode.Success)
 "#;
 
 const ERR_PROGRAM: &str = r#"program capabilities FS APartial
@@ -81,10 +81,10 @@ proc inner (cap : Cap APartial) : HostIO APartial Unit visits [FS, Console] =
 proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode (inner cap) (\_. host_exit APartial Success)
+        Unit ExitCode (inner cap) (\_. host_exit APartial ExitCode.Success)
   }
 "#;
 

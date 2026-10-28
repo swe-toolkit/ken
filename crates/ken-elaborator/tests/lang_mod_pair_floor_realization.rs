@@ -11,16 +11,21 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 15] = [
+const TYPE_FLOOR: [&str; 20] = [
     "Auth",
     "Bool",
     "Bottom",
     "Char",
     "Equal",
+    "ExitCode",
+    "HostIO",
     "List",
     "Nat",
     "Option",
     "Pair",
+    "ProcessInput",
+    "Prod",
+    "ProgramCaps",
     "Prop",
     "Proved",
     "ResourceKind",
@@ -188,8 +193,9 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the primitive producer traversal yields exactly eight signature
-/// identities, and Nat, Pair and five kernel-keyed proposition/equality members
-/// close the type inventory to fifteen. The separately configured companion
+/// identities, and Nat, Pair, five kernel-keyed proposition/equality members,
+/// and five source-required entrypoint-ABI identities close the type inventory
+/// to twenty. The separately configured companion
 /// inventory has three checked-transparent constants keyed to the exact Pair
 /// identity. CLAIMED: type and binding membership are independent closed
 /// inventories rather than one compiler-global allow-list. THE GAP: source
@@ -208,17 +214,41 @@ fn prelude_signature_inventory_is_executable_and_closed() {
         .filter(|name| {
             !matches!(
                 *name,
-                "Nat" | "Pair" | "Bottom" | "Equal" | "Prop" | "Proved" | "Top"
+                "Nat"
+                    | "Pair"
+                    | "Bottom"
+                    | "Equal"
+                    | "ExitCode"
+                    | "HostIO"
+                    | "ProcessInput"
+                    | "Prod"
+                    | "ProgramCaps"
+                    | "Prop"
+                    | "Proved"
+                    | "Top"
             )
         })
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
     assert_eq!(primitive_signature_type_ids(&env), signature_expected);
 
-    let internal = ["Nat", "Pair", "Bottom", "Equal", "Prop", "Proved", "Top"]
-        .map(|name| env.globals[name])
-        .into_iter()
-        .collect::<BTreeSet<_>>();
+    let internal = [
+        "Nat",
+        "Pair",
+        "Bottom",
+        "Equal",
+        "ExitCode",
+        "HostIO",
+        "ProcessInput",
+        "Prod",
+        "ProgramCaps",
+        "Prop",
+        "Proved",
+        "Top",
+    ]
+    .map(|name| env.globals[name])
+    .into_iter()
+    .collect::<BTreeSet<_>>();
     let configured = PRELUDE_FLOOR_NAMES
         .map(|name| env.globals[name])
         .into_iter()
@@ -226,7 +256,7 @@ fn prelude_signature_inventory_is_executable_and_closed() {
     let mut derived = signature_expected;
     derived.extend(internal);
     assert_eq!(configured, derived);
-    assert!(!configured.contains(&env.globals["Prod"]));
+    assert_ne!(env.globals["Pair"], env.globals["Prod"]);
 
     let pair = env.globals["Pair"];
     assert!(matches!(
@@ -420,7 +450,7 @@ fn definitionally_equal_pair_is_a_distinct_identity() {
 /// Nonmembers remain unavailable even when the implementation global map owns
 /// a checked declaration with the requested spelling.
 #[test]
-fn closed_floor_accepts_pair_but_arbitrary_globals_and_prod_do_not() {
+fn closed_floor_accepts_pair_and_prod_but_not_arbitrary_globals() {
     let root = FixtureRoot::new("closed");
     root.write(
         "PairEntry",
@@ -437,10 +467,15 @@ fn closed_floor_accepts_pair_but_arbitrary_globals_and_prod_do_not() {
         .elaborate_module_from_roots_strict(&[root.0.clone()], "AmbientEntry")
         .expect_err("arbitrary implementation global must remain unavailable");
     assert!(matches!(ambient, ElabError::UnboundName { ref name, .. } if name == "Ambient"));
-    let prod = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "ProdEntry")
-        .expect_err("Prod must remain unavailable");
-    assert!(matches!(prod, ElabError::UnboundName { ref name, .. } if name == "Prod"));
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "ProdEntry")
+        .expect("Prod is a distinct source-required entrypoint ABI member");
+    let prod_witness = env.globals["ProdEntry.X"];
+    let (_, prod_body) = env
+        .env
+        .transparent_body(prod_witness)
+        .expect("Prod witness has checked body");
+    assert!(mentions_global(&prod_body, env.globals["Prod"]));
+    assert!(!mentions_global(&prod_body, env.globals["Pair"]));
 }
 
 /// Re-export republishes the existing four identities and allocates no provider
@@ -565,11 +600,14 @@ fn pair_floor_closure_is_rederived_after_realization() {
     assert_eq!(observed_failures, expected_failures);
     assert_eq!(observed_successes, expected_successes);
 
-    let prod = match strict_one("def X = Prod Bool Bool") {
-        Ok(_) => panic!("Prod must not enter the closure authority"),
-        Err(error) => error,
-    };
-    assert!(matches!(prod, ElabError::UnboundName { ref name, .. } if name == "Prod"));
+    let prod = strict_one("def X = Prod Bool Bool")
+        .expect("Prod is a distinct floor member with its own checked identity");
+    let (_, body) = prod
+        .env
+        .transparent_body(prod.globals["Entry.X"])
+        .expect("Prod witness has a checked body");
+    assert!(mentions_global(&body, prod.globals["Prod"]));
+    assert!(!mentions_global(&body, prod.globals["Pair"]));
 
     let ambient_root = FixtureRoot::new("closure-ambient");
     ambient_root.write("Entry", "def X = Ambient");

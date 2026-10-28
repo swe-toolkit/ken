@@ -33,7 +33,7 @@ exact family identities already fixed by §1.2.
 ### stdlib/diagnostic-codes/status-one-separates-program-and-cli-failure
 - promise class: **durable invariant**
 - spec: `70 §1.1`, `§1.3`
-- given: (a) an admitted `ken run` program whose `main` returns `Failure 1`
+- given: (a) an admitted `ken run` program whose `main` returns `ExitCode.Failure 1`
   and writes nothing to stderr, and (b) `ken frobnicate`.
 - expect: both process statuses are 1. The program outcome has no tool
   diagnostic; the unknown-subcommand failure has one C-coded diagnostic.
@@ -41,7 +41,7 @@ exact family identities already fixed by §1.2.
   a numeric C code before assignment.
 - control: using status 1 alone as the predicate classifies both alike and
   fails to distinguish a coded tool failure from the admitted program's own
-  `Failure 1` outcome.
+  `ExitCode.Failure 1` outcome.
 - why: status is not a code. The distinguishing observation is the tool's
   coded line, with the no-stderr program fixture keeping program-authored
   lookalike text out of this pair.
@@ -49,11 +49,12 @@ exact family identities already fixed by §1.2.
 ### stdlib/diagnostic-codes/run-program-outcomes-are-not-tool-codes
 - promise class: **normative compatibility vector**
 - spec: `70 §1.3`
-- given: admitted `ken run` programs returning `Success`, `Failure 0`,
-  `Failure 1`, and `Failure 255`; each writes nothing to stderr.
+- given: admitted `ken run` programs returning `ExitCode.Success`,
+  `ExitCode.Failure 0`, `ExitCode.Failure 1`, and `ExitCode.Failure 255`;
+  each writes nothing to stderr.
 - expect: statuses are respectively 0, 1, 1, and 255. None of these program
   outcomes gets a tool diagnostic code.
-- control: `Failure 300` is not a `UInt8` program outcome. It is refused by
+- control: `ExitCode.Failure 300` is not a `UInt8` program outcome. It is refused by
   source checking before execution and returns the code belonging to that
   elaboration failure, with coded-failure status 1.
 - why: this boundary prevents a program's exit status from being read as a
@@ -148,13 +149,13 @@ exact family identities already fixed by §1.2.
 - expect: each failure is H-coded and exits 1. Resolve its code from the
   corresponding host-owned ledger row; do not infer X from the `ken run`
   subcommand or accept an uncoded status-only refusal.
-- control: the admitted program's own `Failure 1` is not host-coded. The
+- control: the admitted program's own `ExitCode.Failure 1` is not host-coded. The
   positive control distinguishes a pre-program host refusal from an ordinary
   program result.
 - why: these failures belong to the host carrier even where the current
   implementation uses a status value or has a silent path. The malformed
   exit case is exercised through a controlled host-boundary fixture; checked
-  source cannot construct an out-of-range `Failure` value.
+  source cannot construct an out-of-range `ExitCode.Failure` value.
 
 ### stdlib/diagnostic-codes/native-build-error-keeps-its-carrier
 - promise class: **durable invariant**

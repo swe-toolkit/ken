@@ -13,8 +13,8 @@ fn program_caps_is_authority_parametric_and_adds_zero_trust() {
         .expect("ProgramCaps registered");
     let constructor_id = *elab
         .globals
-        .get("MkProgramCaps")
-        .expect("MkProgramCaps registered");
+        .get("ProgramCaps.MkProgramCaps")
+        .expect("ProgramCaps.MkProgramCaps registered");
 
     let inductive = match elab.env.lookup(program_caps_id) {
         Some(Decl::Inductive(inductive)) => inductive,

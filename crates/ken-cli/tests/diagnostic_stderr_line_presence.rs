@@ -55,7 +55,7 @@ fn post_execution_host_diagnostic_starts_on_its_own_line() {
         "malformed-exit.ken",
         &host_exit_source(
             "\"partial\"",
-            "(Failure (add_uint8 (255 : UInt8) (1 : UInt8)))",
+            "(ExitCode.Failure (add_uint8 (255 : UInt8) (1 : UInt8)))",
         ),
     );
     let output = run(&["run", &source]);
@@ -75,7 +75,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   bind (Coproduct (FSOp APartial) AmbientOp) (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) Unit ExitCode
     (host_console APartial Unit (Vis ConsoleOp console_resp Unit (Write Stderr (bytes_encode "partial")) (\_. Ret ConsoleOp console_resp Unit MkUnit)))
-    (\_ . match (intToInt8 (sub_int 0 128)) { Some m |-> (match (eq_int (int8_to_int (neg_int8 m)) 0) { True |-> host_exit APartial Success ; False |-> host_exit APartial Success }) ; None |-> host_exit APartial Success })
+    (\_ . match (intToInt8 (sub_int 0 128)) { Some m |-> (match (eq_int (int8_to_int (neg_int8 m)) 0) { True |-> host_exit APartial ExitCode.Success ; False |-> host_exit APartial ExitCode.Success }) ; None |-> host_exit APartial ExitCode.Success })
 "#,
     );
     let output = run(&["run", &source]);
@@ -90,7 +90,7 @@ fn finished_program_line_adds_no_blank_line_and_success_keeps_exact_stderr() {
         "finished-line.ken",
         &host_exit_source(
             "\"partial\\n\"",
-            "(Failure (add_uint8 (255 : UInt8) (1 : UInt8)))",
+            "(ExitCode.Failure (add_uint8 (255 : UInt8) (1 : UInt8)))",
         ),
     );
     let output = run(&["run", &malformed]);
@@ -99,7 +99,7 @@ fn finished_program_line_adds_no_blank_line_and_success_keeps_exact_stderr() {
     let success = write_source(
         dir.path(),
         "success.ken",
-        &host_exit_source("\"partial\"", "Success"),
+        &host_exit_source("\"partial\"", "ExitCode.Success"),
     );
     let output = run(&["run", &success]);
     assert_eq!(output.status.code(), Some(0), "stderr: {:?}", output.stderr);

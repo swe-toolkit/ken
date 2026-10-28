@@ -226,7 +226,7 @@ external launch grant to compare. The entry point has the authority-monomorphic
 shape
 
 ```ken
-proc main (input : ProcessInput) (caps : ProgramCaps a) : HostIO ExitCode
+proc main (input : ProcessInput) (caps : ProgramCaps a) : HostIO a ExitCode
 ```
 
 where `a` is the header-declared authority. A program whose body performs an FS
@@ -275,9 +275,12 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
-  Equal, List, Nat, Option, Pair, Prop, Proved, ResourceKind, Result, Top,
-  Utf8Error}`. The latter is a fifteen-member type floor, not the superseded
-  ten-member inventory. For an inductive floor type, its per-type
+  Equal, ExitCode, HostIO, List, Nat, Option, Pair, ProcessInput, Prod,
+  ProgramCaps, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. The latter
+  has twenty exact floor identities: the prior fifteen and five entrypoint-ABI
+  identities (`30-taxonomy §4`). `HostIO` is a type-level function, not an
+  inductive type or constructor family. For an inductive floor type, its
+  per-type
   **scoped constructors** property determines whether its whole exact
   constructor family also occupies bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
@@ -285,18 +288,24 @@ is a **surface error** (`24`) — it never reaches the kernel:
   reserved. There is no per-constructor subset choice. `ResourceKind` is scoped:
   `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
   `ResourceKind.Mapping` replace its former three bare reserved names.
-  `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s `True`/`False`,
-  `List`'s `Nil`/`Cons`, `Nat`'s `Zero`/`Suc`, `Option`'s `None`/`Some`,
-  `Result`'s `Err`/`Ok`, and `Utf8Error`'s `InvalidUtf8`
-  remain bare. `Char`, transparent `Pair`, and the proposition/equality
-  members have no constructors. Constructor-private names remain inaccessible
-  under §4.2 in either mode. `Pair`'s three checked companions
-  `{mk_pair, pair_fst, pair_snd}` still enter B at its exact identity. Kernel
-  native names and reserved formers/sugar remain kernel vocabulary, not extra
-  prelude identities. Neither the closed roster nor B includes arbitrary
-  compiler globals; future floor membership requires §4's two witnesses and
-  an atomic roster and per-type property change. The dedicated L2 qualified-
-  constructor/scoped-property slice precedes L2-3's floor additions and
+  `ExitCode` is scoped: `ExitCode.Success` and `ExitCode.Failure` resolve,
+  but bare `Success` and `Failure` do not enter B. `ProgramCaps` is scoped:
+  `MkProgramCaps` is not bare-reserved; qualification does not widen its
+  runner-minted constructor's visibility. `ProcessInput` and `Prod` are
+  unscoped: `MkProcessInput` and `MkProd` are bare names in B, with their
+  exact parent identities. `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s
+  `True`/`False`, `List`'s `Nil`/`Cons`, `Nat`'s `Zero`/`Suc`,
+  `Option`'s `None`/`Some`, `Result`'s `Err`/`Ok`, and `Utf8Error`'s `InvalidUtf8`
+  remain bare. `Char`, `HostIO`, transparent `Pair`, and the
+  proposition/equality members have no constructors. Constructor-private
+  names remain inaccessible under §4.2 in either mode. `Pair`'s three
+  checked companions `{mk_pair, pair_fst, pair_snd}` still enter B at its
+  exact identity. Kernel native names and reserved formers/sugar remain
+  kernel vocabulary, not extra prelude identities. Neither the closed
+  roster nor B includes arbitrary compiler globals; future floor
+  membership requires §4's two witnesses and an atomic roster and
+  per-type property change. The dedicated L2 qualified-constructor/
+  scoped-property slice precedes L2-3's floor additions and
   reconciles existing `ResourceKind` users; until then the implementation's
   older bare behavior is a staged gap, not a second normative mode.
 - **No binding of a built-in name.** No declaration or binder may introduce a

@@ -19,8 +19,8 @@ proc write_then_exit (bytes : Bytes) (code : ExitCode)
 proc finish (outcome : Result Bytes Bytes)
   : HostIO APartial ExitCode visits [Console] =
   match outcome {
-    Err bytes |-> write_then_exit bytes (Failure 7);
-    Ok bytes |-> write_then_exit bytes Success
+    Err bytes |-> write_then_exit bytes (ExitCode.Failure 7);
+    Ok bytes |-> write_then_exit bytes ExitCode.Success
   }
 
 proc produce (as_ok : Bool)
@@ -50,7 +50,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 99);
+      Nil |-> host_exit APartial (ExitCode.Failure 99);
       Cons _ tail |-> match tail {
         Nil |-> run_case True;
         Cons _ _ |-> run_case False
@@ -80,7 +80,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result Bytes Bytes) ExitCode produce
-    (\_outcome. host_exit APartial Success)
+    (\_outcome. host_exit APartial ExitCode.Success)
 "#;
 
 const DYNAMIC_CARRIER_PROGRAM: &str = r#"program capabilities FS APartial
@@ -90,13 +90,13 @@ proc write_then_fail (bytes : Bytes)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit) (write Stdout bytes))
-    (\_. host_exit APartial (Failure 36))
+    (\_. host_exit APartial (ExitCode.Failure 36))
 
 proc finish_dynamic (outcome : Result Bytes Bytes)
   : HostIO APartial ExitCode visits [Console] =
   match outcome {
     Err bytes |-> write_then_fail bytes;
-    Ok _ |-> host_exit APartial (Failure 83)
+    Ok _ |-> host_exit APartial (ExitCode.Failure 83)
   }
 
 proc produce_dynamic (cap : Cap APartial) (path : Bytes)
@@ -138,11 +138,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 81);
+      Nil |-> host_exit APartial (ExitCode.Failure 81);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (Failure 82);
+        Nil |-> host_exit APartial (ExitCode.Failure 82);
         Cons path _ |-> match caps {
-          MkProgramCaps cap |->
+          ProgramCaps.MkProgramCaps cap |->
             bind (Coproduct (FSOp APartial) AmbientOp)
               (resp_coproduct (FSOp APartial) AmbientOp
                 (fs_resp APartial) ambient_resp)

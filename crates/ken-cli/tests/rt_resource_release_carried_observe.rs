@@ -115,8 +115,8 @@ proc rt_branched_done
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode visits [FS] =
   match outcome {
-    Err error |-> host_exit AFull (Failure 71);
-    Ok bracket |-> host_exit AFull (Failure 72)
+    Err error |-> host_exit AFull (ExitCode.Failure 71);
+    Ok bracket |-> host_exit AFull (ExitCode.Failure 72)
   }
 
 proc rt_branched_stage (cap : Cap AFull)
@@ -131,7 +131,7 @@ proc rt_branched_stage (cap : Cap AFull)
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |-> rt_branched_stage cap
+    ProgramCaps.MkProgramCaps cap |-> rt_branched_stage cap
   }
 "#;
 

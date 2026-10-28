@@ -18,12 +18,12 @@ fn px8x_after
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err _ |-> host_exit AFull (Failure 51);
+    Err _ |-> host_exit AFull (ExitCode.Failure 51);
     Ok bracket |-> match bracket {
-      ResourceBracketOk _ |-> host_exit AFull Success;
-      ResourceBracketBodyError _ |-> host_exit AFull (Failure 52);
-      ResourceBracketReleaseError _ |-> host_exit AFull (Failure 53);
-      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (Failure 54)
+      ResourceBracketOk _ |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError _ |-> host_exit AFull (ExitCode.Failure 52);
+      ResourceBracketReleaseError _ |-> host_exit AFull (ExitCode.Failure 53);
+      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (ExitCode.Failure 54)
     }
   }
 
@@ -71,8 +71,8 @@ fn real_buffer_bracket_exposes_ordered_target_bindings() {
         Some(&coproduct),
         &env.env,
         &mut store,
-        env.globals["Success"],
-        env.globals["Failure"],
+        env.globals["ExitCode.Success"],
+        env.globals["ExitCode.Failure"],
     );
 
     assert_eq!(observation.exit_status, 0);

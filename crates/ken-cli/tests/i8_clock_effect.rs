@@ -21,7 +21,7 @@ const CLOCK_BODY: &str = r#"
             (host_clock APartial Instant wall_now)
             (\second .
               match second {
-                MkInstant _secondNanoseconds |-> host_exit APartial Success
+                MkInstant _secondNanoseconds |-> host_exit APartial ExitCode.Success
               })
       })
 "#;

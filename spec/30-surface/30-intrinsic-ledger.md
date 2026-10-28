@@ -1,12 +1,13 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative fifteen-member prelude and its exact constructor/companion closure
-> are `30-taxonomy §4`; resolution and protected names are `33 §3.3`. This
-> ledger cannot admit a sixteenth member or change `trusted_base()`. Once D0
-> proves both §4 witness clauses per name, a keyed, source-required identity
-> joins the reserved floor with an atomic roster/count change. The final list
-> is informational for the operator, not a per-name approval gate.
+> normative twenty-identity prelude and its exact constructor/companion
+> closure are `30-taxonomy §4`; resolution and protected names are `33 §3.3`.
+> This ledger alone cannot admit another member or change `trusted_base()`.
+> Once D0 proves both §4 witness clauses per name, a keyed, source-required
+> identity joins the reserved floor with an atomic roster/count change.
+> The final list is informational for the operator, not a per-name approval
+> gate.
 
 ## Reading the inventory without over-claiming
 
@@ -21,30 +22,34 @@ producer-to-reader proof of keying: a reader of an ID captured during prelude
 registration need never repeat the name literal. Neither an absent literal nor
 an unused catalog census name proves a global is safe to remove.
 
-For each possible reserved name below, the keying column names a **native
-reader to check**, not proof that the reader set is complete. L2's D0 must
-trace registration through every reader and independently establish whether
-the *source contract needs that exact identity* (`30 §4`'s conjunction).
-Both proven → reserved, always-present floor. Keyed but no independent source
+For unruled candidate names below, the keying column names a **native
+reader to check**, not proof that the reader set is complete. The
+entrypoint-ABI rows instead record the ruled exact-ID keying and independent
+source need (`30 §4`'s conjunction). Both proven → reserved,
+always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
 full unit reach is measured. `Empty` has a measured native reader and no
-independent source-name need: its required disposition is internal-only, but
-its fixed-ID capture has not landed. The source name is supplied by a catalog
+independent source-name need: its disposition is internal-only. Its fixed
+pre-source ID is captured and read by `elaborate_space_decl`; it is not an
+unfixed spelling lookup. The source name is supplied by a catalog
 package, not the prelude, with an identity distinct from the compiler's. A
 copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
 there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
-Apart from the internal-only `Empty`, the candidate names in this table are
-**observed spellings**, not names approved for permanent reservation. Before
-L2-3 admits a newly witnessed name, Spec checks that its spelling closely
+Apart from the internal-only `Empty` and the admitted entrypoint-ABI
+identities below, the candidate names in this table are **observed
+spellings**, not names approved for permanent reservation. Before
+a later slice admits a newly witnessed name, Spec checks that its spelling closely
 encloses its meaning (`30 §4`);
-`NotFound`, `Other`, `Unsupported`, `Success`, `Failure`, `write`, `Stdout`, and
-`Instant` are operator-named specificity probes, not an exhaustive list or
-preselected renames. Spec owns the public naming fold in `35`/`38` and this
-ledger. Any necessary type/function rename lands atomically with floor
-admission and catalog/fixture clients. Qualification `T.C` is now normative
+`NotFound`, `Other`, `Unsupported`, `write`, `Stdout`, and `Instant` are
+operator-named specificity probes, not an exhaustive list or preselected
+renames. `Success`/`Failure` are admitted only as qualified
+`ExitCode.Success`/`ExitCode.Failure`, not bare reservations. Spec owns
+public naming folds in `35`/`38` and this ledger. Any necessary
+type/function rename lands atomically with floor admission and
+catalog/fixture clients. Qualification `T.C` is now normative
 in expressions and patterns for every data type (`32 §4`, `33 §3.3`, `34 §1`).
 It can make a generic constructor specific without reserving its bare name;
 this S0 assigns no replacement spelling to any type or function.
@@ -63,13 +68,15 @@ constructor still has the same checked parent and `GlobalId`.
 | `ResourceKind` (current floor) | Yes | `Buffer`, `Mapping`, `FsHandle` are generic bare names; their `ResourceKind.C` paths state their role. |
 | `Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, `Utf8Error` (current floor) | No | The settled bare constructor vocabulary remains available; in particular `True`/`False`, `Zero`/`Suc`, `Nil`/`Cons`, `None`/`Some`, `Ok`/`Err` stay bare. |
 | `IOError` | Yes if admitted | Error causes such as `NotFound`, `Other`, and `Unsupported` need their type qualifier. |
-| `ExitCode` | Yes if admitted | `Success`/`Failure` need their exit-code meaning at the use site. |
+| `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
 | `ResourceError`, `ResourceBodyResult`, `ResourceBracketResult` | Yes if admitted | A result/error qualifier prevents generic error and status names becoming bare reservations. |
 | `Stream`, `Instant`, `CreatePolicy` | Yes if admitted | `Stdout`, `Stderr`, `MkInstant`, and create-policy cases are specific only under their carrier; a generic type name may still need a rename. |
-| `Unit`, `ProcessInput`, `FileError`, `BufferWindow` | No if admitted | `MkUnit`, `MkProcessInput`, `MkFileError`, and `MkBufferWindow` name their carriers closely. |
-| `ProgramCaps`, `BufferSpan`, `TransferCount` | Yes if admitted | Their minted constructor identities need no additional bare source spelling; private visibility stays intact. |
+| `ProcessInput` (floor) | No | Its `MkProcessInput` constructor is bare and reserved with its type. |
+| `Unit`, `FileError`, `BufferWindow` | No if admitted | `MkUnit`, `MkFileError`, and `MkBufferWindow` name their carriers closely. |
+| `ProgramCaps` (floor) | Yes | Its runner-minted `MkProgramCaps` does not reserve a bare spelling; constructor visibility remains unchanged. |
+| `BufferSpan`, `TransferCount` | Yes if admitted | Their minted constructor identities need no additional bare source spelling; private visibility stays intact. |
 | `Coproduct` | Yes if admitted | `InL`/`InR` are generic; the effect-signature role is explicit as `Coproduct.C`. |
-| `Prod` | No if admitted | `MkProd` names its carrier; admission versus retargeting the ABI to floor `Pair` remains D0's question. |
+| `Prod` (floor) | No | `MkProd` names its carrier and is bare and reserved; retargeting the constructor-backed runtime representation to floor `Pair` is not part of this slice. |
 
 The dedicated L2 qualified-constructor/scoped-property slice precedes L2-3
 floor additions. It also migrates uses of the existing `ResourceKind` family
@@ -78,38 +85,41 @@ clients. L2-3 then admits only D0-witnessed types with the property selected
 above. A scoped type's constructor rows below identify exact parent and
 possible native reader, **not** additional bare names to add to B.
 
-## Possible reserved names and one internal identity: reader per name
+## Reserved entrypoint names, other candidates, and internal identities
 
 Each table entry is one named identity. Except for the constructor-private
 `PrivateBufferSpan` and `PrivateTransferCount` (not exported through `globals`
 but recorded on their types), these spellings occur in the 503-name global
-inventory. `Empty` is recorded here as an **internal-only target with a
-measured mutable reader**, not a proposed reservation: the native site uses
-its name without a fixed-ID capture, and the independent source-name clause
-is false. Rows sharing a reader still require individual D0 reads; a family
-label is not a keying proof for every member. Reservation is
+inventory. `Empty` is recorded here as an **internal-only target with a measured
+exact-ID reader**, not a proposed reservation: the native site uses its
+captured pre-source ID and the independent source-name clause is false.
+Rows sharing a reader still require individual D0 reads; a family label
+is not a keying proof for every member. Reservation is
 per **type and whole constructor family**, never a subset chosen by catalog
 use. For a scoped type, only the type is reserved. Its constructor IDs remain
 exact, and its public constructor paths are qualified. D0 traces each native
 constructor producer and checks the parent type's independent source need.
-`prelude.rs` and `program_admission.rs` citations refer to the exact base
-above. No row alone reserves a name today.
+The entrypoint-ABI and `Empty` rows are re-grounded on landed
+`f3e71af9c`; other inventory citations retain their stated census base.
+Only the already-witnessed entrypoint-ABI rows below join the floor;
+no other row alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
-| `Empty` (internal-only target, not a current floor candidate) | **Current implementation:** `elaborate_space_decl` looks up `elab.globals.get("Empty")` by spelling at each `space` (`elab.rs:13450`), then embeds the returned ID in effect/state-fold terms. Same-program `data Empty` replaces that live map entry (`data.rs:99`); this is not a fixed pre-source ID. **Required, not landed:** capture the compiler's `Empty` before source elaboration and use/compare its exact ID, as `Proved`'s fixed-identity check illustrates (`modules.rs:258–261`). **Source need:** none for that exact identity under `36 §4.1–4.2`; the source name belongs to the catalog package `Core.Logic.EmptyDec` with a distinct checked identity, not to the prelude. |
+| `Empty` (internal-only, not floor) | `PreludeEnv.empty_id` captures the compiler's exact pre-source identity (`prelude.rs:388`); `elaborate_space_decl` reads it (`elab.rs:20897`). **Source need:** none for that exact identity under `36 §4.1–4.2`; the source name belongs to `Core.Logic.EmptyDec` with a distinct checked identity, not to the prelude. |
 | `Unit` | Effect-response result type used by the reifier (`38 §1.7`, `prelude.rs`); verify the exact type ID and source need. |
 | `MkUnit` | `CanonicalRuntimeRoles::unit`, effect-response constructor; verify exact parent `Unit`. |
-| `ProcessInput` | `program_admission.rs` checks the `main` parameter against its registered type (`33 §3.2.1`). |
-| `MkProcessInput` | `program_admission.rs` builds runner input with the registered constructor; verify exact parent `ProcessInput`. |
-| `ExitCode` | `program_admission.rs` checks the `main` result against this registered type (`33 §3.2.1`). |
-| `Success` | Host-runner return/status identity (`program_admission.rs`, `ken-runtime/src/native_process_entrypoint.rs`); verify parent `ExitCode`. |
-| `Failure` | Same host-runner status boundary; verify parent `ExitCode`. |
-| `ProgramCaps` | The `main` capability parameter's exact type in `program_admission.rs`, **source-named in `33 §3.2.1` despite catalog-census absence**. |
-| `MkProgramCaps` | Runner-minted constructor in `program_admission.rs`; check if only internal, with exact `ProgramCaps` parent. |
-| `HostIO` | `main` result's exact wrapper in `program_admission.rs`, **source-named in `33 §3.2.1`**; verify whether this identity must be imported. |
-| `Prod` | `ProcessInput` environment carrier: D0 decides whether its exact identity is source-required, or the ABI can be retargeted to canonical floor `Pair`. Reserve-or-retarget, not assumed floor. |
-| `MkProd` | `program_admission.rs` captures this constructor; D0 pairs its `Prod` parent with the same reserve-or-retarget choice. No partial constructor admission. |
+| `ProcessInput` (floor, unscoped) | `program_admission.rs` builds the checked `main` parameter from its registered type (`33 §3.2.1`); source must name that exact identity. |
+| `MkProcessInput` (bare floor constructor) | Runner input uses its exact ID; the whole unscoped `ProcessInput` constructor family is reserved. |
+| `ExitCode` (floor, scoped) | `program_admission.rs` builds the checked `main` result from this exact type (`33 §3.2.1`). |
+| `Success` (qualified floor constructor) | Host-runner status uses its exact `ExitCode` constructor ID; source path `ExitCode.Success`, not bare `Success`. |
+| `Failure` (qualified floor constructor) | Host-runner status uses its exact `ExitCode` constructor ID; source path `ExitCode.Failure`, not bare `Failure`. |
+| `ProgramCaps` (floor, scoped) | The `main` capability parameter uses this exact source-named type despite catalog-census absence (`33 §3.2.1`). |
+| `MkProgramCaps` (scoped floor constructor) | Runner-minted exact `ProgramCaps` constructor; no bare reservation and no widening of constructor visibility. |
+| `HostIO` (floor type-level function) | The checked `main` result uses its exact identity as `HostIO a ExitCode` (`33 §3.2.1`); it has no constructor family. |
+| `Prod` (floor, unscoped) | `ProcessInput`'s environment field names `List (Prod Bytes Bytes)`; its exact constructor-backed runtime identity is source-required. Floor `Pair` cannot replace its representation in this slice. |
+| `MkProd` (bare floor constructor) | Native environment-pair consumers select its exact ID; the whole unscoped `Prod` family is reserved. |
+| `host_exit` (internal-only) | Native entrypoint machinery keys this exact ID, but `33 §3.2.1` does not require programs to name it. An example use does not confer source need; the example migrates in the same build. |
 | `eqChar` | `decimal_char.rs::set_eq_entry` captures the checked definition's ID for literal/comparator selection (`33 §6.2`); confirm every reader. |
 | `leqChar` | Checked projection/comparison definition (`decimal_char.rs`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
@@ -175,11 +185,12 @@ above. No row alone reserves a name today.
 | `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
-These rows remain **outside** the current B. Capturing an ID proves
-keying, not independent source need. `Empty` has a native reader but its
-fixed-ID capture is owed; its intended disposition is internal-only. A future
-`36` contract requiring source to name that exact space identity needs separate
-Spec gates. If adopted, existing Q-B admits it
+Only the five entrypoint-ABI identities and the constructor closure marked
+floor above join B; other rows remain **outside** it. Capturing an ID proves
+keying, not independent source need. `Empty` is read by exact ID but remains
+internal-only; `host_exit` is likewise keyed without independent source
+need. A future `36` contract requiring source to name that exact space
+identity needs separate Spec gates. If adopted, existing Q-B admits it
 to the floor without per-name operator approval, with atomic roster/count
 change and retirement of the catalog `Empty`; it adds nothing to today's floor.
 Both witnesses admit a type to B; its whole constructor family follows the
@@ -189,9 +200,9 @@ For checked definitions the test remains per-name: `leqChar` does not inherit
 `eqChar`'s registry key. If `IOError` qualifies, its thirteen causes are one
 **scoped** family, not thirteen bare B names. D0 still names the native
 producer of each exact cause ID, never inferring all readers from one cause.
-`Prod`/`MkProd` remains an explicit D0 decision: reserve the exact type and
-its unscoped constructor, or retarget the Program-I field to already-floor
-`Pair`, without asserting either outcome here.
+The D0 resolved `Prod`/`MkProd` as a reserved unscoped family. A future
+representation change to kernel `Pair` would be a separate Runtime successor,
+not a second source-visible ABI in this slice.
 
 ## Checked laws and helpers are not intrinsic candidates
 

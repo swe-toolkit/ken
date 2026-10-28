@@ -11,9 +11,9 @@ total policy supplied by the program, so every constructor of an
 application-specific result is handled in ordinary Ken code.
 
 ```ken
-const exit_success : ExitCode = Success
+const exit_success : ExitCode = ExitCode.Success
 
-fn exit_failure (code : UInt8) : ExitCode = Failure code
+fn exit_failure (code : UInt8) : ExitCode = ExitCode.Failure code
 
 fn exit_with (a : Type) (policy : a → ExitCode) (outcome : a) : ExitCode = policy outcome
 

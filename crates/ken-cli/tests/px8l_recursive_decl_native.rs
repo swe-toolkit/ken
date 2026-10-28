@@ -89,8 +89,8 @@ const PROGRAM: &str = r#"program capabilities FS APartial
 fn walk (fuel : Nat) (state : Bool) : HostIO APartial ExitCode =
   match fuel {
     Zero |-> match state {
-      False |-> host_exit APartial (Failure 7);
-      True |-> host_exit APartial Success
+      False |-> host_exit APartial (ExitCode.Failure 7);
+      True |-> host_exit APartial ExitCode.Success
     };
     Suc smaller |-> walk smaller (match state {
       False |-> True;

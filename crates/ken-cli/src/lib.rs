@@ -602,14 +602,14 @@ mod entrypoint_tests {
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
            (Result FileError Unit) ExitCode
         (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
           (Result FileError Unit)
           (writeFile cap (bytes_encode "root/out") CreateNew (bytes_encode "lit")))
-        (\_. host_exit AFull Success)
+        (\_. host_exit AFull ExitCode.Success)
   }"#,
         );
         let admitted = ken_elaborator::program_admission::admit_checked_main(&env)
@@ -643,7 +643,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         assert!(matches!(
             result,
             ken_interp::EvalVal::Ctor { id, .. }
-                if id == *env.globals.get("Success").expect("Success")
+                if id == *env.globals.get("ExitCode.Success").expect("ExitCode.Success")
         ));
         assert_eq!(
             host.fs_trace(),
@@ -664,14 +664,14 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp APartial) AmbientOp)
            (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
            (Result FileError Bytes) ExitCode
         (inject_l (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp
           (Result FileError Bytes)
           (readFile APartial cap (bytes_encode "missing")))
-        (\_. host_exit APartial Success)
+        (\_. host_exit APartial ExitCode.Success)
   }"#,
             )
             .expect_err("an FS effect requires a declared FS capability");
@@ -865,7 +865,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
        (Result IOError Unit) ExitCode
        (host_console APartial (Result IOError Unit)
          (write Stdout (bytes_encode "admitted")))
-       (\_ . host_exit APartial Success)
+       (\_ . host_exit APartial ExitCode.Success)
 "#
         )
     }

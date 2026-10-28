@@ -118,20 +118,20 @@ proc input_body (cap : Cap AFull) (input : Resource ResourceKind.FsHandle)
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (Failure 81);
+    Err error |-> host_exit AFull (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull Success;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 83);
+      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
       ResourceBracketBodyAndReleaseError body_error release_error |->
-        host_exit AFull (Failure 84)
+        host_exit AFull (ExitCode.Failure 84)
     }
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
-    MkProgramCaps cap |->
+    ProgramCaps.MkProgramCaps cap |->
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode

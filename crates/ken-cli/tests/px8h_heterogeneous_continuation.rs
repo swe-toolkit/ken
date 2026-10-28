@@ -51,20 +51,20 @@ proc finish (outcome : Result Int Bool)
       (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit)
         (write Stdout (bytes_encode ":final-E")))
-      (flush_then_exit (Failure 7));
+      (flush_then_exit (ExitCode.Failure 7));
     Ok value |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit)
         (write Stdout (bytes_encode ":final-O")))
-      (flush_then_exit Success)
+      (flush_then_exit ExitCode.Success)
   }
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (Failure 99);
+      Nil |-> host_exit APartial (ExitCode.Failure 99);
       Cons _argv0 rest |-> match rest {
         Nil |-> bind (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp

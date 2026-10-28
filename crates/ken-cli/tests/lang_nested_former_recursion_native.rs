@@ -33,12 +33,12 @@ const two_leaves : NRose =
     (Cons (Pair String NRose) (mk_pair String NRose "y" NLeaf) (Nil (Pair String NRose))))
 
 fn exactNatTwo (value : Nat) : ExitCode = match value {
-  Zero |-> Failure 20;
+  Zero |-> ExitCode.Failure 20;
   Suc one |-> match one {
-    Zero |-> Failure 21;
+    Zero |-> ExitCode.Failure 21;
     Suc two |-> match two {
-      Zero |-> Success;
-      Suc _ |-> Failure 24
+      Zero |-> ExitCode.Success;
+      Suc _ |-> ExitCode.Failure 24
     }
   }
 }
@@ -71,12 +71,12 @@ const two_leaves : NRose =
     (Cons (Pair String NRose) (mk_pair String NRose "y" NLeaf) (Nil (Pair String NRose))))
 
 fn exactNatTwo (value : Nat) : ExitCode = match value {
-  Zero |-> Failure 20;
+  Zero |-> ExitCode.Failure 20;
   Suc one |-> match one {
-    Zero |-> Failure 21;
+    Zero |-> ExitCode.Failure 21;
     Suc two |-> match two {
-      Zero |-> Success;
-      Suc _ |-> Failure 24
+      Zero |-> ExitCode.Success;
+      Suc _ |-> ExitCode.Failure 24
     }
   }
 }

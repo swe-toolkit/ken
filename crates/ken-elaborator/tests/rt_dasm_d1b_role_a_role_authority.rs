@@ -94,10 +94,6 @@ data ConsoleOp = ShadowConsoleOp
 data ClockOp = ShadowClockOp
 data EntropyOp = ShadowEntropyOp
 data Cap = ShadowCap
-data ProcessInput = ShadowProcessInput
-data ProgramCaps = ShadowProgramCaps
-data HostIO = ShadowHostIO
-data ExitCode = ShadowExitCode
 const host_exit : Nat = Zero
 data ShadowPlan = MkProd | MkProcessInput | MkProgramCaps | Success | Failure
 data ShadowSpine = Ret | Vis | InL | InR
@@ -236,17 +232,7 @@ fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
 /// Shadowable **family** roles are declarations rather than constructors.
 /// A shadow is a top-level `data` of the same name rather than a colliding
 /// constructor. Kept in its own table because the declaration shape differs.
-const SHADOWED_FAMILIES: &[&str] = &[
-    "FSOp",
-    "ConsoleOp",
-    "ClockOp",
-    "EntropyOp",
-    "Cap",
-    "ProcessInput",
-    "ProgramCaps",
-    "HostIO",
-    "ExitCode",
-];
+const SHADOWED_FAMILIES: &[&str] = &["FSOp", "ConsoleOp", "ClockOp", "EntropyOp", "Cap"];
 
 /// Shadowable entry functions have a different declaration shape from families.
 const SHADOWED_DEFINITIONS: &[&str] = &["host_exit"];
@@ -263,7 +249,8 @@ fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
     // producers take `&PreludeEnv`, so the package namespace is unnameable in
     // them). The guard now adds an even earlier gate: a package can no longer
     // even DECLARE a constructor under a prelude/runtime role's spelling — the
-    // flat constructor namespace rejects it at declaration time. Capture-by-
+    // newly floored MkProd rejects at admission, and the general constructor
+    // guard rejects the remaining collisions. Capture-by-
     // constructor-spelling is therefore unrepresentable, strictly stronger than
     // "declared but not redirected". So the fixture no longer compiles, and the
     // faithful assertion is the rejection itself.
@@ -274,12 +261,25 @@ fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
     // `&PreludeEnv` signature exactly as the module doc describes; nothing here
     // relied on this test to establish it.)
     match compile_shadowing_package() {
+        Err(CompilerDriverError::Elaboration(ElabError::AmbiguousReference {
+            name,
+            sources,
+            span,
+        })) if name == "MkProd" => {
+            assert!(
+                sources
+                    .iter()
+                    .any(|source| source.contains("<prelude>.MkProd")),
+                "the floor identity, not a later source spelling, owns MkProd: {sources:?}"
+            );
+            assert!(span.end > span.start, "floor collision has a source span");
+        }
         Err(CompilerDriverError::Elaboration(ElabError::DuplicateConstructorSpelling {
             name,
             first_span,
             second_span,
         })) => {
-            // The rejected spelling is one of the Runtime-role constructor
+            // Any rejected spelling is one of the Runtime-role constructor
             // spellings the fixture shadows — proving the rejection is a role
             // capture the guard prevents, not an incidental collision — and both
             // declaration sites are named with real spans.
@@ -297,9 +297,8 @@ fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
             );
         }
         other => panic!(
-            "expected the shadowing package to be REJECTED with a duplicate-constructor-spelling \
-             diagnostic (a runtime-role constructor spelling can no longer be declared by a \
-             package), got {other:?}"
+            "expected the shadowing package to be REJECTED at its checked floor or \
+             runtime-role constructor spelling, got {other:?}"
         ),
     }
 }
@@ -314,7 +313,7 @@ fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
 ///
 /// This keeps the two in step: the roster's spelling table is compared against
 /// the union of the fixture's shadow inventory and constructors whose recorded
-/// parent is one of the exact nine floor parents. Add a shadowable role to
+/// parent is one of the exact floor parents. Add a shadowable role to
 /// `canonical_runtime_roles!` without shadowing it and this reds, naming it,
 /// before the substitution control can go quietly partial.
 ///
@@ -356,6 +355,11 @@ fn d1b_role_a_every_canonical_role_is_covered_by_shadowing_or_floor_immutability
         .iter()
         .map(|name| env.globals[*name])
         .collect::<BTreeSet<_>>();
+    let floor_protected_formers = roster
+        .iter()
+        .copied()
+        .filter(|name| PRELUDE_FLOOR_NAMES.contains(name))
+        .collect::<Vec<_>>();
     let floor_protected = roster
         .iter()
         .copied()
@@ -398,6 +402,7 @@ fn d1b_role_a_every_canonical_role_is_covered_by_shadowing_or_floor_immutability
         .iter()
         .filter(|(_, spelling)| {
             !shadowed.contains(spelling)
+                && !floor_protected_formers.contains(spelling)
                 && !floor_protected.contains(spelling)
                 && !scoped_selected.contains(spelling)
         })

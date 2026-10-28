@@ -474,11 +474,11 @@ fn exit_policy_is_total_explicit_and_keeps_uint8_payloads() {
     let mut store = make_store(&env);
     assert!(matches!(
         eval_global(&env, &mut store, "cc6_okay_exit"),
-        EvalVal::Ctor { id, .. } if id == env.globals["Success"]
+        EvalVal::Ctor { id, .. } if id == env.globals["ExitCode.Success"]
     ));
     assert!(matches!(
         eval_global(&env, &mut store, "cc6_result_okay_exit"),
-        EvalVal::Ctor { id, .. } if id == env.globals["Success"]
+        EvalVal::Ctor { id, .. } if id == env.globals["ExitCode.Success"]
     ));
     for (name, code) in [
         ("cc6_usage_exit", 64),
@@ -486,7 +486,7 @@ fn exit_policy_is_total_explicit_and_keeps_uint8_payloads() {
         ("cc6_result_exit", 65),
     ] {
         let status = eval_global(&env, &mut store, name);
-        let failure = ctor_args(&env, &status, "Failure");
+        let failure = ctor_args(&env, &status, "ExitCode.Failure");
         assert_eq!(failure.last(), Some(&EvalVal::Int(code)));
     }
 }
