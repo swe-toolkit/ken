@@ -1,73 +1,101 @@
 ---
 id: RT-CERTIFIER-ESCAPED-SLOT-ZERO-ARGUMENT-CALL
-title: "After a pointer to a stack slot is stored to the heap, the finished-CLIF Result certifier treats a later zero-argument call as unable to write the slot, because call_may_access_location checks access.escaped only inside its argument loop. Return true for an escaped location before the loop"
+title: "The finished-CLIF Result certifier keeps a stale Exact state whenever a pointer to the tracked slot is in hand but no consumer's partial evidence shows it: a pointer reloaded from a container slot with stack_load, an escaped slot before a zero-argument call, or a retained address before an unknown store. Close all three with one memory-read rule in the slot walk and one leak predicate that every consumer uses"
 status: ready
 owner: runtime
-size: S
+size: M
 tier: T1
 gate: architect
 depends_on: [RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER]
 blocks: []
 github: null
-origin: "Architect review evt_4em6knbncena7 of RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER (candidate 819dabd1): pre-existing on main, out of that candidate's scope, should-fix before ABI-S6-HS18-MAIN-BASED-CLOSURE increment C. Requested by the Runtime Leader in evt_7jbmssk0bvjtw. It is the 'escaped plus zero-argument call' residual that increment A disclosed. Steward-filed per COORDINATION section 2."
+origin: "Architect review evt_4em6knbncena7 of RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER (zero-argument call after escape; requested by the Runtime Leader evt_7jbmssk0bvjtw). Widened by Architect ruling evt_2tsqhgywfxdb to fold in Adversary finding evt_3v8e7x9w7ar4f (stack_load reload, on 28f3dbb36) and a third gap read by the Architect (retention before an unknown store). Should-fix before ABI-S6-HS18-MAIN-BASED-CLOSURE increment C. Steward-filed per COORDINATION section 2."
 ---
 
-# A call after a slot escapes may write the slot
+# A pointer to the slot that is in hand may write the slot
 
 ## Objective
 
-Once a location has escaped, every later call is treated as possibly
-writing it, including a call that takes no arguments. A stale `Exact` state
-no longer survives such a call.
+The certifier gives one answer to "can a pointer to the tracked location be
+in hand at this instruction?" for every consumer. A stale `Exact` state no
+longer survives any operation that can write the location through such a
+pointer. Precision is kept where no pointer can be in hand.
 
-## Fixed inputs (main `afc5e0fae`)
+## Fixed inputs (main `28f3dbb36`, Architect `evt_2tsqhgywfxdb`)
 
-- **The gap.** `call_may_access_location` in
-  `crates/ken-runtime/src/cranelift_backend/lowering/units.rs` (`:12265`)
-  tests `access.escaped` only on an argument that resolves to `None`, inside
-  `for argument in func.dfg.inst_args(call)`. A zero-argument call never
-  enters the loop. Storing a pointer to the heap creates no retaining call,
-  so `call_follows_retention` returns false too.
-- **The directed fix (Architect `evt_4em6knbncena7`).** Return `Ok(true)` at
-  the top of `call_may_access_location` when `access.escaped`, before the
-  loop. The function's other arms are unchanged.
-- **Sequencing.** RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER (candidate
-  `819dabd1`) changes the same function. Cut this node from main after that
-  candidate lands, and do not stack it on the unlanded branch.
+All in `crates/ken-runtime/src/cranelift_backend/lowering/units.rs`. The
+Architect read these and did not compile them.
+
+- **(a) The walk.** `address_dependent_slots` (`:12223`) follows value
+  operands only. `stack_load C` has none, so a pointer reloaded from
+  container `C` depends on nothing. `load(stack_addr C)` reaches `C` through
+  its operand (Adversary `evt_3v8e7x9w7ar4f`, measured).
+- **(b) Escape.** `call_may_access_location` (`:12280`) consults `escaped`
+  only inside its argument loop, so a zero-argument call never sees it.
+- **(c) Retention.** `unknown_write_may_alias` (`:14037`) checks `escaped`
+  and the walk, but never `call_follows_retention`. This was read by the
+  Architect, not measured.
+- **The closure, verbatim from the ruling:**
+  - (i) The walk's `Result` arm inserts `S` for `stack_load S`. This is
+    complete for StackSlot readers in cranelift 0.113.1.
+  - (ii) One `location_leaked_before(func, inst, access)`, equal to
+    `access.escaped || call_follows_retention(...)`. It is used at the top
+    of `call_may_access_location` and in the last line of
+    `unknown_write_may_alias`.
+  - All five walk consumers inherit (i): `:11882`, `:12091`, `:12099`,
+    `:12280` and `:14052`.
 
 Treat anchors as perishable. If a fixed input is false on the landed base,
 stop and report the mismatch; do not build around it.
 
+## Scope
+
+`units.rs` only, production plus `#[cfg(test)]` pins in
+`generated_result_protocol_verifier`, extending `slot_pointer_case`. The
+precise alternative, where reads through memory yield the stored values
+rather than the slot, is not authorized.
+
 ## Deliverable
 
-1. **The pin, first.**
-   - In a single function: store the slot's `stack_addr` to the heap, then
-     make a fresh exact store to the slot.
-   - Then call `later_call()` with zero arguments, then load the slot.
-   - Query `reaching_memory_states_before` at the load. The pin requires
-     `{Unknown}`.
-   - Show it red on the cut base, with the falsely retained `Exact`, before
-     the fix.
-2. **The fix.** The directed early return, in `units.rs` only.
+Rules (i) and (ii) as ruled, and the pins below. Every pin queries
+`reaching_memory_states_before(A, return)`.
+
+- **P1.** Container reload in both spellings, `stack_load C` and
+  `load(stack_addr C)`, each followed by a call, a store through the pointer,
+  and a heap store. All six rows give `{Unknown}`, and `retaining_calls`
+  holds the first call. The three `stack_load` rows are red first.
+- **P2.** A copy chain `C → stack_load → D → load(stack_addr D)`, then a
+  store through the pointer, gives `{Unknown}`.
+- **P3.** Heap-escaped, re-stored, then a zero-argument call gives
+  `{Unknown}`. Red first.
+- **P4.** `call f(stack_addr A)`, re-store, then a store through a heap
+  pointer gives `{Unknown}`. It must be red first. If it is not, drop the
+  row and post why.
+- **Precision controls.** Each keeps `{Exact}`:
+  - P4 without the call;
+  - `stack_load E` passed to a call, where `E` never held A's address.
 
 ## Acceptance
 
-- **AC-1.** The pin is red on the cut base and green with the fix. The seven
-  RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER pins stay green.
-- **AC-2.** A control in the same shape, without the heap store, keeps
-  `Exact` after the zero-argument call. This shows the fix keys on
-  `escaped`, not on every call.
-- **AC-3.** `rt_span_prov_native`, `px7f_resource_native` and the named
-  `rt_parity_native` rows do not regress. A newly refused certified row is a
-  stop, not a pin update.
+- **AC-1.** P1 to P4 and both precision controls pass. Each red-first row is
+  shown red on the cut base.
+- **AC-2.** Each of m1 to m4 from the ruling reddens its own pins, and is
+  restored byte-identically:
+  - m1: drop the StackLoad insert;
+  - m2: move `escaped` back inside the argument loop;
+  - m3: drop the predicate from `unknown_write_may_alias`;
+  - m4: make the predicate always true.
+- **AC-3.** The named native population used in the mixed-caller AC-3
+  (`rt_parity_native` named rows, `rt_span_prov_native`,
+  `px7f_resource_native`, the lib fixtures) is green on the candidate.
 
 ## Stop conditions
 
-- A certified row in AC-3 is refused after the fix. Report it to the
-  Architect.
-- The fix needs a change outside `units.rs`, or beyond the early return.
+- A named plan flips from accepted to refused. Hard-stop with that plan and
+  its query named. Do not narrow either rule without a ruling.
+- The fix needs a change outside `units.rs`.
 
-Checks: 4 fired: the loop-only `access.escaped` test was read at
-`units.rs:12270` to `:12277` on `afc5e0fae`. 8 fired: AC-2's no-escape
-control would also go `Unknown` under a fix that treated every call as a
-clobber, so the AC-1 pin alone is not evidence.
+Checks: 2 fired: the five walk consumers and the two leak-flag reads are
+taken from the Architect's read of `28f3dbb36`. They are cited, not
+re-derived. 8 fired: a fix that returns Unknown everywhere passes P1 to P4,
+so the precision controls and m4 are kept as the discriminating rows.
