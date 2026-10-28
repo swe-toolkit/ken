@@ -526,42 +526,49 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the exact floor is closed
   in both directions
-- spec: `30-taxonomy §4` (closed twenty-name prelude floor), `33 §3.3`
+- spec: `30-taxonomy §4` (closed twenty-three-name prelude floor), `33 §3.3`
   (the exact floor, three Pair companions, and no convenience-global
-  fallback), `39 §2.0`
-  step 4
+  fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked uses of all twenty roster names in their
-     contract-appropriate positions, every exact constructor through values and
-     exhaustive matches, all three Pair companion bindings,
-     `bytes_at`/`bytes_slice` uses whose results are
-     matched as `Option`, a `bytes_decode` use matched as
-     `Result Utf8Error String`, and functions typed by `Cap a` and
-     `Resource k`;
+  1. entry `Floor` contains checked uses of all twenty-three roster names in
+     contract-appropriate positions, every exact constructor through values
+     and exhaustive matches, all three Pair companion bindings,
+     `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, a
+     `bytes_decode` use matched as `Result Utf8Error String`, and functions
+     typed by `Cap a` and `Resource k`. Constructor coverage includes bare
+     `MkUnit`, scoped `Coproduct.InL`/`Coproduct.InR` and
+     `Instant.MkInstant`; bare `InL`, `InR`, and `MkInstant` are rejected;
   2. entry `Leaky` contains only `pub def X = Ambient`;
   3. entry `Explicit` contains `import Provider (Ambient)` followed by
      `pub def X = Ambient`, while `Provider.ken.md` contains
      `pub def Ambient = Bool`;
-  4. entry `Convenience` contains only `pub def P = Unit`.
+  4. entry `Convenience` contains only `pub def P = Empty` without an explicit
+     import of `Core.Logic.EmptyDec`;
+  5. entry `ImportedEmpty` imports `Empty` from `Core.Logic.EmptyDec` and
+     contains the same `pub def P = Empty` client.
 
   Arms 2 and 3 both retain the pre-registered bare `Ambient` in the same kind
-  of `ElabEnv`; arm 4 retains the compiler-installed checked `Unit`. No
-  test-only export map is installed.
+  of `ElabEnv`. Arm 4 does not import the distinct source `Empty` package
+  identity; the compiler's internal `Empty` identity does not create a floor
+  binding. Arm 5 adds only the explicit import edge. No test-only export map is
+  installed.
 - expect: arm 1 accepts and every resolved type, constructor, and Pair-companion
   reference carries the recorded pre-source `GlobalId`. Arm 2 rejects `Ambient`
-  as unbound even
-  though the implementation global exists. Arm 3 accepts and resolves `X`
-  through the imported provider declaration, not the bare global. Arm 4 rejects
-  `Unit` as unbound. None changes `trusted_base()`.
+  as unbound even though the implementation global exists. Arm 3 accepts and
+  resolves `X` through the imported provider declaration, not the bare global.
+  Arm 4 rejects `Empty` as unbound; arm 5 accepts and resolves it to the
+  imported package identity. None changes `trusted_base()`.
 - why: the positive reaches each floor member through ordinary source and the
   public primitive signatures that require the added types. `Bool` and
   `Ambient` are definitionally the same in this fixture, so kernel typing cannot
-  distinguish arm 2; only source scope can. `Unit` separates a pre-installed
-  checked convenience from a later arbitrary global. Widening all globals,
+  distinguish arm 2; only source scope can. `Empty` is compiler-internal, not
+  a source floor member; its matching import control proves the source package
+  name remains available. `Unit` is now admitted with bare `MkUnit`, while the
+  `Coproduct` and `Instant` constructors are scoped. Widening all globals,
   removing the floor, or forbidding explicit imports each fails a different arm.
 
 The fifteen-name floor realization, including the three Pair companions, is
@@ -574,9 +581,10 @@ is historical evidence, not a sentinel retained beside the current contract.
   identity and trust do not
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
-  of `Auth`, `Bool`, `Bottom`, `Char`, `Equal`, `ExitCode`, `HostIO`, `List`,
-  `Nat`, `Option`, `Pair`, `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`,
-  `Proved`, `ResourceKind`, `Result`, `Top`, and `Utf8Error`;
+  of `Auth`, `Bool`, `Bottom`, `Char`, `Coproduct`, `Equal`, `ExitCode`,
+  `HostIO`, `Instant`, `List`, `Nat`, `Option`, `Pair`, `ProcessInput`, `Prod`,
+  `ProgramCaps`, `Prop`, `Proved`, `ResourceKind`, `Result`, `Top`, `Unit`,
+  and `Utf8Error`;
   record every constructor id and kernel parent;
   record `mk_pair`, `pair_fst`, and `pair_snd` plus their exact reference to the
   Pair id; and snapshot `declarations().len()`, `next_global_id()`, and
@@ -584,10 +592,10 @@ is historical evidence, not a sentinel retained beside the current contract.
   declarations that reach every recorded id, including actual
   `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
 - expect: every emitted type/body contains the corresponding recorded id. The
-  exact twenty-name prelude roster is `Auth`, `Bool`, `Bottom`, `Char`,
-  `Equal`, `ExitCode`, `HostIO`, `List`, `Nat`, `Option`, `Pair`,
-  `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceKind`,
-  `Result`, `Top`, and `Utf8Error`. `ResourceKind` is
+  exact twenty-three-name prelude roster is `Auth`, `Bool`, `Bottom`, `Char`,
+  `Coproduct`, `Equal`, `ExitCode`, `HostIO`, `Instant`, `List`, `Nat`,
+  `Option`, `Pair`, `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`,
+  `ResourceKind`, `Result`, `Top`, `Unit`, and `Utf8Error`. `ResourceKind` is
   scoped: its constructor paths are `ResourceKind.FsHandle`,
   `ResourceKind.Buffer`, and `ResourceKind.Mapping`; the bare constructor names
   are not reserved by that family. The inductive members and their exact
@@ -597,17 +605,22 @@ is historical evidence, not a sentinel retained beside the current contract.
   |---|---|
   | `Auth` | `ANone`, `APartial`, `AFull` |
   | `Bool` | `True`, `False` |
+  | `Coproduct` | `Coproduct.InL`, `Coproduct.InR` |
   | `List` | `Nil`, `Cons` |
   | `Nat` | `Zero`, `Suc` |
   | `Option` | `None`, `Some` |
   | `ResourceKind` | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping` |
   | `ExitCode` | `ExitCode.Success`, `ExitCode.Failure` |
+  | `Instant` | `Instant.MkInstant` |
   | `ProcessInput` | `MkProcessInput` |
   | `Prod` | `MkProd` |
   | `ProgramCaps` | `ProgramCaps.MkProgramCaps`, visibility unchanged |
   | `Result` | `Err`, `Ok` |
+  | `Unit` | `MkUnit` |
   | `Utf8Error` | `InvalidUtf8` |
 
+  `Coproduct` and `Instant` are scoped: bare `InL`, `InR`, and `MkInstant`
+  remain unavailable. `Unit` is unscoped and keeps bare `MkUnit`.
   `Char`, `HostIO`, and checked-transparent `Pair` have no constructors. Pair's three
   companions are bindings, not type members, and each resolves to its recorded
   id. Every constructor still reports the recorded parent. Declaration count
@@ -711,36 +724,64 @@ is historical evidence, not a sentinel retained beside the current contract.
 
 ### surface/modules/prelude-protected-name-bindings-and-lookalike-matrix
 
-- promise class: **durable invariant** — no source binding introduces a name in
-  the protected built-in set B
+- promise class: **durable invariant** — the enumerated parent and bare
+  constructor names, `Char`, and Pair-family names are protected from source
+  declarations
 - spec: `33 §3.3` (protected-name introduction ban), `39 §2.0`
-- given: use a fresh strict-roots environment per row. For each of the eight
-  inductive parent names in the table above, attempt a same-shaped declaration
-  retaining only the protected parent spelling, then a reaching positive with
-  that parent and every constructor renamed. For the bare constructor families
-  in B (`Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, and `Utf8Error`),
-  repeat the one-name-at-a-time negative and all-renamed positive; do not treat
-  `ResourceKind`'s scoped constructors as bare B names. For constructor-free
-  `Char`, pair `def Char = Int` with the positive `def LocalChar = Int`. For
-  transparent `Pair` and its three companion bindings, run the independent
-  protected-name matrix in `seed-pair-strict-boundary.md`.
-- expect: every attempted B-name introduction is a hard surface error at the
-  binding site; the diagnostic kind is not further specified here. All-renamed
-  positives accept, with distinct identities and correct constructor parentage;
-  `LocalChar` is a distinct checked transparent identity. The `Pair`-family
-  negatives are likewise protected-name errors, and renamed lookalikes accept.
+- given: use a fresh strict-roots environment for every row. The preceding table
+  has fifteen inductive parent rows: `Auth`, `Bool`, `Coproduct`, `List`, `Nat`,
+  `Option`, `ResourceKind`, `ExitCode`, `Instant`, `ProcessInput`, `Prod`,
+  `ProgramCaps`, `Result`, `Unit`, and `Utf8Error`. For each parent, pair a
+  same-shaped declaration retaining only that protected parent spelling, with
+  the same declaration changing only the parent to a fresh local name; use
+  fresh local constructor names in both arms.
+  For each bare constructor in the ten unscoped families
+  (`Auth`: `ANone`/`APartial`/`AFull`; `Bool`: `True`/`False`; `List`:
+  `Nil`/`Cons`; `Nat`: `Zero`/`Suc`; `Option`: `None`/`Some`; `Result`:
+  `Err`/`Ok`; `Utf8Error`: `InvalidUtf8`; `ProcessInput`: `MkProcessInput`;
+  `Prod`: `MkProd`; `Unit`: `MkUnit`), use a fresh local parent and rename
+  every other constructor. Pair the one-name refusal with the same production
+  changing only the target constructor to a fresh local name. In particular:
+  - `Unit` parent: `data Unit = LocalMkUnit` rejects; the same production
+    `data LocalUnit = LocalMkUnit` accepts.
+  - `MkUnit`: `data LocalUnit = MkUnit` rejects; the same production
+    `data LocalUnit = LocalMkUnit` accepts.
+  - `ProcessInput` parent: `data ProcessInput = LocalMkProcessInput` rejects;
+    `data LocalProcessInput = LocalMkProcessInput` accepts.
+  - `MkProcessInput`: `data LocalProcessInput = MkProcessInput` rejects;
+    `data LocalProcessInput = LocalMkProcessInput` accepts.
+  - `Prod` parent: `data Prod = LocalMkProd` rejects;
+    `data LocalProd = LocalMkProd` accepts.
+  - `MkProd`: `data LocalProd = MkProd` rejects;
+    `data LocalProd = LocalMkProd` accepts.
+  Do not include scoped constructors from `ResourceKind`, `ExitCode`,
+  `ProgramCaps`, `Coproduct`, or `Instant` in the bare-name population; their
+  parent-name rows remain included. For constructor-free `Char`, pair
+  `def Char = Int` with `def LocalChar = Int`. For transparent `Pair` and its
+  three companion bindings, use the separate matrix in
+  `seed-pair-strict-boundary.md`.
+- expect: each listed parent and bare-constructor refusal is a hard surface
+  error at the binding site; the diagnostic kind is not further specified.
+  Every same-production renamed control accepts with a distinct identity and
+  correct constructor parentage. `LocalChar` is a distinct checked transparent
+  identity. The separate Pair-family rows retain their stated controls.
   Successful positive rows preserve `trusted_base()`.
-- why: a generic `expect_err`, or one all-names-collide fixture, can pass at the
-  parser, positivity checker, or the wrong binding. One-name-at-a-time negatives
-  plus same-production positives isolate the protected-name guard. The
-  `ResourceKind` exclusion keeps the population aligned with B's scoped
-  constructor rule; the renamed lookalikes distinguish source identity from
-  structural equality.
-- **MEASURED (prior root-loading probe):** all-renamed same-shape families
-  elaborate under distinct ids; the probed root loader admits a same-spelling
-  floor declaration. **CLAIMED:** each attempted B-name binding is a hard
-  surface error at introduction. **THE GAP:** the producer must enforce
-  `33 §3.3` at each binding site. This claim does not pin allocator movement.
+- why: a generic `expect_err` or one all-names-collide fixture can pass at the
+  parser, positivity checker, or wrong binding. Parent-name and constructor-name
+  rows vary one name at a time while holding the production fixed. Scoped
+  constructor paths are not bare B names, so their names are excluded from the
+  bare collision set. This matrix is bounded to the rows named here; it does not
+  claim to cover every member or binding form in B.
+- **MEASURED (prior root-loading probe):** the tested all-renamed same-shape
+  family elaborated under distinct ids; the tested same-spelling floor
+  declaration also passed the root loader. The probe did not measure the full
+  matrix above. **CLAIMED:** each listed collision rejects at introduction
+  while its paired same-production renamed control accepts. **THE GAP:**
+  non-inductive floor names `Bottom`, `Equal`, `HostIO`, `Prop`, `Proved`, and
+  `Top`, the kernel / built-in vocabulary, and binding forms beyond these
+  declarations are outside this case. The separate Pair matrix covers only its
+  explicitly listed forms. This case does not discharge the full `33 §3.3`
+  binding ban or pin allocator movement.
 
 ### surface/modules/ord-nat-class-owner-and-reexport-use-one-dictionary
 
@@ -899,7 +940,7 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | twenty exact type identities plus parent-derived constructors accept; bare ambient and `Unit` reject; explicit import accepts | floor is closed and arbitrary/pre-installed non-members do not resolve | actual primitive uses, exact ids/parentage, definitionally equal ambient type, imported control |
+| floor/global | twenty-three exact type identities and their parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, scoped `Coproduct`/`Instant`, bare `MkUnit`, definitionally equal ambient type, imported control |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
@@ -1510,15 +1551,18 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all twenty prelude roster names, every exact constructor,
+  Strict uses of all twenty-three prelude roster names, every exact constructor,
   and all three Pair companions accept on the recorded ids, including the
-  public primitive
-  signatures that require the signature arm. Every same-spelling floor binding
-  rejects while each all-renamed lookalike gets distinct ids and local
-  parentage. Ambient availability still does not make an unrelated module a
-  head owner. The actual `Ord Nat` and Pair-instance cases then require
-  class-owned provenance. Widening globals, comparing only shapes, or treating
-  re-export as ownership satisfies at most one axis.
+  public primitive signatures that require the signature arm. `Coproduct` and
+  `Instant` constructors require their scoped paths; `Unit` keeps bare
+  `MkUnit`. The protected-name matrix specifies same-production refusals and
+  renamed controls for its fifteen parent rows and ten unscoped constructor
+  families; `Char` and Pair have separate rows. Its claim is bounded to those
+  entries and controls, not the full B binding ban. Ambient availability still
+  does not make an unrelated module a head owner. The actual `Ord Nat` and
+  Pair-instance cases then require class-owned provenance. Widening globals,
+  comparing only shapes, or treating re-export as ownership satisfies at most
+  one axis.
 - **Root refusal does not decide multi-root precedence.** The root/path matrix
   accepts the one-root anchor and rejects zero or two populated roots in this
   source-world round. It says nothing about how a later package-manager round
@@ -1636,18 +1680,24 @@ discharge the lazy-poison pair.
 ## Build realization (closed signature + internal-provision floor)
 
 The fifteen-name floor and the separate three-companion inventory landed at
-`0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The executable closure derives the
-signature eight and exact internal `{Nat, Pair, Equal, Prop, Proved, Top,
-Bottom}` independently; it never widens resolution from compiler-global
-presence. Constructor capture remains exact-parent-derived, including the
-scoped `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
-`ResourceKind.Mapping` paths. Pair-family capture reuses the four pre-source
-ids and keys every companion type to the exact Pair id. The landing closes the
-strict-Pair rows, keeps unadmitted conveniences such as `Unit` unavailable,
-and closes every
-Pair-binding clash before allocation. Canonical `Ord Nat`, `Ord Pair`, and
-`DecEq Pair` placement follows the class-owner rule. Floor installation adds
-zero declarations, ids, or trusted entries.
+`0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. At that historical stage, `Unit`
+was not yet a floor member. The later keyed-effects build adds `Coproduct`,
+`Instant`, and `Unit`, bringing the specified floor to twenty-three names.
+Language's implementer reports 82/82 named rows at build-only tip
+`8ba60ac31b1968ad2f06184a3d05c5cc20a7dd63`; these candidate-local checks are
+not CI or official conformance execution. No official conformance-runner
+result is claimed for this corpus.
+
+The original executable closure derives the signature eight and exact
+internal `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}` independently; it
+never widens resolution from compiler-global presence. Constructor capture
+remains exact-parent-derived, including the scoped `ResourceKind.FsHandle`,
+`ResourceKind.Buffer`, and `ResourceKind.Mapping` paths. Pair-family capture
+reuses the four pre-source ids and keys every companion type to the exact Pair
+id. The fifteen-name landing closes the strict-Pair rows and every Pair-binding
+clash before allocation. Canonical `Ord Nat`, `Ord Pair`, and `DecEq Pair`
+placement follows the class-owner rule. Floor installation adds zero
+declarations, ids, or trusted entries.
 
 ## Build-forward (N3 Lane B)
 

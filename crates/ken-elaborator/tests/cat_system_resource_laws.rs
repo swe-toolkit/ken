@@ -266,7 +266,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result FileError (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp (PrivateFsOpen a cap path mode))
+              (Coproduct.InL (FSOp a) AmbientOp (PrivateFsOpen a cap path mode))
               (private_with_resource_after_open a e r body)) =
           resource_with_acquire a e r cap path mode body"#,
     );
@@ -314,7 +314,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp (PrivateBufferAllocate a capacity))
+              (Coproduct.InL (FSOp a) AmbientOp (PrivateBufferAllocate a capacity))
               (private_with_buffer_after_allocate a e r capacity body)) =
           buffer_with_acquire a e r capacity body"#,
     );
@@ -363,7 +363,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp
+              (Coproduct.InL (FSOp a) AmbientOp
                 (PrivateMappingAllocate a length protection))
               (private_with_mapping_after_allocate a e r length body)) =
           mapping_with_anonymous_acquire a e r length protection body"#,
@@ -381,7 +381,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp
+              (Coproduct.InL (FSOp a) AmbientOp
                 (PrivateMappingAcquireFile a file length protection))
               (private_with_mapping_after_allocate a e r length body)) =
           mapping_with_file_acquire a e r file length protection body"#,
@@ -431,7 +431,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result o (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp (PrivateBracketRelease a kind resource))
+              (Coproduct.InL (FSOp a) AmbientOp (PrivateBracketRelease a kind resource))
               (private_resource_release_result a o e r body_result)) =
           resource_release_settles a o e r kind resource body_result"#,
     );

@@ -54,7 +54,7 @@ proc px8p_private_release (resource : BufferHandle)
   Vis (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit)
-    (InL (FSOp AFull) AmbientOp
+    (Coproduct.InL (FSOp AFull) AmbientOp
       (Px8pPrivateResourceRelease AFull ResourceKind.Buffer
         (Px8pBufferHandleResource resource)))
     (\settled. Ret (Coproduct (FSOp AFull) AmbientOp)
@@ -159,8 +159,8 @@ fn drive(env: &ken_elaborator::ElabEnv, store: &mut EvalStore, tree: EvalVal) ->
     let ids = ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
     let fs = FSIds::from_elab(&env.prelude_env).expect("FS ABI");
     let coproduct = CoproductIds {
-        inl_id: env.globals["InL"],
-        inr_id: env.globals["InR"],
+        inl_id: env.globals["Coproduct.InL"],
+        inr_id: env.globals["Coproduct.InR"],
     };
     let mut host = PosixHost::new_at(repo_root());
     ken_interp::run_io(

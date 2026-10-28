@@ -6,7 +6,7 @@ fn rt_branched_body (_buffer : BufferHandle)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn rt_computed_read (cap : Cap AFull) : Coproduct (FSOp AFull) AmbientOp =
-  InL (FSOp AFull) AmbientOp (ReadFile AFull cap (bytes_encode "source"))
+  Coproduct.InL (FSOp AFull) AmbientOp (ReadFile AFull cap (bytes_encode "source"))
 
 proc rt_branched_endpoint_buffer
   (cap : Cap AFull) (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
@@ -17,7 +17,7 @@ proc rt_branched_endpoint_buffer
     (Vis (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit)
-      (InL (FSOp AFull) AmbientOp (ReadFile AFull cap (bytes_encode "source")))
+      (Coproduct.InL (FSOp AFull) AmbientOp (ReadFile AFull cap (bytes_encode "source")))
       (\first. Vis (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (rt_computed_read cap)

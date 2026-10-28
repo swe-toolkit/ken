@@ -3413,10 +3413,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // survive any later shadowing declaration, which is the whole point.
     let runtime_roles = Box::new(CanonicalRuntimeRoles::capture(&elab.globals)?);
 
-    // The entrypoint ABI uses the checked constructor IDs captured above.
+    // The entrypoint ABI and effect runtime use constructor IDs captured above.
     // Qualify the complete scoped families only after the prelude's own
-    // declarations have been checked against their original bindings.
-    for name in ["ExitCode", "ProgramCaps"] {
+    // declarations have been checked against their original bindings. The
+    // effect/Clock constructors are registered before this capture as well.
+    for name in ["ExitCode", "ProgramCaps", "Coproduct", "Instant"] {
         let parent_id = elab.globals[name];
         elab.module_state.scope_constructor_family(
             &elab.env,

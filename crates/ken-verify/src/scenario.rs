@@ -1861,14 +1861,14 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
        Instant ExitCode
     (host_clock AFull Instant wall_now)
     (\first . match first {
-      MkInstant first_nanoseconds |->
+      Instant.MkInstant first_nanoseconds |->
         bind (Coproduct (FSOp AFull) AmbientOp)
              (resp_coproduct (FSOp AFull) AmbientOp
                (fs_resp AFull) ambient_resp)
              Instant ExitCode
           (host_clock AFull Instant wall_now)
           (\second . match second {
-            MkInstant second_nanoseconds |->
+            Instant.MkInstant second_nanoseconds |->
               match leq_int 1600000000000000000 first_nanoseconds {
                 False |-> host_exit AFull (ExitCode.Failure 31) ;
                 True |-> match leq_int first_nanoseconds second_nanoseconds {

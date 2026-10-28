@@ -172,8 +172,8 @@ fn drive(env: &ken_elaborator::ElabEnv, store: &mut EvalStore, tree: EvalVal) ->
     let ids = ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
     let fs = FSIds::from_elab(&env.prelude_env).expect("FS ABI");
     let coproduct = CoproductIds {
-        inl_id: env.globals["InL"],
-        inr_id: env.globals["InR"],
+        inl_id: env.globals["Coproduct.InL"],
+        inr_id: env.globals["Coproduct.InR"],
     };
     let mut host = PosixHost::new_at(repo_root());
     ken_interp::run_io(

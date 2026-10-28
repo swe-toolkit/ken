@@ -275,12 +275,13 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
-  Equal, ExitCode, HostIO, List, Nat, Option, Pair, ProcessInput, Prod,
-  ProgramCaps, Prop, Proved, ResourceKind, Result, Top, Utf8Error}`. The latter
-  has twenty exact floor identities: the prior fifteen and five entrypoint-ABI
-  identities (`30-taxonomy §4`). `HostIO` is a type-level function, not an
-  inductive type or constructor family. For an inductive floor type, its
-  per-type
+  Coproduct, Equal, ExitCode, HostIO, Instant, List, Nat, Option, Pair,
+  ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceKind, Result,
+  Top, Unit, Utf8Error}`. The latter has twenty-three exact floor
+  identities: the prior fifteen, five entrypoint-ABI identities and three
+  effect/clock identities (`30-taxonomy §4`). `HostIO` is a type-level
+  function, not an inductive type or constructor family. For an
+  inductive floor type, its per-type
   **scoped constructors** property determines whether its whole exact
   constructor family also occupies bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
@@ -291,9 +292,13 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `ExitCode` is scoped: `ExitCode.Success` and `ExitCode.Failure` resolve,
   but bare `Success` and `Failure` do not enter B. `ProgramCaps` is scoped:
   `MkProgramCaps` is not bare-reserved; qualification does not widen its
-  runner-minted constructor's visibility. `ProcessInput` and `Prod` are
-  unscoped: `MkProcessInput` and `MkProd` are bare names in B, with their
-  exact parent identities. `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s
+  runner-minted constructor's visibility. `Coproduct` and `Instant` are
+  scoped: only `Coproduct.InL`, `Coproduct.InR`, and
+  `Instant.MkInstant` reach their exact checked constructor identities;
+  bare `InL`, `InR`, and `MkInstant` are not reserved by those families.
+  `ProcessInput`, `Prod`, and `Unit` are unscoped: `MkProcessInput`,
+  `MkProd`, and `MkUnit` are bare names in B, with their exact parent
+  identities. `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s
   `True`/`False`, `List`'s `Nil`/`Cons`, `Nat`'s `Zero`/`Suc`,
   `Option`'s `None`/`Some`, `Result`'s `Err`/`Ok`, and `Utf8Error`'s `InvalidUtf8`
   remain bare. `Char`, `HostIO`, transparent `Pair`, and the

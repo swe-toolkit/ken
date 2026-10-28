@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative twenty-identity prelude and its exact constructor/companion
+> normative twenty-three-identity prelude and its exact constructor/companion
 > closure are `30-taxonomy §4`; resolution and protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
 > Once D0 proves both §4 witness clauses per name, a keyed, source-required
@@ -24,9 +24,9 @@ an unused catalog census name proves a global is safe to remove.
 
 For unruled candidate names below, the keying column names a **native
 reader to check**, not proof that the reader set is complete. The
-entrypoint-ABI rows instead record the ruled exact-ID keying and independent
-source need (`30 §4`'s conjunction). Both proven → reserved,
-always-present floor. Keyed but no independent source
+admitted entrypoint-ABI and effect/clock rows instead record ruled
+exact-ID keying and independent source need (`30 §4`'s conjunction).
+Both proven → reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
 full unit reach is measured. `Empty` has a measured native reader and no
@@ -39,18 +39,20 @@ there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
 Apart from the internal-only `Empty` and the admitted entrypoint-ABI
-identities below, the candidate names in this table are **observed
-spellings**, not names approved for permanent reservation. Before
+and effect/clock identities below, the candidate names in this table are
+**observed spellings**, not names approved for permanent reservation. Before
 a later slice admits a newly witnessed name, Spec checks that its spelling closely
 encloses its meaning (`30 §4`);
-`NotFound`, `Other`, `Unsupported`, `write`, `Stdout`, and `Instant` are
+`NotFound`, `Other`, `Unsupported`, `write` and `Stdout` are
 operator-named specificity probes, not an exhaustive list or preselected
-renames. `Success`/`Failure` are admitted only as qualified
-`ExitCode.Success`/`ExitCode.Failure`, not bare reservations. Spec owns
-public naming folds in `35`/`38` and this ledger. Any necessary
-type/function rename lands atomically with floor admission and
-catalog/fixture clients. Qualification `T.C` is now normative
-in expressions and patterns for every data type (`32 §4`, `33 §3.3`, `34 §1`).
+renames. `Instant` is admitted as a specific type spelling, while its
+constructor is qualified `Instant.MkInstant`. `Success`/`Failure`
+are admitted only as qualified `ExitCode.Success`/`ExitCode.Failure`,
+not bare reservations. Spec owns public naming folds in `35`/`38`
+and this ledger. Any necessary type/function rename lands atomically
+with floor admission and catalog/fixture clients. Qualification `T.C`
+is now normative in expressions and patterns for every data type
+(`32 §4`, `33 §3.3`, `34 §1`).
 It can make a generic constructor specific without reserving its bare name;
 this S0 assigns no replacement spelling to any type or function.
 
@@ -70,12 +72,14 @@ constructor still has the same checked parent and `GlobalId`.
 | `IOError` | Yes if admitted | Error causes such as `NotFound`, `Other`, and `Unsupported` need their type qualifier. |
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
 | `ResourceError`, `ResourceBodyResult`, `ResourceBracketResult` | Yes if admitted | A result/error qualifier prevents generic error and status names becoming bare reservations. |
-| `Stream`, `Instant`, `CreatePolicy` | Yes if admitted | `Stdout`, `Stderr`, `MkInstant`, and create-policy cases are specific only under their carrier; a generic type name may still need a rename. |
+| `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
+| `Stream`, `CreatePolicy` | Yes if admitted | `Stdout`, `Stderr` and create-policy cases are specific only under their carrier; a generic type name may still need a rename. |
 | `ProcessInput` (floor) | No | Its `MkProcessInput` constructor is bare and reserved with its type. |
-| `Unit`, `FileError`, `BufferWindow` | No if admitted | `MkUnit`, `MkFileError`, and `MkBufferWindow` name their carriers closely. |
+| `Unit` (current floor) | No | `MkUnit` names its exact checked parent and remains bare and reserved. |
+| `FileError`, `BufferWindow` | No if admitted | `MkFileError` and `MkBufferWindow` name their carriers closely. |
 | `ProgramCaps` (floor) | Yes | Its runner-minted `MkProgramCaps` does not reserve a bare spelling; constructor visibility remains unchanged. |
 | `BufferSpan`, `TransferCount` | Yes if admitted | Their minted constructor identities need no additional bare source spelling; private visibility stays intact. |
-| `Coproduct` | Yes if admitted | `InL`/`InR` are generic; the effect-signature role is explicit as `Coproduct.C`. |
+| `Coproduct` (current floor) | Yes | `InL`/`InR` are generic; only `Coproduct.InL`/`Coproduct.InR` resolve to the exact constructors. |
 | `Prod` (floor) | No | `MkProd` names its carrier and is bare and reserved; retargeting the constructor-backed runtime representation to floor `Pair` is not part of this slice. |
 
 The dedicated L2 qualified-constructor/scoped-property slice precedes L2-3
@@ -100,15 +104,17 @@ use. For a scoped type, only the type is reserved. Its constructor IDs remain
 exact, and its public constructor paths are qualified. D0 traces each native
 constructor producer and checks the parent type's independent source need.
 The entrypoint-ABI and `Empty` rows are re-grounded on landed
-`f3e71af9c`; other inventory citations retain their stated census base.
-Only the already-witnessed entrypoint-ABI rows below join the floor;
-no other row alone reserves a name.
+`f3e71af9c`; the effect/clock rows are settled against the exact-ID
+producer/reader and source requirements in the keyed-effects D0.
+Other inventory citations retain their stated census base. Only
+marked witnessed entrypoint-ABI and effect/clock rows below join the
+floor; no other row alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
 | `Empty` (internal-only, not floor) | `PreludeEnv.empty_id` captures the compiler's exact pre-source identity (`prelude.rs:388`); `elaborate_space_decl` reads it (`elab.rs:20897`). **Source need:** none for that exact identity under `36 §4.1–4.2`; the source name belongs to `Core.Logic.EmptyDec` with a distinct checked identity, not to the prelude. |
-| `Unit` | Effect-response result type used by the reifier (`38 §1.7`, `prelude.rs`); verify the exact type ID and source need. |
-| `MkUnit` | `CanonicalRuntimeRoles::unit`, effect-response constructor; verify exact parent `Unit`. |
+| `Unit` (floor, unscoped) | `PreludeEnv.unit_id` captures the exact checked effect-response result identity; source must name it (`36 §1.1`, §2.1). |
+| `MkUnit` (bare floor constructor) | `CanonicalRuntimeRoles::unit` selects the exact checked constructor whose parent is `Unit`; the unscoped family remains bare and reserved. |
 | `ProcessInput` (floor, unscoped) | `program_admission.rs` builds the checked `main` parameter from its registered type (`33 §3.2.1`); source must name that exact identity. |
 | `MkProcessInput` (bare floor constructor) | Runner input uses its exact ID; the whole unscoped `ProcessInput` constructor family is reserved. |
 | `ExitCode` (floor, scoped) | `program_admission.rs` builds the checked `main` result from this exact type (`33 §3.2.1`). |
@@ -125,9 +131,9 @@ no other row alone reserves a name.
 | `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `IO` | Checked Console-ITree alias (`prelude.rs`); confirm whether the effect reifier selects the alias ID or only the underlying constructors. |
 | `FS` | Checked Auth-indexed ITree alias (`prelude.rs`); confirm whether the reifier/runner selects its ID. |
-| `Coproduct` | Checked effect-signature sum (`effects/state.rs`, `34 §1`); native composition roles are possible ID readers, independent source need unproven. |
-| `InL` | `CanonicalRuntimeRoles::in_l` captures constructor for effect composition; verify parent `Coproduct`. |
-| `InR` | `CanonicalRuntimeRoles::in_r` captures constructor for effect composition; verify parent `Coproduct`. |
+| `Coproduct` (floor, scoped) | `PreludeEnv.coproduct_id` identifies the checked effect-signature sum; native composition keys the exact injection parents and source needs the family (`36 §2.3`, §4.5.7). |
+| `InL` (qualified floor constructor) | `CanonicalRuntimeRoles::in_l` selects the exact `Coproduct` constructor; only `Coproduct.InL` resolves, not bare `InL`. |
+| `InR` (qualified floor constructor) | `CanonicalRuntimeRoles::in_r` selects the exact `Coproduct` constructor; only `Coproduct.InR` resolves, not bare `InR`. |
 | `Stream` | Console stream carrier; trace `ConsoleOp` response/reifier identity and source use before reserving its complete constructor family. |
 | `Stdin` | `Stream` constructor; trace the native stream selector and source requirement. |
 | `Stdout` | `Stream` constructor used by source `write`/`print_line`; trace native stream selection. |
@@ -151,8 +157,8 @@ no other row alone reserves a name.
 | `PermissionDenied` | `CanonicalRuntimeRoles::io_error_permission_denied`; parent `IOError`. |
 | `Revoked` | `CanonicalRuntimeRoles::io_error_revoked`; reconcile the single semantic identity required by `38 §1.8`. |
 | `Unsupported` | `CanonicalRuntimeRoles::io_error_unsupported`; parent `IOError`. |
-| `Instant` | Clock response carrier (`prelude.rs::clock_resp`); trace native clock response's type ID. |
-| `MkInstant` | `CanonicalRuntimeRoles::mk_instant` for clock response; verify exact `Instant` parent. |
+| `Instant` (floor, scoped) | Source names the canonical clock-response result (`36 §1.1`); the native clock response keys its checked `MkInstant` constructor and exact `Instant` parent. |
+| `MkInstant` (qualified floor constructor) | `CanonicalRuntimeRoles::mk_instant` selects the checked `Instant` constructor; only `Instant.MkInstant` resolves, not bare `MkInstant`. |
 | `CreatePolicy` | FS `WriteFile` request parameter (`prelude.rs::fs_resp`); test whether native operation needs this type's ID. |
 | `CreateNew` | `CreatePolicy` constructor; trace native create-policy discriminator. |
 | `CreateOrTruncate` | `CreatePolicy` constructor; trace native create-policy discriminator. |
@@ -185,12 +191,13 @@ no other row alone reserves a name.
 | `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
-Only the five entrypoint-ABI identities and the constructor closure marked
-floor above join B; other rows remain **outside** it. Capturing an ID proves
-keying, not independent source need. `Empty` is read by exact ID but remains
-internal-only; `host_exit` is likewise keyed without independent source
-need. A future `36` contract requiring source to name that exact space
-identity needs separate Spec gates. If adopted, existing Q-B admits it
+Only the five entrypoint-ABI and three effect/clock identities and their
+constructor closure marked floor above join B; other rows remain
+**outside** it. Capturing an ID proves keying, not independent source
+need. `Empty` is read by exact ID but remains internal-only;
+`host_exit` is likewise keyed without independent source need. A future
+`36` contract requiring source to name that exact space identity needs
+separate Spec gates. If adopted, existing Q-B admits it
 to the floor without per-name operator approval, with atomic roster/count
 change and retirement of the catalog `Empty`; it adds nothing to today's floor.
 Both witnesses admit a type to B; its whole constructor family follows the

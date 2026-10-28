@@ -235,15 +235,17 @@ impl ModuleState {
 /// Strict resolution consults [`is_prelude_floor_name`] so the configured type
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
-/// `Nat` and `Pair` have separate internal-provision witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 20] = [
+/// Internally provisioned members have separate exact-ID witnesses.
+pub const PRELUDE_FLOOR_NAMES: [&str; 23] = [
     "Auth",
     "Bool",
     "Bottom",
     "Char",
+    "Coproduct",
     "Equal",
     "ExitCode",
     "HostIO",
+    "Instant",
     "List",
     "Nat",
     "Option",
@@ -256,11 +258,12 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 20] = [
     "ResourceKind",
     "Result",
     "Top",
+    "Unit",
     "Utf8Error",
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
-/// These are not type-floor members and do not increase its twenty-member count.
+/// These are not type-floor members and do not increase its type count.
 pub const PRELUDE_COMPANION_BINDING_NAMES: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
 
 pub fn is_prelude_floor_name(name: &str) -> bool {

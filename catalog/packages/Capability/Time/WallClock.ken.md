@@ -13,11 +13,11 @@ they must not assume it for `wall_now`.
 ```ken
 fn instant_nanoseconds (instant : Instant) : Int =
   match instant {
-    MkInstant nanoseconds ↦ nanoseconds
+    Instant.MkInstant nanoseconds ↦ nanoseconds
   }
 
 fn replace_instant_nanoseconds (instant : Instant) (nanoseconds : Int) : Instant =
   match instant {
-    MkInstant _old ↦ MkInstant nanoseconds
+    Instant.MkInstant _old ↦ Instant.MkInstant nanoseconds
   }
 ```

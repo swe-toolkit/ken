@@ -327,8 +327,9 @@ claim with no conformance case is a claim no one can rely on
   precedence remain out.
 - `surface/modules/seed-pair-strict-boundary.md` — the compiler-origin floor
   boundary for named `Pair`: a build-gated four-name Strict accept matrix on the
-  existing ids, exact signature-eight/internal-provision/twenty-type derivation,
-  a separate three-companion inventory, collision and same-shape/distinct-id
+  existing ids, exact signature-eight/internal-provision/twenty-three-type
+  derivation, a separate three-companion inventory, collision and
+  same-shape/distinct-id
   controls, transparent-Sigma β/η, representation-derived nested positivity,
   and fresh post-realization Strict closure. It preserves class-owned `Ord Nat`
   and Pair-instance placement plus attached-proof obligations while excluding
