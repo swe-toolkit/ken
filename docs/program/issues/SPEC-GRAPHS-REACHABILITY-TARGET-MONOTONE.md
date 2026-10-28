@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE
 title: "Spec 62 decides reachability of a caller's target predicate, but no law says the decision is monotone in that predicate. Rule from a checked D0 at zero trust that reachability of a target carries to any pointwise-larger target, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE
 title: "Algorithm.Optimization.Argmin exports argmin_cost_order_invariant, proved at zero trust from the Architect's D0, with the spec 72 seed run by a package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

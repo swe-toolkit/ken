@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT
 title: "Algorithm.LinearAlgebra.NatMatrix exports spec 65 section 7: transpose_adjoint, proved at zero trust from the Architect's D0, with the section 7 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2

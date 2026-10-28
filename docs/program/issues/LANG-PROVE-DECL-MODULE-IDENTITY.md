@@ -1,7 +1,7 @@
 ---
 id: LANG-PROVE-DECL-MODULE-IDENTITY
 title: "After LANG-FOREIGN-LAW-TEMPORAL, a prove declaration is the only named source declaration left outside is_qualifiable, so a prove inside a module likely keeps a bare globals key and the same spelling in two modules is refused as a duplicate. Measure the leak on the landed base; if it reproduces, give prove the module-qualified, scope-bound identity the other kinds have"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: CAT-GRAPHS-REACHABILITY-TARGET-MONOTONE
 title: "Algorithm.Graphs.Dependency exports spec 62 section 6: graph_reachable_target_monotone, proved at zero trust from the Architect's D0, with the section 6 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2

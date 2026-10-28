@@ -1,7 +1,7 @@
 ---
 id: CAT-GRAPHS-REACHABILITY-ALONG-WALK
 title: "Algorithm.Graphs.Dependency exports spec 62 section 5: graph_reachable_along_walk, proved at zero trust from the Architect's D0, with the section 5 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
