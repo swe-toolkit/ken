@@ -305,13 +305,14 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–6
+**`65-linear-algebra.md`** §§1–7
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
 SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
 SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC;
-SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY).
+SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY;
+SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -332,10 +333,18 @@ or landed trust. Section 6 adds premise-free vector-argument
 additivity and homogeneity for `matrix_vector`, including zero
 dimensions. Architect D0 checked both generic proofs with no new
 `Axiom` and unchanged scratch trust identities (109 → 109). The §6
-catalog exports are absent; its authored closed seed and D0 do not
-establish shipped-seed execution, official conformance, CI,
-publication, landing or landed trust. No rational or `Float` tier is
-claimed.
+catalog exports and package-owned seed test are on main; neither
+establishes official conformance or landed trust. Section 7 states
+one premise-free Transparent `transpose_adjoint m n a x y` law: the
+natural dot of the matrix-vector image with `y` equals the dot of
+`x` with the transposed image of `y`, including zero dimensions.
+`dot_zero_columns` and `transpose_cons_image` stay private. Architect
+checked the generic proof in isolated D0 on `54f68d3cc` with no new
+`Axiom` and equal scratch trust identities (109 → 109). The §7
+catalog export is absent at this base; the separate closed seed and
+D0 overlay do not establish shipped §7 execution, official
+conformance, CI, publication, landing or landed trust. No rational
+or `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–7 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
