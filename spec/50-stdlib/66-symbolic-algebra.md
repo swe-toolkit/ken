@@ -14,9 +14,11 @@
 > pointwise derivative-after-substitution law under two necessary
 > derivative-value premises. Architect's isolated D0 on `97caadd38`
 > checked its generic proof with no new `Axiom` and equal scratch
-> trusted identities 114 → 114. Its catalog export is absent on this
-> base; the D0 does not establish shipped §8 execution, official
-> conformance, CI, publication, landing or landed trust.
+> trusted identities 114 → 114. The export was absent on the spec
+> author's base; this assembled candidate now adds the checked law
+> and a package test of the complete seed and isolated false claim.
+> Those candidate-local checks are not official conformance-runner
+> execution, CI, publication, landing or landed trust.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -732,10 +734,11 @@ syntactic-occurrence test or a consequence of independence alone.
 > owner-local generic Transparent proof, an arbitrary-argument client,
 > and the premise counterexamples with no new `Axiom`, `ken check`
 > and `ken fmt --check` rc 0, and equal scratch `trusted_base()` sets
-> (114 → 114). The §8 catalog export is absent on that base. Its
-> catalog proof, seed and package test belong to the assembled
-> candidate; scratch D0 is not shipped §8 execution, official
-> conformance, CI, publication, landing or landed trust.
+> (114 → 114). The export was absent on the spec author's base.
+> The assembled candidate adds its checked proof and root-loads the
+> complete seed with an isolated refusal in a package-owned test.
+> That is not official conformance-runner execution, CI, publication,
+> landing or landed trust.
 
 ### 8.1 Public checked law
 
@@ -812,12 +815,10 @@ computing `False`. A true claim with the same proof shape for
 `shift_off` accepts, while the false `merge_off` claim is refused
 at its own proof term after a fresh accepted prefix. A fixture's
 independent calculations and refusal isolate the false equation;
-they are not generic proofs. The separate Foundation catalog half
-must export the checked proof and add a package-owned test reading
-CV's seed, checking owner/Transparent status, both private import
-refusals, exact trusted identities and the accepted/refused clients.
-The catalog package's public-theorem count becomes **nineteen**
-with this one addition; its trust prose and contract reference must
-be updated to §§1–8 in that separate code turn. Candidate-local
-evidence remains distinct from CI, official conformance and landed
-trust.
+they are not generic proofs. The Foundation catalog half now exports
+the checked proof and its package-owned test reads CV's seed, checks
+owner/Transparent status, both private import refusals, exact trusted
+identities and the accepted/refused clients. The catalog package's
+public-theorem count is **nineteen** with this addition; its trust prose
+and contract reference include §§1–8. Candidate-local evidence remains
+distinct from CI, official conformance and landed trust.

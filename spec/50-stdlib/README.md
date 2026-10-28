@@ -420,11 +420,12 @@ under `compose_env env s`. This is pointwise `Equal Nat`, not
 structural expression equality or an unrestricted chain rule. Two
 new helpers stay private. Architect's D0 on `97caadd38` checked the
 generic proof without a new `Axiom` and with equal scratch trusted
-identities 114 → 114. The §8 catalog export is absent on this base;
-D0 and the separately owned seed do not establish shipped §8
-execution, official conformance, CI, publication, landing or landed
-trust. A sorted-list normal form and signed/field arithmetic remain
-deferred.
+identities 114 → 114. The §8 catalog export was absent on the spec
+author's base; this assembled candidate adds the checked proof and
+a package-owned test for the complete seed and isolated false claim.
+Those candidate-local checks are not official conformance-runner
+execution, CI, publication, landing or landed trust. A sorted-list normal
+form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–7 (SPEC-GEOMETRY-EXACT-CONTRACT;

@@ -170,6 +170,11 @@ checked the generic law, the `shift_off` accepted client, the `merge_off`
 refusal, and the premise counterexamples with no new `Axiom` and equal scratch
 `trusted_base()` identity sets (114 → 114). The AC-0 catalog patch SHA-256 is
 `de8de0a3fb9ffd1a6f585949f3304db8146ee25056462c6eb7eed14233f4edab`. These are
-isolated scratch checks, not execution of this seed against
-a shipped catalog export, official conformance execution, CI, publication,
-landing, or landed trust. The §8 catalog export is absent on this branch.
+isolated scratch checks, not execution of this seed against a shipped
+catalog export. The §8 export was absent on the seed author's branch;
+this assembled candidate adds the checked law and runs the complete
+accepted source and isolated false claim in the package-owned
+`cat_symbolic_algebra_derivative_substitution` test. Its exact trusted
+GlobalId comparison is candidate-local, not a landed trust measurement.
+This package test is not official conformance-runner execution, CI,
+publication or landing.
