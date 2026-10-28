@@ -206,6 +206,27 @@ pub theorem graph_reachable_along_walk
           graph_reachable_complete q fq g s u target (walk_append q g s t u walk suffix) hit
       }
 
+pub theorem graph_reachable_target_monotone
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (wider : q → Bool)
+      (included : (v : q) → Equal Bool (target v) True → Equal Bool (wider v) True)
+    : Equal Bool (graph_reachable q fq g s target) True
+      → Equal Bool (graph_reachable q fq g s wider) True =
+  λreach.
+    let witness =
+      require_some
+        (ReachWitness q g s target)
+        (graph_find_walk q fq g s target)
+        (graph_find_walk_some q fq g s target reach)
+    in
+      match witness {
+        MkReach t hit walk ↦ graph_reachable_complete q fq g s t wider walk (included t hit)
+      }
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -2242,7 +2263,7 @@ checked first edge gives a strict ordering claim.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–4](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–6](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2252,10 +2273,14 @@ reversed-order refusal. The
 [§4 seed](../../../../conformance/stdlib/graphs/seed-walk-append-unit-assoc.md)
 checks left unit, three positions of `WalkHere` in associativity, the
 same-route control, and the other-route refusal in a package-owned test.
-The public API is the graph, path and certificate types, their constructors,
-the walk-append operation, the predicate-reachability decision and witness,
-the dependency-order operation, five list/order predicates, and fourteen
-kernel-checked laws. Every other helper is private to this package.
+The [§5 seed](../../../../conformance/stdlib/graphs/seed-reachability-along-walk.md)
+checks backwards transport of reachability along a real walk. The
+[§6 seed](../../../../conformance/stdlib/graphs/seed-reachability-target-monotone.md)
+checks a strict target widening and refuses the false converse on the same
+chain. The public API is the graph, path and certificate types, their
+constructors, the walk-append operation, the predicate-reachability decision
+and witness, the dependency-order operation, five list/order predicates,
+and fifteen kernel-checked laws. Every other helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -2275,5 +2300,7 @@ exact public ownership and the package-local trust delta. The separate
 §3 seed, and checks that their private proof dependency stays unimportable.
 The §4 package test root-loads both walk laws, checks their generic public
 types and zero local trust delta, and exercises the §4 seed's accepted and
-refused clients. These are package tests, not official conformance-runner
-execution or CI. Neither suite establishes execution of the §2 seed.
+refused clients. The §6 package test checks its complete accepted client,
+including the independent reachability controls, and refuses the isolated
+false converse. These are package tests, not official conformance-runner
+execution or CI. They do not establish execution of the §2 seed.
