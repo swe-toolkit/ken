@@ -231,6 +231,9 @@ Logs under `/workspaces/ken/local/`:
 `spec-author-assoc-base-laws.log`.
 The patch was reversed and the scratch worktree removed. The shared
 binary was not independently built at the exact detached base, and
-none of these closed checks proves the generic law. Neither seed
-text nor scratch checking establishes shipped-seed execution,
-official conformance, CI, publication, landing or landed trust.
+none of these earlier closed checks proves the generic law. The catalog
+candidate now exports all four checked laws; its targeted package test
+root-loads the whole accepted seed, rejects the isolated false claim,
+and measures unchanged trusted GlobalIds. This is candidate package-test
+execution, not official conformance, CI, publication, landing or landed
+trust.

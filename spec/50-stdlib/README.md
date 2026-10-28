@@ -538,13 +538,22 @@ structural window/merge distribution and k-way merge remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
-SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4) and §3
+SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
+SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5) and §3
 (SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).
 The landed `Algorithm.Optimization.Argmin` selects the earliest minimum
 or greatest `Nat`-cost member of `NonEmpty a` with no `DecEq a`; the
 seven `argmin` and seven `argmax` laws and both seeds are present on
 main. Section 1.4's `argmin_option` and four laws are also landed.
-Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
+Section 1.5 specifies the public `argmin_cost_order_invariant`:
+a transform preserving and reflecting every strict `Nat` cost
+comparison leaves the selected candidate unchanged, ties included.
+Architect's isolated D0 checked its generic proof with no new
+`Axiom` and equal scratch trusted identities 114 → 114. This
+spec-and-seed candidate does not deliver the catalog export;
+local seed checks are not official conformance execution, CI,
+publication, landing or landed trust. Section 3.4 specifies
+`argmax_option` on a possibly empty `List a`:
 `Nil` yields `None`, and `Cons` yields `Some` of `argmax` over
 `nonempty_cons`. Four laws give the two equations and direct-to-`List`
 membership and greatest-cost consequences for an observed `Some`.
@@ -572,9 +581,9 @@ remains at the larger bound. `leq_suc_not_leq_same` stays private;
 there is no `None`-stability law, since a larger range can contain a
 first hit. Architect's D0 checked the generic proof with no new
 `Axiom` and equal scratch trusted identities 114 → 114. The §2.4
-catalog export is absent from this base; its authored closed seed
-and D0 are not shipped §2.4 execution, official conformance, CI,
-publication, landing or landed trust. The `List`-input Option
+catalog export, seed and package-owned test are now on main; the
+test and earlier D0 do not establish official conformance or a
+landed trust measurement. The `List`-input Option
 selector is specified in §1.4, not §2.
 
 ## 4. I/O, effects, serialization
