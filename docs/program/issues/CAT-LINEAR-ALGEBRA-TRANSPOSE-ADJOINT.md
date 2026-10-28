@@ -54,8 +54,9 @@ base, stop and report the mismatch.
 - The export set in `cat_linear_algebra_nat_matrix.rs` updated.
 - A new `crates/ken-elaborator/tests/cat_linear_algebra_transpose_adjoint.rs`
   that root-loads the law and runs the seed.
-- Spec 65 §7's status lines and the seed's execution-status statements,
-  updated to say the package test checks them.
+- Spec 65 §7's status lines, the spec 65 row in `spec/SPEC-PROGRESS.md`
+  and the seed's execution-status statements, updated to say the package
+  test checks them. No other status row changes.
 
 Make no conformance-runner, CI or landing claim.
 
