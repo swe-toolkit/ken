@@ -117,6 +117,8 @@ release_merge_lock|probe 8b (a released lock is acquirable from another worktree
 list_ci_runs_for_head|probe 13 (run selection, through a stubbed gh)
 classify_tested_run|probe 13 (current, stale, pending, and each fail-closed refusal)
 retrigger_ci_by_reopen|probe 13 (returns on a newer run; dies if reopen fails)
+retrigger_if_latest_run_red|probe 14 (fresh run on a red or cancelled latest run only)
+ci_wait_seconds|probe 14 (sized from the latest successful full run only)
 wait_for_green_checks|EXCLUDED: thin poll over gh pr checks, moved verbatim from the unprobed top-level flow
 sync_primary_checkout|EXCLUDED: writes to the real primary checkout at /workspaces/ken, unsafe to drive here
 "
@@ -542,8 +544,10 @@ TESTED_STUB='
   gh() {
     case "$1 $2" in
       "pr view") printf "%s\n" "$T_PRHEAD" ;;
-      "pr close") return 0 ;;
-      "pr reopen") [ -z "${T_NOREOPEN:-}" ] ;;
+      "pr close") echo CLOSED >&2 ;;
+      "pr reopen") [ -z "${T_NOREOPEN:-}" ] || return 1
+        T_IDS="${T_IDS_AFTER:-${T_IDS:-[500]}}" ;;
+      "run list") printf "%s\n" "${T_RUNLIST:-[]}" ;;
       "run download")
         [ -z "${T_NOART:-}" ] || return 1
         mkdir -p "$7"
@@ -616,6 +620,48 @@ if grep -q 'could NOT be reopened' <<<"$out" && ! grep -q 'RETRIGGERED=1' <<<"$o
 else
   bad "a failed reopen was not reported: $out"
 fi
+
+head_ "Probe 14 -- an unchanged-SHA re-route gets a fresh run; the wait ignores non-full runs"
+build_sandbox
+red_case() {
+  run_gate "$TESTED_STUB"'
+  retrigger_if_latest_run_red && echo RETURNED=1'
+}
+out="$(T_CONCLUSION=failure T_IDS_AFTER='[500,501]' red_case)"
+if grep -q 're-triggered CI run 501' <<<"$out" && grep -q 'RETURNED=1' <<<"$out"; then
+  ok "a red latest run on the unchanged head is replaced by a fresh run"
+else
+  bad "a red latest run was not re-triggered: $out"
+fi
+out="$(T_CONCLUSION=cancelled T_IDS_AFTER='[500,501]' red_case)"
+if grep -q 're-triggered CI run 501' <<<"$out"; then ok "a cancelled latest run is replaced by a fresh run"; else bad "a cancelled latest run was not re-triggered: $out"; fi
+for c in "T_CONCLUSION=success" "T_STATUS=in_progress" "T_IDS=[]"; do
+  out="$( export "$c"; red_case )"
+  if grep -q 'RETURNED=1' <<<"$out" && ! grep -q 'CLOSED' <<<"$out"; then
+    ok "no re-trigger when $c"
+  else
+    bad "re-triggered or failed when $c: $out"
+  fi
+done
+
+wait_case() {
+  run_gate "$TESTED_STUB"'
+  echo "WAIT=$(ci_wait_seconds)"'
+}
+runs() {  # newest first, as gh run list returns them; durations in seconds
+  local t0=1761652800 out="[" sep="" d
+  for d in "$@"; do
+    out="$out$sep{\"createdAt\":\"$(date -u -d "@$t0" +%FT%TZ)\",\"updatedAt\":\"$(date -u -d "@$((t0 + d))" +%FT%TZ)\"}"
+    sep=","
+  done
+  printf '%s]' "$out"
+}
+out="$(T_RUNLIST="$(runs 121 2400 2700)" wait_case)"
+if grep -q 'WAIT=2640$' <<<"$out"; then ok "a short doc-mode success is skipped; the latest full run sizes the wait"; else bad "wait not sized from the latest full run: $out"; fi
+out="$(T_RUNLIST="$(runs 121 130)" wait_case)"
+if grep -q 'WAIT=60$' <<<"$out"; then ok "with no full successful run the wait falls back to 60s"; else bad "fallback wait wrong: $out"; fi
+out="$(T_RUNLIST='not json' wait_case)"
+if grep -q 'WAIT=60$' <<<"$out"; then ok "an unreadable run list falls back to 60s"; else bad "unreadable run list not handled: $out"; fi
 
 printf '\n=== %s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -15,8 +15,10 @@ gate.
 
 Behavior:
   * doc-only: merge immediately.
-  * non-doc: wait for the latest CI workflow duration + 10%, then poll PR
-    checks until they complete. Merge only when the PR's latest CI run is
+  * non-doc: if the PR already existed and its latest CI run for this head
+    failed or was cancelled, re-trigger a fresh run. Wait for the latest
+    successful full CI run's duration + 10%, then poll PR checks until they
+    complete. Merge only when the PR's latest CI run is
     green AND tested a merge commit whose first parent is the current
     origin/main tip and whose second parent is the routed head. If main has
     moved since that run, close and reopen the PR to re-trigger CI and wait
@@ -112,8 +114,8 @@ report_failing_job_logs() {
     gh_status="${PIPESTATUS[0]}"
     if [ "$gh_status" -ne 0 ] && [ "$gh_status" -ne 141 ]; then
       printf '  ⛔ could not fetch logs for job %s (gh exit %s).\n' "$job_id" "$gh_status" >&2
-      printf '     If this persists the token likely lacks the Actions read scope;\n' >&2
-      printf '     the job URL remains authoritative: %s\n' "$link" >&2
+      printf '     The fetch can fail transiently on either side; it is not a\n' >&2
+      printf '     CI result. The job URL remains authoritative: %s\n' "$link" >&2
       rm -f "$log_file"
       continue
     fi
@@ -749,6 +751,48 @@ Reopen it by hand: gh pr reopen $pr_number"
   done
 }
 
+# A re-route of an unchanged SHA pushes nothing, so GitHub starts no run and
+# the PR's latest run is the one that already finished red. Polling would read
+# that old red as this attempt's result (PR #5020, run 40651051812). Start one
+# fresh run instead, before the first wait. A green or still-running latest run
+# is left alone; the main loop handles a green run on a moved base.
+retrigger_if_latest_run_red() {
+  local latest run_id status conclusion
+  latest="$(list_ci_runs_for_head | jq -c 'last // empty')" ||
+    die "publisher gate: could not list CI runs for $head_sha. Not merging."
+  [ -n "$latest" ] || return 0
+  run_id="$(printf '%s\n' "$latest" | jq -r '.id')"
+  status="$(printf '%s\n' "$latest" | jq -r '.status')"
+  conclusion="$(printf '%s\n' "$latest" | jq -r '.conclusion')"
+  case "$run_id" in ''|*[!0-9]*)
+    die "publisher gate: malformed CI run id for $head_sha. Not merging." ;;
+  esac
+  [ "$status" = completed ] || return 0
+  [ "$conclusion" = success ] && return 0
+  printf 'Publisher gate: latest CI run %s of PR #%s for unchanged head %s concluded %s; re-triggering a fresh run.\n' \
+    "$run_id" "$pr_number" "$head_sha" "$conclusion"
+  retrigger_ci_by_reopen "$run_id"
+}
+
+# Size the first wait from the latest successful PR run that lasted at least ten
+# minutes. Cancelled and failed runs stop early or hang, and a doc-mode run is
+# done in about two minutes, so the latest completed run of any kind misjudges
+# a full run (measured: first waits of 121s and 8144s). Too short a wait costs
+# only polls, so with no such run the wait falls back to 60s.
+ci_wait_seconds() {
+  local longest
+  longest="$(gh run list --workflow CI --status success --event pull_request \
+      --limit 20 --json createdAt,updatedAt 2>/dev/null |
+    jq '[.[] | ((.updatedAt | fromdateiso8601) - (.createdAt | fromdateiso8601))
+         | select(. >= 600)] | first // 0' 2>/dev/null)" || longest=0
+  case "$longest" in ''|*[!0-9]*) longest=0 ;; esac
+  if [ "$longest" -gt 0 ]; then
+    printf '%s\n' "$(( (longest * 110 + 99) / 100 ))"
+  else
+    printf '60\n'
+  fi
+}
+
 # Poll the PR's checks until none is pending. Dies on any failing or cancelled
 # check, after printing the failing jobs' logs.
 wait_for_green_checks() {
@@ -1008,22 +1052,11 @@ fi
 
 gh pr merge "$pr_number" --disable-auto >/dev/null 2>&1 || true
 
-latest_run_json="$(gh run list --workflow CI --status completed --limit 1 \
-  --json createdAt,updatedAt --jq '.[0] // empty')"
-
-wait_seconds=60
-if [ -n "$latest_run_json" ]; then
-  created_at="$(printf '%s\n' "$latest_run_json" | jq -r '.createdAt // empty')"
-  updated_at="$(printf '%s\n' "$latest_run_json" | jq -r '.updatedAt // empty')"
-  if [ -n "$created_at" ] && [ -n "$updated_at" ]; then
-    created_s="$(date -d "$created_at" +%s)"
-    updated_s="$(date -d "$updated_at" +%s)"
-    duration=$(( updated_s - created_s ))
-    if [ "$duration" -gt 0 ]; then
-      wait_seconds=$(( (duration * 110 + 99) / 100 ))
-    fi
-  fi
+if [ -n "$existing_pr" ]; then
+  retrigger_if_latest_run_red
 fi
+
+wait_seconds="$(ci_wait_seconds)"
 
 max_retriggers="${PUBLISHER_MAX_CI_RETRIGGERS:-3}"
 retriggers=0
