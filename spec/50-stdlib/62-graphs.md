@@ -18,10 +18,11 @@
 > reachability law, checked catalog proof and package-owned seed test
 > are now on main; the test is not official conformance or landed trust.
 > Section 6 specifies one generic target-monotonicity law. Architect's
-> isolated D0 and the separately owned seed do not establish a shipped
-> §6 export or execution, official conformance, CI, publication, landing
-> or landed trust. No kernel, trust, or surface-syntax change or revision
-> to §61 §2 is required.
+> isolated D0 was scratch evidence. The separate Foundation candidate
+> exports the checked law and its package-owned test runs the complete
+> accepted seed and isolated refusal; that is not official conformance-
+> runner execution, CI, publication, landing or landed trust. No kernel,
+> trust, or surface-syntax change or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -593,10 +594,12 @@ neither observation is official conformance or landed trust.
 > (SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE).** Architect's isolated
 > D0 on `abafe3963` checked the generic proof and an independent client,
 > with no new `Axiom`, `ken check` and `ken fmt --check` rc 0, and equal
-> scratch `trusted_base()` GlobalId sets (114 → 114). The §6 catalog
-> export is absent on the authoring base. A D0 client and the separately
-> owned conformance seed do not establish shipped §6 execution, official
-> conformance, CI, publication, landing or landed trust.
+> scratch `trusted_base()` GlobalId sets (114 → 114). The earlier
+> spec-and-seed candidate did not deliver the §6 catalog export. The
+> separate Foundation candidate exports the checked law, root-loads it,
+> checks the complete accepted seed and refuses its isolated converse
+> in a package-owned test. Those are candidate-local checks, not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 `Algorithm.Graphs.Dependency` must export this public Transparent law
 immediately after `graph_reachable_along_walk`. The pointwise
@@ -647,6 +650,9 @@ real edge. From `V2`, the wider predicate is `True` while the narrower
 predicate is `False`; an isolated false-converse claim is rejected
 after the same accepted prefix. These finite controls discriminate
 the direction but do not prove the quantified law. The D0's checked
-proof and seed client are scratch evidence, not a §6 catalog delivery
-or official conformance result; CV owns the authored conformance seed
-separately from this spec/status candidate.
+proof and seed client were scratch evidence, not a §6 catalog delivery
+or official conformance result. The separate Foundation candidate now
+exports the checked law; its package-owned test checks the complete
+accepted seed and isolated false converse. Neither candidate-local
+checking nor the earlier D0 establishes official conformance-runner
+execution, CI, publication, landing or landed trust.

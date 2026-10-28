@@ -210,8 +210,13 @@ client applied the law on the `V0 → V1 → V2` chain, independently
 checked the `V0` results, and rejected the false converse from `V2`.
 The D0 patch SHA-256 is
 `02da799e35e9f0ea9d26994579da22709b1c68d6704adda2ca501f12f3fe960a`.
-That patch and its checks are local scratch evidence, not a §6 catalog
-export or landed proof. The §6 catalog export is absent on this
-seed's authoring base. This authored seed is a conformance obligation;
-it does not claim shipped §6 execution, official conformance, CI,
-publication, landing, or landed trust.
+That patch and its checks were local scratch evidence, not a §6 catalog
+export or landed proof. The earlier spec-and-seed candidate did not
+deliver the §6 catalog law. The separate Foundation candidate exports
+`graph_reachable_target_monotone` and runs the complete accepted client
+and isolated false converse in the package-owned
+`cat_graphs_reachability_target_monotone` test. The exact trusted
+GlobalId set and targeted Dependency ambient row are candidate-local
+measurements, not a full-corpus census or landed trust. This package
+test is not official conformance-runner execution, CI, publication or
+landing.
