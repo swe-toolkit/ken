@@ -153,7 +153,7 @@ patch SHA-256 is
 `4be533217c6582adcf0bac70649fdb961a1369dcdb7154c8f24de31fd6f08ac1`.
 Its public-name client with this four-label cost shape checked;
 its flattened-cost claim refused. The catalog hunk and probe test
-are **not** part of this spec-and-seed candidate.
+were **not** part of the separate spec-and-seed candidate.
 
 For author checks, a disposable detached worktree at `12e91c41b`
 had **only** the catalog hunk of that D0 patch applied. In that
@@ -183,3 +183,15 @@ exercise a proposed catalog proof, not a delivered export. They
 do not prove the generic law from closed cases or establish
 shipped-export execution, official conformance-runner execution,
 CI, publication, landing or landed trust.
+
+The separate Foundation catalog candidate now exports the generic
+checked `argmin_cost_order_invariant` proof and runs this seed via
+`cat_optimization_argmin_cost_order`. That package test root-loads
+the public law and checks the complete accepted client, including
+the open order proof and independently reduced selection results.
+Its isolated appended `seed_neg` is pinned to the false
+flattened-versus-original selection proposition, then refused at
+its own proof. A targeted strict-floor Argmin row and unchanged
+exact trusted-GlobalId set are candidate-local measurements, not
+a full-corpus census or landed trust. The package test is not
+official conformance-runner execution, CI, publication or landing.

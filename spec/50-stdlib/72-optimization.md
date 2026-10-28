@@ -12,9 +12,12 @@
 > four laws and seed are also present on main. Section 1.5 specifies
 > one additional checked law preserving the selected candidate under
 > cost transforms that preserve and reflect strict Nat order. Its
-> catalog export belongs to a separate Foundation WP, not this
-> spec-and-seed candidate. Section 2's catalog module and
-> seed are present on main. Section 3's greatest-cost selector and
+> checked catalog export and package-owned seed test are on a separate
+> Foundation candidate, not yet on main. The test runs the accepted
+> and refused §1.5 clients against the roots-loaded export; it does
+> not establish official conformance-runner execution, CI,
+> publication, landing or landed trust. Section 2's catalog module
+> and seed are present on main. Section 3's greatest-cost selector and
 > seven laws are landed; §3.4 specifies the Option-returning extension
 > and its four laws from Architect-checked D0. The §3.4 catalog exports,
 > seed and package test are now present on main; the package test is not
@@ -333,10 +336,17 @@ proof with `ken check` rc 0, `ken fmt --check` rc 0, no new
 `Axiom`, owner-local Transparent status, private helper import
 refusals, and unchanged exact scratch `trusted_base()` identities
 114 → 114. It also checked the four-label client and its false
-flattened-cost claim. The catalog proof is reserved for the
-separate Foundation WP. The present spec-and-seed candidate does
-not deliver that export or establish shipped-seed execution,
-official conformance, CI, publication, landing or landed trust.
+flattened-cost claim. That historical D0 and the landed
+spec-and-seed candidate did not deliver the catalog export. The
+separate Foundation candidate now adds the checked public law and
+private helpers. Its package test root-loads `Argmin`, consumes the
+full generic public type, checks the accepted §1.5 client including
+both independently reduced selection values and the constant-cost
+head result, then rejects the isolated false flattened-cost claim.
+The package test measures an unchanged exact trusted-GlobalId set
+relative to the imported provider closure. These candidate-local
+checks are not official conformance-runner execution, CI,
+publication, landing or a landed trust measurement.
 
 ## 2. Least witness below a finite bound
 

@@ -714,7 +714,14 @@ this does not erase inherited assumptions.
 **Validation:** `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
 instances and false-result refusals. Its scoped acceptance target checks the
-client programs and the generic seven law types.
+client programs and the generic seven law types. The
+[§1.5 cost-order seed](../../../../conformance/stdlib/optimization/seed-argmin-cost-order-invariance.md)
+adds a four-label non-head earliest tie, an open strict-order proof,
+and a flattened-cost false result on the same input. The candidate's
+`cat_optimization_argmin_cost_order` package test root-loads the
+checked public law, checks the whole accepted seed client and refuses
+the isolated false claim. This is not official conformance-runner
+execution, CI, publication or landing.
 `conformance/stdlib/optimization/seed-argmin-option.md` adds empty,
 singleton and non-degenerate tie cases, instances of the four Option laws,
 and an isolated false `Some`-on-`Nil` refusal. The Option target root-loads
