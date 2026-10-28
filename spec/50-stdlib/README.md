@@ -575,11 +575,12 @@ The bound equalities use `leq_nat`, and the result uses the existing
 `list_append`, which the catalog must add to EventTrace's named
 Derived import. Architect's isolated D0 on `d94af9ee5` checked the
 generic proof with no new `Axiom` and unchanged scratch trusted
-identities 114 → 114. The §7 export is absent on this base; D0
-and the separately owned seed cannot establish shipped §7 execution,
-official conformance, CI, publication, landing or landed
-trust. Clock effects, durations, causality, infinite streams,
-premise-free structural window/merge distribution and k-way merge
+identities 114 → 114. The §7 export was absent on the spec author's
+base; this assembled candidate adds the checked law and a package test
+for the complete accepted seed and isolated refusal. These candidate-
+local checks are not official conformance-runner execution, CI,
+publication, landing or landed trust. Clock effects, durations, causality,
+infinite streams, premise-free structural window/merge distribution and k-way merge
 remain deferred.
 
 The **finite candidate-selection contract** is pinned in

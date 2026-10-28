@@ -10,10 +10,11 @@ in `[3,9)`. Independent `Refl` checks compute the whole and both subwindows;
 a separate `Refl` control checks the true split in the same equality shape.
 
 Architect's AC-0 D0 checked a separate closed seed-shaped client and the
-swapped refusal on scratch. That scratch result does not establish execution
-of this file. No roots-based package execution is claimed at this seed turn;
-no official conformance-runner execution, CI, publication, landing or landed
-trust is claimed.
+swapped refusal on scratch. That scratch result did not establish execution
+of this file. The assembled candidate's `cat_time_window_split` package test
+now root-loads EventTrace and checks this complete accepted source and its
+isolated swapped refusal. These checks are candidate-local, not official
+conformance-runner execution, CI, publication, landing or landed trust.
 
 ## Accepted client
 
@@ -164,5 +165,9 @@ no new `Axiom`, unchanged scratch trusted GlobalIds (114 → 114), and a
 closed client plus swapped refusal on its scratch tree. Its client is not
 execution of this seed file or of a shipped package test. This source
 states the cases and expected behaviors; any seed-execution claim must
-come from a test that reads this file. No official conformance-runner
-execution, CI, publication, landing or landed trust is claimed.
+come from a test that reads this file. The assembled candidate's
+`cat_time_window_split` reads and checks the accepted source and appends
+the swapped claim to a fresh accepted prefix; its exact trusted GlobalId
+comparison is candidate-local. Neither that package test nor the D0
+establishes official conformance-runner execution, CI, publication,
+landing or landed trust.

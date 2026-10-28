@@ -35,9 +35,11 @@
 > specifies a premise-bearing split of an ordered trace across adjacent
 > half-open windows. Architect's isolated D0 on `d94af9ee5` checked
 > its generic proof with no new `Axiom` and equal scratch trusted
-> GlobalIds (114 → 114). The §7 catalog export is absent on this
-> base; D0 does not establish shipped §7 execution, official
-> conformance, CI, publication, landing or landed trust.
+> GlobalIds (114 → 114). The §7 catalog export was absent on the
+> spec author's base. This assembled candidate adds the checked law
+> and a package-owned test of the complete accepted seed and isolated
+> swapped refusal; that test is not official conformance-runner
+> execution, CI, publication, landing or landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -637,10 +639,11 @@ remain distinct from shipped and official evidence.
 > checked the generic owner-local Transparent proof, a public client,
 > and closed true/false controls, with no new `Axiom` and unchanged
 > scratch `trusted_base()` GlobalIds (114 → 114). The §7 catalog
-> export is absent on that authoring base. The catalog law, seed and
-> package-owned test travel together in the assembled candidate;
-> D0 alone is not shipped §7 execution, official conformance, CI,
-> publication, landing or landed trust.
+> export was absent on that authoring base. The assembled candidate
+> now exports the checked law and root-loads the complete accepted
+> seed and isolated refusal in a package-owned test. Neither D0 nor
+> this package test establishes official conformance-runner execution,
+> CI, publication, landing or landed trust.
 
 ### 7.1 Public checked law and necessary premises
 
@@ -736,8 +739,8 @@ independent closed value check establishes that the time-3 event
 is **not** in the left `[1,3)` window, while the true split is
 accepted in the same proof shape. A closed fixture illustrates the
 boundary, not the generic law; the D0 patch and its seed-shaped
-client do not establish execution of the assembled catalog export
-or official conformance. The separately owned package test must
-read the seed, check the export and private-helper boundary, and
-compare exact trusted identity sets; those checks remain distinct
-from CI, publication and landed trust.
+client did not establish execution of the assembled catalog export
+or official conformance. The separately owned package test now reads
+the complete seed, checks the export and private-helper boundary,
+and compares exact trusted identity sets; those candidate-local checks
+remain distinct from CI, publication and landed trust.
