@@ -422,7 +422,7 @@ new helpers stay private. Architect's D0 on `97caadd38` checked the
 generic proof without a new `Axiom` and with equal scratch trusted
 identities 114 → 114. The §8 catalog export was absent on the spec
 author's base; this assembled candidate adds the checked proof and
-a package-owned test for the complete seed and isolated false claim.
+a package-owned test for the complete seed and two isolated premise-drop claims.
 Those candidate-local checks are not official conformance-runner
 execution, CI, publication, landing or landed trust. A sorted-list normal
 form and signed/field arithmetic remain deferred.

@@ -9,18 +9,21 @@ At a fixed environment, the law requires the replacement for the differentiated
 variable to have derivative one, and every replacement for a distinct variable
 to have derivative zero. The accepted `shift_off` fixture meets both premises
 at `env23`. The refused `merge_off` fixture keeps the first premise but sends a
-distinct variable to `EVar Zero`, so its derivative is not zero. In each case
-the conclusion is checked on the same `xy = x₀ · x₁` input. These closed
+distinct variable to `EVar Zero`, so its derivative is not zero. Both cases
+use `xy = x₀ · x₁`. A distinct `all_const` case keeps the zero-elsewhere
+premise but violates the derivative-one premise; it uses `EVar Zero` to keep
+that failure independent of the merged-variable case. These closed
 observations do not prove the generic theorem.
 
 ## Accepted client and independent values
 
-The full client must check before the refused claim is appended. Its premise
+The full client must check before either refused claim is appended to a
+fresh copy. Its premise
 proof establishes the zero-elsewhere condition by splitting the source index;
 the distinguished index is impossible under the premise's inequality. Direct
 `Proved` controls independently compute both sides of the accepted and refused
-fixtures. The `shift_off` same-shape control proves the exact equality shape
-that the refused `merge_off` claim later attempts.
+fixtures. The `shift_off` same-shape controls prove the exact equality shapes
+that the refused `merge_off` and `all_const` claims later attempt.
 
 ```ken
 import Algorithm.SymbolicAlgebra.NatPolynomial
@@ -46,6 +49,8 @@ fn merge_off (w : Nat) : Expr =
     Zero ↦ EVar Zero;
     Suc k ↦ EVar Zero
   }
+
+fn all_const (w : Nat) : Expr = EConst Zero
 
 theorem shift_off_zero_elsewhere
       (w : Nat)
@@ -99,6 +104,56 @@ theorem merge_off_sides_order_false
           (eval (compose_env env23 merge_off) (deriv Zero xy)))
         False =
   Proved
+
+theorem all_const_zero_elsewhere
+      (w : Nat)
+    : (Equal Nat Zero w → Bottom)
+      → Equal Nat (eval env23 (deriv Zero (all_const w))) Zero =
+  λhn. Proved
+
+theorem all_const_derivative_at_zero_zero :
+  Equal Nat (eval env23 (deriv Zero (all_const Zero))) Zero = Proved
+
+theorem shift_off_var_law_instance
+    : Equal Nat
+        (eval env23 (deriv Zero (substitute shift_off (EVar Zero))))
+        (eval (compose_env env23 shift_off) (deriv Zero (EVar Zero))) =
+  deriv_substitute Zero shift_off (EVar Zero) env23
+    shift_off_derivative_at_zero shift_off_zero_elsewhere
+
+theorem shift_off_var_same_shape_control
+    : Equal Nat
+        (eval env23 (deriv Zero (substitute shift_off (EVar Zero))))
+        (eval (compose_env env23 shift_off) (deriv Zero (EVar Zero))) =
+  Proved
+
+theorem shift_off_var_left_value :
+  Equal Nat
+    (eval env23 (deriv Zero (substitute shift_off (EVar Zero))))
+    (Suc Zero) = Proved
+
+theorem shift_off_var_right_value :
+  Equal Nat
+    (eval (compose_env env23 shift_off) (deriv Zero (EVar Zero)))
+    (Suc Zero) = Proved
+
+theorem all_const_var_left_value :
+  Equal Nat
+    (eval env23 (deriv Zero (substitute all_const (EVar Zero))))
+    Zero = Proved
+
+theorem all_const_var_right_value :
+  Equal Nat
+    (eval (compose_env env23 all_const) (deriv Zero (EVar Zero)))
+    (Suc Zero) = Proved
+
+theorem all_const_var_sides_order_false
+    : Equal Bool
+        (leq_nat
+          (eval (compose_env env23 all_const) (deriv Zero (EVar Zero)))
+          (eval env23 (deriv Zero (substitute all_const (EVar Zero)))))
+        False =
+  Proved
 ```
 
 ### stdlib/symbolic-algebra/derivative-after-identity-slope-substitution
@@ -147,8 +202,9 @@ above independently establish that this `merge_off` conclusion is false.
   `Proved`; `merge_off` violates the zero-elsewhere premise at successor one.
 - measured: the accepted controls compute the left side as four, the right
   side as two, and `4 ≤ 2` as `False`.
-- claimed: the two premises are necessary for this derivative/substitution
-  equality; the generic theorem does not license an arbitrary substitution.
+- claimed: the zero-elsewhere premise is necessary for this
+  derivative/substitution equality; the generic theorem does not license
+  an arbitrary substitution.
 - gap: one closed counterexample does not classify every substitution that
   violates a premise or prove the conditional theorem's quantifiers.
 - why: the accepted `shift_off` equality and the same-shaped refused claim
@@ -163,6 +219,42 @@ theorem merge_off_commutation_rejected
   Proved
 ```
 
+## Refused derivative-one premise
+
+Append only the following theorem to a separate fresh full copy of the
+accepted client. `all_const` sends every variable to `EConst Zero`, so its
+zero-elsewhere premise has a checked proof for every index, but the derivative
+at `Zero` is zero rather than one. On `EVar Zero`, the left side is zero and
+the right side is one. The accepted `shift_off` one-variable law application
+and same-shaped `Proved` control check the corresponding true equality; direct
+endpoint proofs and the false order comparison show that this refusal is the
+false conclusion, not an import or premise failure.
+
+### stdlib/symbolic-algebra/reject-derivative-after-constant-substitution
+
+- spec: §8.1 and §8.2.
+- promise class: durable invariant.
+- given: the complete accepted client, `v=Zero`, `e=EVar Zero` and `env23`.
+- expect: the following false `Equal Nat` proposition is rejected at its own
+  `Proved`; `all_const` satisfies `hw` but violates `hv` at `Zero`.
+- measured: the accepted zero-elsewhere proof, derivative-at-zero value zero,
+  matching true `shift_off` equality, independent left/right values zero/one,
+  and `1 ≤ 0` as `False`.
+- claimed: the derivative-one premise is necessary for the general law;
+  the zero-elsewhere premise alone does not license substitution.
+- gap: one closed counterexample does not classify every replacement with
+  derivative other than one or prove the conditional theorem's quantifiers.
+- why: the result after substituting a constant has derivative zero, whereas
+  the derivative of `EVar Zero` evaluates to one in the composed environment.
+
+```ken
+theorem all_const_commutation_rejected
+    : Equal Nat
+        (eval env23 (deriv Zero (substitute all_const (EVar Zero))))
+        (eval (compose_env env23 all_const) (deriv Zero (EVar Zero))) =
+  Proved
+```
+
 ## Evidence boundary
 
 Architect's AC-0 D0 on landed base `97caadd38871b23c7796b219681d0c054b092dec`
@@ -173,7 +265,7 @@ refusal, and the premise counterexamples with no new `Axiom` and equal scratch
 isolated scratch checks, not execution of this seed against a shipped
 catalog export. The §8 export was absent on the seed author's branch;
 this assembled candidate adds the checked law and runs the complete
-accepted source and isolated false claim in the package-owned
+accepted source and both isolated false claims in the package-owned
 `cat_symbolic_algebra_derivative_substitution` test. Its exact trusted
 GlobalId comparison is candidate-local, not a landed trust measurement.
 This package test is not official conformance-runner execution, CI,

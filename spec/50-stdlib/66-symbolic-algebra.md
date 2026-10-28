@@ -16,7 +16,7 @@
 > checked its generic proof with no new `Axiom` and equal scratch
 > trusted identities 114 → 114. The export was absent on the spec
 > author's base; this assembled candidate now adds the checked law
-> and a package test of the complete seed and isolated false claim.
+> and a package test of the complete seed and both isolated premise-drop claims.
 > Those candidate-local checks are not official conformance-runner
 > execution, CI, publication, landing or landed trust.
 
@@ -736,7 +736,7 @@ syntactic-occurrence test or a consequence of independence alone.
 > and `ken fmt --check` rc 0, and equal scratch `trusted_base()` sets
 > (114 → 114). The export was absent on the spec author's base.
 > The assembled candidate adds its checked proof and root-loads the
-> complete seed with an isolated refusal in a package-owned test.
+> complete seed with both isolated premise-drop refusals in a package-owned test.
 > That is not official conformance-runner execution, CI, publication,
 > landing or landed trust.
 
@@ -813,12 +813,16 @@ index to `EVar Zero`; for that same `xy` the resulting two sides
 compute to four and two, with the comparison `four ≤ two`
 computing `False`. A true claim with the same proof shape for
 `shift_off` accepts, while the false `merge_off` claim is refused
-at its own proof term after a fresh accepted prefix. A fixture's
-independent calculations and refusal isolate the false equation;
+at its own proof term after a fresh accepted prefix. The seed also
+checks `all_const`'s universal zero-elsewhere premise while its
+derivative at `Zero` evaluates to zero. On `EVar Zero`, the two sides
+compute to zero and one; a same-shaped `shift_off` equality accepts,
+while the separate `all_const` claim refuses at its own proof term.
+These finite calculations and refusals isolate each missing premise;
 they are not generic proofs. The Foundation catalog half now exports
 the checked proof and its package-owned test reads CV's seed, checks
 owner/Transparent status, both private import refusals, exact trusted
-identities and the accepted/refused clients. The catalog package's
+identities and both accepted/refused premise-drop clients. The catalog package's
 public-theorem count is **nineteen** with this addition; its trust prose
 and contract reference include §§1–8. Candidate-local evidence remains
 distinct from CI, official conformance and landed trust.
