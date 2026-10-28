@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS
 title: "Spec 68 states that hull contains and intersection lies inside each operand, but no law says either is the tightest such interval. Rule from a checked D0 at zero trust that hull is the least upper bound and intersection the greatest lower bound under interval_inside, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

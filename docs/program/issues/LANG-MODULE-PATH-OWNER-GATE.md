@@ -1,7 +1,7 @@
 ---
 id: LANG-MODULE-PATH-OWNER-GATE
 title: "Enforce 33 §3.1's one-owner-per-module-path rule in the elaborator (a hard ModuleOwnerClash in either load order, keyed on unit-ownership records), and re-home the ~36 tests that build same-spelling collisions through the now-forbidden foreign same-path claim without losing their identity coverage"
-status: ready
+status: merged
 owner: language
 size: M
 gate: architect

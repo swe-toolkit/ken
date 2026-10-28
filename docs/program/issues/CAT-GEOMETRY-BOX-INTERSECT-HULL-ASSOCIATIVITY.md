@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY
 title: "Data.Numeric.Nat.Order exports assoc for min and max, and Algorithm.Geometry.NatBox exports intersect_assoc and hull_assoc, proved at zero trust from the Architect's D0, with the spec 67 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2

@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-INTERVAL-ASSOCIATIVITY-INSIDE
 title: "Algorithm.Numeric.RationalInterval exports spec 68 section 6: both regroupings of interval_add and of interval_mul by mutual inclusion, proved at zero trust from the Architect's D0, with the section 6 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
