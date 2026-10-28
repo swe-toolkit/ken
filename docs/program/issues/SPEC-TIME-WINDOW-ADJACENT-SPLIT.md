@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-ADJACENT-SPLIT
 title: "Spec 69 composes nested windows but no law splits one window at an interior bound. Rule from a checked D0 at zero trust that an ordered trace's window [lo, hi) is the append of its windows [lo, mid) and [mid, hi), with the premises the D0 shows necessary, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

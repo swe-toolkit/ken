@@ -1,7 +1,7 @@
 ---
 id: RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER
 title: "The finished-CLIF Result certifier treats a call as unable to write a stack slot when the call receives a pointer derived from that slot by a dynamic offset, a select or a block-param merge, and an earlier store then counts as the slot's exact current contents. The store path already catches the same pointers. Classify call arguments, retained-call arguments and stored values by slot dependency, not exact resolution"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1
