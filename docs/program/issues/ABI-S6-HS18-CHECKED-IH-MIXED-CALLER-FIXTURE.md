@@ -12,14 +12,22 @@ github: null
 origin: "Carried follow-on of ABI-S6-HS18-MAIN-BASED-CLOSURE increment A (bd5c64ed1), split out of increment B as its own node by the Architect's increment B D0 (evt_43ekkkz2adr43, item c). Steward-filed per COORDINATION section 2."
 ---
 
+> **AMENDED 2026-10-28 (Architect `evt_65wp3btz7m0c3`).** The census found
+> no context with two or more selected callers among 34 named plans
+> (`evt_7hbdq2rpegrrc`). A forged plan-level caller is refused by owner and
+> target validation before the gate, so it cannot tell "any" from "all".
+> The Deliverable, Acceptance and Residual sections below replace the
+> original plan-level fixture. Everything else stands.
+
 # A mixed-caller generated context is pinned
 
 ## Objective
 
 A test pins what the checked-IH generated-context gate does when its
 selected callers disagree: one has a completed return boundary and one does
-not. The completed caller keeps its contract. The non-completed caller's
-path is refused fail-closed with the FinishedCode cause.
+not. The context keeps its contract. That rule is extracted into a pure
+helper and pinned there, as amended. The FinishedCode half is a stated
+residual.
 
 ## Fixed inputs (main `a10d37eb3`)
 
@@ -40,26 +48,48 @@ stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-1. **The count.** The first act counts the generated contexts in the existing
-   native and lib corpora that have two or more selected callers whose
-   `checked_ih_static_response_return_boundary` results disagree. Use the
-   existing px8-ds diagnostic, and state the membership rule of the corpus
-   counted.
-2. **The fixture.**
-   - If the count is nonzero, the fixture uses one of the counted contexts.
-   - If the count is zero, it is hand-authored at plan level, in the same way
-     as the row-4 controls.
+1. **The count (done).** In 34 named plans there were 0 contexts with two
+   or more selected callers (`evt_7hbdq2rpegrrc`):
+   - 26 native: the four named `rt_parity_native` rows, all of
+     `rt_span_prov_native` and all of `px7f_resource_native`;
+   - 8 lib: six `static_transition::responses::tests` fixtures.
+2. **A pure extraction, with no change in behavior.**
+   - Extract the "any" rule from `checked_ih_generated_context_result_contract`
+     into the private `generated_context_contract_from_boundaries(completed,
+     identities)`, verbatim from the ruling.
+   - The gate still evaluates every selected caller's boundary first, so its
+     errors propagate as before.
+3. **A unit fixture** on the helper, in `responses.rs`'s `mod tests`. It
+   takes two distinct `ConstructorIdentity` values, `a` and `b`.
+
+Scope: `responses.rs` only.
 
 ## Acceptance
 
-- **AC-1.** The fixture asserts that the completed caller's contract exists.
-  It also asserts that the non-completed caller's path is refused with the
-  FinishedCode cause, and with no other cause.
-- **AC-2.** Mutate the gate from "any" to "all", keeping the fixture. The
-  fixture compiles and reddens at the AC-1 contract assertion. Restore the
-  gate byte-identically.
-- **AC-3.** The existing checked-IH pins pass unchanged: increment A's
-  presence pin and the restore-k row.
+- **AC-1.** The four helper rows pass:
+
+  | Completed flags | Identities | Expected |
+  |---|---|---|
+  | `[true, false]` | `[a]` | `Ok(Some(a))` |
+  | `[false, true]` | `[a]` | `Ok(Some(a))` |
+  | `[false, false]` | `[a]` | `Ok(None)` |
+  | `[true]` | `[a, b]` | `Err`, "disagreeing" |
+
+- **AC-2.** Change `.any(` to `.all(` in the helper only. It compiles, and
+  both mixed rows go red at their `Some(a)` assertion. Restore the file
+  byte-identically.
+- **AC-3.** Behavior is preserved:
+  - increment A's presence pin and the restore-k row pass;
+  - the px8-ds generated-context diagnostic over the same 34 named plans
+    records the same `(context, contract)` pairs before and after the
+    extraction.
+
+## Residual (stated, not measured)
+
+No pin shows the downstream FinishedCode refusal on a non-completed caller
+that holds a contract. Its population is 0 of 34 named plans. The first WP
+whose plan produces a context with two or more distinct selected callers
+owes the real-plan fixture for that half.
 
 ## Stop condition
 

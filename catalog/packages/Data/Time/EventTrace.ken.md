@@ -2,8 +2,8 @@
 
 Finite events with natural-number times support half-open windows and a
 left-biased two-list merge with checked ordering, count, membership,
-window/merge distribution and window-composition laws. Merge membership
-holds even for unordered inputs.
+window/merge distribution, window composition and an adjacent-window
+split. Merge membership holds even for unordered inputs.
 
 ## Contents
 
@@ -29,10 +29,11 @@ Neither operation reads a clock or sorts unordered input.
 The public carrier, operations and the first five generic laws lead the
 checked source, followed by their private recursive merge helper and proof
 lemmas. The window/merge distribution and composition laws, the three merge
-membership laws and merge associativity each lead their private lemmas later
-in the source. Windowing includes the lower bound but excludes the upper;
-a merge tie favors the left input without examining payloads. Membership uses Ω-valued `list_elem`,
-so neither a payload equality decision nor an ordering premise is needed.
+membership laws, merge associativity and the adjacent-window split each lead
+their private lemmas later in the source. Windowing includes the lower bound
+but excludes the upper; a merge tie favors the left input without examining
+payloads. Membership uses Ω-valued `list_elem`, so neither a payload equality
+decision nor an ordering premise is needed.
 
 ```ken
 import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
@@ -51,6 +52,7 @@ import Data.Collections.Derived (is_sorted)
 
 import Data.Collections.Derived
   (filter,
+    list_append,
     count,
     list_elem,
     list_elem_later,
@@ -239,6 +241,44 @@ pub theorem trace_window_window
     (event_in_window p (max lo1 lo2) (min hi1 hi2))
     (λe. event_in_window_inter p lo1 hi1 lo2 hi2 e)
     tr
+
+pub theorem trace_window_split
+      (p : Type) (lo : Nat) (mid : Nat) (hi : Nat) (tr : List (Event p))
+    : time_ordered p tr
+      → Equal Bool (leq_nat lo mid) True
+      → Equal Bool (leq_nat mid hi) True
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi tr)
+        (list_append (Event p) (trace_window p lo mid tr) (trace_window p mid hi tr)) =
+  match tr {
+    Nil ↦ λordered. λlo_mid. λmid_hi. Proved;
+    Cons h t ↦
+      λordered.
+        λlo_mid.
+          λmid_hi.
+            trace_window_split_cons
+              p
+              lo
+              mid
+              hi
+              h
+              t
+              ordered
+              lo_mid
+              mid_hi
+              (trace_window_split
+                p
+                lo
+                mid
+                hi
+                t
+                (list_sorted_tail (Event p) (event_before p) h t ordered)
+                lo_mid
+                mid_hi)
+              (lt_nat (event_time p h) mid)
+              Refl
+  }
 
 pub theorem trace_merge_nil_left
       (p : Type) (ys : List (Event p))
@@ -2435,6 +2475,439 @@ theorem window_filter_fuse
         Refl
         (joined h)
   }
+
+theorem trace_window_split_cons
+      (p : Type)
+      (lo : Nat)
+      (mid : Nat)
+      (hi : Nat)
+      (h : Event p)
+      (t : List (Event p))
+      (ordered : time_ordered p (Cons (Event p) h t))
+      (lo_mid : Equal Bool (leq_nat lo mid) True)
+      (mid_hi : Equal Bool (leq_nat mid hi) True)
+      (ih : Equal
+        (List (Event p))
+        (trace_window p lo hi t)
+        (list_append (Event p) (trace_window p lo mid t) (trace_window p mid hi t)))
+      (below : Bool)
+    : Equal Bool (lt_nat (event_time p h) mid) below
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (Cons (Event p) h t))
+        (list_append
+          (Event p)
+          (trace_window p lo mid (Cons (Event p) h t))
+          (trace_window p mid hi (Cons (Event p) h t))) =
+  match below {
+    True ↦ λbelow_mid. trace_window_split_below p lo mid hi h t mid_hi ih below_mid;
+    False ↦
+      λnot_below.
+        trace_window_split_above
+          p
+          lo
+          mid
+          hi
+          h
+          t
+          ordered
+          lo_mid
+          ((proof false_reverse_leq for lt_nat) (event_time p h) mid not_below)
+  }
+
+theorem trace_window_split_below
+      (p : Type)
+      (lo : Nat)
+      (mid : Nat)
+      (hi : Nat)
+      (h : Event p)
+      (t : List (Event p))
+      (mid_hi : Equal Bool (leq_nat mid hi) True)
+      (ih : Equal
+        (List (Event p))
+        (trace_window p lo hi t)
+        (list_append (Event p) (trace_window p lo mid t) (trace_window p mid hi t)))
+    : Equal Bool (lt_nat (event_time p h) mid) True
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (Cons (Event p) h t))
+        (list_append
+          (Event p)
+          (trace_window p lo mid (Cons (Event p) h t))
+          (trace_window p mid hi (Cons (Event p) h t))) =
+  match h {
+    MkEvent th x ↦
+      λbelow_mid.
+        trans
+          (List (Event p))
+          (trace_window p lo hi (Cons (Event p) (MkEvent p th x) t))
+          (window_keep
+            (Event p)
+            (MkEvent p th x)
+            (trace_window p lo hi t)
+            (bool_and (leq_nat lo th) True))
+          (list_append
+            (Event p)
+            (trace_window p lo mid (Cons (Event p) (MkEvent p th x) t))
+            (trace_window p mid hi (Cons (Event p) (MkEvent p th x) t)))
+          (cong
+            Bool
+            (List (Event p))
+            (lt_nat th hi)
+            True
+            (λd.
+              window_keep
+                (Event p)
+                (MkEvent p th x)
+                (trace_window p lo hi t)
+                (bool_and (leq_nat lo th) d))
+            ((proof from_leq_suc for lt_nat)
+              th
+              hi
+              ((proof trans for leq_nat)
+                (Suc th)
+                mid
+                hi
+                ((proof to_leq_suc for lt_nat) th mid below_mid)
+                mid_hi)))
+          (trans
+            (List (Event p))
+            (window_keep
+              (Event p)
+              (MkEvent p th x)
+              (trace_window p lo hi t)
+              (bool_and (leq_nat lo th) True))
+            (list_append
+              (Event p)
+              (window_keep
+                (Event p)
+                (MkEvent p th x)
+                (trace_window p lo mid t)
+                (bool_and (leq_nat lo th) True))
+              (trace_window p mid hi t))
+            (list_append
+              (Event p)
+              (trace_window p lo mid (Cons (Event p) (MkEvent p th x) t))
+              (trace_window p mid hi (Cons (Event p) (MkEvent p th x) t)))
+            (window_keep_append
+              (Event p)
+              (MkEvent p th x)
+              (trace_window p lo hi t)
+              (trace_window p lo mid t)
+              (trace_window p mid hi t)
+              ih
+              (bool_and (leq_nat lo th) True))
+            (sym
+              (List (Event p))
+              (list_append
+                (Event p)
+                (trace_window p lo mid (Cons (Event p) (MkEvent p th x) t))
+                (trace_window p mid hi (Cons (Event p) (MkEvent p th x) t)))
+              (list_append
+                (Event p)
+                (window_keep
+                  (Event p)
+                  (MkEvent p th x)
+                  (trace_window p lo mid t)
+                  (bool_and (leq_nat lo th) True))
+                (trace_window p mid hi t))
+              (trans
+                (List (Event p))
+                (list_append
+                  (Event p)
+                  (trace_window p lo mid (Cons (Event p) (MkEvent p th x) t))
+                  (trace_window p mid hi (Cons (Event p) (MkEvent p th x) t)))
+                (list_append
+                  (Event p)
+                  (window_keep
+                    (Event p)
+                    (MkEvent p th x)
+                    (trace_window p lo mid t)
+                    (bool_and (leq_nat lo th) True))
+                  (trace_window p mid hi (Cons (Event p) (MkEvent p th x) t)))
+                (list_append
+                  (Event p)
+                  (window_keep
+                    (Event p)
+                    (MkEvent p th x)
+                    (trace_window p lo mid t)
+                    (bool_and (leq_nat lo th) True))
+                  (trace_window p mid hi t))
+                (cong
+                  Bool
+                  (List (Event p))
+                  (lt_nat th mid)
+                  True
+                  (λd.
+                    list_append
+                      (Event p)
+                      (window_keep
+                        (Event p)
+                        (MkEvent p th x)
+                        (trace_window p lo mid t)
+                        (bool_and (leq_nat lo th) d))
+                      (trace_window p mid hi (Cons (Event p) (MkEvent p th x) t)))
+                  below_mid)
+                (cong
+                  Bool
+                  (List (Event p))
+                  (leq_nat mid th)
+                  False
+                  (λd.
+                    list_append
+                      (Event p)
+                      (window_keep
+                        (Event p)
+                        (MkEvent p th x)
+                        (trace_window p lo mid t)
+                        (bool_and (leq_nat lo th) True))
+                      (window_keep
+                        (Event p)
+                        (MkEvent p th x)
+                        (trace_window p mid hi t)
+                        (bool_and d (lt_nat th hi))))
+                  (lt_nat_reverse_leq_false th mid (leq_nat mid th) Refl below_mid)))))
+  }
+
+theorem trace_window_split_above
+      (p : Type)
+      (lo : Nat)
+      (mid : Nat)
+      (hi : Nat)
+      (h : Event p)
+      (t : List (Event p))
+      (ordered : time_ordered p (Cons (Event p) h t))
+      (lo_mid : Equal Bool (leq_nat lo mid) True)
+      (mid_h : Equal Bool (leq_nat mid (event_time p h)) True)
+    : Equal
+        (List (Event p))
+        (trace_window p lo hi (Cons (Event p) h t))
+        (list_append
+          (Event p)
+          (trace_window p lo mid (Cons (Event p) h t))
+          (trace_window p mid hi (Cons (Event p) h t))) =
+  trans
+    (List (Event p))
+    (trace_window p lo hi (Cons (Event p) h t))
+    (trace_window p mid hi (Cons (Event p) h t))
+    (list_append
+      (Event p)
+      (trace_window p lo mid (Cons (Event p) h t))
+      (trace_window p mid hi (Cons (Event p) h t)))
+    (trace_window_raise p lo mid hi h t ordered lo_mid mid_h)
+    (cong
+      (List (Event p))
+      (List (Event p))
+      (Nil (Event p))
+      (trace_window p lo mid (Cons (Event p) h t))
+      (λz. list_append (Event p) z (trace_window p mid hi (Cons (Event p) h t)))
+      (sym
+        (List (Event p))
+        (trace_window p lo mid (Cons (Event p) h t))
+        (Nil (Event p))
+        (trace_window_past p lo mid h t ordered mid_h)))
+
+theorem trace_window_past
+      (p : Type) (lo : Nat) (mid : Nat) (h : Event p) (t : List (Event p))
+    : time_ordered p (Cons (Event p) h t)
+      → Equal Bool (leq_nat mid (event_time p h)) True
+      → Equal (List (Event p)) (trace_window p lo mid (Cons (Event p) h t)) (Nil (Event p)) =
+  match t {
+    Nil ↦
+      λordered.
+        λmid_h.
+          cong
+            Bool
+            (List (Event p))
+            (event_in_window p lo mid h)
+            False
+            (λd. window_keep (Event p) h (Nil (Event p)) d)
+            (event_in_window_past p lo mid h mid_h);
+    Cons h2 t2 ↦
+      λordered.
+        λmid_h.
+          trans
+            (List (Event p))
+            (trace_window p lo mid (Cons (Event p) h (Cons (Event p) h2 t2)))
+            (trace_window p lo mid (Cons (Event p) h2 t2))
+            (Nil (Event p))
+            (cong
+              Bool
+              (List (Event p))
+              (event_in_window p lo mid h)
+              False
+              (λd. window_keep (Event p) h (trace_window p lo mid (Cons (Event p) h2 t2)) d)
+              (event_in_window_past p lo mid h mid_h))
+            (trace_window_past
+              p
+              lo
+              mid
+              h2
+              t2
+              (list_sorted_tail (Event p) (event_before p) h (Cons (Event p) h2 t2) ordered)
+              ((proof trans for leq_nat)
+                mid
+                (event_time p h)
+                (event_time p h2)
+                mid_h
+                (list_sorted_head (Event p) (event_before p) h (Cons (Event p) h2 t2) ordered)))
+  }
+
+theorem trace_window_raise
+      (p : Type) (lo : Nat) (mid : Nat) (hi : Nat) (h : Event p) (t : List (Event p))
+    : time_ordered p (Cons (Event p) h t)
+      → Equal Bool (leq_nat lo mid) True
+      → Equal Bool (leq_nat mid (event_time p h)) True
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (Cons (Event p) h t))
+        (trace_window p mid hi (Cons (Event p) h t)) =
+  match t {
+    Nil ↦
+      λordered.
+        λlo_mid.
+          λmid_h.
+            cong
+              Bool
+              (List (Event p))
+              (event_in_window p lo hi h)
+              (event_in_window p mid hi h)
+              (λd. window_keep (Event p) h (Nil (Event p)) d)
+              (event_in_window_raise p lo mid hi h lo_mid mid_h);
+    Cons h2 t2 ↦
+      λordered.
+        λlo_mid.
+          λmid_h.
+            trans
+              (List (Event p))
+              (trace_window p lo hi (Cons (Event p) h (Cons (Event p) h2 t2)))
+              (window_keep
+                (Event p)
+                h
+                (trace_window p mid hi (Cons (Event p) h2 t2))
+                (event_in_window p lo hi h))
+              (trace_window p mid hi (Cons (Event p) h (Cons (Event p) h2 t2)))
+              (cong
+                (List (Event p))
+                (List (Event p))
+                (trace_window p lo hi (Cons (Event p) h2 t2))
+                (trace_window p mid hi (Cons (Event p) h2 t2))
+                (λrest. window_keep (Event p) h rest (event_in_window p lo hi h))
+                (trace_window_raise
+                  p
+                  lo
+                  mid
+                  hi
+                  h2
+                  t2
+                  (list_sorted_tail (Event p) (event_before p) h (Cons (Event p) h2 t2) ordered)
+                  lo_mid
+                  ((proof trans for leq_nat)
+                    mid
+                    (event_time p h)
+                    (event_time p h2)
+                    mid_h
+                    (list_sorted_head
+                      (Event p)
+                      (event_before p)
+                      h
+                      (Cons (Event p) h2 t2)
+                      ordered))))
+              (cong
+                Bool
+                (List (Event p))
+                (event_in_window p lo hi h)
+                (event_in_window p mid hi h)
+                (λd. window_keep (Event p) h (trace_window p mid hi (Cons (Event p) h2 t2)) d)
+                (event_in_window_raise p lo mid hi h lo_mid mid_h))
+  }
+
+theorem event_in_window_past
+      (p : Type) (lo : Nat) (mid : Nat) (e : Event p)
+    : Equal Bool (leq_nat mid (event_time p e)) True
+      → Equal Bool (event_in_window p lo mid e) False =
+  match e {
+    MkEvent t x ↦
+      λmid_t.
+        trans
+          Bool
+          (bool_and (leq_nat lo t) (lt_nat t mid))
+          (bool_and (leq_nat lo t) False)
+          False
+          (cong
+            Bool
+            Bool
+            (lt_nat t mid)
+            False
+            (λd. bool_and (leq_nat lo t) d)
+            ((proof leq_not_lt for lt_nat) mid t mid_t))
+          ((proof comm for bool_and) (leq_nat lo t) False)
+  }
+
+theorem event_in_window_raise
+      (p : Type) (lo : Nat) (mid : Nat) (hi : Nat) (e : Event p)
+    : Equal Bool (leq_nat lo mid) True
+      → Equal Bool (leq_nat mid (event_time p e)) True
+      → Equal Bool (event_in_window p lo hi e) (event_in_window p mid hi e) =
+  match e {
+    MkEvent t x ↦
+      λlo_mid.
+        λmid_t.
+          trans
+            Bool
+            (bool_and (leq_nat lo t) (lt_nat t hi))
+            (lt_nat t hi)
+            (bool_and (leq_nat mid t) (lt_nat t hi))
+            (cong
+              Bool
+              Bool
+              (leq_nat lo t)
+              True
+              (λd. bool_and d (lt_nat t hi))
+              ((proof trans for leq_nat) lo mid t lo_mid mid_t))
+            (sym
+              Bool
+              (bool_and (leq_nat mid t) (lt_nat t hi))
+              (lt_nat t hi)
+              (cong Bool Bool (leq_nat mid t) True (λd. bool_and d (lt_nat t hi)) mid_t))
+  }
+
+theorem lt_nat_reverse_leq_false
+      (a : Nat) (b : Nat) (decision : Bool)
+    : Equal Bool (leq_nat b a) decision
+      → Equal Bool (lt_nat a b) True
+      → Equal Bool (leq_nat b a) False =
+  match decision {
+    True ↦
+      λba.
+        λab.
+          absurd
+            (trans
+              Bool
+              True
+              (lt_nat a b)
+              False
+              (sym Bool (lt_nat a b) True ab)
+              ((proof leq_not_lt for lt_nat) b a ba));
+    False ↦ λba. λab. ba
+  }
+
+theorem window_keep_append
+      (a : Type)
+      (h : a)
+      (whole : List a)
+      (left : List a)
+      (right : List a)
+      (split : Equal (List a) whole (list_append a left right))
+      (decision : Bool)
+    : Equal
+        (List a)
+        (window_keep a h whole decision)
+        (list_append a (window_keep a h left decision) right) =
+  match decision {
+    True ↦ cong (List a) (List a) whole (list_append a left right) (λrest. Cons a h rest) split;
+    False ↦ split
+  }
 ```
 
 ## 3. Using it
@@ -2457,6 +2930,13 @@ theorem event_left_tie_example
         (Cons (Event Bool) event_a (Cons (Event Bool) event_b (Nil (Event Bool)))) =
   Refl
 ```
+
+To split a half-open window, supply ordered-trace evidence and proofs of
+`lo ≤ mid` and `mid ≤ hi`. The checked `trace_window_split` returns a
+structural equality with the append of the two adjacent windows. An event
+at `mid` belongs only to the right window; the
+[closed split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md)
+shows both subwindows as nonempty lists.
 
 ## 4. Laws & proofs
 
@@ -2519,6 +2999,14 @@ and transitivity determine the same first event under either grouping.
 A timestamp tie is taken from the left input in both groupings, so
 the final list retains the same stored events in the same order.
 
+The adjacent-window proof inducts on the ordered trace and splits on whether
+the head time is below the midpoint. A head below it is kept by the whole
+window exactly when kept by the left subwindow and never by the right;
+`window_keep_append` carries the induction hypothesis. At or above the
+midpoint, ordering forces the left subwindow empty and the whole window to
+match the right. The nine split helpers remain private, and the theorem
+requires both bound-order premises.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -2540,7 +3028,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and thirteen checked law contracts.
+  — the carrier, half-open boundary, left-bias and fourteen checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -2549,7 +3037,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the thirteen laws form the package surface.
+   `trace_merge`, and the fourteen laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -2567,8 +3055,10 @@ merging, not window multiplicity.
    units use the original merge operation; the right unit reuses its existing
    induction, now public under the same name. Merge associativity uses that
    public right unit and the three private head-selection lemmas, with seven
-   new private support theorems; it needs no ordered-input premise.
-4. **Trusted-base delta.** Zero: all thirteen exported laws have checked proof
+   new private support theorems; it needs no ordered-input premise. The
+   adjacent-window split reuses the checked `list_append` provider and nine
+   new private proof helpers under ordered-trace and bound-order premises.
+4. **Trusted-base delta.** Zero: all fourteen exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -2576,9 +3066,12 @@ merging, not window multiplicity.
    [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md),
    [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md),
    [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md),
-   [composition seed](../../../../conformance/stdlib/time-and-events/seed-window-composition.md)
-   and [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md)
+   [composition seed](../../../../conformance/stdlib/time-and-events/seed-window-composition.md),
+   [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md)
+   and [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md)
    supply independent closed values and refused claims; these clients
    complement, not replace, the generic proofs. Package tests run the
-   merge-membership and composition seeds, including their pinned refusals;
-   this is not an official conformance-runner or CI claim.
+   merge-membership and composition seeds, including their pinned refusals.
+   The adjacent-split package test root-loads the checked generic law,
+   accepts the complete seed and refuses its isolated swapped claim;
+   neither test is official conformance-runner execution or CI.
