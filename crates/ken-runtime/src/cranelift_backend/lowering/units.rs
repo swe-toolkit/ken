@@ -11879,7 +11879,7 @@ impl<'f> IndexedFunction<'f> {
                 continue;
             }
             for argument in self.func.dfg.inst_args(inst) {
-                if let Some((slot, _)) = resolve_stack_address(self, *argument)? {
+                for slot in address_dependent_slots(self, *argument)? {
                     let receivers = calls.entry(slot).or_default();
                     if receivers.last() != Some(&inst) {
                         receivers.push(inst);
@@ -12088,7 +12088,7 @@ impl<'f> IndexedFunction<'f> {
                     // address among its operands somewhere this index cannot
                     // name, so each such address escapes.
                     for &argument in self.func.dfg.inst_args(inst) {
-                        if let Some((slot, _)) = resolve_stack_address(self, argument)? {
+                        for slot in address_dependent_slots(self, argument)? {
                             stored_slots.entry(slot).or_default().push(None);
                         }
                     }
@@ -12096,13 +12096,12 @@ impl<'f> IndexedFunction<'f> {
                 }
                 _ => continue,
             };
-            let Some((stored_slot, _)) = resolve_stack_address(self, stored)? else {
-                continue;
-            };
-            stored_slots
-                .entry(stored_slot)
-                .or_default()
-                .push(destination);
+            for stored_slot in address_dependent_slots(self, stored)? {
+                stored_slots
+                    .entry(stored_slot)
+                    .or_default()
+                    .push(destination);
+            }
         }
         Ok(self.stored_slots.get_or_init(|| stored_slots))
     }
@@ -12219,13 +12218,15 @@ pub(super) struct StagedResultBody {
     independent_contract: Option<ConstructorIdentity>,
 }
 
-fn address_depends_on_slots(
+/// Every stack slot whose address contributes to `value`, including through
+/// a dynamic offset, selection, or incoming block argument.
+fn address_dependent_slots(
     func: &IndexedFunction<'_>,
     value: cranelift_codegen::ir::Value,
-    slots: &BTreeSet<cranelift_codegen::ir::StackSlot>,
-) -> Result<bool, CraneliftBackendError> {
+) -> Result<BTreeSet<cranelift_codegen::ir::StackSlot>, CraneliftBackendError> {
     let cfg = func.cfg();
     let entry = func.layout.entry_block();
+    let mut slots = BTreeSet::new();
     let mut seen = BTreeSet::new();
     let mut pending = vec![value];
     while let Some(value) = pending.pop() {
@@ -12233,8 +12234,8 @@ fn address_depends_on_slots(
         if !seen.insert(value) {
             continue;
         }
-        if resolve_stack_address(func, value)?.is_some_and(|(slot, _)| slots.contains(&slot)) {
-            return Ok(true);
+        if let Some((slot, _)) = resolve_stack_address(func, value)? {
+            slots.insert(slot);
         }
         match func.dfg.value_def(value) {
             cranelift_codegen::ir::ValueDef::Result(inst, _) => {
@@ -12259,7 +12260,15 @@ fn address_depends_on_slots(
             }
         }
     }
-    Ok(false)
+    Ok(slots)
+}
+
+fn address_depends_on_slots(
+    func: &IndexedFunction<'_>,
+    value: cranelift_codegen::ir::Value,
+    slots: &BTreeSet<cranelift_codegen::ir::StackSlot>,
+) -> Result<bool, CraneliftBackendError> {
+    Ok(!address_dependent_slots(func, value)?.is_disjoint(slots))
 }
 
 fn call_may_access_location(
@@ -12268,10 +12277,8 @@ fn call_may_access_location(
     access: &LocationAccess,
 ) -> Result<bool, CraneliftBackendError> {
     for argument in func.dfg.inst_args(call) {
-        match resolve_stack_address(func, *argument)? {
-            Some((slot, _)) if access.containers.contains(&slot) => return Ok(true),
-            None if access.escaped => return Ok(true),
-            _ => {}
+        if address_depends_on_slots(func, *argument, &access.containers)? || access.escaped {
+            return Ok(true);
         }
     }
     Ok(call_follows_retention(func, call, access))
@@ -15714,6 +15721,216 @@ mod generated_result_protocol_verifier {
                     .expect("earlier call aliasing is decidable"),
                 "a call that runs before the retaining call cannot use its pointer"
             );
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    enum SlotPointerShape {
+        Exact,
+        DynamicOffset,
+        Select,
+        BlockParam,
+    }
+
+    #[derive(Clone, Copy)]
+    enum SlotPointerUse {
+        Call,
+        RetainingCall,
+        StoreThrough,
+        StoreToHeap,
+        AtomicToHeap,
+    }
+
+    /// A finished-CLIF memory query, not a reimplementation of the address
+    /// classifier. The initial exact store must cease to be current whenever
+    /// the subsequent operation can write the same slot.
+    fn slot_pointer_case(
+        shape: SlotPointerShape,
+        use_pointer: SlotPointerUse,
+    ) -> (
+        Function,
+        StackMemoryLocation,
+        cranelift_codegen::ir::Inst,
+        Option<(cranelift_codegen::ir::Inst, cranelift_codegen::ir::Inst)>,
+    ) {
+        let mut func = Function::new();
+        func.signature.call_conv = CallConv::SystemV;
+        func.signature.params.push(AbiParam::new(types::I64));
+        func.signature.returns.push(AbiParam::new(types::I64));
+        let receiving_call = direct_callee(&mut func, FuncId::from_u32(111), 1);
+        let later_call = direct_callee(&mut func, FuncId::from_u32(112), 0);
+        let slot =
+            func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+        let location = StackMemoryLocation {
+            slot,
+            offset: 0,
+            bytes: 8,
+        };
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        let index = builder.block_params(entry)[0];
+        let stored_word = builder.ins().iconst(types::I64, 7);
+        builder.ins().stack_store(stored_word, slot, 0);
+        let pointer = match shape {
+            SlotPointerShape::Exact => builder.ins().stack_addr(types::I64, slot, 0),
+            SlotPointerShape::DynamicOffset => {
+                let base = builder.ins().stack_addr(types::I64, slot, 0);
+                let offset = builder.ins().band_imm(index, 8);
+                builder.ins().iadd(base, offset)
+            }
+            SlotPointerShape::Select => {
+                let first = builder.ins().stack_addr(types::I64, slot, 0);
+                let second = builder.ins().stack_addr(types::I64, slot, 8);
+                builder.ins().select(index, first, second)
+            }
+            SlotPointerShape::BlockParam => {
+                let left = builder.create_block();
+                let right = builder.create_block();
+                let merge = builder.create_block();
+                builder.append_block_param(merge, types::I64);
+                builder.ins().brif(index, left, &[], right, &[]);
+                builder.switch_to_block(left);
+                let first = builder.ins().stack_addr(types::I64, slot, 0);
+                builder.ins().jump(merge, &[first]);
+                builder.switch_to_block(right);
+                let second = builder.ins().stack_addr(types::I64, slot, 8);
+                builder.ins().jump(merge, &[second]);
+                builder.switch_to_block(merge);
+                builder.block_params(merge)[0]
+            }
+        };
+        let retention = match use_pointer {
+            SlotPointerUse::Call => {
+                builder.ins().call(receiving_call, &[pointer]);
+                None
+            }
+            SlotPointerUse::RetainingCall => {
+                let retaining = builder.ins().call(receiving_call, &[pointer]);
+                let later = builder.ins().call(later_call, &[]);
+                Some((retaining, later))
+            }
+            SlotPointerUse::StoreThrough => {
+                let replacement = builder.ins().iconst(types::I64, 9);
+                builder.ins().store(
+                    cranelift_codegen::ir::MemFlags::trusted(),
+                    replacement,
+                    pointer,
+                    0,
+                );
+                None
+            }
+            SlotPointerUse::StoreToHeap => {
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                builder
+                    .ins()
+                    .store(cranelift_codegen::ir::MemFlags::trusted(), pointer, heap, 0);
+                builder.ins().call(later_call, &[]);
+                None
+            }
+            SlotPointerUse::AtomicToHeap => {
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                store_form(&mut builder, StoreForm::Atomic, pointer, heap, 0);
+                builder.ins().call(later_call, &[]);
+                None
+            }
+        };
+        let loaded = builder.ins().stack_load(types::I64, slot, 0);
+        let dependent = builder.ins().return_(&[loaded]);
+        builder.seal_all_blocks();
+        builder.finalize();
+        (func, location, dependent, retention)
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: the exact-address call and the derived-offset, select and
+    /// merged-pointer calls all leave Unknown after the call; a store through
+    /// the derived offset does too. CLAIMED: a call receiving any pointer
+    /// dependent on this slot may clobber it, just as a store through it may.
+    /// THE GAP: these four concrete pointer shapes do not exhaust all CLIF
+    /// pointer arithmetic; the shared dependency walk closes their operands.
+    #[test]
+    fn derived_stack_pointer_call_clobbers_the_prior_exact_store() {
+        for shape in [
+            SlotPointerShape::Exact,
+            SlotPointerShape::DynamicOffset,
+            SlotPointerShape::Select,
+            SlotPointerShape::BlockParam,
+        ] {
+            let (func, location, dependent, _) = slot_pointer_case(shape, SlotPointerUse::Call);
+            assert_eq!(
+                reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                    .expect("finished call memory is decidable"),
+                BTreeSet::from([ReachingMemoryState::Unknown]),
+                "call through {shape:?} pointer must invalidate the exact store"
+            );
+        }
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::DynamicOffset,
+            SlotPointerUse::StoreThrough,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("finished store memory is decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "store through the derived pointer is the already-guarded sibling"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: exact and dynamically offset stack pointers are recorded as
+    /// retaining-call arguments, so a later call with no pointer argument may
+    /// write the slot. CLAIMED: retention uses dependency, not exact offset.
+    /// THE GAP: zero-argument calls without prior retention or escape remain
+    /// out of scope; the first call is the proven retaining event here.
+    #[test]
+    fn derived_stack_pointer_is_retained_by_a_call() {
+        for shape in [SlotPointerShape::Exact, SlotPointerShape::DynamicOffset] {
+            let (func, location, _, retention) =
+                slot_pointer_case(shape, SlotPointerUse::RetainingCall);
+            let (retaining, later) = retention.expect("fixture has two calls");
+            let indexed = IndexedFunction::new(&func);
+            let access = location_access(&indexed, location).expect("retention is decidable");
+            assert!(
+                access.retaining_calls.contains(&retaining),
+                "{shape:?} pointer must register its retaining call"
+            );
+            assert!(
+                call_may_access_location(&indexed, later, &access)
+                    .expect("later call aliasing is decidable"),
+                "later call may write through the retained {shape:?} pointer"
+            );
+        }
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: storing either an exact or a dynamically offset stack pointer
+    /// in non-stack memory via a regular or an atomic store escapes its slot;
+    /// a subsequent argument-free call leaves Unknown. CLAIMED: a stored
+    /// derived address cannot preserve the earlier Exact state when its
+    /// recipient may write through that address. THE GAP: these two store
+    /// opcodes and one heap destination do not enumerate every storing opcode.
+    #[test]
+    fn stored_derived_stack_pointer_escapes_before_a_call() {
+        for shape in [SlotPointerShape::Exact, SlotPointerShape::DynamicOffset] {
+            for use_pointer in [SlotPointerUse::StoreToHeap, SlotPointerUse::AtomicToHeap] {
+                let (func, location, dependent, _) = slot_pointer_case(shape, use_pointer);
+                let indexed = IndexedFunction::new(&func);
+                assert!(
+                    location_access(&indexed, location)
+                        .expect("slot escape is decidable")
+                        .escaped,
+                    "{shape:?} pointer stored to the heap must escape"
+                );
+                assert_eq!(
+                    reaching_memory_states_before(&indexed, location, dependent)
+                        .expect("memory after escaping pointer is decidable"),
+                    BTreeSet::from([ReachingMemoryState::Unknown]),
+                    "the later call may write through the escaped {shape:?} pointer"
+                );
+            }
         }
     }
 
