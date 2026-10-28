@@ -8,7 +8,7 @@ Four labelled candidates have costs 5, 2, 7 and 2. The two minimum
 costs are at labels 1 and 3, away from the head: the earlier label 1
 wins. Adding three to each cost preserves every strict comparison;
 flattening every cost to zero instead ties all four and selects head 0.
-This spec-and-seed candidate does not deliver the catalog export.
+The earlier spec-and-seed candidate did not deliver the catalog export.
 
 ## Accepted client
 
