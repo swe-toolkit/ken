@@ -149,11 +149,11 @@ fn effect_floor_names_resolve_to_captured_ids_in_strict_and_legacy_modes() {
     }
 }
 
-/// Promise class: durable invariant. MEASURED: qualified paths pass above,
-/// but bare coproduct and clock constructor references reject in every source
-/// route; fresh same-spelling local constructors remain legal. CLAIMED: scoped
-/// families do not reserve or alias their bare names. THE GAP: the fixtures
-/// exercise expression position, not every constructor-pattern spelling.
+/// Promise class: durable invariant. MEASURED: the prelude has no bare
+/// coproduct or clock constructor keys, while source-local same-spelling
+/// constructors remain legal in each route. CLAIMED: scoping does not reserve
+/// those names or keep global aliases. THE GAP: this global-binding check is
+/// not the source-refusal pin; the three independent rows below provide it.
 #[test]
 fn scoped_effect_constructors_have_no_bare_aliases() {
     let base = ElabEnv::new().expect("checked prelude");
@@ -161,30 +161,6 @@ fn scoped_effect_constructors_have_no_bare_aliases() {
         assert!(!base.globals.contains_key(name), "{name}: no bare alias");
     }
     for mode in MODES {
-        for (name, source) in [
-            (
-                "InL",
-                "const witness : Coproduct Nat Nat = InL Nat Nat Zero",
-            ),
-            (
-                "InR",
-                "const witness : Coproduct Nat Nat = InR Nat Nat Zero",
-            ),
-            ("MkInstant", "const witness : Instant = MkInstant 23"),
-        ] {
-            let failure = error(source, mode);
-            if mode == "strict-roots" {
-                assert!(
-                    matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
-                    "{mode} bare {name}: {failure:?}"
-                );
-            } else {
-                assert!(
-                    matches!(failure, ElabError::UnresolvedCon { name: ref rejected, .. } if rejected == name),
-                    "{mode} bare {name}: {failure:?}"
-                );
-            }
-        }
         let local = elaborate("data Local = InL | InR | MkInstant", mode)
             .unwrap_or_else(|failure| panic!("{mode}: legal local constructor: {failure:?}"));
         for name in ["Coproduct.InL", "Coproduct.InR", "Instant.MkInstant"] {
@@ -194,6 +170,56 @@ fn scoped_effect_constructors_have_no_bare_aliases() {
             );
         }
     }
+}
+
+/// Promise class: durable invariant. MEASURED: this route independently
+/// refuses each bare scoped constructor in expression position with its
+/// mode-specific error. CLAIMED: no source route accepts a bare prelude alias.
+/// THE GAP: the qualified positives are pinned independently in the exact-ID
+/// row above; constructor patterns are tested by other consumers.
+fn assert_bare_scoped_constructors_refuse(mode: &str) {
+    for (name, source) in [
+        (
+            "InL",
+            "const witness : Coproduct Nat Nat = InL Nat Nat Zero",
+        ),
+        (
+            "InR",
+            "const witness : Coproduct Nat Nat = InR Nat Nat Zero",
+        ),
+        ("MkInstant", "const witness : Instant = MkInstant 23"),
+    ] {
+        let failure = match elaborate(source, mode) {
+            Ok(_) => panic!("{mode} bare {name}: unexpectedly accepted"),
+            Err(failure) => failure,
+        };
+        if mode == "strict-roots" {
+            assert!(
+                matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
+                "{mode} bare {name}: {failure:?}"
+            );
+        } else {
+            assert!(
+                matches!(failure, ElabError::UnresolvedCon { name: ref rejected, .. } if rejected == name),
+                "{mode} bare {name}: {failure:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn bare_scoped_effect_constructors_refuse_in_strict_roots() {
+    assert_bare_scoped_constructors_refuse("strict-roots");
+}
+
+#[test]
+fn bare_scoped_effect_constructors_refuse_in_legacy_roots() {
+    assert_bare_scoped_constructors_refuse("legacy-roots");
+}
+
+#[test]
+fn bare_scoped_effect_constructors_refuse_in_legacy_file() {
+    assert_bare_scoped_constructors_refuse("legacy-file");
 }
 
 /// Promise class: durable invariant. MEASURED: same-spelling source type or
