@@ -532,10 +532,10 @@ trust. Signed arithmetic, division, `Float`, rounding, width and
 structural hull/intersection equalities remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–6 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–7 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
 SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION;
-SPEC-TIME-MERGE-ASSOCIATIVITY).
+SPEC-TIME-MERGE-ASSOCIATIVITY; SPEC-TIME-WINDOW-ADJACENT-SPLIT).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -563,14 +563,24 @@ identities 114 → 114; §5 catalog exports and a targeted package-owned
 seed test are now present on main. This does not establish official
 conformance, CI or a landed trust measurement. Section 6
 specifies premise-free structural associativity of `trace_merge` on
-arbitrary lists, including unordered inputs. The candidate carries
-the catalog law with seven private helpers and a closed seed that
-separates an outer-operand swap by a cross-input time-4 tie. Architect
-D0 checked the generic proof with no new `Axiom` and equal scratch
-trusted identities (114 → 114); candidate-local checks do not claim
-official conformance, CI, publication, landing or landed trust. Clock
-effects, durations, causality, infinite streams, premise-free
-structural window/merge distribution and k-way merge remain deferred.
+arbitrary lists, including unordered inputs. Its catalog export,
+seven private helpers and closed seed are now on main; Architect's
+prior D0 checked the generic proof with no new `Axiom` and equal
+scratch trusted identities (114 → 114). Section 7 specifies one
+Transparent structural split law: a time-ordered trace window
+`[lo,hi)` equals the appended `[lo,mid)` and `[mid,hi)` windows,
+provided `lo ≤ mid ≤ hi`. Each of its three premises is necessary;
+without any one, a closed counterexample refutes the equality.
+The bound equalities use `leq_nat`, and the result uses the existing
+`list_append`, which the catalog must add to EventTrace's named
+Derived import. Architect's isolated D0 on `d94af9ee5` checked the
+generic proof with no new `Axiom` and unchanged scratch trusted
+identities 114 → 114. The §7 export is absent on this base; D0
+and the separately owned seed cannot establish shipped §7 execution,
+official conformance, CI, publication, landing or landed
+trust. Clock effects, durations, causality, infinite streams,
+premise-free structural window/merge distribution and k-way merge
+remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;

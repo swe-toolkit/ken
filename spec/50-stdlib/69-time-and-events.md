@@ -5,7 +5,8 @@
 > SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3;
 > SPEC-TIME-MERGE-MEMBERSHIP §4;
 > SPEC-TIME-WINDOW-COMPOSITION §5;
-> SPEC-TIME-MERGE-ASSOCIATIVITY §6).** The §1–2 EventTrace
+> SPEC-TIME-MERGE-ASSOCIATIVITY §6;
+> SPEC-TIME-WINDOW-ADJACENT-SPLIT §7).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -28,12 +29,15 @@
 > the exact package-local trusted identity set stays 114 → 114.
 > This does not establish official conformance-runner execution, CI,
 > publication, landing or a landed trust measurement.
-> Section 6 specifies one unconditional structural merge-associativity
-> law. This candidate also carries its catalog export and seven private
-> proof helpers: the Architect's isolated D0 checked it without a new
-> `Axiom` and with equal scratch trusted GlobalIds (114 → 114).
-> Candidate-local catalog and seed checks are not official
-> conformance-runner execution, CI, publication, landing or landed trust.
+> Section 6's unconditional structural merge-associativity law and its
+> private proof helpers are on main; earlier candidate-local checks
+> alone were not official conformance or landed trust. Section 7
+> specifies a premise-bearing split of an ordered trace across adjacent
+> half-open windows. Architect's isolated D0 on `d94af9ee5` checked
+> its generic proof with no new `Axiom` and equal scratch trusted
+> GlobalIds (114 → 114). The §7 catalog export is absent on this
+> base; D0 does not establish shipped §7 execution, official
+> conformance, CI, publication, landing or landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -169,9 +173,10 @@ window/merge distribution; §2 separately states the two membership
 laws, and §3 states distribution under ordered-input premises. They
 do not give structural window/merge distribution on unordered inputs.
 Section 6 separately states unconditional structural **merge
-associativity**, which is a different law. The count law alone does
-not choose an order for equal timestamps; left-biased output is fixed
-by §1.2's definition.
+associativity**, and §7 specifies splitting an ordered windowed trace
+at an intermediate timestamp; neither is an additional §1 law. The
+count law alone does not choose an order for equal timestamps;
+left-biased output is fixed by §1.2's definition.
 
 ### 1.4 Derivation, trust and deferred scope
 
@@ -355,7 +360,11 @@ A closed ordered illustration uses `xs=[0a,3a,6a]` and
 drops the early left event and late right event but keeps the left
 `3a` before the tied right `3b`. A conformance seed will check the
 law application and this exact result separately; these closed
-checks do not establish the generic quantified law.
+checks do not establish the generic quantified law. Section 7's
+split of **one** ordered trace at an intermediate bound does not
+weaken this section's **two** ordered-input premises for merging:
+the unordered `xs=[5,1]` counterexample above is unaffected by
+partitioning one trace into adjacent windows.
 
 ### 3.2 Consequences and excluded claims
 
@@ -562,11 +571,10 @@ publication, landing or a landed trust measurement.
 > Architect checked the generic proof in isolated D0 on `df0b57c98`,
 > with `ken check` and `ken fmt --check` rc 0, no added `Axiom`,
 > two targeted tests passing, and identical scratch `trusted_base()`
-> GlobalIds (114 → 114). This candidate carries the checked catalog
-> export and its closed seed, rather than deferring the export to a
-> separate catalog node. Its candidate-local checks do not establish
-> official conformance-runner execution, CI, publication, landing or
-> landed trust.
+> GlobalIds (114 → 114). The catalog export and closed seed are now on
+> main. The earlier candidate-local checks did not establish official
+> conformance-runner execution, CI, publication, landing or landed
+> trust.
 
 `Data.Time.EventTrace` must export one Transparent checked theorem,
 with exactly this name, binder order and structural list equality:
@@ -618,5 +626,118 @@ that swapped equality; this D0 no-tie control shows that the
 time-4 tie is the discriminating axis, not a generic `Refl` refusal.
 Neither closed calculation nor that refusal establishes the generic
 law; the checked proof body is the catalog obligation. The
-Architect's scratch checks and this candidate's local checks remain
-distinct from shipped and official evidence.
+Architect's scratch checks and the former candidate's local checks
+remain distinct from shipped and official evidence.
+
+## 7. Adjacent half-open window split
+
+> **Section 7 status: DRAFT v0
+> (SPEC-TIME-WINDOW-ADJACENT-SPLIT).** Architect's isolated D0 on
+> landed base `d94af9ee53389c12582baced90c0b71620300563`
+> checked the generic owner-local Transparent proof, a public client,
+> and closed true/false controls, with no new `Axiom` and unchanged
+> scratch `trusted_base()` GlobalIds (114 → 114). The §7 catalog
+> export is absent on that authoring base. The catalog law, seed and
+> package-owned test travel together in the assembled candidate;
+> D0 alone is not shipped §7 execution, official conformance, CI,
+> publication, landing or landed trust.
+
+### 7.1 Public checked law and necessary premises
+
+`Data.Time.EventTrace` must export one public Transparent theorem, after
+`trace_window_window` and before `trace_merge_nil_left`, with precisely
+the following name, argument order, three premises and structural list
+equality:
+
+```ken
+pub theorem trace_window_split
+      (p : Type) (lo : Nat) (mid : Nat) (hi : Nat) (tr : List (Event p))
+    : time_ordered p tr
+      → Equal Bool (leq_nat lo mid) True
+      → Equal Bool (leq_nat mid hi) True
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi tr)
+        (list_append (Event p) (trace_window p lo mid tr) (trace_window p mid hi tr))
+```
+
+Here `list_append` is the existing `Data.Collections.Derived`
+operation, not a new trace primitive. EventTrace's **named** import
+from `Data.Collections.Derived` on the authoring base omits it; the
+catalog half must add **`list_append` to that existing import list**,
+not assume a whole-module import and not add another declaration.
+The seed client also selectively imports
+`Data.Collections.Derived (list_append)` to state the equality.
+All §1–§6 operations and laws retain their types and bodies.
+
+The single ordered input makes concatenation of the two window
+results reproduce the original trace order. The range assumptions
+require `lo ≤ mid ≤ hi` as the two displayed `Equal Bool` premises.
+Window `[lo,mid)` excludes events stamped exactly `mid`, whereas
+`[mid,hi)` includes them; `[lo,hi)` includes `lo` and excludes `hi`.
+The equality is **of lists of stored events in order**, including
+payloads and repeated timestamps, not merely membership or count.
+It holds when a subwindow is empty (for example `lo = mid` or
+`mid = hi`) under the shown premises. It does not sort an unordered
+trace, imply a premise-free split, or relax the two ordered-input
+requirements of §3's distinct window/merge law.
+
+Each premise matters independently; Architect's D0 checked that the
+corresponding law with **that premise dropped** implies `Bottom` in
+a closed instance:
+
+- Without `time_ordered`, `tr=[e5,e1]` at times 5 and 1 with
+  `lo=0`, `mid=3`, `hi=10` gives whole window `[e5,e1]` but
+  appended subwindows `[e1,e5]`. A first-event observer
+  distinguishes the lists.
+- Without `lo ≤ mid`, `tr=[e1]` with `lo=2`, `mid=0`, `hi=5`
+  gives an empty whole window but the event appears in `[mid,hi)`.
+- Without `mid ≤ hi`, `tr=[e4]` with `lo=0`, `mid=5`, `hi=3`
+  gives an empty whole window but the event appears in `[lo,mid)`.
+
+These closed counterexamples show why the premises are retained;
+they do not by themselves prove the generic conditional theorem.
+The premise spelling follows §2's `Equal Bool (leq_nat _ _) True`,
+not a new `IsTrue` convention for EventTrace.
+
+### 7.2 Derivation and evidence boundary
+
+The checked proof proceeds by induction on `tr`. At a nonempty
+trace, it case-splits on a **bound Boolean decision** for whether
+the head time is below `mid`, carrying an equality between that
+decision and `lt_nat (event_time p h) mid`. It does not directly
+match a computed scrutinee and assume that its convertible forms
+are refined. Below `mid`, the head occurs in the whole window
+exactly when it occurs in the left subwindow and never in the right;
+the private `window_keep_append` combines that fact with the
+induction hypothesis. At or above `mid`, ordering propagates the
+lower bound down the tail: the left subwindow is empty by
+`trace_window_past` and the whole window equals the right by
+`trace_window_raise`. This branch does not use the induction
+hypothesis.
+
+Nine new owner-local Transparent helpers stay **private**:
+`trace_window_split_cons`, `trace_window_split_below`,
+`trace_window_split_above`, `trace_window_past`,
+`trace_window_raise`, `event_in_window_past`,
+`event_in_window_raise`, `lt_nat_reverse_leq_false`, and
+`window_keep_append`. The proof also reuses private `window_keep`.
+None becomes a selective-import API or a new public Nat lemma.
+There is no new axiom, postulate, primitive, kernel rule or surface
+feature.
+
+In Architect's closed D0 fixture, the ordered trace `[e1,e3,e7]`
+has timestamps 1, 3 and 7, with `lo=1`, `mid=3`, `hi=9`.
+The whole window is `[e1,e3,e7]`, the left is `[e1]`, and
+the right is `[e3,e7]`; a true structural split is independently
+checked. Swapping the two **nonempty, distinct** subwindows is
+refused at its own `Refl` after a fresh accepted prefix. An
+independent closed value check establishes that the time-3 event
+is **not** in the left `[1,3)` window, while the true split is
+accepted in the same proof shape. A closed fixture illustrates the
+boundary, not the generic law; the D0 patch and its seed-shaped
+client do not establish execution of the assembled catalog export
+or official conformance. The separately owned package test must
+read the seed, check the export and private-helper boundary, and
+compare exact trusted identity sets; those checks remain distinct
+from CI, publication and landed trust.
