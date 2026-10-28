@@ -11,9 +11,10 @@
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
 > Section 7 specifies one additional generic law and a closed seed.
-> Architect's isolated D0 checked its proposed proof, but the §7 catalog
-> export is absent on this base; the seed does not establish shipped §7
-> execution, official conformance, CI, publication, landing or landed trust.
+> Architect's isolated D0 checked its proposed proof. The separate
+> Foundation catalog candidate exports the checked law and runs the seed
+> in a package-owned test; that test is not official conformance-runner
+> execution, CI, publication, landing or landed trust.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -604,10 +605,12 @@ or landed trust.
 > (SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT).** Architect checked the
 > generic proof in an isolated D0 on `54f68d3cc` with no new `Axiom`,
 > `ken check` and `ken fmt --check` rc 0, and identical scratch
-> `trusted_base()` GlobalId sets (109 → 109). The §7 catalog export is
-> absent on this base. Its separately authored seed does not establish
-> shipped §7 execution, official conformance, CI, publication, landing
-> or landed trust.
+> `trusted_base()` GlobalId sets (109 → 109). The earlier spec-and-seed
+> candidate did not deliver the §7 catalog export. The separate Foundation
+> candidate exports the checked law and its package test root-loads the
+> law, checks the complete accepted seed and refuses the isolated false
+> swapped-input claim. Those are candidate-local checks, not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ### 7.1 One premise-free public law
 
@@ -644,8 +647,8 @@ Nat multiplication commutativity, plus existing private
 `cong`, `sym`, and `trans` transport the equalities. Its public type
 has no added premise, import, operation, kernel rule, or scalar tier.
 The §1–6 operations, laws, and private helper visibility remain
-unchanged. A follow-on catalog WP, separate from this spec candidate,
-owns the §7 checked export and the corresponding package law count.
+unchanged. The separate Foundation catalog candidate owns the §7 checked
+export and updates the package law count.
 
 The closed seed uses the non-square `2 × 3` matrix with rows
 `[1,2,3]` and `[4,0,1]`, `x = [2,1,3]`, and `y = [1,2]`. Separate
@@ -660,7 +663,10 @@ equality such as the closed transpose oracle. The refusal tests this
 false swapped-`y` equality, not a generic limit on the theorem.
 
 Architect's D0 established proof feasibility and isolated client
-behavior on a scratch catalog overlay. It is not a shipped §7 export
-or official seed execution. No result here asserts a new landed trust
-measurement or a rational, signed, semiring-general, or approximate
-matrix law.
+behavior on a scratch catalog overlay; that historical check did not
+establish a shipped §7 export or official seed execution. The separate
+Foundation candidate exports the checked law and its package test runs
+the complete accepted seed and isolated refusal. Neither candidate-local
+checking nor the historical D0 establishes official conformance-runner
+execution, CI, publication, landing or landed trust. No rational, signed,
+semiring-general, or approximate matrix law is asserted.

@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and twenty algebraic laws have checked proofs.
+all arithmetic is exact, and twenty-one algebraic laws have checked proofs.
 
 ## Contents
 
@@ -850,6 +850,125 @@ pub theorem matrix_vector_homogeneous
             new_tail
             (VCons Nat k new_head)
             (matrix_vector_homogeneous k n factor rest x))
+  }
+
+pub theorem transpose_adjoint
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat m)
+    : Equal Nat
+        (dot m (matrix_vector m n a x) y)
+        (dot n x (matrix_vector n m (transpose m n a) y)) =
+  match a {
+    VNil ↦
+      sym
+        Nat
+        (dot n x (matrix_vector n Zero (repeat (Vec Nat Zero) n (VNil Nat)) y))
+        Zero
+        (dot_zero_columns n x y);
+    VCons k row tail ↦
+      match y {
+        VCons _ y0 ys ↦
+          let
+            row_dot = dot n row x;
+            tail_dot = dot k (matrix_vector k n tail x) ys;
+            tail_columns = transpose k n tail;
+            tail_image = matrix_vector n k tail_columns ys;
+            tail_adjoint = dot n x tail_image;
+            scaled = vector_scale n y0 row;
+            head = mul y0 (dot n x row)
+          in
+            trans
+              Nat
+              (add (mul row_dot y0) tail_dot)
+              (add head tail_adjoint)
+              (dot
+                n
+                x
+                (matrix_vector
+                  n
+                  (Suc k)
+                  (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) row tail_columns)
+                  (VCons Nat k y0 ys)))
+              (trans
+                Nat
+                (add (mul row_dot y0) tail_dot)
+                (add head tail_dot)
+                (add head tail_adjoint)
+                (cong
+                  Nat
+                  Nat
+                  (mul row_dot y0)
+                  head
+                  (λv. add v tail_dot)
+                  (trans
+                    Nat
+                    (mul row_dot y0)
+                    (mul y0 row_dot)
+                    head
+                    ((proof comm for mul) row_dot y0)
+                    (cong Nat Nat row_dot (dot n x row) (mul y0) (dot_comm n row x))))
+                (cong
+                  Nat
+                  Nat
+                  tail_dot
+                  tail_adjoint
+                  (add head)
+                  (transpose_adjoint k n tail x ys)))
+              (trans
+                Nat
+                (add head tail_adjoint)
+                (dot n x (vector_add n scaled tail_image))
+                (dot
+                  n
+                  x
+                  (matrix_vector
+                    n
+                    (Suc k)
+                    (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) row tail_columns)
+                    (VCons Nat k y0 ys)))
+                (sym
+                  Nat
+                  (dot n x (vector_add n scaled tail_image))
+                  (add head tail_adjoint)
+                  (trans
+                    Nat
+                    (dot n x (vector_add n scaled tail_image))
+                    (add (dot n x scaled) tail_adjoint)
+                    (add head tail_adjoint)
+                    (dot_distrib_right n x scaled tail_image)
+                    (cong
+                      Nat
+                      Nat
+                      (dot n x scaled)
+                      head
+                      (λv. add v tail_adjoint)
+                      (dot_scale_right n y0 x row))))
+                (cong
+                  (Vec Nat n)
+                  Nat
+                  (vector_add n scaled tail_image)
+                  (matrix_vector
+                    n
+                    (Suc k)
+                    (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) row tail_columns)
+                    (VCons Nat k y0 ys))
+                  (dot n x)
+                  (sym
+                    (Vec Nat n)
+                    (matrix_vector
+                      n
+                      (Suc k)
+                      (zip_with
+                        Nat
+                        (Vec Nat k)
+                        (Vec Nat (Suc k))
+                        n
+                        (prepend k)
+                        row
+                        tail_columns)
+                      (VCons Nat k y0 ys))
+                    (vector_add n scaled tail_image)
+                    (transpose_cons_image k n row tail_columns y0 ys))))
+      }
   }
 
 theorem matrix_add_assoc_cons
@@ -2280,6 +2399,76 @@ theorem dot_scale_right
       (dot_scale n factor ys xs)
       (cong Nat Nat (dot n ys xs) (dot n xs ys) (mul factor) (dot_comm n ys xs)))
 
+theorem dot_zero_columns
+      (n : Nat) (x : Vec Nat n) (y : Vec Nat Zero)
+    : Equal Nat (dot n x (matrix_vector n Zero (repeat (Vec Nat Zero) n (VNil Nat)) y)) Zero =
+  match x {
+    VNil ↦ Proved;
+    VCons k x0 tail ↦
+      let rest =
+        dot k tail (matrix_vector k Zero (repeat (Vec Nat Zero) k (VNil Nat)) y)
+      in
+        trans
+          Nat
+          (add (mul x0 Zero) rest)
+          rest
+          Zero
+          ((proof zero_l for add) rest)
+          (dot_zero_columns k tail y)
+  }
+
+theorem transpose_cons_image
+      (k : Nat)
+      (n : Nat)
+      (row : Vec Nat n)
+      (columns : Vec (Vec Nat k) n)
+      (y0 : Nat)
+      (ys : Vec Nat k)
+    : Equal
+        (Vec Nat n)
+        (matrix_vector
+          n
+          (Suc k)
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) row columns)
+          (VCons Nat k y0 ys))
+        (vector_add n (vector_scale n y0 row) (matrix_vector n k columns ys)) =
+  match row {
+    VNil ↦ Proved;
+    VCons j r rest ↦
+      match columns {
+        VCons _ column tail_columns ↦
+          let
+            column_dot = dot k column ys;
+            old_tail =
+              matrix_vector
+                j
+                (Suc k)
+                (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) j (prepend k) rest tail_columns)
+                (VCons Nat k y0 ys);
+            new_tail = vector_add j (vector_scale j y0 rest) (matrix_vector j k tail_columns ys)
+          in
+            trans
+              (Vec Nat (Suc j))
+              (VCons Nat j (add (mul r y0) column_dot) old_tail)
+              (VCons Nat j (add (mul y0 r) column_dot) old_tail)
+              (VCons Nat j (add (mul y0 r) column_dot) new_tail)
+              (cong
+                Nat
+                (Vec Nat (Suc j))
+                (mul r y0)
+                (mul y0 r)
+                (λv. VCons Nat j (add v column_dot) old_tail)
+                ((proof comm for mul) r y0))
+              (cong
+                (Vec Nat j)
+                (Vec Nat (Suc j))
+                old_tail
+                new_tail
+                (VCons Nat j (add (mul y0 r) column_dot))
+                (transpose_cons_image k j rest tail_columns y0 ys))
+      }
+  }
+
 theorem columns_add_right
       (n : Nat) (q : Nat) (row : Vec Nat n) (cs : Vec (Vec Nat n) q) (ds : Vec (Vec Nat n) q)
     : Equal
@@ -2508,22 +2697,26 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–6 owns
-twenty-eight public names across eight operations and twenty laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–7 owns
+twenty-nine public names across eight operations and twenty-one laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
-[sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md)
-and [matrix-vector linearity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-vector-linearity.md)
+[sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
+[matrix-vector linearity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-vector-linearity.md)
+and [transpose adjoint seed](../../../../conformance/stdlib/linear-algebra/seed-transpose-adjoint.md)
 provide finite behavioral clients. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
 prepending, row products and proof bridges remain private. The new
-`dot_scale_right` helper, like `dot_distrib_right`, is not public. All twenty
+`dot_zero_columns` and `transpose_cons_image` helpers, like
+`dot_scale_right` and `dot_distrib_right`, are not public. All twenty-one
 public theorems have checked bodies. This package adds no Axiom, postulate,
 primitive, `Float` or trusted-base entry; dependencies retain their own trust
 posture. Root-loaded acceptance tests check generic
 imports, closed values and indexed relations, isolated refused claims, and
 the exact trusted-identity set. The indexed-sum package test checks the authored
 positive client and four isolated refusals; the matrix-vector linearity test
-checks its authored accepted client and isolated refusal. Both tests use
+checks its authored accepted client and isolated refusal. The transpose
+adjoint test checks its complete accepted seed, including both independently
+computed dot values, and refuses the swapped-input claim. These tests use
 root-loaded exports. They are not official conformance-runner runs or claims
 of CI, publication or landing.

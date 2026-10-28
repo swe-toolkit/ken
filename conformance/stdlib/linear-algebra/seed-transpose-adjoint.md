@@ -10,8 +10,10 @@ The accepted client applies the premise-free public law on a non-square
 also pins the transposed matrix as an indexed `Vec` equality and the
 right side with one swapped input to a distinct value. These closed
 calculations do not prove the generic law or cover all zero dimensions.
-The §7 catalog export is absent on the authoring base; the code fences
-are conformance obligations, not shipped-export results.
+The earlier spec-and-seed candidate did not deliver the §7 catalog
+export. The separate Foundation candidate exports the checked law and
+runs this seed in a package test. That is candidate-local execution,
+not official conformance-runner execution, CI, publication or landing.
 
 ## Accepted shared client
 
@@ -189,7 +191,16 @@ import. Logs under `/workspaces/ken/local/` use prefix
 `overlay-negative-canonical-check`, `overlay-positive-fmt`,
 `overlay-negative-fmt`, `base-values`, and `base-law` (`.log`). The
 reused CLI was built by the Architect's D0, not independently built
-from the detached base. Scratch worktrees were removed. These
-candidate-local checks and the D0 do not establish a shipped §7
-export, official conformance-runner execution, CI, publication,
-landing, or landed trust.
+from the detached base. Scratch worktrees were removed. These historical
+overlay checks and D0 did not establish a shipped §7 export or landed
+trust measurement.
+
+The separate Foundation catalog candidate now exports the checked
+`transpose_adjoint` law and runs this seed in
+`cat_linear_algebra_transpose_adjoint`. Its package test root-loads the
+law, checks the complete accepted client with the independent 35 and 37
+values, and refuses the isolated swapped-input `seed_neg` at its own
+false proposition. Exact trusted-GlobalId identity sets and a targeted
+NatMatrix ambient row are candidate-local measurements, not a
+full-corpus census or landed trust. The package test is not official
+conformance-runner execution, CI, publication or landing.
