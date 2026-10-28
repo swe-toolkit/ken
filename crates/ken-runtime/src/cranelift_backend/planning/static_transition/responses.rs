@@ -5598,36 +5598,20 @@ impl StaticTransitionPlan<'_> {
             .filter(|row| row.k_context() == context)
             .map(StaticResponseContinuation::k_identity)
             .collect::<Vec<_>>();
-        let mut has_completed_boundary = false;
+        let mut completed = Vec::new();
         for selected_caller in selected_callers {
-            has_completed_boundary |= self
-                .checked_ih_static_response_return_boundary(selected_caller)?
-                .is_some();
+            completed.push(
+                self.checked_ih_static_response_return_boundary(selected_caller)?
+                    .is_some(),
+            );
         }
-        let contract = if has_completed_boundary {
-            let mut identities = Vec::new();
-            for identity in self
-                .static_response_continuations
+        let contract = generated_context_contract_from_boundaries(
+            completed,
+            self.static_response_continuations
                 .iter()
                 .filter(|row| row.k_context == context)
-                .map(|row| row.k_ret_identity)
-            {
-                if !identities.contains(&identity) {
-                    identities.push(identity);
-                }
-            }
-            match identities.as_slice() {
-                [] => None,
-                [identity] => Some(*identity),
-                _ => {
-                    return Err(planner_error(
-                        "one generated context has disagreeing response Result contracts",
-                    ));
-                }
-            }
-        } else {
-            None
-        };
+                .map(|row| row.k_ret_identity),
+        )?;
         #[cfg(feature = "px8-ds-test-support")]
         super::record_generated_context_result_contract_diagnostic(context, contract);
         Ok(contract)
@@ -5659,6 +5643,31 @@ impl StaticTransitionPlan<'_> {
 
 }
 
+/// The ruled generated-context rule: a context has a Result contract when ANY
+/// selected caller has a completed return boundary, and that contract is the
+/// context's single response Result identity.
+fn generated_context_contract_from_boundaries(
+    completed: impl IntoIterator<Item = bool>,
+    identities: impl IntoIterator<Item = ConstructorIdentity>,
+) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+    if !completed.into_iter().any(|completed| completed) {
+        return Ok(None);
+    }
+    let mut distinct = Vec::new();
+    for identity in identities {
+        if !distinct.contains(&identity) {
+            distinct.push(identity);
+        }
+    }
+    match distinct.as_slice() {
+        [] => Ok(None),
+        [identity] => Ok(Some(*identity)),
+        _ => Err(planner_error(
+            "one generated context has disagreeing response Result contracts",
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -5675,6 +5684,109 @@ mod tests {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: "static response fixture is total".to_string(),
         }
+    }
+
+    /// Obtain distinct typed identities from two cases in one finished plan;
+    /// the helper under test never decodes or invents constructor spellings.
+    fn mixed_caller_result_identities() -> (ConstructorIdentity, ConstructorIdentity) {
+        let root = RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::MixedResult::First".to_string(),
+                args: Vec::new(),
+            }),
+            cases: vec![
+                RuntimeMatchCase {
+                    constructor: "ctor:fixture::MixedResult::First".to_string(),
+                    binders: 0,
+                    body: RuntimeExpr::Value(RuntimeValue::Bool(true)),
+                },
+                RuntimeMatchCase {
+                    constructor: "ctor:fixture::MixedResult::Second".to_string(),
+                    binders: 0,
+                    body: RuntimeExpr::Value(RuntimeValue::Bool(false)),
+                },
+            ],
+            default: trap(),
+        };
+        let plan = super::super::plan_static_transition_graph(&root, &BTreeMap::new())
+            .expect("two distinct result cases plan");
+        let match_origin = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::Match { .. }))
+            .expect("the plan contains the result match")
+            .static_origin;
+        let first = plan
+            .case_constructor_identity(match_origin, 0)
+            .expect("first checked result identity");
+        let second = plan
+            .case_constructor_identity(match_origin, 1)
+            .expect("second checked result identity");
+        assert_ne!(
+            first, second,
+            "the disagreement control needs two identities"
+        );
+        (first, second)
+    }
+
+    /// Promise class: durable invariant. MEASURED: a completed first caller
+    /// and non-completed second caller keep the checked Result identity.
+    /// CLAIMED: any completed caller is sufficient for the context contract.
+    /// THE GAP: these completed flags are direct helper inputs, not a real
+    /// two-caller plan; downstream FinishedCode refusal remains unmeasured.
+    #[test]
+    fn mixed_caller_completed_first_keeps_result_contract() {
+        let (a, _) = mixed_caller_result_identities();
+        assert_eq!(
+            generated_context_contract_from_boundaries([true, false], [a])
+                .expect("one Result identity is consistent"),
+            Some(a),
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: a completed second caller
+    /// keeps the same Result contract despite the first caller's absence.
+    /// CLAIMED: the ruled any gate is independent of selected caller order.
+    /// THE GAP: the helper input does not exercise real caller-boundary joining.
+    #[test]
+    fn mixed_caller_completed_second_keeps_result_contract() {
+        let (a, _) = mixed_caller_result_identities();
+        assert_eq!(
+            generated_context_contract_from_boundaries([false, true], [a])
+                .expect("one Result identity is consistent"),
+            Some(a),
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: absent boundaries yield no
+    /// contract. CLAIMED: a response row alone cannot mint a Result contract.
+    /// THE GAP: real boundary absence is tested by other checked-IH pins.
+    #[test]
+    fn mixed_caller_no_completed_boundary_has_no_result_contract() {
+        let (a, _) = mixed_caller_result_identities();
+        assert_eq!(
+            generated_context_contract_from_boundaries([false, false], [a])
+                .expect("no boundary leaves the identity unconsumed"),
+            None,
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: one completed boundary
+    /// with two different response identities refuses, rather than choosing
+    /// the first identity. CLAIMED: a context contracts only one Result kind.
+    /// THE GAP: the two identities are from one test plan's distinct cases,
+    /// not two response rows from one generated context in a native product.
+    #[test]
+    fn mixed_caller_disagreeing_result_identities_refuse() {
+        let (a, b) = mixed_caller_result_identities();
+        let error = generated_context_contract_from_boundaries([true], [a, b])
+            .expect_err("two Result identities cannot share one context contract");
+        assert!(
+            format!("{error:?}")
+                .contains("one generated context has disagreeing response Result contracts"),
+            "wrong refusal for disagreeing Result identities: {error:?}"
+        );
     }
 
     fn host_response_case(constructor: &str) -> RuntimeMatchCase {
