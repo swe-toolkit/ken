@@ -5434,6 +5434,39 @@ impl StaticTransitionPlan<'_> {
                 "a static-response return boundary does not join its complete selected caller to the exact K context",
             ));
         }
+        // A K whose returned-result route returns a Vis member does not
+        // complete its caller's detached return itself: its Protocol owner
+        // drives that Vis until the owner's own tag guard sees Ret, so the
+        // Ret obligation is the owner's, not a publication contract of K.
+        let k_returns_vis = match self.pending_vis_settlements.owners.get(&row.id()) {
+            Some(super::returned_vis::ResponseOwnerSettlement::Protocol) => self
+                .pending_vis_settlements
+                .protocol
+                .as_ref()
+                .and_then(|protocol| protocol.owners.get(&row.id()))
+                .ok_or_else(|| {
+                    planner_error(
+                        "a Protocol response owner has no returned-Vis protocol record",
+                    )
+                })?
+                .contexts
+                .iter()
+                .any(|returned| {
+                    returned.context == owner.k_context() && !returned.members.is_empty()
+                }),
+            Some(
+                super::returned_vis::ResponseOwnerSettlement::RetOnly
+                | super::returned_vis::ResponseOwnerSettlement::Excluded { .. },
+            ) => false,
+            None => {
+                return Err(planner_error(
+                    "a static-response return boundary names a response row with no owner settlement",
+                ))
+            }
+        };
+        if k_returns_vis {
+            return Ok(None);
+        }
 
         let mut boundaries = Vec::new();
         for caller_transport in self

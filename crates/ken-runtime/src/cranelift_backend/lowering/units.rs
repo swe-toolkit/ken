@@ -12485,6 +12485,14 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                             break;
                         }
                         realized_call_words.insert(obligation.result_word);
+                    } else if staged_unit(&staged, target)?.is_some_and(|target_unit| {
+                        realizations.iter().any(|realization| {
+                            realization.unit == target_unit && realization.target == target
+                        })
+                    }) {
+                        // As in the realization pass: a callee's realization
+                        // grounds every protocol-verified call of it.
+                        realized_call_words.insert(obligation.result_word);
                     }
                     let certificate = match obligation.identity {
                         Some(identity) => {
@@ -12551,7 +12559,15 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     // initialized returned word. The exact call seed is a
                     // separate dependency; the tag/arity guard cannot conjure
                     // realization from an uninitialized Result slot.
-                    realized_call_words.contains(&publication.returned_word)
+                    let reachable = reachable_with_cuts(func, &BTreeSet::new())?;
+                    let cfg = func.cfg();
+                    publication_resolves_to_realized_calls(
+                        func,
+                        &cfg,
+                        &reachable,
+                        &realized_call_words,
+                        publication.returned_word,
+                    )?
                 } else {
                     let cuts = derive_certified_cuts(
                         body,
@@ -13443,6 +13459,58 @@ fn prove_forwarded_value(
         proof.grounded = false;
     }
     Ok(proof)
+}
+
+/// Whether every reachable source of a response owner's published word is a
+/// realized direct-call result. A Protocol owner joins the result of each K it
+/// drives at one block parameter, so the join's every incoming value must
+/// itself be a realized call result. Any other leaf (a constant, a load, an
+/// entry parameter) could be an uninitialized Result slot.
+fn publication_resolves_to_realized_calls(
+    func: &IndexedFunction<'_>,
+    cfg: &ControlFlowGraph,
+    reachable: &BTreeSet<Block>,
+    realized_call_words: &BTreeSet<cranelift_codegen::ir::Value>,
+    value: cranelift_codegen::ir::Value,
+) -> Result<bool, CraneliftBackendError> {
+    let entry = func.layout.entry_block();
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        let value = func.dfg.resolve_aliases(value);
+        if !seen.insert(value) || realized_call_words.contains(&value) {
+            continue;
+        }
+        match func.dfg.value_def(value) {
+            cranelift_codegen::ir::ValueDef::Param(block, _) if entry == Some(block) => {
+                return Ok(false);
+            }
+            cranelift_codegen::ir::ValueDef::Param(block, index) => {
+                let predecessors = cfg
+                    .pred_iter(block)
+                    .filter(|predecessor| reachable.contains(&predecessor.block))
+                    .collect::<Vec<_>>();
+                if predecessors.is_empty() {
+                    return Ok(false);
+                }
+                for predecessor in predecessors {
+                    pending.extend(incoming_arguments_with_cuts(
+                        func,
+                        predecessor.inst,
+                        block,
+                        index,
+                        &BTreeSet::new(),
+                    )?);
+                }
+            }
+            cranelift_codegen::ir::ValueDef::Union(left, right) => {
+                pending.push(left);
+                pending.push(right);
+            }
+            cranelift_codegen::ir::ValueDef::Result(_, _) => return Ok(false),
+        }
+    }
+    Ok(true)
 }
 
 fn prove_realized_value(
