@@ -914,6 +914,14 @@ pub enum StaticResponseCallerRetargetMutation {
     RetargetToDifferentResponseOwner,
 }
 
+/// Test-only isolation of the generated-Result proof graph from the later
+/// selected-incoming-owner closeout. No obligations or certificates are changed.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResultContractLayerMutation {
+    SuppressMissingContractRefusal,
+}
+
 /// Population-side mutations at the specialized response-owner body seam.
 /// Each variant changes one emitted relation while leaving the typed plan
 /// intact, so the finished-function verifier must reject it.
@@ -983,6 +991,19 @@ thread_local! {
             const { std::cell::Cell::new(None) };
     static STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static RESULT_CONTRACT_LAYER_MUTATION:
+        std::cell::Cell<Option<ResultContractLayerMutation>> =
+            const { std::cell::Cell::new(None) };
+    static RESULT_CONTRACT_LAYER_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
     static STATIC_RESPONSE_OWNER_BODY_MUTATION:
         std::cell::Cell<Option<StaticResponseOwnerBodyMutation>> =
         const { std::cell::Cell::new(None) };
@@ -1060,6 +1081,48 @@ pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CALLER_RETARGET_MUTATION
         .with(std::cell::Cell::get)
         .is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_result_contract_layer_mutation<T>(
+    mutation: ResultContractLayerMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RESULT_CONTRACT_LAYER_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    RESULT_CONTRACT_LAYER_MUTATION.with(|slot| assert_eq!(slot.replace(Some(mutation)), None));
+    RESULT_CONTRACT_LAYER_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications = RESULT_CONTRACT_LAYER_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn result_contract_layer_mutation_is_exact() -> bool {
+    RESULT_CONTRACT_LAYER_MUTATION
+        .with(std::cell::Cell::get)
+        .is_none()
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn suppress_missing_result_contract_refusal() -> bool {
+    RESULT_CONTRACT_LAYER_MUTATION.with(|slot| match slot.get() {
+        None => false,
+        Some(ResultContractLayerMutation::SuppressMissingContractRefusal) => {
+            RESULT_CONTRACT_LAYER_MUTATION_APPLICATIONS.with(|count| count.set(count.get() + 1));
+            true
+        }
+    })
+}
+
+#[cfg(not(any(test, feature = "px8-ds-test-support")))]
+fn suppress_missing_result_contract_refusal() -> bool {
+    false
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -12542,7 +12605,9 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         })
         .copied()
         .collect::<Vec<_>>();
-    if !missing.is_empty() {
+    // The test-only layer-isolation switch is read only when a missing
+    // certificate would otherwise trigger this exact refusal block.
+    if !missing.is_empty() && !suppress_missing_result_contract_refusal() {
         for (target, demanded) in &missing {
             let Some(body) = staged.iter().find(|body| body.target == *target) else {
                 continue;

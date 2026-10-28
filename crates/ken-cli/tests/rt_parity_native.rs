@@ -2090,15 +2090,15 @@ full_demand_census_test!(
 /// exactly one planner-selected incoming identity and at least one decoded
 /// finished-CLIF caller targeting that owner.
 ///
-/// **MEASURED:** removing the incoming edge reaches the selected-caller
-/// refusal; restoring its unspecialized K target reaches the finished-code
-/// identity refusal before that ledger closes. Both restore exact bytes.
-/// **CLAIMED:** a selected call cannot silently enter an unspecialized K or
-/// discharge the wrong response owner.
-/// **THE GAP:** the restored-K call also changes result identity, so its earlier
-/// finished-code refusal does not witness the non-relay selected-caller arm.
-/// No compile-preserving callee-changing negative reaches that arm in this
-/// fixture; the relay arm has a separate reaching control.
+/// **MEASURED:** removing the incoming edge reaches the caller refusal;
+/// restoring its unspecialized K reaches the finished-code identity refusal.
+/// With only that earlier refusal suppressed, restoring K reaches the exact
+/// non-relay selected-caller refusal. Every arm restores identical bytes.
+/// **CLAIMED:** neither a wrong target nor a missing incoming call can
+/// silently discharge a forward-declared response owner.
+/// **THE GAP:** suppression must be inert on a sound build and must skip only
+/// an actually missing generated-Result certificate, leaving the later
+/// selected-caller ledger unchanged.
 #[test]
 fn static_response_selected_caller_retarget_reaches_and_restores() {
     use ken_runtime::StaticResponseCallerRetargetMutation as Mutation;
@@ -2127,6 +2127,25 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
             .expect("baseline response-retarget executable bytes");
         assert_eq!(baseline.len(), 1);
         assert!(!baseline[0].static_response_owners.is_empty());
+        // No missing generated-Result certificate exists on the sound fixture.
+        // Suppression alone must neither fire nor alter the linked executable.
+        let ((inert_root, (inert_result, inert_diagnostic)), inert_applications) =
+            ken_runtime::with_result_contract_layer_mutation(
+                ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
+                || compile("suppression-inert"),
+            );
+        assert_eq!(inert_applications, 0, "sound retarget fixture has no missing certificate");
+        assert!(ken_runtime::result_contract_layer_mutation_is_exact());
+        let inert_result = inert_result.expect("suppression alone must preserve the native build");
+        assert_eq!(inert_diagnostic, baseline);
+        assert_eq!(inert_result.artifact.executable_hash, baseline_hash);
+        assert_eq!(
+            std::fs::read(&inert_result.artifact.executable_path)
+                .expect("suppression-only executable bytes"),
+            baseline_bytes,
+            "suppression alone changed the sound executable"
+        );
+        drop(inert_root);
 
         // RECUT 2 HS7 FALLBACK (Architect evt_73r305aqtchgw; Steward scope confirm
         // evt_7xjkcw0tqnxj0). The >= 2-Specialized-owner arm
@@ -2154,19 +2173,35 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
              need >= 1."
         );
 
-        for (label, mutation) in [
-            ("restore-k", Mutation::RestoreSelectedKTarget),
-            ("remove", Mutation::RemoveSelectedCaller),
+        for (label, mutation, isolated) in [
+            ("restore-k", Mutation::RestoreSelectedKTarget, false),
+            ("restore-k-isolated", Mutation::RestoreSelectedKTarget, true),
+            ("remove", Mutation::RemoveSelectedCaller, false),
         ] {
-            let ((_mutated_root, (mutated_result, mutated_diagnostic)), applications) =
-                ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
+            let (((_mutated_root, (mutated_result, mutated_diagnostic)), applications),
+                layer_applications) = if isolated {
+                ken_runtime::with_result_contract_layer_mutation(
+                    ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
+                    || ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
+                        compile(label)
+                    }),
+                )
+            } else {
+                (ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
                     compile(label)
-                });
+                }), 0)
+            };
             assert!(applications > 0, "{label}: caller mutation did not reach");
+            if isolated {
+                assert!(layer_applications > 0, "{label}: no earlier refusal was suppressed");
+            } else {
+                assert_eq!(layer_applications, 0);
+            }
+            assert!(ken_runtime::result_contract_layer_mutation_is_exact());
             let error =
                 mutated_result.expect_err("a caller mutation must leave an owner unentered");
             let refusal = format!("{error:?}");
-            if mutation == Mutation::RestoreSelectedKTarget {
+            if mutation == Mutation::RestoreSelectedKTarget && !isolated {
                 let owner_ret_identities = baseline[0]
                     .static_response_owners
                     .iter()
@@ -2207,6 +2242,12 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
                     published, demanded,
                     "restore-k: the substituted K must publish a different identity"
                 );
+            } else if isolated {
+                assert!(
+                    refusal.contains("a forward-declared response owner has no verified selected incoming call")
+                        && refusal.contains("source_cause: Some(PlannerInvariant)"),
+                    "restore-k-isolated: the selected-caller closeout must refuse: {error:?}"
+                );
             } else {
                 assert_eq!(mutation, Mutation::RemoveSelectedCaller);
                 assert!(
@@ -2214,10 +2255,19 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
                     "remove: caller mutation failed for a different reason: {error:?}"
                 );
             }
-            if mutation == Mutation::RemoveSelectedCaller {
-                // Removing the caller stops lowering before its context queries,
-                // but cannot change the typed planner population. The complete
-                // diagnostic is still compared after each restored build below.
+            let query_observations_equal = mutated_diagnostic
+                .iter()
+                .map(|row| &row.generated_context_result_contracts)
+                .eq(baseline.iter().map(|row| &row.generated_context_result_contracts));
+            if query_observations_equal {
+                assert_eq!(
+                    mutated_diagnostic, baseline,
+                    "{label}: caller mutation altered the typed planner ledger"
+                );
+            } else {
+                // A malformed call may stop before lowering queries its K.
+                // Compare every planner fact; restored builds still compare
+                // the full diagnostic, including the query observations.
                 let mut baseline_planner = baseline.clone();
                 let mut mutated_planner = mutated_diagnostic.clone();
                 for row in baseline_planner.iter_mut().chain(mutated_planner.iter_mut()) {
@@ -2225,12 +2275,7 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
                 }
                 assert_eq!(
                     mutated_planner, baseline_planner,
-                    "remove: caller mutation altered the typed planner population"
-                );
-            } else {
-                assert_eq!(
-                    mutated_diagnostic, baseline,
-                    "restore-k: caller mutation altered the typed planner ledger"
+                    "{label}: caller mutation altered the typed planner population"
                 );
             }
             assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());

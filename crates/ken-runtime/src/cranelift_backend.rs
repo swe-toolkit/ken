@@ -89,6 +89,8 @@ pub use lowering::joins::with_owner_vis_join_consumed;
 pub use lowering::units::{
     retained_unit_call_target_mutation_is_exact,
     static_response_caller_retarget_mutation_is_exact,
+    result_contract_layer_mutation_is_exact, with_result_contract_layer_mutation,
+    ResultContractLayerMutation,
     static_response_owner_body_mutation_is_exact,
     with_generated_result_path_proof_mutation, GeneratedResultPathProofMutation,
     with_retained_unit_call_target_mutation, with_static_response_caller_retarget_mutation,
