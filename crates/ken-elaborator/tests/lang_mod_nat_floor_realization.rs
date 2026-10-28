@@ -756,7 +756,7 @@ const BINDING_ROUTE_CASES: &[BindingRouteCase] = &[
         label: "prove",
         collision_template: "prove {name} : Bool",
         renamed_source: "prove LocalProve : Bool",
-        renamed_identity: "LocalProve",
+        renamed_identity: "Entry.LocalProve",
     },
     BindingRouteCase {
         label: "prop",
