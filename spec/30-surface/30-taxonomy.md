@@ -158,12 +158,14 @@ admission; Spec owns the public spelling in `35`/`38` and the
 [ledger](30-intrinsic-ledger.md), and the rename lands atomically with the
 floor identity, roster/count, catalog callers, and fixtures. The current
 candidate spellings `NotFound`, `Other`, `Unsupported`, `write`,
-`Stdout`, and `Instant` trigger that review, but this section chooses no
-replacement names. `Success` and `Failure` have passed it as the
-qualified paths `ExitCode.Success` and `ExitCode.Failure`; neither bare
-spelling joins B. A per-type scoped-constructors choice supplies
-specificity structurally: `IOError.NotFound` is unambiguous without
-reserving bare `NotFound`. Type qualification is supported in expressions
+and `Stdout` trigger that review, but this section chooses no
+replacement names. `Instant` passes specificity as a type with a scoped
+`Instant.MkInstant` constructor, not a bare `MkInstant` reservation.
+`Success` and `Failure` have passed it as the qualified paths
+`ExitCode.Success` and `ExitCode.Failure`; neither bare spelling joins B.
+A per-type scoped-constructors choice supplies specificity
+structurally: `IOError.NotFound` is unambiguous without reserving
+bare `NotFound`. Type qualification is supported in expressions
 and patterns for every data type (`34 §1`), even when its constructors
 remain bare. The property changes only source visibility and the B
 inventory, never a constructor's checked identity or the number of floor
@@ -215,16 +217,32 @@ is selected by native environment-pair consumers, whereas `Pair` is a
 kernel Sigma with no constructor ID. Retargeting that representation is
 outside this admission.
 
-Thus the closed **floor-identity roster** has twenty names:
-**`{Auth, Bool, Bottom, Char, Equal, ExitCode, HostIO, List, Nat, Option,
-Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceKind, Result,
-Top, Utf8Error}`**. The original fifteen remain; the five entrypoint
-identities add no postulate or `trusted_base()` entry. Constructor and
-companion closures are separate from this twenty-name count. The definable
-`And`/`Dec`/`Yes`/`No` stay **out** (source-constructible, with a
-`Core/Logic` package home, and no internal-provision witness). The
-`Empty` needed by `space` desugaring is different: its identity is
-captured before source elaboration and read by exact ID
+Three effect/clock source-required checked identities also satisfy the
+internal-provision arm: `Unit` is the canonical effect-response result named
+by `36 §1.1` and §2.1, with its exact pre-source type ID captured in
+`PreludeEnv.unit_id` and its constructor keyed by the effect runtime;
+`Coproduct` is the canonical signature sum required by `36 §2.3` and
+§4.5.7, with its exact pre-source type ID in `PreludeEnv.coproduct_id`
+and its injection IDs selected by native composition;
+`Instant` is the source-named clock result in `36 §1.1`, with its
+pre-source `MkInstant` constructor ID selected by the native clock response
+and its exact `Instant` parent. A same-shaped source declaration of any of
+the three cannot replace the checked identity. The three type names pass
+the specificity rule: the generic injections and clock constructor are
+qualified as `Coproduct.InL`, `Coproduct.InR`, and
+`Instant.MkInstant`; `Unit` keeps its bare `MkUnit` constructor.
+
+Thus the closed **floor-identity roster** has twenty-three names:
+**`{Auth, Bool, Bottom, Char, Coproduct, Equal, ExitCode, HostIO,
+Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop,
+Proved, ResourceKind, Result, Top, Unit, Utf8Error}`**. The original
+fifteen, five entrypoint identities and three effect/clock identities
+remain re-checked, with no new postulate or `trusted_base()` entry.
+Constructor and companion closures are separate from this
+23-name count. The definable `And`/`Dec`/`Yes`/`No` stay **out**
+(source-constructible, with a `Core/Logic` package home, and no
+internal-provision witness). The `Empty` needed by `space` desugaring
+is different: its identity is captured before source elaboration and read by exact ID
 (`prelude.empty_id`), but no surface contract independently requires
 source to name it. It belongs internally, not in the floor. The
 source name `Empty` is provided by the explicit-import catalog package
@@ -255,10 +273,13 @@ paths, not three additional bare names in B. `ExitCode` is scoped:
 `Success`/`Failure`. `ProgramCaps` is scoped: its runner-minted
 `MkProgramCaps` has no bare reservation; when visible, it uses the
 qualified path `ProgramCaps.MkProgramCaps`. Its existing visibility is
-unchanged. `ProcessInput` and
-`Prod` are unscoped: their whole constructor families, respectively
-`MkProcessInput` and `MkProd`, are bare reserved names. `HostIO`, `Char`,
-and transparent `Pair` have no constructor family. A same-shaped
+unchanged. `Coproduct` and `Instant` are scoped:
+`Coproduct.InL`, `Coproduct.InR`, and `Instant.MkInstant` resolve to
+their exact checked constructor IDs, whereas bare `InL`, `InR` and
+`MkInstant` do not enter B. `ProcessInput`, `Prod` and `Unit` are
+unscoped: their whole constructor families, respectively
+`MkProcessInput`, `MkProd` and `MkUnit`, are bare reserved names.
+`HostIO`, `Char`, and transparent `Pair` have no constructor family. A same-shaped
 source family or definition has a different identity and is not the floor
 member. Every floor type, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
@@ -266,8 +287,9 @@ companion is re-checked and **out** of `trusted_base()`.
 **Other effect-surface and Program-I identities remain candidates.** The
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
-also holds. `Unit` remains a candidate, not an automatic extension merely
-because the compiler registers it. A source wrapper over an ABI (for example
+also holds. `Unit`, `Coproduct` and `Instant` are admitted on their measured
+exact-ID keying and independent `36` source needs, not merely because
+the compiler registers them. A source wrapper over an ABI (for example
 `Capability/Process/Exit`'s `exit_with`/`exit_from_result`) does not become
 an intrinsic identity by using one. `host_exit` is keyed but has no independent
 source-name requirement: it remains compiler-internal; an example using that
@@ -298,8 +320,8 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the twenty-identity set above and that candidate has no new ambient
-availability.
+remains the twenty-three-identity set above and that candidate has no new
+ambient availability.
 A keyed identity without an independent source-name requirement stays
 compiler-internal; an unkeyed, promised definition belongs in an explicit
 package; an unkeyed, unpromised registration may be removed after its uses
@@ -315,13 +337,14 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the twenty-identity
+**Implementation staging.** The specification fixes the twenty-three-identity
 floor and Pair's three checked companions as the current target. The original
-fifteen and Pair companions are already realized; the five entrypoint-ABI
-identities join strict resolution in this floor-addition slice, atomically
-with the roster/count and scoped-constructor choices. Other candidates need
-both D0 witness clauses before admission. No implementation gap authorizes a
-second identity or fallback route.
+fifteen, the five entrypoint-ABI identities and Pair companions are already
+realized; `Unit`, `Coproduct` and `Instant` join strict resolution with this
+floor-addition slice, atomically with the roster/count and scoped-constructor
+choices. Other candidates need both D0 witness clauses before
+admission. No implementation gap authorizes a second identity or
+fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 
@@ -336,11 +359,12 @@ and compiler-bootstrap members of the internal-provision arm. `Option` and
 canonical compiler-installed identities. The source-level `Empty` is provided
 by the `Core.Logic.EmptyDec` package with an identity distinct from the
 compiler's; `Either` is also a package. The `Empty` required by `space`
-desugaring is compiler-internal, not a package export. `Unit` is a candidate
-for the internal-provision arm, **not** a floor member until both witness
-clauses are proven and §4's roster changes atomically. A same-shaped
-source definition of `Pair` allocates a distinct identity; it neither replaces
-the floor family nor converts structural equality into floor provenance.
+desugaring is compiler-internal, not a package export. `Unit` instead
+belongs to the internal-provision floor: the source-required effect
+response needs the canonical checked identity, not an optional package
+lookalike. A same-shaped source definition of `Pair` allocates a
+distinct identity; it neither replaces the floor family nor converts
+structural equality into floor provenance.
 
 The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/
