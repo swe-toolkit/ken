@@ -1,6 +1,6 @@
 //! PX7-F checked surface and `ResourceHostIO` collision discriminator.
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{env::PrimReduction, Decl};
 
 const RESOURCE_KEN_MD: &str =
@@ -55,11 +55,20 @@ fn resource_host_io_preserves_the_existing_host_io_identity() {
     assert!(env.env.transparent_body(host_io).is_some());
     assert!(env.env.constructor(resource_host_io).is_some());
 
-    // Opposite mutation: the old spelling destructively replaces the live
-    // former in the flat namespace. The candidate therefore fails the
-    // two-identity closure even though the data declaration itself parses.
-    env.elaborate_decl("data CollisionMutation = HostIO IOError")
-        .expect("opposite spelling demonstrates the destructive collision");
-    assert_ne!(env.globals["HostIO"], host_io);
+    // Promise class: durable invariant. MEASURED: constructor-position reuse
+    // of a floor type refuses before allocating CollisionMutation, while both
+    // checked HostIO identities remain unchanged. CLAIMED: the floor protects
+    // the former even against an unscoped same-spelling source constructor.
+    // THE GAP: this fixture exercises HostIO; the ABI floor test covers the
+    // remaining four entrypoint type names in the same constructor position.
+    let error = env
+        .elaborate_decl("data CollisionMutation = HostIO IOError")
+        .expect_err("a source constructor spelled like a floor type is refused");
+    assert!(
+        matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "HostIO"),
+        "{error:?}"
+    );
+    assert_eq!(env.globals["HostIO"], host_io);
     assert_eq!(env.globals["ResourceHostIO"], resource_host_io);
+    assert!(!env.globals.contains_key("CollisionMutation"));
 }

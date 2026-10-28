@@ -209,9 +209,10 @@ fn legacy_entrypoints_preserve_qualified_only_constructor_scope() {
 }
 
 /// Promise class: durable invariant. MEASURED: source collisions with every
-/// newly reserved floor type and both unscoped constructors refuse before
-/// allocation. CLAIMED: the floor is a protected exact-ID namespace. THE
-/// GAP: these named heads do not enumerate all future syntax variants.
+/// newly reserved floor type in type and constructor positions, and both
+/// unscoped constructors, refuse before allocation. CLAIMED: the floor is a
+/// protected exact-ID namespace. THE GAP: these named heads do not enumerate
+/// all future syntax variants.
 #[test]
 fn entrypoint_floor_names_refuse_same_spelling_source_declarations() {
     for name in ABI_TYPES {
@@ -220,6 +221,14 @@ fn entrypoint_floor_names_refuse_same_spelling_source_declarations() {
         assert!(
             matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
             "{name}: {error:?}"
+        );
+    }
+    for name in ABI_TYPES {
+        let source = format!("data LocalHolder = {name}");
+        let error = strict_error(&source);
+        assert!(
+            matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
+            "constructor position {name}: {error:?}"
         );
     }
     for (name, source) in [
