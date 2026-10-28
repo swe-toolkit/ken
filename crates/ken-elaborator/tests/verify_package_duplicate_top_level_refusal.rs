@@ -108,8 +108,9 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
 /// Promise class: normative compatibility vector for this package. MEASURED:
 /// an unrelated checked example is excluded from the emitted package and
 /// leaves its canonical semantic hash unchanged. The three pre-source
-/// constructor symbols now carry scoped spellings; a scratch un-rename of
-/// exactly those names reproduced the old 0x35e3_b1f7_6682_e1cb hash.
+/// constructor symbols already carried scoped spellings in the landed base.
+/// This slice scopes Coproduct and Instant after role capture; scratch unscoping
+/// exactly those families restored the previous 0xdec1_765f_70b9_069a hash.
 /// CLAIMED: unrelated example checking is still legal, without shifting
 /// admitted declaration identity. THE GAP: this fixes the package-name-
 /// dependent baseline vector for this one package, not every package name.
@@ -122,7 +123,7 @@ fn unrelated_example_keeps_the_baseline_semantics_and_hash() {
     let checked = compile_literate(&with_example)
         .expect("independent example remains valid")
         .package;
-    assert_eq!(baseline.core_semantic_hash, 0xdec1_765f_70b9_069a);
+    assert_eq!(baseline.core_semantic_hash, 0xb250_7f51_71d8_044c);
     assert_eq!(checked.core_semantic_hash, baseline.core_semantic_hash);
     assert_eq!(checked.artifact.semantic, baseline.artifact.semantic);
 }

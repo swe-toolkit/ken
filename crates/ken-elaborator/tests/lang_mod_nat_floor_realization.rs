@@ -319,16 +319,16 @@ fn primitive_signature_type_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 }
 
 /// Promise class: normative compatibility vector. The configured type floor
-/// must be exactly the executable primitive-signature inventory plus the two
-/// internal-provision identities Nat and Pair.
+/// must be exactly the executable primitive-signature inventory plus the
+/// independently witnessed internal-provision identities.
 ///
 /// **MEASURED:** walking every kernel `Decl::Primitive` type reaches exactly
 /// the eight checked surface-type identities and a test-only primitive extends
 /// that result with its checked `Extra` parameter. **CLAIMED:** the signature
 /// arm is producer-closed rather than a selected helper census, and adding the
-/// two independently specified internal identities yields exactly the configured
-/// floor. **THE GAP:** the primitive traversal does not derive either internal
-/// provision witness.
+/// independently specified internal identities yields exactly the configured
+/// floor. **THE GAP:** the primitive traversal does not derive the internal-
+/// provision witnesses.
 #[test]
 fn primitive_signature_inventory_is_executable_and_closed() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -350,15 +350,18 @@ fn primitive_signature_inventory_is_executable_and_closed() {
     observed_plus_internal_provision.extend(
         [
             "Bottom",
+            "Coproduct",
             "Equal",
             "ExitCode",
             "HostIO",
+            "Instant",
             "ProcessInput",
             "Prod",
             "ProgramCaps",
             "Prop",
             "Proved",
             "Top",
+            "Unit",
         ]
         .map(|name| env.globals[name]),
     );
@@ -454,7 +457,7 @@ fn strict_roots_accept_original_ten_canonical_families_and_constructors() {
 /// Promise class: durable invariant. Installing and exporting the configured
 /// floor is namespace bookkeeping only and adds no kernel declaration or trust.
 #[test]
-fn strict_floor_export_allocates_nothing_and_nonmember_unit_rejects() {
+fn strict_floor_export_allocates_nothing_and_nonmember_and_rejects() {
     let root = FixtureRoot::new("zero-allocation");
     root.write("export Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result, Utf8Error");
     let mut env = ElabEnv::new().expect("base environment");
@@ -470,14 +473,14 @@ fn strict_floor_export_allocates_nothing_and_nonmember_unit_rejects() {
     assert_eq!(env.env.trusted_base(), trusted_before);
 
     let nonmember = FixtureRoot::new("nonmember");
-    nonmember.write("const witness : Unit = MkUnit");
+    nonmember.write("fn witness (x : And) : And = x");
     let error = ElabEnv::new()
         .expect("base environment")
         .elaborate_module_from_roots_strict(&[nonmember.0.clone()], "Entry")
-        .expect_err("pre-installed nonmember Unit must remain unavailable in strict roots");
+        .expect_err("unkeyed nonmember And must remain unavailable in strict roots");
     assert!(
-        matches!(error, ElabError::UnboundName { ref name, .. } if name == "Unit"),
-        "closed-floor rejection must name Unit, got {error:?}"
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == "And"),
+        "closed-floor rejection must name And, got {error:?}"
     );
 }
 

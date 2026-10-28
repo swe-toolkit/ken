@@ -11,14 +11,16 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 20] = [
+const TYPE_FLOOR: [&str; 23] = [
     "Auth",
     "Bool",
     "Bottom",
     "Char",
+    "Coproduct",
     "Equal",
     "ExitCode",
     "HostIO",
+    "Instant",
     "List",
     "Nat",
     "Option",
@@ -31,6 +33,7 @@ const TYPE_FLOOR: [&str; 20] = [
     "ResourceKind",
     "Result",
     "Top",
+    "Unit",
     "Utf8Error",
 ];
 
@@ -194,8 +197,8 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 ///
 /// MEASURED: the primitive producer traversal yields exactly eight signature
 /// identities, and Nat, Pair, five kernel-keyed proposition/equality members,
-/// and five source-required entrypoint-ABI identities close the type inventory
-/// to twenty. The separately configured companion
+/// five source-required entrypoint-ABI identities, and three effect identities
+/// close the type inventory to twenty-three. The separately configured companion
 /// inventory has three checked-transparent constants keyed to the exact Pair
 /// identity. CLAIMED: type and binding membership are independent closed
 /// inventories rather than one compiler-global allow-list. THE GAP: source
@@ -216,6 +219,9 @@ fn prelude_signature_inventory_is_executable_and_closed() {
                 *name,
                 "Nat"
                     | "Pair"
+                    | "Coproduct"
+                    | "Instant"
+                    | "Unit"
                     | "Bottom"
                     | "Equal"
                     | "ExitCode"
@@ -235,6 +241,9 @@ fn prelude_signature_inventory_is_executable_and_closed() {
     let internal = [
         "Nat",
         "Pair",
+        "Coproduct",
+        "Instant",
+        "Unit",
         "Bottom",
         "Equal",
         "ExitCode",

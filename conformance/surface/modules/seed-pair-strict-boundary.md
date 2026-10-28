@@ -1,8 +1,8 @@
 # Compiler-origin Pair floor-provider boundary
 
 Format: `../../README.md`. These cases pin the general internal-provision arm,
-the historical ten-type Pair slice (now part of the twenty-type floor), and
-its first compiler-origin member (`spec/30-surface/30
+the historical ten-type Pair slice (now part of the twenty-three-type floor),
+and its first compiler-origin member (`spec/30-surface/30
 §4`, `33 §3.3`, `34 §"Canonical non-dependent pair floor family"`, `39 §2.0`).
 They supersede this seed's former exact-nine, bare-name rejection, and future
 package-provider contract.
@@ -17,11 +17,11 @@ Kernel and runtime forms carry no provider `GlobalId`.
 The Pair floor required by the acceptance rows below was realized by
 `LANG-MOD-CANONICAL-PAIR-PACKAGE` and included in the fifteen-name floor
 landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The rows describe
-Pair behavior; their status does not certify this candidate's five new
-entrypoint identities. The Pair landing authorizes no package, alias,
-registry, or ambient fallback. The representation-only transparent-Sigma
-controls continue to execute and remain evidence for the unchanged kernel
-behavior.
+Pair behavior; they do not certify this candidate's three effect/clock
+additions: `Coproduct`, `Instant`, and `Unit`. The Pair landing authorizes no
+package, alias, registry, or ambient fallback. The representation-only
+transparent-Sigma controls continue to execute and remain evidence for the
+unchanged kernel behavior.
 
 ## AC1 — the four existing Pair-family identities become Strict floor bindings
 
@@ -43,16 +43,18 @@ behavior.
   floor binding whose checked type references that exact `Pair` id. No run
   declares or imports a replacement, advances the allocator because of floor
   installation, or changes `trusted_base()`.
-- controls: an otherwise identical bare `Unit` row rejects as unbound even
-  though the compiler global map contains it. A separately registered unrelated
-  transparent global also remains unbound without an import. Remove one
-  companion from the configured closed inventory while leaving its compiler
+- controls: the client `pub def P = Empty` rejects as unbound without an
+  explicit `import Core.Logic.EmptyDec (Empty)`; the compiler-internal `Empty`
+  identity is not a source floor binding. The same client with that import
+  accepts and resolves the distinct package identity. A separately registered
+  unrelated transparent global also remains unbound without an import. Remove
+  one companion from the configured closed inventory while leaving its compiler
   global present; only that companion row must reject rather than fall back to
   the ambient global.
 - why: successful checking alone cannot distinguish reuse from re-declaration or
   ambient lookup. The exact-id and accounting assertions pin the floor path.
-  `Unit` separates the general internal-provision arm from arbitrary compiler
-  convenience exposure.
+  `Empty` separates an internal compiler identity from a source-resolvable floor
+  binding; `Unit` is now admitted by its independent source need.
 
 ### surface/modules/pair-floor-remains-available-after-unrelated-loads
 
@@ -70,7 +72,7 @@ behavior.
 - why: Pair acceptance must be attributable to the closed floor, not to cached
   globals or a hidden import leak.
 
-## AC2 — the current floor is twenty types plus three Pair companions
+## AC2 — the current floor is twenty-three types plus three Pair companions
 
 ### surface/taxonomy/prelude-internal-provision-inventory-is-executable-and-closed
 
@@ -85,18 +87,20 @@ behavior.
 - expect: the signature inventory is exactly
   `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`; the
   internal-provision type inventory is exactly `{Nat, Pair, Equal, ExitCode,
-  HostIO, ProcessInput, Prod, ProgramCaps, Prop, Proved, Top, Bottom}`. `Nat`
-  is kernel-origin and `Pair` is compiler-bootstrap-origin. Their union is
-  the exact twenty-type floor recorded in `minimality.md`. Pair's companion
-  inventory is exactly `{mk_pair, pair_fst, pair_snd}`. The floor count is
-  twenty: companions are bindings, not type formers.
-- controls: add `Unit` only to the configured type inventory; exact equality
+  HostIO, ProcessInput, Prod, ProgramCaps, Prop, Proved, Top, Bottom,
+  Coproduct, Instant, Unit}`. `Nat` is kernel-origin and `Pair` is
+  compiler-bootstrap-origin. Their union is the exact twenty-three-type floor
+  recorded in `minimality.md`. Pair's companion inventory is exactly
+  `{mk_pair, pair_fst, pair_snd}`. The floor count is twenty-three: companions
+  are bindings, not type formers.
+- controls: add the compiler-internal `Empty` identity, which has no independent
+  source-name requirement, to the configured type inventory; exact equality
   fails with one extra type. Move a Pair companion into the type inventory;
   the type-count and kind assertions fail. Delete either internal witness or
   substitute a same-shaped fresh id; exact identity equality fails closed.
-- why: a hard-coded twenty-name list does not prove derivation. Independent arm,
-  origin, identity, kind, and companion assertions prevent both under-inclusion
-  and compiler-global-map widening.
+- why: a hard-coded twenty-three-name list does not prove derivation.
+  Independent arm, origin, identity, kind, and companion assertions prevent
+  both under-inclusion and compiler-global-map widening.
 
 ## AC3 — spelling, shape, import, and re-export do not manufacture identity
 
@@ -120,24 +124,31 @@ behavior.
 
 ### surface/modules/pair-floor-protected-name-bindings-reject
 
-- promise class: **durable invariant** — source cannot introduce a binding in B
+- promise class: **durable invariant** — source cannot introduce the four
+  Pair-family names at the listed declaration sites or the listed `pair_fst`
+  parameter site
 - stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §3.3`; `39 §2.0`
 - given: in independent Strict roots, attempt a top-level binding named `Pair`,
   `mk_pair`, `pair_fst`, or `pair_snd`, with a well-typed body or family. Also
   try `fn use_pair (pair_fst : Int) : Int = pair_fst`, paired with the same
-  function using the non-B binder `local_pair_fst`. Reuse `seed-modules.md`'s
-  protected-name matrix for the other floor types and bare constructors.
+  function using the non-B binder `local_pair_fst`. This case covers only those
+  four Pair-family top-level names and the explicitly listed `pair_fst`
+  parameter.
 - expect: each Pair-family top-level attempt and the `pair_fst` binder are hard
   surface errors at binding introduction; the diagnostic kind is not further
   specified here. The `local_pair_fst` control accepts. No local binding
-  replaces a floor identity. An ordinary local `data Pair a b = MkPair a b` is
-  included in the `Pair` row and cannot become the transparent floor family.
+  replaces a Pair-family floor identity. An ordinary local
+  `data Pair a b = MkPair a b` is included in the `Pair` row and cannot become
+  the transparent floor family.
 - controls: rename all four local declarations; they admit with fresh ids and
-  remain distinct from the floor declarations. The non-B binder accepts; the
-  separate `seed-modules.md` case covers ordinary lexical shadowing.
-- why: the prohibition covers declarations and binders in the floor type and
-  its companion-binding inventory; no binder can introduce a protected name.
+  remain distinct from the floor declarations. The `local_pair_fst` binder
+  control accepts.
+- why: these rows cover the Pair-family declarations and one local binder only.
+  Broader §33.3 name and binder coverage remains outside this case and is a
+  separate residual unless another named case discharges it. The
+  `prelude-protected-name-bindings-and-lookalike-matrix` case has its own
+  bounded scope; it does not discharge all of B.
 
 ### surface/modules/pair-reexport-is-identity-preserving-republication
 
@@ -339,17 +350,17 @@ behavior.
   three companions, four Strict accepts on existing ids, collision behavior,
   and fresh Strict catalog closure. The Pair floor landed at
   `0a94e80dc11c1fab00d6b0b14addb55b0a47192e` as part of the fifteen-name
-  roster; those rows do not by themselves prove this candidate's twenty-name
-  entrypoint additions.
-- **THE GAP for this candidate:** exact entrypoint-ABI identity, constructor
-  scope, census deletion, and unchanged trust require their own executable
+  roster; those rows do not by themselves prove this candidate's three
+  effect/clock additions.
+- **THE GAP for this candidate:** exact effect/clock identities and constructor
+  scopes, census deletion, and unchanged trust require their own executable
   evidence, stated in `minimality.md` and `seed-modules.md`.
 
 ## Consistency and realization boundary
 
-- The current type floor is exactly the twenty-name roster in `minimality.md`;
-  its internal-provision arm includes the independently source-required
-  entrypoint-ABI family. Pair's companion bindings remain exactly
+- The current type floor is exactly the twenty-three-name roster in
+  `minimality.md`; its internal-provision arm includes the five entrypoint-ABI
+  and three effect/clock identities. Pair's companion bindings remain exactly
   `{mk_pair, pair_fst, pair_snd}`.
 - The four names reuse one compiler-installed transparent declaration family.
   There is no package Pair, second identity, alias, registry, owner map, or
@@ -359,5 +370,6 @@ behavior.
   identity evidence.
 - Kernel formers, runtime pair values, and local declarations named Pair remain
   outside the provider question.
-- `Prod` is now a distinct checked floor inductive with bare `MkProd`;
-  `Unit` remains the non-floor compiler-convenience negative control.
+- `Prod` is a distinct checked floor inductive with bare `MkProd`; `Unit` is
+  also a floor member with bare `MkUnit`. The compiler-internal `Empty` identity
+  remains outside the source floor; its source package has a distinct identity.

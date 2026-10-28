@@ -5,9 +5,10 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base (increment A):** `origin/main` `c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811` (the cut of
-`5ec884387`; re-pinned 2026-10-28 by DOC-BUNDLE-315).
-Increments B and C pin their own bases in §4a-pin. This header is A's.
+**Base (increment A, landed `bd5c64ed1`):** `origin/main` `c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811`
+(the cut of `5ec884387`; re-pinned 2026-10-28 by DOC-BUNDLE-315).
+Increments B and C pin their own bases in §4a-pin. This header is A's; read
+§4a-pin for B's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
 direction (*"do not build on an unmerged commit... the base commit needs to be
@@ -182,11 +183,12 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811   # increment A's pinned base
-# Re-pinned 2026-10-28 to the cut of 5ec884387 (DOC-BUNDLE-315). A literal,
-# never a ref or merge-base(...): see §4b and §4f. When A merges main again,
-# its handoff reports the new cut point; the Steward re-pins it here, and QA
-# binds to the routed bundle that carries it.
+BASE=bd5c64ed14f738545604c2ae1ae3a85850f27713   # increment B's pinned base
+# Re-pinned 2026-10-28 (DOC-BUNDLE-329) to increment A's landing squash. A
+# literal, never a ref or merge-base(...): see §4b and §4f. Increment A ran on
+# c4c8a0ec5 (DOC-BUNDLE-315). When B merges main again, its handoff reports the
+# new cut point; the Steward re-pins it here, and QA binds to the routed
+# bundle that carries it.
 PATHS='-- crates/'                               # the domain, all three crates
 
 # THE PIN NEED NOT EQUAL THE CUT POINT -- requiring that regresses, because
@@ -692,6 +694,17 @@ missing prerequisite.
 `30d35f625` is 24 files including `effect_v1.rs +445`, and it is where the
 refused flip enters the line. `AC-PREDICATE` binds increment B exactly as it
 binds A.
+
+**Released 2026-10-28, after increment A landed at `bd5c64ed1`.** The
+measurements above are records from before A. B opens with an Architect D0 on
+the §4a-pin base, which:
+- re-measures the `source.rs` gap and control 5 there;
+- rules B's extraction scope and its acceptance rows, each with a control that
+  can fail;
+- places A's carried follow-on, a mixed-caller any-vs-all fixture for the
+  completed-boundary gate.
+
+B is built only after that ruling.
 
 ---
 
