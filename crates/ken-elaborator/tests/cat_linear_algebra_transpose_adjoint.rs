@@ -11,7 +11,7 @@ use ken_elaborator::{
     extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr as SourceExpr, KenMdFenceRole,
     Type as SourceType,
 };
-use ken_kernel::Decl;
+use ken_kernel::{Decl, KernelError};
 
 const MATRIX: &str = "Algorithm.LinearAlgebra.NatMatrix";
 const SEED: &str = include_str!(concat!(
@@ -216,10 +216,12 @@ fn full_seed_checks_and_swapped_right_input_refuses() {
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
     match env.elaborate_file(refused) {
-        Err(ElabError::TypeMismatch { span: failure, .. })
-            if failure.start >= span.start
-                && failure.end <= span.end
-                && failure.start < failure.end => {}
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            span: failure,
+        }) if failure.start >= span.start
+            && failure.end <= span.end
+            && failure.start < failure.end => {}
         other => panic!("false swapped-y equation must fail at seed_neg's Proved: {other:?}"),
     }
 }
