@@ -6,16 +6,17 @@
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION §6;
-> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE §7).** The §1–6
-> catalog operations and checked laws and their authored seeds are present
-> on main; their earlier scratch D0 alone does not establish official
-> conformance execution, CI or landed trust. Section 7 specifies one
-> checked pointwise zero-derivative law when the value of the expression
-> is independent of the differentiated variable. Architect D0 on
-> `9e1d6e9cd` checked its generic proof with no new `Axiom` and equal
-> scratch trusted identities 114 → 114. This candidate carries its
-> catalog export and closed seed, not an official conformance run or
-> landed trust measurement.
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE §7;
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION §8).** The §1–7
+> catalog operations, checked laws and authored seeds are present on
+> main; earlier scratch D0 alone does not establish official
+> conformance execution or landed trust. Section 8 specifies one
+> pointwise derivative-after-substitution law under two necessary
+> derivative-value premises. Architect's isolated D0 on `97caadd38`
+> checked its generic proof with no new `Axiom` and equal scratch
+> trusted identities 114 → 114. Its catalog export is absent on this
+> base; the D0 does not establish shipped §8 execution, official
+> conformance, CI, publication, landing or landed trust.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -567,10 +568,12 @@ trust measurement. The §5 conformance seed is authored at
 `conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md`;
 §5 catalog exports and seed are now present on main. Their presence
 alone does not establish official seed execution or landed trust.
-No `DecEq Expr`, function equality, derivative/substitution
-commutation, differentiation of signed or field coefficients, or
-analytic limit is claimed. Section 6 separately specifies semantic
-commutation of two derivatives, not either deferred structural law.
+No `DecEq Expr`, function equality, unrestricted
+derivative/substitution commutation, differentiation of signed or field
+coefficients, or analytic limit is claimed. Section 8 specifies the
+conditional pointwise derivative/substitution law; Section 6 instead
+specifies semantic commutation of two derivatives. Neither gives
+structural `Equal Expr`.
 
 ## 6. Partial derivatives commute under evaluation
 
@@ -649,7 +652,8 @@ before and after loading (114 → 114) and refuses selective import of the
 private helper. This is package-test execution on the candidate, **not**
 official conformance-runner execution, CI, publication, landing or a
 landed trust measurement. No result for signed coefficients, fields,
-analytic limits, or derivative/substitution commutation follows from §6.
+analytic limits, or derivative/substitution commutation follows from §6;
+§8 separately states the conditional pointwise substitution law.
 
 ## 7. A derivative in a semantically unused variable is zero
 
@@ -711,8 +715,109 @@ Architect's isolated D0 on `9e1d6e9cd` checked this generic proof
 with `ken check` and `ken fmt --check` rc 0, no new `Axiom`, owner-local
 Transparent status, three private import refusals, two probe tests
 passing and exact scratch `trusted_base()` identity sets 114 → 114.
-The candidate carries the catalog proof and the authored seed; local
-checks on it do not establish official conformance-runner execution,
-CI, publication, landing or a landed trust measurement. No law for
+The checked catalog proof and authored seed are now on main. Their
+prior candidate-local checks do not establish official conformance-runner
+execution or a landed trust measurement. No law for
 syntactic occurrence, structural derivative equality, signed
-coefficients or analytic differentiation follows from §7.
+coefficients or analytic differentiation follows from §7. Section 8
+states a separate conditional derivative/substitution law, not a
+syntactic-occurrence test or a consequence of independence alone.
+
+## 8. Derivative evaluation after expression substitution
+
+> **Section 8 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION).** Architect's
+> isolated D0 on landed base
+> `97caadd38871b23c7796b219681d0c054b092dec` checked the
+> owner-local generic Transparent proof, an arbitrary-argument client,
+> and the premise counterexamples with no new `Axiom`, `ken check`
+> and `ken fmt --check` rc 0, and equal scratch `trusted_base()` sets
+> (114 → 114). The §8 catalog export is absent on that base. Its
+> catalog proof, seed and package test belong to the assembled
+> candidate; scratch D0 is not shipped §8 execution, official
+> conformance, CI, publication, landing or landed trust.
+
+### 8.1 Public checked law
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent theorem immediately after `deriv_independent` and before
+private `expr_add_cong`, with exactly this name, binder order and type:
+
+```ken
+pub theorem deriv_substitute
+      (v : Nat)
+      (s : Nat → Expr)
+      (e : Expr)
+      (env : Nat → Nat)
+      (hv : Equal Nat (eval env (deriv v (s v))) (Suc Zero))
+      (hw : (w : Nat) → (Equal Nat v w → Bottom) → Equal Nat (eval env (deriv v (s w))) Zero)
+    : Equal Nat (eval env (deriv v (substitute s e))) (eval (compose_env env s) (deriv v e))
+```
+
+The first premise requires the derivative of the replacement for the
+distinguished index `v` to evaluate to one at the supplied `env`.
+The second requires each replacement at an index `w` **distinct from**
+`v` to have derivative zero **at that same environment**. The
+negative equality `Equal Nat v w → Bottom` excludes only the
+index `v`; no premise requires `s v` to be syntactically `EVar v`
+or every other replacement to omit `EVar v` syntactically. The
+result equates evaluated `Nat` values at `env` and at the composed
+environment, not `Expr` trees or functions. It adds neither an
+all-environments premise nor a public environment-update or bump
+operation. This conditional law does not imply an unrestricted
+chain rule for arbitrary substitutions: both derivative-value
+premises are necessary.
+
+Architect's D0 checks two separate closed refutations of the law
+with one premise removed, each with the other premise accepted.
+For `v=Zero`, `env23 w = Suc (Suc w)` and `e=EVar Zero`, a
+substitution `all_const w = EConst Zero` satisfies `hw` but not
+`hv`; the proposed equation would compare zero with one. For
+`e=EVar (Suc Zero)`, a substitution `merge_one` that maps both
+`Zero` and `Suc Zero` to `EVar Zero` satisfies `hv` but not `hw`;
+the proposed equation would compare one with zero. Neither
+counterexample invalidates the law with both premises in place.
+Their accepted refutation proofs establish the premise boundary;
+the finite values do not establish the generic conditional theorem.
+
+### 8.2 Derivation and evidence boundary
+
+The checked proof inducts on `e`. The constant case reduces
+directly. The variable case passes the computed `nat_same v w`
+to the private `deriv_substitute_var`, which matches an **arbitrary
+Boolean argument** rather than directly matching a computed
+expression. The existing private `nat_same_sound` identifies the
+distinguished index when the comparison is true; the new private
+`nat_same_complete` relates index equality back to the comparison
+for the false branch. These transport `hv` or `hw` to the proper
+variable result. Sum and product cases use existing `add_cong`
+and `mul_cong`; the product case uses §3's public
+`eval_substitute` on the two underived factors alongside the
+induction hypotheses. Exactly two new helpers,
+`nat_same_complete` and `deriv_substitute_var`, stay private after
+`bump_env_off` and before `deriv_taylor`, near `nat_same_sound`.
+No §1–§7 operation or law changes. There is no new import,
+postulate, primitive, kernel rule or surface feature.
+
+In the D0 closed fixture, `xy = EMul (EVar Zero)
+(EVar (Suc Zero))` and `v=Zero`. `shift_off` keeps the image
+at `Zero` as `EVar Zero` and maps each successor index to an
+expression adding one to that index's variable, which is
+independent of `Zero` under differentiation. The pointwise
+premises hold at `env23`, and both sides of the law independently
+evaluate to four. A separate `merge_off` sends the successor
+index to `EVar Zero`; for that same `xy` the resulting two sides
+compute to four and two, with the comparison `four ≤ two`
+computing `False`. A true claim with the same proof shape for
+`shift_off` accepts, while the false `merge_off` claim is refused
+at its own proof term after a fresh accepted prefix. A fixture's
+independent calculations and refusal isolate the false equation;
+they are not generic proofs. The separate Foundation catalog half
+must export the checked proof and add a package-owned test reading
+CV's seed, checking owner/Transparent status, both private import
+refusals, exact trusted identities and the accepted/refused clients.
+The catalog package's public-theorem count becomes **nineteen**
+with this one addition; its trust prose and contract reference must
+be updated to §§1–8 in that separate code turn. Candidate-local
+evidence remains distinct from CI, official conformance and landed
+trust.
