@@ -17,7 +17,7 @@ fn resp_coproduct_inl_reduces_to_rg_applied_to_payload() {
         .expect("idNat elaborates");
     let main_id = env
         .elaborate_decl(
-            "const probe : Type = resp_coproduct Nat Nat idNat idNat (InL Nat Nat Zero)",
+            "const probe : Type = resp_coproduct Nat Nat idNat idNat (Coproduct.InL Nat Nat Zero)",
         )
         .expect("probe elaborates");
     // `probe`'s BODY (a `Type`-classified term) must normalize to `Nat`
@@ -49,7 +49,7 @@ fn resp_coproduct_inr_reduces_to_rh_applied_to_payload() {
         .expect("idNat elaborates");
     let main_id = env
         .elaborate_decl(
-            "const probe : Type = resp_coproduct Nat Nat idNat idNat (InR Nat Nat Zero)",
+            "const probe : Type = resp_coproduct Nat Nat idNat idNat (Coproduct.InR Nat Nat Zero)",
         )
         .expect("probe elaborates");
     let ken_kernel::env::Decl::Transparent { body, .. } =

@@ -8729,13 +8729,13 @@ mod package_route_example_declarations {
             "an obligation-free example must not add a package symbol"
         );
         // Promise class: normative compatibility vector for this package.
-        // The three pre-source constructor symbols now use ExitCode.Success,
-        // ExitCode.Failure, and ProgramCaps.MkProgramCaps. A scratch un-rename
-        // of those names alone reproduced the prior 0x4401_b7e1_d50b_abfc;
-        // this exact hash was measured from the candidate's checked package.
+        // The new Coproduct and Instant families are scoped after pre-source
+        // role capture. Scratch unscoping of exactly those families restored
+        // the previous 0xe367_721c_e40b_94d7 checked-package hash; this value
+        // is measured with their qualified checked constructor symbols.
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0xe367_721c_e40b_94d7
+            0x393e_e31c_ea25_53c9
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8770,11 +8770,11 @@ mod package_route_example_declarations {
             "an obligation-free example must not add a denotation symbol"
         );
         // Promise class: normative compatibility vector for the denotation.
-        // The same three scoped constructor symbols also feed this route;
-        // scratch un-rename reproduced the old 0x5275_b6db_8ccc_8d8a.
+        // The Coproduct and Instant checked symbols feed this route too;
+        // scratch unscoping restored the previous 0xf7c4_d11a_ab32_c343.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0xf7c4_d11a_ab32_c343
+            0x3b3b_60f5_21e9_f643
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

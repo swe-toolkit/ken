@@ -55,8 +55,8 @@ fn real_buffer_bracket_exposes_ordered_target_bindings() {
     let ids = ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
     let fs = FSIds::from_elab(&env.prelude_env).expect("FS ABI");
     let coproduct = CoproductIds {
-        inl_id: env.globals["InL"],
-        inr_id: env.globals["InR"],
+        inl_id: env.globals["Coproduct.InL"],
+        inr_id: env.globals["Coproduct.InR"],
     };
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut store = EvalStore::new();

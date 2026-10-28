@@ -1,8 +1,8 @@
 //! `Coproduct` (L5, `Sum`→`Coproduct` rename) — value-level acceptance.
 //!
 //! `docs/program/wp/either-neutral-coproduct.md`: the internal effect
-//! coproduct is renamed `Sum`→`Coproduct` (type name only, `InL`/`InR`
-//! kept). This file confirms `Coproduct`/`InL`/`InR` are still live and
+//! coproduct is renamed `Sum`→`Coproduct`. This file confirms the checked
+//! `Coproduct`/`Coproduct.InL`/`Coproduct.InR` identities are still live and
 //! drive effect composition post-rename (covered in depth by
 //! `effect_composition_resp_coproduct_acceptance.rs` and the interpreter's
 //! D3 peel tests — this file adds a light elaborator-level cross-check),
@@ -28,8 +28,10 @@ fn coproduct_is_the_live_two_param_effect_signature_type() {
         .get("Coproduct")
         .copied()
         .expect("Coproduct registered (renamed from Sum)");
-    let inl_id = env.globals.get("InL").copied().expect("InL registered");
-    let inr_id = env.globals.get("InR").copied().expect("InR registered");
+    let inl_id = env.globals.get("Coproduct.InL").copied().expect("scoped InL registered");
+    let inr_id = env.globals.get("Coproduct.InR").copied().expect("scoped InR registered");
+    assert!(!env.globals.contains_key("InL"));
+    assert!(!env.globals.contains_key("InR"));
 
     let ind = env
         .env

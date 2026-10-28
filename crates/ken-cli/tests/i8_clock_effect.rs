@@ -13,7 +13,7 @@ const CLOCK_BODY: &str = r#"
     (host_clock APartial Instant wall_now)
     (\first .
       match first {
-        MkInstant _firstNanoseconds |->
+        Instant.MkInstant _firstNanoseconds |->
           bind (Coproduct (FSOp APartial) AmbientOp)
                (resp_coproduct (FSOp APartial) AmbientOp
                  (fs_resp APartial) ambient_resp)
@@ -21,7 +21,7 @@ const CLOCK_BODY: &str = r#"
             (host_clock APartial Instant wall_now)
             (\second .
               match second {
-                MkInstant _secondNanoseconds |-> host_exit APartial ExitCode.Success
+                Instant.MkInstant _secondNanoseconds |-> host_exit APartial ExitCode.Success
               })
       })
 "#;
@@ -142,7 +142,7 @@ fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
     assert_eq!(before, env.env.trusted_base());
     for name in [
         "Instant",
-        "MkInstant",
+        "Instant.MkInstant",
         "ClockOp",
         "WallNow",
         "clock_resp",

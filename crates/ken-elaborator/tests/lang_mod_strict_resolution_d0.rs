@@ -278,9 +278,11 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Bool",
             "Bottom",
             "Char",
+            "Coproduct",
             "Equal",
             "ExitCode",
             "HostIO",
+            "Instant",
             "List",
             "Nat",
             "Option",
@@ -293,6 +295,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "ResourceKind",
             "Result",
             "Top",
+            "Unit",
             "Utf8Error",
         ]
         .as_slice()
@@ -301,7 +304,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
         assert!(is_prelude_floor_name(name));
     }
     for name in [
-        "True", "Int", "Ordering", "And", "Unit", "mk_pair", "pair_fst", "pair_snd",
+        "True", "Int", "Ordering", "And", "mk_pair", "pair_fst", "pair_snd",
     ] {
         assert!(!is_prelude_floor_name(name));
     }
@@ -408,8 +411,8 @@ fn expected_vector_strict_floor_names() -> Vec<String> {
 /// Promise class: transition sentinel for Vector's amended provider imports.
 /// Retire or rebaseline when a separately authorized Vector provider changes.
 /// MEASURED: strict roots loading of the real Vector module consumes no
-/// ambient conveniences after its checked provider closure and twenty-member
-/// floor load. CLAIMED: Vector enters the census's clean partition.
+/// ambient conveniences after its checked provider closure and current
+/// closed floor load. CLAIMED: Vector enters the census's clean partition.
 /// THE GAP: this is one row, not a substitute for the full-corpus census in CI.
 #[test]
 fn vector_strict_floor_provider_transition_sentinel() {
@@ -422,9 +425,9 @@ fn vector_strict_floor_provider_transition_sentinel() {
 }
 
 /// Transition sentinel for catalog migration: this is a behavioral census,
-/// not a source-text census. The twenty-type floor intentionally removes its
-/// families and constructors from these residual dependency vectors; every
-/// remaining name still requires an explicit provider migration.
+/// not a source-text census. The twenty-three-type floor removes its newly
+/// admitted families and constructors from these residual dependency vectors;
+/// every remaining name still requires an explicit provider migration.
 #[test]
 fn catalog_ambient_passthrough_migration_census() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -456,7 +459,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Dfa".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -465,7 +468,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Minimisation".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -474,7 +477,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Nfa".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -483,7 +486,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Reachability".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -492,7 +495,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.FormalLanguages.Regex".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -512,7 +515,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Graphs.Dependency".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -538,7 +541,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Optimization.Argmin".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -563,7 +566,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Sorting.InsertionSort".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -575,7 +578,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Statistics.Empirical".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -586,7 +589,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.Statistics.Exact".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -595,7 +598,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Algorithm.SymbolicAlgebra.NatPolynomial".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -606,7 +609,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // boundary loads while strict mode retains only provider compiler
             // conveniences.
             "Application.CommandLine.ArgParse".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -620,7 +623,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Application.Configuration.Decoder".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -633,14 +636,14 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Application.Input.Schema".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
         ),
         (
             "Capability.Console.Text".to_string(),
-            ["IO", "IOError", "Stderr", "Stdout", "Unit", "write"]
+            ["IO", "IOError", "Stderr", "Stdout", "write"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -659,7 +662,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Diagnostics.Render".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -670,7 +673,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "CreatePolicy",
                 "FS",
                 "FileError",
-                "Unit",
                 "read_bytes",
                 "write_file",
             ]
@@ -710,7 +712,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Filesystem.Path.Posix".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -722,7 +724,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Formatting.Doc".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -735,7 +737,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Parsing.Cursor".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -747,7 +749,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Parsing.Decoder".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -758,7 +760,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Parsing.Lexer".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -775,7 +777,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // byte bridges use provider-less prelude builtin charToInt.
             // Strict mode retains that name and the compiler conveniences.
             "Capability.Parsing.Parsing".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -788,7 +790,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Capability.Process.Arguments".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -864,7 +866,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "BufferSpan",
                 "ResourceError",
                 "TransferCount",
-                "Unit",
                 "buffer_span_budget",
                 "transfer_count_nat",
                 "transfer_count_nat_succ",
@@ -894,20 +895,13 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            "Capability.Time.WallClock".to_string(),
-            ["Instant", "MkInstant"]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        ),
-        (
             // EffectfulClasses now declares its complete LF, Derived, and
             // Transport closure. Its ordinary package boundary loads; strict
             // mode records only the remaining compiler-convenience floor.
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Classes.EffectfulClasses".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -926,7 +920,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Core.Classes.LawfulFunctors".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -965,7 +959,7 @@ fn catalog_ambient_passthrough_migration_census() {
         (
             // AC-5: Derived closure set plus charToInt, this package's own provider-less builtin use.
             "Data.Binary.BytesPrimitiveContracts".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -974,7 +968,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.Deque".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -984,7 +978,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.Derived".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -993,7 +987,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.Map".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1005,7 +999,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.NonEmpty".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1018,7 +1012,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Collections.PriorityQueue".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1027,7 +1021,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Finite.Finite".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1053,7 +1047,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Serialization.Json".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1065,7 +1059,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Serialization.JsonCodec".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1077,7 +1071,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Sums.Validation".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1097,7 +1091,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Data.Time.EventTrace".to_string(),
-            ["Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1106,7 +1100,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
             "Tooling.Testing.Property".to_string(),
-            ["MkUnit", "Unit", "charToInt", "eqChar", "leqChar"]
+            ["charToInt", "eqChar", "leqChar"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -1131,6 +1125,7 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.Process.Environment",
         "Capability.Process.Exit",
         "Capability.Process.WorkingDirectory",
+        "Capability.Time.WallClock",
         "Core.Function.Combinators",
         "Core.Logic.And",
         "Core.Logic.Compare",
