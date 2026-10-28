@@ -2090,13 +2090,15 @@ full_demand_census_test!(
 /// exactly one planner-selected incoming identity and at least one decoded
 /// finished-CLIF caller targeting that owner.
 ///
-/// **MEASURED:** removing the incoming edge, restoring its unspecialized K
-/// target, or retargeting it to a different response owner each reaches and
-/// leaves the exact owner unentered.
-/// **CLAIMED:** neither declaration nor another owner's call can discharge the
-/// selected incoming-caller relation.
-/// **THE GAP:** the controls mutate the real resolution population and the
-/// unchanged whole-artifact coverage ledger supplies the refusal.
+/// **MEASURED:** removing the incoming edge reaches the selected-caller
+/// refusal; restoring its unspecialized K target reaches the finished-code
+/// identity refusal before that ledger closes. Both restore exact bytes.
+/// **CLAIMED:** a selected call cannot silently enter an unspecialized K or
+/// discharge the wrong response owner.
+/// **THE GAP:** the restored-K call also changes result identity, so its earlier
+/// finished-code refusal does not witness the non-relay selected-caller arm.
+/// No compile-preserving callee-changing negative reaches that arm in this
+/// fixture; the relay arm has a separate reaching control.
 #[test]
 fn static_response_selected_caller_retarget_reaches_and_restores() {
     use ken_runtime::StaticResponseCallerRetargetMutation as Mutation;
@@ -2152,17 +2154,9 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
              need >= 1."
         );
 
-        for (label, mutation, expected) in [
-            (
-                "restore-k",
-                Mutation::RestoreSelectedKTarget,
-                "a forward-declared response owner has no verified selected incoming call",
-            ),
-            (
-                "remove",
-                Mutation::RemoveSelectedCaller,
-                "removed one selected incoming caller",
-            ),
+        for (label, mutation) in [
+            ("restore-k", Mutation::RestoreSelectedKTarget),
+            ("remove", Mutation::RemoveSelectedCaller),
         ] {
             let ((_mutated_root, (mutated_result, mutated_diagnostic)), applications) =
                 ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
@@ -2171,14 +2165,74 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
             assert!(applications > 0, "{label}: caller mutation did not reach");
             let error =
                 mutated_result.expect_err("a caller mutation must leave an owner unentered");
-            assert!(
-                format!("{error:?}").contains(expected),
-                "{label}: caller mutation failed for a different reason: {error:?}"
-            );
-            assert_eq!(
-                mutated_diagnostic, baseline,
-                "{label}: caller mutation altered the typed planner ledger"
-            );
+            let refusal = format!("{error:?}");
+            if mutation == Mutation::RestoreSelectedKTarget {
+                let owner_ret_identities = baseline[0]
+                    .static_response_owners
+                    .iter()
+                    .map(|owner| {
+                        let matching_rows = baseline[0]
+                            .all_static_response_rows
+                            .iter()
+                            .filter(|row| row.k_context == owner.k_context)
+                            .collect::<Vec<_>>();
+                        let [row] = matching_rows.as_slice() else {
+                            panic!("restore-k requires one baseline Ret row per owner's K context");
+                        };
+                        row.k_ret_identity.as_str()
+                    })
+                    .collect::<Vec<_>>();
+                assert!(!owner_ret_identities.is_empty());
+                assert!(
+                    refusal.contains("source_cause: Some(FinishedCode)")
+                        && refusal.contains("publishes actual constructor identity")
+                        && refusal.contains("but its pending Result obligation demands"),
+                    "restore-k: expected the finished-code constructor identity refusal: {error:?}"
+                );
+                let published = refusal
+                    .split_once(" publishes actual constructor identity ")
+                    .and_then(|(_, after)| after.split_once(" at "))
+                    .map(|(identity, _)| identity)
+                    .expect("restore-k: missing published constructor identity");
+                let demanded = refusal
+                    .split_once("but its pending Result obligation demands ")
+                    .and_then(|(_, after)| after.split_once('"'))
+                    .map(|(identity, _)| identity)
+                    .expect("restore-k: missing demanded constructor identity");
+                assert!(
+                    owner_ret_identities.iter().all(|identity| *identity == demanded),
+                    "restore-k: the demand must be the baseline Ret identity of every selected owner in this fixture; demand={demanded:?}, owners={owner_ret_identities:?}"
+                );
+                assert_ne!(
+                    published, demanded,
+                    "restore-k: the substituted K must publish a different identity"
+                );
+            } else {
+                assert_eq!(mutation, Mutation::RemoveSelectedCaller);
+                assert!(
+                    refusal.contains("removed one selected incoming caller"),
+                    "remove: caller mutation failed for a different reason: {error:?}"
+                );
+            }
+            if mutation == Mutation::RemoveSelectedCaller {
+                // Removing the caller stops lowering before its context queries,
+                // but cannot change the typed planner population. The complete
+                // diagnostic is still compared after each restored build below.
+                let mut baseline_planner = baseline.clone();
+                let mut mutated_planner = mutated_diagnostic.clone();
+                for row in baseline_planner.iter_mut().chain(mutated_planner.iter_mut()) {
+                    row.generated_context_result_contracts.clear();
+                }
+                assert_eq!(
+                    mutated_planner, baseline_planner,
+                    "remove: caller mutation altered the typed planner population"
+                );
+            } else {
+                assert_eq!(
+                    mutated_diagnostic, baseline,
+                    "restore-k: caller mutation altered the typed planner ledger"
+                );
+            }
             assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
             let (restored_root, (restored_result, restored)) =
                 compile(&format!("{label}-restored"));
