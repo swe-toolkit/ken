@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT
 title: "Spec 65 relates transpose to matrix products and sums, but no law moves a matrix across a dot product. Rule from a checked D0 at zero trust that the transpose is the adjoint of matrix_vector for every dimension, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

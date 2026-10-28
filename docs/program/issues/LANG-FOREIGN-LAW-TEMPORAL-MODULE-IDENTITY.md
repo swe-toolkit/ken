@@ -1,7 +1,7 @@
 ---
 id: LANG-FOREIGN-LAW-TEMPORAL-MODULE-IDENTITY
 title: "A foreign, law or temporal declaration inside a module keeps a bare globals key, so a client that never imported it uses it under Legacy and the direct API while Strict refuses. Give these kinds the module-qualified, scope-bound identity that data, class and record declarations have"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1

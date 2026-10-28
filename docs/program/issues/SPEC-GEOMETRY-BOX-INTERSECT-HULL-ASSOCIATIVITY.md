@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY
 title: "Spec 67 states that box intersection and hull commute as boxes, but no law regroups three boxes. Rule from a checked D0 at zero trust that intersect and hull are each associative as structural box equalities, through public min and max associativity selectors in Nat Order, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1

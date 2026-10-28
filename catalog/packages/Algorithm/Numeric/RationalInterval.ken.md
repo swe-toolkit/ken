@@ -38,7 +38,9 @@ further checked laws establish distributivity and factoring by endpoint-value
 inclusion on both sides of multiplication. Five more checked laws establish
 transitivity of inclusion and operand-swap inclusion for addition,
 multiplication, hull and intersection. Four further checked laws establish
-both regroupings of addition and multiplication by mutual inclusion.
+both regroupings of addition and multiplication by mutual inclusion. Two
+more checked laws give the least outer bound of a hull and the greatest
+inner bound of an intersection, including inverted intervals.
 
 ```ken
 import Core.Logic.Conjunction (And, and_intro)
@@ -973,6 +975,70 @@ pub theorem interval_mul_assoc_rev_inside
       }
   }
 
+pub theorem interval_hull_least
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside i k)
+      → IsTrue (interval_inside j k)
+      → IsTrue (interval_inside (interval_hull i j) k) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              λik.
+                λjk.
+                  (proof intro for bool_and)
+                    (rational_leq e (rational_min a c))
+                    (rational_leq (rational_max b d) f)
+                    ((proof greatest for rational_min)
+                      a
+                      c
+                      e
+                      ((proof left for bool_and) (rational_leq e a) (rational_leq b f) ik)
+                      ((proof left for bool_and) (rational_leq e c) (rational_leq d f) jk))
+                    ((proof least for rational_max)
+                      b
+                      d
+                      f
+                      ((proof right for bool_and) (rational_leq e a) (rational_leq b f) ik)
+                      ((proof right for bool_and) (rational_leq e c) (rational_leq d f) jk))
+          }
+      }
+  }
+
+pub theorem interval_intersect_greatest
+      (k : Interval) (i : Interval) (j : Interval)
+    : IsTrue (interval_inside k i)
+      → IsTrue (interval_inside k j)
+      → IsTrue (interval_inside k (interval_intersect i j)) =
+  match k {
+    MkInterval e f ↦
+      match i {
+        MkInterval a b ↦
+          match j {
+            MkInterval c d ↦
+              λki.
+                λkj.
+                  (proof intro for bool_and)
+                    (rational_leq (rational_max a c) e)
+                    (rational_leq f (rational_min b d))
+                    ((proof least for rational_max)
+                      a
+                      c
+                      e
+                      ((proof left for bool_and) (rational_leq a e) (rational_leq f b) ki)
+                      ((proof left for bool_and) (rational_leq c e) (rational_leq f d) kj))
+                    ((proof greatest for rational_min)
+                      b
+                      d
+                      f
+                      ((proof right for bool_and) (rational_leq a e) (rational_leq f b) ki)
+                      ((proof right for bool_and) (rational_leq c e) (rational_leq f d) kj))
+          }
+      }
+  }
+
 theorem equiv_leq
       (x : Rational) (y : Rational)
     : rational_equiv x y → IsTrue (rational_leq x y) =
@@ -1092,6 +1158,13 @@ the corresponding order comparisons. Each operation has a law in both
 grouping directions, including on inverted intervals; no new Rational
 export or structural interval equality is assumed.
 
+The two bound laws split the three intervals and use Rational's checked
+min-greatest and max-least proofs on opposite endpoints. A common outer
+interval contains both hull operands and so contains their hull; a common
+inner interval lies inside both intersection operands and so lies inside
+their intersection. These endpoint-value proofs require no nonempty or
+ordered-endpoint premise, including for inverted intervals.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -1135,7 +1208,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and thirty-two checked interval
+   `interval_intersect`, `interval_inside` and thirty-four checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1153,7 +1226,7 @@ API.
    `comm` laws through two private proof stages. Inclusion transitivity reuses
    Rational order transitivity; the four swap inclusions reuse Rational
    commutativity or public min/max bounds without a new helper.
-4. **Trusted-base delta.** Zero: all thirty-two laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all thirty-four laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1162,7 +1235,8 @@ API.
    [inclusion seed](../../../../conformance/stdlib/numerical/seed-interval-inclusion.md)
    [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
    [inclusion-order seed](../../../../conformance/stdlib/numerical/seed-interval-inside-order.md)
-   and [associativity seed](../../../../conformance/stdlib/numerical/seed-interval-associativity-inside.md)
+   [associativity seed](../../../../conformance/stdlib/numerical/seed-interval-associativity-inside.md)
+   and [bound-laws seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersect-bounds.md)
    supply separately constructed positive values and false controls;
    those finite cases do not replace the generic checked proof bodies. The
    distributivity seed's accepting client and dropped-product refusal, and the
@@ -1170,5 +1244,7 @@ API.
    tests. The associativity seed's whole accepted client, including its two
    closed `Refl` controls, and isolated false prefix-inclusion claim are checked
    by the candidate's `cat_numeric_interval_associativity_inside` package test.
+   The §7 package test root-loads both generic bound proofs, checks the whole
+   accepted bound-laws seed and refuses its isolated false hull claim.
    These package tests do not establish official conformance-runner execution,
    CI, publication or landing.

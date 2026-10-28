@@ -1152,6 +1152,7 @@ pub struct StaticResponseFeasibilityObservation {
     pub k_closure_origin: u32,
     pub k_body_origin: u32,
     pub k_context: u32,
+    pub k_ret_identity: String,
     pub context_was_preexisting: bool,
     pub captures: Vec<StaticResponseCaptureObservation>,
     pub continuation_inputs: Vec<(u32, String, u32)>,
@@ -1237,6 +1238,9 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub bracket_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub bracket_settlement_vis_origins: Vec<u32>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
+    /// Each actual lowering query, not just a planner row: `(context, contract)`.
+    /// A missing boundary must record `None`, and a completed one `Some(Ret)`.
+    pub generated_context_result_contracts: Vec<(u32, Option<String>)>,
     /// Planner-only, pre-schema identities, exposed solely to test whether
     /// the early and late strata agree on exact members rather than counts.
     pub pre_schema_transport_sources: Vec<String>,
@@ -1316,6 +1320,20 @@ pub fn with_static_response_feasibility_diagnostics<T>(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+fn record_generated_context_result_contract_diagnostic(
+    context: ContinuationContextId,
+    contract: Option<ConstructorIdentity>,
+) {
+    STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
+        if let Some(diagnostic) = slot.borrow_mut().as_mut().and_then(|rows| rows.last_mut()) {
+            diagnostic
+                .generated_context_result_contracts
+                .push((context.0, contract.map(|identity| format!("{identity:?}"))));
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
 fn record_static_response_feasibility_diagnostic(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
@@ -1343,6 +1361,7 @@ fn record_static_response_feasibility_diagnostic(
                             k_closure_origin: row.k_closure_origin().0,
                             k_body_origin: row.k_body_origin().0,
                             k_context: row.k_context().0,
+                            k_ret_identity: format!("{:?}", row.k_ret_identity()),
                             context_was_preexisting: row.context_was_preexisting(),
                             captures: row
                                 .captures()
@@ -1505,6 +1524,7 @@ fn record_static_response_feasibility_diagnostic(
                     .map(|region| region.settlement.0).collect::<BTreeSet<_>>()
                     .into_iter().collect(),
                 static_response_owners,
+                generated_context_result_contracts: Vec::new(),
                 pre_schema_transport_sources: plan.pre_schema_transport_sources.iter()
                     .map(|identity| format!("{identity:?}")).collect(),
                 preselected_response_callers: plan.preselected_response_callers.iter()

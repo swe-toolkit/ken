@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-ASSOCIATIVITY
 title: "Spec 69 defines a left-biased trace_merge and states its order, count, membership and empty units, but no law regroups three merges. Rule from a checked D0 at zero trust whether trace_merge is structurally associative and under which premises, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-FLOOR-KEYED-ADDITIONS
 title: "Admit to the reserved strict prelude floor each identity that a whole-ledger D0 proves keyed by a native mechanism and independently required by the surface contract (spec 30 §4), starting with the entrypoint-ABI family (ExitCode, ProcessInput, ProgramCaps, HostIO, the Prod/MkProd disposition), with the spec roster and count changing atomically with PRELUDE_FLOOR_NAMES"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1

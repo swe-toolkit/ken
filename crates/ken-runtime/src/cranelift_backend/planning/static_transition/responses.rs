@@ -5434,6 +5434,39 @@ impl StaticTransitionPlan<'_> {
                 "a static-response return boundary does not join its complete selected caller to the exact K context",
             ));
         }
+        // A K whose returned-result route returns a Vis member does not
+        // complete its caller's detached return itself: its Protocol owner
+        // drives that Vis until the owner's own tag guard sees Ret, so the
+        // Ret obligation is the owner's, not a publication contract of K.
+        let k_returns_vis = match self.pending_vis_settlements.owners.get(&row.id()) {
+            Some(super::returned_vis::ResponseOwnerSettlement::Protocol) => self
+                .pending_vis_settlements
+                .protocol
+                .as_ref()
+                .and_then(|protocol| protocol.owners.get(&row.id()))
+                .ok_or_else(|| {
+                    planner_error(
+                        "a Protocol response owner has no returned-Vis protocol record",
+                    )
+                })?
+                .contexts
+                .iter()
+                .any(|returned| {
+                    returned.context == owner.k_context() && !returned.members.is_empty()
+                }),
+            Some(
+                super::returned_vis::ResponseOwnerSettlement::RetOnly
+                | super::returned_vis::ResponseOwnerSettlement::Excluded { .. },
+            ) => false,
+            None => {
+                return Err(planner_error(
+                    "a static-response return boundary names a response row with no owner settlement",
+                ))
+            }
+        };
+        if k_returns_vis {
+            return Ok(None);
+        }
 
         let mut boundaries = Vec::new();
         for caller_transport in self
@@ -5559,45 +5592,45 @@ impl StaticTransitionPlan<'_> {
             .ok_or_else(|| {
                 planner_error("a generated-context Result contract names no planned context")
             })?;
-        let has_detached_return = self
-            .checked_ih_post_call_consumers
-            .iter()
-            .any(|row| row.detached_return_context().is_some());
-        if has_detached_return {
-            let selected_callers = self
-                .static_response_continuations
-                .iter()
-                .filter(|row| row.k_context() == context)
-                .map(StaticResponseContinuation::k_identity)
-                .collect::<Vec<_>>();
-            let mut has_completed_boundary = false;
-            for selected_caller in selected_callers {
-                has_completed_boundary |= self
-                    .checked_ih_static_response_return_boundary(selected_caller)?
-                    .is_some();
-            }
-            if !has_completed_boundary {
-                return Ok(None);
-            }
-        }
-        let mut identities = Vec::new();
-        for identity in self
+        let selected_callers = self
             .static_response_continuations
             .iter()
-            .filter(|row| row.k_context == context)
-            .map(|row| row.k_ret_identity)
-        {
-            if !identities.contains(&identity) {
-                identities.push(identity);
+            .filter(|row| row.k_context() == context)
+            .map(StaticResponseContinuation::k_identity)
+            .collect::<Vec<_>>();
+        let mut has_completed_boundary = false;
+        for selected_caller in selected_callers {
+            has_completed_boundary |= self
+                .checked_ih_static_response_return_boundary(selected_caller)?
+                .is_some();
+        }
+        let contract = if has_completed_boundary {
+            let mut identities = Vec::new();
+            for identity in self
+                .static_response_continuations
+                .iter()
+                .filter(|row| row.k_context == context)
+                .map(|row| row.k_ret_identity)
+            {
+                if !identities.contains(&identity) {
+                    identities.push(identity);
+                }
             }
-        }
-        match identities.as_slice() {
-            [] => Ok(None),
-            [identity] => Ok(Some(*identity)),
-            _ => Err(planner_error(
-                "one generated context has disagreeing response Result contracts",
-            )),
-        }
+            match identities.as_slice() {
+                [] => None,
+                [identity] => Some(*identity),
+                _ => {
+                    return Err(planner_error(
+                        "one generated context has disagreeing response Result contracts",
+                    ));
+                }
+            }
+        } else {
+            None
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        super::record_generated_context_result_contract_diagnostic(context, contract);
+        Ok(contract)
     }
 
     pub(in crate::cranelift_backend) fn checked_ih_post_call_actual_identity_for_target(

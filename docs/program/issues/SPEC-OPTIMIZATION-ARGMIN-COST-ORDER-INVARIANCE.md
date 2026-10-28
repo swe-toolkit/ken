@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE
 title: "Spec 72 section 1 states what argmin selects for one cost function, but no law relates two cost functions. Rule from a checked D0 at zero trust that composing the cost with a function that preserves and reflects the strict Nat order selects the same candidate, including on ties, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
