@@ -19,8 +19,10 @@
 > selector laws. Its catalog exports and package-owned seed test are on
 > main; that test is not official conformance-runner execution or a
 > landed trust measurement. Section 7 specifies four more laws of
-> associativity. Its catalog exports are not yet landed; the authored
-> seed and D0 do not establish shipped §7 execution, CI or landing.
+> associativity. The separate Foundation catalog candidate exports the
+> four checked laws and runs the §7 seed in a package-owned test. That
+> test is not official conformance-runner execution, CI, publication,
+> landing or a landed trust measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -708,9 +710,12 @@ execution or a landed trust measurement.
 > (SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY).** Architect's
 > isolated D0 on `372a6a1a6` checked four generic proofs with no new
 > `Axiom` and identical scratch `trusted_base()` identities 114 → 114.
-> This spec-only candidate does not deliver the Nat Order or NatBox
-> catalog exports. The closed seed does not establish shipped execution,
-> official conformance, CI, publication, landing or landed trust.
+> The earlier spec-and-seed candidate did not deliver the Nat Order or
+> NatBox catalog exports. The separate Foundation candidate exports all
+> four laws; its package test root-loads them and checks the complete
+> accepted seed and the isolated false claim. This is candidate-local
+> package-test evidence, not official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
 
 ### 7.1 Associativity selectors in Nat Order
 
@@ -784,6 +789,11 @@ were refused with `UnboundName`. The D0 probe accepted closed
 three-box controls and refused the mixed equation with `TypeMismatch`;
 it did not run the CLI, official conformance runner or CI. Those
 scratch measurements do **not** establish a shipped §7 export or
-landed trust result. The catalog delivery is a separate Foundation WP.
-No new box representation, point-set quotient, dimension, validity
-premise or runtime-cost guarantee is introduced here.
+landed trust result. The separate Foundation catalog candidate exports
+all four checked laws. Its `cat_geometry_box_intersect_hull_associativity`
+package test root-loads them and checks the complete accepted seed and
+its isolated refused claim. These candidate-local checks are not
+an official conformance-runner run, CI, publication, landing or a
+landed trust measurement. No new box representation, point-set
+quotient, dimension, validity premise or runtime-cost guarantee is
+introduced here.
