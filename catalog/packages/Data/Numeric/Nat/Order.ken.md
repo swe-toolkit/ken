@@ -1013,5 +1013,8 @@ argument and its bridge exposes the canonical successor relation.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
    controls check the carried dictionary, canonical relation and bridge
    identities, zero local registration, zero trust delta, examples, and
-   rejection fences. These controls are not Strict evidence; Strict closure and
-   the identity assertions rerun after `LANG-MOD-CANONICAL-PAIR-PACKAGE`.
+   rejection fences. The [geometry associativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-associativity.md)
+   applies both public `min` and `max` associativity selectors to the same
+   three natural arguments; its package test root-loads the checked laws.
+   These controls are not Strict evidence; Strict closure and the identity
+   assertions rerun after `LANG-MOD-CANONICAL-PAIR-PACKAGE`.

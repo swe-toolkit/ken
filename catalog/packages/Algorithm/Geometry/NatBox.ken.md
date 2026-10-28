@@ -2058,9 +2058,9 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–6](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and twenty-three existing public proof types;
-   the queued §7 specifies the two additional structural associativity laws.
+1. **Contract.** [Exact geometry, §§1–7](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and twenty-five public checked law types,
+   including the two structural associativity laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
@@ -2106,6 +2106,10 @@ this interface.
    Its package test root-loads the catalog and checks the accepted client and
    each refusal. The [commutativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-commutativity.md)
    checks both public Nat Order selectors, overlapping Box swaps, and a false
-   hull-versus-intersection claim in a roots-loaded package test. These tests
-   are not official conformance-runner execution, CI, publication or landing.
-   All six seeds supplement rather than replace the checked law bodies.
+   hull-versus-intersection claim in a roots-loaded package test. The
+   [associativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-associativity.md)
+   checks both Nat Order selectors and both generic box laws, independent
+   grouping values, and one refused mixed regrouping in a roots-loaded
+   package test. These tests are not official conformance-runner execution,
+   CI, publication or landing. All seven seeds supplement rather than replace
+   the checked law bodies.

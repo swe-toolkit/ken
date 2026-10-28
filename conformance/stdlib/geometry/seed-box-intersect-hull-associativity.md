@@ -9,8 +9,10 @@ their corners differ on both axes. The value checks independently calculate
 each side of each box grouping, not by invoking an associativity law. One
 false mixed-operation equality is attempted only after a fresh, complete
 copy of the accepted client. Closed instances cannot prove the four generic
-laws. The §7 catalog exports are **not yet landed**; this spec-only seed does
-not assert shipped execution or official conformance.
+laws. The earlier spec-and-seed candidate did not deliver the §7 catalog
+exports. The separate Foundation catalog candidate now exports the four
+checked laws and runs this seed in a package test; that test is not official
+conformance-runner execution, CI, publication or landing.
 
 ## Accepted client
 
@@ -206,7 +208,15 @@ on that base failed rc 1/E0012 `UnboundName` at the missing
 `overlay-positive`, `overlay-negative`, `seed-fmt`, `negative-fmt`,
 `base-values`, and `base-laws` (each ending in `.log`).
 The reused local CLI was not independently built at the detached base.
-These checks use a **D0 overlay**, not a shipped catalog export.
-The catalog addition is a separate Foundation WP and is **not landed**
-on this candidate's base. No shipped seed, official conformance-runner
-result, CI, publication, landing or landed trust result is asserted.
+These historical checks use a **D0 overlay**, not a shipped catalog
+export. The earlier spec-and-seed candidate's base did not include the
+separate Foundation catalog addition.
+
+The Foundation catalog candidate now exports the four checked laws and
+runs this seed via `cat_geometry_box_intersect_hull_associativity`. Its
+package test root-loads both providers and all four generic laws, then
+checks the complete accepted client and refuses the isolated `seed_neg`
+at its own false proposition. Exact trusted-GlobalId identity sets and
+targeted ambient rows are candidate-local measurements, not a full-corpus
+census or landed trust. This package test is not official
+conformance-runner execution, CI, publication or landing.
