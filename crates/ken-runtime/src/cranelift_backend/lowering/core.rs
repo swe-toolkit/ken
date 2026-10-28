@@ -3260,6 +3260,8 @@ impl<'a> Lowering<'a> {
         value: LoweringOperand,
         active: ActiveContinuationFrame<'_>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        #[cfg(test)]
+        super::source::q1_record_terminal_resume(self.live_source_continuations);
         let Some((head, tail)) = active.pending.split_first() else {
             return Ok(value);
         };
