@@ -471,13 +471,14 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–5
+**`68-numerical.md`** §§1–7
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
 SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
 SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER;
-SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6). The §1–2
+SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -515,11 +516,20 @@ regroupings coincide structurally by `Refl`; open regroupings are
 not definitionally convertible, and generic structural equality
 would need an out-of-scope Rational export. Architect's isolated
 D0 checked the four generic proofs without a new `Axiom` and with
-scratch trusted identities unchanged (114 → 114). The §6 exports
-are absent on this base; its authored closed seed is not shipped
+scratch trusted identities unchanged (114 → 114). The §6 checked
+exports and package-owned seed test are on main; they do not establish
+official conformance or landed trust. Section 7 adds two public
+premise-bearing endpoint-inclusion laws: `interval_hull_least i j k`
+combines inclusion of both operands in `k`, while
+`interval_intersect_greatest k i j` combines inclusion of `k` in
+both operands. Both cover inverted intervals without claiming
+structural equality. Architect's isolated D0 on `1363b09b4` checked
+both generic proofs with no new `Axiom` and equal scratch trusted
+identities (114 → 114). The §7 catalog exports are absent on this
+base; D0 and the separately owned seed do not establish shipped §7
 execution, official conformance, CI, publication, landing or landed
 trust. Signed arithmetic, division, `Float`, rounding, width and
-structural hull/intersection algebra remain deferred.
+structural hull/intersection equalities remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–6 (SPEC-TIME-EVENT-TRACE-CONTRACT;

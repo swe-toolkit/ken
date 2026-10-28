@@ -5,7 +5,8 @@
 > SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3;
 > SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY §4;
 > SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER §5;
-> SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -25,13 +26,18 @@
 > types, shipped seed's accepted client and two refused clients, with an exact
 > package-local trusted-identity delta of 114 → 114. This does not establish
 > official conformance-runner execution, CI, landing or a landed trust delta.
-> Section 6 specifies four new generic mutual-inclusion laws for addition
-> and multiplication regrouping. Architect checked their generic proofs
-> on an isolated D0 at `edc1da359` with no new `Axiom` and unchanged
-> scratch trusted GlobalIds (114 → 114). The §6 catalog exports are absent
-> from this base; the authored closed seed does not establish shipped
-> §6 execution, official conformance, CI, publication, landing or landed
-> trust.
+> Section 6's four generic mutual-inclusion laws for addition and
+> multiplication regrouping have checked catalog exports and a
+> package-owned seed test on main. Architect's earlier isolated D0 on
+> `edc1da359` had no new `Axiom` and unchanged scratch trusted GlobalIds
+> (114 → 114); neither it nor the package test establishes official
+> conformance or landed trust. Section 7 specifies two endpoint-order
+> hull/intersection bounds laws. Architect's isolated D0 on `1363b09b4`
+> checked both generic proofs with no new `Axiom` and unchanged scratch
+> trusted GlobalIds (114 → 114). The §7 catalog exports are absent on
+> this base; the D0 client and separately owned seed do not establish
+> shipped §7 execution, official conformance, CI, publication, landing
+> or landed trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -674,12 +680,11 @@ test is official conformance-runner execution, CI or landing.
 > **Section 6 status: DRAFT v0
 > (SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE).** Architect's isolated
 > D0 checked four generic proof bodies on `edc1da359` with no new
-> `Axiom` or trusted GlobalId. The catalog candidate now exports all
-> four Transparent laws: its targeted package test root-loads the
-> generic client and whole accepted §6 seed, rejects the isolated false
-> inclusion, and measures no local trust delta. This is candidate
-> package-test evidence, not official conformance, CI, publication,
-> landing or landed trust.
+> `Axiom` or trusted GlobalId. All four Transparent laws and the
+> targeted package test are on main: the test root-loads the generic
+> client and accepted §6 seed, rejects the isolated false inclusion,
+> and measures no local trust delta. This package-test evidence is not
+> official conformance or landed trust.
 
 For every three intervals `i`, `j`, `k`, including inverted ones,
 `Algorithm.Numeric.RationalInterval` must export these **four**
@@ -749,5 +754,81 @@ control and independent `False` value establish that the refusal
 comes from the false endpoint comparison rather than the proof form.
 These closed checks are examples, not proofs of the generic laws.
 The Architect's earlier D0 checked a proposed implementation. The
-catalog candidate's package test now checks the landed seed against its
-exports; neither observation is official conformance or landed trust.
+landed catalog's package test checks the §6 seed against its exports;
+neither observation is official conformance or landed trust.
+
+## 7. Hull and intersection bound endpoint inclusion
+
+> **Section 7 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS).** Architect's
+> isolated D0 on `1363b09b4` checked both generic Transparent proofs,
+> their public clients and closed controls, with no new `Axiom`,
+> `ken check` and `ken fmt --check` rc 0, and equal scratch
+> `trusted_base()` GlobalId sets (114 → 114). Neither §7 catalog
+> export is present on the authoring base. The D0 and the separately
+> owned conformance seed do not establish shipped §7 execution,
+> official conformance, CI, publication, landing or landed trust.
+
+### 7.1 Two premise-bearing public laws
+
+`Algorithm.Numeric.RationalInterval` must export the following public
+Transparent theorems immediately after §6's
+`interval_mul_assoc_rev_inside`. They use §3.1's endpoint-value
+`interval_inside` and no new membership or equality relation. Each
+premise is an arrow from `IsTrue` of an endpoint-inclusion test; the
+premises are supplied in the same order as their corresponding
+operands.
+
+```ken
+pub theorem interval_hull_least
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside i k)
+      → IsTrue (interval_inside j k)
+      → IsTrue (interval_inside (interval_hull i j) k)
+
+pub theorem interval_intersect_greatest
+      (k : Interval) (i : Interval) (j : Interval)
+    : IsTrue (interval_inside k i)
+      → IsTrue (interval_inside k j)
+      → IsTrue (interval_inside k (interval_intersect i j))
+```
+
+The hull law receives its two operands first, then their common outer
+bound `k`: if each lies inside `k`, their hull does too. The
+intersection law receives the common inner bound `k` first, then
+the two intervals: if `k` lies inside each, it lies inside their
+intersection. Neither conclusion alone supplies either premise, and
+neither orientation is a claim that a hull lies inside either of its
+operands or that an intersection lies inside every unrelated
+interval. The laws include inverted intervals, since the endpoint
+test compares stored values even when the represented member set is
+empty. There is no validity, nonempty-membership, distinctness, or
+structural `Equal Interval` premise.
+
+### 7.2 Proof and evidence boundary
+
+The proofs destructure the three intervals and combine their two
+endpoint comparisons with the existing public
+`(proof greatest for rational_min)` and
+`(proof least for rational_max)` in opposite positions for hull and
+intersection. They introduce no helper. The existing private
+`equiv_leq` and `rational_distrib_r` remain private, and all §1–§6
+operations and laws remain unchanged. The two checked bodies and
+package-owned tests belong to a separate Foundation catalog WP, not
+to this spec/status candidate. No new Rational export, axiom,
+postulate, kernel rule, surface feature, or trust entry is specified.
+
+In Architect's D0 closed fixture, `low = [1/2,1]` and
+`high = [2,3]` both lie inside `outer = [0,4]`, and their hull
+`[1/2,3]` lies inside that strictly wider outer bound. The interval
+`narrow = [2,3]` lies inside both `[0,3]` and `[1,4]`, and thus
+inside their intersection `[1,3]`, which is strictly wider than
+`narrow`. An inverted `[4,0]` exercises both laws under the same
+endpoint-value relation. Independent closed `Proved` controls
+compute the premise and conclusion values; an accepted same-form
+control and a separately computed `False` isolate the false claim
+that the hull of `low` and `high` lies inside `low`. The refusal
+cannot supply the missing inclusion premise. These finite checks
+illustrate the orientations, not proofs of the generic laws. The
+D0's scratch package and client are not shipped §7 execution or an
+official conformance-runner result; CV authors the seed separately.
