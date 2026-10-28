@@ -251,8 +251,9 @@ The **Layer-3 graphs and dependency contract** is pinned in
 **`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT), §2
 (SPEC-GRAPHS-CYCLE-REFUTES-ORDER), §3
 (SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
-(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC), and §5
-(SPEC-GRAPHS-REACHABILITY-ALONG-WALK). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC), §5
+(SPEC-GRAPHS-REACHABILITY-ALONG-WALK), and §6
+(SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -272,10 +273,18 @@ trust. Section 5 specifies a checked `graph_reachable_along_walk`
 law: reachability at a walk's endpoint carries back to its start.
 The Architect's isolated D0 checked the generic proof on `454adf947`
 with no new `Axiom` and identical scratch trusted GlobalIds
-(114 → 114). The §5 export is absent; the separately authored closed
-seed does not establish shipped §5 execution, official conformance,
-CI, publication, landing or landed trust. No second fixed point is
-added.
+(114 → 114). The §5 checked export and package-owned seed test are
+now on main; neither establishes official conformance or landed trust.
+Section 6 specifies `graph_reachable_target_monotone`: a pointwise
+inclusion `target v = True → wider v = True` carries affirmative
+reachability at `s` from `target` to `wider`, not conversely. The
+public Transparent law reuses private `require_some` without a new
+helper or change to §1–5. Architect D0 on `abafe3963` checked the
+generic proof with no new `Axiom` and equal scratch trusted identities
+(114 → 114). Its §6 catalog export is absent; D0 and the separately
+owned closed seed do not establish shipped §6 execution, official
+conformance, CI, publication, landing or landed trust. No second
+fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;

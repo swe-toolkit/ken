@@ -4,7 +4,8 @@
 > SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2;
 > SPEC-GRAPHS-WALK-COMPOSITION-ORDER §3;
 > SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC §4;
-> SPEC-GRAPHS-REACHABILITY-ALONG-WALK §5).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REACHABILITY-ALONG-WALK §5;
+> SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE §6).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -13,12 +14,14 @@
 > fences are exercised in a package-owned test. Section 4's left-unit and
 > associativity laws now have checked catalog exports, and the closed §4
 > seed is exercised by a package-owned test. These package tests are not
-> official conformance-runner execution or CI. Section 5 specifies a
-> new generic reachability law and a closed seed. Its catalog export
-> is absent on this base; isolated D0 does not establish shipped §5
-> execution, official conformance, CI, publication, landing or landed
-> trust. No kernel, trust, or surface-syntax change or revision to
-> §61 §2 is required.
+> official conformance-runner execution or CI. Section 5's public
+> reachability law, checked catalog proof and package-owned seed test
+> are now on main; the test is not official conformance or landed trust.
+> Section 6 specifies one generic target-monotonicity law. Architect's
+> isolated D0 and the separately owned seed do not establish a shipped
+> §6 export or execution, official conformance, CI, publication, landing
+> or landed trust. No kernel, trust, or surface-syntax change or revision
+> to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -521,11 +524,10 @@ a landed trust measurement.
 > **Section 5 status: DRAFT v0
 > (SPEC-GRAPHS-REACHABILITY-ALONG-WALK).** The Architect's isolated D0
 > checked the generic proof on `454adf947` without a new `Axiom` or
-> trusted GlobalId. The catalog candidate now exports the checked law:
-> its targeted package test root-loads the generic client and the whole
+> trusted GlobalId. The checked catalog export and targeted package
+> test are now on main. That test root-loads the generic client and
 > accepted §5 seed, rejects the isolated false claim, and measures no
-> local trust delta. This is candidate package-test evidence, not
-> official conformance, CI, publication, landing or landed trust.
+> local trust delta; it is not official conformance or landed trust.
 
 `Algorithm.Graphs.Dependency` must export this Transparent checked law,
 with its public name, argument order and result type exactly as follows:
@@ -582,5 +584,69 @@ reachability claim on that chain, was kernel-rejected with
 `TypeMismatch` after the whole accepted client; an accepted
 same-shape `Proved` control and a checked `False` result isolate the
 false conclusion. Those earlier checks used an isolated proposed implementation. The
-catalog candidate's package test now checks the landed seed against its
-export; neither observation is official conformance or landed trust.
+landed catalog's package test checks the §5 seed against its export;
+neither observation is official conformance or landed trust.
+
+## 6. Reachability is monotone in the target predicate
+
+> **Section 6 status: DRAFT v0
+> (SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE).** Architect's isolated
+> D0 on `abafe3963` checked the generic proof and an independent client,
+> with no new `Axiom`, `ken check` and `ken fmt --check` rc 0, and equal
+> scratch `trusted_base()` GlobalId sets (114 → 114). The §6 catalog
+> export is absent on the authoring base. A D0 client and the separately
+> owned conformance seed do not establish shipped §6 execution, official
+> conformance, CI, publication, landing or landed trust.
+
+`Algorithm.Graphs.Dependency` must export this public Transparent law
+immediately after `graph_reachable_along_walk`. The pointwise
+`included` proof is the **sole** premise: every vertex satisfying
+`target` also satisfies `wider`. Its conclusion takes affirmative
+reachability for `target` at `s` to affirmative reachability for
+`wider` at the same `s`, `g`, and `fq`.
+
+```ken
+pub theorem graph_reachable_target_monotone
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (wider : q → Bool)
+      (included : (v : q) → Equal Bool (target v) True → Equal Bool (wider v) True)
+    : Equal Bool (graph_reachable q fq g s target) True
+      → Equal Bool (graph_reachable q fq g s wider) True
+```
+
+The input order is `q`, `fq`, `g`, `s`, `target`, `wider`,
+`included`, then the reachability hypothesis as an arrow. The
+pointwise proof uses only public names and the same checked
+`Equal Bool (target v) True` hit form carried by `ReachWitness`.
+No `DecEq q`, nonempty-walk premise, strict-inclusion premise, or
+extra graph assumption is needed. The law holds when the two targets
+are equal, when the start itself satisfies the target, and when a
+nonempty walk reaches it. It does **not** state the converse:
+reachability of a wider target need not imply reachability of its
+narrower subset.
+
+The proof reuses §1.2's `graph_find_walk_some` and private
+`require_some` to obtain a `ReachWitness` for the narrower target.
+Its checked target hit is transported through `included` at the
+witness endpoint; §1.2's `graph_reachable_complete` then establishes
+the wider result along the same genuine walk. No new helper, search,
+operation, graph carrier, kernel rule, surface feature, axiom, or
+trust entry is required. `require_some`, `walk_reachable`, and
+`find_walk_selected` remain private. All §1–§5 operations and laws
+are unchanged.
+
+Architect's D0 accepted both an independent generic client and a
+closed three-vertex one-way-chain client. The narrower predicate
+selects `V1`; the wider one selects `V1` and `V2`. From `V0`, both
+reachability decisions check as `True`, and the law applies across a
+real edge. From `V2`, the wider predicate is `True` while the narrower
+predicate is `False`; an isolated false-converse claim is rejected
+after the same accepted prefix. These finite controls discriminate
+the direction but do not prove the quantified law. The D0's checked
+proof and seed client are scratch evidence, not a §6 catalog delivery
+or official conformance result; CV owns the authored conformance seed
+separately from this spec/status candidate.
