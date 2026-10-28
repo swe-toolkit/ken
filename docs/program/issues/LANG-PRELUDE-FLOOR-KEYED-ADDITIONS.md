@@ -100,16 +100,20 @@ base, stop and report the mismatch.
 
 ## Acceptance
 
-- **AC-1.** Each admitted type resolves in strict mode to its exact
-  registered id. A scoped family resolves only as `T.C`. A same-name
-  source declaration is refused.
+- **AC-1.** In both strict and legacy resolution modes, each admitted
+  type resolves to its exact registered id. A scoped family resolves
+  only as `T.C`, so `ExitCode.Success`, `ExitCode.Failure` and
+  `ProgramCaps.MkProgramCaps` resolve to their ids, and bare `Success`,
+  `Failure` and `MkProgramCaps` are refused. A same-name source
+  declaration is refused (Architect `evt_4k303wsmrmj4z`).
 - **AC-2.** The spec count equals `PRELUDE_FLOOR_NAMES.len()`. The census
   diff is deletion-only, with predicted pairs.
 - **AC-3.** `trusted_base()` is unchanged as an identity set.
 - **AC-4 (mutation, QA).** Each mutant fails and is restored:
   - removing one admitted name from `PRELUDE_FLOOR_NAMES` reddens its
     AC-1 row;
-  - admitting a scoped constructor unscoped reddens the `T.C`-only row.
+  - admitting a scoped constructor unscoped reddens the bare-name
+    refusal row in both modes.
 
 ## Stop conditions
 

@@ -5,8 +5,8 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base (increment A):** `origin/main` `9e5d4bc7d986616a1e8a27688edc2ea89beeb031` (the cut of
-`59b930cc9`; re-pinned 2026-10-27 by DOC-BUNDLE-309).
+**Base (increment A):** `origin/main` `c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811` (the cut of
+`5ec884387`; re-pinned 2026-10-28 by DOC-BUNDLE-315).
 Increments B and C pin their own bases in §4a-pin. This header is A's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
@@ -182,8 +182,8 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=9e5d4bc7d986616a1e8a27688edc2ea89beeb031   # increment A's pinned base
-# Re-pinned 2026-10-27 to the cut of 59b930cc9 (DOC-BUNDLE-309). A literal,
+BASE=c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811   # increment A's pinned base
+# Re-pinned 2026-10-28 to the cut of 5ec884387 (DOC-BUNDLE-315). A literal,
 # never a ref or merge-base(...): see §4b and §4f. When A merges main again,
 # its handoff reports the new cut point; the Steward re-pins it here, and QA
 # binds to the routed bundle that carries it.
