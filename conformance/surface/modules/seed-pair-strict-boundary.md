@@ -14,12 +14,14 @@ are distinct from kernel `Term::Sigma`/`Term::Pair`/`Term::Proj1`/
 `Term::Proj2`, runtime `EvalVal::Pair`, and any same-shaped source declaration.
 Kernel and runtime forms carry no provider `GlobalId`.
 
-The acceptance rows below are **RED-UNTIL
-`LANG-MOD-CANONICAL-PAIR-PACKAGE`**, the redirected floor-realization build WP.
-That build must reuse the four existing compiler-installed identities. RED-UNTIL
-is not an accepted failure and does not authorize a package, alias, registry, or
-ambient fallback. The representation-only transparent-Sigma controls execute
-now and remain evidence for the unchanged kernel behavior.
+The Pair floor required by the acceptance rows below was realized by
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` and included in the fifteen-name floor
+landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The rows describe
+Pair behavior; their status does not certify this candidate's five new
+entrypoint identities. The Pair landing authorizes no package, alias,
+registry, or ambient fallback. The representation-only transparent-Sigma
+controls continue to execute and remain evidence for the unchanged kernel
+behavior.
 
 ## AC1 — the four existing Pair-family identities become Strict floor bindings
 
@@ -27,7 +29,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — a witnessed closed floor reuses its
   pre-source declarations rather than searching or reallocating
-- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `30 §4`; `33 §3.3`; `34 §"Canonical non-dependent pair floor family"`;
   `39 §2.0` steps 4–6
 - given: create a fresh environment before source elaboration and record the
@@ -56,7 +58,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — per-unit loading neither supplies nor
   masks an always-present floor binding
-- stage: **RED-UNTIL floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §3.3`; `39 §2.0` steps 2, 4, and 5
 - given: strict-load an unrelated provider and an unrelated re-export facade,
   then load entries that use each bare Pair-family name without imports.
@@ -119,7 +121,7 @@ now and remain evidence for the unchanged kernel behavior.
 ### surface/modules/pair-floor-protected-name-bindings-reject
 
 - promise class: **durable invariant** — source cannot introduce a binding in B
-- stage: **RED-UNTIL floor realization for the four Pair-family rows**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §3.3`; `39 §2.0`
 - given: in independent Strict roots, attempt a top-level binding named `Pair`,
   `mk_pair`, `pair_fst`, or `pair_snd`, with a well-typed body or family. Also
@@ -141,7 +143,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — a re-export creates a public path, not
   a provider or source owner
-- stage: **RED-UNTIL floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `33 §4.3`; `34 §"Canonical non-dependent pair floor family"`
 - given: record all four floor ids, then load one module that explicitly
   re-exports the four bindings and a consumer of that facade.
@@ -178,7 +180,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **normative compatibility vector** — downstream proofs use
   conversion, not an imported theorem
-- stage: **RED-UNTIL floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `34 §"Canonical non-dependent pair floor family"`; `13 §2`/`§6`
 - given: with no Pair import, check
   `pair_fst Bool Bool (mk_pair Bool Bool True False) = True` with `Proved`,
@@ -205,7 +207,7 @@ now and remain evidence for the unchanged kernel behavior.
   spelling allow-list, determines positivity
 - shape: **soundness/completeness pair** — each positive orientation is paired
   with the corresponding inner-arrow negative
-- stage: **RED-UNTIL floor realization for the named Pair instantiation**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `14 §8.3`/`§8.5`; `34 §"Canonical non-dependent pair floor family"`
 - given: through the ordinary inductive admission path submit
   `data Good1 = MkGood1 (Pair Good1 Unit)` and
@@ -234,7 +236,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — available evidence bounds every
   identity and closure inference
-- stage: **current pre-floor-realization evidence frontier**
+- stage: **historical pre-Pair-floor evidence frontier**
 - spec: `30 §4`; `33 §3.3`; `39 §2.0`
 - given: enumerate the census subjects `Core.Logic.Compare`,
   `Core.Classes.LawfulClasses`, `Data.Collections.Derived`,
@@ -259,7 +261,7 @@ now and remain evidence for the unchanged kernel behavior.
 
 - promise class: **durable invariant** — target closure comes from fresh Strict
   execution and exact floor identities, never projected staging
-- stage: **RED-UNTIL `LANG-MOD-CANONICAL-PAIR-PACKAGE` floor realization**
+- stage: **Pair floor landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`**
 - spec: `30 §4`; `33 §3.3`; `39 §2.0`
 - given: after floor realization, record the four canonical ids before source
   loads. Re-run the census subjects and any coupled catalog population through
@@ -327,10 +329,10 @@ now and remain evidence for the unchanged kernel behavior.
   checked-transparent `Pair = g232`, `mk_pair = g233`, `pair_fst = g234`, and
   `pair_snd = g235`; all are outside `trusted_base()`, every helper type names
   `g232`, and the bodies are non-dependent Sigma, pair introduction, first
-  projection, and second projection. The current configured floor still has
-  nine type names. Across all 48 catalog `.ken.md` leaves, no source declaration
-  defines `Pair`; catalog occurrences are consumers under the current Legacy
-  route.
+  projection, and second projection. At that base, the configured floor still
+  had nine type names. Across all 48 catalog `.ken.md` leaves at that base, no
+  source declaration defined `Pair`; catalog occurrences were consumers under
+  that base's Legacy route.
 - **CHECKED now:** the representation-only transparent-Sigma positivity controls
   execute through both components and reject both inner-arrow negatives.
 - **CLAIMED at the historical spec base:** the ten-type Pair floor, exact

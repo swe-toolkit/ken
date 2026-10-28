@@ -1510,7 +1510,7 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all fifteen prelude roster names, every exact constructor,
+  Strict uses of all twenty prelude roster names, every exact constructor,
   and all three Pair companions accept on the recorded ids, including the
   public primitive
   signatures that require the signature arm. Every same-spelling floor binding
