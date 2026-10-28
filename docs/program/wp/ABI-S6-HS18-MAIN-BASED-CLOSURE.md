@@ -802,26 +802,27 @@ ruling that put them at the top of
 the queue as independent work was **withdrawn** — it quoted the ruling and
 dropped its qualifier.
 
-### 7a. Disclosed residual on increment A: the `:9345` non-relay disjunct
+### 7a. Disclosed residual on increment A: the `:9345` closeout is unpinned
 
-The selected-incoming-owner closeout at `units.rs:9345` has two disjuncts
-(Architect `evt_765wn38yxrg89`).
+The selected-incoming-owner closeout at `units.rs:9345` has two disjuncts,
+relay and non-relay. Measured at `ee836f811`, **neither has a reaching
+negative in the suite** (Architect `evt_1whdjnp7dmax4`, correcting
+`evt_765wn38yxrg89`).
 
-- **Relay.** The relay disjunct (relay-promoted and source lowered) is still
-  reached by
-  `rt_branched_scrutinee_unit_body_port::lowering_relay_source_without_entering_owner_refuses_coverage`
-  through `RestoreRelayPromotedKTarget`.
-- **Non-relay.** The non-relay disjunct has **no compile-preserving reaching
-  negative at this fixture**. The only callee-changing mutant available under
-  increment A, restore-k in
-  `static_response_selected_caller_retarget_reaches_and_restores`, also
-  changes the result identity. Finished-code verification therefore refuses it
-  first, lawfully. Restore-k is pinned to that cause-specific refusal. Verifier
+- **Non-relay.** restore-k in
+  `static_response_selected_caller_retarget_reaches_and_restores` also changes
+  the result identity, so finished-code verification refuses it first,
+  lawfully. Restore-k is pinned to that cause-specific refusal. Verifier
   order and contract attribution do not change.
+- **Relay.**
+  `rt_branched_scrutinee_unit_body_port::lowering_relay_source_without_entering_owner_refuses_coverage`
+  applies its mutation, but the `:9345` refusal is not recorded (0 of 1).
+  The earlier "still reached" was read from a filtered CI log, not measured.
 
-Keep the arm: it still guards an unentered owner whose callee agrees on
-identity. Do not add a detector-side mutant. The precedent is the HS7
-non-constructibility retirement in the same test.
+Keep the arm. Do not edit the rt_branched row, and do not add a detector-side
+mutant. The Architect rules how the guard is pinned under increment A, or why
+it is subsumed and disclosed, on the implementer's evidence. That ruling
+replaces this subsection.
 
 ---
 
