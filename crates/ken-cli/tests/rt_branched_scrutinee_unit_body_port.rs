@@ -361,12 +361,13 @@ fn suppressing_relay_promotion_refuses_the_forwarded_read_before_lowering() {
 }
 
 /// Promise class: durable invariant. MEASURED: the reached source Construct
-/// lowers while a mutation retargets only its selected response-owner call
-/// to the original K, so object closeout refuses. CLAIMED: a relay owner
-/// lacking an incoming call may be discharged only when its source was never
-/// lowered in any generated function. THE GAP: the mutation must change the
-/// actual resolved callee, not only falsify the coverage detector; its
-/// application count comes from exact target resolution.
+/// lowers, and retargeting its selected owner call to the original K first
+/// reaches a finished-code identity refusal. With only that earlier refusal
+/// suppressed, the relay selected-incoming guard records and refuses the
+/// unentered owner. CLAIMED: a lowered relay source needs an incoming owner
+/// call, even if a preceding Result check would otherwise refuse its K.
+/// THE GAP: suppression alone must be inert; the retarget mutation changes
+/// the actual resolved callee, not just the guard's recorded evidence.
 #[test]
 fn lowering_relay_source_without_entering_owner_refuses_coverage() {
     with_stack_floor("rt-relay-lowered-without-owner", || {
@@ -375,9 +376,23 @@ fn lowering_relay_source_without_entering_owner_refuses_coverage() {
             "(MkBufferWindow (0 : Int) (4 : Int))", 1,
         );
         assert_ne!(source, BRANCHED_SCRUTINEE_SOURCE);
-        let root = tempfile::tempdir().expect("temporary native-build root");
-        let ((built, applications), coverage) =
-            ken_runtime::with_relay_owner_coverage_refusal_observations(|| {
+        let inert_root = tempfile::tempdir().expect("suppression-only native-build root");
+        let (inert_result, inert_applications) = ken_runtime::with_result_contract_layer_mutation(
+            ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
+            || ken_cli::build_native_program(
+                &source, ken_cli::SourceFormat::Ken,
+                "rt_relay_suppression_inert", inert_root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            ),
+        );
+        assert_eq!(inert_applications, 0, "sound relay build has no missing contract");
+        assert!(ken_runtime::result_contract_layer_mutation_is_exact());
+        inert_result.expect("suppression alone must preserve the relay native build");
+        drop(inert_root);
+
+        for (label, isolated) in [("retarget-only", false), ("retarget-isolated", true)] {
+            let root = tempfile::tempdir().expect("temporary native-build root");
+            let run = || ken_runtime::with_relay_owner_coverage_refusal_observations(|| {
                 ken_runtime::with_static_response_caller_retarget_mutation(
                     ken_runtime::StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget,
                     || ken_cli::build_native_program(
@@ -387,15 +402,48 @@ fn lowering_relay_source_without_entering_owner_refuses_coverage() {
                     ),
                 )
             });
-        assert!(applications > 0, "the reached relay must select its owner call");
-        assert_eq!(coverage.len(), 1, "the exact relay owner coverage guard must refuse");
-        assert!(coverage[0].source_lowered, "the source Construct must actually lower");
-        assert!(!coverage[0].selected_caller.is_empty(), "the guard checks an exact incoming edge");
-        let error = built.expect_err("a lowered relay source without its owner must refuse");
-        assert_eq!(error.code().as_str(), "N0003");
-        let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = error
-        else { panic!("the missing owner call must refuse during native object closeout") };
-        assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
-        assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::PlannerInvariant));
+            let (((built, applications), coverage), layer_applications) = if isolated {
+                ken_runtime::with_result_contract_layer_mutation(
+                    ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
+                    run,
+                )
+            } else {
+                (run(), 0)
+            };
+            assert!(applications > 0, "{label}: the reached relay must select its owner call");
+            assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
+            assert!(ken_runtime::result_contract_layer_mutation_is_exact());
+            let error = built.expect_err("a lowered relay without its owner must refuse");
+            let expected_code = if isolated { "N0003" } else { "N0004" };
+            assert_eq!(error.code().as_str(), expected_code, "{label}: wrong refusal code");
+            let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = error
+            else { panic!("{label}: refusal must occur during native object closeout") };
+            assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
+            if isolated {
+                assert!(layer_applications > 0, "{label}: no earlier refusal was suppressed");
+                assert_eq!(coverage.len(), 1, "{label}: the exact relay guard must refuse");
+                assert!(coverage[0].source_lowered, "{label}: source Construct must lower");
+                assert!(!coverage[0].selected_caller.is_empty(), "{label}: exact incoming edge");
+                assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::PlannerInvariant));
+                assert!(
+                    packaging.reason.contains("a forward-declared response owner has no verified selected incoming call"),
+                    "{label}: wrong closeout refusal: {:?}", packaging.reason
+                );
+            } else {
+                assert_eq!(layer_applications, 0);
+                assert!(coverage.is_empty(), "{label}: earlier verifier must refuse first");
+                assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::FinishedCode));
+                let published = packaging.reason
+                    .split_once(" publishes actual constructor identity ")
+                    .and_then(|(_, after)| after.split_once(" at "))
+                    .map(|(identity, _)| identity)
+                    .expect("retarget-only: missing published constructor identity");
+                let demanded = packaging.reason
+                    .split_once("but its pending Result obligation demands ")
+                    .map(|(_, identity)| identity)
+                    .expect("retarget-only: missing demanded constructor identity");
+                assert_ne!(published, demanded, "retarget-only: wrong K identity must differ");
+            }
+        }
     });
 }

@@ -1264,6 +1264,33 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
 
         let (read, read_roles) = compile("read", "rt_read_offset_stage");
         let (write, _) = compile("write", "rt_write_writable_stage");
+        // Promise class: durable invariant. MEASURED: a completed response
+        // boundary in the fixed context-demand product actually yields the
+        // declared Ret contract at the lowering query. CLAIMED: a needed
+        // generated-context Result contract cannot silently disappear. THE GAP:
+        // the response row alone does not prove a consumer exists; the separate
+        // completed-boundary and mutation controls establish that consumer.
+        let completed_context_contracts = [&read, &write]
+            .into_iter()
+            .flat_map(|plan| {
+                plan.all_static_response_rows.iter().flat_map(|row| {
+                    plan.generated_context_result_contracts
+                        .iter()
+                        .filter(move |(context, contract)| {
+                            *context == row.k_context
+                                && row.k_context == 0
+                                && contract.as_ref() == Some(&row.k_ret_identity)
+                        })
+                })
+            })
+            .count();
+        assert!(
+            completed_context_contracts > 0,
+            "the fixed response-demand product must retain a completed-boundary Ret contract: \
+             read={:?}, write={:?}",
+            read.generated_context_result_contracts,
+            write.generated_context_result_contracts
+        );
         // Structural totality for both products. The former read P2 population
         // belongs to marked Continuation regions, while the eligible write plane
         // specializes its transport sources. Each Specialized row owns one
@@ -2063,13 +2090,15 @@ full_demand_census_test!(
 /// exactly one planner-selected incoming identity and at least one decoded
 /// finished-CLIF caller targeting that owner.
 ///
-/// **MEASURED:** removing the incoming edge, restoring its unspecialized K
-/// target, or retargeting it to a different response owner each reaches and
-/// leaves the exact owner unentered.
-/// **CLAIMED:** neither declaration nor another owner's call can discharge the
-/// selected incoming-caller relation.
-/// **THE GAP:** the controls mutate the real resolution population and the
-/// unchanged whole-artifact coverage ledger supplies the refusal.
+/// **MEASURED:** removing the incoming edge reaches the caller refusal;
+/// restoring its unspecialized K reaches the finished-code identity refusal.
+/// With only that earlier refusal suppressed, restoring K reaches the exact
+/// non-relay selected-caller refusal. Every arm restores identical bytes.
+/// **CLAIMED:** neither a wrong target nor a missing incoming call can
+/// silently discharge a forward-declared response owner.
+/// **THE GAP:** suppression must be inert on a sound build and must skip only
+/// an actually missing generated-Result certificate, leaving the later
+/// selected-caller ledger unchanged.
 #[test]
 fn static_response_selected_caller_retarget_reaches_and_restores() {
     use ken_runtime::StaticResponseCallerRetargetMutation as Mutation;
@@ -2098,6 +2127,25 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
             .expect("baseline response-retarget executable bytes");
         assert_eq!(baseline.len(), 1);
         assert!(!baseline[0].static_response_owners.is_empty());
+        // No missing generated-Result certificate exists on the sound fixture.
+        // Suppression alone must neither fire nor alter the linked executable.
+        let ((inert_root, (inert_result, inert_diagnostic)), inert_applications) =
+            ken_runtime::with_result_contract_layer_mutation(
+                ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
+                || compile("suppression-inert"),
+            );
+        assert_eq!(inert_applications, 0, "sound retarget fixture has no missing certificate");
+        assert!(ken_runtime::result_contract_layer_mutation_is_exact());
+        let inert_result = inert_result.expect("suppression alone must preserve the native build");
+        assert_eq!(inert_diagnostic, baseline);
+        assert_eq!(inert_result.artifact.executable_hash, baseline_hash);
+        assert_eq!(
+            std::fs::read(&inert_result.artifact.executable_path)
+                .expect("suppression-only executable bytes"),
+            baseline_bytes,
+            "suppression alone changed the sound executable"
+        );
+        drop(inert_root);
 
         // RECUT 2 HS7 FALLBACK (Architect evt_73r305aqtchgw; Steward scope confirm
         // evt_7xjkcw0tqnxj0). The >= 2-Specialized-owner arm
@@ -2125,33 +2173,111 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
              need >= 1."
         );
 
-        for (label, mutation, expected) in [
-            (
-                "restore-k",
-                Mutation::RestoreSelectedKTarget,
-                "a forward-declared response owner has no verified selected incoming call",
-            ),
-            (
-                "remove",
-                Mutation::RemoveSelectedCaller,
-                "removed one selected incoming caller",
-            ),
+        for (label, mutation, isolated) in [
+            ("restore-k", Mutation::RestoreSelectedKTarget, false),
+            ("restore-k-isolated", Mutation::RestoreSelectedKTarget, true),
+            ("remove", Mutation::RemoveSelectedCaller, false),
         ] {
-            let ((_mutated_root, (mutated_result, mutated_diagnostic)), applications) =
-                ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
+            let (((_mutated_root, (mutated_result, mutated_diagnostic)), applications),
+                layer_applications) = if isolated {
+                ken_runtime::with_result_contract_layer_mutation(
+                    ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
+                    || ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
+                        compile(label)
+                    }),
+                )
+            } else {
+                (ken_runtime::with_static_response_caller_retarget_mutation(mutation, || {
                     compile(label)
-                });
+                }), 0)
+            };
             assert!(applications > 0, "{label}: caller mutation did not reach");
+            if isolated {
+                assert!(layer_applications > 0, "{label}: no earlier refusal was suppressed");
+            } else {
+                assert_eq!(layer_applications, 0);
+            }
+            assert!(ken_runtime::result_contract_layer_mutation_is_exact());
             let error =
                 mutated_result.expect_err("a caller mutation must leave an owner unentered");
-            assert!(
-                format!("{error:?}").contains(expected),
-                "{label}: caller mutation failed for a different reason: {error:?}"
-            );
-            assert_eq!(
-                mutated_diagnostic, baseline,
-                "{label}: caller mutation altered the typed planner ledger"
-            );
+            let refusal = format!("{error:?}");
+            if mutation == Mutation::RestoreSelectedKTarget && !isolated {
+                let owner_ret_identities = baseline[0]
+                    .static_response_owners
+                    .iter()
+                    .map(|owner| {
+                        let matching_rows = baseline[0]
+                            .all_static_response_rows
+                            .iter()
+                            .filter(|row| row.k_context == owner.k_context)
+                            .collect::<Vec<_>>();
+                        let [row] = matching_rows.as_slice() else {
+                            panic!("restore-k requires one baseline Ret row per owner's K context");
+                        };
+                        row.k_ret_identity.as_str()
+                    })
+                    .collect::<Vec<_>>();
+                assert!(!owner_ret_identities.is_empty());
+                assert!(
+                    refusal.contains("source_cause: Some(FinishedCode)")
+                        && refusal.contains("publishes actual constructor identity")
+                        && refusal.contains("but its pending Result obligation demands"),
+                    "restore-k: expected the finished-code constructor identity refusal: {error:?}"
+                );
+                let published = refusal
+                    .split_once(" publishes actual constructor identity ")
+                    .and_then(|(_, after)| after.split_once(" at "))
+                    .map(|(identity, _)| identity)
+                    .expect("restore-k: missing published constructor identity");
+                let demanded = refusal
+                    .split_once("but its pending Result obligation demands ")
+                    .and_then(|(_, after)| after.split_once('"'))
+                    .map(|(identity, _)| identity)
+                    .expect("restore-k: missing demanded constructor identity");
+                assert!(
+                    owner_ret_identities.iter().all(|identity| *identity == demanded),
+                    "restore-k: the demand must be the baseline Ret identity of every selected owner in this fixture; demand={demanded:?}, owners={owner_ret_identities:?}"
+                );
+                assert_ne!(
+                    published, demanded,
+                    "restore-k: the substituted K must publish a different identity"
+                );
+            } else if isolated {
+                assert!(
+                    refusal.contains("a forward-declared response owner has no verified selected incoming call")
+                        && refusal.contains("source_cause: Some(PlannerInvariant)"),
+                    "restore-k-isolated: the selected-caller closeout must refuse: {error:?}"
+                );
+            } else {
+                assert_eq!(mutation, Mutation::RemoveSelectedCaller);
+                assert!(
+                    refusal.contains("removed one selected incoming caller"),
+                    "remove: caller mutation failed for a different reason: {error:?}"
+                );
+            }
+            let query_observations_equal = mutated_diagnostic
+                .iter()
+                .map(|row| &row.generated_context_result_contracts)
+                .eq(baseline.iter().map(|row| &row.generated_context_result_contracts));
+            if query_observations_equal {
+                assert_eq!(
+                    mutated_diagnostic, baseline,
+                    "{label}: caller mutation altered the typed planner ledger"
+                );
+            } else {
+                // A malformed call may stop before lowering queries its K.
+                // Compare every planner fact; restored builds still compare
+                // the full diagnostic, including the query observations.
+                let mut baseline_planner = baseline.clone();
+                let mut mutated_planner = mutated_diagnostic.clone();
+                for row in baseline_planner.iter_mut().chain(mutated_planner.iter_mut()) {
+                    row.generated_context_result_contracts.clear();
+                }
+                assert_eq!(
+                    mutated_planner, baseline_planner,
+                    "{label}: caller mutation altered the typed planner population"
+                );
+            }
             assert!(ken_runtime::static_response_caller_retarget_mutation_is_exact());
             let (restored_root, (restored_result, restored)) =
                 compile(&format!("{label}-restored"));
@@ -2237,8 +2363,17 @@ fn owner_body_control(
         format!("{error:?}").contains(expected),
         "{label}: wrong finished-body refusal: {error:?}"
     );
+    // The contract-query observation is from lowering, not the typed planner
+    // population: an intentionally malformed owner may stop before making
+    // every query. Compare all planner facts, and keep the full diagnostic
+    // (including query observations) in the restored-byte comparison below.
+    let mut baseline_planner = baseline_rows.clone();
+    let mut mutated_planner = diagnostics.clone();
+    for row in baseline_planner.iter_mut().chain(mutated_planner.iter_mut()) {
+        row.generated_context_result_contracts.clear();
+    }
     assert_eq!(
-        &diagnostics, &baseline_rows,
+        mutated_planner, baseline_planner,
         "{label}: body mutation changed the typed planner population"
     );
     assert!(ken_runtime::static_response_owner_body_mutation_is_exact());

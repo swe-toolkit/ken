@@ -1177,6 +1177,8 @@ impl ArtifactHelpers<'_> {
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
+            generated_constructor_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
@@ -1491,6 +1493,11 @@ struct FunctionLocalRefs {
     /// context function. Source identities, retarget callers, transports, and
     /// derivation ancestry are absent from its type.
     checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
+    /// The exact emitted constructor identity for each function-local SSA word.
+    generated_constructor_authorities:
+        BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    /// Each generated call's exact finished status/Trap/Result obligation.
+    pending_call_result_obligations: Vec<PendingCallResultObligation>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
@@ -15026,4 +15033,70 @@ pub(in crate::cranelift_backend) fn lrc_d2b_entered() -> BTreeSet<StaticOriginId
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn lrc_d2b_worker_calls() -> BTreeSet<StaticOriginId> {
     LRC_D2B_WORKER_CALLS.with(|cell| cell.borrow().clone())
+}
+
+
+/// Move-only compiler authority for publishing one generated-context Result.
+///
+/// The identity comes from the context plan and the value from an exact
+/// governed producer. Neither field is serialized or added to the carrier.
+#[derive(Clone, Copy)]
+struct GeneratedConstructorAuthority {
+    identity: ConstructorIdentity,
+    word: cranelift_codegen::ir::Value,
+}
+
+
+/// One declared call-result obligation, located in a single finished CLIF
+/// function.  Every instruction/value/slot here is only a locator: the
+/// finished verifier reads the actual instruction data, direct callee,
+/// comparisons, branches, and memory operands before issuing a seed.
+#[derive(Clone)]
+struct PendingCallResultObligation {
+    identity: Option<ConstructorIdentity>,
+    realization_required: bool,
+    call: cranelift_codegen::ir::Inst,
+    payload: cranelift_codegen::ir::StackSlot,
+    status: cranelift_codegen::ir::Value,
+    status_compare: cranelift_codegen::ir::Value,
+    status_branch: cranelift_codegen::ir::Inst,
+    trap_word: cranelift_codegen::ir::Value,
+    trap_compare: cranelift_codegen::ir::Value,
+    trap_branch: cranelift_codegen::ir::Inst,
+    result_word: cranelift_codegen::ir::Value,
+    frame_bytes: u32,
+    trap_offset: i32,
+    result_offset: i32,
+}
+
+
+impl Lowering<'_> {
+    fn register_generated_constructor_authority(
+        &mut self,
+        identity: ConstructorIdentity,
+        word: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        let authority = GeneratedConstructorAuthority {
+            identity,
+            word: word.word,
+        };
+        if let Some(existing) = self
+            .function_local
+            .generated_constructor_authorities
+            .get(&word.word)
+        {
+            if existing.identity == authority.identity && existing.word == authority.word {
+                return Ok(());
+            }
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                "one generated-context Result word acquired incompatible terminal authorities"
+                    .to_string(),
+            ));
+        }
+        self.function_local
+            .generated_constructor_authorities
+            .insert(word.word, authority);
+        Ok(())
+    }
 }
