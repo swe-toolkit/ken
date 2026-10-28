@@ -3545,6 +3545,42 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
     );
 }
 
+/// Q1: a resume dispatched by `Terminal(ResumeOuter)` is entered only after
+/// the inner source-machine frame that reached the terminal has returned.
+#[test]
+fn q1_terminal_resume_runs_after_its_inner_source_frame_pops() {
+    use crate::cranelift_backend::lowering::core::with_required_consumer_route_suppressed;
+    use crate::cranelift_backend::lowering::source::q1_terminal_resumes_take;
+
+    for (depth, suppressed) in [(2, false), (2, true), (3, false), (3, true)] {
+        let _ = q1_terminal_resumes_take();
+        let compile = || {
+            crate::cranelift_backend::lowering::reset_d5a_trace();
+            let expression =
+                host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+            let _ = px8j_capture_source_trace(
+                &expression,
+                false,
+                &format!("ken_q1_probe_depth{depth}"),
+            );
+        };
+        if suppressed {
+            let _ = with_required_consumer_route_suppressed(compile);
+        } else {
+            compile();
+        }
+        let records = q1_terminal_resumes_take();
+        assert!(
+            !records.is_empty(),
+            "depth {depth} suppressed {suppressed}: no terminal resume was observed"
+        );
+        assert!(
+            records.iter().all(|(live_inner, live_wrappers)| live_inner < live_wrappers),
+            "depth {depth} suppressed {suppressed}: a terminal resume ran inside its inner frame: {records:?}"
+        );
+    }
+}
+
 /// `RT-PLANNED-CLOSURE-PREEXISTENCE` D1/D2: ask the planner whether the
 /// origin-5 result already has a closure-typed field, without executing the
 /// projected route or observing a crossing.
