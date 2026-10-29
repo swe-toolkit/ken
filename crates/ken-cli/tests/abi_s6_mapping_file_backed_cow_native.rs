@@ -66,8 +66,12 @@ fn file_backed_mapping_write_is_private_on_both_engines() {
         differential(SOURCE).expect("private file-backed mapping differential");
     assert_eq!(interpreted.effect_trace, native.effect_trace);
     assert_eq!(interpreted.filesystem_delta, native.filesystem_delta);
-    for (lane, disk) in [(&interpreted, &interpreted_file), (&native, &native_file)] {
-        assert_eq!(lane.exit_status, 60);
+    for lane in [&interpreted, &native] {
+        assert_eq!(
+            lane.exit_status, 60,
+            "effect trace: {:?}",
+            lane.effect_trace
+        );
         assert_eq!(lane.terminal_error, None);
         assert_eq!(
             lane.effect_trace
@@ -118,18 +122,23 @@ fn file_backed_mapping_write_is_private_on_both_engines() {
             CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes))
                 if bytes.as_slice() == PRIVATE_WRITE
         ));
-        assert!(
-            matches!(
-                &lane.effect_trace[6].outcome,
-                CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes))
-                    if bytes.as_slice() == ORIGINAL && bytes.as_slice() != WRITTEN_FILE
-            ),
-            "file read after settlement must return original bytes"
-        );
-        assert_eq!(
-            disk.as_slice(),
-            ORIGINAL,
-            "backing file must remain unchanged"
-        );
+        assert!(matches!(
+            &lane.effect_trace[6].outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(_))
+        ));
     }
+    let read_back = [&interpreted, &native].map(|lane| match &lane.effect_trace[6].outcome {
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes)) => bytes.as_slice(),
+        other => panic!("expected an ordinary file-read reply, got {other:?}"),
+    });
+    assert_eq!(
+        read_back,
+        [ORIGINAL, ORIGINAL],
+        "both engines' §1.3 file reads must return original bytes, not {WRITTEN_FILE:?}"
+    );
+    assert_eq!(
+        [interpreted_file.as_slice(), native_file.as_slice()],
+        [ORIGINAL, ORIGINAL],
+        "neither backing file may be changed by the mapping write"
+    );
 }
