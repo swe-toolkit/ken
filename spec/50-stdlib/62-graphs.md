@@ -5,7 +5,8 @@
 > SPEC-GRAPHS-WALK-COMPOSITION-ORDER §3;
 > SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC §4;
 > SPEC-GRAPHS-REACHABILITY-ALONG-WALK §5;
-> SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE §6).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE §6;
+> SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE §7).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -21,8 +22,13 @@
 > isolated D0 was scratch evidence. The separate Foundation candidate
 > exports the checked law and its package-owned test runs the complete
 > accepted seed and isolated refusal; that is not official conformance-
-> runner execution, CI, publication, landing or landed trust. No kernel,
-> trust, or surface-syntax change or revision to §61 §2 is required.
+> runner execution, CI, publication, landing or landed trust. Section 7
+> specifies one public graph-monotonicity law; its checked proof and seed
+> were first measured in Architect's isolated D0. This assembled candidate
+> adds the §7 catalog export, its authored seed and a package-owned test;
+> these candidate-local checks are not official conformance-runner execution,
+> CI, publication, landing or landed trust. No kernel, trust, or surface-syntax
+> change or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -656,3 +662,77 @@ exports the checked law; its package-owned test checks the complete
 accepted seed and isolated false converse. Neither candidate-local
 checking nor the earlier D0 establishes official conformance-runner
 execution, CI, publication, landing or landed trust.
+
+## 7. Reachability is monotone under edge inclusion
+
+> **Section 7 status: DRAFT v0
+> (SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE).** Architect's isolated D0
+> on `944cabd38344c9118f50692b510ac57da7ec8bf8` checked the generic
+> proof and independent client with `ken check` and `ken fmt --check` rc 0,
+> no `Axiom`, and equal scratch `trusted_base()` identity sets (114 → 114).
+> This assembled candidate adds the catalog export, the conformance seed and
+> a package-owned test; it does not establish official conformance execution,
+> CI, publication, landing, or landed trust.
+
+`Algorithm.Graphs.Dependency` must export the following public Transparent law
+immediately after `graph_reachable_target_monotone`. The pointwise `included`
+proof is the sole premise on the graphs: each true edge of `g` is also a true
+edge of `h`. The final arrow takes affirmative reachability from `s` to the
+same `target` in `g` and yields affirmative reachability in `h` at the same
+`fq`, `s`, and `target`.
+
+```ken
+pub theorem graph_reachable_graph_monotone
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q g u v)
+        True
+        → Equal
+        Bool
+        (edge q h u v)
+        True)
+    : Equal Bool (graph_reachable q fq g s target) True
+      → Equal Bool (graph_reachable q fq h s target) True
+```
+
+The inputs occur in the order `q`, `fq`, `g`, `h`, `s`, `target`,
+`included`, then the reachability hypothesis. No `DecEq q`, strict
+inclusion, new search, target inclusion, or separate finite certificate
+for `h` is required. In particular, the result includes the same-graph
+case. It does not state the converse: an edge added to `h` may make a
+previously unreachable target reachable.
+
+The proof uses §1.2's `graph_find_walk_some` and private `require_some` to
+extract a `ReachWitness` in `g`. A new **private** `walk_lift` recursively
+rebuilds that witness walk in `h`: `WalkHere` stays at the same vertex,
+and each `WalkStep` gets its checked `h` edge from `included` applied to
+the corresponding checked `g` edge. The target-hit proof is unchanged;
+§1.2's `graph_reachable_complete` applies to the lifted walk. `walk_lift`
+is not a public operation, and `require_some` and `walk_reachable` remain
+private. All §1–§6 operation and law types are unchanged. No new graph
+carrier, axiom, kernel or surface rule, or trusted-base entry is needed.
+
+The fixed §7 conformance seed path is
+`conformance/stdlib/graphs/seed-reachability-graph-monotone.md`. Its
+three-vertex `chain` has the genuine two-edge walk V0 → V1 → V2;
+`looped` adds only V2 → V0. From V0, both graphs reach target V2.
+Independent closed `Proved` controls check both reachability values,
+the missing and added edge, and that V0 is not already a target. A
+separate law application transports affirmative reachability in `chain`
+to `looped` using pointwise edge inclusion. From V2, `looped` reaches
+V0 but `chain` does not; an isolated `seed_neg` claiming the converse
+is refused at its own `Proved` after the complete accepted prefix.
+The inclusion proof uses `λe. Proved` for true-edge arms and
+`λe. absurd e` for false-edge arms. The Architect measured that all
+seven closed Bool rows refuse `Refl`; their proof form is `Proved`.
+These finite cases discriminate direction but do not prove the generic
+law. The D0's checked development is scratch evidence, not catalog
+delivery, official conformance, CI, publication, landing, or landed trust.

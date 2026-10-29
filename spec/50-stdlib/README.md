@@ -252,8 +252,9 @@ The **Layer-3 graphs and dependency contract** is pinned in
 (SPEC-GRAPHS-CYCLE-REFUTES-ORDER), §3
 (SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
 (SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC), §5
-(SPEC-GRAPHS-REACHABILITY-ALONG-WALK), and §6
-(SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-REACHABILITY-ALONG-WALK), §6
+(SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE), and §7
+(SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -281,9 +282,22 @@ reachability at `s` from `target` to `wider`, not conversely. The
 public Transparent law reuses private `require_some` without a new
 helper or change to §1–5. Architect D0 on `abafe3963` checked the
 generic proof with no new `Axiom` and equal scratch trusted identities
-(114 → 114). Its §6 catalog export is absent; D0 and the separately
-owned closed seed do not establish shipped §6 execution, official
-conformance, CI, publication, landing or landed trust. No second
+(114 → 114). Its §6 catalog export is present on the pinned base;
+D0 and the separately owned closed seed do not establish shipped §6
+execution, official conformance, CI, publication, landing or landed
+trust. Section 7
+specifies `graph_reachable_graph_monotone`: pointwise inclusion of
+every true edge of `g` in `h` preserves affirmative reachability of
+the same target from the same start under the same `Finite q`; the
+converse fails when `h` adds a needed edge. Its witness walk is lifted
+edge by edge through a private `walk_lift`. Architect's D0 on
+`944cabd38344c9118f50692b510ac57da7ec8bf8` checked the generic
+proof with no `Axiom` and equal scratch trust identities 114 → 114.
+The §7 seed is assigned at
+`conformance/stdlib/graphs/seed-reachability-graph-monotone.md`;
+this assembled candidate adds that seed, the catalog export and a
+package-owned test. Scratch D0 and spec authorship do not establish
+official conformance, CI, publication, landing or landed trust. No second
 fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
