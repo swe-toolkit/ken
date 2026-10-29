@@ -1039,6 +1039,26 @@ pub theorem interval_intersect_greatest
       }
   }
 
+pub theorem interval_inside_intersect_hull_left
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside i (interval_intersect i (interval_hull i j))) =
+  interval_intersect_greatest
+    i
+    i
+    (interval_hull i j)
+    (interval_inside_refl i)
+    (interval_inside_hull_left i j)
+
+pub theorem interval_hull_intersect_inside_left
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_hull i (interval_intersect i j)) i) =
+  interval_hull_least
+    i
+    (interval_intersect i j)
+    i
+    (interval_inside_refl i)
+    (interval_intersect_inside_left i j)
+
 theorem equiv_leq
       (x : Rational) (y : Rational)
     : rational_equiv x y → IsTrue (rational_leq x y) =
@@ -1165,6 +1185,14 @@ inner interval lies inside both intersection operands and so lies inside
 their intersection. These endpoint-value proofs require no nonempty or
 ordered-endpoint premise, including for inverted intervals.
 
+The two absorption laws apply the bound laws without splitting endpoints.
+`interval_inside_intersect_hull_left` passes `interval_intersect_greatest`
+reflexivity and the left hull inclusion; `interval_hull_intersect_inside_left`
+passes `interval_hull_least` reflexivity and the left intersection inclusion.
+Each partner direction is an instance of one of those two inclusion laws, so
+both absorptions hold as mutual endpoint-value inclusion, not structural
+equality.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -1208,7 +1236,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and thirty-four checked interval
+   `interval_intersect`, `interval_inside` and thirty-six checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1226,7 +1254,7 @@ API.
    `comm` laws through two private proof stages. Inclusion transitivity reuses
    Rational order transitivity; the four swap inclusions reuse Rational
    commutativity or public min/max bounds without a new helper.
-4. **Trusted-base delta.** Zero: all thirty-four laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all thirty-six laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1236,7 +1264,8 @@ API.
    [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
    [inclusion-order seed](../../../../conformance/stdlib/numerical/seed-interval-inside-order.md)
    [associativity seed](../../../../conformance/stdlib/numerical/seed-interval-associativity-inside.md)
-   and [bound-laws seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersect-bounds.md)
+   [bound-laws seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersect-bounds.md)
+   and [absorption seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersect-absorption.md)
    supply separately constructed positive values and false controls;
    those finite cases do not replace the generic checked proof bodies. The
    distributivity seed's accepting client and dropped-product refusal, and the
@@ -1246,5 +1275,8 @@ API.
    by the candidate's `cat_numeric_interval_associativity_inside` package test.
    The §7 package test root-loads both generic bound proofs, checks the whole
    accepted bound-laws seed and refuses its isolated false hull claim.
+   The §8 `cat_numeric_interval_hull_intersect_absorption` package test checks
+   the complete accepted absorption seed and its isolated moved-argument
+   refusal against the two new public laws.
    These package tests do not establish official conformance-runner execution,
    CI, publication or landing.

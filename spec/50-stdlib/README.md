@@ -524,14 +524,15 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–7
+**`68-numerical.md`** §§1–8
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
 SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
 SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER;
 SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
-SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7). The §1–2
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -578,11 +579,21 @@ combines inclusion of both operands in `k`, while
 both operands. Both cover inverted intervals without claiming
 structural equality. Architect's isolated D0 on `1363b09b4` checked
 both generic proofs with no new `Axiom` and equal scratch trusted
-identities (114 → 114). The §7 catalog exports are absent on this
-base; D0 and the separately owned seed do not establish shipped §7
-execution, official conformance, CI, publication, landing or landed
-trust. Signed arithmetic, division, `Float`, rounding, width and
-structural hull/intersection equalities remain deferred.
+identities (114 → 114). Both §7 checked exports and a package-owned
+seed test are present on this base. The test checks the complete
+accepted client and isolated false hull claim; it is not official
+conformance-runner execution, CI, publication, landing or landed
+trust. Section 8 specifies absorption by mutual endpoint-value
+inclusion, including inverted intervals: two new compositional laws
+and two existing-law instances, without structural `Equal Interval`.
+Architect's isolated D0 on `fd2f57557` checked the two generic bodies
+with no new `Axiom` and equal scratch trust identities (114 → 114).
+This assembled candidate adds both §8 checked catalog exports, the
+corrected CV seed and a package-owned test. Architect's D0 remains
+scratch evidence; reported candidate-local tests and mutations are not
+official conformance-runner execution, CI, publication, landing or
+landed trust. Signed arithmetic, division, `Float`, rounding, width
+and structural hull/intersection equalities remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–7 (SPEC-TIME-EVENT-TRACE-CONTRACT;
