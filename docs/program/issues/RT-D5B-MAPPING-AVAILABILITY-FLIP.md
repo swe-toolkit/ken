@@ -1,16 +1,77 @@
 ---
 id: RT-D5B-MAPPING-AVAILABILITY-FLIP
 title: "Promote MappingAcquireFile out of the RepresentedUnavailable tail: flip site 2 (effect_v1.rs:193) to NativeTested and carry the sites the AC-AVAIL membership rule identifies. Cluster A of the ABI-S6-d5b drain. Gated on RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE, which is what makes site 2 the SINGLE flip point, and on the artifact differential that effect_v1.rs:250 conditions promotion upon. Also holds the Architect's F3 SAFETY-precondition carry."
-status: draft
+status: ready
 owner: runtime
-size: unsized
-gate: none
+size: L
+gate: architect
 depends_on: [RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE, RT-D5B-HOST-FILE-ACQUISITION-SURFACE]
 blocks: []
 github: null
 tier: T1
 origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks + 3 shared with cluster B, plus 23 test hunks the runtime-implementer measured as belonging to this flip). Held out of slice 4 on Architect ruling evt_3wtg8w8krmmt: 'Membership is a plan, not evidence.' Unblocked for CUTTING -- not for release -- by Architect ruling evt_21f23zmgqfxsc on the permissive-by-design question."
 ---
+
+> # RELEASED: L1's next ABI-S6 WP, after HS18 closed at increment C (Z).
+>
+> This banner supersedes the DRAFT banner and every section below wherever
+> they conflict. The sections below are measurements and hazards; read them
+> as inputs, not as scope. L, T1, gate architect. The base is the main named
+> at kickoff.
+>
+> - **Why now.** HS18 closed without code (AC-C0 (Z), Architect). That ruling
+>   moved its control 1 here: the tag query executing on `0x0f09` for a
+>   file-backed Mapping, which main cannot observe while `MappingAcquireFile`
+>   is `RepresentedUnavailable` (`effect_v1.rs:215`). The HS18 §4 gate keyed
+>   on this operation retires with HS18.
+> - **AC-0 first (D0, Architect, on the kickoff base).** Rule:
+>   - the site population by the `AC-PREDICATE` below, not by the five- or
+>     six-site tables;
+>   - the differential scenario: one real file-backed acquisition that runs
+>     natively and in the interpreter;
+>   - F3, the SAFETY-precondition split and the irreducible TOCTOU: what is
+>     safe to make available;
+>   - how the `abi_s6_mapping_file_backed_native.rs` acceptance file is
+>     written fresh on main. Nothing is harvested from `5d977ac79`.
+> - **Deliverable: one change, in "The ordering" order.** Flip `availability()`
+>   and the `NATIVE_TESTED_TARGETS_V1` roster. Add the scenario and its
+>   `CanonicalDifferentialRun`. Assert the positive confirmation. Add the
+>   per-field negative controls.
+>
+> **Acceptance.**
+> - **AC-1.** The differential on a real file-backed acquisition gives equal
+>   native and interpreter traces, and
+>   `confirm_native_tested_transition(MappingAcquireFile, evidence)` is
+>   `Ok(NativeTested)`.
+> - **AC-2.** Three negative controls, one per evidence field, each assert
+>   their own `StatusTransitionError` variant. A control that flips all three
+>   fields at once does not count.
+> - **AC-3 (HS18 control 1).** The acceptance program executes the tag query
+>   on `0x0f09`, observed at the site the D0 names.
+> - **AC-4 (`AC-PREDICATE`).** Grep the candidate's tree under `crates/`,
+>   not its diff: no unavailable arm, refusal roster or named-unavailable lane
+>   still holds `MappingAcquireFile`. That covers the two pure-deletion sites,
+>   the `effect_v1.rs` refusal arm and the `CRANELIFT_HOST_EFFECT_CONSUMERS_V1`
+>   lane arm. The uniform refusal gate's rows for the other nine unavailable
+>   operations stay green.
+>
+> **Out of scope.** The ten roster members that have no differential, the
+> resource-table lifecycle, and `seed-mapping.md:53`, which the Spec Leader
+> unblocks after this lands.
+>
+> **Stop conditions.**
+> - Native and interpreter disagree on the acquisition. That is a finding for
+>   the Architect, not a repair.
+> - The flip needs a new carrier, a kernel change or trust growth. That is an
+>   operator stop.
+>
+> Checks: 4 fired: the promoting act is the `ken-host` edit, because
+> `confirm_native_tested_transition` (`catalog.rs:315`) requires the operation
+> to be NativeTested before it reads evidence, so AC-1 and the flip land
+> together. 8 fired: AC-2's per-field controls make the confirmation read each
+> field separately, since a single all-fields control passes whichever field
+> is read. 6 fired: the site population is measured on the candidate's tree, because
+> two sites are pure deletions that a list of added lines cannot see.
 
 > # DRAFT. Not framed, not released. Do not start.
 >
