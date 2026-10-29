@@ -1,7 +1,7 @@
 ---
 id: RT-D5B-DEAD-FILE-MMAP-ROUTE
 title: "After the file-backed mapping flip, native file acquisition copies into owned bytes, and the file-mmap route (resource_map_file, try_new_mapped_file, map_file_v1) has no live caller while carrying an unsafe block whose SAFETY precondition is false. Delete the route or rule why it stays, correct the comments that now misdescribe the copy-in path, and rule whether ABI-S6's acceptance is met"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1
