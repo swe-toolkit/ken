@@ -308,7 +308,11 @@ fn full_seed_checks_literal_identity_and_refuses_false_square_symmetry() {
         let id = env.globals[name];
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    match env.elaborate_file(refused) {
+    let mut rejecting = loaded_matrix();
+    rejecting
+        .elaborate_file(accepted)
+        .expect("fresh complete accepted §8 prefix checks before refusal");
+    match rejecting.elaborate_file(refused) {
         Err(ElabError::TypeMismatch { reason, span })
             if reason == "Refl expects an `Eq`-shaped goal"
                 && span.start >= proof_span.start
