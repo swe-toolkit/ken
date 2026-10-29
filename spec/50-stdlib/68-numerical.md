@@ -42,9 +42,10 @@
 > Section 8 specifies two new premise-free absorption laws by endpoint-value
 > inclusion. Architect's isolated D0 on `fd2f57557` checked their generic
 > bodies with no new `Axiom` and equal scratch trusted GlobalId sets
-> (114 → 114). This spec-only turn delivers no §8 catalog exports, seed
-> or package test; D0 does not establish official conformance, CI,
-> publication, landing or landed trust.
+> (114 → 114). This assembled candidate adds the two §8 checked catalog
+> laws, the corrected CV seed and a package-owned test. D0 remains scratch;
+> reported candidate-local tests and mutations do not establish official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -850,10 +851,11 @@ not as an official conformance-runner result.
 > isolated D0 on `fd2f575576aa2f5893054dcaf89e38243b739edc` checked
 > both generic proof bodies and a public client (`ken check` and
 > `ken fmt --check` rc 0), with no new `Axiom` and equal scratch
-> `trusted_base()` GlobalId sets (114 → 114). This spec-only turn does not
-> deliver the §8 catalog exports, conformance seed or package-owned test.
-> D0 is not official conformance-runner execution, CI, publication,
-> landing or landed trust.
+> `trusted_base()` GlobalId sets (114 → 114). This assembled candidate
+> adds both §8 checked catalog exports, the corrected CV seed and a
+> package-owned test. D0 remains scratch evidence; reported candidate-local
+> tests and mutations are not official conformance-runner execution, CI,
+> publication, landing or landed trust.
 
 For any two intervals `i` and `j`, including inverted ones, each of
 these absorption pairs is **mutually included by endpoint value**:

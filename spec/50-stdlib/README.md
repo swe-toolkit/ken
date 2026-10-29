@@ -574,11 +574,12 @@ inclusion, including inverted intervals: two new compositional laws
 and two existing-law instances, without structural `Equal Interval`.
 Architect's isolated D0 on `fd2f57557` checked the two generic bodies
 with no new `Axiom` and equal scratch trust identities (114 → 114).
-The §8 catalog exports, seed and package test are not delivered by this
-spec-only turn; scratch evidence is not official conformance, CI,
-publication, landing or landed trust. Signed arithmetic, division,
-`Float`, rounding, width and structural hull/intersection equalities
-remain deferred.
+This assembled candidate adds both §8 checked catalog exports, the
+corrected CV seed and a package-owned test. Architect's D0 remains
+scratch evidence; reported candidate-local tests and mutations are not
+official conformance-runner execution, CI, publication, landing or
+landed trust. Signed arithmetic, division, `Float`, rounding, width
+and structural hull/intersection equalities remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–7 (SPEC-TIME-EVENT-TRACE-CONTRACT;
