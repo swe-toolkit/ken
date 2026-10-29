@@ -199,7 +199,7 @@ theorem expected_law : Equal (List (Event Bool))
 theorem expected_same_shape : Equal (List (Event Bool))
   (trace_window Bool t2 t6 (list_append (Event Bool) xs ys))
   (list_append (Event Bool) (trace_window Bool t2 t6 xs) (trace_window Bool t2 t6 ys)) = Refl
-theorem expected_swapped_start : Equal Nat (first_event_time swapped_windows) t3 = Refl
+theorem expected_swapped_start : Equal Nat (first_event_time swapped_windows) t3 = Proved
 theorem expected_swapped_not_five :
   Equal Bool (leq_nat t5 (first_event_time swapped_windows)) False = Proved
 "#;
@@ -224,7 +224,7 @@ theorem window_drops_one : Equal Bool (event_in_window Bool t2 t6 e1) False = Pr
 theorem window_drops_eight : Equal Bool (event_in_window Bool t2 t6 e8) False = Proved
 
 theorem unswapped_starts_at_five :
-  Equal Nat (first_event_time appended_window) t5 = Refl
+  Equal Nat (first_event_time appended_window) t5 = Proved
 "#;
 
 /// MEASURED: the entire accepted seed checks the unordered xs witness,
