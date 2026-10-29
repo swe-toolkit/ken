@@ -8729,10 +8729,10 @@ mod package_route_example_declarations {
             "an obligation-free example must not add a package symbol"
         );
         // Promise class: normative compatibility vector for this package.
-        // The new Coproduct and Instant families are scoped after pre-source
-        // role capture. Scratch unscoping of exactly those families restored
-        // the previous 0xe367_721c_e40b_94d7 checked-package hash; this value
-        // is measured with their qualified checked constructor symbols.
+        // Coproduct, Instant, and now ITree are scoped after pre-source role
+        // capture. Scratch unscoping of only ITree restored the preceding
+        // 0x393e_e31c_ea25_53c9 checked-package hash; this value includes
+        // the ITree qualified checked constructor symbols.
         assert_eq!(
             package_source.package.core_semantic_hash,
             0x6c92_44e9_4730_3a45
@@ -8770,8 +8770,8 @@ mod package_route_example_declarations {
             "an obligation-free example must not add a denotation symbol"
         );
         // Promise class: normative compatibility vector for the denotation.
-        // The Coproduct and Instant checked symbols feed this route too;
-        // scratch unscoping restored the previous 0xf7c4_d11a_ab32_c343.
+        // The ITree checked symbols feed this route too; scratch unscoping
+        // only ITree restored the preceding 0x3b3b_60f5_21e9_f643.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
             0xe158_b743_ec4d_6062

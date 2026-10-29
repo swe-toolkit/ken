@@ -107,10 +107,10 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
 
 /// Promise class: normative compatibility vector for this package. MEASURED:
 /// an unrelated checked example is excluded from the emitted package and
-/// leaves its canonical semantic hash unchanged. The three pre-source
-/// constructor symbols already carried scoped spellings in the landed base.
-/// This slice scopes Coproduct and Instant after role capture; scratch unscoping
-/// exactly those families restored the previous 0xdec1_765f_70b9_069a hash.
+/// leaves its canonical semantic hash unchanged. Coproduct and Instant already
+/// carried scoped pre-source symbols in the landed base. This slice scopes
+/// ITree after role capture; unscoping only ITree restores the previous
+/// 0xb250_7f51_71d8_044c package hash.
 /// CLAIMED: unrelated example checking is still legal, without shifting
 /// admitted declaration identity. THE GAP: this fixes the package-name-
 /// dependent baseline vector for this one package, not every package name.
