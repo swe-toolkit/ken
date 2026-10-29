@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-FLOOR-FS-RESOURCE-FAMILIES
 title: "Admit to the reserved strict prelude floor the FS and resource identities that have both witnesses, keyed by a native reader of the exact id and required by name in source, each type with its ledger scope choice, and keep every other ledger candidate in this group internal or package, with the roster, count and PRELUDE_FLOOR_NAMES changing together"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1
