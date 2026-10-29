@@ -6,15 +6,20 @@
 > SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY §4;
 > SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC §5;
 > SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY §6;
-> SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT §7).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT §7;
+> SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC §8).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
-> Section 7 specifies one additional generic law and a closed seed.
-> Architect's isolated D0 checked its proposed proof. The separate
-> Foundation catalog candidate exports the checked law and runs the seed
-> in a package-owned test; that test is not official conformance-runner
-> execution, CI, publication, landing or landed trust.
+> Section 7's generic law, closed seed and package-owned test are now
+> on main; earlier D0 and local test execution are not official
+> conformance or landed trust. Section 8 promotes the existing checked
+> transpose-of-identity helper to a public law without a wrapper or
+> new proof body. Architect's isolated D0 on `18e269f32` checked its
+> public visibility and equal scratch trusted identities 109 → 109.
+> The §8 export and seed are absent on this base; D0 does not establish
+> shipped §8 execution, official conformance, CI, publication, landing
+> or landed trust.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -606,11 +611,9 @@ or landed trust.
 > generic proof in an isolated D0 on `54f68d3cc` with no new `Axiom`,
 > `ken check` and `ken fmt --check` rc 0, and identical scratch
 > `trusted_base()` GlobalId sets (109 → 109). The earlier spec-and-seed
-> candidate did not deliver the §7 catalog export. The separate Foundation
-> candidate exports the checked law and its package test root-loads the
-> law, checks the complete accepted seed and refuses the isolated false
-> swapped-input claim. Those are candidate-local checks, not official
-> conformance-runner execution, CI, publication, landing or landed trust.
+> candidate did not deliver the §7 catalog export. The checked law,
+> seed and package-owned test are now on main. Its earlier candidate-local
+> checks are not official conformance-runner execution or landed trust.
 
 ### 7.1 One premise-free public law
 
@@ -647,8 +650,7 @@ Nat multiplication commutativity, plus existing private
 `cong`, `sym`, and `trans` transport the equalities. Its public type
 has no added premise, import, operation, kernel rule, or scalar tier.
 The §1–6 operations, laws, and private helper visibility remain
-unchanged. The separate Foundation catalog candidate owns the §7 checked
-export and updates the package law count.
+unchanged. The §7 checked export and updated package law count are now on main.
 
 The closed seed uses the non-square `2 × 3` matrix with rows
 `[1,2,3]` and `[4,0,1]`, `x = [2,1,3]`, and `y = [1,2]`. Separate
@@ -664,9 +666,94 @@ false swapped-`y` equality, not a generic limit on the theorem.
 
 Architect's D0 established proof feasibility and isolated client
 behavior on a scratch catalog overlay; that historical check did not
-establish a shipped §7 export or official seed execution. The separate
-Foundation candidate exports the checked law and its package test runs
-the complete accepted seed and isolated refusal. Neither candidate-local
-checking nor the historical D0 establishes official conformance-runner
-execution, CI, publication, landing or landed trust. No rational, signed,
+establish a shipped §7 export or official seed execution. The checked
+law, authored seed and package test are now on main. Neither earlier
+candidate-local checking nor the historical D0 establishes official
+conformance-runner execution or landed trust. No rational, signed,
 semiring-general, or approximate matrix law is asserted.
+
+## 8. Transposing the square identity preserves its entries
+
+> **Section 8 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC).** Architect's isolated
+> D0 on exact landed base `18e269f3205be0d6c1d0ab3e776960a824ae2646`
+> checked the existing theorem with public visibility, `ken check` and
+> `ken fmt --check` rc 0, and equal scratch `trusted_base()` identity
+> sets 109 → 109. Its public catalog export and closed seed are absent
+> on this base. D0 is not shipped §8 execution, official conformance,
+> CI, publication, landing or landed trust.
+
+### 8.1 One checked law, promoted in place
+
+`Algorithm.LinearAlgebra.NatMatrix` must expose its already checked
+private `transpose_identity` proof as a **public Transparent theorem**.
+Its name, type and body remain unchanged; the catalog moves the whole
+declaration out of the private helper region and places it directly
+after `transpose_adjoint`, before `matrix_add_assoc_cons`, with only
+the `pub` visibility prefix added. It must not publish a wrapper or
+second spelling. Its exact public type is:
+
+```ken
+pub theorem transpose_identity
+      (n : Nat)
+    : Equal (Vec (Vec Nat n) n) (transpose n n (identity n)) (identity n)
+```
+
+For every `n`, transposing the `n × n` matrix built by `identity n`
+yields exactly that indexed matrix, including `n=Zero`. The equality
+is **structural on `Vec` entries**, not equality modulo permutation
+or an assumption that every square matrix is symmetric. The theorem
+needs no index positivity premise or new operation. It is distinct
+from §1.3's `transpose_invol`, which transposes *twice*, and from
+§7's `transpose_adjoint`, which equates natural dot results. This
+visibility promotion adds one public law, taking the package from
+eight operations and twenty-one laws (twenty-nine public names) to
+eight operations and twenty-two laws (thirty public names). All
+§1–§7 public operation and law types remain byte-identical.
+
+The original proof inducts on `n`, using a zero row over the smaller
+identity and the induction hypothesis to recover the trailing rows
+when the successor identity is transposed. Existing private
+`transpose_zero_prefix_rows`, `zip_zero_map`, `prepend_zero`, and
+`repeat` remain private. The existing recursive reference and the
+private consumer `row_right_identity` still call the **same**
+`transpose_identity` name and type; moving it to the public law
+block does not replace or duplicate its body. No new helper,
+postulate, kernel rule or surface feature is introduced. Its type
+mentions only the already public `transpose`, `identity`, `Vec` and
+`Nat`.
+
+### 8.2 Closed discriminator and evidence boundary
+
+The closed seed applies the law at `n=3`. It independently computes
+`identity three` and `transpose three three (identity three)` as
+the same explicitly constructed `3 × 3` identity, each with `Refl`.
+Closed `Equal (Vec (Vec Nat three) three)` goals use `Refl`, **not**
+`Proved`: Architect's D0 refused `Proved` even for a true closed
+matrix equality. This distinguishes the proof-form boundary from
+the law's actual content.
+
+A separate `2 × 2` upper-triangular matrix with rows `[1,2]` and
+`[0,1]` transposes to rows `[1,0]` and `[2,1]`. The accepted prefix
+computes that transpose with `Refl` and includes the same-form true
+control `upper = upper` with `Refl`. An isolated claim that
+`transpose two two upper = upper` must then be refused at **its own**
+`Refl`, after a fresh fully accepted prefix. The false matrix claim
+is not a consequence of the identity-specific law; the true control
+with the same proof form and the independently computed transpose
+isolate its false content. Closed instances do not prove the generic
+`n` theorem.
+
+Architect D0 checked the public theorem's module ownership and
+Transparent status, a generic public client, private-import refusals
+for all four direct helpers, and one D0 test. The existing
+`cat_linear_algebra_nat_matrix` visible-name inventory will require
+a matching one-name update: twenty-nine to thirty public names and
+`transpose_identity` as the additional visible name. Foundation owns
+that catalog/test change after CV authors the seed. The D0 patch
+SHA-256 is
+`74cff3e2237167533ec8324c0193ab140b871662e3cd7cf394635f46f0a1db4a`.
+These scratch checks are not package-test execution on the assembled
+candidate, official conformance, CI, publication, landing or landed
+trust. Neither this visibility promotion nor a closed symmetric
+example grants symmetry to an arbitrary matrix.
