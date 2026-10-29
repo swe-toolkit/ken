@@ -11808,6 +11808,15 @@ struct IndexedFunction<'f> {
     call_address_arguments: std::cell::OnceCell<
         BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Inst>>,
     >,
+    frame_calls: std::cell::RefCell<
+        BTreeMap<
+            cranelift_codegen::ir::Inst,
+            (
+                cranelift_codegen::ir::StackSlot,
+                cranelift_codegen::ir::StackSlot,
+            ),
+        >,
+    >,
     location_accesses:
         std::cell::RefCell<BTreeMap<cranelift_codegen::ir::StackSlot, std::rc::Rc<LocationAccess>>>,
 }
@@ -11862,6 +11871,7 @@ impl<'f> IndexedFunction<'f> {
             branches_comparing: std::cell::OnceCell::new(),
             loads: std::cell::OnceCell::new(),
             call_address_arguments: std::cell::OnceCell::new(),
+            frame_calls: std::cell::RefCell::default(),
             location_accesses: std::cell::RefCell::default(),
         }
     }
@@ -12363,6 +12373,29 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         .iter()
         .map(|body| IndexedFunction::new(&body.func))
         .collect::<Vec<_>>();
+    // A unit body certified not to retain its frame addresses lets each
+    // protocol call of it leave the caller's frame unretained.
+    let mut certified = BTreeSet::new();
+    for (body, func) in staged.iter().zip(&indexed) {
+        if frame_non_retaining(func)?.is_none() {
+            certified.insert(body.target);
+        }
+    }
+    for (body, func) in staged.iter().zip(&indexed) {
+        for obligation in &body.call_obligations {
+            let target = Lowering::decode_direct_callee(func, obligation.call)?;
+            if !certified.contains(&target) {
+                continue;
+            }
+            if let Some(frame) = func.dfg.inst_args(obligation.call).first() {
+                if let Some((header, 0)) = resolve_stack_address(func, *frame)? {
+                    func.frame_calls
+                        .borrow_mut()
+                        .insert(obligation.call, (header, obligation.payload));
+                }
+            }
+        }
+    }
     // Protocol verification depends only on finalized CLIF and the exact typed
     // call target, not on fixed-point certificate availability. Verify each
     // call/publication once before either graph iteration so a later SCC pass
@@ -13391,10 +13424,15 @@ fn location_access(
         }
     }
     let call_arguments = func.call_address_arguments()?;
-    let retaining_calls = containers
+    let mut retaining_calls = BTreeSet::new();
+    for call in containers
         .iter()
         .flat_map(|slot| call_arguments.get(slot).into_iter().flatten().copied())
-        .collect();
+    {
+        if !certified_frame_call_exempt(func, call, location.slot, &containers)? {
+            retaining_calls.insert(call);
+        }
+    }
     let access = std::rc::Rc::new(LocationAccess {
         containers,
         escaped,
@@ -13448,6 +13486,225 @@ fn call_follows_retention(
         }
     }
     false
+}
+
+/// Whether `call` is a unit call whose callee is certified not to keep its
+/// frame addresses, and whose header and payload carry no other address of
+/// `containers` to it. Such a call reads and writes the frame but cannot
+/// leave a pointer to it behind.
+fn certified_frame_call_exempt(
+    func: &IndexedFunction<'_>,
+    call: cranelift_codegen::ir::Inst,
+    location_slot: cranelift_codegen::ir::StackSlot,
+    containers: &BTreeSet<cranelift_codegen::ir::StackSlot>,
+) -> Result<bool, CraneliftBackendError> {
+    let Some((header, payload)) = func.frame_calls.borrow().get(&call).copied() else {
+        return Ok(false);
+    };
+    if location_slot != header && location_slot != payload {
+        return Ok(false);
+    }
+    let [frame, services] = func.dfg.inst_args(call) else {
+        return Ok(false);
+    };
+    if resolve_stack_address(func, *frame)? != Some((header, 0))
+        || address_depends_on_slots(func, *services, containers)?
+    {
+        return Ok(false);
+    }
+    let slots_offset = i64::from(crate::activation_services::UNIT_CALL_FRAME_SLOTS);
+    for inst in func.insts() {
+        let (value, destination) = match &func.dfg.insts[inst] {
+            cranelift_codegen::ir::InstructionData::StackStore {
+                arg,
+                stack_slot,
+                offset,
+                ..
+            } => (*arg, Some((*stack_slot, i64::from(*offset)))),
+            cranelift_codegen::ir::InstructionData::Store { args, offset, .. } => (
+                args[0],
+                resolve_stack_address(func, args[1])?
+                    .map(|(slot, base)| (slot, base + i64::from(*offset))),
+            ),
+            cranelift_codegen::ir::InstructionData::StoreNoOffset { args, .. } => {
+                (args[0], resolve_stack_address(func, args[1])?)
+            }
+            _ => continue,
+        };
+        let Some((slot, offset)) = destination else {
+            continue;
+        };
+        if slot != header && slot != payload {
+            continue;
+        }
+        if !address_depends_on_slots(func, value, containers)? {
+            continue;
+        }
+        if slot != header
+            || offset != slots_offset
+            || resolve_stack_address(func, value)? != Some((payload, 0))
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// The constant byte offset of `value` from `frame`, through immediate adds.
+fn frame_constant_offset(
+    func: &IndexedFunction<'_>,
+    value: cranelift_codegen::ir::Value,
+    frame: cranelift_codegen::ir::Value,
+) -> Option<i64> {
+    let value = func.dfg.resolve_aliases(value);
+    if value == frame {
+        return Some(0);
+    }
+    let cranelift_codegen::ir::ValueDef::Result(inst, 0) = func.dfg.value_def(value) else {
+        return None;
+    };
+    match &func.dfg.insts[inst] {
+        cranelift_codegen::ir::InstructionData::BinaryImm64 {
+            opcode: cranelift_codegen::ir::Opcode::IaddImm,
+            arg,
+            imm,
+        } => frame_constant_offset(func, *arg, frame)?.checked_add(imm.bits()),
+        cranelift_codegen::ir::InstructionData::Binary {
+            opcode: cranelift_codegen::ir::Opcode::Iadd,
+            args,
+        } => {
+            if let Some(constant) = iconst_value(func, args[1]) {
+                frame_constant_offset(func, args[0], frame)?.checked_add(constant)
+            } else if let Some(constant) = iconst_value(func, args[0]) {
+                frame_constant_offset(func, args[1], frame)?.checked_add(constant)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// `None` when this unit body cannot leave its caller's frame addresses
+/// behind: neither its frame parameter nor the payload pointer it loads from
+/// the frame's Slots field, nor any value computed from them, is ever stored
+/// as a value, passed to a call, or returned. Otherwise the first leak.
+fn frame_non_retaining(
+    func: &IndexedFunction<'_>,
+) -> Result<Option<String>, CraneliftBackendError> {
+    use cranelift_codegen::ir::InstructionData;
+    let Some(entry) = func.layout.entry_block() else {
+        return Ok(Some("no entry block".to_string()));
+    };
+    let Some(&frame) = func.dfg.block_params(entry).first() else {
+        return Ok(Some("no frame parameter".to_string()));
+    };
+    let context_offset =
+        i64::from(crate::activation_services::UNIT_CALL_FRAME_HOST_DISPATCH_CONTEXT);
+    let mut header = BTreeSet::from([frame]);
+    let mut payload = BTreeSet::new();
+    loop {
+        let before = (header.len(), payload.len());
+        for inst in func.insts() {
+            let data = &func.dfg.insts[inst];
+            let opcode = data.opcode();
+            let args = func
+                .dfg
+                .inst_args(inst)
+                .iter()
+                .map(|value| func.dfg.resolve_aliases(*value))
+                .collect::<Vec<_>>();
+            let tainted = |value: &cranelift_codegen::ir::Value| {
+                header.contains(value) || payload.contains(value)
+            };
+            if opcode.is_call() || opcode.is_return() {
+                if let Some(value) = args.iter().find(|value| tainted(value)) {
+                    return Ok(Some(format!(
+                        "{opcode} {inst} receives frame-derived {value}"
+                    )));
+                }
+                continue;
+            }
+            if opcode.is_branch() {
+                for destination in data.branch_destination(&func.dfg.jump_tables) {
+                    let block = destination.block(&func.dfg.value_lists);
+                    let params = func.dfg.block_params(block).to_vec();
+                    for (index, argument) in destination
+                        .args_slice(&func.dfg.value_lists)
+                        .iter()
+                        .enumerate()
+                    {
+                        let argument = func.dfg.resolve_aliases(*argument);
+                        if header.contains(&argument) {
+                            header.insert(params[index]);
+                        }
+                        if payload.contains(&argument) {
+                            payload.insert(params[index]);
+                        }
+                    }
+                }
+                continue;
+            }
+            if opcode.can_store() {
+                let stored = match data {
+                    InstructionData::StackStore { arg, .. } => vec![*arg],
+                    InstructionData::Store { args, .. }
+                    | InstructionData::StoreNoOffset { args, .. } => vec![args[0]],
+                    InstructionData::AtomicRmw { args, .. } => vec![args[1]],
+                    InstructionData::AtomicCas { args, .. } => vec![args[1], args[2]],
+                    _ => args.clone(),
+                };
+                if let Some(value) = stored
+                    .iter()
+                    .map(|value| func.dfg.resolve_aliases(*value))
+                    .find(|value| tainted(value))
+                {
+                    return Ok(Some(format!(
+                        "{opcode} {inst} stores frame-derived {value}"
+                    )));
+                }
+            }
+            if opcode.can_load() {
+                let address = match data {
+                    InstructionData::Load { arg, offset, .. } => {
+                        Some((*arg, Some(i64::from(*offset))))
+                    }
+                    InstructionData::LoadNoOffset { arg, .. } => Some((*arg, Some(0))),
+                    InstructionData::AtomicRmw { args, .. } => Some((args[0], None)),
+                    InstructionData::AtomicCas { args, .. } => Some((args[0], None)),
+                    _ => None,
+                };
+                let loads_payload_pointer = match address {
+                    Some((address, offset)) => {
+                        let address = func.dfg.resolve_aliases(address);
+                        header.contains(&address)
+                            && frame_constant_offset(func, address, frame)
+                                .zip(offset)
+                                .and_then(|(base, offset)| base.checked_add(offset))
+                                != Some(context_offset)
+                    }
+                    None => args.iter().any(|value| header.contains(value)),
+                };
+                if loads_payload_pointer {
+                    payload.extend(func.dfg.inst_results(inst).iter().copied());
+                }
+                continue;
+            }
+            let from_header = args.iter().any(|value| header.contains(value));
+            let from_payload = args.iter().any(|value| payload.contains(value));
+            for result in func.dfg.inst_results(inst) {
+                if from_header {
+                    header.insert(*result);
+                }
+                if from_payload {
+                    payload.insert(*result);
+                }
+            }
+        }
+        if (header.len(), payload.len()) == before {
+            return Ok(None);
+        }
+    }
 }
 
 /// Whether a pointer to the location may already be held where no SSA value
@@ -14115,7 +14372,8 @@ fn unknown_write_may_alias(
     let Some(address) = address else {
         return Ok(true);
     };
-    Ok(access.escaped || address_depends_on_slots(func, address, &access.containers)?)
+    Ok(location_leaked_before(func, inst, access)
+        || address_depends_on_slots(func, address, &access.containers)?)
 }
 
 fn value_is_guarded_nonzero_at_inst(
@@ -15815,6 +16073,7 @@ mod generated_result_protocol_verifier {
         EscapedRestoredZeroArgCall,
         ScalarReadToHeapZeroArgCall,
         UnretainedRestoredHeapStore,
+        RetainedRestoredHeapStore,
     }
 
     /// A finished-CLIF memory query, not a reimplementation of the address
@@ -16015,6 +16274,25 @@ mod generated_result_protocol_verifier {
                 builder.ins().call(later_call, &[]);
                 None
             }
+            SlotPointerUse::RetainedRestoredHeapStore => {
+                builder.ins().call(receiving_call, &[pointer]);
+                builder.ins().stack_store(stored_word, slot, 0);
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                let target = builder.ins().load(
+                    types::I64,
+                    cranelift_codegen::ir::MemFlags::trusted(),
+                    heap,
+                    0,
+                );
+                let replacement = builder.ins().iconst(types::I64, 9);
+                builder.ins().store(
+                    cranelift_codegen::ir::MemFlags::trusted(),
+                    replacement,
+                    target,
+                    0,
+                );
+                None
+            }
             SlotPointerUse::AtomicToHeap => {
                 let heap = builder.ins().iconst(types::I64, 0x1000);
                 store_form(&mut builder, StoreForm::Atomic, pointer, heap, 0);
@@ -16206,6 +16484,127 @@ mod generated_result_protocol_verifier {
             states.iter().next(),
             Some(ReachingMemoryState::Exact(_))
         ));
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a non-obligation callee receives &A, A is restored, then an
+    /// unknown heap-loaded destination is written through; A becomes Unknown.
+    /// CLAIMED: a call that could retain &A may publish it for later stores.
+    /// THE GAP: this CLIF pin does not execute the callee; its unknown store
+    /// models a published address and the caller-side clobber conservatively.
+    #[test]
+    fn retained_address_unknown_store_clobbers_restored_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::Exact,
+            SlotPointerUse::RetainedRestoredHeapStore,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the post-retention unknown store's memory state is decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    enum CalleeFrameUse {
+        StoreFrame,
+        StorePayloadPointer,
+        PassPayloadPointer,
+        ReturnFrame,
+        StorePayloadPointerViaOffset,
+        StoreDerivedPayloadAddress,
+        StorePayloadPointerThroughBlockParam,
+        FrameOnly,
+    }
+
+    /// A unit body `(frame, services)` that writes through its payload,
+    /// copies one argument word and the dispatch context to the heap, and
+    /// then does one frame-address use under test.
+    fn callee_frame_case(frame_use: CalleeFrameUse) -> Function {
+        let mut func = Function::new();
+        func.signature.call_conv = CallConv::SystemV;
+        func.signature.params.push(AbiParam::new(types::I64));
+        func.signature.params.push(AbiParam::new(types::I64));
+        func.signature.returns.push(AbiParam::new(types::I64));
+        let callee = direct_callee(&mut func, FuncId::from_u32(113), 1);
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
+        builder.switch_to_block(entry);
+        let frame = builder.block_params(entry)[0];
+        let flags = cranelift_codegen::ir::MemFlags::trusted();
+        let payload = builder.ins().load(types::I64, flags, frame, 0);
+        let heap = builder.ins().iconst(types::I64, 0x1000);
+        let seven = builder.ins().iconst(types::I64, 7);
+        builder.ins().store(flags, seven, payload, 8);
+        let argument = builder.ins().load(types::I64, flags, payload, 16);
+        builder.ins().store(flags, argument, heap, 0);
+        let dispatch = builder.ins().load(types::I64, flags, frame, 8);
+        builder.ins().store(flags, dispatch, heap, 8);
+        let mut returned = builder.ins().iconst(types::I64, 0);
+        match frame_use {
+            CalleeFrameUse::StoreFrame => {
+                builder.ins().store(flags, frame, heap, 16);
+            }
+            CalleeFrameUse::StorePayloadPointer => {
+                builder.ins().store(flags, payload, heap, 16);
+            }
+            CalleeFrameUse::PassPayloadPointer => {
+                builder.ins().call(callee, &[payload]);
+            }
+            CalleeFrameUse::ReturnFrame => returned = frame,
+            CalleeFrameUse::StorePayloadPointerViaOffset => {
+                let slots = builder.ins().iadd_imm(frame, 0);
+                let reloaded = builder.ins().load(types::I64, flags, slots, 0);
+                builder.ins().store(flags, reloaded, heap, 16);
+            }
+            CalleeFrameUse::StoreDerivedPayloadAddress => {
+                let field = builder.ins().iadd_imm(payload, 8);
+                builder.ins().store(flags, field, heap, 16);
+            }
+            CalleeFrameUse::StorePayloadPointerThroughBlockParam => {
+                let next = builder.create_block();
+                let carried = builder.append_block_param(next, types::I64);
+                builder.ins().jump(next, &[payload]);
+                builder.switch_to_block(next);
+                builder.ins().store(flags, carried, heap, 16);
+            }
+            CalleeFrameUse::FrameOnly => {}
+        }
+        builder.ins().return_(&[returned]);
+        builder.seal_all_blocks();
+        builder.finalize();
+        func
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: writing through a payload pointer, copying its scalar word
+    /// and the header context word out still certifies; seven independently
+    /// frame-derived store/call/return/offset/block-param shapes are refused.
+    /// CLAIMED: finished staged bodies cannot leak caller-frame addresses.
+    /// THE GAP: the fixture exercises seven body escape shapes and one clean
+    /// body, not every CLIF opcode or the caller-side exemption condition.
+    #[test]
+    fn frame_non_retaining_certificate_admits_frame_use_and_refuses_each_leak() {
+        let clean = callee_frame_case(CalleeFrameUse::FrameOnly);
+        assert_eq!(
+            frame_non_retaining(&IndexedFunction::new(&clean)).expect("decidable"),
+            None
+        );
+        for frame_use in [
+            CalleeFrameUse::StoreFrame,
+            CalleeFrameUse::StorePayloadPointer,
+            CalleeFrameUse::PassPayloadPointer,
+            CalleeFrameUse::ReturnFrame,
+            CalleeFrameUse::StorePayloadPointerViaOffset,
+            CalleeFrameUse::StoreDerivedPayloadAddress,
+            CalleeFrameUse::StorePayloadPointerThroughBlockParam,
+        ] {
+            let func = callee_frame_case(frame_use);
+            let verdict = frame_non_retaining(&IndexedFunction::new(&func)).expect("decidable");
+            assert!(verdict.is_some(), "{frame_use:?} must not certify");
+        }
     }
 
     /// Promise class: durable invariant.
