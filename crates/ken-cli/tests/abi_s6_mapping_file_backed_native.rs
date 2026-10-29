@@ -7,10 +7,19 @@
 
 const SOURCE: &str = include_str!("fixtures/abi_s6_mapping_file_backed.ken");
 
-fn differential(source: &str) -> Result<(ken_runtime::EffectObservation, ken_runtime::EffectObservation), String> {
+fn differential(
+    source: &str,
+) -> Result<
+    (
+        ken_runtime::EffectObservation,
+        ken_runtime::EffectObservation,
+    ),
+    String,
+> {
     let build = tempfile::tempdir().map_err(|error| format!("build root: {error}"))?;
     let native_root = tempfile::tempdir().map_err(|error| format!("native root: {error}"))?;
-    let interpreted_root = tempfile::tempdir().map_err(|error| format!("interpreter root: {error}"))?;
+    let interpreted_root =
+        tempfile::tempdir().map_err(|error| format!("interpreter root: {error}"))?;
     for root in [native_root.path(), interpreted_root.path()] {
         std::fs::write(root.join("mapped.bin"), b"KENFILE!")
             .map_err(|error| format!("seed mapping file: {error}"))?;
@@ -21,7 +30,8 @@ fn differential(source: &str) -> Result<(ken_runtime::EffectObservation, ken_run
         "abi_s6_mapping_file_backed",
         build.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-    ).map_err(|error| format!("native build: {error:?}"))?;
+    )
+    .map_err(|error| format!("native build: {error:?}"))?;
     let native = ken_runtime::run_bound_process_effect_observation(
         &built.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -30,15 +40,18 @@ fn differential(source: &str) -> Result<(ken_runtime::EffectObservation, ken_run
             cwd: native_root.path().to_owned(),
             plan_hash: built.plan_transport_hash,
         },
-    ).map_err(|error| format!("native execution: {error:?}"))?;
+    )
+    .map_err(|error| format!("native execution: {error:?}"))?;
     let mut host = ken_interp::PosixHost::new_at(interpreted_root.path());
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
-        &[], &[],
+        &[],
+        &[],
         interpreted_root.path().as_os_str().as_encoded_bytes(),
         &mut host,
-    ).map_err(|error| format!("interpreter execution: {error:?}"))?;
+    )
+    .map_err(|error| format!("interpreter execution: {error:?}"))?;
     Ok((interpreted, native))
 }
 
@@ -52,7 +65,11 @@ fn file_backed_mapping_executes_its_inner_result_consumer_on_both_engines() {
     assert_eq!(interpreted.effect_trace, native.effect_trace);
     assert_eq!(interpreted.filesystem_delta, native.filesystem_delta);
     assert_eq!(
-        native.effect_trace.iter().map(|event| event.operation).collect::<Vec<_>>(),
+        native
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
         vec![
             ken_runtime::HostOpV1::FsOpen,
             ken_runtime::HostOpV1::MappingAcquireFile,

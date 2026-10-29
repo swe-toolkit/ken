@@ -1242,10 +1242,11 @@ impl MappingRegionV1 {
         }
     }
 
-    pub(crate) fn unmap_native(self) -> Result<(), IoErrorIdentityV1> {
+    pub(crate) fn release_native(self) -> Result<(), IoErrorIdentityV1> {
         match self.storage {
             MappingStorageV1::Mapped(mapped) => crate::mapping_v1::unmap_v1(mapped),
-            MappingStorageV1::InProcess(_) => Err(IoErrorIdentityV1::Unsupported),
+            // File-backed acquisition copies into owned bytes; dropping them is the release.
+            MappingStorageV1::InProcess(_) => Ok(()),
         }
     }
 }
@@ -5281,7 +5282,7 @@ mod tests {
     /// naming even one operation here would reproduce the enumeration defect
     /// filed against `AC-AVAIL`, because a list cannot fail for a member it
     /// does not contain. That is also why `AC-NATIVE-UNTOUCHED` needs no
-    /// allow-list: the 25 `NativeTested` operations are excluded by the
+    /// allow-list: `NativeTested` operations are excluded by the
     /// predicate's shape rather than by an exception.
     ///
     /// **The request is the same for every operation and matches almost none of
@@ -5558,31 +5559,23 @@ mod tests {
         }
     }
 
-    /// Promise class: transition sentinel. ABI-S6 D5a removes exactly the three
-    /// anonymous Mapping operations from the represented-unavailable tail while
-    /// leaving file-backed acquisition for D5b.
+    /// Promise class: durable catalog partition. D5b retires the D5a sentinel
+    /// that deliberately held file acquisition unavailable until this native
+    /// differential existed. Later promotions keep the partition and derived
+    /// manifest count green without freezing today's unavailable count.
     #[test]
-    fn abi_s6_d5a_leaves_file_acquisition_represented_unavailable() {
+    fn abi_s6_d5b_file_acquisition_joins_native_catalog_partition() {
         assert_eq!(
-            HostOpV1::ALL
-                .into_iter()
-                .filter(|operation| {
-                    operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable
-                })
+            HostOpV1::MappingAcquireFile.availability(),
+            HostOpAvailabilityV1::NativeTested
+        );
+        assert!(NATIVE_TESTED_TARGETS_V1.contains(&HostOpV1::MappingAcquireFile));
+        assert!(host_effect_wire_layout_v1(HostOpV1::MappingAcquireFile).is_ok());
+        assert_eq!(
+            HostOpV1::ALL.into_iter()
+                .filter(|op| op.availability() == HostOpAvailabilityV1::NativeTested)
                 .collect::<Vec<_>>(),
-            vec![
-                HostOpV1::ClockMonotonicNow,
-                HostOpV1::ClockSleepUntil,
-                HostOpV1::FsSeek,
-                HostOpV1::FsSetLength,
-                HostOpV1::FsSync,
-                HostOpV1::FsGetInheritance,
-                HostOpV1::FsSetInheritance,
-                HostOpV1::FsDuplicate,
-                HostOpV1::MappingAcquireFile,
-                HostOpV1::EntropyRandomBytes,
-            ],
-            "D5a must leave only file-backed Mapping acquisition in the unavailable tail"
+            NATIVE_TESTED_TARGETS_V1
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,

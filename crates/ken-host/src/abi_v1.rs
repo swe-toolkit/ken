@@ -770,7 +770,7 @@ impl HostEffectBackendV1 for ProcessHost {
     }
 
     fn resource_unmap(&mut self, region: crate::MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
-        region.unmap_native()
+        region.release_native()
     }
 }
 
