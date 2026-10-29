@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-APPEND-DISTRIBUTION
 title: "Spec 69 splits one window at an interior bound, but no law relates a window to a concatenated trace. Rule from a checked D0 at zero trust that windowing the append of two traces equals the append of their windows, for every bound pair and every input order, and state the law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
