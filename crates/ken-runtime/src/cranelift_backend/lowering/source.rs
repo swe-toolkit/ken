@@ -1923,13 +1923,13 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             {
                                 let mut returns = cases.iter().enumerate().filter(|(_, case)| {
                                     case.argument_binders == 1
-                                        && case.constructor.ends_with("::ITree::Ret")
+                                        && case.constructor == self.process_symbols.itree_ret
                                 });
                                 let return_case = returns.next();
                                 let exact_return = returns.next().is_none();
                                 let mut visible = cases
                                     .iter()
-                                    .filter(|case| case.constructor.ends_with("::ITree::Vis"));
+                                    .filter(|case| case.constructor == self.process_symbols.itree_vis);
                                 let exact_visible = visible.next().is_some()
                                     && visible.next().is_none()
                                     && cases.len() == 2;

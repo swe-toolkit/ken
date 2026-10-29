@@ -545,6 +545,9 @@ fn dense_slice<T>(arena: &[T], range: semantic_ir::DenseRange) -> Option<&[T]> {
 
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
+    /// Checked role identities, carried from the input of this plan rather than
+    /// rediscovered from constructor symbol spellings by its consumers.
+    process_symbols: crate::NativeProcessSymbols,
     /// Read-only selected pending-call admission; no emitter reads it yet.
     selected_pending_calls: BTreeMap<StaticOriginId, selected_pending_calls::PendingCallAdmission>,
     entries: Vec<StaticNodeId>,
@@ -1058,7 +1061,7 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
 ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
     #[cfg(test)]
     reset_recursive_lowering_frame_count();
-    let mut planner = Planner::new()?;
+    let mut planner = Planner::new(symbols)?;
     let empty = PersistentNodeId(0);
     let context = PlanContext {
         environment: empty,

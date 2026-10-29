@@ -256,7 +256,9 @@ pub(super) struct Planner<'src> {
 }
 
 impl<'src> Planner<'src> {
-    pub(super) fn new() -> Result<Self, CraneliftBackendError> {
+    pub(super) fn new(
+        symbols: &crate::NativeProcessSymbols,
+    ) -> Result<Self, CraneliftBackendError> {
         let empty = PersistentNodeId(0);
         let frame = DynamicActivationFrame {
             syntax: empty,
@@ -270,6 +272,7 @@ impl<'src> Planner<'src> {
         };
         let mut planner = Self {
             plan: StaticTransitionPlan {
+                process_symbols: symbols.clone(),
                 selected_pending_calls: BTreeMap::new(),
                 checked_ih_post_call_consumers: Vec::new(),
                 entries: Vec::new(),
@@ -1840,7 +1843,8 @@ mod tests {
     fn computational_match_is_the_sole_entry_occurrence_split() {
         let mut split = Vec::new();
         for (name, expr) in b2ac_topology_fixtures() {
-            let mut planner = Planner::new().expect("planner");
+            let mut planner =
+                Planner::new(&crate::NativeProcessSymbols::legacy_prelude()).expect("planner");
             let empty = PersistentNodeId(0);
             let context = PlanContext {
                 environment: empty,

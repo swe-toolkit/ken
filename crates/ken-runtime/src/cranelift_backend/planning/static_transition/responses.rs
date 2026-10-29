@@ -1706,7 +1706,7 @@ fn response_leaf_owner(
             if position
                 .checked_sub(1)
                 .and_then(|index| cases.get(index))
-                .is_some_and(|case| case.constructor.as_str().ends_with("::ITree::Vis"))
+                .is_some_and(|case| case.constructor == plan.process_symbols.itree_vis)
             {
                 return Ok(Some((parent, position)));
             }
@@ -1807,7 +1807,7 @@ fn response_forwards_vis(
 ) -> Result<bool, CraneliftBackendError> {
     match plan.planned_occurrence_expr(origin)? {
         RuntimeExpr::Construct { constructor, args }
-            if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 =>
+            if constructor == &plan.process_symbols.itree_vis && args.len() == 2 =>
         {
             Ok(matches!(&args[0], RuntimeExpr::Var(index) if *index == op_binder))
         }
@@ -1951,9 +1951,10 @@ fn response_vis_dispatch_leaf(
         };
         if let RuntimeExpr::ComputationalMatch { cases, .. } = plan.planned_occurrence_expr(parent)? {
             if position == 0 {
-                let mut vis_cases = cases.iter().enumerate().filter(|(_, case)| {
-                    case.constructor.as_str().ends_with("::ITree::Vis")
-                });
+                let mut vis_cases = cases
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, case)| case.constructor == plan.process_symbols.itree_vis);
                 let Some((case_index, vis_case)) = vis_cases.next() else {
                     return Ok(None);
                 };
@@ -2073,7 +2074,7 @@ impl StaticTransitionPlan<'_> {
                 self.planned_occurrence_expr(parent)?
             {
                 if position.checked_sub(1).and_then(|index| cases.get(index))
-                    .is_some_and(|case| case.constructor.as_str().ends_with("::ITree::Vis"))
+                    .is_some_and(|case| case.constructor == self.process_symbols.itree_vis)
                 {
                     let mut pending = vec![self.semantic.child_origin(parent, 0)?];
                     let mut contains_vis = false;
@@ -2175,7 +2176,7 @@ fn exact_response_ret_identity(
         .iter()
         .enumerate()
         .filter(|(_, case)| {
-            case.constructor.as_str().ends_with("::ITree::Ret")
+            case.constructor == plan.process_symbols.itree_ret
                 && case.argument_binders == 1
                 && case.recursive_positions.is_empty()
         })
@@ -2547,9 +2548,9 @@ fn tail_answers_directly(
         RuntimeExpr::ComputationalMatch { cases, .. } => {
             each(&(1..=cases.len()).collect::<Vec<_>>(), visited)
         }
-        RuntimeExpr::Construct { constructor, .. } => Ok(!inside_callee
-            || !(constructor.as_str().ends_with("::ITree::Ret")
-                || constructor.as_str().ends_with("::ITree::Vis"))),
+        RuntimeExpr::Construct { constructor, .. } => {
+            Ok(!inside_callee || !plan.process_symbols.is_itree_constructor(constructor))
+        }
         RuntimeExpr::Call { .. } => {
             let callee = plan.semantic.child_origin(origin, 0)?;
             let declared = matches!(
@@ -2587,9 +2588,9 @@ fn tail_answers_directly(
         // does not answer directly. Every other form is named, so a new
         // RuntimeExpr variant has to be classified here.
         RuntimeExpr::Var(_) | RuntimeExpr::Project { .. } => Ok(!inside_callee),
-        RuntimeExpr::Value(RuntimeValue::Constructor { constructor, .. }) => Ok(!inside_callee
-            || !(constructor.as_str().ends_with("::ITree::Ret")
-                || constructor.as_str().ends_with("::ITree::Vis"))),
+        RuntimeExpr::Value(RuntimeValue::Constructor { constructor, .. }) => {
+            Ok(!inside_callee || !plan.process_symbols.is_itree_constructor(constructor))
+        }
         RuntimeExpr::Value(_)
         | RuntimeExpr::PrimitiveCall { .. }
         | RuntimeExpr::Record { .. }
@@ -2765,7 +2766,7 @@ fn classify_deferred_response_tail(
             }
         }
         RuntimeExpr::Construct { constructor, args }
-            if constructor.as_str().ends_with("::ITree::Ret") && args.len() == 1 =>
+            if constructor == &plan.process_symbols.itree_ret && args.len() == 1 =>
         {
             shape.ret_exits += 1;
         }
@@ -2995,7 +2996,7 @@ impl StaticTransitionPlan<'_> {
             let RuntimeExpr::Construct { constructor, args } = occurrence.expr else {
                 continue;
             };
-            if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 {
+            if constructor != &self.process_symbols.itree_vis || args.len() != 2 {
                 continue;
             }
             let vis_origin = occurrence.static_origin;
@@ -4460,7 +4461,7 @@ impl StaticTransitionPlan<'_> {
                 }
             }
             RuntimeExpr::Construct { constructor, args }
-                if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 =>
+                if constructor == &self.process_symbols.itree_vis && args.len() == 2 =>
             {
                 let known = self
                     .static_response_continuations
@@ -4478,7 +4479,7 @@ impl StaticTransitionPlan<'_> {
                 }
             }
             RuntimeExpr::Construct { constructor, args }
-                if constructor.as_str().ends_with("::ITree::Ret") && args.len() == 1 =>
+                if constructor == &self.process_symbols.itree_ret && args.len() == 1 =>
             {
                 Ok(Some(Vec::new()))
             }
@@ -5789,6 +5790,53 @@ mod tests {
         );
     }
 
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a non-floor ITree-looking Ret answers directly, while a
+    /// checked Ret with no ITree segment is classified as an ITree-form tail.
+    /// CLAIMED: response tail analysis follows resolved constructor roles.
+    /// THE GAP: this tests the Value tail decision; other response consumers
+    /// are covered by the named native-plan population and independent QA.
+    #[test]
+    fn response_tail_ret_role_uses_resolved_identity_not_spelling() {
+        let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+        symbols.itree_ret = "ctor:checked::Session::Return".to_string();
+        let classify = |constructor: &str| {
+            let root = RuntimeExpr::Value(RuntimeValue::Constructor {
+                constructor: constructor.to_string(),
+                args: Vec::new(),
+            });
+            let plan = super::super::plan_static_transition_graph_with_symbols(
+                &root,
+                &BTreeMap::new(),
+                &symbols,
+                super::super::AbiRootIngress::Value,
+                false,
+            )
+            .expect("a constructor Value has a source occurrence");
+            let root = plan.root_occurrence.expect("the Value is the root");
+            tail_answers_directly(&plan, root, &mut BTreeSet::new(), true)
+                .expect("the response tail has a decidable role")
+        };
+        assert!(classify(concat!("ctor:other::ITree", "::Ret")));
+        assert!(!classify(&symbols.itree_ret));
+    }
+
+    fn plan_fixture_itree_graph<'src>(
+        entry: &'src RuntimeExpr,
+        declarations: &BTreeMap<&str, &'src RuntimeDeclaration>,
+    ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
+        let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+        symbols.itree_ret = "ctor:fixture::ITree::Ret".to_string();
+        symbols.itree_vis = "ctor:fixture::ITree::Vis".to_string();
+        super::super::plan_static_transition_graph_with_symbols(
+            entry,
+            declarations,
+            &symbols,
+            super::super::AbiRootIngress::Value,
+            false,
+        )
+    }
+
     fn host_response_case(constructor: &str) -> RuntimeMatchCase {
         RuntimeMatchCase {
             constructor: constructor.to_string(),
@@ -5925,7 +5973,7 @@ mod tests {
     #[test]
     fn nested_unpaired_response_candidate_owned_by_same_vis_refuses() {
         let root = two_leaf_response_fixture(true);
-        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+        let error = match plan_fixture_itree_graph(&root, &BTreeMap::new()) {
             Err(error) => error,
             Ok(_) => panic!("an unpaired owned response candidate must refuse"),
         };
@@ -5942,7 +5990,7 @@ mod tests {
     #[test]
     fn top_level_unpaired_response_candidate_still_refuses() {
         let root = two_leaf_response_fixture(false);
-        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+        let error = match plan_fixture_itree_graph(&root, &BTreeMap::new()) {
             Err(error) => error,
             Ok(_) => panic!("an unpaired top-level response candidate must refuse"),
         };
@@ -5983,7 +6031,7 @@ mod tests {
             }),
             else_expr: Box::new(host_response_root(constructor)),
         };
-        let plan = super::super::plan_static_transition_graph(&root, &BTreeMap::new())
+        let plan = plan_fixture_itree_graph(&root, &BTreeMap::new())
             .expect("both source response producers are representable");
         let cm = plan.source_occurrences.iter().flatten()
             .find(|entry| matches!(entry.expr, RuntimeExpr::ComputationalMatch { .. }))
@@ -6034,7 +6082,7 @@ mod tests {
             }],
             default: trap(),
         };
-        let error = match super::super::plan_static_transition_graph(&root, &BTreeMap::new()) {
+        let error = match plan_fixture_itree_graph(&root, &BTreeMap::new()) {
             Err(error) => error,
             Ok(_) => panic!("Call argument cannot convey the Vis to the dispatch"),
         };
@@ -6062,7 +6110,7 @@ mod tests {
             }],
             default: trap(),
         };
-        let plan = super::super::plan_static_transition_graph(&root, &BTreeMap::new())
+        let plan = plan_fixture_itree_graph(&root, &BTreeMap::new())
             .expect("the forward-case fixture has planned source occurrences");
         let cm = plan.source_occurrences.iter().flatten()
             .find(|entry| matches!(entry.expr, RuntimeExpr::ComputationalMatch { .. }))
@@ -6121,7 +6169,7 @@ mod tests {
                 RuntimeExpr::Value(RuntimeValue::Unknown),
             ],
         };
-        let plan = super::super::plan_static_transition_graph(&vis, &declarations)
+        let plan = plan_fixture_itree_graph(&vis, &declarations)
             .expect("the opaque-K response fixture plans");
         let infeasible = plan
             .static_response_feasibility_ledger_all()
@@ -6193,7 +6241,7 @@ mod tests {
                 (countdown.symbol.as_str(), &countdown),
                 (itree_copy.symbol.as_str(), &itree_copy),
             ]);
-            let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            let plan = plan_fixture_itree_graph(&k_body, &declarations)
                 .expect("the direct-countdown and ITree-form copy fixtures plan");
             let k_origin = plan
                 .source_occurrences
@@ -6264,7 +6312,7 @@ mod tests {
             metadata: RuntimeSymbolMetadata::empty(),
         };
         let declarations = BTreeMap::from([(probe.symbol.as_str(), &probe)]);
-        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+        let plan = plan_fixture_itree_graph(&k_body, &declarations)
             .expect("the computational-match callee fixture plans");
         let k_origin = plan
             .source_occurrences
@@ -6414,7 +6462,7 @@ mod tests {
     /// production planner's direct-answer walk. CLAIMED: an ITree-form value,
     /// whether held as a Value or built as a Construct, is not a direct answer.
     /// THE GAP: this RuntimeExpr fixture is not px8ds's checked ITree-form
-    /// occurrence; the identity convention still keys on constructor suffix.
+    /// occurrence; its fixture role symbols are explicitly resolved.
     #[test]
     fn rt_p1_tail_walk_itree_value_callee_is_not_direct() {
         for role in ["Ret", "Vis"] {
@@ -6439,7 +6487,7 @@ mod tests {
                 metadata: RuntimeSymbolMetadata::empty(),
             };
             let declarations = BTreeMap::from([(value_tree.symbol.as_str(), &value_tree)]);
-            let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            let plan = plan_fixture_itree_graph(&k_body, &declarations)
                 .expect("the ITree-value callee fixture plans");
             let k_origin = plan
                 .source_occurrences

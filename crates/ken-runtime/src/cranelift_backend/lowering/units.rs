@@ -3465,7 +3465,7 @@ pub(super) fn lower_continuation_selected_case_body(
     // not by replaying the enclosing Match there. Observe that completed
     // body beside the carried owner's trapped branch at the same origin.
     #[cfg(feature = "px8-ds-test-support")]
-    if case.constructor.ends_with("::ITree::Vis")
+    if case.constructor == compiler.process_symbols.itree_vis
         && compiler
             .static_transition_plan
             .pending_result_validated_owner(frame_occurrence.static_origin)?
@@ -5720,7 +5720,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                         "the test-only owner bypass lost its source Vis constructor".to_string(),
                     ));
                 };
-                if !constructor.ends_with("::ITree::Vis") || args.len() != 2 {
+                if constructor != compiler.process_symbols.itree_vis || args.len() != 2 {
                     return Err(backend_module(
                         LoweringCause::PlannerInvariant,
                         "the test-only owner bypass needs a binary Vis constructor".to_string(),

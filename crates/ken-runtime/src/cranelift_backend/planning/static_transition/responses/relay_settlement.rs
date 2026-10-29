@@ -75,7 +75,7 @@ fn source_for_relay(
             if position > 0 {
                 let case = cases.get(position - 1)
                     .ok_or_else(|| format!("CM {parent:?} missing case {position}"))?;
-                if case.constructor.as_str().ends_with("::ITree::Vis") {
+                if case.constructor == plan.process_symbols.itree_vis {
                     let binder = response_vis_operation_binder(case)
                         .ok_or_else(|| format!("CM {parent:?} has no checked Vis operation binder"))?;
                     if usize::try_from(*index).ok().and_then(|i| i.checked_add(crossed_binders))
@@ -168,7 +168,8 @@ fn source_results_in_scope(
                     Some(body), false, seen_relays, seen_calls, omissions)?);
             }
             RuntimeExpr::Construct { constructor, args }
-                if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 => {
+                if constructor == &plan.process_symbols.itree_vis && args.len() == 2 =>
+            {
                 let path_tail = inherited_tail && tail_to(plan, parents, origin, scope)?;
                 let operation = plan.child_static_origin(origin, 0).map_err(|e| e.to_string())?;
                 let operation = plan.source_occurrence(operation).map_err(|e| e.to_string())?;
@@ -188,7 +189,7 @@ fn source_results_in_scope(
                 }
             }
             RuntimeExpr::Construct { constructor, .. }
-                if constructor.as_str().ends_with("::ITree::Ret") => {}
+                if constructor == &plan.process_symbols.itree_ret => {}
             RuntimeExpr::Trap(_) => {}
             RuntimeExpr::Effect { .. } | RuntimeExpr::Var(_)
             | RuntimeExpr::Value(_) | RuntimeExpr::PrimitiveCall { .. }
@@ -216,7 +217,9 @@ fn source_results_in_scope(
 fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<bool, String> {
     let expr = plan.source_occurrence(vis).map_err(|e| e.to_string())?;
     let RuntimeExpr::Construct { constructor, args } = expr else { return Ok(false) };
-    if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 { return Ok(false); }
+    if constructor != &plan.process_symbols.itree_vis || args.len() != 2 {
+        return Ok(false);
+    }
     let RuntimeExpr::Construct { args: outer, .. } = &args[0] else { return Ok(false) };
     let [operation] = outer.as_slice() else { return Ok(false); };
     if !matches!(peel_checked_bracket_operation(operation), RuntimeExpr::Construct { .. }) {

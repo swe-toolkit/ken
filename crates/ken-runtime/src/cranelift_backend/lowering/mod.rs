@@ -7951,7 +7951,8 @@ impl<'a> Lowering<'a> {
             .and_then(|protocol| protocol.members.get(&origin)).cloned() else {
             return Ok(());
         };
-        if !constructor.ends_with("::ITree::Vis") || lowered.len() != 2
+        if constructor != self.process_symbols.itree_vis.as_str()
+            || lowered.len() != 2
             || row.vis_origin() != origin
         {
             return Err(backend_module(LoweringCause::PlannerInvariant,

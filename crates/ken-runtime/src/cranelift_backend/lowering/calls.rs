@@ -2749,59 +2749,66 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
-        pub(super) fn unwrap_terminal_ret(mut lowered: Lowered) -> Lowered {
-            loop {
-                match lowered {
-                    Lowered::Constructor {
-                        constructor,
-                        mut args,
-                        synthesized_identity,
-                        occurrence,
-                    } if constructor.ends_with("::ITree::Ret") && args.len() == 1 => {
-                        match args.remove(0) {
-                            ConstructorField::Specialized(inner) => lowered = inner,
-                            // This function is infallible, so it cannot refuse; the
-                            // decision it CAN take is to leave the wrapper on and
-                            // keep the refusal with a consumer that is able to make
-                            // one. Unwrapping would hand a caller expecting a value
-                            // something with no value representation.
-                            //
-                            // **Re-derived now that a worker really can arrive
-                            // here.** The original justification was that the read
-                            // was infallible because nothing constructed a worker;
-                            // that premise is gone, so the claim has to rest on
-                            // where the intact constructor actually lands. Both
-                            // reachable consumers fail closed on it:
-                            // `emit_process_exit_status` answers its `-3`
-                            // malformed-payload sentinel, and the scalar-pair join
-                            // either routes into that same decoder or refuses with
-                            // *"dynamic native arms must produce scalar Int
-                            // values"*. Neither can mistake the wrapper for a
-                            // value, which is what makes handing it back the
-                            // conservative move rather than merely the unchanged
-                            // one.
-                            //
-                            // **And the conservation close is behind both of
-                            // them.** A worker field that nothing rebinds refuses
-                            // before the root answer is emitted, so an intact
-                            // wrapper carrying an unconsumed worker cannot appear
-                            // in a shipped object at all — the two decoder
-                            // refusals above are what happens on the way there,
-                            // not the last line of defence.
-                            field @ ConstructorField::StaticWorker { .. } => {
-                                return Lowered::Constructor {
-                                    constructor,
-                                    synthesized_identity,
-                                    occurrence,
-                                    args: vec![field],
-                                };
-                            }
-                        }
+    pub(super) fn unwrap_terminal_ret(&self, lowered: Lowered) -> Lowered {
+        unwrap_terminal_ret_with_symbols(lowered, &self.process_symbols)
+    }
+}
+
+fn unwrap_terminal_ret_with_symbols(
+    mut lowered: Lowered,
+    symbols: &crate::NativeProcessSymbols,
+) -> Lowered {
+    loop {
+        match lowered {
+            Lowered::Constructor {
+                constructor,
+                mut args,
+                synthesized_identity,
+                occurrence,
+            } if constructor == symbols.itree_ret && args.len() == 1 => {
+                match args.remove(0) {
+                    ConstructorField::Specialized(inner) => lowered = inner,
+                    // This function is infallible, so it cannot refuse; the
+                    // decision it CAN take is to leave the wrapper on and
+                    // keep the refusal with a consumer that is able to make
+                    // one. Unwrapping would hand a caller expecting a value
+                    // something with no value representation.
+                    //
+                    // **Re-derived now that a worker really can arrive
+                    // here.** The original justification was that the read
+                    // was infallible because nothing constructed a worker;
+                    // that premise is gone, so the claim has to rest on
+                    // where the intact constructor actually lands. Both
+                    // reachable consumers fail closed on it:
+                    // `emit_process_exit_status` answers its `-3`
+                    // malformed-payload sentinel, and the scalar-pair join
+                    // either routes into that same decoder or refuses with
+                    // *"dynamic native arms must produce scalar Int
+                    // values"*. Neither can mistake the wrapper for a
+                    // value, which is what makes handing it back the
+                    // conservative move rather than merely the unchanged
+                    // one.
+                    //
+                    // **And the conservation close is behind both of
+                    // them.** A worker field that nothing rebinds refuses
+                    // before the root answer is emitted, so an intact
+                    // wrapper carrying an unconsumed worker cannot appear
+                    // in a shipped object at all — the two decoder
+                    // refusals above are what happens on the way there,
+                    // not the last line of defence.
+                    field @ ConstructorField::StaticWorker { .. } => {
+                        return Lowered::Constructor {
+                            constructor,
+                            synthesized_identity,
+                            occurrence,
+                            args: vec![field],
+                        };
                     }
-                    lowered => return lowered,
                 }
             }
+            lowered => return lowered,
         }
+    }
 }
 
 impl<'a> Lowering<'a> {
@@ -2812,7 +2819,7 @@ impl<'a> Lowering<'a> {
         ) -> Result<(cranelift_codegen::ir::Value, ResultDecoder), CraneliftBackendError> {
             if self.process_object {
                 let _authority = self.mint_terminal_answer_authority()?;
-                let value = Self::unwrap_terminal_ret(value);
+                let value = self.unwrap_terminal_ret(value);
                 let value = match value {
                     Lowered::ProcessExitStatus { value } => value,
                     value => self.emit_process_exit_status(builder, value),
@@ -2956,6 +2963,34 @@ mod tests {
     use crate::cranelift_backend::lowering::core::compile_expr_into_module;
     use crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan;
     use crate::{RuntimeLowerabilityStatus, RuntimeSymbolMetadata};
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: the production Ret unwrap leaves a lookalike wrapped and
+    /// unwraps the resolved Ret despite its unrelated spelling.
+    /// CLAIMED: lowering consumes the checked Ret role, not a suffix.
+    /// THE GAP: this exercises the lowered Ret consumer, not every lowering
+    /// branch that interprets a constructor role.
+    #[test]
+    fn terminal_ret_unwrap_uses_resolved_role_not_spelling() {
+        let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+        symbols.itree_ret = "ctor:checked::Session::Return".to_string();
+        let wrap = |constructor: &str| Lowered::Constructor {
+            constructor: constructor.to_string(),
+            synthesized_identity: None,
+            occurrence: None,
+            args: vec![ConstructorField::Specialized(Lowered::String(
+                "answer".to_string(),
+            ))],
+        };
+        assert!(matches!(
+            unwrap_terminal_ret_with_symbols(wrap(concat!("ctor:other::ITree", "::Ret")), &symbols),
+            Lowered::Constructor { .. }
+        ));
+        assert!(matches!(
+            unwrap_terminal_ret_with_symbols(wrap(&symbols.itree_ret), &symbols),
+            Lowered::String(answer) if answer == "answer"
+        ));
+    }
 
     /// **`RT-DECL-CLOSURE-PORT` `D6` — a functionized recursive declaration ACCEPTS
     /// a changing argument constructor through its one `ValueWord` parameter.**

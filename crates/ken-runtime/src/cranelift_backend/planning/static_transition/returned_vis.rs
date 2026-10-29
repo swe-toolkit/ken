@@ -179,8 +179,10 @@ impl StaticTransitionPlan<'_> {
         // The reached Construct and its arguments are already the lowering
         // operand. Do not re-resolve its source occurrence behind the single
         // origin-to-expression route merely to inspect this shape.
-        if !constructor.ends_with("::ITree::Vis") || args.len() != 2
-            || !matches!(args.first(), Some(RuntimeExpr::Var(_))) {
+        if constructor != self.process_symbols.itree_vis.as_str()
+            || args.len() != 2
+            || !matches!(args.first(), Some(RuntimeExpr::Var(_)))
+        {
             return Ok(());
         }
         for owner in &self.static_response_continuations {
@@ -407,7 +409,7 @@ impl StaticTransitionPlan<'_> {
                     }
                 }
                 RuntimeExpr::Construct { constructor, .. }
-                    if constructor.as_str().ends_with("::ITree::Vis") =>
+                    if constructor == &self.process_symbols.itree_vis =>
                 {
                     returned.insert(origin);
                 }
@@ -743,10 +745,12 @@ mod tests {
             }),
             args: vec![],
         };
+        let mut symbols = NativeProcessSymbols::legacy_prelude();
+        symbols.itree_vis = "ctor:fixture::ITree::Vis".to_string();
         let plan = plan_static_transition_graph_with_symbols(
             &entry,
             &BTreeMap::new(),
-            &NativeProcessSymbols::legacy_prelude(),
+            &symbols,
             AbiRootIngress::Value,
             true,
         )

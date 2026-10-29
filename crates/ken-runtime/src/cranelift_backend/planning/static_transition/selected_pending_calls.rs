@@ -526,7 +526,7 @@ impl StaticTransitionPlan<'_> {
             return Err(planner_error("an owner-fed Match is not computational"));
         };
         let mut returns = cases.iter().enumerate()
-            .filter(|(_, case)| case.constructor.ends_with("::ITree::Ret"));
+            .filter(|(_, case)| case.constructor == self.process_symbols.itree_ret);
         let (index, ret) = returns.next().ok_or_else(|| {
             planner_error("an owner-fed Match has no ITree::Ret case")
         })?;
@@ -691,7 +691,7 @@ fn selected_leaf_response_witness(
             let RuntimeExpr::Construct { constructor, args } = occurrence.expr else {
                 continue;
             };
-            if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 {
+            if constructor != &plan.process_symbols.itree_vis || args.len() != 2 {
                 continue;
             }
             let vis = occurrence.static_origin;
@@ -1756,8 +1756,17 @@ mod tests {
             value: Box::new(ordinary),
             body: Box::new(entry),
         };
-        let plan = super::super::plan_static_transition_graph(&entry, &declarations)
-            .expect("response fixture plans");
+        let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+        symbols.itree_ret = "ctor:fixture::ITree::Ret".to_owned();
+        symbols.itree_vis = "ctor:fixture::ITree::Vis".to_owned();
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            &entry,
+            &declarations,
+            &symbols,
+            super::super::AbiRootIngress::Value,
+            false,
+        )
+        .expect("response fixture plans");
         let owners = plan.static_response_owner_specializations()
             .expect("the fixture's response-owner relation plans")
             .expect("the selected response is feasible");

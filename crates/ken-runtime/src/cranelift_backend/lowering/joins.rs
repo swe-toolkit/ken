@@ -2641,7 +2641,7 @@ impl<'a> Lowering<'a> {
             }
             let lowered = lowered.specialized_join_arm(construct)?;
             if required_kind == Some(ScalarMergeKind::ExitCode) {
-                let lowered = Self::unwrap_terminal_ret(lowered);
+                let lowered = self.unwrap_terminal_ret(lowered);
                 let zero_tag = builder.ins().iconst(types::I64, 0);
                 return match lowered {
                     Lowered::RecursiveBackedge => Ok((
@@ -2678,7 +2678,7 @@ impl<'a> Lowering<'a> {
             // scalar refusal feeds back to a carrier-word join.
             let ret_carries_exit = match &lowered {
                 Lowered::Constructor { constructor, args, .. }
-                    if constructor.ends_with("::ITree::Ret") && args.len() == 1 =>
+                    if constructor == &self.process_symbols.itree_ret && args.len() == 1 =>
                 {
                     match &args[0] {
                         ConstructorField::Specialized(Lowered::ProcessExitStatus { .. }) => true,
@@ -2700,7 +2700,7 @@ impl<'a> Lowering<'a> {
                 });
             let checked_root_exit_representation = self.has_checked_root_exit_representation();
             let lowered = if exit_terminal_join {
-                Self::unwrap_terminal_ret(lowered)
+                self.unwrap_terminal_ret(lowered)
             } else {
                 lowered
             };
