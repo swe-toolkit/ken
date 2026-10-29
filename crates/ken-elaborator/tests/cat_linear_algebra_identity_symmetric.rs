@@ -114,8 +114,8 @@ fn generic_identity_symmetry_is_owned_public_private_and_trust_free() {
     }
 }
 
-// Compare Ken term and proposition ASTs, not source lines or whitespace. The
-// constructor-valued identity is an independent fixture, not `identity three`.
+// Compare Ken proposition ASTs, not source lines or whitespace. The seed's
+// identity fixture must construct a value, not alias the operation under test.
 fn type_shape(ty: &SourceType) -> String {
     match ty {
         SourceType::TCon(name, _) => format!("constructor:{name}"),
@@ -147,26 +147,51 @@ fn expected_theorem(proposition: &str, proof: &str) -> (String, String) {
     (type_shape(theorem), expr_shape(body))
 }
 
-const EXPECTED_LITERAL_IDENTITY3: &str = r#"
-const expected_identity3 : Vec (Vec Nat three) three =
+// This independent Ken value uses its own numerals and row constructor;
+// it never computes the expected matrix with the package's `identity`.
+const INDEPENDENT_IDENTITY3: &str = r#"
+const fixed_one : Nat = Suc Zero
+const fixed_two : Nat = Suc fixed_one
+const fixed_three : Nat = Suc fixed_two
+
+fn fixed_row3 (p : Nat) (q : Nat) (r : Nat) : Vec Nat fixed_three =
+  VCons Nat fixed_two p (VCons Nat fixed_one q (VCons Nat Zero r (VNil Nat)))
+
+const fixed_identity3 : Vec (Vec Nat fixed_three) fixed_three =
   VCons
-    (Vec Nat three)
-    two
-    (vec3 one Zero Zero)
+    (Vec Nat fixed_three)
+    fixed_two
+    (fixed_row3 fixed_one Zero Zero)
     (VCons
-      (Vec Nat three)
-      one
-      (vec3 Zero one Zero)
-      (VCons (Vec Nat three) Zero (vec3 Zero Zero one) (VNil (Vec Nat three))))
+      (Vec Nat fixed_three)
+      fixed_one
+      (fixed_row3 Zero fixed_one Zero)
+      (VCons
+        (Vec Nat fixed_three)
+        Zero
+        (fixed_row3 Zero Zero fixed_one)
+        (VNil (Vec Nat fixed_three))))
+
+theorem seed_identity3_has_literal_value :
+  Equal (Vec (Vec Nat fixed_three) fixed_three) identity3 fixed_identity3 = Refl
 "#;
+
+fn constructor_head(expr: &SourceExpr) -> Option<&str> {
+    match expr {
+        SourceExpr::ECon(name, _) => Some(name),
+        SourceExpr::EApp(function, _, _) => constructor_head(function),
+        _ => None,
+    }
+}
 
 /// SOURCE: conformance/stdlib/linear-algebra/seed-identity-symmetric.md.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: the literal constructor-built identity and four accepted Refl
-/// relations have independently stated Ken ASTs; the complete accepted client
-/// kernel-checks with the public law applied at three. On a fresh accepted
-/// prefix the false transpose=original claim has its required AST, is well
-/// typed, and fails at its own Refl while the same-form control checks.
+/// MEASURED: the complete accepted client kernel-checks; the seed's direct
+/// constructor fixture equals an independently constructed fixed 3×3 identity
+/// under a second checked `Refl`. The five accepted theorem goals/proofs are
+/// pinned as Ken ASTs. On a fresh accepted prefix the false
+/// transpose=original claim has its required AST, is well typed, and fails
+/// at its own Refl while the same-form control checks.
 /// CLAIMED: transposing the 3×3 identity preserves its entries, but the
 /// specified 2×2 upper-triangular matrix is not symmetric.
 /// THE GAP: these fixed clients cannot substitute for the generic §8 proof;
@@ -183,26 +208,21 @@ fn full_seed_checks_literal_identity_and_refuses_false_square_symmetry() {
         .iter()
         .find(|decl| matches!(decl, SourceDecl::ViewDecl { name, .. } if name == "identity3"))
         .expect("seed independently constructs a literal identity matrix");
-    let expected_fixture =
-        parse_decls(EXPECTED_LITERAL_IDENTITY3).expect("independent literal identity parses");
-    let [SourceDecl::ViewDecl {
-        ret_ty: Some(expected_ty),
-        body: expected_val,
-        ..
-    }] = expected_fixture.as_slice()
-    else {
-        panic!("expected one typed literal matrix");
+    let SourceDecl::ViewDecl { body, .. } = fixture else {
+        panic!("seed identity3 must be a constructor-built value");
     };
-    let SourceDecl::ViewDecl {
-        ret_ty: Some(actual_ty),
-        body: actual_val,
-        ..
-    } = fixture
-    else {
-        panic!("seed identity3 must be a typed constructor value");
-    };
-    assert_eq!(type_shape(actual_ty), type_shape(expected_ty));
-    assert_eq!(expr_shape(actual_val), expr_shape(expected_val));
+    assert_eq!(
+        constructor_head(body),
+        Some("VCons"),
+        "seed fixture must not alias identity three"
+    );
+    env.elaborate_file(INDEPENDENT_IDENTITY3)
+        .expect("seed fixture equals a separately constructed literal 3×3 identity");
+    let fixed_id = env.globals["seed_identity3_has_literal_value"];
+    assert!(matches!(
+        env.env.lookup(fixed_id),
+        Some(Decl::Transparent { .. })
+    ));
 
     for (name, proposition, proof) in [
         (
