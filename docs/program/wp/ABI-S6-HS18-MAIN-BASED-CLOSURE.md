@@ -8,7 +8,7 @@ grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 **Base (increment A, landed `bd5c64ed1`):** `origin/main` `c4c8a0ec5bb4af4c1a9a8e0d9311e57066ea4811`
 (the cut of `5ec884387`; re-pinned 2026-10-28 by DOC-BUNDLE-315).
 Increments B and C pin their own bases in §4a-pin. This header is A's; read
-§4a-pin for B's.
+§4a-pin for C's (B landed at `afc5e0fae` on `bd5c64ed1`).
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
 direction (*"do not build on an unmerged commit... the base commit needs to be
@@ -183,12 +183,13 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=bd5c64ed14f738545604c2ae1ae3a85850f27713   # increment B's pinned base
-# Re-pinned 2026-10-28 (DOC-BUNDLE-329) to increment A's landing squash. A
+BASE=1db1031792ef9be8af48d8285076f254e67c70a7   # increment C's pinned base
+# Re-pinned 2026-10-29 (DOC-BUNDLE-340) to main after FRAME-CALL-PIN
+# (22aca17e2), ITREE-ROLE (c9c7afe04) and NUMERICAL (1db103179) landed. A
 # literal, never a ref or merge-base(...): see §4b and §4f. Increment A ran on
-# c4c8a0ec5 (DOC-BUNDLE-315). When B merges main again, its handoff reports the
-# new cut point; the Steward re-pins it here, and QA binds to the routed
-# bundle that carries it.
+# c4c8a0ec5 (DOC-BUNDLE-315); B ran on bd5c64ed1 (DOC-BUNDLE-329). When C merges
+# main again, its handoff reports the new cut point; the Steward re-pins it
+# here, and QA binds to the routed bundle that carries it.
 PATHS='-- crates/'                               # the domain, all three crates
 
 # THE PIN NEED NOT EQUAL THE CUT POINT -- requiring that regresses, because

@@ -1,7 +1,7 @@
 ---
 id: RT-CERTIFIER-FRAME-CALL-EXEMPT-CALLER-PIN
 title: "The caller-side half of the certified frame-call retention exemption, certified_frame_call_exempt, has no test that reaches it, because only close_and_define_staged_result_bodies fills frame_calls. Deleting its store scan widens the exemption and leaves every suite green. Pin each refusing guard with rows that fill frame_calls directly and go red when the guard is removed"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1
