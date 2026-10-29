@@ -11,15 +11,19 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 24] = [
+const TYPE_FLOOR: [&str; 30] = [
     "Auth",
     "Bool",
     "Bottom",
+    "BufferSpan",
     "Char",
     "Coproduct",
+    "CreatePolicy",
     "Equal",
     "ExitCode",
+    "FileError",
     "HostIO",
+    "IOError",
     "ITree",
     "Instant",
     "List",
@@ -31,9 +35,11 @@ const TYPE_FLOOR: [&str; 24] = [
     "ProgramCaps",
     "Prop",
     "Proved",
+    "ResourceError",
     "ResourceKind",
     "Result",
     "Top",
+    "TransferCount",
     "Unit",
     "Utf8Error",
 ];
@@ -225,14 +231,20 @@ fn prelude_signature_inventory_is_executable_and_closed() {
                     | "ITree"
                     | "Unit"
                     | "Bottom"
+                    | "BufferSpan"
+                    | "CreatePolicy"
                     | "Equal"
                     | "ExitCode"
+                    | "FileError"
                     | "HostIO"
+                    | "IOError"
                     | "ProcessInput"
                     | "Prod"
                     | "ProgramCaps"
                     | "Prop"
                     | "Proved"
+                    | "ResourceError"
+                    | "TransferCount"
                     | "Top"
             )
         })
@@ -248,14 +260,20 @@ fn prelude_signature_inventory_is_executable_and_closed() {
         "ITree",
         "Unit",
         "Bottom",
+        "BufferSpan",
+        "CreatePolicy",
         "Equal",
         "ExitCode",
+        "FileError",
         "HostIO",
+        "IOError",
         "ProcessInput",
         "Prod",
         "ProgramCaps",
         "Prop",
         "Proved",
+        "ResourceError",
+        "TransferCount",
         "Top",
     ]
     .map(|name| env.globals[name])

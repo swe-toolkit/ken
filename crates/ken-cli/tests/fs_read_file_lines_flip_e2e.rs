@@ -108,7 +108,7 @@ proc app (cap : Cap {auth}) : Compose (Result IOError Unit) visits [FS, Console]
           match bytes_decode bytes {{
             Err _ |-> ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
                          (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
-                         (Result IOError Unit) (Err IOError Unit (Other 0)) ;
+                         (Result IOError Unit) (Err IOError Unit (IOError.Other 0)) ;
             Ok text |-> printLines (lines text)
           }}
       }})
@@ -125,19 +125,19 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
           match r {{
             Err e |->
               match e {{
-                NotFound |-> host_program_then APartial (print_line "NotFound") (ExitCode.Failure 1) ;
-                PermissionDenied |-> host_program_then APartial (print_line "PermissionDenied") (ExitCode.Failure 1) ;
-                CapabilityDenied |-> host_program_then APartial (print_line "CapabilityDenied") (ExitCode.Failure 1) ;
-                BrokenPipe |-> host_program_then APartial (print_line "BrokenPipe") (ExitCode.Failure 1) ;
-                Interrupted |-> host_program_then APartial (print_line "Interrupted") (ExitCode.Failure 1) ;
-                AlreadyExists |-> host_program_then APartial (print_line "AlreadyExists") (ExitCode.Failure 1) ;
-                InvalidInput |-> host_program_then APartial (print_line "InvalidInput") (ExitCode.Failure 1) ;
-                IsDirectory |-> host_program_then APartial (print_line "IsDirectory") (ExitCode.Failure 1) ;
-                NotDirectory |-> host_program_then APartial (print_line "NotDirectory") (ExitCode.Failure 1) ;
-                NotEmpty |-> host_program_then APartial (print_line "NotEmpty") (ExitCode.Failure 1) ;
-                Unsupported |-> host_program_then APartial (print_line "Unsupported") (ExitCode.Failure 1) ;
-                Revoked |-> host_program_then APartial (print_line "Revoked") (ExitCode.Failure 1) ;
-                Other errno |-> host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
+                IOError.NotFound |-> host_program_then APartial (print_line "NotFound") (ExitCode.Failure 1) ;
+                IOError.PermissionDenied |-> host_program_then APartial (print_line "PermissionDenied") (ExitCode.Failure 1) ;
+                IOError.CapabilityDenied |-> host_program_then APartial (print_line "CapabilityDenied") (ExitCode.Failure 1) ;
+                IOError.BrokenPipe |-> host_program_then APartial (print_line "BrokenPipe") (ExitCode.Failure 1) ;
+                IOError.Interrupted |-> host_program_then APartial (print_line "Interrupted") (ExitCode.Failure 1) ;
+                IOError.AlreadyExists |-> host_program_then APartial (print_line "AlreadyExists") (ExitCode.Failure 1) ;
+                IOError.InvalidInput |-> host_program_then APartial (print_line "InvalidInput") (ExitCode.Failure 1) ;
+                IOError.IsDirectory |-> host_program_then APartial (print_line "IsDirectory") (ExitCode.Failure 1) ;
+                IOError.NotDirectory |-> host_program_then APartial (print_line "NotDirectory") (ExitCode.Failure 1) ;
+                IOError.NotEmpty |-> host_program_then APartial (print_line "NotEmpty") (ExitCode.Failure 1) ;
+                IOError.Unsupported |-> host_program_then APartial (print_line "Unsupported") (ExitCode.Failure 1) ;
+                IOError.Revoked |-> host_program_then APartial (print_line "Revoked") (ExitCode.Failure 1) ;
+                IOError.Other errno |-> host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               }} ;
             Ok _ |-> host_exit APartial ExitCode.Success
           }})

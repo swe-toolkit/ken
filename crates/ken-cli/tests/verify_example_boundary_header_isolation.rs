@@ -36,7 +36,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
               (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
-                (Result FileError Unit) (writeFile cap path CreateNew path))
+                (Result FileError Unit) (writeFile cap path CreatePolicy.CreateNew path))
               (\written. match written {
                 Err _ |-> host_exit AFull (ExitCode.Failure 31) ;
                 Ok _ |-> host_exit AFull ExitCode.Success

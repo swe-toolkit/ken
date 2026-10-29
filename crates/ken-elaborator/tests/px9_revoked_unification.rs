@@ -51,18 +51,18 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
     assert_eq!(
         constructor_names(&env, "ResourceError"),
         [
-            "ResourceHostIO",
-            "Closed",
-            "MalformedResource",
-            "RightNotHeld",
-            "ReleaseFailed",
-            "ResourceKindMismatch",
-            "BufferLimit",
-            "AllocationFailed",
-            "InvalidOffset",
-            "InvalidBounds",
-            "NoProgress",
-            "MappingLimit",
+            "ResourceError.ResourceHostIO",
+            "ResourceError.Closed",
+            "ResourceError.MalformedResource",
+            "ResourceError.RightNotHeld",
+            "ResourceError.ReleaseFailed",
+            "ResourceError.ResourceKindMismatch",
+            "ResourceError.BufferLimit",
+            "ResourceError.AllocationFailed",
+            "ResourceError.InvalidOffset",
+            "ResourceError.InvalidBounds",
+            "ResourceError.NoProgress",
+            "ResourceError.MappingLimit",
         ]
     );
     assert_eq!(
@@ -111,7 +111,7 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
         "ResourceError constructors must remain outside the trusted base"
     );
 
-    let revoked = env.globals["Revoked"];
+    let revoked = env.globals["IOError.Revoked"];
     assert_eq!(
         env.env
             .constructor(revoked)
@@ -124,7 +124,7 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
 
     let before = env.env.trusted_base();
     env.elaborate_decl(
-        "const px9_canonical_resource_error : ResourceError = ResourceHostIO Revoked",
+        "const px9_canonical_resource_error : ResourceError = ResourceError.ResourceHostIO IOError.Revoked",
     )
     .expect("canonical ResourceHostIO Revoked must elaborate without a package");
     let owned = env
@@ -134,9 +134,9 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
         .elaborate_file(
             "import Capability.System.Error (Transience, error_transience, Permanent)\n\
              theorem px9_canonical_revoked_is_permanent :\n\
-               Equal Transience (error_transience Revoked) Permanent = Proved",
+               Equal Transience (error_transience IOError.Revoked) Permanent = Proved",
         )
-        .expect("the package classifier must prove canonical Revoked Permanent");
+        .expect("the package classifier must prove canonical IOError.Revoked Permanent");
     let theorem = *proofs.last().expect("classifier theorem must be checked");
     let references = catalog_or::declaration_references(
         env.env.lookup(theorem).expect("checked classifier proof"),

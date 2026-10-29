@@ -204,7 +204,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
               (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
             (Equal (Result o (ResourceBracketResult e r))
               (resource_settle_result_for o e r (ResourceBodyOk e r value)
-                (Err ResourceError Unit Closed))
+                (Err ResourceError Unit ResourceError.Closed))
               (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value))) =
           resource_settle_body_ok_clean o e r value"#,
     );
@@ -221,7 +221,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
                 (ResourceBracketBodyError e r body_error)))
             (Equal (Result o (ResourceBracketResult e r))
               (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
-                (Err ResourceError Unit Closed))
+                (Err ResourceError Unit ResourceError.Closed))
               (Ok o (ResourceBracketResult e r)
                 (ResourceBracketBodyError e r body_error))) =
           resource_settle_body_error_clean o e r body_error"#,
@@ -231,7 +231,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
         "resource_settle_body_ok_release_error",
         r#"theorem client_resource_settle_body_ok_release_error
           (o : Type) (e : Type) (r : Type) (value : r) (release_error : ResourceError)
-          : Not (Equal ResourceError release_error Closed)
+          : Not (Equal ResourceError release_error ResourceError.Closed)
             → Equal (Result o (ResourceBracketResult e r))
               (resource_settle_result_for o e r (ResourceBodyOk e r value)
                 (Err ResourceError Unit release_error))
@@ -245,7 +245,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
         r#"theorem client_resource_settle_body_error_release_error
           (o : Type) (e : Type) (r : Type) (body_error : e)
           (release_error : ResourceError)
-          : Not (Equal ResourceError release_error Closed)
+          : Not (Equal ResourceError release_error ResourceError.Closed)
             → Equal (Result o (ResourceBracketResult e r))
               (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
                 (Err ResourceError Unit release_error))

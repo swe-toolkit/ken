@@ -608,7 +608,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
            (Result FileError Unit) ExitCode
         (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
           (Result FileError Unit)
-          (writeFile cap (bytes_encode "root/out") CreateNew (bytes_encode "lit")))
+          (writeFile cap (bytes_encode "root/out") CreatePolicy.CreateNew (bytes_encode "lit")))
         (\_. host_exit AFull ExitCode.Success)
   }"#,
         );
@@ -817,7 +817,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
             .elaborate_file(
                 r#"proc rejected (cap : Cap APartial)
   : FS AFull (Result FileError Unit) visits [FS] =
-  writeFile cap (bytes_encode "out") CreateNew (bytes_encode "no")"#,
+  writeFile cap (bytes_encode "out") CreatePolicy.CreateNew (bytes_encode "no")"#,
             )
             .expect_err("APartial must not satisfy writeFile's AFull argument");
         assert!(matches!(

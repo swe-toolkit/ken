@@ -284,7 +284,7 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
         !env.globals.contains_key("ErrorIdentity"),
         "INC1 reuses IOError rather than minting a colliding identity family"
     );
-    let revoked = env.globals["Revoked"];
+    let revoked = env.globals["IOError.Revoked"];
     assert_eq!(
         env.env
             .constructor(revoked)
@@ -302,7 +302,7 @@ const px9_error : SystemError =
   MkSystemError
     (FilesystemOp OpReadFile)
     (FilesystemResource (None Bytes))
-    Revoked
+    IOError.Revoked
     RedactedSafeContext
 
 fn px9_error_identity (error : SystemError) : IOError =
@@ -311,7 +311,7 @@ fn px9_error_identity (error : SystemError) : IOError =
   }
 
 theorem px9_error_identity_is_canonical :
-  Equal IOError (px9_error_identity px9_error) Revoked = Proved
+  Equal IOError (px9_error_identity px9_error) IOError.Revoked = Proved
 "#
     ))
     .expect("the reconciled SystemError construction and identity projection elaborate");
@@ -322,19 +322,19 @@ fn total_classifiers_compute_the_complete_ruled_matrices() {
     let (mut env, owned) = system_error_env();
     env.elaborate_file(
         &format!("{SYSTEM_ERROR_IMPORT}\n{}", r#"
-theorem px9_not_found : Equal Transience (error_transience NotFound) Permanent = Proved
-theorem px9_permission_denied : Equal Transience (error_transience PermissionDenied) Permanent = Proved
-theorem px9_capability_denied : Equal Transience (error_transience CapabilityDenied) Permanent = Proved
-theorem px9_broken_pipe : Equal Transience (error_transience BrokenPipe) Permanent = Proved
-theorem px9_interrupted : Equal Transience (error_transience Interrupted) Transient = Proved
-theorem px9_already_exists : Equal Transience (error_transience AlreadyExists) Permanent = Proved
-theorem px9_invalid_input : Equal Transience (error_transience InvalidInput) Permanent = Proved
-theorem px9_is_directory : Equal Transience (error_transience IsDirectory) Permanent = Proved
-theorem px9_not_directory : Equal Transience (error_transience NotDirectory) Permanent = Proved
-theorem px9_not_empty : Equal Transience (error_transience NotEmpty) Permanent = Proved
-theorem px9_unsupported : Equal Transience (error_transience Unsupported) Permanent = Proved
-theorem px9_revoked : Equal Transience (error_transience Revoked) Permanent = Proved
-const px9_other_identity : IOError = Other 0
+theorem px9_not_found : Equal Transience (error_transience IOError.NotFound) Permanent = Proved
+theorem px9_permission_denied : Equal Transience (error_transience IOError.PermissionDenied) Permanent = Proved
+theorem px9_capability_denied : Equal Transience (error_transience IOError.CapabilityDenied) Permanent = Proved
+theorem px9_broken_pipe : Equal Transience (error_transience IOError.BrokenPipe) Permanent = Proved
+theorem px9_interrupted : Equal Transience (error_transience IOError.Interrupted) Transient = Proved
+theorem px9_already_exists : Equal Transience (error_transience IOError.AlreadyExists) Permanent = Proved
+theorem px9_invalid_input : Equal Transience (error_transience IOError.InvalidInput) Permanent = Proved
+theorem px9_is_directory : Equal Transience (error_transience IOError.IsDirectory) Permanent = Proved
+theorem px9_not_directory : Equal Transience (error_transience IOError.NotDirectory) Permanent = Proved
+theorem px9_not_empty : Equal Transience (error_transience IOError.NotEmpty) Permanent = Proved
+theorem px9_unsupported : Equal Transience (error_transience IOError.Unsupported) Permanent = Proved
+theorem px9_revoked : Equal Transience (error_transience IOError.Revoked) Permanent = Proved
+const px9_other_identity : IOError = IOError.Other 0
 theorem px9_other : Equal Transience (error_transience px9_other_identity) Permanent = Proved
 
 theorem px9_read_file : Equal Idempotence (operation_idempotence (FilesystemOp OpReadFile)) Idempotent = Proved

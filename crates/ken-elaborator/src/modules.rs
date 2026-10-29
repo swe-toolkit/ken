@@ -236,15 +236,19 @@ impl ModuleState {
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 24] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 30] = [
     "Auth",
     "Bool",
     "Bottom",
+    "BufferSpan",
     "Char",
     "Coproduct",
+    "CreatePolicy",
     "Equal",
     "ExitCode",
+    "FileError",
     "HostIO",
+    "IOError",
     "ITree",
     "Instant",
     "List",
@@ -256,9 +260,11 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 24] = [
     "ProgramCaps",
     "Prop",
     "Proved",
+    "ResourceError",
     "ResourceKind",
     "Result",
     "Top",
+    "TransferCount",
     "Unit",
     "Utf8Error",
 ];

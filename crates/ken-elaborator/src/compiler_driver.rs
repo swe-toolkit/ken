@@ -4690,6 +4690,9 @@ mod native_pre_source_stable_symbols {
             "Coproduct",
             "ITree",
             "Instant",
+            "IOError",
+            "CreatePolicy",
+            "ResourceError",
         ] {
             let family_id = env.globals[family_name];
             let family = env.env.inductive(family_id).expect("checked scoped family");
@@ -4725,6 +4728,27 @@ mod native_pre_source_stable_symbols {
                     "{family_name}: artifact leaf derives from the checked id"
                 );
                 assert_eq!(artifact.components.last(), Some(leaf));
+            }
+        }
+        // Constructor-private families retain checked leaves for artifact
+        // identity, but neither bare nor qualified source globals may expose
+        // their constructors after the prelude hides those checked IDs.
+        for family_name in ["BufferSpan", "TransferCount"] {
+            let family_id = env.globals[family_name];
+            let family = env.env.inductive(family_id).expect("checked private family");
+            let leaves = env
+                .module_state
+                .scoped_constructor_leaves(family_id)
+                .expect("private checked family leaves");
+            assert_eq!(leaves.len(), family.constructors.len());
+            for ctor in &family.constructors {
+                let leaf = &leaves[&ctor.id];
+                assert!(!env.globals.contains_key(leaf));
+                assert!(!env.globals.contains_key(&format!("{family_name}.{leaf}")));
+                assert_eq!(
+                    table.resolve_global(ctor.id),
+                    Ok(&StableSymbol::constructor(&symbols[&family_id], leaf.clone()))
+                );
             }
         }
     }
@@ -8368,13 +8392,17 @@ mod d1b_role_c1_roster_identity {
             ),
             ("mapping_read_only", "ReadOnly", roles.mapping_read_only),
             ("mapping_read_write", "ReadWrite", roles.mapping_read_write),
-            ("create_new", "CreateNew", roles.create_new),
+            ("create_new", "CreatePolicy.CreateNew", roles.create_new),
             (
                 "create_or_truncate",
-                "CreateOrTruncate",
+                "CreatePolicy.CreateOrTruncate",
                 roles.create_or_truncate,
             ),
-            ("create_or_keep", "CreateOrKeep", roles.create_or_keep),
+            (
+                "create_or_keep",
+                "CreatePolicy.CreateOrKeep",
+                roles.create_or_keep,
+            ),
         ];
         for (field, spelling, id) in &entry_abi_roles {
             assert_eq!(

@@ -19,19 +19,19 @@ downstream filesystem resolution enforces confinement.
 ```ken
 fn renderIOError (error : IOError) : String =
   match error {
-    NotFound ↦ "NotFound";
-    PermissionDenied ↦ "PermissionDenied";
-    CapabilityDenied ↦ "CapabilityDenied";
-    BrokenPipe ↦ "BrokenPipe";
-    Interrupted ↦ "Interrupted";
-    AlreadyExists ↦ "AlreadyExists";
-    InvalidInput ↦ "InvalidInput";
-    IsDirectory ↦ "IsDirectory";
-    NotDirectory ↦ "NotDirectory";
-    NotEmpty ↦ "NotEmpty";
-    Unsupported ↦ "Unsupported";
-    Revoked ↦ "Revoked";
-    Other errno ↦ "Other"
+    IOError.NotFound ↦ "NotFound";
+    IOError.PermissionDenied ↦ "PermissionDenied";
+    IOError.CapabilityDenied ↦ "CapabilityDenied";
+    IOError.BrokenPipe ↦ "BrokenPipe";
+    IOError.Interrupted ↦ "Interrupted";
+    IOError.AlreadyExists ↦ "AlreadyExists";
+    IOError.InvalidInput ↦ "InvalidInput";
+    IOError.IsDirectory ↦ "IsDirectory";
+    IOError.NotDirectory ↦ "NotDirectory";
+    IOError.NotEmpty ↦ "NotEmpty";
+    IOError.Unsupported ↦ "Unsupported";
+    IOError.Revoked ↦ "Revoked";
+    IOError.Other errno ↦ "Other"
   }
 
 fn renderFileError (error : FileError) : String =

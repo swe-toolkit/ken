@@ -73,7 +73,7 @@ fn env() -> ken_elaborator::ElabEnv {
             ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError FileMetadata)
-              (Err ResourceError FileMetadata MalformedResource);
+              (Err ResourceError FileMetadata ResourceError.MalformedResource);
             ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError FileMetadata)
@@ -92,7 +92,7 @@ fn env() -> ken_elaborator::ElabEnv {
             Err open_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError FileMetadata)
-              (Err ResourceError FileMetadata MalformedResource);
+              (Err ResourceError FileMetadata ResourceError.MalformedResource);
             Ok bracket |-> px7f_after_escaped_bracket bracket
           }
 
@@ -240,14 +240,14 @@ fn injected_release_failure(env: &ken_elaborator::ElabEnv, store: &mut EvalStore
         let constructor = apply(constructor, EvalVal::Int(0), &env.env, store);
         apply(constructor, EvalVal::Int(7), &env.env, store)
     };
-    let io = apply_constructor_many(env, store, "Other", [EvalVal::Int(5)]);
+    let io = apply_constructor_many(env, store, "IOError.Other", [EvalVal::Int(5)]);
     let kind = eval(
         &[],
         &Term::constructor(env.prelude_env.fs_handle_id, vec![]),
         &env.env,
         store,
     );
-    apply_constructor_many(env, store, "ReleaseFailed", [kind, identity, io])
+    apply_constructor_many(env, store, "ResourceError.ReleaseFailed", [kind, identity, io])
 }
 
 fn injected_release_result(env: &ken_elaborator::ElabEnv, store: &mut EvalStore) -> EvalVal {
@@ -261,7 +261,7 @@ fn assert_injected_release_failure(env: &ken_elaborator::ElabEnv, value: &EvalVa
     let EvalVal::Ctor { id, args, .. } = value else {
         panic!("expected ReleaseFailed, got {value:?}");
     };
-    assert_eq!(*id, env.globals["ReleaseFailed"]);
+    assert_eq!(*id, env.globals["ResourceError.ReleaseFailed"]);
     assert!(matches!(
         &args[0],
         EvalVal::Ctor { id, .. } if *id == env.prelude_env.fs_handle_id
@@ -275,7 +275,7 @@ fn assert_injected_release_failure(env: &ken_elaborator::ElabEnv, value: &EvalVa
     assert!(matches!(
         &args[2],
         EvalVal::Ctor { id, args, .. }
-            if *id == env.globals["Other"] && args.as_ref() == &[EvalVal::Int(5)]
+            if *id == env.globals["IOError.Other"] && args.as_ref() == &[EvalVal::Int(5)]
     ));
 }
 
@@ -313,7 +313,7 @@ fn read_only_handle_metadata_surfaces_exact_right_not_held_masks() {
     else {
         panic!("expected ResourceError payload, got {:?}", args[2]);
     };
-    assert_eq!(*error_id, env.globals["RightNotHeld"]);
+    assert_eq!(*error_id, env.globals["ResourceError.RightNotHeld"]);
     assert_eq!(error_args.as_ref(), &[EvalVal::Int(32), EvalVal::Int(1)]);
 }
 
@@ -337,7 +337,7 @@ fn escaped_copy_is_legal_but_every_later_use_is_closed() {
     assert_eq!(id, env.globals["Err"]);
     assert!(matches!(
         &args[2],
-        EvalVal::Ctor { id, .. } if *id == env.globals["Closed"]
+        EvalVal::Ctor { id, .. } if *id == env.globals["ResourceError.Closed"]
     ));
 }
 
@@ -371,7 +371,7 @@ fn caller_control_release_failure_preserves_success_and_body_error_ordering() {
     assert_injected_release_failure(&env, &args[2]);
 
     let mut error_store = EvalStore::new();
-    let body_error = ctor(&env, &mut error_store, "MalformedResource");
+    let body_error = ctor(&env, &mut error_store, "ResourceError.MalformedResource");
     let error_type = type_value(&env, &mut error_store, "ResourceError");
     let error_unit_type = type_value(&env, &mut error_store, "Unit");
     let error_release = injected_release_result(&env, &mut error_store);
@@ -388,7 +388,7 @@ fn caller_control_release_failure_preserves_success_and_body_error_ordering() {
     assert_eq!(*id, env.globals["ResourceBracketBodyAndReleaseError"]);
     assert!(matches!(
         &args[2],
-        EvalVal::Ctor { id, .. } if *id == env.globals["MalformedResource"]
+        EvalVal::Ctor { id, .. } if *id == env.globals["ResourceError.MalformedResource"]
     ));
     assert_injected_release_failure(&env, &args[3]);
 }

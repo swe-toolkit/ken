@@ -133,7 +133,7 @@ proc app (cap : Cap APartial) : Compose (Result IOError Unit) visits [FS, Consol
                 (Coproduct (FSOp APartial) AmbientOp)
                 (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
                 (Result IOError Unit)
-                (Err IOError Unit (Other 0));
+                (Err IOError Unit (IOError.Other 0));
             Ok text ↦ printLines (lines text)
           }
       })
@@ -154,37 +154,37 @@ proc main
           match r {
             Err e ↦
               match e {
-                NotFound ↦
+                IOError.NotFound ↦
                   host_program_then APartial (print_line "NotFound") (ExitCode.Failure 1);
-                PermissionDenied ↦
+                IOError.PermissionDenied ↦
                   host_program_then
                     APartial
                     (print_line "PermissionDenied")
                     (ExitCode.Failure 1);
-                CapabilityDenied ↦
+                IOError.CapabilityDenied ↦
                   host_program_then
                     APartial
                     (print_line "CapabilityDenied")
                     (ExitCode.Failure 1);
-                BrokenPipe ↦
+                IOError.BrokenPipe ↦
                   host_program_then APartial (print_line "BrokenPipe") (ExitCode.Failure 1);
-                Interrupted ↦
+                IOError.Interrupted ↦
                   host_program_then APartial (print_line "Interrupted") (ExitCode.Failure 1);
-                AlreadyExists ↦
+                IOError.AlreadyExists ↦
                   host_program_then APartial (print_line "AlreadyExists") (ExitCode.Failure 1);
-                InvalidInput ↦
+                IOError.InvalidInput ↦
                   host_program_then APartial (print_line "InvalidInput") (ExitCode.Failure 1);
-                IsDirectory ↦
+                IOError.IsDirectory ↦
                   host_program_then APartial (print_line "IsDirectory") (ExitCode.Failure 1);
-                NotDirectory ↦
+                IOError.NotDirectory ↦
                   host_program_then APartial (print_line "NotDirectory") (ExitCode.Failure 1);
-                NotEmpty ↦
+                IOError.NotEmpty ↦
                   host_program_then APartial (print_line "NotEmpty") (ExitCode.Failure 1);
-                Unsupported ↦
+                IOError.Unsupported ↦
                   host_program_then APartial (print_line "Unsupported") (ExitCode.Failure 1);
-                Revoked ↦
+                IOError.Revoked ↦
                   host_program_then APartial (print_line "Revoked") (ExitCode.Failure 1);
-                Other errno ↦
+                IOError.Other errno ↦
                   host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               };
             Ok _ ↦
