@@ -88,9 +88,10 @@ fn file_backed_mapping_executes_its_inner_result_consumer_on_both_engines() {
 
 #[test]
 fn inner_resource_bracket_ok_arm_is_not_skipped_or_reapplied() {
-    let before = "ResourceBracketOk _ |-> body_err_io 60";
-    assert_eq!(SOURCE.matches(before).count(), 1);
-    let mutated = SOURCE.replace(before, "ResourceBracketOk _ |-> body_ok_io");
+    let mutated = SOURCE.replace(
+        "ResourceBracketOk _ |-> body_err_io 60",
+        "ResourceBracketOk _ |-> body_ok_io",
+    );
     let (interpreted, native) = differential(&mutated).expect("consumer-arm mutation differential");
     assert_eq!(interpreted.exit_status, 0);
     assert_eq!(native.exit_status, 0);

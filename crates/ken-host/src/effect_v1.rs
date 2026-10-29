@@ -5572,7 +5572,8 @@ mod tests {
         assert!(NATIVE_TESTED_TARGETS_V1.contains(&HostOpV1::MappingAcquireFile));
         assert!(host_effect_wire_layout_v1(HostOpV1::MappingAcquireFile).is_ok());
         assert_eq!(
-            HostOpV1::ALL.into_iter()
+            HostOpV1::ALL
+                .into_iter()
                 .filter(|op| op.availability() == HostOpAvailabilityV1::NativeTested)
                 .collect::<Vec<_>>(),
             NATIVE_TESTED_TARGETS_V1

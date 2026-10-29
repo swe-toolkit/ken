@@ -3657,7 +3657,8 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::MappingAcquireFile => {
                 if capability.is_some() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(
+                        LoweringCause::Fragment,
                         "Effect",
                         "MappingAcquireFile carried a capability",
                     ));
@@ -3679,7 +3680,9 @@ impl<'a> Lowering<'a> {
                     valid,
                     0,
                 );
-                let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
                 let protection = self.wire_constructor_tag_seat(
                     builder,
@@ -3689,7 +3692,9 @@ impl<'a> Lowering<'a> {
                     "MappingAcquireFile has a malformed MappingProtection",
                 )?;
                 for (index, value) in [resource, length, protection].into_iter().enumerate() {
-                    builder.ins().stack_store(value, request, request_offset(index));
+                    builder
+                        .ins()
+                        .stack_store(value, request, request_offset(index));
                 }
             }
             ken_host::HostOpV1::MappingReadView => {

@@ -4701,16 +4701,24 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         use ken_host::{MappingProtectionV1, ResourceBindingRole, ResourceKindV1};
         let mut run = run_scenario(&mapping_acquire_file_scenario())
             .expect("real file-backed acquisition differential");
-        run.compare_exact().expect("exact observations including mapping bytes");
+        run.compare_exact()
+            .expect("exact observations including mapping bytes");
         assert!(run.exact_artifact_executed);
         for lane in [&run.interpreter, &run.native] {
             assert_eq!(lane.exit_status, 60);
             assert!(lane.terminal_error.is_none());
             assert_eq!(
-                lane.effect_trace.iter().map(|event| event.operation).collect::<Vec<_>>(),
-                vec![HostOpV1::FsOpen, HostOpV1::MappingAcquireFile,
-                     HostOpV1::MappingReadView, HostOpV1::ResourceRelease,
-                     HostOpV1::ResourceRelease],
+                lane.effect_trace
+                    .iter()
+                    .map(|event| event.operation)
+                    .collect::<Vec<_>>(),
+                vec![
+                    HostOpV1::FsOpen,
+                    HostOpV1::MappingAcquireFile,
+                    HostOpV1::MappingReadView,
+                    HostOpV1::ResourceRelease,
+                    HostOpV1::ResourceRelease,
+                ],
             );
             let [file, acquire, read, ..] = lane.effect_trace.as_slice() else {
                 panic!("expected five effect events");
@@ -4725,11 +4733,14 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             assert!(matches!(
                 acquire.outcome,
                 CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
-                    resource_kind: ResourceKindV1::Mapping, ..
+                    resource_kind: ResourceKindV1::Mapping,
+                    ..
                 })
             ));
             let [(ResourceBindingRole::Target, file_identity)] = file.resource_bindings.as_slice()
-                else { panic!("FsOpen must bind the acquired handle") };
+            else {
+                panic!("FsOpen must bind the acquired handle")
+            };
             assert_eq!(
                 acquire.resource_bindings.first(),
                 Some(&(ResourceBindingRole::Target, *file_identity)),
@@ -4743,35 +4754,58 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }
         let operation = HostOpV1::MappingAcquireFile;
         let confirm = |run: &CanonicalDifferentialRun| {
-            confirm_native_tested_transition(operation, NativeTestedEvidence::from_run(operation, run))
+            confirm_native_tested_transition(
+                operation,
+                NativeTestedEvidence::from_run(operation, run),
+            )
         };
         assert_eq!(confirm(&run), Ok(HostOpAvailabilityV1::NativeTested));
 
         let clean_interpreter = run.interpreter.clone();
         let clean_native = run.native.clone();
         run.exact_artifact_executed = false;
-        assert_eq!(confirm(&run), Err(StatusTransitionError::MissingExactArtifactEvidence(operation)));
+        assert_eq!(
+            confirm(&run),
+            Err(StatusTransitionError::MissingExactArtifactEvidence(
+                operation
+            ))
+        );
         run.exact_artifact_executed = true;
         run.interpreter = clean_interpreter.clone();
         run.native = clean_native.clone();
-        let read = run.native.effect_trace.iter_mut()
+        let read = run
+            .native
+            .effect_trace
+            .iter_mut()
             .find(|event| event.operation == HostOpV1::MappingReadView)
             .expect("read event");
-        let CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes)) = &mut read.outcome
-            else { panic!("read reply must contain bytes") };
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes)) = &mut read.outcome else {
+            panic!("read reply must contain bytes")
+        };
         *bytes = b"NFIX".to_vec();
         assert!(run.exact_artifact_executed);
-        assert!([&run.interpreter, &run.native].into_iter().all(|lane|
-            lane.effect_trace.iter().any(|event| event.operation == operation)));
-        assert_eq!(confirm(&run), Err(StatusTransitionError::ExternalObservationMismatch(operation)));
+        assert!([&run.interpreter, &run.native].into_iter().all(|lane| lane
+            .effect_trace
+            .iter()
+            .any(|event| event.operation == operation)));
+        assert_eq!(
+            confirm(&run),
+            Err(StatusTransitionError::ExternalObservationMismatch(
+                operation
+            ))
+        );
         run.interpreter = clean_interpreter;
         run.native = clean_native;
         for lane in [&mut run.interpreter, &mut run.native] {
-            lane.effect_trace.retain(|event| event.operation != operation);
+            lane.effect_trace
+                .retain(|event| event.operation != operation);
         }
         assert!(run.compare_exact().is_ok());
         assert!(run.exact_artifact_executed);
-        assert_eq!(confirm(&run), Err(StatusTransitionError::OperationNotObserved(operation)));
+        assert_eq!(
+            confirm(&run),
+            Err(StatusTransitionError::OperationNotObserved(operation))
+        );
     }
 
     #[test]
