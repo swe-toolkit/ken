@@ -746,29 +746,6 @@ impl HostEffectBackendV1 for ProcessHost {
         })
     }
 
-    fn resource_map_file(
-        &mut self,
-        handle: &crate::ResourceHandleV1,
-        length: u64,
-        protection: crate::MappingProtectionV1,
-    ) -> Result<crate::MappingRegionV1, crate::SemanticErrorV1> {
-        let metadata = crate::resource_metadata_v1(handle).map_err(|error| {
-            crate::SemanticErrorV1::Io(crate::io_error_identity_v1(&error.into_io_error()))
-        })?;
-        if metadata.size < length {
-            return Err(crate::SemanticErrorV1::Resource(
-                crate::ResourceErrorV1::InvalidBounds,
-            ));
-        }
-        crate::MappingRegionV1::try_new_mapped_file(handle, length, protection).map_err(|error| {
-                if crate::mapping_v1::is_allocation_failure(error) {
-                    crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed)
-                } else {
-                    crate::SemanticErrorV1::Io(error)
-                }
-        })
-    }
-
     fn resource_unmap(&mut self, region: crate::MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
         region.release_native()
     }
