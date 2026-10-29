@@ -15799,6 +15799,8 @@ mod generated_result_protocol_verifier {
         ContainerStackLoad,
         ContainerLoadAddr,
         ContainerCopyChain,
+        ContainerStoreStackLoad,
+        ContainerAtomicStoreStackLoad,
         UnrelatedScalarStackLoad,
     }
 
@@ -15877,14 +15879,33 @@ mod generated_result_protocol_verifier {
             }
             SlotPointerShape::ContainerStackLoad
             | SlotPointerShape::ContainerLoadAddr
-            | SlotPointerShape::ContainerCopyChain => {
+            | SlotPointerShape::ContainerCopyChain
+            | SlotPointerShape::ContainerStoreStackLoad
+            | SlotPointerShape::ContainerAtomicStoreStackLoad => {
                 let container = builder.func.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     8,
                     3,
                 ));
                 let address = builder.ins().stack_addr(types::I64, slot, 0);
-                builder.ins().stack_store(address, container, 0);
+                if matches!(shape, SlotPointerShape::ContainerStoreStackLoad) {
+                    let destination = builder.ins().stack_addr(types::I64, container, 0);
+                    builder.ins().store(
+                        cranelift_codegen::ir::MemFlags::trusted(),
+                        address,
+                        destination,
+                        0,
+                    );
+                } else if matches!(shape, SlotPointerShape::ContainerAtomicStoreStackLoad) {
+                    let destination = builder.ins().stack_addr(types::I64, container, 0);
+                    builder.ins().atomic_store(
+                        cranelift_codegen::ir::MemFlags::trusted(),
+                        address,
+                        destination,
+                    );
+                } else {
+                    builder.ins().stack_store(address, container, 0);
+                }
                 if matches!(shape, SlotPointerShape::ContainerCopyChain) {
                     let second = builder.func.create_sized_stack_slot(StackSlotData::new(
                         StackSlotKind::ExplicitSlot,
@@ -15900,7 +15921,12 @@ mod generated_result_protocol_verifier {
                         second_address,
                         0,
                     )
-                } else if matches!(shape, SlotPointerShape::ContainerStackLoad) {
+                } else if matches!(
+                    shape,
+                    SlotPointerShape::ContainerStackLoad
+                        | SlotPointerShape::ContainerStoreStackLoad
+                        | SlotPointerShape::ContainerAtomicStoreStackLoad
+                ) {
                     builder.ins().stack_load(types::I64, container, 0)
                 } else {
                     let container_address = builder.ins().stack_addr(types::I64, container, 0);
@@ -16068,6 +16094,47 @@ mod generated_result_protocol_verifier {
                 .expect("the copy-chain memory state is decidable"),
             BTreeSet::from([ReachingMemoryState::Unknown]),
             "the pointer copied into D still refers to A"
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a Store-format write places A's pointer in C; stack_load C
+    /// supplies a subsequent store's destination, leaving A Unknown.
+    /// CLAIMED: exact-address Store writes contribute stored values to the
+    /// certifier's pointer dependency closure. THE GAP: this is one full-width
+    /// Store opcode; the narrow istore siblings share its format, but their
+    /// truncated values cannot reconstruct the original pointer precisely.
+    #[test]
+    fn store_format_pointer_copy_clobbers_original_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::ContainerStoreStackLoad,
+            SlotPointerUse::StoreThrough,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the Store-format copy and indirect write are decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "the pointer stored into C with Store still refers to A"
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a direct atomic_store places A's pointer in C; stack_load C
+    /// supplies a subsequent store's destination, leaving A Unknown.
+    /// CLAIMED: StoreNoOffset writes contribute stored values to the same
+    /// pointer dependency closure. THE GAP: the fixture pins atomic_store's
+    /// exact destination only, not an arbitrary atomic read-modify-write.
+    #[test]
+    fn atomic_store_pointer_copy_clobbers_original_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::ContainerAtomicStoreStackLoad,
+            SlotPointerUse::StoreThrough,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the atomic_store copy and indirect write are decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "the pointer stored into C with atomic_store still refers to A"
         );
     }
 
