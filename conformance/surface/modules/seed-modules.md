@@ -273,6 +273,46 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   error to acceptance while the prelude environment is fixed. This is not an
   ordinary non-B ambiguity check. **RED UNTIL N3 LANE B.**
 
+### surface/modules/unkeyed-buffer-window-stays-bindable-and-legacy-stable
+
+- promise class: **discriminating** — strict mode leaves the unkeyed package
+  name bindable while refusing its admitted sibling
+- spec: `30-taxonomy §4` (`BufferWindow` is outside B; `BufferSpan` is in the
+  floor), `33 §3.3`, and `39 §2.0`
+- given: use separate fresh strict-roots units with no explicit package import:
+
+  ```ken
+  data BufferWindow = LocalWindow
+  const local_window : BufferWindow = LocalWindow
+  ```
+
+  and
+
+  ```ken
+  data BufferSpan = LocalWindow
+  const local_window : BufferSpan = LocalWindow
+  ```
+
+  At cut base `fd2f575576aa2f5893054dcaf89e38243b739edc`, record the exact
+  `GlobalId` selected for `BufferWindow` by
+  `fn window_id (x : BufferWindow) : BufferWindow = x` in legacy-roots and
+  legacy single-file modes. Run that identical client and routes on this
+  candidate.
+- expect: the strict `BufferWindow` unit accepts. Its local
+  `Entry.BufferWindow` is a fresh inductive identity, distinct from the
+  cut-base `BufferWindow` identity, and `local_window` is typed by the local
+  identity. The strict `BufferSpan` unit rejects at name introduction as a
+  hard surface error; do not pin its diagnostic variant or payload. In both
+  legacy routes, `window_id` resolves `BufferWindow` to the same exact
+  `GlobalId` recorded at cut base.
+- controls: the strict units differ only in the admitted versus unkeyed type
+  name. Adding `BufferWindow` to the floor roster must make the accepting arm
+  refuse. The `BufferSpan` refusal stays as the paired admitted-name control.
+  Compare legacy results by identity, not spelling or type shape.
+- why: this is AC-1's package-row boundary and AC-4's family-label mutant. A
+  blanket buffer-family reservation would reject the `BufferWindow` arm while
+  the admitted `BufferSpan` refusal remains correct.
+
 ### surface/modules/per-name-rename-parses-hiding-is-syntax-error
 - spec: `32` import EBNF, `33 §3.2` (selection item rename; no `hiding` form)
 - given: parse `import M (foo as bar)` and, as the controlled negative, parse
@@ -1688,6 +1728,7 @@ monotone-downward and revocation management actions remain runner/host-internal
   `§4.3`/`§5.3`, `39 §2.0`/`§6.1`, `51 §7`):
   `prelude-floor-reuses-exact-types-and-constructors`,
   `prelude-protected-name-bindings-and-lookalike-matrix`,
+  `unkeyed-buffer-window-stays-bindable-and-legacy-stable`,
   `ord-nat-class-owner-and-reexport-use-one-dictionary`, and
   `prelude-head-does-not-transfer-orphan-ownership`.
 - **ITree source resolution** (`30 §4`, `33 §3.3`, `36 §2.1`):
@@ -1781,7 +1822,9 @@ monotone-downward and revocation management actions remain runner/host-internal
   `ResourceError` constructors require their scoped paths. `BufferSpan` and
   `TransferCount` retain private constructors. `Coproduct`, `Instant`, and
   `ITree` constructors require their scoped paths; `Unit` keeps bare `MkUnit`.
-  The protected-name matrix specifies same-production refusals
+  The dedicated `BufferWindow` case contrasts a strict same-name acceptance
+  with the admitted `BufferSpan` refusal and checks legacy identity against
+  the cut base. The protected-name matrix specifies same-production refusals
   and renamed controls for its sixteen parent rows and ten unscoped constructor
   families; `Char` and Pair have separate rows. The ITree cases additionally
   test exact constructor paths, both bare-name refusals and bindings, and the
