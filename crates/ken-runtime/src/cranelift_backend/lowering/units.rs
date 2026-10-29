@@ -11787,6 +11787,9 @@ struct IndexedFunction<'f> {
     stored_slots: std::cell::OnceCell<
         BTreeMap<cranelift_codegen::ir::StackSlot, Vec<Option<cranelift_codegen::ir::StackSlot>>>,
     >,
+    stack_slot_stores: std::cell::OnceCell<
+        BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Value>>,
+    >,
     calls: std::cell::OnceCell<Vec<(cranelift_codegen::ir::Inst, Option<FuncId>)>>,
     comparisons:
         std::cell::OnceCell<BTreeMap<cranelift_codegen::ir::Value, Vec<ConstantComparison>>>,
@@ -11852,6 +11855,7 @@ impl<'f> IndexedFunction<'f> {
             edges: std::cell::OnceCell::new(),
             stack_addresses: std::cell::RefCell::default(),
             stored_slots: std::cell::OnceCell::new(),
+            stack_slot_stores: std::cell::OnceCell::new(),
             calls: std::cell::OnceCell::new(),
             comparisons: std::cell::OnceCell::new(),
             branches_on: std::cell::OnceCell::new(),
@@ -12105,6 +12109,36 @@ impl<'f> IndexedFunction<'f> {
         }
         Ok(self.stored_slots.get_or_init(|| stored_slots))
     }
+
+    /// Every value stored into each stack slot at an exact stack address. A
+    /// store at an inexact or non-stack address is absent; if its value
+    /// carries a slot address, `stored_slots` escapes that slot instead.
+    fn stack_slot_stores(
+        &self,
+    ) -> Result<
+        &BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Value>>,
+        CraneliftBackendError,
+    > {
+        if let Some(stores) = self.stack_slot_stores.get() {
+            return Ok(stores);
+        }
+        let mut stores = BTreeMap::<_, Vec<_>>::new();
+        for inst in self.insts() {
+            match &self.func.dfg.insts[inst] {
+                cranelift_codegen::ir::InstructionData::StackStore {
+                    arg, stack_slot, ..
+                } => stores.entry(*stack_slot).or_default().push(*arg),
+                cranelift_codegen::ir::InstructionData::Store { args, .. }
+                | cranelift_codegen::ir::InstructionData::StoreNoOffset { args, .. } => {
+                    if let Some((slot, _)) = resolve_stack_address(self, args[1])? {
+                        stores.entry(slot).or_default().push(args[0]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(self.stack_slot_stores.get_or_init(|| stores))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -12239,6 +12273,24 @@ fn address_dependent_slots(
         }
         match func.dfg.value_def(value) {
             cranelift_codegen::ir::ValueDef::Result(inst, _) => {
+                // A value read from a stack slot is one of the values stored
+                // there, so a slot address reaches it only through those.
+                if let cranelift_codegen::ir::InstructionData::StackLoad {
+                    opcode,
+                    stack_slot,
+                    ..
+                } = &func.dfg.insts[inst]
+                {
+                    if *opcode == cranelift_codegen::ir::Opcode::StackLoad {
+                        pending.extend(
+                            func.stack_slot_stores()?
+                                .get(stack_slot)
+                                .into_iter()
+                                .flatten()
+                                .copied(),
+                        );
+                    }
+                }
                 pending.extend(func.dfg.inst_args(inst).iter().copied());
             }
             cranelift_codegen::ir::ValueDef::Param(block, index) => {
@@ -12276,12 +12328,15 @@ fn call_may_access_location(
     call: cranelift_codegen::ir::Inst,
     access: &LocationAccess,
 ) -> Result<bool, CraneliftBackendError> {
+    if location_leaked_before(func, call, access) {
+        return Ok(true);
+    }
     for argument in func.dfg.inst_args(call) {
-        if address_depends_on_slots(func, *argument, &access.containers)? || access.escaped {
+        if address_depends_on_slots(func, *argument, &access.containers)? {
             return Ok(true);
         }
     }
-    Ok(call_follows_retention(func, call, access))
+    Ok(false)
 }
 
 pub(super) fn close_and_define_staged_result_bodies<M: Module>(
@@ -13393,6 +13448,17 @@ fn call_follows_retention(
         }
     }
     false
+}
+
+/// Whether a pointer to the location may already be held where no SSA value
+/// of this function shows it: stored to memory no stack slot names, or handed
+/// to a call that can have returned before `inst`.
+fn location_leaked_before(
+    func: &IndexedFunction<'_>,
+    inst: cranelift_codegen::ir::Inst,
+    access: &LocationAccess,
+) -> bool {
+    access.escaped || call_follows_retention(func, inst, access)
 }
 
 fn locations_overlap(left: StackMemoryLocation, right: StackMemoryLocation) -> bool {
@@ -15730,15 +15796,25 @@ mod generated_result_protocol_verifier {
         DynamicOffset,
         Select,
         BlockParam,
+        ContainerStackLoad,
+        ContainerLoadAddr,
+        ContainerCopyChain,
+        ContainerStoreStackLoad,
+        ContainerAtomicStoreStackLoad,
+        UnrelatedScalarStackLoad,
     }
 
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Debug)]
     enum SlotPointerUse {
         Call,
         RetainingCall,
         StoreThrough,
         StoreToHeap,
+        StoreToHeapRestored,
         AtomicToHeap,
+        EscapedRestoredZeroArgCall,
+        ScalarReadToHeapZeroArgCall,
+        UnretainedRestoredHeapStore,
     }
 
     /// A finished-CLIF memory query, not a reimplementation of the address
@@ -15801,6 +15877,77 @@ mod generated_result_protocol_verifier {
                 builder.switch_to_block(merge);
                 builder.block_params(merge)[0]
             }
+            SlotPointerShape::ContainerStackLoad
+            | SlotPointerShape::ContainerLoadAddr
+            | SlotPointerShape::ContainerCopyChain
+            | SlotPointerShape::ContainerStoreStackLoad
+            | SlotPointerShape::ContainerAtomicStoreStackLoad => {
+                let container = builder.func.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let address = builder.ins().stack_addr(types::I64, slot, 0);
+                if matches!(shape, SlotPointerShape::ContainerStoreStackLoad) {
+                    let destination = builder.ins().stack_addr(types::I64, container, 0);
+                    builder.ins().store(
+                        cranelift_codegen::ir::MemFlags::trusted(),
+                        address,
+                        destination,
+                        0,
+                    );
+                } else if matches!(shape, SlotPointerShape::ContainerAtomicStoreStackLoad) {
+                    let destination = builder.ins().stack_addr(types::I64, container, 0);
+                    builder.ins().atomic_store(
+                        cranelift_codegen::ir::MemFlags::trusted(),
+                        address,
+                        destination,
+                    );
+                } else {
+                    builder.ins().stack_store(address, container, 0);
+                }
+                if matches!(shape, SlotPointerShape::ContainerCopyChain) {
+                    let second = builder.func.create_sized_stack_slot(StackSlotData::new(
+                        StackSlotKind::ExplicitSlot,
+                        8,
+                        3,
+                    ));
+                    let copied = builder.ins().stack_load(types::I64, container, 0);
+                    builder.ins().stack_store(copied, second, 0);
+                    let second_address = builder.ins().stack_addr(types::I64, second, 0);
+                    builder.ins().load(
+                        types::I64,
+                        cranelift_codegen::ir::MemFlags::trusted(),
+                        second_address,
+                        0,
+                    )
+                } else if matches!(
+                    shape,
+                    SlotPointerShape::ContainerStackLoad
+                        | SlotPointerShape::ContainerStoreStackLoad
+                        | SlotPointerShape::ContainerAtomicStoreStackLoad
+                ) {
+                    builder.ins().stack_load(types::I64, container, 0)
+                } else {
+                    let container_address = builder.ins().stack_addr(types::I64, container, 0);
+                    builder.ins().load(
+                        types::I64,
+                        cranelift_codegen::ir::MemFlags::trusted(),
+                        container_address,
+                        0,
+                    )
+                }
+            }
+            SlotPointerShape::UnrelatedScalarStackLoad => {
+                let unrelated = builder.func.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let scalar = builder.ins().iconst(types::I64, 42);
+                builder.ins().stack_store(scalar, unrelated, 0);
+                builder.ins().stack_load(types::I64, unrelated, 0)
+            }
         };
         let retention = match use_pointer {
             SlotPointerUse::Call => {
@@ -15822,11 +15969,49 @@ mod generated_result_protocol_verifier {
                 );
                 None
             }
-            SlotPointerUse::StoreToHeap => {
+            SlotPointerUse::StoreToHeap | SlotPointerUse::StoreToHeapRestored => {
                 let heap = builder.ins().iconst(types::I64, 0x1000);
                 builder
                     .ins()
                     .store(cranelift_codegen::ir::MemFlags::trusted(), pointer, heap, 0);
+                if matches!(use_pointer, SlotPointerUse::StoreToHeapRestored) {
+                    // Make the post-escape call, not the heap store itself,
+                    // decide whether the freshly restored Exact can survive.
+                    builder.ins().stack_store(stored_word, slot, 0);
+                }
+                builder.ins().call(later_call, &[]);
+                None
+            }
+            SlotPointerUse::EscapedRestoredZeroArgCall => {
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                builder
+                    .ins()
+                    .store(cranelift_codegen::ir::MemFlags::trusted(), pointer, heap, 0);
+                builder.ins().stack_store(stored_word, slot, 0);
+                builder.ins().call(later_call, &[]);
+                None
+            }
+            SlotPointerUse::ScalarReadToHeapZeroArgCall => {
+                let scalar = builder.ins().stack_load(types::I64, slot, 0);
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                builder
+                    .ins()
+                    .store(cranelift_codegen::ir::MemFlags::trusted(), scalar, heap, 0);
+                builder.ins().call(later_call, &[]);
+                None
+            }
+            SlotPointerUse::UnretainedRestoredHeapStore => {
+                builder.ins().stack_store(stored_word, slot, 0);
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                let replacement = builder.ins().iconst(types::I64, 9);
+                builder.ins().store(
+                    cranelift_codegen::ir::MemFlags::trusted(),
+                    replacement,
+                    heap,
+                    0,
+                );
+                // There is no retaining call before the store. A later call
+                // with no argument must also leave A current without a leak.
                 builder.ins().call(later_call, &[]);
                 None
             }
@@ -15842,6 +16027,208 @@ mod generated_result_protocol_verifier {
         builder.seal_all_blocks();
         builder.finalize();
         (func, location, dependent, retention)
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: both pointer reload spellings from C invalidate A's Exact
+    /// after a call, a store through the reloaded pointer, and an escape to
+    /// heap memory; the first call of both retaining-call cases is indexed.
+    /// CLAIMED: pointer provenance cannot depend on which stack-slot reader
+    /// the finished CLIF selected. THE GAP: the heap-store case alone can
+    /// already clobber A; the restored variant separately pins the later
+    /// argument-free call, and no one fixture enumerates every CLIF opcode.
+    #[test]
+    fn container_pointer_reloads_clobber_all_three_consumers() {
+        let mut failures = Vec::new();
+        for shape in [
+            SlotPointerShape::ContainerStackLoad,
+            SlotPointerShape::ContainerLoadAddr,
+        ] {
+            for use_pointer in [
+                SlotPointerUse::Call,
+                SlotPointerUse::StoreThrough,
+                SlotPointerUse::StoreToHeap,
+                SlotPointerUse::StoreToHeapRestored,
+                SlotPointerUse::RetainingCall,
+            ] {
+                let (func, location, dependent, retention) = slot_pointer_case(shape, use_pointer);
+                let indexed = IndexedFunction::new(&func);
+                let states = reaching_memory_states_before(&indexed, location, dependent)
+                    .expect("the finished reload's memory effect is decidable");
+                if states != BTreeSet::from([ReachingMemoryState::Unknown]) {
+                    failures.push(format!(
+                        "{shape:?} followed by {use_pointer:?}: expected Unknown, got {states:?}"
+                    ));
+                }
+                if let Some((retaining, later)) = retention {
+                    let access = location_access(&indexed, location)
+                        .expect("the first call's retention is decidable");
+                    if !access.retaining_calls.contains(&retaining) {
+                        failures.push(format!("{shape:?}: first retaining call not indexed"));
+                    }
+                    if !call_may_access_location(&indexed, later, &access)
+                        .expect("the later call's aliasing is decidable")
+                    {
+                        failures.push(format!("{shape:?}: later retaining call cannot access A"));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: copying a pointer out of C with stack_load and into D, then
+    /// loading through D, leaves A Unknown after a store through the copy.
+    /// CLAIMED: each stack_load source contributes a container edge in the
+    /// closure. THE GAP: this one copy chain tests one hop through each slot;
+    /// arbitrary CFG joins rely on the existing shared value walk.
+    #[test]
+    fn copied_container_pointer_through_stack_load_clobbers_original() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::ContainerCopyChain,
+            SlotPointerUse::StoreThrough,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the copy-chain memory state is decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "the pointer copied into D still refers to A"
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a Store-format write places A's pointer in C; stack_load C
+    /// supplies a subsequent store's destination, leaving A Unknown.
+    /// CLAIMED: exact-address Store writes contribute stored values to the
+    /// certifier's pointer dependency closure. THE GAP: this is one full-width
+    /// Store opcode; the narrow istore siblings share its format, but their
+    /// truncated values cannot reconstruct the original pointer precisely.
+    #[test]
+    fn store_format_pointer_copy_clobbers_original_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::ContainerStoreStackLoad,
+            SlotPointerUse::StoreThrough,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the Store-format copy and indirect write are decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "the pointer stored into C with Store still refers to A"
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a direct atomic_store places A's pointer in C; stack_load C
+    /// supplies a subsequent store's destination, leaving A Unknown.
+    /// CLAIMED: StoreNoOffset writes contribute stored values to the same
+    /// pointer dependency closure. THE GAP: the fixture pins atomic_store's
+    /// exact destination only, not an arbitrary atomic read-modify-write.
+    #[test]
+    fn atomic_store_pointer_copy_clobbers_original_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::ContainerAtomicStoreStackLoad,
+            SlotPointerUse::StoreThrough,
+        );
+        assert_eq!(
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the atomic_store copy and indirect write are decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "the pointer stored into C with atomic_store still refers to A"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: after an address escapes to heap memory and A is restored,
+    /// a zero-argument call turns A's new Exact into Unknown. CLAIMED: escape
+    /// is consulted even when the call has no visible argument. THE GAP: the
+    /// call may use the leaked address; the test does not execute that callee.
+    #[test]
+    fn escaped_pointer_clobbers_restored_slot_at_zero_argument_call() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::Exact,
+            SlotPointerUse::EscapedRestoredZeroArgCall,
+        );
+        let indexed = IndexedFunction::new(&func);
+        assert!(
+            location_access(&indexed, location)
+                .expect("escape is decidable")
+                .escaped
+        );
+        assert_eq!(
+            reaching_memory_states_before(&indexed, location, dependent)
+                .expect("the post-escape zero-argument call is decidable"),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+            "the zero-argument call may hold the escaped pointer"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: the scalar 7 is read from A, stored to non-stack memory,
+    /// and followed by a zero-argument call while A retains an Exact state.
+    /// CLAIMED: reading a scalar from a slot does not publish that slot's
+    /// address. THE GAP: this fixture seeds the slot with only one iconst;
+    /// arbitrary stored values need the shared stored-value walk.
+    #[test]
+    fn scalar_stack_load_published_to_heap_preserves_original_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::Exact,
+            SlotPointerUse::ScalarReadToHeapZeroArgCall,
+        );
+        let states =
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the scalar read, heap store and later call are decidable");
+        assert_eq!(states.len(), 1);
+        assert!(
+            matches!(states.iter().next(), Some(ReachingMemoryState::Exact(_))),
+            "scalar read must not publish A's address: {states:?}"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: restoring A, storing through an unrelated heap pointer,
+    /// and making a zero-argument call without any retaining call leaves one
+    /// Exact state. CLAIMED: an unescaped A cannot be clobbered by either.
+    /// THE GAP: the fixture supplies no path that could retain A's address.
+    #[test]
+    fn unrelated_heap_store_without_retention_preserves_exact() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::Exact,
+            SlotPointerUse::UnretainedRestoredHeapStore,
+        );
+        let indexed = IndexedFunction::new(&func);
+        let access = location_access(&indexed, location).expect("escape is decidable");
+        assert!(!access.escaped && access.retaining_calls.is_empty());
+        let states = reaching_memory_states_before(&indexed, location, dependent)
+            .expect("the nonaliasing heap store is decidable");
+        assert_eq!(states.len(), 1);
+        assert!(matches!(
+            states.iter().next(),
+            Some(ReachingMemoryState::Exact(_))
+        ));
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: the value read from E, which never held an address to A,
+    /// can be passed to a call while A stays Exact. CLAIMED: stack_load does
+    /// not taint every slot merely because it reads some slot. THE GAP: the
+    /// fixture explicitly seeds E only with a scalar; no pointer enters it.
+    #[test]
+    fn unrelated_scalar_stack_load_call_preserves_exact() {
+        let (func, location, dependent, _) = slot_pointer_case(
+            SlotPointerShape::UnrelatedScalarStackLoad,
+            SlotPointerUse::Call,
+        );
+        let indexed = IndexedFunction::new(&func);
+        let access = location_access(&indexed, location).expect("escape is decidable");
+        assert!(!access.escaped && access.retaining_calls.is_empty());
+        let states = reaching_memory_states_before(&indexed, location, dependent)
+            .expect("the unrelated loaded scalar is decidable");
+        assert_eq!(states.len(), 1);
+        assert!(matches!(
+            states.iter().next(),
+            Some(ReachingMemoryState::Exact(_))
+        ));
     }
 
     /// Promise class: durable invariant.
