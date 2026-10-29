@@ -819,7 +819,10 @@ sentinel beside the current contract.
   and bare constructor names, `Char`, and Pair-family names are protected
   contract values; each collision/renaming pair is a durable relation
 - spec: `33 §3.3` (protected-name introduction ban), `39 §2.0`
-- given: use a fresh strict-roots environment for every row. The preceding table
+- given: use a fresh strict-roots environment for every row. For the six
+  newly admitted FS/resource parents, also run the same collision/renaming
+  pairs independently in legacy roots and legacy single-file, as specified
+  by the route-explicit matrix below. The preceding table
   has twenty-two inductive parent rows: `Auth`, `Bool`, `BufferSpan`,
   `Coproduct`, `CreatePolicy`, `FileError`, `IOError`, `List`, `Nat`, `Option`,
   `ResourceError`, `ResourceKind`, `ExitCode`, `Instant`, `ITree`, `ProcessInput`,
@@ -888,7 +891,8 @@ sentinel beside the current contract.
   declaration also passed the root loader. The probe did not measure the full
   matrix above. **CLAIMED:** each listed collision rejects at introduction
   while its paired same-production renamed control accepts. The dedicated
-  ITree route cases below cover strict and legacy source modes. **THE GAP:**
+  ITree route cases below cover strict and legacy source modes; the FS/resource
+  case below extends the six new parent pairs to both legacy routes. **THE GAP:**
   non-inductive floor names `Bottom`, `Equal`, `HostIO`, `Prop`, `Proved`, and
   `Top`, the kernel / built-in vocabulary, and binding forms beyond these
   declarations are outside this case. The separate Pair matrix covers only its
@@ -928,43 +932,96 @@ sentinel beside the current contract.
 
   The accepted prefix must complete first; the negative is isolated to the
   one removed `IOError.` qualifier, not a missing type, import, or parser
-  failure. In separate fresh units, change only `IOError` to `LocalIOError`
-  in the parent-name declaration pair above, and check that the protected
-  name rejects while the renamed local family accepts. In another fresh
-  unit, `data LocalCause = NotFound` and
-  `const local : LocalCause = NotFound` accept; adding
-  `const still_checked : IOError = IOError.NotFound` selects the original
-  checked constructor, not the local same-leaf ID.
+  failure.
+- admitted-parent collisions: **in each route separately** (strict roots,
+  legacy roots, legacy single-file), test every row below in two fresh source
+  units. Start each with the accepted six-type prefix above. Append the
+  rejected `data` in one unit and the renamed `data` in the other. Change
+  only the parent name between units; retain the fresh constructor spelling.
+
+  | admitted parent | rejected declaration | accepted renamed declaration |
+  |---|---|---|
+  | `BufferSpan` | `data BufferSpan = LocalSpan` | `data LocalBufferSpan = LocalSpan` |
+  | `CreatePolicy` | `data CreatePolicy = LocalPolicy` | `data LocalCreatePolicy = LocalPolicy` |
+  | `FileError` | `data FileError = LocalMkFileError` | `data LocalFileError = LocalMkFileError` |
+  | `IOError` | `data IOError = LocalCause` | `data LocalIOError = LocalCause` |
+  | `ResourceError` | `data ResourceError = LocalResourceCause` | `data LocalResourceError = LocalResourceCause` |
+  | `TransferCount` | `data TransferCount = LocalCount` | `data LocalTransferCount = LocalCount` |
+
+  Reject the same-name parent at introduction, after the accepted prefix,
+  not at a later reference. The renamed production accepts with a fresh
+  checked local parent and constructor, distinct from the recorded floor IDs.
+  Each route must establish both observations for **each** of the six rows;
+  strict success does not stand in for either legacy route. The `FileError`
+  family's bare `MkFileError` reservation has its separate constructor row
+  in the protected-name matrix above.
+- family closure: use the exact 13 `IOError.C`, 3 `CreatePolicy.C`, and 12
+  `ResourceError.C` entries of the constructor table in
+  `prelude-floor-reuses-exact-types-and-constructors`. **For every one of
+  these 28 `T.C` entries independently, in every route**, run two distinct
+  source units after the accepted six-type prefix:
+
+  1. Reuse its accepted typed expression or exhaustive-pattern arm from
+     `closed-floor-accepts-arbitrary-global-does-not`; in a fresh unit
+     remove only this occurrence's `T.` qualifier, preserving its arguments,
+     type context, and other constructor paths. Bare `C` must refuse at
+     surface name resolution while the original qualified arm accepts and
+     resolves to its recorded checked ID. The value forms give
+     `const bare_policy : CreatePolicy = CreateNew` and
+     `const bare_resource : ResourceError = Closed` as two instances.
+  2. In another fresh unit, append `data LocalCase = C`, then
+     `const local_case : LocalCase = C`. The name `C` is the **same bare
+     leaf**, not a renamed stand-in; `LocalCase` is fresh for this unit.
+     After this declaration, use the matching **qualified `T.C` again**
+     in its valid typed expression or exhaustive pattern, with the exact
+     arguments from the accepted arm. Compare its checked constructor and
+     parent IDs against the pre-source `T.C` record. The accepted local
+     `C` has a distinct checked ID and the new `LocalCase` parent. Never
+     combine different leaves into one unit; a collision in one leaf must
+     not hide another's observation.
+
+  The nullary policy and resource cases instantiate the second arm as:
+
+  ```ken
+  data LocalPolicyCase = CreateNew
+
+  const local_policy : LocalPolicyCase = CreateNew
+
+  const checked_policy_after : CreatePolicy = CreatePolicy.CreateNew
+  ```
+
+  ```ken
+  data LocalResourceCase = Closed
+
+  const local_resource : LocalResourceCase = Closed
+
+  const checked_resource_after : ResourceError = ResourceError.Closed
+  ```
+
+  For `IOError.NotFound` the same arm uses `data LocalCase = NotFound`,
+  `const local_case : LocalCase = NotFound`, and a later
+  `const checked_after : IOError = IOError.NotFound`. All 28 local-leaf
+  acceptances must succeed **in the presence of their qualified checked-ID
+  control**. Merely rejecting the bare use as the floor constructor does
+  not prove the spelling is unreserved.
 - expect: every accepted prefix resolves the six types to their recorded
-  pre-source IDs, and the three qualified values to constructors with their
+  pre-source IDs, and its three qualified values to constructors with their
   respective checked parents. Bare `NotFound` rejects at surface name
-  resolution **after** the accepted prefix. The `IOError` declaration is a
-  protected-name refusal at introduction, independent of any later use; the
-  paired `LocalIOError` declaration and local `NotFound` source constructor
-  accept without replacing the canonical `IOError.NotFound` ID. No route
-  changes `trusted_base()` or allocates a replacement floor family.
+  resolution **after** the accepted prefix. Each admitted-parent collision
+  rejects at introduction while its paired renamed local family accepts
+  in each of the three routes. For all 28 scoped leaves, the isolated bare
+  floor use rejects, the same-leaf local constructor accepts with a distinct
+  checked parent and ID, and the qualified `T.C` still resolves to its
+  original checked ID **after** the local binding. No route changes
+  `trusted_base()` or allocates a replacement floor family.
 - controls: admitting `IOError` unscoped accepts the isolated bare
   `NotFound` arm and **must redden this case** while the qualified positive
-  remains accepted. Reserving every spelling of `NotFound` instead rejects
-  `LocalCause` and fails its opposite control. Removing the whole `IOError`
-  family fails the accepted prefix and the parent-ID comparison; a parser
-  that rejects every test unit cannot pass the positives.
-- family closure: reuse the accepted all-constructor source arm of
-  `closed-floor-accepts-arbitrary-global-does-not` above and the exact
-  public constructor inventories in
-  `prelude-floor-reuses-exact-types-and-constructors`. For each of the
-  thirteen `IOError.C`, three `CreatePolicy.C`, and twelve
-  `ResourceError.C` paths, in a fresh route
-  retain its accepted typed expression or exhaustive pattern and remove
-  **only that occurrence's family qualifier**, leaving constructor arguments,
-  type context, other constructors, and accepted prefix unchanged. The
-  isolated bare use must reject at surface name resolution; its qualified
-  control must still resolve to the same recorded checked ID. For the
-  `CreatePolicy.CreateNew` and `ResourceError.Closed` value forms above this
-  yields `const bare_policy : CreatePolicy = CreateNew` and
-  `const bare_resource : ResourceError = Closed`. A source-local same-leaf
-  constructor in a separate unit may bind under ordinary non-B rules; it
-  must not change the meaning of the checked `T.C` path.
+  remains accepted. Reserving **any one** of the 28 bare `C` spellings in B
+  rejects that leaf's local `data LocalCase = C` arm at introduction; its
+  qualified `T.C` positive and bare floor-use refusal alone would still pass.
+  Removing any admitted parent lets its same-name collision arm accept or
+  fails the six-type prefix, while its renamed-local control remains valid.
+  A parser that rejects every test unit cannot pass the positives.
 - privacy boundary: the accepted `keep_span` and `keep_count` functions make
   the two public types nameable. In separate fresh units, reject both
   `PrivateBufferSpan` and `BufferSpan.PrivateBufferSpan` as patterns on a
@@ -994,7 +1051,9 @@ sentinel beside the current contract.
   update; do not rebaseline only the failing negative fixture.
 - why: the first pair is AC-4's unscoped-`IOError` discriminator, which
   qualified-only positives cannot catch. The parent and local-lookalike
-  pairs separate protected types from unreserved scoped leaves. The
+  pairs separate protected types from unreserved scoped leaves. For each
+  scoped leaf, over-reservation fails its local same-leaf introduction even
+  while qualified acceptance and bare floor-use refusal remain green. The
   all-constructor variants keep the per-name rule honest; the private
   pattern rows reject both routes around visibility rather than relying
   on absence from a Rust name table. No official conformance-runner result
