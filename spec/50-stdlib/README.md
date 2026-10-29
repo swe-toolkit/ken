@@ -356,13 +356,14 @@ conformance, CI, publication, landing or landed trust. No rational
 or `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–7 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–8 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION;
-SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE). The §1
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE;
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -407,11 +408,24 @@ changing every variable except `v` leaves the value of `e` unchanged,
 its derivative in `v` evaluates to zero at the given environment.
 The premise is semantic, even when `v` occurs in a zero-valued product.
 Architect D0 checked the generic proof on `9e1d6e9cd` with no new
-`Axiom` and unchanged scratch trusted identities 114 → 114. This
-candidate adds the checked catalog export and a same-input accepted
-and refused seed; author-local checks do not establish official
-conformance, CI, publication, landing or landed trust. A sorted-list
-normal form and signed/field arithmetic remain deferred.
+`Axiom` and unchanged scratch trusted identities 114 → 114. The §7
+checked catalog export and closed seed are now on main; their earlier
+candidate-local checks are not official conformance or landed trust.
+Section 8 states public `deriv_substitute v s e env hv hw`: the
+replacement at `v` has derivative value one, while all distinct
+indices' replacements have derivative value zero, both at `env`.
+Under those necessary premises, differentiating the substituted
+expression at `env` equals evaluation of the original derivative
+under `compose_env env s`. This is pointwise `Equal Nat`, not
+structural expression equality or an unrestricted chain rule. Two
+new helpers stay private. Architect's D0 on `97caadd38` checked the
+generic proof without a new `Axiom` and with equal scratch trusted
+identities 114 → 114. The §8 catalog export was absent on the spec
+author's base; this assembled candidate adds the checked proof and
+a package-owned test for the complete seed and two isolated premise-drop claims.
+Those candidate-local checks are not official conformance-runner
+execution, CI, publication, landing or landed trust. A sorted-list normal
+form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–7 (SPEC-GEOMETRY-EXACT-CONTRACT;

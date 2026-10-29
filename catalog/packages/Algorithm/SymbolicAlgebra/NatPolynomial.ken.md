@@ -55,6 +55,10 @@ checked laws say that equal polynomial functions have equal derivatives at
 every environment, that `poly_eq` preserves a `True` answer after
 differentiation, and that the two orders of differentiation evaluate equally.
 Private Taylor, natural-arithmetic, and product-summand proofs support them.
+The independent-variable law proves zero derivative under semantic invariance;
+the derivative-after-substitution law proves equal evaluated derivatives when
+the distinguished replacement has slope one and all other replacements have
+slope zero at the given environment.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -1056,6 +1060,66 @@ pub theorem deriv_independent
         a
         (sym Nat (eval bumped e) (add a (mul t (add d (mul t r)))) (deriv_taylor v t env e))
         (h bumped (λw. λhw. bump_env_off v t env w hw)))
+
+pub theorem deriv_substitute
+      (v : Nat)
+      (s : Nat → Expr)
+      (e : Expr)
+      (env : Nat → Nat)
+      (hv : Equal Nat (eval env (deriv v (s v))) (Suc Zero))
+      (hw : (w : Nat) → (Equal Nat v w → Bottom) → Equal Nat (eval env (deriv v (s w))) Zero)
+    : Equal Nat (eval env (deriv v (substitute s e))) (eval (compose_env env s) (deriv v e)) =
+  match e {
+    EConst c ↦ Proved;
+    EVar w ↦
+      deriv_substitute_var
+        (eval env (deriv v (s w)))
+        (compose_env env s)
+        (nat_same v w)
+        (λhs.
+          trans
+            Nat
+            (eval env (deriv v (s w)))
+            (eval env (deriv v (s v)))
+            (Suc Zero)
+            (cong
+              Nat
+              Nat
+              w
+              v
+              (λu. eval env (deriv v (s u)))
+              (sym Nat v w (nat_same_sound v w hs)))
+            hv)
+        (λhn. hw w (λheq. hn (nat_same_complete v w heq)));
+    EAdd a b ↦
+      add_cong
+        (eval env (deriv v (substitute s a)))
+        (eval (compose_env env s) (deriv v a))
+        (eval env (deriv v (substitute s b)))
+        (eval (compose_env env s) (deriv v b))
+        (deriv_substitute v s a env hv hw)
+        (deriv_substitute v s b env hv hw);
+    EMul a b ↦
+      add_cong
+        (mul (eval env (deriv v (substitute s a))) (eval env (substitute s b)))
+        (mul (eval (compose_env env s) (deriv v a)) (eval (compose_env env s) b))
+        (mul (eval env (substitute s a)) (eval env (deriv v (substitute s b))))
+        (mul (eval (compose_env env s) a) (eval (compose_env env s) (deriv v b)))
+        (mul_cong
+          (eval env (deriv v (substitute s a)))
+          (eval (compose_env env s) (deriv v a))
+          (eval env (substitute s b))
+          (eval (compose_env env s) b)
+          (deriv_substitute v s a env hv hw)
+          (eval_substitute env s b))
+        (mul_cong
+          (eval env (substitute s a))
+          (eval (compose_env env s) a)
+          (eval env (deriv v (substitute s b)))
+          (eval (compose_env env s) (deriv v b))
+          (eval_substitute env s a)
+          (deriv_substitute v s b env hv hw))
+  }
 
 theorem expr_add_cong
       (a1 : Expr)
@@ -2409,6 +2473,29 @@ fn taylor_rem (v : Nat) (t : Nat) (env : Nat → Nat) (e : Expr) : Nat =
           (add (eval env (deriv v b)) (mul t (taylor_rem v t env b))))
   }
 
+theorem nat_same_complete (a : Nat) (b : Nat) (h : Equal Nat a b) : IsTrue (nat_same a b) =
+  trans
+    Bool
+    (nat_same a b)
+    (nat_same a a)
+    True
+    (cong Nat Bool b a (λu. nat_same a u) (sym Nat a b h))
+    ((proof intro for bool_and)
+      (leq_nat a a)
+      (leq_nat a a)
+      ((proof refl for leq_nat) a)
+      ((proof refl for leq_nat) a))
+
+theorem deriv_substitute_var
+      (x : Nat) (env : Nat → Nat) (b : Bool)
+    : (IsTrue b → Equal Nat x (Suc Zero))
+      → ((IsTrue b → Bottom) → Equal Nat x Zero)
+      → Equal Nat x (eval env (var_deriv b)) =
+  match b {
+    True ↦ λht. λhf. ht Proved;
+    False ↦ λht. λhf. hf (λp. p)
+  }
+
 theorem deriv_taylor
       (v : Nat) (t : Nat) (env : Nat → Nat) (e : Expr)
     : Equal Nat
@@ -2707,6 +2794,14 @@ helper matches on the Boolean argument to `var_deriv`. None of these laws
 equates derivative expression trees or uses `canonicalize_complete` as a
 derivative theorem.
 
+The independent-variable law reduces a semantic invariance premise to a
+zero derivative at the chosen environment. For derivative after substitution,
+induction on the expression uses the two pointwise derivative premises on a
+variable. The product case reuses `eval_substitute` for its underived factors,
+then lifts the induction hypotheses through multiplication and addition
+congruence. Both new comparison helpers remain private; no equality of
+expression trees or every-environment substitution claim follows.
+
 ## 5. Design notes
 
 A variable index is a `Nat`, and the evaluator's environment is a total
@@ -2748,16 +2843,18 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–6 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–8 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
 [composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md),
 [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md),
-and [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md)
+[commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
+[independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md)
+and [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md)
 specify the public surface and closed observations. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and seventeen checked theorems; Horner, substitution and differentiation expose
+and nineteen checked theorems; Horner, substitution and differentiation expose
 no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
