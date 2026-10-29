@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative twenty-three-identity prelude and its exact constructor/companion
+> normative twenty-four-identity prelude and its exact constructor/companion
 > closure are `30-taxonomy §4`; resolution and protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
 > Once D0 proves both §4 witness clauses per name, a keyed, source-required
@@ -24,8 +24,8 @@ an unused catalog census name proves a global is safe to remove.
 
 For unruled candidate names below, the keying column names a **native
 reader to check**, not proof that the reader set is complete. The
-admitted entrypoint-ABI and effect/clock rows instead record ruled
-exact-ID keying and independent source need (`30 §4`'s conjunction).
+admitted entrypoint-ABI, effect/clock and ITree rows instead record
+ruled exact-ID keying and independent source need (`30 §4`'s conjunction).
 Both proven → reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
@@ -38,8 +38,8 @@ copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
 there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
-Apart from the internal-only `Empty` and the admitted entrypoint-ABI
-and effect/clock identities below, the candidate names in this table are
+Apart from the internal-only `Empty` and the admitted entrypoint-ABI,
+effect/clock and ITree identities below, the candidate names in this table are
 **observed spellings**, not names approved for permanent reservation. Before
 a later slice admits a newly witnessed name, Spec checks that its spelling closely
 encloses its meaning (`30 §4`);
@@ -73,6 +73,7 @@ constructor still has the same checked parent and `GlobalId`.
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
 | `ResourceError`, `ResourceBodyResult`, `ResourceBracketResult` | Yes if admitted | A result/error qualifier prevents generic error and status names becoming bare reservations. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
+| `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
 | `Stream`, `CreatePolicy` | Yes if admitted | `Stdout`, `Stderr` and create-policy cases are specific only under their carrier; a generic type name may still need a rename. |
 | `ProcessInput` (floor) | No | Its `MkProcessInput` constructor is bare and reserved with its type. |
 | `Unit` (current floor) | No | `MkUnit` names its exact checked parent and remains bare and reserved. |
@@ -107,8 +108,8 @@ The entrypoint-ABI and `Empty` rows are re-grounded on landed
 `f3e71af9c`; the effect/clock rows are settled against the exact-ID
 producer/reader and source requirements in the keyed-effects D0.
 Other inventory citations retain their stated census base. Only
-marked witnessed entrypoint-ABI and effect/clock rows below join the
-floor; no other row alone reserves a name.
+marked witnessed entrypoint-ABI, effect/clock and ITree rows below join
+the floor; no other row alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
@@ -131,6 +132,9 @@ floor; no other row alone reserves a name.
 | `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `IO` | Checked Console-ITree alias (`prelude.rs`); confirm whether the effect reifier selects the alias ID or only the underlying constructors. |
 | `FS` | Checked Auth-indexed ITree alias (`prelude.rs`); confirm whether the reifier/runner selects its ID. |
+| `ITree` (floor, scoped) | `PreludeEnv.itree_id` captures the checked pre-source inductive ID; effect lowering and the host interpreter select that family by exact ID. The surface requires source to name the canonical type and its constructors (`36 §2.1`, §2.4). A same-shaped source family does not replace it. |
+| `Ret` (qualified floor constructor) | `PreludeEnv.ret_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Ret`, never a reserved bare `Ret`. The constructor itself is not renamed. |
+| `Vis` (qualified floor constructor) | `PreludeEnv.vis_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Vis`, never a reserved bare `Vis`. The constructor itself is not renamed. |
 | `Coproduct` (floor, scoped) | `PreludeEnv.coproduct_id` identifies the checked effect-signature sum; native composition keys the exact injection parents and source needs the family (`36 §2.3`, §4.5.7). |
 | `InL` (qualified floor constructor) | `CanonicalRuntimeRoles::in_l` selects the exact `Coproduct` constructor; only `Coproduct.InL` resolves, not bare `InL`. |
 | `InR` (qualified floor constructor) | `CanonicalRuntimeRoles::in_r` selects the exact `Coproduct` constructor; only `Coproduct.InR` resolves, not bare `InR`. |
@@ -191,9 +195,11 @@ floor; no other row alone reserves a name.
 | `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 | `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
 
-Only the five entrypoint-ABI and three effect/clock identities and their
-constructor closure marked floor above join B; other rows remain
-**outside** it. Capturing an ID proves keying, not independent source
+The five entrypoint-ABI, three effect/clock and `ITree` type identities
+marked floor above join B alongside the original fifteen. Unscoped
+constructor families reserve bare names; scoped families retain exact
+IDs reachable only through `T.C`, without bare B entries. Other rows
+remain **outside** B. Capturing an ID proves keying, not independent source
 need. `Empty` is read by exact ID but remains internal-only;
 `host_exit` is likewise keyed without independent source need. A future
 `36` contract requiring source to name that exact space identity needs
@@ -207,7 +213,9 @@ For checked definitions the test remains per-name: `leqChar` does not inherit
 `eqChar`'s registry key. If `IOError` qualifies, its thirteen causes are one
 **scoped** family, not thirteen bare B names. D0 still names the native
 producer of each exact cause ID, never inferring all readers from one cause.
-The D0 resolved `Prod`/`MkProd` as a reserved unscoped family. A future
+`ITree` joins the type floor without adding bare `Ret` or `Vis` to B;
+source may bind either under ordinary non-B rules. The D0 resolved
+`Prod`/`MkProd` as a reserved unscoped family. A future
 representation change to kernel `Pair` would be a separate Runtime successor,
 not a second source-visible ABI in this slice.
 
