@@ -207,7 +207,7 @@ theorem expected_intersect_law : IsTrue (interval_inside (interval_intersect lef
 theorem expected_intersect_hull_law : IsTrue (interval_inside left (interval_intersect left (interval_hull left right))) = interval_inside_intersect_hull_left left right
 theorem expected_hull_intersect_law : IsTrue (interval_inside left (interval_hull left (interval_intersect left right))) = interval_inside_hull_left left (interval_intersect left right)
 theorem expected_hull_inside_law : IsTrue (interval_inside (interval_hull left (interval_intersect left right)) left) = interval_hull_intersect_inside_left left right
-theorem expected_same_shape : IsTrue (interval_inside (interval_hull left (interval_intersect left right)) left) = interval_hull_intersect_inside_left left right
+theorem expected_same_shape : IsTrue (interval_inside (interval_hull (interval_intersect left right) left) left) = Proved
 theorem expected_false_value : Equal Bool (interval_inside (interval_hull (interval_intersect left right) right) left) False = Proved
 "#;
 const EXPECTED_REFUSAL: &str = r#"
