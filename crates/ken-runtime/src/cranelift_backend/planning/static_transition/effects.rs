@@ -378,16 +378,15 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
 
 /// The seat contract of one admitted operation at one semantic ordinal.
 ///
-/// **Total over the 22 admitted operations, with no `_` arm**, so a new
-/// admitted operation is a compile error here rather than an operation whose
-/// seats silently have no contract. `None` means the operation has no seat at
-/// that ordinal, which is an arity disagreement and is refused by the caller —
-/// never a seat that is exempt.
+/// **Total over the operations in `CRANELIFT_HOST_EFFECT_CONSUMERS_V1`, with
+/// no `_` arm**, so a new admitted operation is a compile error here rather
+/// than an operation whose seats silently have no contract. `None` means the
+/// operation has no seat at that ordinal, which is an arity disagreement and
+/// is refused by the caller — never a seat that is exempt.
 ///
-/// ⚠ The `Avail` column is where this release's one new capability appears, and
-/// nowhere else: `BufferAllocate.capacity` is the single seat whose exact `Int`
-/// this release can observe through the carrier ABI. Every other `ExactIntU64`
-/// seat stays specialized-only, which is why `Avail` is recorded per seat.
+/// The `Avail` column records per seat whether its exact `Int` is observable
+/// through the carrier ABI (`carried_exact_int`) or stays specialized-only
+/// (`exact_int`). A seat is widened only on a measured, quoted refusal.
 fn host_effect_seat_contract(
     operation: ken_host::HostOpV1,
     slot: EffectSeatSlot,
@@ -540,7 +539,6 @@ fn host_effect_seat_contract(
         // Int decoder and bounds lane handle the widened seat.
         (Op::MappingAcquireFile, 1) => Some(carried_exact_int),
         (Op::MappingAcquireFile, 2) => Some(tag),
-        // ⭐ The one seat this release teaches the carrier to observe.
         (Op::BufferAllocate, 0) | (Op::MappingAllocate, 0) => Some(carried_exact_int),
         (Op::MappingAllocate, 1) => Some(tag),
         (Op::BufferFreeze, 0)
