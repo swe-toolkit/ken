@@ -231,13 +231,27 @@ theorem expect_same_form : Equal Box (intersect (hull box_a box_b) box_b) box_b 
 const EXPECTED_REFUSAL: &str =
     "theorem expected_false : Equal Box (intersect (hull box_a box_b) box_b) box_a = Refl";
 
+// These are checked against the seed's actual boxes, not duplicated fixture
+// constructors in the test. The public corner-wise relation computes both
+// independent directions; the nonempty intersection value is checked above.
+// A contained but otherwise coherent pair cannot satisfy both propositions.
+const NON_CONTAINMENT_CONTROLS: &str = r#"
+import Algorithm.Geometry.NatBox (inside)
+
+theorem box_a_not_inside_box_b : Equal Bool (inside box_a box_b) False = Proved
+
+theorem box_b_not_inside_box_a : Equal Bool (inside box_b box_a) False = Proved
+"#;
+
 /// MEASURED: the complete accepted client root-loads both packages and
 /// checks direct and public-law Nat controls, independent hull/intersection
 /// corners, both mixed results and applications, and inverted-box instances.
-/// The same-form right-operand true control uses Refl. The isolated closed
-/// false equality is AST-pinned and refused at its own Refl after a fresh
-/// accepted prefix. CLAIMED: the left box is structurally recovered for both
-/// mixed operations; moving the shared operand to the right changes the law.
+/// After the full seed, two additional checked `inside` controls establish
+/// that neither fixture box contains the other, in both directions. The
+/// same-form right-operand true control uses Refl. The isolated closed false
+/// equality is AST-pinned and refused at its own Refl after a fresh accepted
+/// prefix. CLAIMED: the left box is structurally recovered for both mixed
+/// operations, and the seed's regular pair overlaps without containment.
 /// THE GAP: these finite clients do not establish the universal law, which
 /// instead rests on the generic kernel-checked bodies above.
 #[test]
@@ -300,7 +314,11 @@ fn full_absorption_seed_checks_and_right_operand_false_claim_refuses() {
     let mut env = loaded_geometry();
     env.elaborate_file(accepted)
         .expect("full accepted §8 client and true same-form control check");
+    env.elaborate_file(NON_CONTAINMENT_CONTROLS)
+        .expect("both regular seed boxes must be non-containing in opposite directions");
     for name in [
+        "box_a_not_inside_box_b",
+        "box_b_not_inside_box_a",
         "nat_min_absorption_value",
         "nat_min_absorption_law",
         "nat_max_absorption_value",
@@ -326,6 +344,9 @@ fn full_absorption_seed_checks_and_right_operand_false_claim_refuses() {
     rejecting
         .elaborate_file(accepted)
         .expect("fresh complete accepted prefix checks before refusal");
+    rejecting
+        .elaborate_file(NON_CONTAINMENT_CONTROLS)
+        .expect("fresh accepted pair independently excludes containment both ways");
     match rejecting.elaborate_file(refused) {
         Err(ElabError::TypeMismatch { span, .. })
             if span.start >= claim_span.start
