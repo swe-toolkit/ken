@@ -800,45 +800,59 @@ sentinel beside the current contract.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
-and legacy single-file. The six bare-name rows assert a surface
-name-resolution refusal for each unqualified constructor; they do not pin
+and legacy single-file. Each of the six bare-name rows reuses the full accepted
+client below, including its local `Effect` record and signature value; it
+changes only the selected constructor qualifier. The rows assert a surface
+name-resolution refusal for each unqualified constructor and do not pin
 route-specific diagnostic variants or payloads.
 
 ### surface/modules/itree-qualified-constructors-resolve-to-checked-family
 
 - promise class: **normative compatibility vector** — the floor family and its
   scoped constructors retain their checked identities
-- spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`; `36 §2.1`/§2.4
+- spec: `30-taxonomy §4`; `31 §2`; `32 §1`; `33 §2`/§3.3;
+  `34 §1.1`; `36 §2.1`/§2.4
 - given: in each fresh route — strict roots, legacy roots, and legacy single-file
   — elaborate:
 
   ```ken
-  const nat_unit_effect : Effect =
-    { Op = Nat, Resp = \op -> Unit }
+  record Effect {
+    op : Type, resp : op → Type
+  }
 
-  fn ret_witness_for (E : Effect) : ITree E Nat =
-    ITree.Ret E Nat Zero
-  fn vis_witness_for (E : Effect) (op : E.Op)
-    (k : E.Resp op -> ITree E Nat) : ITree E Nat =
-    ITree.Vis E Nat op k
-  fn inspect (E : Effect) (tree : ITree E Nat) : Nat =
-    match tree { ITree.Ret value |-> value ; ITree.Vis op k |-> Zero }
+  const nat_unit_effect : Effect = {op = Nat, resp = λop.Unit}
+
+  fn ret_witness_for (e : Effect) : ITree e Nat = ITree.Ret e Nat Zero
+
+  fn vis_witness_for (e : Effect) (op : e.op) (k : e.resp op → ITree e Nat) : ITree e Nat =
+    ITree.Vis e Nat op k
+
+  fn inspect (e : Effect) (tree : ITree e Nat) : Nat =
+    match tree {
+      ITree.Ret value ↦ value;
+      ITree.Vis op k ↦ Zero
+    }
 
   const ret_witness = ret_witness_for nat_unit_effect
-  const vis_witness = vis_witness_for nat_unit_effect Zero
-    (\response -> ret_witness_for nat_unit_effect)
+
+  const vis_witness =
+    vis_witness_for nat_unit_effect Zero (λresponse. ret_witness_for nat_unit_effect)
+
   const inspected_ret = inspect nat_unit_effect ret_witness
+
   const inspected_vis = inspect nat_unit_effect vis_witness
   ```
 
 - expect: every route accepts. `nat_unit_effect` is an `Effect` value with
-  `Op = Nat` and `Resp _ = Unit`. Both witnesses have the specified
-  `ITree E Nat` carrier. The `ITree` type references the exact checked
+  `op = Nat` and `resp _ = Unit`. Both witnesses have the specified
+  `ITree e Nat` carrier. The `ITree` type references the exact checked
   pre-source family identity; `ITree.Ret` and `ITree.Vis` resolve to their
   exact checked constructor identities and retain `ITree` as parent.
-- why: each qualified path is reached through ordinary source typing, not a
-  spelling-only inventory. The two constructor witnesses distinguish the
-  complete scoped family; bare-name behavior has separate rows below.
+- why: the local `Effect` record supplies a source-visible signature without
+  a floor entry; lowercase `op` and `resp` fields make its projections
+  well-formed. Each qualified path is reached through ordinary source typing,
+  not a spelling-only inventory. The two constructor witnesses distinguish
+  the complete scoped family; bare-name behavior has separate rows below.
 
 ### surface/modules/itree-source-name-is-protected-in-all-routes
 
