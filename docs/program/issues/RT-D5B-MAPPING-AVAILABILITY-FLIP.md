@@ -1,7 +1,7 @@
 ---
 id: RT-D5B-MAPPING-AVAILABILITY-FLIP
 title: "Promote MappingAcquireFile out of the RepresentedUnavailable tail: flip site 2 (effect_v1.rs:193) to NativeTested and carry the sites the AC-AVAIL membership rule identifies. Cluster A of the ABI-S6-d5b drain. Gated on RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE, which is what makes site 2 the SINGLE flip point, and on the artifact differential that effect_v1.rs:250 conditions promotion upon. Also holds the Architect's F3 SAFETY-precondition carry."
-status: ready
+status: merged
 owner: runtime
 size: L
 gate: architect
