@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION
 title: "Spec 66 defers derivative/substitution commutation. Rule from a checked D0 at zero trust that the derivative in v of a substituted expression evaluates to the substituted derivative when the substitution's images have derivative one at v and zero elsewhere, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

@@ -12,6 +12,13 @@ github: null
 origin: "Slice 3 of the keyed floor additions, split out of LANG-PRELUDE-FLOOR-KEYED-EFFECTS. Scope: Spec ruling evt_6g6zj2k2vzp5e, confirmed by the Spec Leader in evt_5fw7p5jnrxq3x. Keying: Architect evt_a9zrvmkrazcr. Steward-filed per COORDINATION section 2."
 ---
 
+> **AMENDED 2026-10-29 (Architect `evt_2vg7zkq5yh2va`, hard stop
+> `evt_4zsf5m00r95g7`).** Scoping made the constructor's artifact symbol
+> `ctor:<pkg>::ITree::ITree.Ret`, because `stable_symbols_for_env` takes
+> the post-scoping spelling. Scoping is a surface binding property (spec 34
+> §1.1), so the symbol must stay `T::C`. The fix is in this WP: deliverable
+> item 3 and the restated AC-2 and AC-3 below. Everything else stands.
+
 # The strict floor admits ITree with a scoped constructor family
 
 ## Objective
@@ -72,6 +79,16 @@ base, stop and report the mismatch; do not build around it.
 
    The Spec co-turn on the same branch owns the `spec/` text. CV votes on the
    `spec/` and `conformance/` paths.
+3. **Artifact symbols from the checked leaf (amended).** As ruled:
+   - add `ModuleState::scoped_constructor_leaves(parent_id)` in
+     `modules.rs`, which maps each constructor id to its bare leaf through
+     `constructor_members`;
+   - in `compiler_driver.rs` `stable_symbols_for_env`, name each constructor
+     of a scoped family by that leaf, keyed by `ctor.id`.
+
+   This applies to every scoped family, not only ITree. Runtime code stays
+   out of this WP; the backend's spelling keys for `Ret`/`Vis` are
+   `RT-ITREE-ROLE-IDENTITY-NOT-SPELLING`.
 
 ## Acceptance
 
@@ -82,14 +99,27 @@ base, stop and report the mismatch; do not build around it.
     independently executable row, with the mode's exact error;
   - a source declaration that binds `Ret` or `Vis` is accepted;
   - a same-name source declaration of `ITree` is refused.
-- **AC-2.** The spec count equals `PRELUDE_FLOOR_NAMES.len()`, and
-  `trusted_base()` is unchanged as an identity set. Every hash re-measured on
-  the branch is cause-controlled: its change is attributed to the scoping,
-  and no other hash moves.
+- **AC-2 (amended).** The spec count equals `PRELUDE_FLOOR_NAMES.len()`,
+  and `trusted_base()` is unchanged as an identity set.
+  - Every moved hash is named, with the reason "scoped constructor symbols
+    take the family leaf". This covers every scoped family (ExitCode,
+    ProgramCaps, Coproduct, Instant, ITree, and ResourceKind if it moves).
+    Comments that cite "qualified checked constructor symbols" are
+    corrected.
+  - "No other hash moves" is shown by a control, not asserted: the same
+    qualified sources built with the scoped loop emptied measure the same
+    hashes.
+  - **Neutrality pin.** For each family in the scoped loop, plus
+    ResourceKind, each constructor's stable symbol is looked up by its
+    `GlobalId`. Its final component equals the kernel leaf and contains no
+    `.`. One row fixes the ITree `Ret` symbol's `Display` to end
+    `::ITree::Ret`.
 - **AC-3 (mutation, QA).** Each mutant fails and is restored:
   - removing `ITree` from `PRELUDE_FLOOR_NAMES` reddens its AC-1 row;
   - admitting `ITree` unscoped reddens both bare-constructor refusal rows in
-    both modes.
+    both modes;
+  - reverting the `compiler_driver.rs` hunk reddens both
+    `ken-verify --test px8f_write_partition` and the neutrality pin.
 
 ## Stop conditions
 
