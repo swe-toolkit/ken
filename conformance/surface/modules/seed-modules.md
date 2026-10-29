@@ -526,7 +526,7 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the exact floor is closed
   in both directions
-- spec: `30-taxonomy §4` (closed twenty-four-name prelude floor), `33 §3.3`
+- spec: `30-taxonomy §4` (closed thirty-name prelude floor), `33 §3.3`
   (the exact floor, three Pair companions, and no convenience-global
   fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
@@ -534,16 +534,19 @@ unrelated `ElabEnv` does not satisfy them.
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked uses of all twenty-four roster names in
-     contract-appropriate positions, every exact constructor through values
-     and exhaustive matches, all three Pair companion bindings,
+  1. entry `Floor` contains checked uses of all thirty roster types in
+     contract-appropriate positions, every source-visible constructor through
+     values and exhaustive matches, all three Pair companion bindings,
      `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, a
      `bytes_decode` use matched as `Result Utf8Error String`, and functions
      typed by `Cap a` and `Resource k`. Constructor coverage includes bare
-     `MkUnit`, scoped `Coproduct.InL`/`Coproduct.InR`, `Instant.MkInstant`,
-     `ITree.Ret`, and `ITree.Vis`; its dedicated positive case also matches
-     both scoped constructors. Bare `InL`, `InR`, `MkInstant`, `Ret`, and `Vis`
-     are not prelude references and are covered by separate controls;
+     `MkUnit` and `MkFileError`; scoped `Coproduct.InL`/`InR`,
+     `Instant.MkInstant`, `ITree.Ret`/`Vis`, all thirteen `IOError.C` cases,
+     all three `CreatePolicy.C` cases, and all twelve `ResourceError.C` cases.
+     The `BufferSpan` and `TransferCount` types are reached while their exact
+     constructor ids and parents are recorded as private and unavailable to
+     source. Bare `InL`, `InR`, `MkInstant`, `Ret`, and `Vis` are not prelude
+     references and are covered by separate controls;
   2. entry `Leaky` contains only `pub def X = Ambient`;
   3. entry `Explicit` contains `import Provider (Ambient)` followed by
      `pub def X = Ambient`, while `Provider.ken.md` contains
@@ -558,14 +561,17 @@ unrelated `ElabEnv` does not satisfy them.
   identity; the compiler's internal `Empty` identity does not create a floor
   binding. Arm 5 adds only the explicit import edge. No test-only export map is
   installed.
-- expect: arm 1 accepts and every resolved type, constructor, and Pair-companion
-  reference carries the recorded pre-source `GlobalId`. Arm 2 rejects `Ambient`
+- expect: arm 1 accepts and every resolved type, source-visible constructor,
+  and Pair-companion reference carries the recorded pre-source `GlobalId`;
+  the private `BufferSpan` and `TransferCount` constructors retain their exact
+  recorded parent ids without becoming source-visible. Arm 2 rejects `Ambient`
   as unbound even though the implementation global exists. Arm 3 accepts and
   resolves `X` through the imported provider declaration, not the bare global.
   Arm 4 rejects `Empty` as unbound; arm 5 accepts and resolves it to the
   imported package identity. None changes `trusted_base()`.
 - why: the positive reaches each floor member through ordinary source and the
-  public primitive signatures that require the added types. `Bool` and
+  source-facing contracts for the added types. The eight signature-arm types
+  are reached through actual built-in primitive signatures. `Bool` and
   `Ambient` are definitionally the same in this fixture, so kernel typing cannot
   distinguish arm 2; only source scope can. `Empty` is compiler-internal, not
   a source floor member; its matching import control proves the source package
@@ -585,21 +591,26 @@ sentinel beside the current contract.
   identity and trust do not
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
-  of `Auth`, `Bool`, `Bottom`, `Char`, `Coproduct`, `Equal`, `ExitCode`,
-  `HostIO`, `ITree`, `Instant`, `List`, `Nat`, `Option`, `Pair`, `ProcessInput`,
-  `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceKind`, `Result`, `Top`,
-  `Unit`, and `Utf8Error`;
+  of all thirty names: `Auth`, `Bool`, `Bottom`, `BufferSpan`, `Char`,
+  `Coproduct`, `CreatePolicy`, `Equal`, `ExitCode`, `FileError`, `HostIO`,
+  `IOError`, `ITree`, `Instant`, `List`, `Nat`, `Option`, `Pair`,
+  `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceError`,
+  `ResourceKind`, `Result`, `Top`, `TransferCount`, `Unit`, and `Utf8Error`;
   record every constructor id and kernel parent;
   record `mk_pair`, `pair_fst`, and `pair_snd` plus their exact reference to the
   Pair id; and snapshot `declarations().len()`, `next_global_id()`, and
   `trusted_base()`. Through strict roots elaborate an entry with checked
-  declarations that reach every recorded id, including actual
+  declarations that reach every source-visible recorded id, including actual
   `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
+  Record the exact constructor ids and parent ids for private
+  `PrivateBufferSpan` and `PrivateTransferCount` without resolving either from
+  source.
 - expect: every emitted type/body contains the corresponding recorded id. The
-  exact twenty-four-name prelude roster is `Auth`, `Bool`, `Bottom`, `Char`,
-  `Coproduct`, `Equal`, `ExitCode`, `HostIO`, `ITree`, `Instant`, `List`,
-  `Nat`, `Option`, `Pair`, `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`,
-  `Proved`, `ResourceKind`, `Result`, `Top`, `Unit`, and `Utf8Error`.
+  exact thirty-name prelude roster is `Auth`, `Bool`, `Bottom`, `BufferSpan`,
+  `Char`, `Coproduct`, `CreatePolicy`, `Equal`, `ExitCode`, `FileError`,
+  `HostIO`, `IOError`, `ITree`, `Instant`, `List`, `Nat`, `Option`, `Pair`,
+  `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceError`,
+  `ResourceKind`, `Result`, `Top`, `TransferCount`, `Unit`, and `Utf8Error`.
   `ResourceKind` is
   scoped: its constructor paths are `ResourceKind.FsHandle`,
   `ResourceKind.Buffer`, and `ResourceKind.Mapping`; the bare constructor names
@@ -611,6 +622,12 @@ sentinel beside the current contract.
   | `Auth` | `ANone`, `APartial`, `AFull` |
   | `Bool` | `True`, `False` |
   | `Coproduct` | `Coproduct.InL`, `Coproduct.InR` |
+  | `FileError` | `MkFileError` |
+  | `IOError` | `IOError.AlreadyExists`, `IOError.BrokenPipe`, `IOError.CapabilityDenied`, `IOError.Interrupted`, `IOError.InvalidInput`, `IOError.IsDirectory`, `IOError.NotDirectory`, `IOError.NotEmpty`, `IOError.NotFound`, `IOError.Other`, `IOError.PermissionDenied`, `IOError.Revoked`, `IOError.Unsupported` |
+  | `CreatePolicy` | `CreatePolicy.CreateNew`, `CreatePolicy.CreateOrTruncate`, `CreatePolicy.CreateOrKeep` |
+  | `ResourceError` | `ResourceError.ResourceHostIO`, `ResourceError.Closed`, `ResourceError.MalformedResource`, `ResourceError.RightNotHeld`, `ResourceError.ReleaseFailed`, `ResourceError.ResourceKindMismatch`, `ResourceError.BufferLimit`, `ResourceError.AllocationFailed`, `ResourceError.InvalidOffset`, `ResourceError.InvalidBounds`, `ResourceError.NoProgress`, `ResourceError.MappingLimit` |
+  | `BufferSpan` | `PrivateBufferSpan` (private; not source-visible) |
+  | `TransferCount` | `PrivateTransferCount` (private; not source-visible) |
   | `List` | `Nil`, `Cons` |
   | `Nat` | `Zero`, `Suc` |
   | `Option` | `None`, `Some` |
@@ -628,7 +645,11 @@ sentinel beside the current contract.
   `Coproduct` and `Instant` are scoped: bare `InL`, `InR`, and `MkInstant`
   remain unavailable. `ITree` is scoped: `ITree.Ret` and `ITree.Vis` retain
   their checked IDs, while bare `Ret` and `Vis` are not reserved and may be
-  bound by source. `Unit` is unscoped and keeps bare `MkUnit`.
+  bound by source. `FileError` is unscoped and keeps bare `MkFileError`;
+  `IOError`, `CreatePolicy`, and `ResourceError` use only their qualified
+  constructor paths. `BufferSpan` and `TransferCount` retain private
+  constructors, with no bare or qualified source constructor path. `Unit` is
+  unscoped and keeps bare `MkUnit`.
   `Char`, `HostIO`, and checked-transparent `Pair` have no constructors.
   Pair's three companions are bindings, not type members, and each resolves to
   its recorded id. Every constructor still reports the recorded parent.
@@ -648,8 +669,9 @@ sentinel beside the current contract.
   `ResourceKind.FsHandle`, `.Buffer`, and `.Mapping` paths are the contract in
   `30-taxonomy §4` and `33 §3.3`, realized at
   `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **CURRENT CONTRACT:** this
-  row now specifies the twenty-four-name roster, including ITree and its
-  scoped constructors. This is a conformance expectation, not a measurement;
+  row now specifies the thirty-name roster, including the six FS/resource
+  additions and their constructor dispositions. This is a conformance
+  expectation, not a measurement;
   no official conformance-runner result is claimed. **THE GAP:** every
   constructor must retain its recorded parent identity, and equal-shaped or
   same-spelling substitutions must not replace a floor identity.
@@ -1136,7 +1158,7 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | twenty-four exact type identities and their parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`, definitionally equal ambient type, imported control |
+| floor/global | all thirty type ids and source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
@@ -1753,11 +1775,13 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all twenty-four prelude roster names, every exact constructor,
-  and all three Pair companions accept on the recorded ids, including the
-  public primitive signatures that require the signature arm. `Coproduct`,
-  `Instant`, and `ITree` constructors require their scoped paths; `Unit` keeps
-  bare `MkUnit`. The protected-name matrix specifies same-production refusals
+  Strict uses of all thirty prelude roster names, every source-visible
+  constructor, and all three Pair companions accept on the recorded ids.
+  `FileError` keeps bare `MkFileError`; `IOError`, `CreatePolicy`, and
+  `ResourceError` constructors require their scoped paths. `BufferSpan` and
+  `TransferCount` retain private constructors. `Coproduct`, `Instant`, and
+  `ITree` constructors require their scoped paths; `Unit` keeps bare `MkUnit`.
+  The protected-name matrix specifies same-production refusals
   and renamed controls for its sixteen parent rows and ten unscoped constructor
   families; `Char` and Pair have separate rows. The ITree cases additionally
   test exact constructor paths, both bare-name refusals and bindings, and the

@@ -79,6 +79,12 @@ and no-allocation witnesses. This is the surface analog of the kernel's closed
 | **`Instant`** | internal provision: `now` names its canonical clock result (`36 §1.1`) | exact pre-source type id; clock construction uses scoped `Instant.MkInstant`. |
 | **`Unit`** | internal provision: effect responses require the canonical result type (`36 §1.1`, §2.1) | exact pre-source type id; its exact-parent `MkUnit` remains bare. |
 | **`ITree`** | internal provision: effects require source to name the canonical tree family (`36 §2.1`, §2.4) | exact checked pre-source identity is keyed by effect lowering and the host interpreter; `ITree.Ret` and `ITree.Vis` are its complete scoped family. |
+| **`FileError`** | internal provision: public `readFile`/`writeFile` result carrier (`38 §1.3.1`) | native code produces exact `MkFileError`, fixing its parent; the complete constructor family is unscoped. |
+| **`IOError`** | internal provision: public file-error cause family, including `Revoked` (`38 §1.3.1`, §1.8) | native code produces all thirteen exact cause IDs; source uses scoped `IOError.C` paths. |
+| **`CreatePolicy`** | internal provision: public `writeFile` parameter (`38 §1.3.1`) | native code reads the three exact policy constructor IDs; source uses scoped `CreatePolicy.C` paths. |
+| **`BufferSpan`** | internal provision: public bounded-transfer argument (`38 §1.7.1–2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
+| **`TransferCount`** | internal provision: public read/write progress carrier (`38 §1.7.2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
+| **`ResourceError`** | internal provision: public resource-operation result carrier (`38 §1.7.1–2`) | native code produces all twelve exact constructor IDs; source uses scoped `ResourceError.C` paths. |
 | **`Ω` (Omega)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
 The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
@@ -89,19 +95,26 @@ ResourceKind, Result, Utf8Error}`**. The internal-provision arm adds
 effect/clock identities `{Coproduct, Instant, Unit}`, and the source-required
 `ITree` identity (`30-taxonomy §4`). The prior roster had 23 names; this
 candidate adds `ITree` as the twenty-fourth. The original
-fifteen were realized at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. For
-every inductive member, the floor admits constructors only by matching their
-kernel-recorded parent `GlobalId`. `ResourceKind` is scoped: its constructors
-are available as `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
-`ResourceKind.Mapping`, not as bare names. `ExitCode` and `ProgramCaps` are
-also scoped; their constructor names are respectively `ExitCode.Success`,
-`ExitCode.Failure`, and `ProgramCaps.MkProgramCaps`. `ProcessInput`, `Prod`,
-and `Unit` bring their bare constructor names `MkProcessInput`, `MkProd`, and
-`MkUnit`. `Coproduct` and `Instant` are scoped: only `Coproduct.InL`,
-`Coproduct.InR`, and `Instant.MkInstant` resolve; bare `InL`, `InR`, and
-`MkInstant` do not. `ITree` is scoped as a complete family: `ITree.Ret` and
-`ITree.Vis` retain their exact constructor identities; bare `Ret` and `Vis`
-are not floor names or reserved and remain available to source declarations.
+fifteen were realized at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. This
+FS/resource slice adds six identities to that historical 24-name floor,
+closing the current 30-name roster. For every inductive member, the floor
+admits constructors only by matching their kernel-recorded parent `GlobalId`.
+`ResourceKind` is scoped: its constructors are available as
+`ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`,
+not as bare names. `ExitCode` and `ProgramCaps` are also scoped; their
+constructor names are respectively `ExitCode.Success`, `ExitCode.Failure`,
+and `ProgramCaps.MkProgramCaps`. `ProcessInput`, `Prod`, and `Unit` bring
+their bare constructor names `MkProcessInput`, `MkProd`, and `MkUnit`.
+`Coproduct` and `Instant` are scoped: only `Coproduct.InL`, `Coproduct.InR`,
+and `Instant.MkInstant` resolve; bare `InL`, `InR`, and `MkInstant` do not.
+`ITree` is scoped as a complete family: `ITree.Ret` and `ITree.Vis` retain
+their exact constructor identities; bare `Ret` and `Vis` are not floor names
+or reserved and remain available to source declarations. `FileError` is
+unscoped, retaining bare `MkFileError`. `IOError`, `CreatePolicy`, and
+`ResourceError` are scoped complete families: their source paths are
+`IOError.C`, `CreatePolicy.C`, and `ResourceError.C`, with no bare cases
+reserved. `BufferSpan` and `TransferCount` are scoped types whose constructors
+remain private and unavailable by either bare or qualified source spelling.
 `Char`, `HostIO`, and transparent `Pair` have no constructor arm. Pair's
 companion inventory is exactly `{mk_pair, pair_fst, pair_snd}`; each checked
 type is keyed to the exact Pair id. Every listed family, definition,
@@ -117,7 +130,7 @@ possession.
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently record the
-  `GlobalId` and actual declaration kind for each name in the twenty-four-name
+  `GlobalId` and actual declaration kind for each name in the thirty-name
   roster, keeping type-forming identities distinct from the `Top`/`Bottom`
   proposition constants and the `Proved : Top` proof binding. Also record each
   constructor id and parent, the three Pair companion ids and checked types,
@@ -125,20 +138,22 @@ possession.
   declarations by helper name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
-  internal-provision name set `{Nat, Pair, Equal, ExitCode, HostIO,
-  ProcessInput, Prod, ProgramCaps, Prop, Proved, Top, Bottom, Coproduct,
-  Instant, Unit, ITree}` closes the twenty-four-name roster. `Proved` has type
-  `Top` and is a proof binding, not a type former. The constructor set is
-  exactly the constructors recorded under the seven inductive signature
-  members plus `Nat`, `ExitCode`, `ProcessInput`, `Prod`, `ProgramCaps`,
-  `Coproduct`, `Instant`, `Unit`, and `ITree`; scoped families use only `T.C`
-  in source;
-  no same-spelling constructor with another parent qualifies. The separate
-  companion set is exactly `{mk_pair, pair_fst, pair_snd}`, and every companion
-  type references the exact Pair id. Installing the floor changes neither the
-  declaration count nor allocator position. None of the twenty-four roster
-  identities, constructor identities, or Pair-companion identities enters
-  `trusted_base()`.
+  internal-provision set `{Nat, Pair, Equal, ExitCode, HostIO, ProcessInput,
+  Prod, ProgramCaps, Prop, Proved, Top, Bottom, Coproduct, Instant, Unit,
+  ITree, BufferSpan, CreatePolicy, FileError, IOError, ResourceError,
+  TransferCount}` closes the thirty-name roster. `Proved` has type `Top` and
+  is a proof binding, not a type former. The constructor set is the exact
+  parent-derived closure, including all constructors of the six added families:
+  `MkFileError` remains bare; all thirteen `IOError` causes, the three
+  `CreatePolicy` cases, and all twelve `ResourceError` cases are scoped; the
+  `BufferSpan` and `TransferCount` constructors retain private visibility.
+  Existing constructor dispositions remain unchanged, including bare `MkUnit`
+  and scoped `Coproduct`, `Instant`, and `ITree`; no same-spelling constructor
+  with another parent qualifies. The separate companion set is exactly
+  `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
+  Pair id. Installing the floor changes neither the declaration count nor
+  allocator position. None of the thirty roster identities, constructor
+  identities, or Pair-companion identities enters `trusted_base()`.
 - controls: prove both equality directions with compile-preserving mutations.
   For under-inclusion, install a checked `Extra` type and a real test-only
   primitive whose signature names `Extra`, leaving the configured floor
@@ -278,10 +293,10 @@ ordinary data representation.
 - **AC2** (prelude closed by the two-arm rule): §B — executable traversal of
   every primitive type closes the eight-member signature set; exact-identity,
   origin, and no-allocation witnesses add the internal set `{Nat, Pair}` (and
-  the five kernel-machinery-keyed `30-taxonomy §4` members), and include the
-  five entrypoint-ABI and three effect/clock identities, plus the scoped
-  `ITree` family. The inventory yields the twenty-four-name roster, three Pair
-  companions, and constructor closure. The `OrdResult` bloat
+  the five kernel-machinery-keyed `30-taxonomy §4` members), the five
+  entrypoint-ABI and three effect/clock identities, the scoped `ITree` family,
+  and the six FS/resource types. The inventory yields the thirty-name roster,
+  three Pair companions, and constructor closure. The `OrdResult` bloat
   finding proves the opposite direction (ruled remove; `Ordering`→package,
   §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/
