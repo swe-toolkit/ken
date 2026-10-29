@@ -77,3 +77,11 @@ guard. 2 fired: `frame_calls` has a single writer at `:12392`, as the Adversary
 measured, so a row must fill it directly to reach past the first line. 3
 fired: the Adversary grepped `frame_calls`, `certified_frame_call_exempt` and
 `frame_non_retaining` across `crates/`, and every hit is in `units.rs`.
+
+## Hard-stop inventory (§1b)
+
+§1a count (caller-guard pinning): 1 (Architect `evt_38t04nvmh6gte`).
+
+1. The location-slot guard is implied by the frame, services and scan
+   guards because the caller index and container edges share decoding
+   (keyed on index-protocol coupling).

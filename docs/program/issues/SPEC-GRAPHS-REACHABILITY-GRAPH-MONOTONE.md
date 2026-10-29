@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE
 title: "Spec 62 proves reachability monotone in the target predicate, but no law says it is monotone in the graph: adding edges cannot lose a reachable target. Rule from a checked D0 at zero trust the public law and whether the walk lifting it needs is a public operation or a private helper, and state the law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

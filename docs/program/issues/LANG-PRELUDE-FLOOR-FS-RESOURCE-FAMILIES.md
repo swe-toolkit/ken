@@ -76,13 +76,19 @@ base, stop and report the mismatch; do not build around it.
   - each scoped family's `T.C` resolves to its checked constructor id, and the
     bare spelling is refused;
   - a same-name source declaration of an admitted type is refused;
-  - one row the table keeps internal is refused as a source name.
+  - in strict mode, `BufferWindow` is absent from `PRELUDE_FLOOR_NAMES`
+    and a same-name source declaration of it is accepted, paired with
+    the `BufferSpan` same-name refusal. In legacy mode its resolution is
+    unchanged from the cut base (amended `evt_2vnx26mfhn0bh`: the AC-0
+    table keeps no row internal-only).
 - **AC-2.** The spec count equals `PRELUDE_FLOOR_NAMES.len()`. The census diff
   is deletion-only, with predicted pairs.
 - **AC-3.** `trusted_base()` is unchanged as an identity set.
 - **AC-4 (mutation, QA).** Removing one admitted name from
   `PRELUDE_FLOOR_NAMES` reddens its AC-1 row. Admitting `IOError` unscoped,
-  if it is admitted, reddens the bare `NotFound` refusal row.
+  if it is admitted, reddens the bare `NotFound` refusal row. Adding
+  `BufferWindow` to `PRELUDE_FLOOR_NAMES` reddens its strict acceptance
+  row.
 
 ## Stop conditions
 
@@ -94,5 +100,6 @@ Checks: 6 fired: the candidate group is the ledger's FS and resource rows, and
 the slice claims no member's witness. AC-0 measures each row individually,
 because the ledger states that a shared reader is not a keying proof. 3 fired:
 the migration population is the deliverable's census, not a count in this
-frame, since ITree's landing moves it. 8 fired: AC-1's internal-row refusal
-fails if the slice admits by family label instead of by the table.
+frame, since ITree's landing moves it. 8 fired: AC-1's paired `BufferWindow`
+acceptance and `BufferSpan` refusal fail if the slice admits by family
+label instead of by the table.

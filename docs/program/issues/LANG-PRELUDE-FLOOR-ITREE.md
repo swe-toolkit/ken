@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-FLOOR-ITREE
 title: "Admit ITree to the reserved strict prelude floor as the third keyed-additions slice, with its unchanged constructors scoped as ITree.Ret and ITree.Vis, bare Ret and Vis freed rather than reserved, and the spec roster, count and PRELUDE_FLOOR_NAMES changing together"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1

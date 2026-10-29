@@ -12,6 +12,40 @@ tier: T1
 origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's OPERATIVE base is a separate value living in frame 4a-pin and MAY DIFFER from this SHA -- it already does."
 ---
 
+> # INCREMENT C, released after RT-CERTIFIER-FRAME-CALL-EXEMPT-CALLER-PIN.
+>
+> This banner supersedes the banners below wherever they conflict.
+> Increments A (`bd5c64ed1`) and B (`afc5e0fae`) are merged. C is amendment
+> 8's consumer relocation (frame §6). It is L, T1, gate architect. Its base is
+> the main named at kickoff, written into frame §4a-pin.
+>
+> - **The census moved.** Frame §6e was measured before A landed. On
+>   `fd2f57557` over `crates/`, `constructed_context_frame` has 0
+>   occurrences (§6e: 11), `detached_return_context` has 12 (§6e: 0), and
+>   `detached_post_call_consumer_frames` has 4 (§6e: 0). Amendment 8's
+>   writer and readers (`core.rs:12081`, `calls.rs:1165`, `core.rs:14827`)
+>   were measured on WIP `b601e2ec7`, not on main.
+> - **AC-C0 first (D0, Architect, on the kickoff base).** Re-measure
+>   amendment 8's census on main: the frame writer, its readers, and every
+>   site that emits a detached post-call consumer. Rule one of:
+>   - **(R) relocate:** a wrong-site consumer replay exists on main. Name
+>     the creation-site function and the producer-side site, and the
+>     implementer relocates per §6 with all five §6b controls.
+>   - **(Z) already satisfied:** main has no producer-side consumer replay,
+>     because A's static-response route realizes the exact call word at the
+>     owner (`evt_3adhrn49d55h3`). Name the measured witness for control 2
+>     (the call is satisfied at the creation site) and control 3 (no
+>     wrong-site replay). C then closes without code, and HS18 closes with it.
+> - **Fences.** §6c's not-authorized list holds in full. A ruling that
+>   needs a new carrier, phase tag, second planner relation or runtime
+>   object is a stop for the operator, not a widening.
+>
+> Checks: 3 fired: the four §6e spellings and `constructed_context_frame`
+> were recounted over `crates/` on `fd2f57557`, and three counts moved, so
+> the frame's census is not reused. 8 fired: (Z) is accepted only with the
+> control-2 and control-3 witnesses, which a main that still replays at the
+> producer site would fail.
+
 > # ACTIVE 2026-10-27: INCREMENT A REBASES DIRECTLY ONTO MAIN.
 >
 > This banner supersedes every banner below wherever they conflict,
