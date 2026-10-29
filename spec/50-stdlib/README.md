@@ -295,8 +295,8 @@ edge by edge through a private `walk_lift`. Architect's D0 on
 proof with no `Axiom` and equal scratch trust identities 114 → 114.
 The §7 seed is assigned at
 `conformance/stdlib/graphs/seed-reachability-graph-monotone.md`;
-this spec-only turn does not deliver that seed, the catalog export,
-or a package-owned test. Scratch D0 and spec authorship do not establish
+this assembled candidate adds that seed, the catalog export and a
+package-owned test. Scratch D0 and spec authorship do not establish
 official conformance, CI, publication, landing or landed trust. No second
 fixed point is added.
 

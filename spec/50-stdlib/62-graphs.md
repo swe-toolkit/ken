@@ -24,10 +24,11 @@
 > accepted seed and isolated refusal; that is not official conformance-
 > runner execution, CI, publication, landing or landed trust. Section 7
 > specifies one public graph-monotonicity law; its checked proof and seed
-> were measured only in Architect's isolated D0. The §7 catalog export,
-> package-owned test and authored conformance seed are not delivered by this
-> spec-only turn. No kernel, trust, or surface-syntax change or revision to
-> §61 §2 is required.
+> were first measured in Architect's isolated D0. This assembled candidate
+> adds the §7 catalog export, its authored seed and a package-owned test;
+> these candidate-local checks are not official conformance-runner execution,
+> CI, publication, landing or landed trust. No kernel, trust, or surface-syntax
+> change or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -669,9 +670,9 @@ execution, CI, publication, landing or landed trust.
 > on `944cabd38344c9118f50692b510ac57da7ec8bf8` checked the generic
 > proof and independent client with `ken check` and `ken fmt --check` rc 0,
 > no `Axiom`, and equal scratch `trusted_base()` identity sets (114 → 114).
-> This spec-only turn does not deliver the catalog export, conformance seed,
-> package-owned test, official conformance execution, CI, publication,
-> landing, or landed trust.
+> This assembled candidate adds the catalog export, the conformance seed and
+> a package-owned test; it does not establish official conformance execution,
+> CI, publication, landing, or landed trust.
 
 `Algorithm.Graphs.Dependency` must export the following public Transparent law
 immediately after `graph_reachable_target_monotone`. The pointwise `included`
