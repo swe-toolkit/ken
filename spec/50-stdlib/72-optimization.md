@@ -20,9 +20,11 @@
 > 1.6 specifies two further public checked append-selection laws;
 > Architect's isolated D0 on `c99b3e998` checked their generic proofs
 > with no new `Axiom` and unchanged scratch trusted identities 114 → 114.
-> Its catalog exports, seed and test are separate candidate work, not
-> delivered by this spec-only turn. Section 2's catalog module and
-> seed are present on main. Section 3's greatest-cost selector and
+> This assembled candidate includes the §1.6 checked catalog exports,
+> CV seed and package-owned test. Its candidate-local checks are not
+> official conformance-runner execution, CI, publication, landing or
+> landed trust. Section 2's catalog module and seed are present on main.
+> Section 3's greatest-cost selector and
 > seven laws are landed; §3.4 specifies the Option-returning extension
 > and its four laws from Architect-checked D0. The §3.4 catalog exports,
 > seed and package test are now present on main; the package test is not
@@ -422,10 +424,14 @@ bodies, a generic public client, the closed tie and strict-right
 instances, and isolated false claims with `ken check` rc 0 for the
 accepted fixtures, no `Axiom`, and unchanged scratch `trusted_base()`
 GlobalId sets 114 → 114. The private helpers refused import. This is
-scratch design evidence, not catalog delivery, official conformance,
-CI, publication or landed trust. This spec-only turn introduces no
-catalog export, conformance seed, test, new primitive, kernel or
-surface feature.
+scratch design evidence, not itself catalog delivery. This assembled
+candidate includes the two checked §1.6 catalog exports, the CV seed,
+and a package-owned test of the complete accepted client and isolated
+later-tie refusal. Candidate-local checks pass 2/2, and a true-neighbor
+mutation reddens the isolated refusal at its behavioral assertion.
+Neither the scratch D0 nor these candidate-local checks are official
+conformance-runner execution, CI, publication, landing or landed trust.
+No new primitive, kernel or surface feature is introduced.
 
 ## 2. Least witness below a finite bound
 

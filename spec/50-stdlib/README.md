@@ -679,8 +679,11 @@ landed trust. Section 1.6 specifies two public checked laws for
 minimum is strictly cheaper, and keep the left part on a tie.
 Architect's isolated D0 on `c99b3e998` checked the generic proofs
 with no new `Axiom` and equal scratch trusted identities 114 → 114.
-Its catalog exports, CV seed and package-owned test belong to later
-candidate turns; this spec-only turn establishes none of them.
+This assembled candidate includes its two checked catalog exports,
+the CV seed and a package-owned test of the complete accepted client
+and isolated later-tie refusal. Scratch D0 and candidate-local checks
+are not official conformance-runner execution, CI, publication,
+landing or landed trust.
 Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
 `Nil` yields `None`, and `Cons` yields `Some` of `argmax` over
 `nonempty_cons`. Four laws give the two equations and direct-to-`List`
