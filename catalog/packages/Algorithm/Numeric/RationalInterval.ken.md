@@ -1185,6 +1185,14 @@ inner interval lies inside both intersection operands and so lies inside
 their intersection. These endpoint-value proofs require no nonempty or
 ordered-endpoint premise, including for inverted intervals.
 
+The two absorption laws apply the bound laws without splitting endpoints.
+`interval_inside_intersect_hull_left` passes `interval_intersect_greatest`
+reflexivity and the left hull inclusion; `interval_hull_intersect_inside_left`
+passes `interval_hull_least` reflexivity and the left intersection inclusion.
+Each partner direction is an instance of one of those two inclusion laws, so
+both absorptions hold as mutual endpoint-value inclusion, not structural
+equality.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
