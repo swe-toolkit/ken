@@ -900,9 +900,8 @@ second composes §7's `interval_hull_least i (interval_intersect i j) i`
 with `interval_inside_refl i` and `interval_intersect_inside_left i j`.
 Neither proof requires a helper, an `Axiom`, or a Rational export;
 private `equiv_leq` and `rational_distrib_r` remain private and unused.
-The new laws belong immediately after `interval_intersect_greatest`
-and before private `equiv_leq` in the catalog. That placement is an
-obligation for the later catalog turn, not an edit in this spec turn.
+The new laws sit immediately after `interval_intersect_greatest`
+and before private `equiv_leq` in the catalog.
 All §1–§7 operations and law types remain unchanged.
 
 The assigned closed seed is
@@ -918,5 +917,7 @@ rejects both a `Proved` body and a body using
 and an independently computed `False`
 isolate the false endpoint comparison rather than a malformed proof
 form. The closed checks illustrate the four directions; they do not
-prove the generic laws. The §8 seed, catalog implementation and package
-test are owed in later, separately owned turns.
+prove the generic laws. The package-owned
+`cat_numeric_interval_hull_intersect_absorption` test checks the seed's
+accepted client and isolated refusal against the two §8 catalog laws; it
+is not official conformance-runner execution.
