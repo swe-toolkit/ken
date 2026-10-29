@@ -12,15 +12,18 @@ github: null
 origin: "Architect review evt_4em6knbncena7 of RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER (zero-argument call after escape; requested by the Runtime Leader evt_7jbmssk0bvjtw). Widened by Architect ruling evt_2tsqhgywfxdb to fold in Adversary finding evt_3v8e7x9w7ar4f (stack_load reload, on 28f3dbb36) and a third gap read by the Architect (retention before an unknown store). Should-fix before ABI-S6-HS18-MAIN-BASED-CLOSURE increment C. Steward-filed per COORDINATION section 2."
 ---
 
-> **AMENDED 2026-10-29 (Architect `evt_zdyes4xcv8fc`, then
-> `evt_15rkc0pjxhm1z`; hard stops `evt_3pjmdgmw69zt8`, `evt_3ts5d91sq7amt`;
+> **AMENDED 2026-10-29 (Architect `evt_zdyes4xcv8fc`, `evt_15rkc0pjxhm1z`,
+> then `evt_5gty25zxqwndr` after a QA block of `9288e1902`; hard stops
+> `evt_3pjmdgmw69zt8`, `evt_3ts5d91sq7amt`;
 > §1a count 2).** Rules (i) and (ii) refused two `SP_A_FREEZE` rows in
 > `rt_span_prov_native`, and the bisect showed each rule refuses on its own.
 > The WP is split:
 > - rule (i) is replaced by (i');
 > - rule (ii) applies to calls only;
 > - gap (c), retention before an unknown store, leaves this WP for
->   `RT-CERTIFIER-CALLEE-SLOT-RETENTION`, together with P4 and m3.
+>   `RT-CERTIFIER-CALLEE-SLOT-RETENTION`, together with P4 and m3;
+> - each `stack_slot_stores` writer arm gets its own pin (P6, P7) and
+>   mutant (m5a, m5b).
 >
 > The Deliverable and Acceptance below are the amended ones.
 
@@ -91,18 +94,29 @@ queries `reaching_memory_states_before(A, return)`.
   `{Unknown}`. Red first.
 - **P5.** `v = stack_load A` (the scalar 7), store v to heap `0x1000`, then
   a zero-argument call gives `{Exact}`. Red first against rule (i).
+- **P6.** `store stack_addr(A), stack_addr(C)`; `p = stack_load C`;
+  `store 9, p` gives `{Unknown}`. It pins the `Store` format arm, which
+  also covers `istore8/16/32`; those get no separate rows.
+- **P7.** The same shape with a direct `atomic_store stack_addr(A),
+  stack_addr(C)` gives `{Unknown}`. It pins the `StoreNoOffset` arm, whose
+  only opcode is `atomic_store`. Do not use the `StoreForm::Atomic` helper,
+  which emits `atomic_rmw`.
 - **Precision controls.** Each keeps `{Exact}`:
-  - `stack_store 7, A; p = load(iconst 0x1000); store 9, p`, with no call;
+  - `stack_store 7, A; p = load(iconst 0x1000); store 9, p`, a heap store
+    with no leak, followed by an unrelated zero-argument call;
   - `stack_load E` passed to a call, where `E` never held A's address.
 
 ## Acceptance
 
-- **AC-1.** P1, P2, P3, P5 and both precision controls pass. Each red-first row is
-  shown red on the cut base.
+- **AC-1.** P1, P2, P3, P5, P6, P7 and both precision controls pass. Each
+  red-first row is shown red on the cut base.
 - **AC-2.** Each mutant reddens its pins and is restored byte-identically:
   - m1, drop the `StackLoad` arm: P1's `stack_load` rows and P2;
   - m2, move `escaped` back inside the argument loop: P3;
-  - m4, make `location_leaked_before` always true: both precision controls.
+  - m4, make `location_leaked_before` always true: both precision controls;
+  - m5a, remove only `Store` from the writer or-pattern: P6 red, P1 and P7
+    green;
+  - m5b, remove only `StoreNoOffset`: P7 red, P1 and P6 green.
 - **AC-3.** The named native population used in the mixed-caller AC-3
   (`rt_parity_native` named rows, `rt_span_prov_native`,
   `px7f_resource_native`, the lib fixtures) is green on the candidate.
