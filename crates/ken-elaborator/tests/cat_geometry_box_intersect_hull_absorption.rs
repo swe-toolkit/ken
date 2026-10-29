@@ -231,27 +231,35 @@ theorem expect_same_form : Equal Box (intersect (hull box_a box_b) box_b) box_b 
 const EXPECTED_REFUSAL: &str =
     "theorem expected_false : Equal Box (intersect (hull box_a box_b) box_b) box_a = Refl";
 
-// These are checked against the seed's actual boxes, not duplicated fixture
-// constructors in the test. The public corner-wise relation computes both
-// independent directions; the nonempty intersection value is checked above.
-// A contained but otherwise coherent pair cannot satisfy both propositions.
-const NON_CONTAINMENT_CONTROLS: &str = r#"
-import Algorithm.Geometry.NatBox (inside)
+// These kernel-checked facts use the actual seed boxes, not duplicated box
+// constructors. Both `inside` directions exclude nesting. The SAME point
+// belongs to both via `contains`, independently of the seed's intersection
+// result constant: disjoint boxes can still satisfy that value equation.
+const FIXTURE_GEOMETRY_CONTROLS: &str = r#"
+import Algorithm.Geometry.NatBox (inside, contains, MkPoint)
 
 theorem box_a_not_inside_box_b : Equal Bool (inside box_a box_b) False = Proved
 
 theorem box_b_not_inside_box_a : Equal Bool (inside box_b box_a) False = Proved
+
+theorem shared_point_inside_box_a :
+  Equal Bool (contains box_a (MkPoint three one)) True = Proved
+
+theorem shared_point_inside_box_b :
+  Equal Bool (contains box_b (MkPoint three one)) True = Proved
 "#;
 
 /// MEASURED: the complete accepted client root-loads both packages and
 /// checks direct and public-law Nat controls, independent hull/intersection
 /// corners, both mixed results and applications, and inverted-box instances.
-/// After the full seed, two additional checked `inside` controls establish
-/// that neither fixture box contains the other, in both directions. The
-/// same-form right-operand true control uses Refl. The isolated closed false
-/// equality is AST-pinned and refused at its own Refl after a fresh accepted
-/// prefix. CLAIMED: the left box is structurally recovered for both mixed
-/// operations, and the seed's regular pair overlaps without containment.
+/// After the full seed, two checked `inside` controls reject containment
+/// in either direction. Two checked `contains` controls require one shared
+/// point of both actual seed boxes, establishing overlap independently of
+/// the declared intersection-result constant. The same-form right-operand
+/// true control uses Refl. The isolated false equality is AST-pinned and
+/// refused at its own Refl after a fresh accepted prefix. CLAIMED: the left
+/// box is structurally recovered, and the regular seed pair overlaps without
+/// either box containing the other.
 /// THE GAP: these finite clients do not establish the universal law, which
 /// instead rests on the generic kernel-checked bodies above.
 #[test]
@@ -314,11 +322,13 @@ fn full_absorption_seed_checks_and_right_operand_false_claim_refuses() {
     let mut env = loaded_geometry();
     env.elaborate_file(accepted)
         .expect("full accepted §8 client and true same-form control check");
-    env.elaborate_file(NON_CONTAINMENT_CONTROLS)
-        .expect("both regular seed boxes must be non-containing in opposite directions");
+    env.elaborate_file(FIXTURE_GEOMETRY_CONTROLS)
+        .expect("regular seed boxes must overlap without containing each other");
     for name in [
         "box_a_not_inside_box_b",
         "box_b_not_inside_box_a",
+        "shared_point_inside_box_a",
+        "shared_point_inside_box_b",
         "nat_min_absorption_value",
         "nat_min_absorption_law",
         "nat_max_absorption_value",
@@ -345,8 +355,8 @@ fn full_absorption_seed_checks_and_right_operand_false_claim_refuses() {
         .elaborate_file(accepted)
         .expect("fresh complete accepted prefix checks before refusal");
     rejecting
-        .elaborate_file(NON_CONTAINMENT_CONTROLS)
-        .expect("fresh accepted pair independently excludes containment both ways");
+        .elaborate_file(FIXTURE_GEOMETRY_CONTROLS)
+        .expect("fresh accepted pair overlaps without either containment");
     match rejecting.elaborate_file(refused) {
         Err(ElabError::TypeMismatch { span, .. })
             if span.start >= claim_span.start
