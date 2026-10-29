@@ -232,14 +232,30 @@ the specificity rule: the generic injections and clock constructor are
 qualified as `Coproduct.InL`, `Coproduct.InR`, and
 `Instant.MkInstant`; `Unit` keeps its bare `MkUnit` constructor.
 
-Thus the closed **floor-identity roster** has twenty-three names:
+`ITree` satisfies the same internal-provision conjunction. The
+compiler installs one kernel-checked inductive before source resolution
+and captures its `PreludeEnv.itree_id` with the checked `Ret` and `Vis`
+constructor IDs. Effect lowering and the host interpreter select that
+family and its constructors by exact identity; a same-shaped source
+`ITree` cannot substitute for the installed family. The effect surface
+independently requires programs to name `ITree` and construct its
+`Ret`/`Vis` nodes (`36 §2.1`, §2.4). The source-required type enters the
+floor under its existing spelling, not as a primitive or a new kind of
+membership witness. Its complete constructor family is scoped as
+`ITree.Ret` and `ITree.Vis`: the unchanged checked constructor IDs
+remain reachable, while bare `Ret` and `Vis` are neither floor names
+nor reserved spellings. Other source declarations may bind those bare
+names under the ordinary non-B clash and visibility rules (`33 §3.3`).
+
+Thus the closed **floor-identity roster** has twenty-four names:
 **`{Auth, Bool, Bottom, Char, Coproduct, Equal, ExitCode, HostIO,
-Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop,
-Proved, ResourceKind, Result, Top, Unit, Utf8Error}`**. The original
-fifteen, five entrypoint identities and three effect/clock identities
-remain re-checked, with no new postulate or `trusted_base()` entry.
-Constructor and companion closures are separate from this
-23-name count. The definable `And`/`Dec`/`Yes`/`No` stay **out**
+ITree, Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
+Prop, Proved, ResourceKind, Result, Top, Unit, Utf8Error}`**. The
+original fifteen, five entrypoint identities, three effect/clock
+identities and `ITree` remain re-checked; floor admission alone adds
+no postulate or `trusted_base()` entry. Constructor and companion
+closures are separate from this 24-name count. The definable
+`And`/`Dec`/`Yes`/`No` stay **out**
 (source-constructible, with a `Core/Logic` package home, and no
 internal-provision witness). The `Empty` needed by `space` desugaring
 is different: its identity is captured before source elaboration and read by exact ID
@@ -276,9 +292,12 @@ qualified path `ProgramCaps.MkProgramCaps`. Its existing visibility is
 unchanged. `Coproduct` and `Instant` are scoped:
 `Coproduct.InL`, `Coproduct.InR`, and `Instant.MkInstant` resolve to
 their exact checked constructor IDs, whereas bare `InL`, `InR` and
-`MkInstant` do not enter B. `ProcessInput`, `Prod` and `Unit` are
-unscoped: their whole constructor families, respectively
-`MkProcessInput`, `MkProd` and `MkUnit`, are bare reserved names.
+`MkInstant` do not enter B. `ITree` is scoped as a complete family:
+`ITree.Ret` and `ITree.Vis` retain their exact constructor IDs, while
+bare `Ret` and `Vis` do not enter B and may be bound by source.
+`ProcessInput`, `Prod` and `Unit` are unscoped: their whole constructor
+families, respectively `MkProcessInput`, `MkProd` and `MkUnit`, are bare
+reserved names.
 `HostIO`, `Char`, and transparent `Pair` have no constructor family. A same-shaped
 source family or definition has a different identity and is not the floor
 member. Every floor type, constructor, and
@@ -287,9 +306,9 @@ companion is re-checked and **out** of `trusted_base()`.
 **Other effect-surface and Program-I identities remain candidates.** The
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
-also holds. `Unit`, `Coproduct` and `Instant` are admitted on their measured
-exact-ID keying and independent `36` source needs, not merely because
-the compiler registers them. A source wrapper over an ABI (for example
+also holds. `Unit`, `Coproduct`, `Instant` and `ITree` are admitted on exact-ID
+keying and independent `36` source needs, not merely because the
+compiler registers them. A source wrapper over an ABI (for example
 `Capability/Process/Exit`'s `exit_with`/`exit_from_result`) does not become
 an intrinsic identity by using one. `host_exit` is keyed but has no independent
 source-name requirement: it remains compiler-internal; an example using that
@@ -320,8 +339,8 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the twenty-three-identity set above and that candidate has no new
-ambient availability.
+remains the twenty-four-identity set above and that candidate has no
+new ambient availability.
 A keyed identity without an independent source-name requirement stays
 compiler-internal; an unkeyed, promised definition belongs in an explicit
 package; an unkeyed, unpromised registration may be removed after its uses
@@ -337,13 +356,14 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the twenty-three-identity
+**Implementation staging.** The specification fixes the twenty-four-identity
 floor and Pair's three checked companions as the current target. The original
-fifteen, the five entrypoint-ABI identities and Pair companions are already
-realized; `Unit`, `Coproduct` and `Instant` join strict resolution with this
-floor-addition slice, atomically with the roster/count and scoped-constructor
-choices. Other candidates need both D0 witness clauses before
-admission. No implementation gap authorizes a second identity or
+fifteen, five entrypoint-ABI identities, three effect/clock identities and
+Pair companions are already realized. This floor-addition slice admits
+`ITree` with its complete scoped `Ret`/`Vis` family, atomically with the
+roster/count and existing-source migration; the co-turn itself does not
+establish QA, CI or landing. Other candidates need both D0 witness clauses
+before admission. No implementation gap authorizes a second identity or
 fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib

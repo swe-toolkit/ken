@@ -26,7 +26,7 @@ impl Fixture {
         elab.elaborate_decl(
             "fn rt_capture_reply (eff : Type) (resp : eff -> Type) \
              (op : eff) (reply : resp op) : ITree eff resp (resp op) = \
-             Ret eff resp (resp op) reply",
+             ITree.Ret eff resp (resp op) reply",
         )
         .expect("checked first-response continuation");
         elab.elaborate_decl(
@@ -243,7 +243,7 @@ impl Fixture {
             "rt_capture_reply",
             [effect.clone(), family.clone(), op.clone()],
         );
-        let mut vis = self.ctor("Vis");
+        let mut vis = self.ctor("ITree.Vis");
         for arg in [effect, family, selected, op, k] {
             vis = apply(vis, arg, &self.elab.env, &mut self.store);
         }

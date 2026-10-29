@@ -22,7 +22,7 @@ fn body_from_write (outcome : Result ResourceError Unit)
 
 fn after_write (outcome : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (body_from_write outcome)
 
@@ -39,11 +39,11 @@ proc after_read
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (read_error_body error);
     Ok progress |-> match progress {
-      ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (read_eof_body MkUnit);
       ReadSome span count |->
@@ -82,7 +82,7 @@ fn buffer_bracket_body
 fn after_buffer
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (buffer_bracket_body outcome)
 
@@ -113,7 +113,7 @@ fn file_bracket_body
 fn after_output
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (file_bracket_body outcome)
 

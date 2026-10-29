@@ -13,7 +13,7 @@ proc two_step (label : String) : HostIO APartial Unit visits [Console] =
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush Stdout))
-      (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit MkUnit))
 
@@ -50,7 +50,7 @@ proc write_bytes_then_line (bytes : Bytes) (label : String)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       Unit Unit
       (host_console APartial Unit (print_line label))
-      (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit MkUnit))
 

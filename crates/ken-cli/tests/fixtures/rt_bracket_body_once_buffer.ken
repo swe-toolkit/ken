@@ -1,6 +1,6 @@
 program capabilities FS AFull
 fn done (_u : Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 fn fin (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
   match outcome { Ok (ResourceBracketOk _) |-> host_exit AFull ExitCode.Success; Ok _ |-> host_exit AFull (ExitCode.Failure 92); Err _ |-> host_exit AFull (ExitCode.Failure 91) }
 proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)

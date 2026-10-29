@@ -11,7 +11,7 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 23] = [
+const TYPE_FLOOR: [&str; 24] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -20,6 +20,7 @@ const TYPE_FLOOR: [&str; 23] = [
     "Equal",
     "ExitCode",
     "HostIO",
+    "ITree",
     "Instant",
     "List",
     "Nat",
@@ -197,8 +198,8 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 ///
 /// MEASURED: the primitive producer traversal yields exactly eight signature
 /// identities, and Nat, Pair, five kernel-keyed proposition/equality members,
-/// five source-required entrypoint-ABI identities, and three effect identities
-/// close the type inventory to twenty-three. The separately configured companion
+/// five source-required entrypoint-ABI identities, three effect/clock identities,
+/// and ITree close the type inventory to twenty-four. The separately configured companion
 /// inventory has three checked-transparent constants keyed to the exact Pair
 /// identity. CLAIMED: type and binding membership are independent closed
 /// inventories rather than one compiler-global allow-list. THE GAP: source
@@ -221,6 +222,7 @@ fn prelude_signature_inventory_is_executable_and_closed() {
                     | "Pair"
                     | "Coproduct"
                     | "Instant"
+                    | "ITree"
                     | "Unit"
                     | "Bottom"
                     | "Equal"
@@ -243,6 +245,7 @@ fn prelude_signature_inventory_is_executable_and_closed() {
         "Pair",
         "Coproduct",
         "Instant",
+        "ITree",
         "Unit",
         "Bottom",
         "Equal",

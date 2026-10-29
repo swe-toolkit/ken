@@ -144,9 +144,9 @@ fn run_plain_recursive_match_census() {
     // The checked zero-S invariant and linked native/interpreter parity above
     // are independent of this post-route byte-level codegen snapshot. Ignore
     // only Cranelift's trailing blank display separator when comparing IR.
-    // The three pre-source constructors now carry scoped stable symbols. The
-    // scratch un-rename reproduced the old IR byte-for-byte; this fixture was
-    // regenerated from this test's own emitted_ir on the scoped candidate.
+    // Constructor artifact symbols use the checked family's bare leaf, so
+    // source scoping (`T.C`) does not move this unit: it is byte-identical to
+    // the region-capacity IR reviewed before the pre-source families scoped.
     assert_eq!(emitted_ir.trim_end_matches('\n').as_bytes(),
         PLAIN_MATCH_CAPACITY_IR.trim_end_matches('\n').as_bytes(),
         "the measured zero-S native unit IR differs from reviewed capacity routing");

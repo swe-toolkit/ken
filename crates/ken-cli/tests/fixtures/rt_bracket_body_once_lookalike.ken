@@ -1,24 +1,24 @@
 program capabilities FS AFull
 fn leaf_body (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn lk_leaf (_u : Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn lk_ret (br : ResourceBodyResult Unit Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) br
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) br
 
 fn body_result
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
     Ok (ResourceBracketOk unit) |->
-      Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
     Ok bracket |->
-      Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Err error |->
-      Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
 
 fn after_root

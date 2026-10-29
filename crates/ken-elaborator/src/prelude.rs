@@ -3417,7 +3417,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // Qualify the complete scoped families only after the prelude's own
     // declarations have been checked against their original bindings. The
     // effect/Clock constructors are registered before this capture as well.
-    for name in ["ExitCode", "ProgramCaps", "Coproduct", "Instant"] {
+    for name in ["ExitCode", "ProgramCaps", "Coproduct", "ITree", "Instant"] {
         let parent_id = elab.globals[name];
         elab.module_state.scope_constructor_family(
             &elab.env,

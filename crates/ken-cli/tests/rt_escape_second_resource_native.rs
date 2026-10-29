@@ -205,7 +205,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
         (withResource AFull Unit (Resource ResourceKind.FsHandle)
           cap (bytes_encode "held.bin") ResourceMetadata
-          (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
+          (\resource. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
             (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)))
@@ -240,7 +240,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (Result FileError (ResourceBracketResult Unit (Prod (Resource ResourceKind.FsHandle) Unit))) ExitCode
         (withResource AFull Unit (Prod (Resource ResourceKind.FsHandle) Unit)
           cap (bytes_encode "held.bin") ResourceMetadata
-          (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
+          (\resource. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Prod (Resource ResourceKind.FsHandle) Unit))
             (ResourceBodyOk Unit (Prod (Resource ResourceKind.FsHandle) Unit)
@@ -262,7 +262,7 @@ proc read_body (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHa
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
 
@@ -295,7 +295,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
         (withResource AFull Unit (Resource ResourceKind.FsHandle)
           cap (bytes_encode "held.bin") ResourceRead
-          (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
+          (\resource. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
             (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)))
@@ -311,7 +311,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 const ESCAPE_BUFFER_THEN_READAT: &str = r#"program capabilities FS AFull
 fn escape_buffer (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit (BufferHandle)) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit (BufferHandle))
     (ResourceBodyOk Unit (BufferHandle) buffer)
@@ -322,7 +322,7 @@ proc read_with_escaped_buffer (file : Resource ResourceKind.FsHandle) (buffer_cl
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file (0 : Int) buffer_closed (MkBufferWindow (0 : Int) (6 : Int)))
-    (\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
 
@@ -331,18 +331,18 @@ proc after_buffer_escape
   (inner : Result ResourceError (ResourceBracketResult Unit (BufferHandle)))
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match inner {
-    Err allocate_error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err allocate_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Ok bracket |-> match bracket {
       ResourceBracketOk buffer_closed |-> read_with_escaped_buffer file buffer_closed;
-      ResourceBracketBodyError error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-      ResourceBracketReleaseError error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      ResourceBracketBodyAndReleaseError body_error release_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
     }
@@ -429,11 +429,11 @@ fn body_from_alloc (outcome : Result ResourceError (ResourceBracketResult Unit U
 proc after_read (buffer_b : BufferHandle) (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Ok progress |-> match progress {
-      ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
       ReadSome span_a count |->
@@ -441,7 +441,7 @@ proc after_read (buffer_b : BufferHandle) (outcome : Result ResourceError ReadPr
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
           (freeze AFull buffer_b span_a)
-          (\r. Ret (Coproduct (FSOp AFull) AmbientOp)
+          (\r. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit Unit) (body_from_freeze r))
     }
@@ -461,7 +461,7 @@ proc buffer_a_body (file : Resource ResourceKind.FsHandle) (buffer_a : BufferHan
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (2 : Int) (buffer_b_body file buffer_a))
-    (\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (body_from_alloc outcome))
 
@@ -471,7 +471,7 @@ proc file_body (file : Resource ResourceKind.FsHandle)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (6 : Int) (buffer_a_body file))
-    (\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (body_from_alloc outcome))
 
@@ -618,12 +618,12 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 
 #[cfg(target_os = "linux")]
 fn escape_file_then_two_reads() -> String {
-    let first = "    (\\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    let first = "    (\\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)";
     let second = r"    (\outcome. bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\again. Ret (Coproduct (FSOp AFull) AmbientOp)";
+    (\again. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)";
     let end = "(ResourceBodyOk Unit Unit MkUnit))";
     assert_eq!(ESCAPE_FILE_THEN_READAT.matches(first).count(), 1);
     assert_eq!(ESCAPE_FILE_THEN_READAT.matches(end).count(), 1);
@@ -977,12 +977,12 @@ const NAT_FANOUT_REACHED_LIVE_RESOURCE: &str =
 fn reached_nat_arm_variant(arm: &str) -> String {
     let original = match arm {
         "zero" => {
-            r#"Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            r#"Zero |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);"#
         }
         "suc" => {
-            r#"Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            r#"Suc m |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)"#
         }
@@ -1080,7 +1080,7 @@ enum CarriedNatArm {
 #[cfg(target_os = "linux")]
 fn carried_nat_predecessor_source(offset: i64, scrutinee: &str, arm: CarriedNatArm) -> String {
     let read = "readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int))";
-    let eof = "Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)";
+    let eof = "ITree.Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)";
     let suc = match arm {
         CarriedNatArm::OneDeep => format!("Suc m |-> match m {{ Zero |-> {read}; Suc q |-> {eof} }}"),
         CarriedNatArm::OneLeafTwoDeep => format!(
@@ -1098,12 +1098,12 @@ fn carried_nat_predecessor_source(offset: i64, scrutinee: &str, arm: CarriedNatA
     let replacement_read = format!(
         "(readAt AFull file ({offset} : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))\n    (\\outcome. after_read file buffer outcome)"
     );
-    let original_nat = "match buffer_span_budget span {\n            Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);\n            Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)\n          }";
+    let original_nat = "match buffer_span_budget span {\n            Zero |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);\n            Suc m |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)\n              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)\n          }";
     let replacement_nat = format!(
         "match {scrutinee} {{\n            Zero |-> {eof};\n            {suc}\n          }}"
     );
     let original_cont = "(\\_ignored. second_read file buffer)";
-    let replacement_cont = "(\\_ignored. Ret (Coproduct (FSOp AFull) AmbientOp)\n            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n            (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))";
+    let replacement_cont = "(\\_ignored. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)\n            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)\n            (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))";
     let source = NAT_FANOUT_REACHED_LIVE_RESOURCE;
     for old in [original_read, original_nat, original_cont] {
         assert_eq!(

@@ -24,9 +24,9 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
     env.elaborate_decl(
         r"fn client_console_tree (stream : Stream) (payload : Bytes)
              : IO (Result IOError Unit) =
-           Vis ConsoleOp console_resp (Result IOError Unit)
+           ITree.Vis ConsoleOp console_resp (Result IOError Unit)
              (Write stream payload)
-             (λr. Ret ConsoleOp console_resp (Result IOError Unit) r)",
+             (λr. ITree.Ret ConsoleOp console_resp (Result IOError Unit) r)",
     )
     .expect("independent one-Write Result-passthrough tree");
     env.elaborate_decl(

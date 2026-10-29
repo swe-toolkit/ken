@@ -78,33 +78,33 @@ and no-allocation witnesses. This is the surface analog of the kernel's closed
 | **`Coproduct`** | internal provision: effect composition needs its canonical signature sum (`36 §2.3`, §4.5.7) | exact pre-source type id; injections use scoped `Coproduct.InL` and `Coproduct.InR`. |
 | **`Instant`** | internal provision: `now` names its canonical clock result (`36 §1.1`) | exact pre-source type id; clock construction uses scoped `Instant.MkInstant`. |
 | **`Unit`** | internal provision: effect responses require the canonical result type (`36 §1.1`, §2.1) | exact pre-source type id; its exact-parent `MkUnit` remains bare. |
+| **`ITree`** | internal provision: effects require source to name the canonical tree family (`36 §2.1`, §2.4) | exact checked pre-source identity is keyed by effect lowering and the host interpreter; `ITree.Ret` and `ITree.Vis` are its complete scoped family. |
 | **`Ω` (Omega)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
 The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
 ResourceKind, Result, Utf8Error}`**. The internal-provision arm adds
 `{Nat, Pair}`, the five kernel-machinery-keyed proposition/equality members
 `{Equal, Prop, Proved, Top, Bottom}`, the five entrypoint-ABI identities
-`{ExitCode, HostIO, ProcessInput, Prod, ProgramCaps}`, and the three
-effect/clock identities `{Coproduct, Instant, Unit}` (`30-taxonomy §4`).
-Together they yield the twenty-three-name roster: `Auth`, `Bool`, `Bottom`,
-`Char`, `Coproduct`, `Equal`, `ExitCode`, `HostIO`, `Instant`, `List`, `Nat`,
-`Option`, `Pair`, `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`,
-`ResourceKind`, `Result`, `Top`, `Unit`, `Utf8Error`. The original fifteen were
-realized at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. For every
-inductive member, the floor admits constructors only by matching their
+`{ExitCode, HostIO, ProcessInput, Prod, ProgramCaps}`, the three
+effect/clock identities `{Coproduct, Instant, Unit}`, and the source-required
+`ITree` identity (`30-taxonomy §4`). The prior roster had 23 names; this
+candidate adds `ITree` as the twenty-fourth. The original
+fifteen were realized at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. For
+every inductive member, the floor admits constructors only by matching their
 kernel-recorded parent `GlobalId`. `ResourceKind` is scoped: its constructors
-are available as
-`ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`,
-not as bare names. `ExitCode` and `ProgramCaps` are also scoped; their
-constructor names are respectively `ExitCode.Success`, `ExitCode.Failure`,
-and `ProgramCaps.MkProgramCaps`. `ProcessInput`, `Prod`, and `Unit` bring
-their bare constructor names `MkProcessInput`, `MkProd`, and `MkUnit`.
-`Coproduct` and `Instant` are scoped: only `Coproduct.InL`, `Coproduct.InR`,
-and `Instant.MkInstant` resolve; bare
-`InL`, `InR`, and `MkInstant` do not. `Char`, `HostIO`, and transparent
-`Pair` have no constructor arm. Pair's companion inventory is
-exactly `{mk_pair, pair_fst, pair_snd}`; each checked type is keyed to the exact
-Pair id. Every listed family, definition,
+are available as `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
+`ResourceKind.Mapping`, not as bare names. `ExitCode` and `ProgramCaps` are
+also scoped; their constructor names are respectively `ExitCode.Success`,
+`ExitCode.Failure`, and `ProgramCaps.MkProgramCaps`. `ProcessInput`, `Prod`,
+and `Unit` bring their bare constructor names `MkProcessInput`, `MkProd`, and
+`MkUnit`. `Coproduct` and `Instant` are scoped: only `Coproduct.InL`,
+`Coproduct.InR`, and `Instant.MkInstant` resolve; bare `InL`, `InR`, and
+`MkInstant` do not. `ITree` is scoped as a complete family: `ITree.Ret` and
+`ITree.Vis` retain their exact constructor identities; bare `Ret` and `Vis`
+are not floor names or reserved and remain available to source declarations.
+`Char`, `HostIO`, and transparent `Pair` have no constructor arm. Pair's
+companion inventory is exactly `{mk_pair, pair_fst, pair_snd}`; each checked
+type is keyed to the exact Pair id. Every listed family, definition,
 constructor, and companion is outside `trusted_base()`. Compiler-installed
 checked declarations outside these closed inventories are not admitted by mere
 possession.
@@ -117,7 +117,7 @@ possession.
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently record the
-  `GlobalId` and actual declaration kind for each name in the twenty-three-name
+  `GlobalId` and actual declaration kind for each name in the twenty-four-name
   roster, keeping type-forming identities distinct from the `Top`/`Bottom`
   proposition constants and the `Proved : Top` proof binding. Also record each
   constructor id and parent, the three Pair companion ids and checked types,
@@ -127,15 +127,16 @@ possession.
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
   internal-provision name set `{Nat, Pair, Equal, ExitCode, HostIO,
   ProcessInput, Prod, ProgramCaps, Prop, Proved, Top, Bottom, Coproduct,
-  Instant, Unit}` closes the twenty-three-name roster. `Proved` has type
+  Instant, Unit, ITree}` closes the twenty-four-name roster. `Proved` has type
   `Top` and is a proof binding, not a type former. The constructor set is
   exactly the constructors recorded under the seven inductive signature
   members plus `Nat`, `ExitCode`, `ProcessInput`, `Prod`, `ProgramCaps`,
-  `Coproduct`, `Instant`, and `Unit`; scoped families use only `T.C` in source;
+  `Coproduct`, `Instant`, `Unit`, and `ITree`; scoped families use only `T.C`
+  in source;
   no same-spelling constructor with another parent qualifies. The separate
   companion set is exactly `{mk_pair, pair_fst, pair_snd}`, and every companion
   type references the exact Pair id. Installing the floor changes neither the
-  declaration count nor allocator position. None of the twenty-three roster
+  declaration count nor allocator position. None of the twenty-four roster
   identities, constructor identities, or Pair-companion identities enters
   `trusted_base()`.
 - controls: prove both equality directions with compile-preserving mutations.
@@ -158,10 +159,11 @@ possession.
   outside `trusted_base()`, while the configured floor was nine. **LANDED:** the
   original fifteen-name floor and three-companion inventory were realized at
   `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The five entrypoint-ABI
-  identities formed the prior twenty-name roster. This keyed-effects build
-  adds `Coproduct`, `Instant`, and `Unit`, yielding the specified
-  twenty-three-name roster. This contract is not an execution report; no
-  official conformance-runner result is claimed. **THE GAP:** executable
+  identities formed the prior twenty-name roster. The keyed-effects build
+  added `Coproduct`, `Instant`, and `Unit`, yielding the then-current
+  twenty-three-name roster. The ITree slice adds the scoped family as the
+  twenty-fourth name. This contract is not an execution report; no official
+  conformance-runner result is claimed. **THE GAP:** executable
   derivation and Strict resolution must match this inventory. Production
   resolution must not auto-admit an unreviewed newly observed name.
 
@@ -277,9 +279,9 @@ ordinary data representation.
   every primitive type closes the eight-member signature set; exact-identity,
   origin, and no-allocation witnesses add the internal set `{Nat, Pair}` (and
   the five kernel-machinery-keyed `30-taxonomy §4` members), and include the
-  five entrypoint-ABI and three effect/clock identities. The inventory yields
-  the twenty-three-name roster, three Pair companions, and constructor
-  closure. The `OrdResult` bloat
+  five entrypoint-ABI and three effect/clock identities, plus the scoped
+  `ITree` family. The inventory yields the twenty-four-name roster, three Pair
+  companions, and constructor closure. The `OrdResult` bloat
   finding proves the opposite direction (ruled remove; `Ordering`→package,
   §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/

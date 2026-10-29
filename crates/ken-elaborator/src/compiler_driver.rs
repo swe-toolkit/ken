@@ -4528,8 +4528,16 @@ fn stable_symbols_for_env(
             let Some(parent) = symbols.get(&ind.id).cloned() else {
                 continue;
             };
+            // A scoped family's constructors are written `T.C` in source, but
+            // scoping is a surface binding property (`34 §1.1`): the artifact
+            // symbol stays `T::C`, taken from the family's checked members.
+            let scoped_leaves = env.module_state.scoped_constructor_leaves(ind.id);
             for (index, ctor) in ind.constructors.iter().enumerate() {
-                let name = name_of(ctor.id).unwrap_or_else(|| format!("ctor_{index}"));
+                let name = scoped_leaves
+                    .as_ref()
+                    .and_then(|leaves| leaves.get(&ctor.id).cloned())
+                    .or_else(|| name_of(ctor.id))
+                    .unwrap_or_else(|| format!("ctor_{index}"));
                 symbols.insert(ctor.id, StableSymbol::constructor(&parent, name));
             }
         }
@@ -4661,6 +4669,82 @@ mod native_pre_source_stable_symbols {
         assert_eq!(
             recorded, checked,
             "every checked compiler id must be captured"
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: the checked constructor
+    /// IDs of every compiler-scoped family map to artifact symbols whose last
+    /// component is the registered bare leaf, without a dot. CLAIMED: source
+    /// qualification cannot change constructor artifact identity. THE GAP:
+    /// this checks compiler families and their canonical symbol table; the
+    /// native px8f consumer independently exercises ITree's Ret recognition.
+    #[test]
+    fn scoped_constructor_artifact_symbols_use_checked_family_leaves() {
+        let env = ElabEnv::new().expect("complete pre-source registration");
+        let (symbols, table) =
+            stable_symbols_for_env("itree-symbol-control", &env, true).expect("artifact symbols");
+        for family_name in [
+            "ResourceKind",
+            "ExitCode",
+            "ProgramCaps",
+            "Coproduct",
+            "ITree",
+            "Instant",
+        ] {
+            let family_id = env.globals[family_name];
+            let family = env.env.inductive(family_id).expect("checked scoped family");
+            let leaves = env
+                .module_state
+                .scoped_constructor_leaves(family_id)
+                .expect("checked scoped family leaves");
+            let expected_ids = family
+                .constructors
+                .iter()
+                .map(|ctor| ctor.id)
+                .collect::<BTreeSet<_>>();
+            assert_eq!(
+                leaves.keys().copied().collect::<BTreeSet<_>>(),
+                expected_ids,
+                "{family_name}: all checked constructors have leaves"
+            );
+            let parent = &symbols[&family_id];
+            for ctor in &family.constructors {
+                let leaf = &leaves[&ctor.id];
+                assert!(!leaf.contains('.'), "{family_name}: bare leaf {leaf}");
+                assert_eq!(
+                    env.globals[&format!("{family_name}.{leaf}")],
+                    ctor.id,
+                    "{family_name}: checked qualified source path"
+                );
+                let artifact = table
+                    .resolve_global(ctor.id)
+                    .expect("constructor id in table");
+                assert_eq!(
+                    artifact,
+                    &StableSymbol::constructor(parent, leaf.clone()),
+                    "{family_name}: artifact leaf derives from the checked id"
+                );
+                assert_eq!(artifact.components.last(), Some(leaf));
+            }
+        }
+    }
+
+    /// Promise class: durable invariant. MEASURED: the artifact table looked
+    /// up by ITree's checked Ret id displays the native-recognized suffix.
+    /// CLAIMED: source qualification does not change the native Ret identity.
+    /// THE GAP: the sibling inventory pin covers the other scoped families.
+    #[test]
+    fn itree_ret_artifact_symbol_keeps_native_checked_suffix() {
+        let env = ElabEnv::new().expect("complete pre-source registration");
+        let (_, table) =
+            stable_symbols_for_env("itree-symbol-control", &env, true).expect("artifact symbols");
+        let ret = table
+            .resolve_global(env.prelude_env.ret_id)
+            .expect("checked ITree Ret symbol");
+        assert_eq!(
+            ret.to_string(),
+            "ctor:itree-symbol-control::ITree::Ret",
+            "native backend's ITree Ret suffix stays stable"
         );
     }
 
@@ -8729,13 +8813,14 @@ mod package_route_example_declarations {
             "an obligation-free example must not add a package symbol"
         );
         // Promise class: normative compatibility vector for this package.
-        // The new Coproduct and Instant families are scoped after pre-source
-        // role capture. Scratch unscoping of exactly those families restored
-        // the previous 0xe367_721c_e40b_94d7 checked-package hash; this value
-        // is measured with their qualified checked constructor symbols.
+        // This package vector moves from the WIP 0x6c92_44e9_4730_3a45
+        // because every scoped constructor's artifact symbol now uses its
+        // checked family's bare leaf rather than a `T.C` source spelling.
+        // Emptying only the late scoped-family loop on the same qualified
+        // source leaves this exact 0xfd9d_81f8_fbce_6ee8 vector unchanged.
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0x393e_e31c_ea25_53c9
+            0xfd9d_81f8_fbce_6ee8
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8770,11 +8855,12 @@ mod package_route_example_declarations {
             "an obligation-free example must not add a denotation symbol"
         );
         // Promise class: normative compatibility vector for the denotation.
-        // The Coproduct and Instant checked symbols feed this route too;
-        // scratch unscoping restored the previous 0xf7c4_d11a_ab32_c343.
+        // The denotation vector similarly moves from the WIP
+        // 0xe158_b743_ec4d_6062 with checked scoped-family artifact leaves.
+        // The same loop-empty control leaves 0x7886_43b9_b36c_aae3 unchanged.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0x3b3b_60f5_21e9_f643
+            0x7886_43b9_b36c_aae3
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

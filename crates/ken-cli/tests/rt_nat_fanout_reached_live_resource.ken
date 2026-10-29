@@ -5,7 +5,7 @@ proc second_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\r2. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\r2. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
 
@@ -13,7 +13,7 @@ proc after_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Ok progress |-> match progress {
@@ -23,10 +23,10 @@ proc after_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
           (match buffer_span_budget span {
-            Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Zero |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);
-            Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Suc m |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)
           })
@@ -49,7 +49,7 @@ proc file_body (file : Resource ResourceKind.FsHandle)
     (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (6 : Int) (read_body file))
-    (\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
 

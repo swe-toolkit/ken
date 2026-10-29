@@ -3,11 +3,11 @@ program capabilities FS AFull
 fn leaf_body (terminal : Bool) (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match terminal {
-    True |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    True |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit)
       (ResourceBodyOk Unit Unit MkUnit);
-    False |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    False |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit)
       (ResourceBodyErr Unit Unit MkUnit)
@@ -18,17 +18,17 @@ fn body_result
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
     Ok (ResourceBracketOk unit) |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit)
         (ResourceBodyOk Unit Unit MkUnit);
     Ok bracket |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit)
         (ResourceBodyErr Unit Unit MkUnit);
     Err error |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit)
         (ResourceBodyErr Unit Unit MkUnit)

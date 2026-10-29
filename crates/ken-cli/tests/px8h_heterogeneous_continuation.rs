@@ -18,7 +18,7 @@ proc step (marker : Bytes) (tree : HostIO APartial (Result Int Bool))
     (retain_tree tree)
 
 fn zero_tree (_unit : Unit) : HostIO APartial (Result Int Bool) =
-  Ret (Coproduct (FSOp APartial) AmbientOp)
+  ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result Int Bool) (Ok Int Bool True)
 
@@ -27,7 +27,7 @@ proc multi_tree (_unit : Unit)
   step (bytes_encode "A")
     (step (bytes_encode "B")
       (step (bytes_encode "C")
-        (Ret (Coproduct (FSOp APartial) AmbientOp)
+        (ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp
             (fs_resp APartial) ambient_resp)
           (Result Int Bool) (Err Int Bool (7 : Int)))))

@@ -196,8 +196,8 @@ block19:
 
 block16:
     v48 = stack_load.i64 ss4
-    v49 = iconst.i64 60
-    v50 = call fn20(v7, v48, v49)  ; v49 = 60
+    v49 = iconst.i64 48
+    v50 = call fn20(v7, v48, v49)  ; v49 = 48
     v51 = icmp_imm eq v50, 0
     brif v51, block21, block22
 
@@ -342,8 +342,8 @@ block48:
 
 block47:
     v107 = stack_load.i64 ss10
-    v108 = iconst.i64 0x0083_0000_0030
-    v109 = icmp.i64 eq v102, v108  ; v108 = 0x0083_0000_0030
+    v108 = iconst.i64 0x006e_0000_0027
+    v109 = icmp.i64 eq v102, v108  ; v108 = 0x006e_0000_0027
     brif v109, block49, block50
 
 block49:
@@ -359,8 +359,8 @@ block51:
     jump block38(v112)  ; v112 = 0
 
 block50:
-    v113 = iconst.i64 0x0054_0000_0030
-    v114 = icmp.i64 eq v102, v113  ; v113 = 0x0054_0000_0030
+    v113 = iconst.i64 0x0048_0000_0027
+    v114 = icmp.i64 eq v102, v113  ; v113 = 0x0048_0000_0027
     v115 = icmp_imm eq v114, 1
     brif v115, block53, block54
 
@@ -727,8 +727,8 @@ block40:
 
 block39:
     v81 = stack_load.i64 ss4
-    v84 = iconst.i64 0x011a_0000_0032
-    v85 = icmp.i64 eq v76, v84  ; v84 = 0x011a_0000_0032
+    v84 = iconst.i64 0x00fc_0000_0032
+    v85 = icmp.i64 eq v76, v84  ; v84 = 0x00fc_0000_0032
     brif v85, block42, block43
 
 block42:
@@ -908,8 +908,8 @@ block79:
 
 block78:
     v160 = stack_load.i64 ss12
-    v163 = iconst.i64 0x00dd_0000_001f
-    v164 = icmp.i64 eq v155, v163  ; v163 = 0x00dd_0000_001f
+    v163 = iconst.i64 0x00bf_0000_001f
+    v164 = icmp.i64 eq v155, v163  ; v163 = 0x00bf_0000_001f
     brif v164, block81, block82
 
 block81:
@@ -926,8 +926,8 @@ block83:
     jump block80(v167, v168)  ; v167 = 0, v168 = 0
 
 block82:
-    v169 = iconst.i64 0x00fb_0000_0020
-    v170 = icmp.i64 eq v155, v169  ; v169 = 0x00fb_0000_0020
+    v169 = iconst.i64 0x00dd_0000_0020
+    v170 = icmp.i64 eq v155, v169  ; v169 = 0x00dd_0000_0020
     brif v170, block85, block86
 
 block85:

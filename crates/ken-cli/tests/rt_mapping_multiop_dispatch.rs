@@ -10,7 +10,7 @@ use std::os::unix::ffi::OsStrExt;
 
 const SOURCE_TEMPLATE: &str = r#"program capabilities FS AFull
 const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)

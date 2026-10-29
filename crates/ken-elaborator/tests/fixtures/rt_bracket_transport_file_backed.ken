@@ -2,7 +2,7 @@ program capabilities FS AFull
 
 fn mapping_body (_mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
@@ -11,15 +11,15 @@ fn after_mapping_body
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
     Ok (ResourceBracketOk _) |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
     Ok _ |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Err _ |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }

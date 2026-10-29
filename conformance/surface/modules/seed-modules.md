@@ -526,7 +526,7 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the exact floor is closed
   in both directions
-- spec: `30-taxonomy §4` (closed twenty-three-name prelude floor), `33 §3.3`
+- spec: `30-taxonomy §4` (closed twenty-four-name prelude floor), `33 §3.3`
   (the exact floor, three Pair companions, and no convenience-global
   fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
@@ -534,14 +534,16 @@ unrelated `ElabEnv` does not satisfy them.
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked uses of all twenty-three roster names in
+  1. entry `Floor` contains checked uses of all twenty-four roster names in
      contract-appropriate positions, every exact constructor through values
      and exhaustive matches, all three Pair companion bindings,
      `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, a
      `bytes_decode` use matched as `Result Utf8Error String`, and functions
      typed by `Cap a` and `Resource k`. Constructor coverage includes bare
-     `MkUnit`, scoped `Coproduct.InL`/`Coproduct.InR` and
-     `Instant.MkInstant`; bare `InL`, `InR`, and `MkInstant` are rejected;
+     `MkUnit`, scoped `Coproduct.InL`/`Coproduct.InR`, `Instant.MkInstant`,
+     `ITree.Ret`, and `ITree.Vis`; its dedicated positive case also matches
+     both scoped constructors. Bare `InL`, `InR`, `MkInstant`, `Ret`, and `Vis`
+     are not prelude references and are covered by separate controls;
   2. entry `Leaky` contains only `pub def X = Ambient`;
   3. entry `Explicit` contains `import Provider (Ambient)` followed by
      `pub def X = Ambient`, while `Provider.ken.md` contains
@@ -567,13 +569,15 @@ unrelated `ElabEnv` does not satisfy them.
   `Ambient` are definitionally the same in this fixture, so kernel typing cannot
   distinguish arm 2; only source scope can. `Empty` is compiler-internal, not
   a source floor member; its matching import control proves the source package
-  name remains available. `Unit` is now admitted with bare `MkUnit`, while the
-  `Coproduct` and `Instant` constructors are scoped. Widening all globals,
-  removing the floor, or forbidding explicit imports each fails a different arm.
+  name remains available. `Unit` is admitted with bare `MkUnit`, while the
+  `Coproduct`, `Instant`, and `ITree` constructors are scoped. Separate
+  source-resolution cases below discriminate ITree qualification from bare
+  bindings. Widening all globals, removing the floor, or forbidding explicit
+  imports each fails a different arm.
 
 The fifteen-name floor realization, including the three Pair companions, is
-landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The strict-Pair rejection
-is historical evidence, not a sentinel retained beside the current contract.
+historical evidence from `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`, not a
+sentinel beside the current contract.
 
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
@@ -582,9 +586,9 @@ is historical evidence, not a sentinel retained beside the current contract.
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
   of `Auth`, `Bool`, `Bottom`, `Char`, `Coproduct`, `Equal`, `ExitCode`,
-  `HostIO`, `Instant`, `List`, `Nat`, `Option`, `Pair`, `ProcessInput`, `Prod`,
-  `ProgramCaps`, `Prop`, `Proved`, `ResourceKind`, `Result`, `Top`, `Unit`,
-  and `Utf8Error`;
+  `HostIO`, `ITree`, `Instant`, `List`, `Nat`, `Option`, `Pair`, `ProcessInput`,
+  `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceKind`, `Result`, `Top`,
+  `Unit`, and `Utf8Error`;
   record every constructor id and kernel parent;
   record `mk_pair`, `pair_fst`, and `pair_snd` plus their exact reference to the
   Pair id; and snapshot `declarations().len()`, `next_global_id()`, and
@@ -592,10 +596,11 @@ is historical evidence, not a sentinel retained beside the current contract.
   declarations that reach every recorded id, including actual
   `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
 - expect: every emitted type/body contains the corresponding recorded id. The
-  exact twenty-three-name prelude roster is `Auth`, `Bool`, `Bottom`, `Char`,
-  `Coproduct`, `Equal`, `ExitCode`, `HostIO`, `Instant`, `List`, `Nat`,
-  `Option`, `Pair`, `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`,
-  `ResourceKind`, `Result`, `Top`, `Unit`, and `Utf8Error`. `ResourceKind` is
+  exact twenty-four-name prelude roster is `Auth`, `Bool`, `Bottom`, `Char`,
+  `Coproduct`, `Equal`, `ExitCode`, `HostIO`, `ITree`, `Instant`, `List`,
+  `Nat`, `Option`, `Pair`, `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`,
+  `Proved`, `ResourceKind`, `Result`, `Top`, `Unit`, and `Utf8Error`.
+  `ResourceKind` is
   scoped: its constructor paths are `ResourceKind.FsHandle`,
   `ResourceKind.Buffer`, and `ResourceKind.Mapping`; the bare constructor names
   are not reserved by that family. The inductive members and their exact
@@ -612,6 +617,7 @@ is historical evidence, not a sentinel retained beside the current contract.
   | `ResourceKind` | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping` |
   | `ExitCode` | `ExitCode.Success`, `ExitCode.Failure` |
   | `Instant` | `Instant.MkInstant` |
+  | `ITree` | `ITree.Ret`, `ITree.Vis` |
   | `ProcessInput` | `MkProcessInput` |
   | `Prod` | `MkProd` |
   | `ProgramCaps` | `ProgramCaps.MkProgramCaps`, visibility unchanged |
@@ -620,11 +626,14 @@ is historical evidence, not a sentinel retained beside the current contract.
   | `Utf8Error` | `InvalidUtf8` |
 
   `Coproduct` and `Instant` are scoped: bare `InL`, `InR`, and `MkInstant`
-  remain unavailable. `Unit` is unscoped and keeps bare `MkUnit`.
-  `Char`, `HostIO`, and checked-transparent `Pair` have no constructors. Pair's three
-  companions are bindings, not type members, and each resolves to its recorded
-  id. Every constructor still reports the recorded parent. Declaration count
-  and allocator advance by exactly the number of source declarations, with no
+  remain unavailable. `ITree` is scoped: `ITree.Ret` and `ITree.Vis` retain
+  their checked IDs, while bare `Ret` and `Vis` are not reserved and may be
+  bound by source. `Unit` is unscoped and keeps bare `MkUnit`.
+  `Char`, `HostIO`, and checked-transparent `Pair` have no constructors.
+  Pair's three companions are bindings, not type members, and each resolves to
+  its recorded id. Every constructor still reports the recorded parent.
+  Declaration count and allocator advance by exactly the number of source
+  declarations, with no
   extra family, constructor, or companion allocation. No recorded floor id
   enters `trusted_base()`.
 - why: ids and parentage are the property. Comparing names or data shapes cannot
@@ -638,9 +647,12 @@ is historical evidence, not a sentinel retained beside the current contract.
   untrusted. **LANDED:** the fifteen-name floor and the scoped
   `ResourceKind.FsHandle`, `.Buffer`, and `.Mapping` paths are the contract in
   `30-taxonomy §4` and `33 §3.3`, realized at
-  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **THE GAP:** every constructor
-  must retain its recorded parent identity, and equal-shaped or same-spelling
-  substitutions must not replace a floor identity.
+  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **CURRENT CONTRACT:** this
+  row now specifies the twenty-four-name roster, including ITree and its
+  scoped constructors. This is a conformance expectation, not a measurement;
+  no official conformance-runner result is claimed. **THE GAP:** every
+  constructor must retain its recorded parent identity, and equal-shaped or
+  same-spelling substitutions must not replace a floor identity.
 
 ### surface/modules/qualified-constructor-in-type-argument
 
@@ -729,11 +741,11 @@ is historical evidence, not a sentinel retained beside the current contract.
   declarations
 - spec: `33 §3.3` (protected-name introduction ban), `39 §2.0`
 - given: use a fresh strict-roots environment for every row. The preceding table
-  has fifteen inductive parent rows: `Auth`, `Bool`, `Coproduct`, `List`, `Nat`,
-  `Option`, `ResourceKind`, `ExitCode`, `Instant`, `ProcessInput`, `Prod`,
-  `ProgramCaps`, `Result`, `Unit`, and `Utf8Error`. For each parent, pair a
-  same-shaped declaration retaining only that protected parent spelling, with
-  the same declaration changing only the parent to a fresh local name; use
+  has sixteen inductive parent rows: `Auth`, `Bool`, `Coproduct`, `List`, `Nat`,
+  `Option`, `ResourceKind`, `ExitCode`, `Instant`, `ITree`, `ProcessInput`,
+  `Prod`, `ProgramCaps`, `Result`, `Unit`, and `Utf8Error`. For each parent,
+  pair a same-shaped declaration retaining only that protected parent spelling
+  with the same declaration changing only the parent to a fresh local name; use
   fresh local constructor names in both arms.
   For each bare constructor in the ten unscoped families
   (`Auth`: `ANone`/`APartial`/`AFull`; `Bool`: `True`/`False`; `List`:
@@ -754,11 +766,13 @@ is historical evidence, not a sentinel retained beside the current contract.
     `data LocalProd = LocalMkProd` accepts.
   - `MkProd`: `data LocalProd = MkProd` rejects;
     `data LocalProd = LocalMkProd` accepts.
+  - `ITree` parent: `data ITree = LocalNode` rejects; the same production
+    `data LocalITree = LocalNode` accepts.
   Do not include scoped constructors from `ResourceKind`, `ExitCode`,
-  `ProgramCaps`, `Coproduct`, or `Instant` in the bare-name population; their
-  parent-name rows remain included. For constructor-free `Char`, pair
-  `def Char = Int` with `def LocalChar = Int`. For transparent `Pair` and its
-  three companion bindings, use the separate matrix in
+  `ProgramCaps`, `Coproduct`, `Instant`, or `ITree` in the bare-name
+  population; their parent-name rows remain included. For constructor-free
+  `Char`, pair `def Char = Int` with `def LocalChar = Int`. For transparent
+  `Pair` and its three companion bindings, use the separate matrix in
   `seed-pair-strict-boundary.md`.
 - expect: each listed parent and bare-constructor refusal is a hard surface
   error at the binding site; the diagnostic kind is not further specified.
@@ -776,12 +790,194 @@ is historical evidence, not a sentinel retained beside the current contract.
   family elaborated under distinct ids; the tested same-spelling floor
   declaration also passed the root loader. The probe did not measure the full
   matrix above. **CLAIMED:** each listed collision rejects at introduction
-  while its paired same-production renamed control accepts. **THE GAP:**
+  while its paired same-production renamed control accepts. The dedicated
+  ITree route cases below cover strict and legacy source modes. **THE GAP:**
   non-inductive floor names `Bottom`, `Equal`, `HostIO`, `Prop`, `Proved`, and
   `Top`, the kernel / built-in vocabulary, and binding forms beyond these
   declarations are outside this case. The separate Pair matrix covers only its
   explicitly listed forms. This case does not discharge the full `33 §3.3`
   binding ban or pin allocator movement.
+
+The ITree cases below implement the source-resolution slice of
+`LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
+and legacy single-file. Each of the six bare-name rows reuses the full accepted
+client below, including its local `Effect` record and signature value; it
+changes only the selected constructor qualifier. The rows assert a surface
+name-resolution refusal for each unqualified constructor and do not pin
+route-specific diagnostic variants or payloads.
+
+### surface/modules/itree-qualified-constructors-resolve-to-checked-family
+
+- promise class: **normative compatibility vector** — the floor family and its
+  scoped constructors retain their checked identities
+- spec: `30-taxonomy §4`; `31 §2`; `32 §1`; `33 §2`/§3.3;
+  `34 §1.1`; `36 §2.1`/§2.4
+- given: in each fresh route — strict roots, legacy roots, and legacy single-file
+  — elaborate:
+
+  ```ken
+  record Effect {
+    op : Type, resp : op → Type
+  }
+
+  const nat_unit_effect : Effect = {op = Nat, resp = λop.Unit}
+
+  fn ret_witness_for (e : Effect) : ITree e.op e.resp Nat = ITree.Ret e.op e.resp Nat Zero
+
+  fn vis_witness_for
+        (e : Effect) (op : e.op) (k : e.resp op → ITree e.op e.resp Nat)
+      : ITree e.op e.resp Nat =
+    ITree.Vis e.op e.resp Nat op k
+
+  fn inspect (e : Effect) (tree : ITree e.op e.resp Nat) : Nat =
+    match tree {
+      ITree.Ret value ↦ value;
+      ITree.Vis op k ↦ Zero
+    }
+
+  const ret_witness = ret_witness_for nat_unit_effect
+
+  const vis_witness =
+    vis_witness_for nat_unit_effect Zero (λresponse. ret_witness_for nat_unit_effect)
+
+  const inspected_ret = inspect nat_unit_effect ret_witness
+
+  const inspected_vis = inspect nat_unit_effect vis_witness
+  ```
+
+- expect: every route accepts. `nat_unit_effect` is an `Effect` value with
+  `op = Nat` and `resp _ = Unit`. Both witnesses have the specified
+  `ITree e.op e.resp Nat` carrier. The `ITree` type references the exact checked
+  pre-source family identity; `ITree.Ret` and `ITree.Vis` resolve to their
+  exact checked constructor identities and retain `ITree` as parent.
+- why: the local `Effect` record supplies a source-visible signature without
+  a floor entry; lowercase `op` and `resp` fields make its projections
+  well-formed. Each qualified path is reached through ordinary source typing,
+  not a spelling-only inventory. The two constructor witnesses distinguish
+  the complete scoped family; bare-name behavior has separate rows below.
+
+### surface/modules/itree-source-name-is-protected-in-all-routes
+
+- promise class: **discriminating** — protected ITree bindings refuse while
+  same-production fresh names remain available
+- spec: `33 §3.3` (B binding ban); `30-taxonomy §4` (ITree member)
+- given: in separate fresh strict-roots, legacy-roots, and legacy single-file
+  runs, compare each refusal with its one-token control:
+
+  | binding position | refusal source | accepted control |
+  |---|---|---|
+  | data parent | `data ITree = LocalNode` | `data LocalITree = LocalNode` |
+  | data constructor | `data LocalHolder = ITree` | `data LocalHolder = LocalITree` |
+
+  Each row is a separate source unit in each route.
+- expect: both protected-name forms refuse at their binding site; each
+  one-name control accepts. The refusal does not replace the checked floor
+  `ITree` identity. No diagnostic class beyond a hard surface error is pinned.
+- why: the controls preserve the data production and change only the spelling
+  in B. The two rows distinguish a protected type declaration from a protected
+  constructor binding. This case does not cover every binding form in §33 §3.3.
+
+### surface/modules/itree-bare-ret-refuses-strict-roots
+
+- promise class: **discriminating** — an unqualified constructor is not a
+  prelude reference in strict roots mode
+- spec: `33 §3.3`; `36 §2.1`
+- given: start with the `ret_witness_for` fixture in
+  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
+  `ITree.` qualifier from its `Ret` constructor path and run strict roots.
+- expect: reject at surface name resolution because bare `Ret` is not in scope.
+  Do not pin a diagnostic variant or payload.
+- why: the otherwise identical qualified fixture accepts in this mode. This
+  row tests the bare `Ret` route independently of `Vis`.
+
+### surface/modules/itree-bare-vis-refuses-strict-roots
+
+- promise class: **discriminating** — an unqualified constructor is not a
+  prelude reference in strict roots mode
+- spec: `33 §3.3`; `36 §2.1`
+- given: start with the `vis_witness_for` fixture in
+  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
+  `ITree.` qualifier from its outer `Vis` path and run strict roots.
+- expect: reject at surface name resolution because bare `Vis` is not in scope.
+  Do not pin a diagnostic variant or payload.
+- why: the otherwise identical qualified fixture accepts in this mode. This
+  row tests the bare `Vis` route independently of `Ret`.
+
+### surface/modules/itree-bare-ret-refuses-legacy-roots
+
+- promise class: **discriminating** — an unqualified constructor is not a
+  prelude reference in legacy roots mode
+- spec: `33 §3.3`; `36 §2.1`
+- given: start with the `ret_witness_for` fixture in
+  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
+  `ITree.` qualifier from its `Ret` constructor path and run legacy roots.
+- expect: reject at surface name resolution because bare `Ret` is not in scope.
+  Do not pin a diagnostic variant or payload.
+- why: the otherwise identical qualified fixture accepts in this mode. This
+  row tests the bare `Ret` route independently of `Vis`.
+
+### surface/modules/itree-bare-vis-refuses-legacy-roots
+
+- promise class: **discriminating** — an unqualified constructor is not a
+  prelude reference in legacy roots mode
+- spec: `33 §3.3`; `36 §2.1`
+- given: start with the `vis_witness_for` fixture in
+  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
+  `ITree.` qualifier from its outer `Vis` path and run legacy roots.
+- expect: reject at surface name resolution because bare `Vis` is not in scope.
+  Do not pin a diagnostic variant or payload.
+- why: the otherwise identical qualified fixture accepts in this mode. This
+  row tests the bare `Vis` route independently of `Ret`.
+
+### surface/modules/itree-bare-ret-refuses-legacy-file
+
+- promise class: **discriminating** — an unqualified constructor is not a
+  prelude reference in legacy single-file mode
+- spec: `33 §3.3`; `36 §2.1`
+- given: start with the `ret_witness_for` fixture in
+  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
+  `ITree.` qualifier from its `Ret` constructor path and run legacy single-file.
+- expect: reject at surface name resolution because bare `Ret` is not in scope.
+  Do not pin a diagnostic variant or payload.
+- why: the otherwise identical qualified fixture accepts in this mode. This
+  row tests the bare `Ret` route independently of `Vis`.
+
+### surface/modules/itree-bare-vis-refuses-legacy-file
+
+- promise class: **discriminating** — an unqualified constructor is not a
+  prelude reference in legacy single-file mode
+- spec: `33 §3.3`; `36 §2.1`
+- given: start with the `vis_witness_for` fixture in
+  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
+  `ITree.` qualifier from its outer `Vis` path and run legacy single-file.
+- expect: reject at surface name resolution because bare `Vis` is not in scope.
+  Do not pin a diagnostic variant or payload.
+- why: the otherwise identical qualified fixture accepts in this mode. This
+  row tests the bare `Vis` route independently of `Ret`.
+
+### surface/modules/bare-ret-is-bindable-source-constructor
+
+- promise class: **durable invariant** — freed `Ret` remains bindable by source
+- spec: `33 §3.3` (scoped ITree family); `36 §2.1`
+- given: in separate fresh strict-roots, legacy-roots, and legacy single-file
+  runs, elaborate `data LocalRet = Ret`.
+- expect: every route accepts and records `Ret` as a constructor of the new
+  `LocalRet` family, distinct from checked `ITree.Ret`.
+- why: this same-spelling source declaration is the positive control for the
+  `Ret` refusal rows. It shows the bare spelling is free, not renamed or
+  globally banned.
+
+### surface/modules/bare-vis-is-bindable-source-constructor
+
+- promise class: **durable invariant** — freed `Vis` remains bindable by source
+- spec: `33 §3.3` (scoped ITree family); `36 §2.1`
+- given: in separate fresh strict-roots, legacy-roots, and legacy single-file
+  runs, elaborate `data LocalVis = Vis`.
+- expect: every route accepts and records `Vis` as a constructor of the new
+  `LocalVis` family, distinct from checked `ITree.Vis`.
+- why: this same-spelling source declaration is the positive control for the
+  `Vis` refusal rows. It shows the bare spelling is free, not renamed or
+  globally banned.
 
 ### surface/modules/ord-nat-class-owner-and-reexport-use-one-dictionary
 
@@ -940,7 +1136,7 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | twenty-three exact type identities and their parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, scoped `Coproduct`/`Instant`, bare `MkUnit`, definitionally equal ambient type, imported control |
+| floor/global | twenty-four exact type identities and their parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`, definitionally equal ambient type, imported control |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
@@ -1472,6 +1668,12 @@ monotone-downward and revocation management actions remain runner/host-internal
   `prelude-protected-name-bindings-and-lookalike-matrix`,
   `ord-nat-class-owner-and-reexport-use-one-dictionary`, and
   `prelude-head-does-not-transfer-orphan-ownership`.
+- **ITree source resolution** (`30 §4`, `33 §3.3`, `36 §2.1`):
+  `itree-qualified-constructors-resolve-to-checked-family`,
+  `itree-source-name-is-protected-in-all-routes`, the six independent
+  strict/legacy `Ret`/`Vis` refusal rows, and the separate bindable-name rows.
+  These cases cover strict roots, legacy roots, and legacy single-file mode;
+  they do not claim the full B binding ban.
 - **N3** (module clash error + explicit resolution, lexical boundary, prelude
   floor, and grammar): `top-level-local-import-clash-rejected`,
   `import-de-selection-leaves-local-sole-binding`,
@@ -1551,18 +1753,20 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all twenty-three prelude roster names, every exact constructor,
+  Strict uses of all twenty-four prelude roster names, every exact constructor,
   and all three Pair companions accept on the recorded ids, including the
-  public primitive signatures that require the signature arm. `Coproduct` and
-  `Instant` constructors require their scoped paths; `Unit` keeps bare
-  `MkUnit`. The protected-name matrix specifies same-production refusals and
-  renamed controls for its fifteen parent rows and ten unscoped constructor
-  families; `Char` and Pair have separate rows. Its claim is bounded to those
-  entries and controls, not the full B binding ban. Ambient availability still
-  does not make an unrelated module a head owner. The actual `Ord Nat` and
-  Pair-instance cases then require class-owned provenance. Widening globals,
-  comparing only shapes, or treating re-export as ownership satisfies at most
-  one axis.
+  public primitive signatures that require the signature arm. `Coproduct`,
+  `Instant`, and `ITree` constructors require their scoped paths; `Unit` keeps
+  bare `MkUnit`. The protected-name matrix specifies same-production refusals
+  and renamed controls for its sixteen parent rows and ten unscoped constructor
+  families; `Char` and Pair have separate rows. The ITree cases additionally
+  test exact constructor paths, both bare-name refusals and bindings, and the
+  type-name guard across strict roots, legacy roots, and legacy single-file
+  routes. These bounded cases do not claim the full B binding ban. Ambient
+  availability still does not make an unrelated module a head owner. The actual
+  `Ord Nat` and Pair-instance cases then require class-owned provenance.
+  Widening globals, comparing only shapes, or treating re-export as ownership
+  satisfies at most one axis.
 - **Root refusal does not decide multi-root precedence.** The root/path matrix
   accepts the one-root anchor and rejects zero or two populated roots in this
   source-world round. It says nothing about how a later package-manager round
@@ -1677,16 +1881,19 @@ identity/cycle/flat-`Σ` homes in §D5 remain unchanged. A direct call to the
 loader does not discharge the front-end row, and an eager scan does not
 discharge the lazy-poison pair.
 
-## Build realization (closed signature + internal-provision floor)
+## Build history and current floor contract
 
 The fifteen-name floor and the separate three-companion inventory landed at
 `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. At that historical stage, `Unit`
-was not yet a floor member. The later keyed-effects build adds `Coproduct`,
-`Instant`, and `Unit`, bringing the specified floor to twenty-three names.
-Language's implementer reports 82/82 named rows at build-only tip
-`8ba60ac31b1968ad2f06184a3d05c5cc20a7dd63`; these candidate-local checks are
-not CI or official conformance execution. No official conformance-runner
-result is claimed for this corpus.
+was not yet a floor member. The keyed-effects build later added `Coproduct`,
+`Instant`, and `Unit`, bringing that roster to twenty-three. This ITree slice
+adds the source-required type as the twenty-fourth name and scopes its complete
+constructor family; the exact population and source-resolution contract are
+stated in the cases above. Language's implementer reports 82/82 named rows at
+build-only tip `8ba60ac31b1968ad2f06184a3d05c5cc20a7dd63`; those candidate-local
+checks concern the earlier build tip, not this ITree extension. They are not CI
+or official conformance execution. No official conformance-runner result is
+claimed for this corpus.
 
 The original executable closure derives the signature eight and exact
 internal `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}` independently; it

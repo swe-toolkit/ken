@@ -231,9 +231,9 @@ fn fizzBuzzLine (n : Nat) : String =
 -- VAL2 #10 / OQ-C.C2): `E=ConsoleOp`, `Resp=console_resp`, `R=Unit`.
 proc fizzBuzzLoop (remaining : Nat) (current : Nat) : IO Unit visits [Console] =
   match remaining {
-    Zero ↦ Ret ConsoleOp console_resp Unit MkUnit;
+    Zero ↦ ITree.Ret ConsoleOp console_resp Unit MkUnit;
     Suc r ↦
-      Vis
+      ITree.Vis
         ConsoleOp
         console_resp
         Unit

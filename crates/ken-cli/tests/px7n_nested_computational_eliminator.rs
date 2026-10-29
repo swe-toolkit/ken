@@ -12,14 +12,14 @@ proc wrap_result (as_ok : Bool)
     (host_console APartial (Result IOError Unit)
       (write Stdout (bytes_encode "seed:")))
     (\written. match written {
-      Err _ |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+      Err _ |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         (Result Bytes Bytes) (Err Bytes Bytes (bytes_encode "host-error"));
       Ok _ |-> match as_ok {
-        False |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+        False |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
           (Result Bytes Bytes) (Err Bytes Bytes (bytes_encode "err-payload"));
-        True |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+        True |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
           (Result Bytes Bytes) (Ok Bytes Bytes (bytes_encode "ok-payload"))
       }
@@ -51,7 +51,7 @@ proc relay (body : Unit -> HostIO APartial (Result Bytes Bytes))
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result Bytes Bytes) (Result Bytes Bytes)
     (body MkUnit)
-    (\outcome. Ret (Coproduct (FSOp APartial) AmbientOp)
+    (\outcome. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result Bytes Bytes) outcome)
 

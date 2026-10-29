@@ -9,7 +9,7 @@ const PX8DS_SIBLING_RECURSION_PROGRAM: &str = r#"program capabilities FS APartia
 proc countdown (fuel : Nat)
   : HostIO APartial (Result Int Bool) visits [Console] =
   match fuel {
-    Zero |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+    Zero |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp
         (fs_resp APartial) ambient_resp)
       (Result Int Bool) (Ok Int Bool True);
@@ -26,7 +26,7 @@ proc countdown (fuel : Nat)
 
 fn after_countdown (_outcome : Result Int Bool)
   : HostIO APartial (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp APartial) AmbientOp)
+  ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp
       (fs_resp APartial) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)

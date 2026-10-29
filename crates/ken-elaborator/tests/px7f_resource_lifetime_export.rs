@@ -12,10 +12,10 @@ const RESOURCE_PRODUCER: &str = r#"
 fn px7f_after_metadata (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err _ |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-    Ok _ |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
   }

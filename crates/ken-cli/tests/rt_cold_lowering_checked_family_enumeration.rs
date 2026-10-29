@@ -46,7 +46,7 @@
 const CHECKED_FAMILY_SOURCE: &str = r#"program capabilities FS AFull
 fn rt_branched_body (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
@@ -59,10 +59,10 @@ proc rt_branched_endpoint_buffer
     (readAt AFull file (0 : Int) buffer
       (MkBufferWindow (8 : Int) (4 : Int)))
     (\outcome. match outcome {
-      Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-      Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
     })
@@ -71,10 +71,10 @@ proc rt_branched_after_buffer
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-    Ok bracket |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Ok bracket |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }

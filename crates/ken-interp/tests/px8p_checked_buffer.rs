@@ -30,34 +30,34 @@ fn env() -> ken_elaborator::ElabEnv {
         r#"
 fn px8p_ok_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
 
 fn px8p_error_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult ResourceError Unit)
     (ResourceBodyErr ResourceError Unit InvalidBounds)
 
 fn px8p_escape_body (resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit (BufferHandle)) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit (BufferHandle))
     (ResourceBodyOk Unit (BufferHandle) resource)
 
 proc px8p_private_release (resource : BufferHandle)
   : HostIO AFull (Result ResourceError Unit) visits [FS] =
-  Vis (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Vis (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit)
     (Coproduct.InL (FSOp AFull) AmbientOp
       (Px8pPrivateResourceRelease AFull ResourceKind.Buffer
         (Px8pBufferHandleResource resource)))
-    (\settled. Ret (Coproduct (FSOp AFull) AmbientOp)
+    (\settled. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) settled)
 
@@ -66,14 +66,14 @@ proc px8p_after_escape_bracket
   : HostIO AFull (Result ResourceError Unit) visits [FS] =
   match bracket {
     ResourceBracketOk resource |-> px8p_private_release resource;
-    ResourceBracketBodyError error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (Err ResourceError Unit MalformedResource);
-    ResourceBracketReleaseError error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (Err ResourceError Unit error);
     ResourceBracketBodyAndReleaseError body_error release_error |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
+      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result ResourceError Unit) (Err ResourceError Unit release_error)
   }
@@ -83,7 +83,7 @@ proc px8p_after_escape_outer
     (ResourceBracketResult Unit (BufferHandle)))
   : HostIO AFull (Result ResourceError Unit) visits [FS] =
   match outcome {
-    Err acquire_error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err acquire_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (Err ResourceError Unit acquire_error);
     Ok bracket |-> px8p_after_escape_bracket bracket

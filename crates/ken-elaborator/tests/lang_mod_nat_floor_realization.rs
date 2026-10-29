@@ -354,6 +354,7 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "Equal",
             "ExitCode",
             "HostIO",
+            "ITree",
             "Instant",
             "ProcessInput",
             "Prod",

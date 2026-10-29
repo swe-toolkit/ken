@@ -79,7 +79,7 @@ const Compose (r : Type) : Type =
 proc printLines (xs : List String) : Compose (Result IOError Unit) visits [Console] =
   match xs {{
     Nil |->
-      Ret (Coproduct (FSOp {auth}) AmbientOp)
+      ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
           (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
           (Result IOError Unit) (Ok IOError Unit MkUnit) ;
     Cons x xs' |->
@@ -100,13 +100,13 @@ proc app (cap : Cap {auth}) : Compose (Result IOError Unit) visits [FS, Console]
       match r {{
         Err e    |-> match e {{
           MkFileError operation path kind |->
-            Ret (Coproduct (FSOp {auth}) AmbientOp)
+            ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
                 (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
                 (Result IOError Unit) (Err IOError Unit kind)
         }} ;
         Ok bytes |->
           match bytes_decode bytes {{
-            Err _ |-> Ret (Coproduct (FSOp {auth}) AmbientOp)
+            Err _ |-> ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
                          (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
                          (Result IOError Unit) (Err IOError Unit (Other 0)) ;
             Ok text |-> printLines (lines text)

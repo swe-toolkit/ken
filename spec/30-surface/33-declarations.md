@@ -275,11 +275,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
-  Coproduct, Equal, ExitCode, HostIO, Instant, List, Nat, Option, Pair,
-  ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceKind, Result,
-  Top, Unit, Utf8Error}`. The latter has twenty-three exact floor
-  identities: the prior fifteen, five entrypoint-ABI identities and three
-  effect/clock identities (`30-taxonomy §4`). `HostIO` is a type-level
+  Coproduct, Equal, ExitCode, HostIO, ITree, Instant, List, Nat, Option,
+  Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceKind,
+  Result, Top, Unit, Utf8Error}`. The latter has twenty-four exact floor
+  identities: the prior fifteen, five entrypoint-ABI identities, three
+  effect/clock identities and `ITree` (`30-taxonomy §4`). `HostIO` is a type-level
   function, not an inductive type or constructor family. For an
   inductive floor type, its per-type
   **scoped constructors** property determines whether its whole exact
@@ -296,6 +296,9 @@ is a **surface error** (`24`) — it never reaches the kernel:
   scoped: only `Coproduct.InL`, `Coproduct.InR`, and
   `Instant.MkInstant` reach their exact checked constructor identities;
   bare `InL`, `InR`, and `MkInstant` are not reserved by those families.
+  `ITree` is scoped: `ITree.Ret` and `ITree.Vis` resolve to the unchanged
+  checked constructor IDs; bare `Ret` and `Vis` are not reserved and
+  may be bound by other source declarations under ordinary non-B rules.
   `ProcessInput`, `Prod`, and `Unit` are unscoped: `MkProcessInput`,
   `MkProd`, and `MkUnit` are bare names in B, with their exact parent
   identities. `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s
