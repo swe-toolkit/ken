@@ -11787,6 +11787,9 @@ struct IndexedFunction<'f> {
     stored_slots: std::cell::OnceCell<
         BTreeMap<cranelift_codegen::ir::StackSlot, Vec<Option<cranelift_codegen::ir::StackSlot>>>,
     >,
+    stack_slot_stores: std::cell::OnceCell<
+        BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Value>>,
+    >,
     calls: std::cell::OnceCell<Vec<(cranelift_codegen::ir::Inst, Option<FuncId>)>>,
     comparisons:
         std::cell::OnceCell<BTreeMap<cranelift_codegen::ir::Value, Vec<ConstantComparison>>>,
@@ -11852,6 +11855,7 @@ impl<'f> IndexedFunction<'f> {
             edges: std::cell::OnceCell::new(),
             stack_addresses: std::cell::RefCell::default(),
             stored_slots: std::cell::OnceCell::new(),
+            stack_slot_stores: std::cell::OnceCell::new(),
             calls: std::cell::OnceCell::new(),
             comparisons: std::cell::OnceCell::new(),
             branches_on: std::cell::OnceCell::new(),
@@ -12105,6 +12109,36 @@ impl<'f> IndexedFunction<'f> {
         }
         Ok(self.stored_slots.get_or_init(|| stored_slots))
     }
+
+    /// Every value stored into each stack slot at an exact stack address. A
+    /// store at an inexact or non-stack address is absent; if its value
+    /// carries a slot address, `stored_slots` escapes that slot instead.
+    fn stack_slot_stores(
+        &self,
+    ) -> Result<
+        &BTreeMap<cranelift_codegen::ir::StackSlot, Vec<cranelift_codegen::ir::Value>>,
+        CraneliftBackendError,
+    > {
+        if let Some(stores) = self.stack_slot_stores.get() {
+            return Ok(stores);
+        }
+        let mut stores = BTreeMap::<_, Vec<_>>::new();
+        for inst in self.insts() {
+            match &self.func.dfg.insts[inst] {
+                cranelift_codegen::ir::InstructionData::StackStore {
+                    arg, stack_slot, ..
+                } => stores.entry(*stack_slot).or_default().push(*arg),
+                cranelift_codegen::ir::InstructionData::Store { args, .. }
+                | cranelift_codegen::ir::InstructionData::StoreNoOffset { args, .. } => {
+                    if let Some((slot, _)) = resolve_stack_address(self, args[1])? {
+                        stores.entry(slot).or_default().push(args[0]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(self.stack_slot_stores.get_or_init(|| stores))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -12239,9 +12273,8 @@ fn address_dependent_slots(
         }
         match func.dfg.value_def(value) {
             cranelift_codegen::ir::ValueDef::Result(inst, _) => {
-                // A value read from a stack slot may be any address stored
-                // there: the same dependency `load(stack_addr slot)` reaches
-                // through its address operand.
+                // A value read from a stack slot is one of the values stored
+                // there, so a slot address reaches it only through those.
                 if let cranelift_codegen::ir::InstructionData::StackLoad {
                     opcode,
                     stack_slot,
@@ -12249,7 +12282,13 @@ fn address_dependent_slots(
                 } = &func.dfg.insts[inst]
                 {
                     if *opcode == cranelift_codegen::ir::Opcode::StackLoad {
-                        slots.insert(*stack_slot);
+                        pending.extend(
+                            func.stack_slot_stores()?
+                                .get(stack_slot)
+                                .into_iter()
+                                .flatten()
+                                .copied(),
+                        );
                     }
                 }
                 pending.extend(func.dfg.inst_args(inst).iter().copied());
@@ -14076,8 +14115,7 @@ fn unknown_write_may_alias(
     let Some(address) = address else {
         return Ok(true);
     };
-    Ok(location_leaked_before(func, inst, access)
-        || address_depends_on_slots(func, address, &access.containers)?)
+    Ok(access.escaped || address_depends_on_slots(func, address, &access.containers)?)
 }
 
 fn value_is_guarded_nonzero_at_inst(
@@ -15773,7 +15811,7 @@ mod generated_result_protocol_verifier {
         StoreToHeapRestored,
         AtomicToHeap,
         EscapedRestoredZeroArgCall,
-        RetainedRestoredHeapStore,
+        ScalarReadToHeapZeroArgCall,
         UnretainedRestoredHeapStore,
     }
 
@@ -15927,24 +15965,29 @@ mod generated_result_protocol_verifier {
                 builder.ins().call(later_call, &[]);
                 None
             }
-            SlotPointerUse::RetainedRestoredHeapStore
-            | SlotPointerUse::UnretainedRestoredHeapStore => {
-                let retaining = if matches!(use_pointer, SlotPointerUse::RetainedRestoredHeapStore)
-                {
-                    Some(builder.ins().call(receiving_call, &[pointer]))
-                } else {
-                    None
-                };
+            SlotPointerUse::ScalarReadToHeapZeroArgCall => {
+                let scalar = builder.ins().stack_load(types::I64, slot, 0);
+                let heap = builder.ins().iconst(types::I64, 0x1000);
+                builder
+                    .ins()
+                    .store(cranelift_codegen::ir::MemFlags::trusted(), scalar, heap, 0);
+                builder.ins().call(later_call, &[]);
+                None
+            }
+            SlotPointerUse::UnretainedRestoredHeapStore => {
                 builder.ins().stack_store(stored_word, slot, 0);
                 let heap = builder.ins().iconst(types::I64, 0x1000);
                 let replacement = builder.ins().iconst(types::I64, 9);
-                let store = builder.ins().store(
+                builder.ins().store(
                     cranelift_codegen::ir::MemFlags::trusted(),
                     replacement,
                     heap,
                     0,
                 );
-                retaining.map(|call| (call, store))
+                // There is no retaining call before the store. A later call
+                // with no argument must also leave A current without a leak.
+                builder.ins().call(later_call, &[]);
+                None
             }
             SlotPointerUse::AtomicToHeap => {
                 let heap = builder.ins().iconst(types::I64, 0x1000);
@@ -16054,34 +16097,32 @@ mod generated_result_protocol_verifier {
     }
 
     /// Promise class: durable invariant.
-    /// MEASURED: after f receives A's address and A is restored, a store via
-    /// an unrelated heap pointer turns A's Exact into Unknown. CLAIMED: an
-    /// earlier retaining call may have published that address. THE GAP: the
-    /// pin reads may-alias CLIF, not whether f actually publishes the address.
+    /// MEASURED: the scalar 7 is read from A, stored to non-stack memory,
+    /// and followed by a zero-argument call while A retains an Exact state.
+    /// CLAIMED: reading a scalar from a slot does not publish that slot's
+    /// address. THE GAP: this fixture seeds the slot with only one iconst;
+    /// arbitrary stored values need the shared stored-value walk.
     #[test]
-    fn retained_pointer_clobbers_restored_slot_at_unknown_heap_store() {
-        let (func, location, dependent, retention) = slot_pointer_case(
+    fn scalar_stack_load_published_to_heap_preserves_original_slot() {
+        let (func, location, dependent, _) = slot_pointer_case(
             SlotPointerShape::Exact,
-            SlotPointerUse::RetainedRestoredHeapStore,
+            SlotPointerUse::ScalarReadToHeapZeroArgCall,
         );
-        let (retaining, store) = retention.expect("the fixture has one retaining call");
-        let indexed = IndexedFunction::new(&func);
-        let access = location_access(&indexed, location).expect("retention is decidable");
-        assert!(access.retaining_calls.contains(&retaining));
-        assert!(call_follows_retention(&indexed, store, &access));
-        assert_eq!(
-            reaching_memory_states_before(&indexed, location, dependent)
-                .expect("the post-retention heap store is decidable"),
-            BTreeSet::from([ReachingMemoryState::Unknown]),
-            "the heap store may target A after retention"
+        let states =
+            reaching_memory_states_before(&IndexedFunction::new(&func), location, dependent)
+                .expect("the scalar read, heap store and later call are decidable");
+        assert_eq!(states.len(), 1);
+        assert!(
+            matches!(states.iter().next(), Some(ReachingMemoryState::Exact(_))),
+            "scalar read must not publish A's address: {states:?}"
         );
     }
 
     /// Promise class: durable invariant.
-    /// MEASURED: restoring A then storing through a heap pointer without
-    /// any retaining call leaves one Exact state. CLAIMED: an unescaped A
-    /// cannot be clobbered by an unrelated heap store. THE GAP: the fixture
-    /// supplies no path through which another caller could retain A.
+    /// MEASURED: restoring A, storing through an unrelated heap pointer,
+    /// and making a zero-argument call without any retaining call leaves one
+    /// Exact state. CLAIMED: an unescaped A cannot be clobbered by either.
+    /// THE GAP: the fixture supplies no path that could retain A's address.
     #[test]
     fn unrelated_heap_store_without_retention_preserves_exact() {
         let (func, location, dependent, _) = slot_pointer_case(
