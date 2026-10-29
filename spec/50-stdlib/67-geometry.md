@@ -810,9 +810,11 @@ introduced here.
 > isolated AC-0 on exact landed base `439fa7bb7` checked the four
 > generic public laws below with `ken check` and `ken fmt --check` rc 0,
 > no new `Axiom` and equal scratch `trusted_base()` identity sets
-> 114 → 114. The four §8 catalog exports and seed are absent on this
-> base. That D0 does not establish shipped §8 execution, official
-> conformance, CI, publication, landing or landed trust.
+> 114 → 114. The §8 exports were absent on the spec author's base;
+> this assembled candidate adds the checked exports and a package-owned
+> test of the complete accepted seed and isolated false claim. Neither
+> D0 nor these candidate-local checks establish official conformance-
+> runner execution, CI, publication, landing or landed trust.
 
 ### 8.1 Absorption selectors in Nat Order
 
@@ -886,8 +888,8 @@ of the existing private box helpers, and a counterexample to swapping
 a lower-corner selector; the new private Nat helper also refused
 selective import. Its patch SHA-256 is
 `440df27e96f94cb4796e0723cf280781dec2bce2ff2a6ac47b75e6408daca9d7`.
-These measurements are scratch-only. CV owns the closed seed after
-the AC-2 proof-form correction; Foundation owns the catalog and
-package-test half on the same candidate. No local check here
-establishes official conformance-runner execution, CI, publication,
-landing or landed trust.
+The D0 measurements are scratch-only. This assembled candidate's
+package-owned test root-loads the checked exports, runs the complete
+accepted seed and refuses its isolated false equality after a fresh
+accepted prefix. Those checks are not official conformance-runner
+execution, CI, publication, landing or landed trust.

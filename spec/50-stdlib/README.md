@@ -487,10 +487,12 @@ The common operand `a` stays on the left; neither law equates
 arbitrary boxes sharing a point set. The existing box-congruence
 helpers remain private. Architect's D0 on `439fa7bb7` checked all
 four generic proofs without a new `Axiom` and with equal scratch
-trusted identities 114 → 114. All §8 catalog exports are absent
-on this base; the separately owned seed and D0 are not shipped
-§8 execution, official conformance, CI, publication, landing or
-landed trust.
+trusted identities 114 → 114. The §8 catalog exports were absent
+on the spec author's base; this assembled candidate adds their
+checked proofs and a package-owned test of the complete accepted
+seed and isolated false claim. Neither scratch D0 nor these
+candidate-local checks are official conformance-runner execution,
+CI, publication, landing or landed trust.
 Signed-coordinate geometry, Euclidean and floating-point distance,
 other dimensions, canonical empty boxes and point-set equality remain
 outside scope.

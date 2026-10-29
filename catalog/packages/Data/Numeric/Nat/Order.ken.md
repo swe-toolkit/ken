@@ -140,6 +140,22 @@ pub proof assoc for min
       }
   }
 
+pub proof absorb for min (m : Nat) (n : Nat) : Equal Nat (min m (max m n)) m =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ cong Nat Nat (min m2 m2) m2 Suc ((proof idempotent for min) m2);
+        Suc n2 ↦ cong Nat Nat (min m2 (max m2 n2)) m2 Suc ((proof absorb for min) m2 n2)
+      }
+  }
+
+proof idempotent for min (n : Nat) : Equal Nat (min n n) n =
+  match n {
+    Zero ↦ Proved;
+    Suc n2 ↦ cong Nat Nat (min n2 n2) n2 Suc ((proof idempotent for min) n2)
+  }
+
 pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
@@ -226,6 +242,16 @@ pub proof assoc for max
                 Suc
                 ((proof assoc for max) k2 m2 n2)
           }
+      }
+  }
+
+pub proof absorb for max (m : Nat) (n : Nat) : Equal Nat (max m (min m n)) m =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Refl;
+        Suc n2 ↦ cong Nat Nat (max m2 (min m2 n2)) m2 Suc ((proof absorb for max) m2 n2)
       }
   }
 
@@ -909,7 +935,12 @@ proofs complete these bounds: any common lower bound lies below `min`, and
 `max::comm` proofs swap the two Nat operands by structural recursion,
 without changing the operations. The public `min::assoc` and `max::assoc`
 proofs regroup three operands by structural recursion, reducing Zero
-arms with `Proved` for `min` and `Refl` for `max`. The private `compare`
+arms with `Proved` for `min` and `Refl` for `max`. The public
+`min::absorb` and `max::absorb` proofs show that a nested opposite
+extremum restores its left operand without an order hypothesis. The
+successor/zero branch of `min::absorb` reuses a private checked
+idempotence step; that helper is not another exported law. The private
+`compare`
 proofs
 establish the missing result directions: self-comparison is `Eq`, a strict
 left side gives `Lt`, and `Lt` reverses to `Gt`. The three public `compare`
@@ -971,7 +1002,7 @@ argument and its bridge exposes the canonical successor relation.
    facts; fourteen attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
    positive-right-multiplication order transports; the six `min`/`max` bounds
-   and their four selectors (`comm` and `assoc` for each); the three
+   and their six selectors (`comm`, `assoc`, and `absorb` for each); the three
    `compare` agreements;
    and the five inductive `sub` proofs, including `sub::add_cancel`.
    `OrdResult` remains package-local.
@@ -999,7 +1030,7 @@ argument and its bridge exposes the canonical successor relation.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
    package's checked laws use structural recursion for the strict-order and
    successor/weakening/addition bounds, `min`/`max` bounds and their
-   commutativity and associativity selectors, and subtraction theory,
+   commutativity, associativity and absorption selectors, and subtraction theory,
    including cancellation; and case analysis on the canonical relation
    for the `compare` agreements. The equality arm closes through
    `leq_nat::antisym`. The order-scaling family proves equality of Boolean
@@ -1016,5 +1047,10 @@ argument and its bridge exposes the canonical successor relation.
    rejection fences. The [geometry associativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-associativity.md)
    applies both public `min` and `max` associativity selectors to the same
    three natural arguments; its package test root-loads the checked laws.
-   These controls are not Strict evidence; Strict closure and the identity
-   assertions rerun after `LANG-MOD-CANONICAL-PAIR-PACKAGE`.
+   The [geometry absorption seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-absorption.md)
+   applies both public absorption selectors and independently checks their
+   Nat results; its package-owned test root-loads the checked proofs. These
+   candidate-local checks are not official conformance-runner execution, CI,
+   publication, landing or landed trust. These controls are not Strict
+   evidence; Strict closure and the identity assertions rerun after
+   `LANG-MOD-CANONICAL-PAIR-PACKAGE`.

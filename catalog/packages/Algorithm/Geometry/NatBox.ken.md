@@ -1,8 +1,8 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. Six box-and-distance laws, four structural
-commutativity and associativity laws, two metric laws, seven corner-wise
+geometry operations. Six box-and-distance laws, six structural
+commutativity, associativity and absorption laws, two metric laws, seven corner-wise
 containment laws, three inclusion-order laws, and three area laws carry
 kernel-checked generic proofs.
 
@@ -28,11 +28,12 @@ point set is empty.
 
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
-box-and-distance laws lead the definition; the four structural
-commutativity and associativity laws follow intersection and hull, ahead
-of the two metric laws. The corner-wise `inside` operation and its seven laws
-come next, then the three inclusion-order laws, followed by `area` and
-its three laws. Per-axis proof helpers and distance helpers stay private.
+box-and-distance laws lead the definition; the six structural
+commutativity, associativity and absorption laws follow intersection and
+hull, ahead of the two metric laws. The corner-wise `inside` operation
+and its seven laws come next, then the three inclusion-order laws,
+followed by `area` and its three laws. Per-axis proof helpers and
+distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -570,6 +571,84 @@ pub theorem hull_assoc
                                   }
                               }
                           }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem intersect_hull_absorb (a : Box) (b : Box) : Equal Box (intersect a (hull a b)) a =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match alo {
+            MkPoint alx aly ↦
+              match ahi {
+                MkPoint ahx ahy ↦
+                  match blo {
+                    MkPoint blx bly ↦
+                      match bhi {
+                        MkPoint bhx bhy ↦
+                          box_equal
+                            (MkPoint (max alx (min alx blx)) (max aly (min aly bly)))
+                            (MkPoint alx aly)
+                            (MkPoint (min ahx (max ahx bhx)) (min ahy (max ahy bhy)))
+                            (MkPoint ahx ahy)
+                            (point_equal
+                              (max alx (min alx blx))
+                              alx
+                              (max aly (min aly bly))
+                              aly
+                              ((proof absorb for max) alx blx)
+                              ((proof absorb for max) aly bly))
+                            (point_equal
+                              (min ahx (max ahx bhx))
+                              ahx
+                              (min ahy (max ahy bhy))
+                              ahy
+                              ((proof absorb for min) ahx bhx)
+                              ((proof absorb for min) ahy bhy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem hull_intersect_absorb (a : Box) (b : Box) : Equal Box (hull a (intersect a b)) a =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match alo {
+            MkPoint alx aly ↦
+              match ahi {
+                MkPoint ahx ahy ↦
+                  match blo {
+                    MkPoint blx bly ↦
+                      match bhi {
+                        MkPoint bhx bhy ↦
+                          box_equal
+                            (MkPoint (min alx (max alx blx)) (min aly (max aly bly)))
+                            (MkPoint alx aly)
+                            (MkPoint (max ahx (min ahx bhx)) (max ahy (min ahy bhy)))
+                            (MkPoint ahx ahy)
+                            (point_equal
+                              (min alx (max alx blx))
+                              alx
+                              (min aly (max aly bly))
+                              aly
+                              ((proof absorb for min) alx blx)
+                              ((proof absorb for min) aly bly))
+                            (point_equal
+                              (max ahx (min ahx bhx))
+                              ahx
+                              (max ahy (min ahy bhy))
+                              ahy
+                              ((proof absorb for max) ahx bhx)
+                              ((proof absorb for max) ahy bhy))
                       }
                   }
               }
@@ -2002,8 +2081,14 @@ The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
 `max::assoc` on the lower corners and `min::assoc` on the upper corners
 for intersection, reversing those selectors for hull. `point_equal` and
-`box_equal` assemble structural box equality; none of the twenty-two
-pre-area public laws identifies boxes by their sets of members.
+`box_equal` assemble structural box equality; none of the twenty-four
+pre-area public laws identifies boxes by their sets of members. Both
+mixed absorption proofs keep their shared box as the left operand.
+`intersect_hull_absorb` uses `max::absorb` to restore its lower coordinates
+and `min::absorb` for its upper coordinates; `hull_intersect_absorb` uses
+the opposite selectors. `point_equal` and `box_equal` assemble the four
+coordinate equalities into structural `Equal Box`, including when a box
+has inverted corners and no member.
 
 `inside_sound` transports point membership along the four corner comparisons
 of `inside`; `inside_refl` uses checked order reflexivity, including for
@@ -2042,10 +2127,12 @@ identity are proved. Corner-wise `inside` is directional and sufficient for
 point-set inclusion, but an empty inner box can be outside a second box by
 its corners despite having no points. Its converse law therefore requires
 a member of the inner box. The corner order is transitive; intersection is a
-greatest lower bound and hull a least upper bound for that order, without an
-`Equal Box` claim. Different inverted boxes can have the same zero area
-without being structurally equal. Signed orientation remains outside
-this interface.
+greatest lower bound and hull a least upper bound for that order. The two
+mixed absorption laws return structural `Equal Box` to their shared left
+operand, without identifying boxes merely because they have the same points
+or claiming that either operation distributes over the other. Different
+inverted boxes can have the same zero area without being structurally equal.
+Signed orientation remains outside this interface.
 
 ## 6. References
 
@@ -2058,14 +2145,15 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–7](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and twenty-five public checked law types,
-   including the two structural associativity laws.
+1. **Contract.** [Exact geometry, §§1–8](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and twenty-seven public checked law types,
+   including the two structural absorption laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
    `intersect_comm`, `hull_comm`, `intersect_assoc`, `hull_assoc`,
-   `manhattan_symm`, `manhattan_self`,
+   `intersect_hull_absorb`, `hull_intersect_absorb`, `manhattan_symm`,
+   `manhattan_self`,
    `manhattan_triangle`, `manhattan_zero_equal`, `inside`,
    `inside_sound`, `inside_refl`, `intersect_inside_left`,
    `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
@@ -2110,6 +2198,11 @@ this interface.
    [associativity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-associativity.md)
    checks both Nat Order selectors and both generic box laws, independent
    grouping values, and one refused mixed regrouping in a roots-loaded
-   package test. These tests are not official conformance-runner execution,
-   CI, publication or landing. All seven seeds supplement rather than replace
-   the checked law bodies.
+   package test. The
+   [absorption seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-absorption.md)
+   checks both Nat selectors, independent overlapping-box and inverted-box
+   results, and a same-form true control before refusing a false equality to
+   the other box; its package-owned test checks the complete accepted client
+   against the root-loaded laws. These candidate-local tests are not official
+   conformance-runner execution, CI, publication, landing or landed trust. All
+   eight seeds supplement rather than replace the checked generic law bodies.
