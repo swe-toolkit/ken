@@ -6,7 +6,8 @@
 > SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY §4;
 > SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER §5;
 > SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
-> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -34,11 +35,16 @@
 > conformance or landed trust. Section 7 specifies two endpoint-order
 > hull/intersection bounds laws. Architect's isolated D0 on `1363b09b4`
 > checked both generic proofs with no new `Axiom` and unchanged scratch
-> trusted GlobalIds (114 → 114). The §7 catalog exports were absent on
-> the spec author's base; this separate Foundation candidate adds both
-> checked laws and a package-owned test of the complete accepted seed
-> and isolated refusal. Candidate-local checks are not official
+> trusted GlobalIds (114 → 114). Both §7 checked exports and a package-owned
+> test are present on this base; the test checks the complete accepted seed
+> and isolated false hull claim. These package checks are not official
 > conformance-runner execution, CI, publication, landing or landed trust.
+> Section 8 specifies two new premise-free absorption laws by endpoint-value
+> inclusion. Architect's isolated D0 on `fd2f57557` checked their generic
+> bodies with no new `Axiom` and equal scratch trusted GlobalId sets
+> (114 → 114). This spec-only turn delivers no §8 catalog exports, seed
+> or package test; D0 does not establish official conformance, CI,
+> publication, landing or landed trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -765,12 +771,11 @@ neither observation is official conformance or landed trust.
 > isolated D0 on `1363b09b4` checked both generic Transparent proofs,
 > their public clients and closed controls, with no new `Axiom`,
 > `ken check` and `ken fmt --check` rc 0, and equal scratch
-> `trusted_base()` GlobalId sets (114 → 114). Neither §7 catalog
-> export was present on the spec author's base. The separate Foundation
-> candidate now exports both checked laws, root-loads them and tests the
-> complete accepted conformance seed and isolated false hull claim.
-> These package checks are not official conformance-runner execution,
-> CI, publication, landing or landed trust.
+> `trusted_base()` GlobalId sets (114 → 114). Both §7 catalog exports
+> and a package-owned test are present on this base. The test root-loads
+> the laws, checks the complete accepted conformance seed and refuses
+> the isolated false hull claim. These package checks are not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ### 7.1 Two premise-bearing public laws
 
@@ -817,9 +822,10 @@ endpoint comparisons with the existing public
 intersection. They introduce no helper. The existing private
 `equiv_leq` and `rational_distrib_r` remain private, and all §1–§6
 operations and laws remain unchanged. The two checked bodies and
-package-owned test are now in the separate Foundation catalog candidate,
-not the spec author's original status candidate. No new Rational export,
-axiom, postulate, kernel rule, surface feature, or trust entry is specified.
+package-owned test are present on this base, having been added in the
+separate Foundation candidate, not the spec author's original turn.
+No new Rational export, axiom, postulate, kernel rule, surface feature,
+or trust entry is specified.
 
 In Architect's D0 closed fixture, `low = [1/2,1]` and
 `high = [2,3]` both lie inside `outer = [0,4]`, and their hull
@@ -834,5 +840,81 @@ that the hull of `low` and `high` lies inside `low`. The refusal
 cannot supply the missing inclusion premise. These finite checks
 illustrate the orientations, not proofs of the generic laws. The
 D0's scratch package and client were not shipped §7 execution. The
-separate Foundation candidate now checks the authored seed against its
-exports in a package-owned test, not an official conformance-runner result.
+package-owned test checks the authored seed against the §7 exports,
+not as an official conformance-runner result.
+
+## 8. Hull and intersection absorption by endpoint-value inclusion
+
+> **Section 8 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION).** Architect's
+> isolated D0 on `fd2f575576aa2f5893054dcaf89e38243b739edc` checked
+> both generic proof bodies and a public client (`ken check` and
+> `ken fmt --check` rc 0), with no new `Axiom` and equal scratch
+> `trusted_base()` GlobalId sets (114 → 114). This spec-only turn does not
+> deliver the §8 catalog exports, conformance seed or package-owned test.
+> D0 is not official conformance-runner execution, CI, publication,
+> landing or landed trust.
+
+For any two intervals `i` and `j`, including inverted ones, each of
+these absorption pairs is **mutually included by endpoint value**:
+`interval_intersect i (interval_hull i j)` and `i`; and
+`interval_hull i (interval_intersect i j)` and `i`. The comparison is
+§3.1's `interval_inside`: it compares exact rational endpoint values,
+not stored endpoint spellings or member sets. No validity, nonempty
+membership, ordering, or distinctness premise is needed. In particular,
+these are not structural `Equal Interval` laws; equivalent rational
+endpoints can retain distinct spellings.
+
+The two compositional directions require exactly two new public
+Transparent laws, with the shared interval `i` first:
+
+```ken
+pub theorem interval_inside_intersect_hull_left
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside i (interval_intersect i (interval_hull i j)))
+
+pub theorem interval_hull_intersect_inside_left
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_hull i (interval_intersect i j)) i)
+```
+
+The other two directions are already single applications of §3's
+public bounds, not new theorem names. For the same `i` and `j`, their
+public applications and result types are:
+
+```ken
+interval_intersect_inside_left i (interval_hull i j)
+  : IsTrue (interval_inside (interval_intersect i (interval_hull i j)) i)
+
+interval_inside_hull_left i (interval_intersect i j)
+  : IsTrue (interval_inside i (interval_hull i (interval_intersect i j)))
+```
+
+Thus each absorption is mutual inclusion, with one new compositional
+law and one existing-law instance. The first new law composes §7's
+`interval_intersect_greatest i i (interval_hull i j)` with
+`interval_inside_refl i` and `interval_inside_hull_left i j`. The
+second composes §7's `interval_hull_least i (interval_intersect i j) i`
+with `interval_inside_refl i` and `interval_intersect_inside_left i j`.
+Neither proof requires a helper, an `Axiom`, or a Rational export;
+private `equiv_leq` and `rational_distrib_r` remain private and unused.
+The new laws belong immediately after `interval_intersect_greatest`
+and before private `equiv_leq` in the catalog. That placement is an
+obligation for the later catalog turn, not an edit in this spec turn.
+All §1–§7 operations and law types remain unchanged.
+
+The assigned closed seed is
+`conformance/stdlib/numerical/seed-interval-hull-intersect-absorption.md`.
+Architect's D0 used overlapping `[0,2]` and `[1,3]`, with distinct
+endpoints and neither interval inside the other. The accepted client
+applies each of the four public directions and separately checks each
+closed inclusion value by `Proved`. Moving the shared argument in
+`interval_hull (interval_intersect i j) j` breaks absorption: for those
+inputs it is `[1,3]`, which is not inside `[0,2]`. That false claim
+rejects both a `Proved` body and a body using
+`interval_hull_intersect_inside_left i j`; a same-shape true control
+and an independently computed `False`
+isolate the false endpoint comparison rather than a malformed proof
+form. The closed checks illustrate the four directions; they do not
+prove the generic laws. The §8 seed, catalog implementation and package
+test are owed in later, separately owned turns.
