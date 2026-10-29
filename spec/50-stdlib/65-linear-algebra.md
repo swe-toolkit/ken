@@ -17,9 +17,11 @@
 > transpose-of-identity helper to a public law without a wrapper or
 > new proof body. Architect's isolated D0 on `18e269f32` checked its
 > public visibility and equal scratch trusted identities 109 → 109.
-> The §8 export and seed are absent on this base; D0 does not establish
-> shipped §8 execution, official conformance, CI, publication, landing
-> or landed trust.
+> The §8 export and seed were absent on the spec author's base. This
+> assembled candidate adds the checked export and a package-owned test
+> of the accepted seed and isolated false claim. Neither scratch D0 nor
+> these candidate-local checks establish official conformance-runner
+> execution, CI, publication, landing or landed trust.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -747,10 +749,10 @@ isolate its false content. Closed instances do not prove the generic
 Architect D0 checked the public theorem's module ownership and
 Transparent status, a generic public client, private-import refusals
 for all four direct helpers, and one D0 test. The existing
-`cat_linear_algebra_nat_matrix` visible-name inventory will require
-a matching one-name update: twenty-nine to thirty public names and
-`transpose_identity` as the additional visible name. Foundation owns
-that catalog/test change after CV authors the seed. The D0 patch
+`cat_linear_algebra_nat_matrix` visible-name inventory receives a
+matching one-name update: twenty-nine to thirty public names with
+`transpose_identity` as the additional visible name. The package-owned
+§8 test checks the complete accepted seed and its isolated false claim. The D0 patch
 SHA-256 is
 `74cff3e2237167533ec8324c0193ab140b871662e3cd7cf394635f46f0a1db4a`.
 These scratch checks are not package-test execution on the assembled

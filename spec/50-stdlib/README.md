@@ -360,9 +360,11 @@ law without a wrapper: the transpose of `identity n` is structurally
 four direct helpers remain private; no §1–§7 public type changes.
 Architect's D0 on `18e269f32` checked the visibility promotion at
 unchanged scratch trusted identities 109 → 109, with no new `Axiom`.
-The §8 public export and seed are absent on this base; scratch D0
-alone is not shipped §8 execution, official conformance, CI,
-publication, landing or landed trust. No rational or `Float` tier
+The §8 public export and seed were absent on the spec author's base;
+this assembled candidate adds the checked public law and a package-owned
+test of the accepted seed and isolated false claim. Scratch D0 and
+candidate-local checks are not official conformance-runner execution,
+CI, publication, landing or landed trust. No rational or `Float` tier
 is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
