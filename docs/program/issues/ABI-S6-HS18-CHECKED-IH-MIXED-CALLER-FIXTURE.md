@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-CHECKED-IH-MIXED-CALLER-FIXTURE
 title: "The checked-IH generated-context gate gives every selected caller a result contract when ANY of them has a completed return boundary, but no fixture has callers that disagree. Count the disagreeing contexts, then pin the ruled any behavior together with a fail-closed FinishedCode refusal on the non-completed caller's path"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1
