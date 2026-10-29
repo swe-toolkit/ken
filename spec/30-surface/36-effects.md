@@ -502,8 +502,14 @@ schematic `Op` and `Resp` above are spelled `op` and `resp` in source,
 with projections `E.op` and `E.resp e`, not `E.Op` or `E.Resp e`.
 The capitalized forms in the formulas of this subsection are
 mathematical placeholders, not additional accepted source field
-spellings. Providing the ordinary `Effect` record does not change
-the `ITree E R` carrier shape, the floor roster, or name resolution.
+spellings. The checked floor family is the unbundled container
+`ITree (Op : Type) (Resp : Op → Type) (R : Type)`, the form §4.5.7
+already uses (`ITree g rg a`). `ITree E R` in this subsection is
+schematic for `ITree E.op E.resp R`. Given a source-local `e : Effect`,
+the source carrier is `ITree e.op e.resp R`, and the constructors take
+the three parameters: `ITree.Ret e.op e.resp R r` and
+`ITree.Vis e.op e.resp R op k`. Providing the ordinary `Effect` record
+changes neither this carrier, the floor roster, nor name resolution.
 
 - `Ret r` — finished with value `r`.
 - `Vis e k` — perform operation `e`, then **continue** with `k`, which maps the
