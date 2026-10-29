@@ -6,7 +6,8 @@
 > SPEC-GEOMETRY-BOX-AREA §4;
 > SPEC-GEOMETRY-BOX-INSIDE-ORDER §5;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY §6;
-> SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY §7).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY §7;
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION §8).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -19,10 +20,14 @@
 > selector laws. Its catalog exports and package-owned seed test are on
 > main; that test is not official conformance-runner execution or a
 > landed trust measurement. Section 7 specifies four more laws of
-> associativity. The separate Foundation catalog candidate exports the
-> four checked laws and runs the §7 seed in a package-owned test. That
-> test is not official conformance-runner execution, CI, publication,
-> landing or a landed trust measurement.
+> associativity. All four §7 exports, their seed and package-owned test
+> are now present on main; earlier candidate-local checks are not
+> official conformance or landed trust. Section 8 specifies two Nat
+> selector absorptions and two structural box equalities. Architect D0
+> checked their generic proofs on `439fa7bb7` without a new `Axiom`
+> and with equal scratch trusted identities 114 → 114; their exports
+> are absent on this base. D0 is not shipped §8 execution, official
+> conformance, CI, publication, landing or landed trust.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -711,11 +716,11 @@ execution or a landed trust measurement.
 > isolated D0 on `372a6a1a6` checked four generic proofs with no new
 > `Axiom` and identical scratch `trusted_base()` identities 114 → 114.
 > The earlier spec-and-seed candidate did not deliver the Nat Order or
-> NatBox catalog exports. The separate Foundation candidate exports all
-> four laws; its package test root-loads them and checks the complete
-> accepted seed and the isolated false claim. This is candidate-local
-> package-test evidence, not official conformance-runner execution, CI,
-> publication, landing or a landed trust measurement.
+> NatBox catalog exports. All four laws, the seed and a package-owned
+> test are now on main. That test root-loads the laws, checks the
+> complete accepted seed and refuses its isolated false claim. Its
+> earlier candidate-local execution is not official conformance-runner
+> execution or a landed trust measurement.
 
 ### 7.1 Associativity selectors in Nat Order
 
@@ -789,11 +794,100 @@ were refused with `UnboundName`. The D0 probe accepted closed
 three-box controls and refused the mixed equation with `TypeMismatch`;
 it did not run the CLI, official conformance runner or CI. Those
 scratch measurements do **not** establish a shipped §7 export or
-landed trust result. The separate Foundation catalog candidate exports
-all four checked laws. Its `cat_geometry_box_intersect_hull_associativity`
-package test root-loads them and checks the complete accepted seed and
-its isolated refused claim. These candidate-local checks are not
-an official conformance-runner run, CI, publication, landing or a
-landed trust measurement. No new box representation, point-set
+landed trust result. All four checked laws, their seed and the
+`cat_geometry_box_intersect_hull_associativity` package test are now
+present on main. The test root-loads the laws, checks the complete
+accepted seed and refuses its isolated false claim; its earlier
+candidate-local execution is not an official conformance-runner run
+or a landed trust measurement. No new box representation, point-set
 quotient, dimension, validity premise or runtime-cost guarantee is
 introduced here.
+
+## 8. Absorption of box intersection and hull
+
+> **Section 8 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION).** Architect's
+> isolated AC-0 on exact landed base `439fa7bb7` checked the four
+> generic public laws below with `ken check` and `ken fmt --check` rc 0,
+> no new `Axiom` and equal scratch `trusted_base()` identity sets
+> 114 → 114. The four §8 catalog exports and seed are absent on this
+> base. That D0 does not establish shipped §8 execution, official
+> conformance, CI, publication, landing or landed trust.
+
+### 8.1 Absorption selectors in Nat Order
+
+The existing `Data.Numeric.Nat.Order` package must export two public
+Transparent checked proof selectors with these exact types, placed
+directly after `assoc for min` and `assoc for max`, respectively:
+
+```ken
+pub proof absorb for min (m : Nat) (n : Nat) : Equal Nat (min m (max m n)) m
+
+pub proof absorb for max (m : Nat) (n : Nat) : Equal Nat (max m (min m n)) m
+```
+
+Each law returns the **left** natural argument after one nested
+opposite extremum, for all `m` and `n`. Clients use `(proof absorb
+for min) m n` or `(proof absorb for max) m n`; no premise about
+their order is needed. These are distinct from §6's commutativity
+and §7's associativity, and do not export a separate idempotence
+interface. All existing Nat selectors keep their types. An internal
+checked proof helper may support a recursive case; it is not a new
+public law or a new source-visible operation.
+
+### 8.2 Two structural box equalities
+
+`Algorithm.Geometry.NatBox` must export exactly two further public
+Transparent checked theorems after `hull_assoc`, with these exact
+types:
+
+```ken
+pub theorem intersect_hull_absorb (a : Box) (b : Box) : Equal Box (intersect a (hull a b)) a
+
+pub theorem hull_intersect_absorb (a : Box) (b : Box) : Equal Box (hull a (intersect a b)) a
+```
+
+Both statements hold **unconditionally** for all boxes, including
+inverted bounds and disjoint boxes. The shared box `a` is the **left
+operand** of both nested operations: the law does not silently
+change the operand order, nor does it identify arbitrary boxes with
+the same points. The result is structural `Equal Box` of stored
+corners, not an `inside` Boolean, point-set equivalence, or equality
+of area. The §1.2 formulas show why the Nat selector laws suffice:
+`intersect a (hull a b)` takes `max x (min x y)` on each lower
+coordinate and `min x (max x y)` on each upper coordinate. The
+second theorem reverses those choices: `min x (max x y)` on lower
+coordinates and `max x (min x y)` on upper coordinates. The two
+§8.1 proofs restore each coordinate of `a`, regardless of whether
+its lower corner is below its upper corner. Private `point_equal`
+and `box_equal` assemble the two corner equalities into a checked
+`Equal Box`; private `box_with_lo` and `box_with_hi` remain private.
+No §1–§7 operation or law type changes, and no new kernel rule,
+primitive, postulate, or box-identity quotient is added.
+
+A closed seed may use `a=(1,1)–(4,4)` and `b=(3,0)–(6,2)`:
+they overlap, are distinct, and neither contains the other. Their
+hull is `(1,0)–(6,4)` and intersection is `(3,1)–(4,2)`.
+Both absorption left sides compute back to `a`, including the
+unequal lower/upper coordinates contributed by `b`. On the **same**
+pair, `intersect (hull a b) b` computes to `b`, not `a`; its
+structural equality to `b` is a same-form accepted control, while
+the false equality to `a` must be refused at its own proof term after
+a fresh accepted prefix. Closed `Equal Box` value controls and the
+refused row use `Refl`; closed Nat-value absorption controls use
+`Proved`. Architect measured that substituting `Proved` for a closed
+`Equal Box` control was itself refused, so such a refusal would not
+discriminate the false mixed claim. Finite controls establish this
+boundary, not the generic box laws or a distribution law.
+
+The isolated D0 checked ownership and Transparent status for all
+four laws, generic clients of each type, selective-import refusal
+of the existing private box helpers, and a counterexample to swapping
+a lower-corner selector; the new private Nat helper also refused
+selective import. Its patch SHA-256 is
+`440df27e96f94cb4796e0723cf280781dec2bce2ff2a6ac47b75e6408daca9d7`.
+These measurements are scratch-only. CV owns the closed seed after
+the AC-2 proof-form correction; Foundation owns the catalog and
+package-test half on the same candidate. No local check here
+establishes official conformance-runner execution, CI, publication,
+landing or landed trust.
