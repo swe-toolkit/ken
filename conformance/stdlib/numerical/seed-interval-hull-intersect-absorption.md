@@ -152,7 +152,7 @@ result is `[1,3]`, which is not inside `left = [0,2]`. Require refusal at
   and the independent false value, followed by `seed_neg` alone.
 - expect: reject the moved-shared-argument claim that
   `interval_hull (interval_intersect left right) right` is inside `left`.
-- measured: the accepted same-shape law application succeeds, and
+- measured: the accepted same-shape `Proved` control succeeds, and
   `moved_shared_argument_value` independently computes `False`.
 - claimed: the specified absorption does not license moving its shared
   interval argument.
@@ -175,6 +175,6 @@ same `[0,2]` and `[1,3]` intervals, checked all four public directions, and
 refused the moved-shared-argument claim after an accepted control. This D0
 is Architect-reported scratch evidence; it does not establish execution of
 this exact seed. The current candidate includes the §8 catalog
-implementation and a package-owned test; the test must be repinned to this
-control. This CV correction does not establish official conformance-runner
-execution, CI, publication, landing or landed trust.
+implementation and a package-owned test pinned to this control. This CV
+correction does not establish official conformance-runner execution, CI,
+publication, landing or landed trust.
