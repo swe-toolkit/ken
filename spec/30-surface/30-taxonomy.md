@@ -153,14 +153,16 @@ the prelude bridges to the surface. This is the surface analog of the kernel's
 **Reserved-name specificity (normative for every internal-provision
 admission).** Because authors cannot bind a name in B anywhere, a new
 reserved spelling must closely enclose the identity's meaning, not consume a
-generic name for a narrow intrinsic. A proposed generic name is renamed before
-admission; Spec owns the public spelling in `35`/`38` and the
-[ledger](30-intrinsic-ledger.md), and the rename lands atomically with the
-floor identity, roster/count, catalog callers, and fixtures. The current
-candidate spellings `NotFound`, `Other`, `Unsupported`, `write`,
-and `Stdout` trigger that review, but this section chooses no
-replacement names. `Instant` passes specificity as a type with a scoped
-`Instant.MkInstant` constructor, not a bare `MkInstant` reservation.
+generic name for a narrow intrinsic. A generic constructor can be made
+specific by type qualification; a generic name not covered by that route
+needs a rename before admission. Spec owns public spelling in `35`/`38`
+and the [ledger](30-intrinsic-ledger.md); any rename lands atomically with
+the floor identity, roster/count, catalog callers and fixtures.
+`NotFound`, `Other` and `Unsupported` are now admitted only as
+`IOError.C` paths, with no bare reservation or rename. `write` and
+`Stdout` remain specificity probes, with no replacement names decided.
+`Instant` passes specificity as a type with a scoped `Instant.MkInstant`
+constructor, not a bare `MkInstant` reservation.
 `Success` and `Failure` have passed it as the qualified paths
 `ExitCode.Success` and `ExitCode.Failure`; neither bare spelling joins B.
 A per-type scoped-constructors choice supplies specificity
@@ -247,15 +249,30 @@ remain reachable, while bare `Ret` and `Vis` are neither floor names
 nor reserved spellings. Other source declarations may bind those bare
 names under the ordinary non-B clash and visibility rules (`33 §3.3`).
 
-Thus the closed **floor-identity roster** has twenty-four names:
-**`{Auth, Bool, Bottom, Char, Coproduct, Equal, ExitCode, HostIO,
-ITree, Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
-Prop, Proved, ResourceKind, Result, Top, Unit, Utf8Error}`**. The
+Six FS/resource families also satisfy the internal-provision conjunction.
+Native code produces or reads their exact checked constructor IDs, which
+fix their parent type identities; independently, `38 §1.3.1` and
+`§1.7.1–2` require source to name those types. `FileError` carries public
+file-operation failures; `IOError` carries their thirteen distinct causes,
+including `Revoked`; and `CreatePolicy` selects the `writeFile` creation
+mode. `BufferSpan` crosses the bounded transfer operations, `TransferCount`
+is carried by read/write progress, and `ResourceError` carries distinct
+resource failures. A same-shaped source type cannot replace any of these
+six families. None is a new primitive or a trusted-base entry. Native
+`CreatePolicy` suffix readers still require the unchanged artifact leaf
+`CreatePolicy::CreateNew` (and its sibling policy leaves); constructor
+scoping changes source paths, not these checked identities or leaves.
+
+Thus the closed **floor-identity roster** has thirty names:
+**`{Auth, Bool, Bottom, BufferSpan, Char, Coproduct, CreatePolicy, Equal,
+ExitCode, FileError, HostIO, IOError, ITree, Instant, List, Nat, Option,
+Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceError,
+ResourceKind, Result, Top, TransferCount, Unit, Utf8Error}`**. The
 original fifteen, five entrypoint identities, three effect/clock
-identities and `ITree` remain re-checked; floor admission alone adds
-no postulate or `trusted_base()` entry. Constructor and companion
-closures are separate from this 24-name count. The definable
-`And`/`Dec`/`Yes`/`No` stay **out**
+identities, `ITree` and six FS/resource identities remain re-checked;
+floor admission alone adds no postulate or `trusted_base()` entry.
+Constructor and companion closures are separate from this 30-name count.
+The definable `And`/`Dec`/`Yes`/`No` stay **out**
 (source-constructible, with a `Core/Logic` package home, and no
 internal-provision witness). The `Empty` needed by `space` desugaring
 is different: its identity is captured before source elaboration and read by exact ID
@@ -295,20 +312,32 @@ their exact checked constructor IDs, whereas bare `InL`, `InR` and
 `MkInstant` do not enter B. `ITree` is scoped as a complete family:
 `ITree.Ret` and `ITree.Vis` retain their exact constructor IDs, while
 bare `Ret` and `Vis` do not enter B and may be bound by source.
+`FileError` is unscoped: `MkFileError` is bare and reserved. `IOError`
+is scoped as the complete thirteen-cause family: each source path is
+`IOError.C` (including `IOError.NotFound`, `IOError.Other`,
+`IOError.Unsupported` and `IOError.Revoked`), and no bare cause enters B.
+`CreatePolicy` is scoped: `CreatePolicy.CreateNew`,
+`CreatePolicy.CreateOrTruncate` and `CreatePolicy.CreateOrKeep` resolve to
+their unchanged checked IDs; no bare policy case enters B. `ResourceError`
+is scoped as the complete twelve-constructor family: source uses
+`ResourceError.C` paths, and no bare error name enters B. `BufferSpan`
+and `TransferCount` are scoped; their `PrivateBufferSpan` and
+`PrivateTransferCount` constructors retain their checked IDs and private
+visibility, with no bare reservation or newly public qualified path.
 `ProcessInput`, `Prod` and `Unit` are unscoped: their whole constructor
 families, respectively `MkProcessInput`, `MkProd` and `MkUnit`, are bare
-reserved names.
-`HostIO`, `Char`, and transparent `Pair` have no constructor family. A same-shaped
-source family or definition has a different identity and is not the floor
-member. Every floor type, constructor, and
-companion is re-checked and **out** of `trusted_base()`.
+reserved names. `HostIO`, `Char`, and transparent `Pair` have no
+constructor family. A same-shaped source family or definition has a
+different identity and is not the floor member. Every floor type,
+constructor, and companion is re-checked and **out** of `trusted_base()`.
 
 **Other effect-surface and Program-I identities remain candidates.** The
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
 also holds. `Unit`, `Coproduct`, `Instant` and `ITree` are admitted on exact-ID
-keying and independent `36` source needs, not merely because the
-compiler registers them. A source wrapper over an ABI (for example
+keying and independent `36` source needs; the six FS/resource families above
+are admitted on exact-ID keying and independent `38` source needs. Mere
+registration does not admit any type. A source wrapper over an ABI (for example
 `Capability/Process/Exit`'s `exit_with`/`exit_from_result`) does not become
 an intrinsic identity by using one. `host_exit` is keyed but has no independent
 source-name requirement: it remains compiler-internal; an example using that
@@ -339,13 +368,19 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the twenty-four-identity set above and that candidate has no
-new ambient availability.
-A keyed identity without an independent source-name requirement stays
-compiler-internal; an unkeyed, promised definition belongs in an explicit
-package; an unkeyed, unpromised registration may be removed after its uses
-are measured. A ledger row alone does not admit a name, and registering it in
-`globals` proves neither clause. Each added checked floor member remains out
+remains the thirty-identity set above and that candidate has no new
+ambient availability. `BufferWindow`, `ResourceBodyResult`,
+`ResourceBracketResult`, the `FS` source alias, `read_bytes` and `write_file`
+are source-promised but unkeyed: they remain outside B as package material,
+not internal-only identities. In particular, `BufferWindow` is unreserved;
+a same-name source declaration is allowed in strict mode, while legacy
+resolution stays unchanged. `FS` as an effect/capability label does not
+make the distinct type alias keyed. A keyed identity without an independent
+source-name requirement stays compiler-internal; an unkeyed, promised
+definition belongs in an explicit package; an unkeyed, unpromised
+registration may be removed after its uses are measured. A ledger row
+alone does not admit a name, and registering it in `globals` proves
+neither clause. Each added checked floor member remains out
 of `trusted_base()`.
 
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
@@ -356,15 +391,15 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the twenty-four-identity
-floor and Pair's three checked companions as the current target. The original
+**Implementation staging.** The specification fixes the thirty-identity
+floor and Pair's three checked companions as the current target. The prior
 fifteen, five entrypoint-ABI identities, three effect/clock identities and
-Pair companions are already realized. This floor-addition slice admits
-`ITree` with its complete scoped `Ret`/`Vis` family, atomically with the
-roster/count and existing-source migration; the co-turn itself does not
-establish QA, CI or landing. Other candidates need both D0 witness clauses
-before admission. No implementation gap authorizes a second identity or
-fallback route.
+`ITree` form the earlier twenty-four; this co-turn admits the six witnessed
+FS/resource families with their whole scoped or unscoped constructor
+families, atomically with the roster/count and existing-source migration.
+It does not establish QA, CI or landing. Other candidates need both D0
+witness clauses before admission. No implementation gap authorizes a
+second identity or fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 
