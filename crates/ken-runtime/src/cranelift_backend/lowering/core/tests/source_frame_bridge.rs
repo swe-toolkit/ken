@@ -1329,7 +1329,7 @@ fn d8o_expected_authorities() -> std::collections::BTreeMap<
     let plan = plan_static_transition_graph_with_symbols(
         &entry,
         &declarations,
-        &crate::NativeProcessSymbols::legacy_prelude(),
+        &crate::cranelift_backend::test_objects::px8tr_nested_post_effect_symbols(),
         AbiRootIngress::Value,
         true,
     )

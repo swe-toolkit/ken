@@ -1640,7 +1640,7 @@ mod tests {
         let mut plan = super::super::plan_static_transition_graph_with_symbols(
             &entry,
             &declarations,
-            &crate::NativeProcessSymbols::legacy_prelude(),
+            &crate::cranelift_backend::test_objects::px8tr_nested_post_effect_symbols(),
             super::super::AbiRootIngress::Value,
             true,
         )

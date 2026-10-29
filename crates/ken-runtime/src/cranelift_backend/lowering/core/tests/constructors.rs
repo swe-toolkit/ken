@@ -5190,6 +5190,13 @@ fn ac_c7_computational_match_edge(scrutinee: &str, inner: &str) -> (i64, u64, u6
     (observed, inner_identity, sentinel_identity)
 }
 
+fn ret_vis_fixture_symbols() -> crate::NativeProcessSymbols {
+    let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+    symbols.itree_ret = "ctor:fixture::ITree::Ret".to_string();
+    symbols.itree_vis = "ctor:fixture::ITree::Vis".to_string();
+    symbols
+}
+
 fn direct_none_frame_recursive_ret_vis_compile() -> Result<(), CraneliftBackendError> {
     let fixture = RuntimeExpr::Let {
         value: Box::new(ac_c7_wrap("Absent", "Gamma")),
@@ -5222,13 +5229,22 @@ fn compile_ret_vis_fixture(fixture: &RuntimeExpr) -> Result<(), CraneliftBackend
     else {
         unreachable!()
     };
-    let (plan, root) = planned_root_occurrence(fixture);
+    let symbols = ret_vis_fixture_symbols();
+    let plan = plan_static_transition_graph_with_symbols(
+        fixture,
+        &BTreeMap::new(),
+        &symbols,
+        AbiRootIngress::Value,
+        false,
+    )?;
+    let root = plan.root_static_origin().expect("the fixture has a root");
     let scrutinee_origin = plan.child_static_origin(root, 0).unwrap();
     let match_origin = plan.child_static_origin(root, 1).unwrap();
     let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, "Absent", "Gamma");
     let seed_env =
         NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     ac_c7_try_compile_edge(&seed_env, plan, move |compiler, builder| {
+        compiler.process_symbols = symbols;
         let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
         let eliminated = compiler.lower_expr(
             builder,
@@ -5303,8 +5319,14 @@ fn strict_ret_sink_excludes_recursive_ret_case() {
         (false, Some(StrictRetSinkStatus::Ready), 1usize),
     ] {
         let fixture = ret_vis_fixture(recursive);
-        let plan =
-            plan_static_transition_graph(&fixture, &BTreeMap::new()).expect("both fixtures plan");
+        let plan = plan_static_transition_graph_with_symbols(
+            &fixture,
+            &BTreeMap::new(),
+            &ret_vis_fixture_symbols(),
+            AbiRootIngress::Value,
+            false,
+        )
+        .expect("both fixtures plan");
         let root = plan.root_static_origin().expect("the fixture has a root");
         let match_origin = plan
             .child_static_origin(root, 1)

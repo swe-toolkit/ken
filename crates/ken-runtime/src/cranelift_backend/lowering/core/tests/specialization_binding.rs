@@ -70,7 +70,7 @@ fn d5a_the_landed_object_fixture_consumes_its_ih_marker_before_emitting_the_work
     let census = plan_static_transition_graph_with_symbols(
         &entry_expr,
         &declarations,
-        &crate::NativeProcessSymbols::legacy_prelude(),
+        &crate::cranelift_backend::test_objects::px8tr_nested_post_effect_symbols(),
         AbiRootIngress::Value,
         true,
     )
@@ -4317,7 +4317,7 @@ fn d8a_one_emission_owner_answers_one_composed_source_coordinate() {
         let witness = plan_static_transition_graph_with_symbols(
             &entry,
             &declarations,
-            &crate::NativeProcessSymbols::legacy_prelude(),
+            &crate::cranelift_backend::test_objects::px8tr_nested_post_effect_symbols(),
             AbiRootIngress::Value,
             true,
         )
