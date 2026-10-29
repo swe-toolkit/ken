@@ -98,7 +98,7 @@ theorem unswapped_same_shape_refl_control :
       (trace_window Bool t2 t6 ys)) = Refl
 
 theorem swapped_windows_start_at_three :
-  Equal Nat (first_event_time swapped_windows) t3 = Refl
+  Equal Nat (first_event_time swapped_windows) t3 = Proved
 
 theorem swapped_windows_do_not_start_at_five :
   Equal Bool (leq_nat t5 (first_event_time swapped_windows)) False = Proved
