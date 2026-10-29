@@ -1,6 +1,6 @@
 ---
 id: RT-CERTIFIER-ESCAPED-SLOT-ZERO-ARGUMENT-CALL
-title: "The finished-CLIF Result certifier keeps a stale Exact state whenever a pointer to the tracked slot is in hand but no consumer's partial evidence shows it: a pointer reloaded from a container slot with stack_load, an escaped slot before a zero-argument call, or a retained address before an unknown store. Close all three with one memory-read rule in the slot walk and one leak predicate that every consumer uses"
+title: "The finished-CLIF Result certifier keeps a stale Exact state whenever a pointer to the tracked slot is in hand but no consumer's partial evidence shows it: a pointer reloaded from a container slot with stack_load, or an escaped slot before a zero-argument call. Close both with a stored-values read rule in the slot walk and one leak predicate for calls; retention before an unknown store is a stated residual"
 status: ready
 owner: runtime
 size: M
@@ -12,14 +12,17 @@ github: null
 origin: "Architect review evt_4em6knbncena7 of RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER (zero-argument call after escape; requested by the Runtime Leader evt_7jbmssk0bvjtw). Widened by Architect ruling evt_2tsqhgywfxdb to fold in Adversary finding evt_3v8e7x9w7ar4f (stack_load reload, on 28f3dbb36) and a third gap read by the Architect (retention before an unknown store). Should-fix before ABI-S6-HS18-MAIN-BASED-CLOSURE increment C. Steward-filed per COORDINATION section 2."
 ---
 
-> **AMENDED 2026-10-29 (Architect `evt_zdyes4xcv8fc`, hard stop
-> `evt_3pjmdgmw69zt8`).** Under rules (i) and (ii), AC-3 refused two
-> `SP_A_FREEZE` rows in `rt_span_prov_native`. The ruling requires a
-> step-1 trace and bisection first. It pre-rules one repair, for one
-> outcome only: rule (i) is replaced by (i'), under which `stack_load S`
-> depends on the values stored into S, through a new `stack_slot_stores`
-> index. Pin P5 is added with it. Every other outcome is a hard stop with
-> the trace. Everything else stands.
+> **AMENDED 2026-10-29 (Architect `evt_zdyes4xcv8fc`, then
+> `evt_15rkc0pjxhm1z`; hard stops `evt_3pjmdgmw69zt8`, `evt_3ts5d91sq7amt`;
+> §1a count 2).** Rules (i) and (ii) refused two `SP_A_FREEZE` rows in
+> `rt_span_prov_native`, and the bisect showed each rule refuses on its own.
+> The WP is split:
+> - rule (i) is replaced by (i');
+> - rule (ii) applies to calls only;
+> - gap (c), retention before an unknown store, leaves this WP for
+>   `RT-CERTIFIER-CALLEE-SLOT-RETENTION`, together with P4 and m3.
+>
+> The Deliverable and Acceptance below are the amended ones.
 
 # A pointer to the slot that is in hand may write the slot
 
@@ -61,14 +64,22 @@ stop and report the mismatch; do not build around it.
 
 `units.rs` only, production plus `#[cfg(test)]` pins in
 `generated_result_protocol_verifier`, extending `slot_pointer_case`. The
-precise alternative, where reads through memory yield the stored values
-rather than the slot, is not authorized,
-except as (i') under the condition in `evt_zdyes4xcv8fc`.
+alternative where `load(stack_addr S)` also yields S's stored values is not
+authorized.
 
 ## Deliverable
 
-Rules (i) and (ii) as ruled, and the pins below. Every pin queries
-`reaching_memory_states_before(A, return)`.
+The rules as amended in `evt_15rkc0pjxhm1z`, and the pins below. Every pin
+queries `reaching_memory_states_before(A, return)`.
+
+- **(i').** A new cached `stack_slot_stores` index on `IndexedFunction`
+  records every value stored into each slot at an exact stack address. The
+  walk's `StackLoad` arm pushes the values stored into S, not S itself.
+- **(ii), calls only.** `location_leaked_before` is
+  `access.escaped || call_follows_retention(...)`, used first in
+  `call_may_access_location`. `unknown_write_may_alias` keeps its
+  `28f3dbb36` last line, with no retention.
+
 
 - **P1.** Container reload in both spellings, `stack_load C` and
   `load(stack_addr C)`, each followed by a call, a store through the pointer,
@@ -78,34 +89,45 @@ Rules (i) and (ii) as ruled, and the pins below. Every pin queries
   store through the pointer, gives `{Unknown}`.
 - **P3.** Heap-escaped, re-stored, then a zero-argument call gives
   `{Unknown}`. Red first.
-- **P4.** `call f(stack_addr A)`, re-store, then a store through a heap
-  pointer gives `{Unknown}`. It must be red first. If it is not, drop the
-  row and post why.
+- **P5.** `v = stack_load A` (the scalar 7), store v to heap `0x1000`, then
+  a zero-argument call gives `{Exact}`. Red first against rule (i).
 - **Precision controls.** Each keeps `{Exact}`:
-  - P4 without the call;
+  - `stack_store 7, A; p = load(iconst 0x1000); store 9, p`, with no call;
   - `stack_load E` passed to a call, where `E` never held A's address.
 
 ## Acceptance
 
-- **AC-1.** P1 to P4 and both precision controls pass. Each red-first row is
+- **AC-1.** P1, P2, P3, P5 and both precision controls pass. Each red-first row is
   shown red on the cut base.
-- **AC-2.** Each of m1 to m4 from the ruling reddens its own pins, and is
-  restored byte-identically:
-  - m1: drop the StackLoad insert;
-  - m2: move `escaped` back inside the argument loop;
-  - m3: drop the predicate from `unknown_write_may_alias`;
-  - m4: make the predicate always true.
+- **AC-2.** Each mutant reddens its pins and is restored byte-identically:
+  - m1, drop the `StackLoad` arm: P1's `stack_load` rows and P2;
+  - m2, move `escaped` back inside the argument loop: P3;
+  - m4, make `location_leaked_before` always true: both precision controls.
 - **AC-3.** The named native population used in the mixed-caller AC-3
   (`rt_parity_native` named rows, `rt_span_prov_native`,
   `px7f_resource_native`, the lib fixtures) is green on the candidate.
+  Both `SP_A_FREEZE` rows pass. The four-name parity run reports its build
+  time and test time separately.
+
+## Residual (stated, owned elsewhere)
+
+The certifier assumes a call that receives a slot address does not publish
+that address into memory the caller later reloads and writes through.
+Retention is consulted for later calls, not for later unknown-destination
+stores. This gap predates this WP. (i')'s soundness for slot contents
+written by a callee rests on the same assumption. Owner:
+`RT-CERTIFIER-CALLEE-SLOT-RETENTION`.
 
 ## Stop conditions
 
 - A named plan flips from accepted to refused. Hard-stop with that plan and
-  its query named. Do not narrow either rule without a ruling.
+  its query named, in the step-1 trace format. If `escaped` is still true
+  under (i'), name the store into the slot whose stored value walks to a
+  slot. Do not narrow either rule without a ruling.
 - The fix needs a change outside `units.rs`.
 
 Checks: 2 fired: the five walk consumers and the two leak-flag reads are
 taken from the Architect's read of `28f3dbb36`. They are cited, not
-re-derived. 8 fired: a fix that returns Unknown everywhere passes P1 to P4,
-so the precision controls and m4 are kept as the discriminating rows.
+re-derived. 8 fired: a fix that returns Unknown everywhere passes P1 to P3,
+so the precision controls and m4 are kept as the discriminating rows, and
+P5 separates (i') from (i).
