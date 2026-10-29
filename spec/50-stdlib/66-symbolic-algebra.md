@@ -7,18 +7,21 @@
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION §6;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE §7;
-> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION §8).** The §1–7
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION §8;
+> SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT §9).** The §1–8
 > catalog operations, checked laws and authored seeds are present on
-> main; earlier scratch D0 alone does not establish official
-> conformance execution or landed trust. Section 8 specifies one
-> pointwise derivative-after-substitution law under two necessary
-> derivative-value premises. Architect's isolated D0 on `97caadd38`
-> checked its generic proof with no new `Axiom` and equal scratch
-> trusted identities 114 → 114. The export was absent on the spec
-> author's base; this assembled candidate now adds the checked law
-> and a package test of the complete seed and both isolated premise-drop claims.
-> Those candidate-local checks are not official conformance-runner
-> execution, CI, publication, landing or landed trust.
+> main; historical scratch D0 and package checks do not establish
+> official conformance or landed trust. Section 8's conditional
+> derivative-after-substitution law keeps both derivative-value
+> premises. Section 9 specifies three premise-free checked laws:
+> normalization preserves `poly_eq` with the source, and derivative
+> and substitution each preserve that equivalence. Architect's D0
+> on `757b2bd12` checked the generic compositions with no new
+> `Axiom` and equal scratch trusted identities 114 → 114.
+> This assembled candidate adds the three §9 checked exports, the
+> closed seed and a package-owned test of the complete seed and its
+> isolated refusal; those candidate-local checks are not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -734,11 +737,10 @@ syntactic-occurrence test or a consequence of independence alone.
 > owner-local generic Transparent proof, an arbitrary-argument client,
 > and the premise counterexamples with no new `Axiom`, `ken check`
 > and `ken fmt --check` rc 0, and equal scratch `trusted_base()` sets
-> (114 → 114). The export was absent on the spec author's base.
-> The assembled candidate adds its checked proof and root-loads the
-> complete seed with both isolated premise-drop refusals in a package-owned test.
-> That is not official conformance-runner execution, CI, publication,
-> landing or landed trust.
+> (114 → 114). The §8 checked proof, seed and package-owned test are
+> present on this turn's base. Historical scratch D0 and candidate-local
+> checks are not official conformance-runner execution, CI,
+> publication, landing or landed trust.
 
 ### 8.1 Public checked law
 
@@ -819,10 +821,99 @@ derivative at `Zero` evaluates to zero. On `EVar Zero`, the two sides
 compute to zero and one; a same-shaped `shift_off` equality accepts,
 while the separate `all_const` claim refuses at its own proof term.
 These finite calculations and refusals isolate each missing premise;
-they are not generic proofs. The Foundation catalog half now exports
-the checked proof and its package-owned test reads CV's seed, checks
-owner/Transparent status, both private import refusals, exact trusted
-identities and both accepted/refused premise-drop clients. The catalog package's
-public-theorem count is **nineteen** with this addition; its trust prose
-and contract reference include §§1–8. Candidate-local evidence remains
-distinct from CI, official conformance and landed trust.
+they are not generic proofs. The checked proof and its package-owned
+test are present on main. The package test reads the seed, checks
+owner/Transparent status, private import refusals, exact trusted
+identities, and accepted/refused
+premise-drop clients. The base package has **nineteen** public
+checked theorems through §8; its trust prose and contract reference
+include §§1–8. Candidate-local evidence remains distinct from CI,
+official conformance and landed trust.
+
+## 9. Normalization is transparent to canonical equality
+
+> **Section 9 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT).** Architect's
+> isolated D0 on main `757b2bd12fdaeba5c7ed5da3ca5b5a0d7c588232`
+> checked the three generic proofs and a client with no new `Axiom`
+> and equal scratch trusted GlobalId sets 114 → 114. The assembled
+> candidate adds the three checked exports, the closed seed and a
+> package-owned test of the complete seed and its isolated refusal.
+> Neither the scratch D0 nor those candidate-local checks are official
+> conformance, CI, publication or landed trust.
+
+### 9.1 Three public checked laws
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export the following
+three public Transparent theorems in this order, immediately after
+`deriv_substitute` and before private `expr_add_cong`. Their bodies
+compose existing public proofs; there is no new private helper or
+import. Each holds for every `Expr` and, respectively, every `Nat`
+derivative index or total substitution `Nat → Expr`, without a
+premise about shape, order, or the environment:
+
+```ken
+pub theorem normalize_poly_eq (e : Expr) : IsTrue (poly_eq (normalize e) e) =
+  poly_eq_complete (normalize e) e (λenv. normalize_sound env e)
+
+pub theorem deriv_normalize
+      (v : Nat) (e : Expr)
+    : IsTrue (poly_eq (deriv v (normalize e)) (deriv v e)) =
+  poly_eq_deriv v (normalize e) e (normalize_poly_eq e)
+
+pub theorem substitute_normalize
+      (s : Nat → Expr) (e : Expr)
+    : IsTrue (poly_eq (substitute s (normalize e)) (substitute s e)) =
+  poly_eq_substitute s (normalize e) e (normalize_poly_eq e)
+```
+
+`normalize_poly_eq` subsumes the semantic input needed by either
+operation: §1's `normalize_sound` equates evaluated natural values
+under every total environment, and §2's `poly_eq_complete` turns
+that universal equality into a `True` answer. Sections 5 and 3
+respectively transport that answer through derivative and one-pass
+substitution. These are `IsTrue` claims about §2's canonical
+comparison, **not structural `Equal Expr` claims** about the
+noncanonical §1 normal form or about derivative/substitution output
+syntax. The value-level equalities at an arbitrary environment follow
+from `poly_eq_sound` applied to either new law; they are not further
+public names. No §1–8 operation or law type changes, new premise,
+postulate, primitive, kernel rule or surface feature is required.
+With these three laws the package has twenty-two public checked
+theorems; nineteen cover §§1–8.
+
+### 9.2 Closed discrimination and evidence boundary
+
+The assigned closed seed under `conformance/stdlib/symbolic-algebra/`
+uses `e = (x₀ + 1) · x₁`, represented by `EMul (EAdd (EVar Zero)
+(EConst (Suc Zero))) (EVar (Suc Zero))`. Write `one = Suc Zero`.
+The Architect's D0 accepted the following **positive structural**
+normal-form control for this closed `e`:
+
+```ken
+Equal Expr (normalize e)
+  (EAdd
+    (EMul (EVar Zero) (EMul (EVar one) (EConst one)))
+    (EAdd (EMul (EVar one) (EConst one)) (EConst Zero))) = Refl
+```
+
+The original expression and that normal form have different syntax.
+The seed applies each public law, independently checks the
+corresponding `poly_eq` answers with `Proved`, and
+includes both `deriv Zero` and `deriv (Suc Zero)` controls and a
+substitution that swaps the two variables. It must not use an
+`Equal Expr (normalize e) e = Refl` refusal: the Architect's D0
+observed an elaborator-level non-`Eq`-shaped-goal refusal rather than
+a kernel rejection for that probe.
+
+The false moved-variable claim compares `deriv Zero (normalize e)`
+with `deriv (Suc Zero) e`: at the all-zero environment their
+values are respectively zero and one. A separately accepted
+same-shape `deriv Zero` control, an independent `False` result
+for the moved-variable `poly_eq`, and the distinct natural values
+isolate the false claim. Append each refusal to a **fresh fully
+accepted prefix** so its rejection occurs at that claim, not at a
+prior fixture or unrelated proof. These closed observations do not
+prove the generic theorems: those rest on the checked bodies above,
+whose catalog export and package-owned seed test this assembled
+candidate adds.

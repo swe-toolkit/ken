@@ -382,14 +382,15 @@ CI, publication, landing or landed trust. No rational or `Float` tier
 is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–8 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–9 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE;
-SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION). The §1
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION;
+SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -446,12 +447,19 @@ under `compose_env env s`. This is pointwise `Equal Nat`, not
 structural expression equality or an unrestricted chain rule. Two
 new helpers stay private. Architect's D0 on `97caadd38` checked the
 generic proof without a new `Axiom` and with equal scratch trusted
-identities 114 → 114. The §8 catalog export was absent on the spec
-author's base; this assembled candidate adds the checked proof and
-a package-owned test for the complete seed and two isolated premise-drop claims.
-Those candidate-local checks are not official conformance-runner
-execution, CI, publication, landing or landed trust. A sorted-list normal
-form and signed/field arithmetic remain deferred.
+identities 114 → 114. The §8 checked proof, seed and package-owned
+test are present on this base; earlier candidate-local checks are not
+official conformance,
+CI or landed trust. Section 9 specifies three premise-free public
+`IsTrue (poly_eq _ _)` laws: normalization agrees canonically with its
+source, and differentiation and substitution each preserve that
+agreement. No structural `Equal Expr` or new value-level law is
+exported. Architect's D0 on `757b2bd12` checked all three generic
+bodies with no new `Axiom` and equal scratch trusted identities
+114 → 114; this assembled candidate adds the §9 catalog exports, seed
+and package-owned test, which are not official conformance, CI or
+landed trust.
+A sorted-list normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–8 (SPEC-GEOMETRY-EXACT-CONTRACT;
