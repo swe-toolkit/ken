@@ -212,7 +212,7 @@ impl HostOpV1 {
             Self::MappingAllocate => HostOpAvailabilityV1::NativeTested,
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
-            Self::MappingAcquireFile => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
@@ -279,7 +279,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -305,6 +305,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25] = [
     HostOpV1::MappingAllocate,
     HostOpV1::MappingReadView,
     HostOpV1::MappingWriteView,
+    HostOpV1::MappingAcquireFile,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -554,6 +555,11 @@ pub fn host_effect_wire_layout_v1(
             checked_u32(field("length")?)?,
             checked_u32(field("protection")?)?,
         ],
+        HostOpV1::MappingAcquireFile => vec![
+            checked_u32(field("resource")?)?,
+            checked_u32(field("length")?)?,
+            checked_u32(field("protection")?)?,
+        ],
         HostOpV1::MappingWriteView => {
             let bytes = slice("bytes")?;
             vec![
@@ -574,7 +580,7 @@ pub fn host_effect_wire_layout_v1(
         // turns a new operation from a runtime refusal into `error[E0004]`.
         //
         // These operations are exactly the `RepresentedUnavailable` set, and
-        // the twenty-two matched above are exactly the `NativeTested` set. That
+        // the 26 matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
         HostOpV1::ClockMonotonicNow
@@ -585,7 +591,6 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
         | HostOpV1::FsDuplicate
-        | HostOpV1::MappingAcquireFile
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation));
         }
@@ -5714,7 +5719,7 @@ mod tests {
             "MappingAllocate|0404|native|MappingAllocateRequestV1|2|HostReplyV1|1",
             "MappingReadView|0405|native|MappingReadViewRequestV1|4|HostReplyV1|1",
             "MappingWriteView|0406|native|MappingWriteViewRequestV1|4|HostReplyV1|1",
-            "MappingAcquireFile|0407|unavailable|MappingAcquireFileRequestV1|3|HostReplyV1|1",
+            "MappingAcquireFile|0407|native|MappingAcquireFileRequestV1|3|HostReplyV1|1",
             "lifetime=filesystem_observation_schema|2",
             "lifetime=resource_observation_schema|1",
             "lifetime=resource_error_reply_schema|1",
@@ -6176,13 +6181,12 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: D4 occupies the
-    /// next Mapping-band identity, stays represented-unavailable and non-ambient,
-    /// admits one Target resource, and has no capability seat or native roster
-    /// entry. CLAIMED: file-backed acquisition extends the represented Mapping
-    /// surface without becoming checked-Ken/native authority. THE GAP: dispatch
-    /// tests independently exercise protection-derived source rights and lineage.
+    /// next Mapping-band identity, is native-tested and non-ambient, admits one
+    /// Target resource, and has no capability seat. CLAIMED: file-backed
+    /// acquisition is a native Mapping operation. THE GAP: the real-artifact
+    /// differential independently exercises its admission and trace.
     #[test]
-    fn abi_s6_d4_file_acquire_identity_and_unavailable_posture_are_pinned() {
+    fn abi_s6_d5b_file_acquire_identity_and_available_posture_are_pinned() {
         assert_eq!(HostOpV1::try_from(0x0407), Ok(HostOpV1::MappingAcquireFile));
         assert_eq!(
             HostOpV1::MappingAcquireFile.next_in_inventory(),
@@ -6190,7 +6194,7 @@ mod tests {
         );
         assert_eq!(
             HostOpV1::MappingAcquireFile.availability(),
-            HostOpAvailabilityV1::RepresentedUnavailable
+            HostOpAvailabilityV1::NativeTested
         );
         assert!(!HostOpV1::MappingAcquireFile.is_ambient());
         assert_eq!(
@@ -6201,13 +6205,10 @@ mod tests {
             HostOpV1::MappingAcquireFile.resource_admission_requirement(),
             ResourceAdmissionRequirementV1::Target
         );
-        assert!(!NATIVE_TESTED_TARGETS_V1.contains(&HostOpV1::MappingAcquireFile));
-        assert_eq!(
-            host_effect_wire_layout_v1(HostOpV1::MappingAcquireFile),
-            Err(TerminalErrorV1::OperationUnavailable(
-                HostOpV1::MappingAcquireFile
-            ))
-        );
+        assert!(NATIVE_TESTED_TARGETS_V1.contains(&HostOpV1::MappingAcquireFile));
+        let layout = host_effect_wire_layout_v1(HostOpV1::MappingAcquireFile)
+            .expect("file acquisition has a native wire layout");
+        assert_eq!(layout.request_offsets.len(), 3);
     }
 
     /// Promise class: durable invariant. MEASURED: the three represented D3

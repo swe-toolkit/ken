@@ -94,4 +94,4 @@ operation|BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1
 operation|MappingAllocate|0404|native|MappingAllocateRequestV1|2|HostReplyV1|1
 operation|MappingReadView|0405|native|MappingReadViewRequestV1|4|HostReplyV1|1
 operation|MappingWriteView|0406|native|MappingWriteViewRequestV1|4|HostReplyV1|1
-operation|MappingAcquireFile|0407|unavailable|MappingAcquireFileRequestV1|3|HostReplyV1|1
+operation|MappingAcquireFile|0407|native|MappingAcquireFileRequestV1|3|HostReplyV1|1

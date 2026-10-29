@@ -347,7 +347,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 25] = [
+    [ken_host::HostOpV1; 26] = [
     ken_host::HostOpV1::ConsoleRead,
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
@@ -373,6 +373,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::MappingAllocate,
     ken_host::HostOpV1::MappingReadView,
     ken_host::HostOpV1::MappingWriteView,
+    ken_host::HostOpV1::MappingAcquireFile,
 ];
 
 /// The seat contract of one admitted operation at one semantic ordinal.
@@ -530,7 +531,15 @@ fn host_effect_seat_contract(
         (Op::FsCreateDirectory, 1) | (Op::FsRemoveDirectory, 1) => Some(bytes),
         (Op::FsWriteFile, 1) | (Op::FsOpen, 1) => Some(tag),
         (Op::FsChangeMode, 1) => Some(exact_int),
-        (Op::FsHandleMetadata, 0) | (Op::ResourceRelease, 0) => Some(resource),
+        (Op::FsHandleMetadata, 0)
+        | (Op::ResourceRelease, 0)
+        | (Op::MappingAcquireFile, 0) => Some(resource),
+        // The file-backed differential reaches this exact ordinal carried:
+        // "seat Argument(1) of MappingAcquireFile needs ExactIntU64, which it
+        // cannot observe in CarriedWord". The existing fail-closed carried
+        // Int decoder and bounds lane handle the widened seat.
+        (Op::MappingAcquireFile, 1) => Some(carried_exact_int),
+        (Op::MappingAcquireFile, 2) => Some(tag),
         // ⭐ The one seat this release teaches the carrier to observe.
         (Op::BufferAllocate, 0) | (Op::MappingAllocate, 0) => Some(carried_exact_int),
         (Op::MappingAllocate, 1) => Some(tag),
@@ -616,7 +625,8 @@ fn host_effect_seat_contract(
             | Op::BufferFreeze
             | Op::MappingAllocate
             | Op::MappingReadView
-            | Op::MappingWriteView,
+            | Op::MappingWriteView
+            | Op::MappingAcquireFile,
             _,
         ) => None,
         // ⛔ The represented-UNAVAILABLE lanes, named rather than wildcarded.
@@ -633,7 +643,6 @@ fn host_effect_seat_contract(
             | Op::FsGetInheritance
             | Op::FsSetInheritance
             | Op::FsDuplicate
-            | Op::MappingAcquireFile
             | Op::EntropyRandomBytes,
             _,
         ) => None,
@@ -880,7 +889,8 @@ impl<'src> StaticTransitionPlan<'src> {
                 }
                 paths
             }
-            (Op::MappingAllocate, EffectSeatSlot::Argument(1)) => {
+            (Op::MappingAllocate, EffectSeatSlot::Argument(1))
+            | (Op::MappingAcquireFile, EffectSeatSlot::Argument(2)) => {
                 roots(&[(Role::MappingReadOnly, 0), (Role::MappingWritable, 1)])?
             }
             _ => return Ok(None),

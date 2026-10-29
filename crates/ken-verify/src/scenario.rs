@@ -1786,6 +1786,8 @@ mod tests {
         PX5_PLANNED_NATIVE_TARGETS,
     };
 
+    const MAPPING_FILE_SOURCE: &str = include_str!("../../ken-cli/tests/fixtures/abi_s6_mapping_file_backed.ken");
+
     const FIVE_OP_SOURCE: &str = r#"program capabilities FS AFull
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
@@ -3363,6 +3365,25 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }
     }
 
+    fn mapping_acquire_file_scenario() -> Scenario {
+        Scenario {
+            boundary_resource_profile: ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            process_input: RawProcessInput::default(),
+            ambient: AmbientScript::default(),
+            program_caps: ProgramCapsShape::default(),
+            entry: CheckedProgramEntry {
+                identity: "abi-s6-mapping-file-backed-real-artifact".to_string(),
+                package_name: "abi-s6-mapping-file-backed-real-artifact".to_string(),
+                source: MAPPING_FILE_SOURCE.to_string(),
+            },
+            initial_filesystem: vec![SeedNode {
+                relative_path: b"mapped.bin".to_vec(),
+                kind: crate::SeedNodeKind::File(b"KENFILE!".to_vec()),
+            }],
+            expected_fs: Vec::new(),
+        }
+    }
+
     fn change_directory_mode_scenario() -> Scenario {
         let path = b"mode-dir".to_vec();
         Scenario {
@@ -4633,18 +4654,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsWriteFile needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -4685,18 +4694,86 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         assert!(run.rejects_wrong_plan_binding());
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsChangeMode needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
+    /// Promise class: normative compatibility vector (38 §1.9). File-backed
+    /// mapping must confirm a real artifact with independent evidence controls.
+    #[test]
+    fn mapping_acquire_file_confirms_native_tested_with_independent_controls() {
+        use ken_host::{MappingProtectionV1, ResourceBindingRole, ResourceKindV1};
+        let mut run = run_scenario(&mapping_acquire_file_scenario())
+            .expect("real file-backed acquisition differential");
+        run.compare_exact().expect("exact observations including mapping bytes");
+        assert!(run.exact_artifact_executed);
+        for lane in [&run.interpreter, &run.native] {
+            assert_eq!(lane.exit_status, 60);
+            assert!(lane.terminal_error.is_none());
+            assert_eq!(
+                lane.effect_trace.iter().map(|event| event.operation).collect::<Vec<_>>(),
+                vec![HostOpV1::FsOpen, HostOpV1::MappingAcquireFile,
+                     HostOpV1::MappingReadView, HostOpV1::ResourceRelease,
+                     HostOpV1::ResourceRelease],
+            );
+            let [file, acquire, read, ..] = lane.effect_trace.as_slice() else {
+                panic!("expected five effect events");
+            };
+            assert_eq!(
+                acquire.request,
+                CanonicalRequestV1::MappingAcquireFile {
+                    length: 8,
+                    protection: MappingProtectionV1::ReadOnly,
+                },
+            );
+            assert!(matches!(
+                acquire.outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
+                    resource_kind: ResourceKindV1::Mapping, ..
+                })
+            ));
+            let [(ResourceBindingRole::Target, file_identity)] = file.resource_bindings.as_slice()
+                else { panic!("FsOpen must bind the acquired handle") };
+            assert_eq!(
+                acquire.resource_bindings.first(),
+                Some(&(ResourceBindingRole::Target, *file_identity)),
+            );
+            assert!(matches!(
+                &read.outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes))
+                    if bytes.as_slice() == b"NFIL"
+            ));
+            assert!(lane.filesystem_delta.is_empty());
+        }
+        let operation = HostOpV1::MappingAcquireFile;
+        let confirm = |run: &CanonicalDifferentialRun| {
+            confirm_native_tested_transition(operation, NativeTestedEvidence::from_run(operation, run))
+        };
+        assert_eq!(confirm(&run), Ok(HostOpAvailabilityV1::NativeTested));
+
+        let clean_interpreter = run.interpreter.clone();
+        let clean_native = run.native.clone();
+        run.exact_artifact_executed = false;
+        assert_eq!(confirm(&run), Err(StatusTransitionError::MissingExactArtifactEvidence(operation)));
+        run.exact_artifact_executed = true;
+        run.interpreter = clean_interpreter.clone();
+        run.native = clean_native.clone();
+        let read = run.native.effect_trace.iter_mut()
+            .find(|event| event.operation == HostOpV1::MappingReadView)
+            .expect("read event");
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes)) = &mut read.outcome
+            else { panic!("read reply must contain bytes") };
+        *bytes = b"NFIX".to_vec();
+        assert!(run.exact_artifact_executed);
+        assert!([&run.interpreter, &run.native].into_iter().all(|lane|
+            lane.effect_trace.iter().any(|event| event.operation == operation)));
+        assert_eq!(confirm(&run), Err(StatusTransitionError::ExternalObservationMismatch(operation)));
+        run.interpreter = clean_interpreter;
+        run.native = clean_native;
+        for lane in [&mut run.interpreter, &mut run.native] {
+            lane.effect_trace.retain(|event| event.operation != operation);
+        }
+        assert!(run.compare_exact().is_ok());
+        assert!(run.exact_artifact_executed);
+        assert_eq!(confirm(&run), Err(StatusTransitionError::OperationNotObserved(operation)));
+    }
+
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsChangeMode Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -4745,18 +4822,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         );
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsChangeMode needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsChangeMode Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -4796,18 +4861,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         ));
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsChangeMode needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsChangeMode Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -4830,18 +4883,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         );
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -4889,18 +4930,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -5025,18 +5054,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         ));
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsWriteFile needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -5087,18 +5104,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }));
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsWriteFile needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span
@@ -5140,18 +5145,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }));
     }
 
-    // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
-    //
-    // Observed signature, exactly:
-    //   Effect: seat Argument(0) of FsWriteFile needs BytesPointerLength, which it cannot observe in CarriedWord
-    //
-    // Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-    // Pre-existing base debt, NOT a bind-order regression: measured failing at
-    // the frozen base 21fd46dc by the D14 differential, before any
-    // RT-SRCBODY-BIND-ORDER commit.
-    // It refuses at object emission, so the program never executes and no
-    // binding order is observable in it.
-    // Annotation only -- test body and expectations are unchanged.
     #[test]
     // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
     // FileError SiteOperand(0) could not project its carried word. D5 byte-span

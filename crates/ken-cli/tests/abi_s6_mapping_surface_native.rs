@@ -3,8 +3,8 @@
 //! Promise class: normative compatibility vectors from `38 §1.9` and
 //! `conformance/surface/ffi-io/seed-mapping.md`. The programs cross the real
 //! checked-source, native-object, host-dispatch, and interpreter boundaries.
-//! File-backed copy-on-write remains blocked on D5b; this target exercises only
-//! the frozen anonymous allocate/read/write operation set plus release.
+//! This target exercises the anonymous allocate/read/write operation set plus
+//! release. File-backed acquisition is exercised by the dedicated D5b target.
 
 #![cfg(target_os = "linux")]
 
@@ -206,7 +206,8 @@ fn parity_difference(case: &str, result: &Differential) -> Option<String> {
 /// exact operation-order, request/outcome/binding parity and one terminal
 /// release. CLAIMED: the D1 carried-transport frontier is closed for every
 /// Mapping access kind that can follow either sibling. THE GAP: file-backed
-/// acquisition and MAP_PRIVATE COW remain D5b.
+/// acquisition is exercised separately by the D5b file-backed target; this
+/// anonymous matrix does not establish external-write isolation.
 #[test]
 fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
     use ken_runtime::HostOpV1::{MappingAllocate, MappingReadView, MappingWriteView};
@@ -353,7 +354,7 @@ fn suppressing_bounded_response_owner_drive_reports_typed_capacity_exhaustion() 
 /// cross declared proc ABI slots, returns four copied zero bytes from exactly
 /// [2,6), and releases once. CLAIMED: both carried read-window seats compose
 /// over the frozen MappingReadView wire. THE GAP: file acquisition is not
-/// exercised and remains D5b.
+/// exercised by this anonymous-only case; the D5b target checks file acquisition.
 #[test]
 fn window_direct_map_bytes_executes_natively_and_matches_the_interpreter() {
     let result = differential("read", "read_stage");
@@ -380,7 +381,7 @@ fn window_direct_map_bytes_executes_natively_and_matches_the_interpreter() {
 /// proc ABI slots; both engines must observe `ABCD`, agree on the ordered effect
 /// trace, and release once. CLAIMED: payload-derived write extent composes with
 /// window-direct read access without a response transform. THE GAP: MAP_PRIVATE
-/// file isolation remains D5b.
+/// file isolation is not asserted here or by the file-backed target.
 #[test]
 fn offset_direct_map_write_then_window_read_preserves_process_local_bytes() {
     let result = differential("write-read", "write_read_stage");
@@ -427,7 +428,7 @@ fn offset_direct_map_write_then_window_read_preserves_process_local_bytes() {
 /// terminal result, and one release. CLAIMED: read-window then payload-derived
 /// write access composes independently of sequential direction. THE GAP: later
 /// in-mapping readback and MAP_PRIVATE file isolation are covered by the
-/// write-then-read sibling and remain D5b respectively.
+/// write-then-read sibling and not asserted by this anonymous case respectively.
 #[test]
 fn window_read_then_offset_direct_map_write_executes_in_source_order() {
     let result = differential("read-write", "read_write_stage");
@@ -579,8 +580,8 @@ fn negative_window_skips_mapping_read_dispatch_in_both_engines() {
 /// the real host admission and returns the exact WRITE-vs-READ masks in both
 /// engines. CLAIMED: response-owner threading never bypasses per-effect rights
 /// admission on effects two through N. THE GAP: revocation during an anonymous
-/// mapping bracket is not source-constructible; file-source revocation remains
-/// D5b with MappingAcquireFile.
+/// mapping bracket is not source-constructible; the separate D5b file-backed
+/// test exercises acquisition, not mid-bracket revocation.
 #[test]
 fn second_mapping_effect_rechecks_read_only_rights() {
     let result = differential(
