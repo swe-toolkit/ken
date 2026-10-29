@@ -779,6 +779,9 @@ it is.
 
 ### 6e. The consumer-authority machinery is absent from `main` — all four spellings
 
+> **Superseded 2026-10-29.** This census predates increment A. The current
+> census is AC-C0's §1 (`evt_fge5r2byetm2`), on `610a2d84a`.
+
     detached_return_context              0
     checked_ih_detached                  0
     detached_consumer_authorities        0
