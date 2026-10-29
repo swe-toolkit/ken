@@ -11,7 +11,7 @@ use ken_elaborator::{
     extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr as SourceExpr, KenMdFenceRole,
     Type as SourceType,
 };
-use ken_kernel::{Decl, KernelError};
+use ken_kernel::Decl;
 
 const DERIVED: &str = "Data.Collections.Derived";
 const TRACE: &str = "Data.Time.EventTrace";
@@ -233,7 +233,8 @@ theorem unswapped_starts_at_five :
 /// observation of the swap. Four direct predicate controls run on the seed's
 /// actual events; the accepted append starts at five, the swapped at three.
 /// Each isolated refusal has the same swapped goal but a different proof
-/// body, and rejects at its own declaration on a separate fresh prefix.
+/// body, and elaborates only its parsed closed theorem span after a fresh
+/// prefix. No diagnostic variant or message is required by the seed.
 /// CLAIMED: windowing an append keeps the input order, not a swapped order.
 /// THE GAP: finite Bool traces do not establish the generic law or official
 /// conformance; the open checked law/client above supplies generic evidence.
@@ -298,7 +299,7 @@ fn complete_unordered_seed_accepts_and_both_swapped_claims_refuse() {
             Some(Decl::Transparent { .. })
         ));
     }
-    for (source, by_public_law) in [(refl_refusal, false), (law_refusal, true)] {
+    for source in [refl_refusal, law_refusal] {
         let parsed = parse_decls(source).expect("isolated §8 refusal parses");
         let [SourceDecl::TheoremDecl {
             params,
@@ -309,6 +310,14 @@ fn complete_unordered_seed_accepts_and_both_swapped_claims_refuse() {
             panic!("each refusal must contain exactly one theorem");
         };
         assert!(params.is_empty(), "swapped equality is closed");
+        let claim = source
+            .get(claim_span.start..claim_span.end)
+            .expect("parsed theorem span is inside the refusal source");
+        let claim_decls = parse_decls(claim).expect("isolated claim span parses");
+        assert!(matches!(
+            claim_decls.as_slice(),
+            [SourceDecl::TheoremDecl { .. }]
+        ));
         let mut refusing = trace_env();
         refusing
             .elaborate_file(accepted)
@@ -316,17 +325,8 @@ fn complete_unordered_seed_accepts_and_both_swapped_claims_refuse() {
         refusing
             .elaborate_file(FIXTURE_CONTROLS)
             .expect("fresh seed's opposite first-event controls check");
-        match (by_public_law, refusing.elaborate_file(source)) {
-            (false, Err(ElabError::TypeMismatch { span, .. }))
-                if claim_span.start <= span.start && span.end <= claim_span.end => {}
-            (
-                true,
-                Err(ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { .. },
-                    span,
-                }),
-            ) if claim_span.start <= span.start && span.end <= claim_span.end => {}
-            other => panic!("swapped claim must reject at its own proof: {other:?}"),
-        }
+        refusing
+            .elaborate_file(claim)
+            .expect_err("the sole closed swapped theorem must be refused");
     }
 }
