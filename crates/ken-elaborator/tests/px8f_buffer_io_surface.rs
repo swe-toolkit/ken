@@ -319,8 +319,8 @@ theorem first_error_is_no_progress
         .expect("the actual error must check against the named loop step");
 
     let wrong_error = true_twin.replace(
-        "(Err ResourceError Unit NoProgress)) =",
-        "(Err ResourceError Unit Closed)) =",
+        "(Err ResourceError Unit ResourceError.NoProgress)) =",
+        "(Err ResourceError Unit ResourceError.Closed)) =",
     );
     assert_ne!(
         wrong_error, true_twin,

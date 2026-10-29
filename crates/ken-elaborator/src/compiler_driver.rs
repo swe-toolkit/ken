@@ -4735,7 +4735,10 @@ mod native_pre_source_stable_symbols {
         // their constructors after the prelude hides those checked IDs.
         for family_name in ["BufferSpan", "TransferCount"] {
             let family_id = env.globals[family_name];
-            let family = env.env.inductive(family_id).expect("checked private family");
+            let family = env
+                .env
+                .inductive(family_id)
+                .expect("checked private family");
             let leaves = env
                 .module_state
                 .scoped_constructor_leaves(family_id)
@@ -4747,7 +4750,10 @@ mod native_pre_source_stable_symbols {
                 assert!(!env.globals.contains_key(&format!("{family_name}.{leaf}")));
                 assert_eq!(
                     table.resolve_global(ctor.id),
-                    Ok(&StableSymbol::constructor(&symbols[&family_id], leaf.clone()))
+                    Ok(&StableSymbol::constructor(
+                        &symbols[&family_id],
+                        leaf.clone()
+                    ))
                 );
             }
         }

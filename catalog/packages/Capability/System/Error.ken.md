@@ -186,7 +186,9 @@ revocation identity.
 
 ```ken example
 const revoked_retry : RetryGuidance =
-  retry_guidance (error_transience IOError.Revoked) (operation_idempotence (FilesystemOp OpReadFile))
+  retry_guidance
+    (error_transience IOError.Revoked)
+    (operation_idempotence (FilesystemOp OpReadFile))
 
 theorem revoked_retry_is_permanent : Equal RetryGuidance revoked_retry DoNotRetryPermanent =
   Proved
