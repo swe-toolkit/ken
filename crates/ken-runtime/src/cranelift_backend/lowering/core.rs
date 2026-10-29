@@ -109,6 +109,42 @@ enum ContinuationOperandEnvironment {
 #[cfg(test)]
 pub(in crate::cranelift_backend::lowering) mod tests;
 
+/// Both eliminator kinds use the same checked-family identity test. A case
+/// whose spelling merely resembles ITree must not make an exit a family frame.
+fn floor_itree_frame_has_case<'a>(
+    symbols: &crate::NativeProcessSymbols,
+    constructors: impl IntoIterator<Item = &'a RuntimeSymbol>,
+) -> bool {
+    constructors
+        .into_iter()
+        .any(|constructor| symbols.is_itree_constructor(constructor))
+}
+
+#[cfg(test)]
+mod itree_role_identity_tests {
+    use super::*;
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: the exact production eliminator-case predicate rejects a
+    /// non-floor ITree-looking Ret and admits a checked Ret under another name.
+    /// CLAIMED: terminal exit handling uses checked ITree family identity.
+    /// THE GAP: this tests the predicate's two constructor populations, not
+    /// every path into lower_computational_producer_construct.
+    #[test]
+    fn terminal_exit_frame_uses_closed_checked_itree_case_identity() {
+        let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+        symbols.itree_ret = "ctor:checked::Session::Return".to_string();
+        symbols.itree_vis = "ctor:checked::Session::Visible".to_string();
+        let wrong = concat!("ctor:other::ITree", "::Ret").to_string();
+        assert!(!floor_itree_frame_has_case(&symbols, [&wrong]));
+        assert!(floor_itree_frame_has_case(&symbols, [&symbols.itree_ret]));
+        assert!(floor_itree_frame_has_case(
+            &symbols,
+            [&wrong, &symbols.itree_vis]
+        ));
+    }
+}
+
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct InvocationReturnTransportDecision {
@@ -7279,14 +7315,14 @@ impl<'a> Lowering<'a> {
         let terminal_exit = constructor == &self.process_symbols.exit_success
             || constructor == &self.process_symbols.exit_failure;
         let itree_frame = match eliminator {
-            EliminatorFrame::Computational(frame) => frame
-                .cases
-                .iter()
-                .any(|case| case.constructor.contains("::ITree::")),
-            EliminatorFrame::Ordinary(frame) => frame
-                .cases
-                .iter()
-                .any(|case| case.constructor.contains("::ITree::")),
+            EliminatorFrame::Computational(frame) => floor_itree_frame_has_case(
+                &self.process_symbols,
+                frame.cases.iter().map(|case| &case.constructor),
+            ),
+            EliminatorFrame::Ordinary(frame) => floor_itree_frame_has_case(
+                &self.process_symbols,
+                frame.cases.iter().map(|case| &case.constructor),
+            ),
             EliminatorFrame::PendingLet(_) => {
                 unreachable!("pending Let continuations are consumed before dispatch")
             }
@@ -10163,7 +10199,7 @@ impl<'a> Lowering<'a> {
         Ok(matches!(
             self.retained_body_occurrence(body_origin)?.expr,
             RuntimeExpr::Construct { constructor, args }
-                if constructor.ends_with("::ITree::Ret") && args.len() == 1
+                if constructor == &self.process_symbols.itree_ret && args.len() == 1
         ))
     }
 
@@ -15953,7 +15989,7 @@ impl<'a> Lowering<'a> {
             builder.ins().brif(matched, selected, &[], next, &[]);
 
             builder.switch_to_block(selected);
-            if pending_owner_ret_only && case.constructor.ends_with("::ITree::Vis") {
+            if pending_owner_ret_only && case.constructor == self.process_symbols.itree_vis {
                 // Internal: returned carrier is not Ret after a validated
                 // response owner. The owner checks exact Ret identity and
                 // arity before storing Result, so native success cannot reach
@@ -16253,7 +16289,7 @@ impl<'a> Lowering<'a> {
                 builder.ins().jump(merge, &[word.word.into()]);
             }
             #[cfg(feature = "px8-ds-test-support")]
-            if case.constructor.ends_with("::ITree::Vis") {
+            if case.constructor == self.process_symbols.itree_vis {
                 if let Some(emission_owner) = self.defining_emission_owner {
                     crate::cranelift_backend::planning::record_selected_pending_match_emission(
                         eliminator.static_origin,

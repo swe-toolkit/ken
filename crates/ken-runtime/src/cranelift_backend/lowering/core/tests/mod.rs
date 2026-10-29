@@ -2507,7 +2507,7 @@ fn with_d5a_witness_plan<T>(f: impl FnOnce(&StaticTransitionPlan<'_>) -> T) -> T
     let plan = plan_static_transition_graph_with_symbols(
         &entry_expr,
         &declarations,
-        &crate::NativeProcessSymbols::legacy_prelude(),
+        &crate::cranelift_backend::test_objects::px8tr_nested_post_effect_symbols(),
         AbiRootIngress::Value,
         true,
     )

@@ -6662,7 +6662,7 @@ fn strict_ret_sink_assessment(
     for (alternative, case) in cases.iter().enumerate() {
         if !case.recursive_positions.is_empty()
             || case.argument_binders != 1
-            || !case.constructor.ends_with("::ITree::Ret")
+            || case.constructor != plan.process_symbols.itree_ret
         {
             continue;
         }
@@ -6684,7 +6684,7 @@ fn strict_ret_sink_assessment(
     let exact_visible = cases.len() == 2
         && cases
             .iter()
-            .filter(|case| case.constructor.ends_with("::ITree::Vis"))
+            .filter(|case| case.constructor == plan.process_symbols.itree_vis)
             .count() == 1;
     let status = if !exact_visible {
         StrictRetSinkStatus::PendingTopology
@@ -9042,7 +9042,7 @@ impl StaticTransitionPlan<'_> {
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedJoinSite { .. } => return Ok(false),
                 RuntimeExpr::Construct { constructor, .. }
-                    if constructor.as_str().ends_with("::ITree::Vis") =>
+                    if constructor == &self.process_symbols.itree_vis =>
                 {
                     return Ok(false);
                 }
@@ -11664,7 +11664,17 @@ mod tests {
                 }),
                 args: Vec::new(),
             }));
-            let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
+            let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+            symbols.itree_ret = "ctor:fixture::ITree::Ret".to_owned();
+            symbols.itree_vis = "ctor:fixture::ITree::Vis".to_owned();
+            let plan = plan_static_transition_graph_with_symbols(
+                expr,
+                &BTreeMap::new(),
+                &symbols,
+                AbiRootIngress::Value,
+                false,
+            )
+            .expect("plans");
             let root = plan.root_occurrence.expect("the Call has a root occurrence");
             plan.checked_ih_body_is_pure_narrowing(root)
                 .expect("the purity walk resolves the exact static body")

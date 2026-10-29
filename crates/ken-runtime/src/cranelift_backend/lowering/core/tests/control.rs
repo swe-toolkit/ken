@@ -3918,6 +3918,28 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
 // widened into the capture-bearing case would flip the second while leaving the
 // first green.
 
+#[cfg(test)]
+fn d1_ret_vis_symbols() -> crate::NativeProcessSymbols {
+    let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+    symbols.itree_ret = "ctor:fixture::ITree::Ret".to_string();
+    symbols.itree_vis = "ctor:fixture::ITree::Vis".to_string();
+    symbols
+}
+
+#[cfg(test)]
+fn d1_ret_vis_plan(fixture: &RuntimeExpr) -> (StaticTransitionPlan<'_>, StaticOriginId) {
+    let plan = plan_static_transition_graph_with_symbols(
+        fixture,
+        &BTreeMap::new(),
+        &d1_ret_vis_symbols(),
+        AbiRootIngress::Value,
+        false,
+    )
+    .expect("the Ret/Vis fixture plans with its resolved roles");
+    let root = plan.root_static_origin().expect("the fixture has a root");
+    (plan, root)
+}
+
 /// `Ret`/`Vis` over a shared producer, parameterised only by the recursive
 /// position's capture list.
 ///
@@ -3978,9 +4000,10 @@ fn d1_ret_vis_producer(captures: Vec<RuntimeExpr>) -> RuntimeExpr {
 fn the_branch_local_partition_mints_a_declared_body_for_a_capture_free_recursive_position() {
     let fixture = d1_ret_vis_producer(Vec::new());
     let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
-    let (plan, root) = planned_root_occurrence(&fixture);
+    let (plan, root) = d1_ret_vis_plan(&fixture);
     let mut lowering = root_authority_test_lowering(&seed_env);
     lowering.static_transition_plan = plan;
+    lowering.process_symbols = d1_ret_vis_symbols();
 
     let minted = lowering
         .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string(), 0)
@@ -4024,9 +4047,10 @@ fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
     // are in, and RT-CAPTURE-SUPPLY closed as word-only.
     let fixture = d1_ret_vis_producer(vec![RuntimeExpr::Var(0)]);
     let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
-    let (plan, root) = planned_root_occurrence(&fixture);
+    let (plan, root) = d1_ret_vis_plan(&fixture);
     let mut lowering = root_authority_test_lowering(&seed_env);
     lowering.static_transition_plan = plan;
+    lowering.process_symbols = d1_ret_vis_symbols();
 
     let minted = lowering
         .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string(), 0)
@@ -4042,7 +4066,7 @@ fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
 #[test]
 fn residual_consumers_refuse_a_nontrivial_selection_continuation() {
     let fixture = d1_ret_vis_producer(Vec::new());
-    let (plan, root) = planned_root_occurrence(&fixture);
+    let (plan, root) = d1_ret_vis_plan(&fixture);
     let constructor = plan.case_constructor_identity(root, 0)
         .expect("the selected case has a checked constructor identity");
     let body = plan.child_static_origin(root, 0)

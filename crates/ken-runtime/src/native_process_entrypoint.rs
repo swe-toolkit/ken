@@ -92,6 +92,12 @@ pub struct NativeProcessSymbols {
 }
 
 impl NativeProcessSymbols {
+    /// The checked floor ITree family is closed with exactly Ret and Vis.
+    /// Recognize it by its resolved constructor identities, not a symbol suffix.
+    pub(crate) fn is_itree_constructor(&self, constructor: &RuntimeSymbol) -> bool {
+        constructor == &self.itree_ret || constructor == &self.itree_vis
+    }
+
     pub(crate) fn legacy_prelude() -> Self {
         Self {
             process_input: PROCESS_INPUT_CONSTRUCTOR.to_string(),

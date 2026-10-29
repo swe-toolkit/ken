@@ -114,14 +114,22 @@ pub(crate) fn px8tr_nested_post_effect_planning_inputs()
     (entry, vec![declaration])
 }
 
+pub(crate) fn px8tr_nested_post_effect_symbols() -> crate::NativeProcessSymbols {
+    let mut symbols = crate::NativeProcessSymbols::legacy_prelude();
+    symbols.itree_ret = "ctor:fixture::PX8TR::ITree::Ret".to_string();
+    symbols.itree_vis = "ctor:fixture::PX8TR::ITree::Vis".to_string();
+    symbols
+}
+
 fn px8tr_nested_post_effect_fixture() -> (
     RuntimeExpr,
     RuntimeDeclaration,
     crate::OrientedSubcontinuationPlanV1,
 ) {
     let declaration = "decl:fixture::PX8TR::main".to_string();
-    let ret_constructor = "ctor:fixture::PX8TR::ITree::Ret".to_string();
-    let vis_constructor = "ctor:fixture::PX8TR::ITree::Vis".to_string();
+    let symbols = px8tr_nested_post_effect_symbols();
+    let ret_constructor = symbols.itree_ret;
+    let vis_constructor = symbols.itree_vis;
     let result_err = "ctor:prelude::Result::Err".to_string();
     let result_ok = "ctor:prelude::Result::Ok".to_string();
     let unit = || RuntimeExpr::Construct {
@@ -495,7 +503,7 @@ pub(crate) fn emit_px8tr_nested_post_effect_object_with_plan(
         declarations,
         None,
         true,
-        Some(&crate::NativeProcessSymbols::legacy_prelude()),
+        Some(&px8tr_nested_post_effect_symbols()),
         Some(crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan()),
         Some(plan),
     )?;

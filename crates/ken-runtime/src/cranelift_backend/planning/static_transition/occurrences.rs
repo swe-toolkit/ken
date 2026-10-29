@@ -1119,7 +1119,8 @@ mod tests {
             .find(|(name, _)| *name == "computational")
             .expect("the computational fixture");
 
-        let mut planner = Planner::new().expect("planner");
+        let mut planner =
+            Planner::new(&crate::NativeProcessSymbols::legacy_prelude()).expect("planner");
         let empty = PersistentNodeId(0);
         let context = PlanContext {
             environment: empty,
