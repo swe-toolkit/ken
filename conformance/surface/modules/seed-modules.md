@@ -822,12 +822,14 @@ route-specific diagnostic variants or payloads.
 
   const nat_unit_effect : Effect = {op = Nat, resp = λop.Unit}
 
-  fn ret_witness_for (e : Effect) : ITree e Nat = ITree.Ret e Nat Zero
+  fn ret_witness_for (e : Effect) : ITree e.op e.resp Nat = ITree.Ret e.op e.resp Nat Zero
 
-  fn vis_witness_for (e : Effect) (op : e.op) (k : e.resp op → ITree e Nat) : ITree e Nat =
-    ITree.Vis e Nat op k
+  fn vis_witness_for
+        (e : Effect) (op : e.op) (k : e.resp op → ITree e.op e.resp Nat)
+      : ITree e.op e.resp Nat =
+    ITree.Vis e.op e.resp Nat op k
 
-  fn inspect (e : Effect) (tree : ITree e Nat) : Nat =
+  fn inspect (e : Effect) (tree : ITree e.op e.resp Nat) : Nat =
     match tree {
       ITree.Ret value ↦ value;
       ITree.Vis op k ↦ Zero
@@ -845,7 +847,7 @@ route-specific diagnostic variants or payloads.
 
 - expect: every route accepts. `nat_unit_effect` is an `Effect` value with
   `op = Nat` and `resp _ = Unit`. Both witnesses have the specified
-  `ITree e Nat` carrier. The `ITree` type references the exact checked
+  `ITree e.op e.resp Nat` carrier. The `ITree` type references the exact checked
   pre-source family identity; `ITree.Ret` and `ITree.Vis` resolve to their
   exact checked constructor identities and retain `ITree` as parent.
 - why: the local `Effect` record supplies a source-visible signature without
