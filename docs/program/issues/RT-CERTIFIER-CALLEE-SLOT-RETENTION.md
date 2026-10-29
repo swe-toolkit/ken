@@ -1,7 +1,7 @@
 ---
 id: RT-CERTIFIER-CALLEE-SLOT-RETENTION
 title: "The finished-CLIF Result certifier assumes a call that receives a slot address does not publish it into memory the caller later reloads and writes through, and consults retention only for later calls, not for later unknown-destination stores. Decide and certify the property that makes a Result producer non-retaining for its out-parameter, then reinstate retention for unknown stores after every other retaining call"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

@@ -137,3 +137,11 @@ Checks: 4 fired: `itree_id` exists in `prelude.rs` (`:287`, `:431`, and the
 6 fired: the consumer count is stated as a word-grep ceiling, with its
 corpus named and its known over-count classes listed. The migration
 population is left to the deliverable's token-aware census.
+
+## Hard-stop inventory (§1b)
+
+§1a count (CI IR attribution): 1 (Architect `evt_7qctpzpychwgz`).
+
+1. Scoped-family artifact symbols took the `T.C` source leaf, and a
+   downstream IR snapshot was regenerated around it (keyed on the
+   constructor's source spelling).

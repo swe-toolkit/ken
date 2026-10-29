@@ -67,18 +67,25 @@ stop and report the mismatch; do not build around it.
    or `itree_vis`. Where the symbols are not in reach, thread them through
    `ken-runtime` only. Test fixtures that build `ctor:fixture::ITree::*`
    strings supply matching resolved symbols instead.
-3. **The sweep pin.** A `ken-runtime` test fails if any non-test source file
-   under `crates/ken-runtime/src` contains a `::ITree::` string match. It
-   names the file and line.
+3. **The census audit, not a test** (Steward amendment `evt_669we9mv1jq87`;
+   a test whose subject is repository text is prohibited). The handoff
+   records the census command and its output on the exact tip, and QA
+   reruns it. Per Architect `evt_dnsdc9kj0zg7`, the two `itree_frame`
+   family sites (`core.rs:7285`, `:7289`) migrate through
+   `NativeProcessSymbols::is_itree_constructor`; the two `legacy_prelude()`
+   defaults and the doc line stay.
 
 ## Acceptance
 
-- **AC-1.** The sweep pin passes. It goes red when any one migrated site is
-  restored to its suffix match.
+- **AC-1.** The census audit on the exact tip shows only the three
+  unchanged non-decision lines.
 - **AC-2 (identity, not spelling).** A unit row whose constructor is
   spelled `ctor:other::ITree::Ret` but is not the resolved `itree_ret` is
   not recognised as `Ret`. It is red first on the cut base. A row whose
   resolved `itree_ret` is spelled with no `::ITree::` segment is recognised.
+  The rows run on each distinct decision plane: at least one lowering
+  consumer, the `core.rs` `itree_frame` path, and one `static_transition`
+  responses consumer.
 - **AC-3.** The named native population is green on the candidate:
   - the named `rt_parity_native` rows;
   - `rt_span_prov_native`;
@@ -86,6 +93,8 @@ stop and report the mismatch; do not build around it.
   - the six `static_transition::responses::tests` fixtures.
 
   A newly refused plan is a stop, not a pin update.
+- **AC-4 (mutation, QA).** Restoring one site's spelling match reddens
+  that plane's AC-2 row, and the site is restored byte-identically.
 
 ## Stop conditions
 
