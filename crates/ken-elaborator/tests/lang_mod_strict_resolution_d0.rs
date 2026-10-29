@@ -650,7 +650,7 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Console.Text".to_string(),
-            ["IO", "IOError", "Stderr", "Stdout", "write"]
+            ["IO", "Stderr", "Stdout", "write"]
                 .into_iter()
                 .map(str::to_string)
                 .collect(),
@@ -676,40 +676,10 @@ fn catalog_ambient_passthrough_migration_census() {
         ),
         (
             "Capability.Filesystem.Authority".to_string(),
-            [
-                "CreatePolicy",
-                "FS",
-                "FileError",
-                "read_bytes",
-                "write_file",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        ),
-        (
-            "Capability.Filesystem.Errors".to_string(),
-            [
-                "AlreadyExists",
-                "BrokenPipe",
-                "CapabilityDenied",
-                "FileError",
-                "IOError",
-                "Interrupted",
-                "InvalidInput",
-                "IsDirectory",
-                "MkFileError",
-                "NotDirectory",
-                "NotEmpty",
-                "NotFound",
-                "Other",
-                "PermissionDenied",
-                "Revoked",
-                "Unsupported",
-            ]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+            ["FS", "read_bytes", "write_file"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
         ),
         (
             // Filesystem.Path.Posix now declares its exact Compare,
@@ -805,10 +775,8 @@ fn catalog_ambient_passthrough_migration_census() {
         (
             "Capability.System.Buffer".to_string(),
             [
-                "BufferSpan",
                 "BufferWindow",
                 "MkBufferWindow",
-                "TransferCount",
                 "buffer_span_budget",
                 "buffer_span_length",
                 "transfer_count_int",
@@ -825,19 +793,7 @@ fn catalog_ambient_passthrough_migration_census() {
             // Capability.System.Error carries the checked classification ambient row.
             "Capability.System.Error".to_string(),
             [
-                "AlreadyExists",
-                "BrokenPipe",
-                "CapabilityDenied",
-                "FileError",
                 "FileOperation",
-                "IOError",
-                "Interrupted",
-                "InvalidInput",
-                "IsDirectory",
-                "MkFileError",
-                "NotDirectory",
-                "NotEmpty",
-                "NotFound",
                 "OpAppendFile",
                 "OpChangeMode",
                 "OpCreateDirectory",
@@ -854,10 +810,6 @@ fn catalog_ambient_passthrough_migration_census() {
                 "OpSetLength",
                 "OpSync",
                 "OpWriteFile",
-                "Other",
-                "PermissionDenied",
-                "Revoked",
-                "Unsupported",
             ]
             .into_iter()
             .map(str::to_string)
@@ -870,9 +822,6 @@ fn catalog_ambient_passthrough_migration_census() {
             // prelude-intrinsic: projections/witness over constructor-private TransferCount/BufferSpan; no catalog provider is possible without exposing the constructor (Architect, CAT-SYSTEM-IO-LAWS)
             "Capability.System.IO".to_string(),
             [
-                "BufferSpan",
-                "ResourceError",
-                "TransferCount",
                 "buffer_span_budget",
                 "transfer_count_nat",
                 "transfer_count_nat_succ",
@@ -1129,6 +1078,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .collect::<BTreeSet<_>>();
     let expected_clean = [
         "Algorithm.LinearAlgebra.NatMatrix",
+        "Capability.Filesystem.Errors",
         "Capability.Process.Environment",
         "Capability.Process.Exit",
         "Capability.Process.WorkingDirectory",

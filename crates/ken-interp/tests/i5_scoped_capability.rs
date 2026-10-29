@@ -35,7 +35,7 @@ fn fs_env() -> FsEnv {
         write_file: get("write_file"),
         change_mode: get("change_mode"),
         afull: get("AFull"),
-        create_or_truncate: get("CreateOrTruncate"),
+        create_or_truncate: get("CreatePolicy.CreateOrTruncate"),
         ok: console.ok_id,
         err: console.err_id,
         console,

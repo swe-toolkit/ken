@@ -8851,10 +8851,13 @@ mod package_route_example_declarations {
         // because every scoped constructor's artifact symbol now uses its
         // checked family's bare leaf rather than a `T.C` source spelling.
         // Emptying only the late scoped-family loop on the same qualified
-        // source leaves this exact 0xfd9d_81f8_fbce_6ee8 vector unchanged.
+        // source left 0xfd9d_81f8_fbce_6ee8 unchanged before the FS/resource
+        // floor expansion. Six newly reserved checked families and their
+        // scoped source constructors change the compiler-owned pre-source
+        // closure. This fixed source now hashes to 0x5011_0ebe_49e0_1727.
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0xfd9d_81f8_fbce_6ee8
+            0x5011_0ebe_49e0_1727
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8891,10 +8894,12 @@ mod package_route_example_declarations {
         // Promise class: normative compatibility vector for the denotation.
         // The denotation vector similarly moves from the WIP
         // 0xe158_b743_ec4d_6062 with checked scoped-family artifact leaves.
-        // The same loop-empty control leaves 0x7886_43b9_b36c_aae3 unchanged.
+        // The same loop-empty control left 0x7886_43b9_b36c_aae3 unchanged
+        // before the six-family FS/resource floor expansion. The checked
+        // pre-source denotation closure now hashes to 0xa486_5cf9_3d62_dfec.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0x7886_43b9_b36c_aae3
+            0xa486_5cf9_3d62_dfec
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

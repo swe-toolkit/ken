@@ -350,10 +350,14 @@ fn primitive_signature_inventory_is_executable_and_closed() {
     observed_plus_internal_provision.extend(
         [
             "Bottom",
+            "BufferSpan",
             "Coproduct",
+            "CreatePolicy",
             "Equal",
             "ExitCode",
+            "FileError",
             "HostIO",
+            "IOError",
             "ITree",
             "Instant",
             "ProcessInput",
@@ -361,7 +365,9 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "ProgramCaps",
             "Prop",
             "Proved",
+            "ResourceError",
             "Top",
+            "TransferCount",
             "Unit",
         ]
         .map(|name| env.globals[name]),
