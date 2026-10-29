@@ -227,6 +227,37 @@ pub theorem graph_reachable_target_monotone
         MkReach t hit walk ↦ graph_reachable_complete q fq g s t wider walk (included t hit)
       }
 
+pub theorem graph_reachable_graph_monotone
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q g u v)
+        True
+        → Equal
+        Bool
+        (edge q h u v)
+        True)
+    : Equal Bool (graph_reachable q fq g s target) True
+      → Equal Bool (graph_reachable q fq h s target) True =
+  λreach.
+    let witness =
+      require_some
+        (ReachWitness q g s target)
+        (graph_find_walk q fq g s target)
+        (graph_find_walk_some q fq g s target reach)
+    in
+      match witness {
+        MkReach t hit walk ↦
+          graph_reachable_complete q fq h s t target (walk_lift q g h included s t walk) hit
+      }
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -490,7 +521,10 @@ both `q`. A candidate letter advances only on a checked edge; letters for
 absent edges stutter. The private word-to-walk conversion discards those
 stutters, so public `ReachWitness` always carries a real walk, and the
 completeness proof turns any real walk back into a witness word. This is one
-reachability fixed point, not another graph-specific search.
+reachability fixed point, not another graph-specific search. Graph
+monotonicity re-types the witness walk edge by edge: the private `walk_lift`
+replaces each step's checked edge proof with the inclusion premise's proof for
+the larger graph, and completeness then decides along the lifted walk.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -742,6 +776,30 @@ fn walk_transport_end
       (walk : Walk q g s t)
     : Walk q g s u =
   J (λpoint _. Walk q g s point) walk same
+
+fn walk_lift
+      (q : Type)
+      (g : Graph q)
+      (h : Graph q)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q g u v)
+        True
+        → Equal
+        Bool
+        (edge q h u v)
+        True)
+      (s : q)
+      (t : q)
+      (walk : Walk q g s t)
+    : Walk q h s t =
+  match walk {
+    WalkHere ↦ WalkHere q h s;
+    WalkStep prev end e prefix ↦
+      WalkStep q h s prev end (included prev end e) (walk_lift q g h included s prev prefix)
+  }
 
 fn named (q : Type) (d : DecEq q) (x : q) (v : q) : Bool = d.eq v x
 
@@ -2263,7 +2321,7 @@ checked first edge gives a strict ordering claim.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–6](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–7](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2277,10 +2335,13 @@ The [§5 seed](../../../../conformance/stdlib/graphs/seed-reachability-along-wal
 checks backwards transport of reachability along a real walk. The
 [§6 seed](../../../../conformance/stdlib/graphs/seed-reachability-target-monotone.md)
 checks a strict target widening and refuses the false converse on the same
-chain. The public API is the graph, path and certificate types, their
+chain. The
+[§7 seed](../../../../conformance/stdlib/graphs/seed-reachability-graph-monotone.md)
+adds one edge to the same chain and refuses the converse on the pair. The
+public API is the graph, path and certificate types, their
 constructors, the walk-append operation, the predicate-reachability decision
 and witness, the dependency-order operation, five list/order predicates,
-and fifteen kernel-checked laws. Every other helper is private to this package.
+and sixteen kernel-checked laws. Every other helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -2302,5 +2363,7 @@ The §4 package test root-loads both walk laws, checks their generic public
 types and zero local trust delta, and exercises the §4 seed's accepted and
 refused clients. The §6 package test checks its complete accepted client,
 including the independent reachability controls, and refuses the isolated
-false converse. These are package tests, not official conformance-runner
-execution or CI. They do not establish execution of the §2 seed.
+false converse. The §7 package test checks the accepted two-edge seed and
+all nine graph-edge pairs before refusing the isolated graph-converse claim.
+These are package tests, not official conformance-runner execution or CI.
+They do not establish execution of the §2 seed.
