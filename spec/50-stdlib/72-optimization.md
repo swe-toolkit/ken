@@ -3,6 +3,7 @@
 > **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT §1;
 > SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
 > SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5;
+> SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT §1.6;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-ARGMAX §3;
@@ -16,20 +17,24 @@
 > checked catalog export and package-owned seed test are now present
 > on main. Their candidate-local execution does not establish official
 > conformance-runner execution or a landed trust measurement. Section
-> 2's catalog module and seed are present on main. Section 3's
-> greatest-cost selector and seven laws are landed; §3.4 specifies the Option-returning extension
+> 1.6 specifies two further public checked append-selection laws;
+> Architect's isolated D0 on `c99b3e998` checked their generic proofs
+> with no new `Axiom` and unchanged scratch trusted identities 114 → 114.
+> Its catalog exports, seed and test are separate candidate work, not
+> delivered by this spec-only turn. Section 2's catalog module and
+> seed are present on main. Section 3's greatest-cost selector and
+> seven laws are landed; §3.4 specifies the Option-returning extension
 > and its four laws from Architect-checked D0. The §3.4 catalog exports,
 > seed and package test are now present on main; the package test is not
 > official conformance-runner execution or a landed `trusted_base()`
 > measurement. Section 3.5 specifies a conditional argmax cost-order
 > invariance law; the Architect checked its generic proof in isolated
 > D0 on this base with unchanged scratch trusted identities 114 → 114.
-> The §3.5 catalog export was absent on the spec author's base; this
-> assembled candidate adds the checked law and a package-owned test of
-> the complete accepted seed and isolated false claim. Those are not
-> official conformance-runner execution, CI or landed trust. The §2.4
-> checked law and package-owned seed test are on main; their local
-> execution is not official conformance or landed trust.
+> The §3.5 checked catalog law, seed and package-owned test are now
+> present on main; earlier candidate-local execution is not official
+> conformance-runner execution, CI or landed trust. The §2.4 checked
+> law and package-owned seed test are on main; their local execution
+> is not official conformance or landed trust.
 
 ## 1. Least-cost candidate
 
@@ -350,7 +355,77 @@ and the constant-cost head result, then rejects the isolated false
 flattened-cost claim. Its candidate-local trust comparison and seed
 execution are not official conformance-runner execution or a landed
 trust measurement. The public §1.5 type and its proof boundary remain
-unchanged by §3.5.
+unchanged by §3.5 or the §1.6 extension below.
+
+### 1.6 Selection over two appended non-empty parts
+
+`Algorithm.Optimization.Argmin` must export checked, public Transparent
+proof bodies for the following two laws in this order, after
+`argmin_cost_order_invariant` and before `argmin_option`. Both
+`xs` and `ys` use the existing `NonEmpty a`; their concatenation is
+`Data.Collections.NonEmpty.nonempty_append`. The comparison asks
+whether the best value of the **later** `ys` is strictly cheaper than
+the best value of the **earlier** `xs`:
+
+```ken
+pub theorem argmin_append_keeps_left
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal Bool (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs))) False
+      → Equal a (argmin a cost (nonempty_append a xs ys)) (argmin a cost xs)
+
+pub theorem argmin_append_takes_right
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal Bool (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs))) True
+      → Equal a (argmin a cost (nonempty_append a xs ys)) (argmin a cost ys)
+```
+
+On `False`, including an equal-cost tie between the two parts, the
+append result is the left part's choice. On `True`, the right part is
+strictly cheaper and its choice wins. Each part retains §1.1's own
+earliest-tie rule, so a tied choice spanning the split is the
+**earlier left** choice, even if the left and right values differ.
+These are structural `Equal a` results about the selected candidate,
+not mere equality of minimum costs. They quantify over every candidate
+type and total natural cost function, without `DecEq a`, candidate
+ordering, a non-strict cost premise, or exposure of a private helper.
+Neither law asserts a function equality or a machine complexity bound.
+
+The generic proof route composes the existing strict selector with
+the public `nonempty_append` list-view equality and
+`nonempty_to_list_shape`. The private list-fold combination uses
+strict-order transitivity and the false-comparison order facts to
+preserve the earliest tied result. `choose` remains private, as do
+`argmin_view`, `argmin_via_view`, `argmin_append_choice`,
+`argmin_from_append`, and `choose_earliest_assoc`; none is an extra
+public law, trust assumption, or permitted premise in these types.
+The proof does not require access to `NonEmptyCons`. Section 1.2's
+seven interfaces, §1.4's selector and four interfaces, §1.5's law,
+and §§2–3 retain their existing operation and law types. The argmax
+mirror is a **separate successor**, not part of §1.6.
+
+The assigned closed seed splits labels `0, 1 | 2, 3` with costs
+`5, 2 | 2, 7`. Both parts have cost `2` as their minimum, but the
+append selects left label `1`; it applies `argmin_append_keeps_left`
+and checks the selected label independently with `Proved`. Lowering
+label `2`'s cost to `1` instead exercises
+`argmin_append_takes_right` and independently selects right label
+`2`. A false claim that the original tied append selects the right
+part's label `2` is refused at its **appended theorem** after a fresh,
+fully accepted prefix. An independent accepted left result and
+right result on the same split isolate the difference; these closed
+instances do not prove either generic law. The seed and its
+package-owned test are CV- and Foundation-owned turns, respectively.
+
+Architect's isolated AC-0 on exact base
+`c99b3e998b5993f87acdda57afeaf19a2d72ca8b` checked both generic
+bodies, a generic public client, the closed tie and strict-right
+instances, and isolated false claims with `ken check` rc 0 for the
+accepted fixtures, no `Axiom`, and unchanged scratch `trusted_base()`
+GlobalId sets 114 → 114. The private helpers refused import. This is
+scratch design evidence, not catalog delivery, official conformance,
+CI, publication or landed trust. This spec-only turn introduces no
+catalog export, conformance seed, test, new primitive, kernel or
+surface feature.
 
 ## 2. Least witness below a finite bound
 
