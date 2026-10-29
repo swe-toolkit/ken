@@ -601,7 +601,8 @@ The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
 SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
 SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5) and §3
-(SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).
+(SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
+SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5).
 The landed `Algorithm.Optimization.Argmin` selects the earliest minimum
 or greatest `Nat`-cost member of `NonEmpty a` with no `DecEq a`; the
 seven `argmin` and seven `argmax` laws and both seeds are present on
@@ -610,10 +611,10 @@ Section 1.5 specifies the public `argmin_cost_order_invariant`:
 a transform preserving and reflecting every strict `Nat` cost
 comparison leaves the selected candidate unchanged, ties included.
 Architect's isolated D0 checked its generic proof with no new
-`Axiom` and equal scratch trusted identities 114 → 114. This
-spec-and-seed candidate does not deliver the catalog export;
-local seed checks are not official conformance execution, CI,
-publication, landing or landed trust. Section 3.4 specifies
+`Axiom` and equal scratch trusted identities 114 → 114. The §1.5
+checked catalog export, seed and package-owned test are now on main;
+the earlier candidate-local checks are not official conformance or
+landed trust. Section 3.4 specifies
 `argmax_option` on a possibly empty `List a`:
 `Nil` yields `None`, and `Cons` yields `Some` of `argmax` over
 `nonempty_cons`. Four laws give the two equations and direct-to-`List`
@@ -621,7 +622,19 @@ membership and greatest-cost consequences for an observed `Some`.
 Architect's D0 checked these laws at 114→114 trusted identities. The
 §3.4 catalog exports, seed and package-owned seed test are now on
 main; its checks are distinct from official conformance execution.
-Earlier D0 alone established no CI or landed trust measurement. Continuous or
+Section 3.5 states `argmax_cost_order_invariant` with the same
+public `same_order` premise as §1.5: preserving and reflecting
+strict Nat cost comparisons leaves the earliest tied maximum
+unchanged after composing the cost with `f`. The checked D0 on
+`6e778c2d5` reused generalized private selector helpers and
+measured no new `Axiom` and equal scratch trusted identities
+114 → 114. §1.5's public type and proof boundary remain unchanged.
+The §3.5 export was absent on the spec author's base; this assembled
+candidate adds the checked law and a package-owned test of the
+complete accepted seed and isolated false claim. These candidate-local
+checks are not official conformance-runner execution, CI, publication,
+landing or landed trust. Earlier D0 alone established no CI or landed
+trust measurement. Continuous or
 implicit search, heuristics, approximation, arbitrary-order or
 multi-objective costs, top-k and complexity claims remain deferred.
 

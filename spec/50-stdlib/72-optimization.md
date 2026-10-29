@@ -6,26 +6,30 @@
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-ARGMAX §3;
-> SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** Section 1 specifies the
+> SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
+> SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5).** Section 1 specifies the
 > non-empty least-cost selector and seven initial laws; its catalog
 > module and seed are present on main. Section 1.4's Option selector,
 > four laws and seed are also present on main. Section 1.5 specifies
 > one additional checked law preserving the selected candidate under
 > cost transforms that preserve and reflect strict Nat order. Its
-> checked catalog export and package-owned seed test are on a separate
-> Foundation candidate, not yet on main. The test runs the accepted
-> and refused §1.5 clients against the roots-loaded export; it does
-> not establish official conformance-runner execution, CI,
-> publication, landing or landed trust. Section 2's catalog module
-> and seed are present on main. Section 3's greatest-cost selector and
-> seven laws are landed; §3.4 specifies the Option-returning extension
+> checked catalog export and package-owned seed test are now present
+> on main. Their candidate-local execution does not establish official
+> conformance-runner execution or a landed trust measurement. Section
+> 2's catalog module and seed are present on main. Section 3's
+> greatest-cost selector and seven laws are landed; §3.4 specifies the Option-returning extension
 > and its four laws from Architect-checked D0. The §3.4 catalog exports,
 > seed and package test are now present on main; the package test is not
 > official conformance-runner execution or a landed `trusted_base()`
-> measurement. The §2.4 checked catalog law and package-owned seed test
-> are also on main; the test runs the authored seed against the export.
-> This is not official conformance-runner execution, CI, publication,
-> landing or a landed trust measurement.
+> measurement. Section 3.5 specifies a conditional argmax cost-order
+> invariance law; the Architect checked its generic proof in isolated
+> D0 on this base with unchanged scratch trusted identities 114 → 114.
+> The §3.5 catalog export was absent on the spec author's base; this
+> assembled candidate adds the checked law and a package-owned test of
+> the complete accepted seed and isolated false claim. Those are not
+> official conformance-runner execution, CI or landed trust. The §2.4
+> checked law and package-owned seed test are on main; their local
+> execution is not official conformance or landed trust.
 
 ## 1. Least-cost candidate
 
@@ -336,17 +340,17 @@ proof with `ken check` rc 0, `ken fmt --check` rc 0, no new
 `Axiom`, owner-local Transparent status, private helper import
 refusals, and unchanged exact scratch `trusted_base()` identities
 114 → 114. It also checked the four-label client and its false
-flattened-cost claim. That historical D0 and the landed
+flattened-cost claim. That historical D0 and the earlier
 spec-and-seed candidate did not deliver the catalog export. The
-separate Foundation candidate now adds the checked public law and
-private helpers. Its package test root-loads `Argmin`, consumes the
-full generic public type, checks the accepted §1.5 client including
-both independently reduced selection values and the constant-cost
-head result, then rejects the isolated false flattened-cost claim.
-The package test measures an unchanged exact trusted-GlobalId set
-relative to the imported provider closure. These candidate-local
-checks are not official conformance-runner execution, CI,
-publication, landing or a landed trust measurement.
+checked public law, private helpers and package-owned test are now
+present on main. The test root-loads
+`Argmin`, consumes the full generic public type, checks the accepted
+§1.5 client including both independently reduced selection values
+and the constant-cost head result, then rejects the isolated false
+flattened-cost claim. Its candidate-local trust comparison and seed
+execution are not official conformance-runner execution or a landed
+trust measurement. The public §1.5 type and its proof boundary remain
+unchanged by §3.5.
 
 ## 2. Least witness below a finite bound
 
@@ -532,12 +536,16 @@ measurement.
 ## 3. Greatest-cost candidate
 
 > **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX;
-> SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** The §3.1–§3.2 operation
+> SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
+> SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5).** The §3.1–§3.2 operation
 > and seven laws, plus their seed, are present on main. Architect
 > checked §3.4 on an isolated D0 from `914cfbda0`; the §3.4 exports,
 > seed and package-owned test are now on main. Those package checks
 > are not official conformance-runner execution or a landed trust
-> measurement; this §2.4 candidate claims no new §3 delivery or CI.
+> measurement. Section 3.5's law is checked in Architect's isolated
+> D0 on `6e778c2d5` but has no catalog export or seed on this base;
+> D0 does not establish shipped §3.5 execution or official
+> conformance, CI, publication, landing or landed trust.
 
 ### 3.1 Carrier, operation and tie rule
 
@@ -717,3 +725,82 @@ package's current census row or change to existing selectors is
 required. Option minimization remains §1.4; `argmax_option` adds no
 `argmax` law, generic Option search, top-k selection or runtime-cost
 promise.
+
+### 3.5 Invariance under a strict-order-preserving cost transform
+
+`Algorithm.Optimization.Argmin` must export one more public Transparent
+checked theorem immediately after `argmax_takes_tail` and before
+`argmax_option`. Its exact name, binder order and type are:
+
+```ken
+pub theorem argmax_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : NonEmpty a)
+    : Equal a (argmax a (comp a Nat Nat f cost) xs) (argmax a cost xs)
+```
+
+As in §1.5, `same_order` states equality of each strict Nat-order
+comparison before and after the transform: it both preserves and
+reflects strict order. The premise names only public `lt_nat`,
+`Equal Bool`, and Nat indices. The result is structural `Equal a`
+of the two selected **input values** for any type `a`, total cost
+function and nonempty input. It is not equality of transformed
+numeric costs, an operation on arbitrary orders, or a runtime-cost
+claim. Equal original costs cannot become strictly ordered under
+`f`; unchanged strict comparisons also preserve the earlier winner
+when the maximum is tied away from the head. No `DecEq a` is needed.
+`comp` is the existing public `Core.Function.Combinators.comp`,
+not a new selector or a lambda in a public type position.
+
+The §1.5 `argmin_cost_order_invariant` theorem keeps its exact public
+type, including its sole `same_order` premise and `NonEmpty a` input.
+No §1.2, §1.4, §3.2 or §3.4 public operation or law changes. The
+existing private `select_from_cost_order` and `choose_cost_order`
+can serve both laws by taking a private `better : Nat → Nat → Bool`
+and a private equality premise for that comparison. For argmin,
+`better` is `lt_nat` and its existing public `same_order` is used
+unchanged. For argmax, `better` is the existing private `costlier`:
+`costlier challenger incumbent` reduces to
+`lt_nat incumbent challenger`, so `same_order j i` supplies the
+reversed comparison without a second public premise. The old argmin
+proof boundary remains one private selection lemma (whose private
+choice step is likewise shared): its body passes `lt_nat` to the
+generalized lemma, while its public type is byte-identical.
+Generalizing those helpers does not export them or change the
+theorem clients import. The helpers
+and `costlier` remain private. This states the checked D0 route;
+Foundation owns its catalog implementation, with no new import,
+assumption, built-in, or trusted-base entry.
+
+The premise is necessary. Label the four candidates `0, 1, 2, 3`,
+with respective costs `5, 7, 2, 7`. For `f c = add c three`, the
+strict-order comparisons agree on open costs and both selectors
+independently return label `1`, the **earlier of the two tied maxima**
+and not the head. A constant transform `flattened c = Zero` instead
+turns every cost into a tie and returns head `0`; the original
+selector still returns `1`. A refused claim equating those two
+selections on the same input must be isolated after a fresh accepted
+prefix. The seed checks the original result, shifted result and
+flattened head independently before refusing the false equality at
+its own proof term. Closed examples discriminate the premise; they
+do not establish the generic checked law.
+
+Architect's isolated AC-0 on exact landed base
+`6e778c2d5288219287884de49eb53fb278ba98ea` checked the
+generic proof and both public argmin/argmax types, `ken check` and
+`ken fmt --check` rc 0, no new `Axiom`, package-owned Transparent
+status, three private import refusals, and equal scratch
+`trusted_base()` identity sets 114 → 114. Its accepted seed client
+and separately refused flattened-cost claim also checked as expected;
+the existing five named optimization package-test binaries passed
+in that scratch overlay. Those are Architect D0 observations, not
+shipped §3.5 execution. The catalog export was absent on the spec
+author's base; this assembled candidate adds its checked proof and
+a package-owned test that root-loads the complete accepted seed and
+refuses the isolated false claim. The generalized helpers remain
+private, and §1.5's public type is unchanged. Neither scratch D0 nor
+these candidate-local checks establish official conformance-runner
+execution, CI, publication, landing or a landed trust measurement.
