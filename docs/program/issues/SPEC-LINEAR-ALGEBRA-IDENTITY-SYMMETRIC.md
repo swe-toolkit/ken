@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC
 title: "Spec 65 states transpose laws for products, sums and matrix-vector application, but no law says the identity matrix is its own transpose, although NatMatrix already proves it as the private helper transpose_identity. Rule from a checked D0 at zero trust whether that helper becomes a public law with its type unchanged, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
