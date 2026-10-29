@@ -314,14 +314,15 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–7
+**`65-linear-algebra.md`** §§1–8
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
 SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
 SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC;
 SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY;
-SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT).
+SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT;
+SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -349,11 +350,22 @@ natural dot of the matrix-vector image with `y` equals the dot of
 `x` with the transposed image of `y`, including zero dimensions.
 `dot_zero_columns` and `transpose_cons_image` stay private. Architect
 checked the generic proof in isolated D0 on `54f68d3cc` with no new
-`Axiom` and equal scratch trust identities (109 → 109). The §7
-catalog export is absent at this base; the separate closed seed and
-D0 overlay do not establish shipped §7 execution, official
-conformance, CI, publication, landing or landed trust. No rational
-or `Float` tier is claimed.
+`Axiom` and equal scratch trust identities (109 → 109). The §7 checked
+catalog export, closed seed and package-owned test are now on main;
+the earlier D0 and candidate-local tests do not establish official
+conformance or landed trust. Section 8 promotes
+the existing checked `transpose_identity n` to a public Transparent
+law without a wrapper: the transpose of `identity n` is structurally
+`Equal (Vec (Vec Nat n) n)` to `identity n`, including at zero. Its
+four direct helpers remain private; no §1–§7 public type changes.
+Architect's D0 on `18e269f32` checked the visibility promotion at
+unchanged scratch trusted identities 109 → 109, with no new `Axiom`.
+The §8 public export and seed were absent on the spec author's base;
+this assembled candidate adds the checked public law and a package-owned
+test of the accepted seed and isolated false claim. Scratch D0 and
+candidate-local checks are not official conformance-runner execution,
+CI, publication, landing or landed trust. No rational or `Float` tier
+is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–8 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;

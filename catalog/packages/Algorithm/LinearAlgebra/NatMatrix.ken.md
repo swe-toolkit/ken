@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and twenty-one algebraic laws have checked proofs.
+all arithmetic is exact, and twenty-two algebraic laws have checked proofs.
 
 ## Contents
 
@@ -971,6 +971,92 @@ pub theorem transpose_adjoint
       }
   }
 
+pub theorem transpose_identity
+      (n : Nat)
+    : Equal (Vec (Vec Nat n) n) (transpose n n (identity n)) (identity n) =
+  match n {
+    Zero ↦ Proved;
+    Suc k ↦
+      let
+        first = VCons Nat k (Suc Zero) (repeat Nat k Zero);
+        old_tail =
+          transpose
+            k
+            (Suc k)
+            (map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k));
+        new_tail = VCons (Vec Nat k) k (repeat Nat k Zero) (transpose k k (identity k));
+        zipped_old =
+          zip_with
+            Nat
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            k
+            (prepend k)
+            (repeat Nat k Zero)
+            (transpose k k (identity k));
+        zipped_mid =
+          zip_with
+            Nat
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            k
+            (prepend k)
+            (repeat Nat k Zero)
+            (identity k);
+        mapped = map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k);
+        start_value =
+          zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) (Suc k) (prepend k) first old_tail;
+        after_zero = VCons (Vec Nat (Suc k)) k first zipped_old;
+        after_ih = VCons (Vec Nat (Suc k)) k first zipped_mid;
+        wanted = VCons (Vec Nat (Suc k)) k first mapped
+      in
+        trans
+          (Vec (Vec Nat (Suc k)) (Suc k))
+          start_value
+          after_zero
+          wanted
+          (cong
+            (Vec (Vec Nat k) (Suc k))
+            (Vec (Vec Nat (Suc k)) (Suc k))
+            old_tail
+            new_tail
+            (λtail. zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) (Suc k) (prepend k) first tail)
+            (transpose_zero_prefix_rows k k (identity k)))
+          (trans
+            (Vec (Vec Nat (Suc k)) (Suc k))
+            after_zero
+            after_ih
+            wanted
+            (cong
+              (Vec (Vec Nat (Suc k)) k)
+              (Vec (Vec Nat (Suc k)) (Suc k))
+              zipped_old
+              zipped_mid
+              (VCons (Vec Nat (Suc k)) k first)
+              (cong
+                (Vec (Vec Nat k) k)
+                (Vec (Vec Nat (Suc k)) k)
+                (transpose k k (identity k))
+                (identity k)
+                (λv.
+                  zip_with
+                    Nat
+                    (Vec Nat k)
+                    (Vec Nat (Suc k))
+                    k
+                    (prepend k)
+                    (repeat Nat k Zero)
+                    v)
+                (transpose_identity k)))
+            (cong
+              (Vec (Vec Nat (Suc k)) k)
+              (Vec (Vec Nat (Suc k)) (Suc k))
+              zipped_mid
+              mapped
+              (VCons (Vec Nat (Suc k)) k first)
+              (zip_zero_map k k (identity k))))
+  }
+
 theorem matrix_add_assoc_cons
       (k : Nat)
       (n : Nat)
@@ -1480,92 +1566,6 @@ theorem zip_zero_map
         (map (Vec Nat n) (Vec Nat (Suc n)) k (prepend_zero n) rest)
         (VCons (Vec Nat (Suc n)) k (VCons Nat n Zero row))
         (zip_zero_map k n rest)
-  }
-
-theorem transpose_identity
-      (n : Nat)
-    : Equal (Vec (Vec Nat n) n) (transpose n n (identity n)) (identity n) =
-  match n {
-    Zero ↦ Proved;
-    Suc k ↦
-      let
-        first = VCons Nat k (Suc Zero) (repeat Nat k Zero);
-        old_tail =
-          transpose
-            k
-            (Suc k)
-            (map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k));
-        new_tail = VCons (Vec Nat k) k (repeat Nat k Zero) (transpose k k (identity k));
-        zipped_old =
-          zip_with
-            Nat
-            (Vec Nat k)
-            (Vec Nat (Suc k))
-            k
-            (prepend k)
-            (repeat Nat k Zero)
-            (transpose k k (identity k));
-        zipped_mid =
-          zip_with
-            Nat
-            (Vec Nat k)
-            (Vec Nat (Suc k))
-            k
-            (prepend k)
-            (repeat Nat k Zero)
-            (identity k);
-        mapped = map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k);
-        start_value =
-          zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) (Suc k) (prepend k) first old_tail;
-        after_zero = VCons (Vec Nat (Suc k)) k first zipped_old;
-        after_ih = VCons (Vec Nat (Suc k)) k first zipped_mid;
-        wanted = VCons (Vec Nat (Suc k)) k first mapped
-      in
-        trans
-          (Vec (Vec Nat (Suc k)) (Suc k))
-          start_value
-          after_zero
-          wanted
-          (cong
-            (Vec (Vec Nat k) (Suc k))
-            (Vec (Vec Nat (Suc k)) (Suc k))
-            old_tail
-            new_tail
-            (λtail. zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) (Suc k) (prepend k) first tail)
-            (transpose_zero_prefix_rows k k (identity k)))
-          (trans
-            (Vec (Vec Nat (Suc k)) (Suc k))
-            after_zero
-            after_ih
-            wanted
-            (cong
-              (Vec (Vec Nat (Suc k)) k)
-              (Vec (Vec Nat (Suc k)) (Suc k))
-              zipped_old
-              zipped_mid
-              (VCons (Vec Nat (Suc k)) k first)
-              (cong
-                (Vec (Vec Nat k) k)
-                (Vec (Vec Nat (Suc k)) k)
-                (transpose k k (identity k))
-                (identity k)
-                (λv.
-                  zip_with
-                    Nat
-                    (Vec Nat k)
-                    (Vec Nat (Suc k))
-                    k
-                    (prepend k)
-                    (repeat Nat k Zero)
-                    v)
-                (transpose_identity k)))
-            (cong
-              (Vec (Vec Nat (Suc k)) k)
-              (Vec (Vec Nat (Suc k)) (Suc k))
-              zipped_mid
-              mapped
-              (VCons (Vec Nat (Suc k)) k first)
-              (zip_zero_map k k (identity k))))
   }
 
 theorem map_cong
@@ -2632,9 +2632,12 @@ associativity and commutativity; it does not add a shared export.
 `transpose_invol` proves the column-prepend step then inducts over rows.
 `vector_identity` reduces a diagonal head dot to its head value, proves that
 zero-prefixed trailing rows ignore the added coordinate, and recurses.
-`matrix_identity_right` first proves the diagonal matrix is unchanged by
-transpose, applies `dot_comm` pointwise to each right-identity row, and lifts
-the row proof across the matrix. `matrix_identity_left` instead selects the
+`transpose_identity` inducts on the dimension: transposing the zero-prefixed
+trailing rows gives a zero row above the transposed smaller identity, and the
+induction hypothesis restores that identity. `matrix_identity_right` uses
+this public law to replace the identity's columns by its rows, applies
+`dot_comm` pointwise to each right-identity row, and lifts the row proof
+across the matrix. `matrix_identity_left` instead selects the
 head row with the first unit row and removes the zero-prefixed coordinate
 from each trailing row. `matrix_product_assoc` distributes column products
 over vector sums and scaling. The public `dot_scale` proof uses the checked
@@ -2697,18 +2700,19 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–7 owns
-twenty-nine public names across eight operations and twenty-one laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–8 owns
+thirty public names across eight operations and twenty-two laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
 [matrix-vector linearity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-vector-linearity.md)
-and [transpose adjoint seed](../../../../conformance/stdlib/linear-algebra/seed-transpose-adjoint.md)
+[transpose adjoint seed](../../../../conformance/stdlib/linear-algebra/seed-transpose-adjoint.md)
+and [identity symmetry seed](../../../../conformance/stdlib/linear-algebra/seed-identity-symmetric.md)
 provide finite behavioral clients. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
 prepending, row products and proof bridges remain private. The new
 `dot_zero_columns` and `transpose_cons_image` helpers, like
-`dot_scale_right` and `dot_distrib_right`, are not public. All twenty-one
+`dot_scale_right` and `dot_distrib_right`, are not public. All twenty-two
 public theorems have checked bodies. This package adds no Axiom, postulate,
 primitive, `Float` or trusted-base entry; dependencies retain their own trust
 posture. Root-loaded acceptance tests check generic
