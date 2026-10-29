@@ -64,8 +64,6 @@ fn file_backed_mapping_write_is_private_on_both_engines() {
 
     let (interpreted, native, interpreted_file, native_file) =
         differential(SOURCE).expect("private file-backed mapping differential");
-    assert_eq!(interpreted.effect_trace, native.effect_trace);
-    assert_eq!(interpreted.filesystem_delta, native.filesystem_delta);
     for lane in [&interpreted, &native] {
         assert_eq!(
             lane.exit_status, 60,
@@ -134,11 +132,13 @@ fn file_backed_mapping_write_is_private_on_both_engines() {
     assert_eq!(
         read_back,
         [ORIGINAL, ORIGINAL],
-        "both engines' §1.3 file reads must return original bytes, not {WRITTEN_FILE:?}"
+        "both engines' §1.3 file reads must return original bytes, not {WRITTEN_FILE:?}; disk: interpreter={interpreted_file:?}, native={native_file:?}"
     );
     assert_eq!(
         [interpreted_file.as_slice(), native_file.as_slice()],
         [ORIGINAL, ORIGINAL],
         "neither backing file may be changed by the mapping write"
     );
+    assert_eq!(interpreted.effect_trace, native.effect_trace);
+    assert_eq!(interpreted.filesystem_delta, native.filesystem_delta);
 }
