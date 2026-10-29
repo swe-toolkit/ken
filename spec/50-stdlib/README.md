@@ -282,9 +282,10 @@ reachability at `s` from `target` to `wider`, not conversely. The
 public Transparent law reuses private `require_some` without a new
 helper or change to §1–5. Architect D0 on `abafe3963` checked the
 generic proof with no new `Axiom` and equal scratch trusted identities
-(114 → 114). Its §6 catalog export is absent; D0 and the separately
-owned closed seed do not establish shipped §6 execution, official
-conformance, CI, publication, landing or landed trust. Section 7
+(114 → 114). Its §6 catalog export is present on the pinned base;
+D0 and the separately owned closed seed do not establish shipped §6
+execution, official conformance, CI, publication, landing or landed
+trust. Section 7
 specifies `graph_reachable_graph_monotone`: pointwise inclusion of
 every true edge of `g` in `h` preserves affirmative reachability of
 the same target from the same start under the same `Finite q`; the
