@@ -295,8 +295,9 @@ their exact checked constructor IDs, whereas bare `InL`, `InR` and
 `MkInstant` do not enter B. `ITree` is scoped as a complete family:
 `ITree.Ret` and `ITree.Vis` retain their exact constructor IDs, while
 bare `Ret` and `Vis` do not enter B and may be bound by source.
-`ProcessInput`, `Prod` and `Unit` are unscoped: their whole constructor families, respectively
-`MkProcessInput`, `MkProd` and `MkUnit`, are bare reserved names.
+`ProcessInput`, `Prod` and `Unit` are unscoped: their whole constructor
+families, respectively `MkProcessInput`, `MkProd` and `MkUnit`, are bare
+reserved names.
 `HostIO`, `Char`, and transparent `Pair` have no constructor family. A same-shaped
 source family or definition has a different identity and is not the floor
 member. Every floor type, constructor, and
