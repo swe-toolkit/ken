@@ -12,6 +12,15 @@ github: null
 origin: "Architect review evt_4em6knbncena7 of RT-CERTIFIER-DERIVED-STACK-POINTER-CLOBBER (zero-argument call after escape; requested by the Runtime Leader evt_7jbmssk0bvjtw). Widened by Architect ruling evt_2tsqhgywfxdb to fold in Adversary finding evt_3v8e7x9w7ar4f (stack_load reload, on 28f3dbb36) and a third gap read by the Architect (retention before an unknown store). Should-fix before ABI-S6-HS18-MAIN-BASED-CLOSURE increment C. Steward-filed per COORDINATION section 2."
 ---
 
+> **AMENDED 2026-10-29 (Architect `evt_zdyes4xcv8fc`, hard stop
+> `evt_3pjmdgmw69zt8`).** Under rules (i) and (ii), AC-3 refused two
+> `SP_A_FREEZE` rows in `rt_span_prov_native`. The ruling requires a
+> step-1 trace and bisection first. It pre-rules one repair, for one
+> outcome only: rule (i) is replaced by (i'), under which `stack_load S`
+> depends on the values stored into S, through a new `stack_slot_stores`
+> index. Pin P5 is added with it. Every other outcome is a hard stop with
+> the trace. Everything else stands.
+
 # A pointer to the slot that is in hand may write the slot
 
 ## Objective
@@ -53,7 +62,8 @@ stop and report the mismatch; do not build around it.
 `units.rs` only, production plus `#[cfg(test)]` pins in
 `generated_result_protocol_verifier`, extending `slot_pointer_case`. The
 precise alternative, where reads through memory yield the stored values
-rather than the slot, is not authorized.
+rather than the slot, is not authorized,
+except as (i') under the condition in `evt_zdyes4xcv8fc`.
 
 ## Deliverable
 
