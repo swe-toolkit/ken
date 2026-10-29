@@ -246,6 +246,8 @@ identity sets (114 → 114). Its closed client accepted the complete
 positive block and rejected the isolated converse at its appended
 `Proved`. The seven closed Bool rows refused `Refl`. These are isolated
 D0 measurements, not an exact-candidate check or official conformance-runner
-execution. The catalog export and package-owned test are not in this
-spec-and-seed candidate; Foundation owns their later turn. No CI,
+execution. The assembled candidate adds the catalog export and the
+package-owned `cat_graphs_reachability_graph_monotone`
+test, which checks the complete accepted client and refuses the isolated
+converse. No CI,
 publication, landing, or landed-trust result is claimed.
