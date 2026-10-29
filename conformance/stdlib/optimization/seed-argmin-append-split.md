@@ -43,8 +43,8 @@ fn tied_cost (n : Nat) : Nat =
         Zero ↦ two;
         Suc k ↦
           match k {
-            Zero ↦ seven;
-            Suc j ↦ two
+            Zero ↦ two;
+            Suc j ↦ seven
           }
       }
   }
@@ -76,9 +76,9 @@ theorem tied_cost_zero_is_five : Equal Nat (tied_cost Zero) five = Proved
 
 theorem tied_cost_one_is_two : Equal Nat (tied_cost one) two = Proved
 
-theorem tied_cost_two_is_seven : Equal Nat (tied_cost two) seven = Proved
+theorem tied_cost_two_is_two : Equal Nat (tied_cost two) two = Proved
 
-theorem tied_cost_three_is_two : Equal Nat (tied_cost three) two = Proved
+theorem tied_cost_three_is_seven : Equal Nat (tied_cost three) seven = Proved
 
 theorem tied_left_selects_one
     : Equal Nat (argmin Nat tied_cost left_part) one =
