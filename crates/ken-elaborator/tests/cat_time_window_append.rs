@@ -262,24 +262,6 @@ fn complete_unordered_seed_accepts_and_both_swapped_claims_refuse() {
             "accepted §8 obligation {actual} retains its proposition and proof"
         );
     }
-    for (source, actual, expected) in [
-        (
-            refl_refusal,
-            "reject_swapped_window_append_by_refl",
-            EXPECTED_REFL_REFUSAL,
-        ),
-        (
-            law_refusal,
-            "reject_swapped_window_append_by_public_law",
-            EXPECTED_LAW_REFUSAL,
-        ),
-    ] {
-        assert_eq!(
-            theorem_shape(source, actual),
-            theorem_shape(expected, "expected_neg"),
-            "swapped refusal {actual} retains its exact proposition and proof"
-        );
-    }
     let mut positive = trace_env();
     positive
         .elaborate_file(accepted)
@@ -328,5 +310,25 @@ fn complete_unordered_seed_accepts_and_both_swapped_claims_refuse() {
         refusing
             .elaborate_file(claim)
             .expect_err("the sole closed swapped theorem must be refused");
+    }
+    // Check fixture shape only after each isolated false claim reaches the
+    // rejection assertion, so a true-neighbor mutation cannot be masked here.
+    for (source, actual, expected) in [
+        (
+            refl_refusal,
+            "reject_swapped_window_append_by_refl",
+            EXPECTED_REFL_REFUSAL,
+        ),
+        (
+            law_refusal,
+            "reject_swapped_window_append_by_public_law",
+            EXPECTED_LAW_REFUSAL,
+        ),
+    ] {
+        assert_eq!(
+            theorem_shape(source, actual),
+            theorem_shape(expected, "expected_neg"),
+            "swapped refusal {actual} retains its exact proposition and proof"
+        );
     }
 }
