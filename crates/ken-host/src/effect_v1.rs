@@ -6503,7 +6503,9 @@ mod tests {
             8,
             MappingProtectionV1::Writable,
         );
-        let mapping = admitted.resource_token.expect("READ-only source admits private write");
+        let mapping = admitted
+            .resource_token
+            .expect("READ-only source admits private write");
         assert!(matches!(admitted.outcome, CanonicalOutcomeV1::Success(_)));
         assert_eq!(admitted.resource_bindings[0].1, read_source_identity);
         assert_eq!(backend.read_calls, 3, "copy-in reads only from the source");
@@ -6511,7 +6513,9 @@ mod tests {
             .resolve_mapping(mapping, crate::RightSet::WRITE)
             .expect("private mapping retains destination write right");
         assert_eq!(region.backing(), MappingBackingV1::FileBacked);
-        let pending = resources.begin_release(mapping).expect("release private mapping");
+        let pending = resources
+            .begin_release(mapping)
+            .expect("release private mapping");
         ResourceTableV1::finish_release_with(pending, &mut backend)
             .expect("READ-only source mapping releases");
         assert_eq!(resources.live_owned_capacity, 0);
@@ -6531,7 +6535,10 @@ mod tests {
                 held: crate::RightSet::WRITE.union(crate::RightSet::CREATE).bits(),
             }))
         );
-        assert_eq!(backend.read_calls, 0, "missing READ refuses before file I/O");
+        assert_eq!(
+            backend.read_calls, 0,
+            "missing READ refuses before file I/O"
+        );
 
         assert_eq!(
             acquire(

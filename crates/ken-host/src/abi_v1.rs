@@ -4277,20 +4277,24 @@ mod tests {
     /// token; this tests the host boundary directly.
     #[test]
     fn mapping_future_generation_reifies_malformed_resource() {
-        let directory = std::env::temp_dir().join(format!(
-            "ken-mapping-malformed-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("ken-mapping-malformed-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let initialized = context(&directory);
         let mut reply = HostReplyV1 {
             tag: u64::MAX,
             detail: u64::MAX,
-            bytes: SliceV1 { data: std::ptr::null(), len: 0 },
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
         };
-        let allocate = MappingAllocateRequestV1 { length: 8, protection: 1 };
+        let allocate = MappingAllocateRequestV1 {
+            length: 8,
+            protection: 1,
+        };
         let status = unsafe {
             ken_host_dispatch_v1(
                 initialized.context.cast_const(),
@@ -4304,12 +4308,20 @@ mod tests {
         assert_eq!(reply.tag, REPLY_RESOURCE);
         let live = crate::ResourceTokenV1::from_erased_identity(reply.detail);
         let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
-        context.resources.identity(live).expect("live Mapping token");
+        context
+            .resources
+            .identity(live)
+            .expect("live Mapping token");
         let future = live
             .erased_identity()
             .checked_add(1_u64 << u32::BITS)
             .expect("derived future generation");
-        let read = MappingReadViewRequestV1 { resource: future, start: 0, length: 1, span_origin: future };
+        let read = MappingReadViewRequestV1 {
+            resource: future,
+            start: 0,
+            length: 1,
+            span_origin: future,
+        };
         let status = unsafe {
             ken_host_dispatch_v1(
                 initialized.context.cast_const(),
