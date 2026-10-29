@@ -25,9 +25,12 @@
 > official conformance or landed trust. Section 8 specifies two Nat
 > selector absorptions and two structural box equalities. Architect D0
 > checked their generic proofs on `439fa7bb7` without a new `Axiom`
-> and with equal scratch trusted identities 114 → 114; their exports
-> are absent on this base. D0 is not shipped §8 execution, official
-> conformance, CI, publication, landing or landed trust.
+> and with equal scratch trusted identities 114 → 114. The exports
+> were absent on the spec author's base; this assembled candidate adds
+> them with a package-owned test of the complete accepted seed and
+> isolated false claim. Neither D0 nor these candidate-local checks
+> establish official conformance-runner execution, CI, publication,
+> landing or landed trust.
 
 ## 1. Points and closed boxes over natural coordinates
 
