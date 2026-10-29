@@ -274,14 +274,17 @@ is a **surface error** (`24`) — it never reaches the kernel:
 - **Closed built-in name set B.** For resolution and name protection, B is the
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
-  checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom, Char,
-  Coproduct, Equal, ExitCode, HostIO, ITree, Instant, List, Nat, Option,
-  Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceKind,
-  Result, Top, Unit, Utf8Error}`. The latter has twenty-four exact floor
-  identities: the prior fifteen, five entrypoint-ABI identities, three
-  effect/clock identities and `ITree` (`30-taxonomy §4`). `HostIO` is a type-level
-  function, not an inductive type or constructor family. For an
-  inductive floor type, its per-type
+  checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
+  BufferSpan, Char, Coproduct, CreatePolicy, Equal, ExitCode, FileError,
+  HostIO, IOError, ITree, Instant, List, Nat, Option, Pair, ProcessInput,
+  Prod, ProgramCaps, Prop, Proved, ResourceError, ResourceKind, Result,
+  Top, TransferCount, Unit, Utf8Error}`. This floor subset contains thirty
+  exact identities: the prior fifteen, five entrypoint-ABI identities,
+  three effect/clock identities, `ITree`, and six FS/resource families
+  (`30-taxonomy §4`). These are not thirty types: `Top` and `Bottom` are
+  proposition constants, `Proved` is a proof binding, and `HostIO` is a
+  type-level function, not an inductive type or constructor family. For
+  an inductive floor type, its per-type
   **scoped constructors** property determines whether its whole exact
   constructor family also occupies bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
@@ -299,6 +302,19 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `ITree` is scoped: `ITree.Ret` and `ITree.Vis` resolve to the unchanged
   checked constructor IDs; bare `Ret` and `Vis` are not reserved and
   may be bound by other source declarations under ordinary non-B rules.
+  `FileError` is unscoped: `MkFileError` remains bare and reserved with
+  its exact parent. `IOError` is scoped as a complete thirteen-cause
+  family: only public `IOError.C` paths resolve, including
+  `IOError.NotFound`, `IOError.Other`, `IOError.Unsupported`, and
+  `IOError.Revoked`; none of the bare causes enters B. `CreatePolicy` is
+  scoped as a complete three-case family: `CreatePolicy.CreateNew`,
+  `CreatePolicy.CreateOrTruncate`, and `CreatePolicy.CreateOrKeep` resolve
+  to their unchanged checked IDs, not as bare names in B. `ResourceError`
+  is scoped as a complete twelve-case family: its public constructors
+  resolve only as `ResourceError.C`, with no bare error name in B.
+  `BufferSpan` and `TransferCount` are scoped, but `PrivateBufferSpan`
+  and `PrivateTransferCount` remain constructor-private: neither bare
+  names nor qualified `T.C` paths expose them to source.
   `ProcessInput`, `Prod`, and `Unit` are unscoped: `MkProcessInput`,
   `MkProd`, and `MkUnit` are bare names in B, with their exact parent
   identities. `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s
@@ -312,10 +328,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel vocabulary, not extra prelude identities. Neither the closed
   roster nor B includes arbitrary compiler globals; future floor
   membership requires §4's two witnesses and an atomic roster and
-  per-type property change. The dedicated L2 qualified-constructor/
-  scoped-property slice precedes L2-3's floor additions and
-  reconciles existing `ResourceKind` users; until then the implementation's
-  older bare behavior is a staged gap, not a second normative mode.
+  per-type property change. The earlier L2 qualified-constructor/
+  scoped-property slice precedes the six-family floor addition. This
+  candidate migrates source uses to the qualified paths; its local
+  checks do not establish CI or landing, and there is no second
+  normative bare-constructor mode.
 - **No binding of a built-in name.** No declaration or binder may introduce a
   name in the built-in set B. This is a hard surface error at introduction,
   even if the proposed target has the same canonical identity as the built-in
