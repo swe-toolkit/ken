@@ -16506,6 +16506,258 @@ mod generated_result_protocol_verifier {
     }
 
     #[derive(Clone, Copy, Debug)]
+    enum CallerFrameGuardCase {
+        Control,
+        PayloadSelfPointer,
+        PayloadSlotsSelfPointer,
+        HeaderContextPointer,
+        ShiftedPayloadAddress,
+        ServicesHeaderPointer,
+        FrameHeaderOffset,
+    }
+
+    /// The finished caller in the frame's repro. The test installs the
+    /// certified call in `frame_calls` itself, since normal production fills
+    /// that map only while closing staged Result bodies.
+    fn certified_caller_frame_case(
+        case: CallerFrameGuardCase,
+    ) -> (
+        Function,
+        StackMemoryLocation,
+        cranelift_codegen::ir::StackSlot,
+        cranelift_codegen::ir::StackSlot,
+        cranelift_codegen::ir::Inst,
+        cranelift_codegen::ir::Inst,
+    ) {
+        let mut func = Function::new();
+        func.signature.call_conv = CallConv::SystemV;
+        func.signature.returns.push(AbiParam::new(types::I64));
+        let callee = direct_callee(&mut func, FuncId::from_u32(114), 2);
+        let header =
+            func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+        let payload =
+            func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 24, 3));
+        let unrelated =
+            func.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
+        let location = StackMemoryLocation {
+            slot: payload,
+            offset: 8,
+            bytes: 8,
+        };
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        let payload_address = builder.ins().stack_addr(types::I64, payload, 0);
+        let stored_payload = if matches!(case, CallerFrameGuardCase::ShiftedPayloadAddress) {
+            builder.ins().iadd_imm(payload_address, 8)
+        } else {
+            payload_address
+        };
+        builder.ins().stack_store(
+            stored_payload,
+            header,
+            crate::activation_services::UNIT_CALL_FRAME_SLOTS,
+        );
+        let header_address = builder.ins().stack_addr(types::I64, header, 0);
+        let context_word = if matches!(case, CallerFrameGuardCase::HeaderContextPointer) {
+            payload_address
+        } else {
+            builder.ins().iconst(types::I64, 0x3000)
+        };
+        builder.ins().stack_store(context_word, header, 8);
+        if matches!(case, CallerFrameGuardCase::PayloadSelfPointer) {
+            builder.ins().stack_store(payload_address, payload, 16);
+        } else if matches!(case, CallerFrameGuardCase::PayloadSlotsSelfPointer) {
+            builder.ins().stack_store(
+                payload_address,
+                payload,
+                crate::activation_services::UNIT_CALL_FRAME_SLOTS,
+            );
+        }
+        let services = if matches!(case, CallerFrameGuardCase::ServicesHeaderPointer) {
+            builder.ins().iadd_imm(header_address, 0)
+        } else {
+            builder.ins().iconst(types::I64, 0x2000)
+        };
+        let frame = if matches!(case, CallerFrameGuardCase::FrameHeaderOffset) {
+            builder.ins().iadd_imm(header_address, 8)
+        } else {
+            header_address
+        };
+        let call = builder.ins().call(callee, &[frame, services]);
+        let seven = builder.ins().iconst(types::I64, 7);
+        builder.ins().stack_store(seven, payload, 8);
+        let heap = builder.ins().iconst(types::I64, 0x1000);
+        let destination = builder.ins().load(
+            types::I64,
+            cranelift_codegen::ir::MemFlags::trusted(),
+            heap,
+            0,
+        );
+        let nine = builder.ins().iconst(types::I64, 9);
+        builder.ins().store(
+            cranelift_codegen::ir::MemFlags::trusted(),
+            nine,
+            destination,
+            0,
+        );
+        let observed = builder.ins().stack_load(types::I64, payload, 8);
+        let dependent = builder
+            .func
+            .dfg
+            .value_def(observed)
+            .inst()
+            .expect("dependent load");
+        builder.ins().return_(&[observed]);
+        builder.seal_all_blocks();
+        builder.finalize();
+        (func, location, header, unrelated, call, dependent)
+    }
+
+    fn certified_caller_frame_states(case: CallerFrameGuardCase) -> BTreeSet<ReachingMemoryState> {
+        let (func, location, header, _, call, dependent) = certified_caller_frame_case(case);
+        let indexed = IndexedFunction::new(&func);
+        indexed
+            .frame_calls
+            .borrow_mut()
+            .insert(call, (header, location.slot));
+        let access = location_access(&indexed, location).expect("caller access is decidable");
+        assert_eq!(access.containers, BTreeSet::from([header, location.slot]));
+        assert!(!access.escaped);
+        assert!(indexed
+            .call_address_arguments()
+            .expect("call arguments are decidable")
+            .get(&header)
+            .is_some_and(|calls| calls.contains(&call)));
+        reaching_memory_states_before(&indexed, location, dependent)
+            .expect("post-call memory state is decidable")
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: a certified frame call and an unrelated heap write leave the
+    /// caller payload's restored value Exact. CLAIMED: the clean caller may
+    /// use the callee's non-retention certificate. THE GAP: the test directly
+    /// supplies `frame_calls`; it does not recertify the callee's body.
+    #[test]
+    fn certified_caller_frame_clean_control_preserves_exact() {
+        let states = certified_caller_frame_states(CallerFrameGuardCase::Control);
+        assert_eq!(states.len(), 1);
+        assert!(
+            matches!(states.iter().next(), Some(ReachingMemoryState::Exact(_))),
+            "{states:?}"
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: storing &P at P+16 makes the restored P+8 Unknown after the
+    /// unknown heap write. CLAIMED: a frame retaining its own address cannot
+    /// inherit a callee non-retention exemption. THE GAP: this pins one
+    /// StackStore shape, not all possible store opcodes.
+    #[test]
+    fn certified_caller_frame_payload_self_pointer_refuses_exemption() {
+        assert_eq!(
+            certified_caller_frame_states(CallerFrameGuardCase::PayloadSelfPointer),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: storing &P at H+8 makes the restored P+8 Unknown after the
+    /// unknown heap write. CLAIMED: the header context is not an additional
+    /// path for a retained container address. THE GAP: this pins one
+    /// StackStore shape at the context offset.
+    #[test]
+    fn certified_caller_frame_header_context_pointer_refuses_exemption() {
+        assert_eq!(
+            certified_caller_frame_states(CallerFrameGuardCase::HeaderContextPointer),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: deriving services from &H makes P+8 Unknown after the
+    /// restored store and unknown heap write. CLAIMED: the services argument
+    /// cannot retain a container's address under the exemption. THE GAP:
+    /// this pins an immediate-offset H-derived services value only.
+    #[test]
+    fn certified_caller_frame_header_derived_services_refuses_exemption() {
+        assert_eq!(
+            certified_caller_frame_states(CallerFrameGuardCase::ServicesHeaderPointer),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: storing &P at P's slots offset, rather than H's, makes the
+    /// restored P+8 Unknown. CLAIMED: the store-scan destination must be H.
+    /// THE GAP: this tests the StackStore decoder and one exact offset only.
+    #[test]
+    fn certified_caller_frame_payload_slots_pointer_refuses_exemption() {
+        assert_eq!(
+            certified_caller_frame_states(CallerFrameGuardCase::PayloadSlotsSelfPointer),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: H's slots field containing &P+8 makes restored P+8 Unknown.
+    /// CLAIMED: only P's base address may occupy that field.
+    /// THE GAP: this tests a constant-offset P-derived pointer, not every
+    /// representable address computation or store opcode.
+    #[test]
+    fn certified_caller_frame_shifted_payload_pointer_refuses_exemption() {
+        assert_eq!(
+            certified_caller_frame_states(CallerFrameGuardCase::ShiftedPayloadAddress),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: call(&H+8, services) makes the restored P+8 Unknown.
+    /// CLAIMED: a certified frame call requires exactly H's base address.
+    /// THE GAP: this is a constant-offset variant, not all frame expressions.
+    #[test]
+    fn certified_caller_frame_offset_header_refuses_exemption() {
+        assert_eq!(
+            certified_caller_frame_states(CallerFrameGuardCase::FrameHeaderOffset),
+            BTreeSet::from([ReachingMemoryState::Unknown]),
+        );
+    }
+
+    /// Promise class: durable invariant (spec/40-runtime/45-native-backend.md).
+    /// MEASURED: with the certified call indexed as (H, P), the predicate
+    /// admits P for containers {H, P} and refuses unrelated Q for {Q}.
+    /// CLAIMED: only the frame's own slots can inherit its exemption.
+    /// THE GAP: location_access cannot reach this guard on this index protocol;
+    /// the other guards refuse reachable Q cases before it, so this direct
+    /// predicate row does not claim a distinct Unknown memory state.
+    #[test]
+    fn certified_caller_frame_exemption_is_limited_to_frame_slots() {
+        let (func, location, header, unrelated, call, _) =
+            certified_caller_frame_case(CallerFrameGuardCase::Control);
+        let indexed = IndexedFunction::new(&func);
+        indexed
+            .frame_calls
+            .borrow_mut()
+            .insert(call, (header, location.slot));
+        assert!(certified_frame_call_exempt(
+            &indexed,
+            call,
+            location.slot,
+            &BTreeSet::from([header, location.slot]),
+        )
+        .expect("the checked frame slot is decidable"));
+        assert!(!certified_frame_call_exempt(
+            &indexed,
+            call,
+            unrelated,
+            &BTreeSet::from([unrelated])
+        )
+        .expect("the unrelated slot is decidable"));
+    }
+
+    #[derive(Clone, Copy, Debug)]
     enum CalleeFrameUse {
         StoreFrame,
         StorePayloadPointer,
