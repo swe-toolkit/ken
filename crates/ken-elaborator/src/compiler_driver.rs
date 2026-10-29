@@ -4716,7 +4716,9 @@ mod native_pre_source_stable_symbols {
                     ctor.id,
                     "{family_name}: checked qualified source path"
                 );
-                let artifact = table.resolve_global(ctor.id).expect("constructor id in table");
+                let artifact = table
+                    .resolve_global(ctor.id)
+                    .expect("constructor id in table");
                 assert_eq!(
                     artifact,
                     &StableSymbol::constructor(parent, leaf.clone()),

@@ -421,9 +421,12 @@ impl ModuleState {
         if !self.scoped_constructor_types.contains(&parent_id) {
             return None;
         }
-        self.constructor_members
-            .get(&parent_id)
-            .map(|members| members.iter().map(|(leaf, id)| (*id, leaf.clone())).collect())
+        self.constructor_members.get(&parent_id).map(|members| {
+            members
+                .iter()
+                .map(|(leaf, id)| (*id, leaf.clone()))
+                .collect()
+        })
     }
 
     pub(crate) fn capture_strict_builtin_names(
