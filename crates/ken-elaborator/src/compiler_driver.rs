@@ -8814,6 +8814,8 @@ mod package_route_example_declarations {
         // This package vector moves from the WIP 0x6c92_44e9_4730_3a45
         // because every scoped constructor's artifact symbol now uses its
         // checked family's bare leaf rather than a `T.C` source spelling.
+        // Emptying only the late scoped-family loop on the same qualified
+        // source leaves this exact 0xfd9d_81f8_fbce_6ee8 vector unchanged.
         assert_eq!(
             package_source.package.core_semantic_hash,
             0xfd9d_81f8_fbce_6ee8
@@ -8853,6 +8855,7 @@ mod package_route_example_declarations {
         // Promise class: normative compatibility vector for the denotation.
         // The denotation vector similarly moves from the WIP
         // 0xe158_b743_ec4d_6062 with checked scoped-family artifact leaves.
+        // The same loop-empty control leaves 0x7886_43b9_b36c_aae3 unchanged.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
             0x7886_43b9_b36c_aae3

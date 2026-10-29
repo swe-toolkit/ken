@@ -110,6 +110,8 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
 /// leaves its canonical semantic hash unchanged. The WIP vector
 /// 0xa906_9212_3b5f_b224 moves when scoped constructor artifact symbols
 /// take their checked family leaf rather than their `T.C` source spelling.
+/// Emptying only the late scoped-family loop with the same qualified source
+/// leaves 0x10e0_c33e_cb2a_7c2a unchanged.
 /// CLAIMED: unrelated example checking is still legal, without shifting
 /// admitted declaration identity. THE GAP: this fixes the package-name-
 /// dependent baseline vector for this one package, not every package name.
