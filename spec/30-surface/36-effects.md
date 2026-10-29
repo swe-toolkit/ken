@@ -468,7 +468,8 @@ rest of the kernel (ADR 0001/0004/0005). *(Precedents, one per layer: Koka rows
 
 An **effect signature** is a container: which operations exist and what response
 each returns. It is an ordinary `record` (negative Σ with η, `../10-kernel/14
-§4`, `13 §3`):
+§4`, `13 §3`). The following displays use **schematic notation**, not a
+standalone source unit:
 
 ```
 record Effect : Type (suc (max ℓ_op ℓ_resp)) where    -- level-poly in ℓ_op, ℓ_resp
@@ -490,6 +491,19 @@ data ITree (E : Effect) (R : Type ℓ_R) : Type (max ℓ_R ℓ_op ℓ_resp) wher
   Ret : R → ITree E R
   Vis : (e : E.Op) → (E.Resp e → ITree E R) → ITree E R
 ```
+
+`Effect` is an **ordinary type identity**, not a built-in, a prelude
+member, or an effect-row tag. A source unit must declare its `Effect`
+record locally or explicitly import it from a named public provider
+(`33 §3.3`); no such provider is established for a standalone fixture,
+so that fixture must declare the record locally. Source record fields
+use lowercase `ident` (`31 §2`, `32 §1`, `33 §2`): the fields shown as
+schematic `Op` and `Resp` above are spelled `op` and `resp` in source,
+with projections `E.op` and `E.resp e`, not `E.Op` or `E.Resp e`.
+The capitalized forms in the formulas of this subsection are
+mathematical placeholders, not additional accepted source field
+spellings. Providing the ordinary `Effect` record does not change
+the `ITree E R` carrier shape, the floor roster, or name resolution.
 
 - `Ret r` — finished with value `r`.
 - `Vis e k` — perform operation `e`, then **continue** with `k`, which maps the
