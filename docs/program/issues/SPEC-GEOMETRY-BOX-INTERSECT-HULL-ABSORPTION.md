@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION
 title: "Spec 67 states that box intersection and hull each commute and associate, but no law relates the two operations. Rule from a checked D0 at zero trust that each absorbs the other as a structural box equality, through public min and max absorption selectors in Nat Order, and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
