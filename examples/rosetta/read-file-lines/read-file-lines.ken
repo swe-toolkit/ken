@@ -85,7 +85,7 @@ const Compose (r : Type) : Type = HostIO APartial r
 proc printLines (xs : List String) : Compose (Result IOError Unit) visits [Console] =
   match xs {
     Nil ↦
-      Ret
+      ITree.Ret
         (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         (Result IOError Unit)
@@ -120,7 +120,7 @@ proc app (cap : Cap APartial) : Compose (Result IOError Unit) visits [FS, Consol
         Err e ↦
           match e {
             MkFileError operation path kind ↦
-              Ret
+              ITree.Ret
                 (Coproduct (FSOp APartial) AmbientOp)
                 (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
                 (Result IOError Unit)
@@ -129,7 +129,7 @@ proc app (cap : Cap APartial) : Compose (Result IOError Unit) visits [FS, Consol
         Ok bytes ↦
           match bytes_decode bytes {
             Err _ ↦
-              Ret
+              ITree.Ret
                 (Coproduct (FSOp APartial) AmbientOp)
                 (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
                 (Result IOError Unit)
@@ -188,7 +188,7 @@ proc main
                   host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               };
             Ok _ ↦
-              Ret
+              ITree.Ret
                 (Coproduct (FSOp APartial) AmbientOp)
                 (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
                 ExitCode

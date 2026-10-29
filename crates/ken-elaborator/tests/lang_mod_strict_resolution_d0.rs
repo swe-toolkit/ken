@@ -282,6 +282,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Equal",
             "ExitCode",
             "HostIO",
+            "ITree",
             "Instant",
             "List",
             "Nat",

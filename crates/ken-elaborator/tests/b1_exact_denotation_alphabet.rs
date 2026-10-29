@@ -10,10 +10,10 @@ const RESOURCE_PRODUCER: &str = r#"
 fn after_metadata (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err _ |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-    Ok _ |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
   }
@@ -35,7 +35,7 @@ proc target (cap : Cap AFull) (path : Bytes)
 const DECLARED_HEADROOM_WITHOUT_METADATA: &str = r#"
 fn body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
@@ -122,8 +122,8 @@ fn local_resp (_op : LocalOp) : Type = Unit
 
 proc target (_value : Unit)
   : ITree LocalOp local_resp Unit visits [Local] =
-  Vis LocalOp local_resp Unit Ping
-    (\_response. Ret LocalOp local_resp Unit MkUnit)
+  ITree.Vis LocalOp local_resp Unit Ping
+    (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#;
     let ping = export(ping_source).expect("closed non-host L5 perform");
     let pong_source = ping_source.replacen("Unit Ping", "Unit Pong", 1);
@@ -180,8 +180,8 @@ fn local_resp (_op : LocalOp) : Type = Unit
 
 proc target (operation : LocalOp)
   : ITree LocalOp local_resp Unit visits [Local] =
-  Vis LocalOp local_resp Unit operation
-    (\_response. Ret LocalOp local_resp Unit MkUnit)
+  ITree.Vis LocalOp local_resp Unit operation
+    (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#,
     );
 }
@@ -208,8 +208,8 @@ fn local_resp (_op : LocalOp) : Type = Unit
 proc target (boxed : OperationBox)
   : ITree LocalOp local_resp Unit visits [Local] =
   match boxed {
-    Wrap operation |-> Vis LocalOp local_resp Unit operation
-      (\_response. Ret LocalOp local_resp Unit MkUnit)
+    Wrap operation |-> ITree.Vis LocalOp local_resp Unit operation
+      (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
   }
 "#,
     );

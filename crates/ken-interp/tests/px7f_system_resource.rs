@@ -16,7 +16,7 @@ fn env() -> ken_elaborator::ElabEnv {
         r#"
         fn px7f_escape_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
-          Ret (Coproduct (FSOp AFull) AmbientOp)
+          ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
             (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)
@@ -24,11 +24,11 @@ fn env() -> ken_elaborator::ElabEnv {
         fn px7f_metadata_after (outcome : Result ResourceError FileMetadata)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) =
           match outcome {
-            Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (ResourceBodyResult ResourceError Unit)
               (ResourceBodyErr ResourceError Unit error);
-            Ok metadata |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Ok metadata |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (ResourceBodyResult ResourceError Unit)
               (ResourceBodyOk ResourceError Unit MkUnit)
@@ -46,11 +46,11 @@ fn env() -> ken_elaborator::ElabEnv {
         fn px7f_release_after (outcome : Result ResourceError Unit)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) =
           match outcome {
-            Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (ResourceBodyResult ResourceError Unit)
               (ResourceBodyErr ResourceError Unit error);
-            Ok unit |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Ok unit |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (ResourceBodyResult ResourceError Unit)
               (ResourceBodyOk ResourceError Unit MkUnit)
@@ -70,16 +70,16 @@ fn env() -> ken_elaborator::ElabEnv {
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           match bracket {
             ResourceBracketOk resource |-> resourceMetadata AFull resource;
-            ResourceBracketBodyError error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError FileMetadata)
               (Err ResourceError FileMetadata MalformedResource);
-            ResourceBracketReleaseError error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError FileMetadata)
               (Err ResourceError FileMetadata error);
             ResourceBracketBodyAndReleaseError body_error release_error |->
-              Ret (Coproduct (FSOp AFull) AmbientOp)
+              ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
                 (Result ResourceError FileMetadata)
                 (Err ResourceError FileMetadata release_error)
@@ -89,7 +89,7 @@ fn env() -> ken_elaborator::ElabEnv {
           (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           match outcome {
-            Err open_error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+            Err open_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result ResourceError FileMetadata)
               (Err ResourceError FileMetadata MalformedResource);

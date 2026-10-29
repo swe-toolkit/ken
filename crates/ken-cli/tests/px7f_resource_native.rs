@@ -91,7 +91,7 @@ fn assert_exact_operation_and_terminal_parity(
 const ESCAPE_CLOSED: &str = r#"program capabilities FS AFull
 fn escape_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
     (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)
@@ -132,7 +132,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
         (withResource AFull Unit (Resource ResourceKind.FsHandle)
           cap (bytes_encode "held.bin") ResourceMetadata
-          (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
+          (\resource. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
             (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)))
@@ -144,11 +144,11 @@ const RIGHT_NOT_HELD: &str = r#"program capabilities FS AFull
 fn metadata_after (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
   match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyErr ResourceError Unit error);
-    Ok metadata |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Ok metadata |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyOk ResourceError Unit MkUnit)
@@ -216,7 +216,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 const DOUBLE_RELEASE: &str = r#"program capabilities FS AFull
 fn double_release_unexpected (error : ResourceError)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult ResourceError Unit)
     (ResourceBodyErr ResourceError Unit error)
@@ -224,23 +224,23 @@ fn double_release_unexpected (error : ResourceError)
 fn double_release_second_error (error : ResourceError)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
   match error {
-    Closed |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Closed |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyOk ResourceError Unit MkUnit);
-    ResourceHostIO io |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    ResourceHostIO io |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyErr ResourceError Unit (ResourceHostIO io));
-    MalformedResource |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    MalformedResource |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyErr ResourceError Unit MalformedResource);
-    RightNotHeld required held |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    RightNotHeld required held |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyErr ResourceError Unit (RightNotHeld required held));
-    ReleaseFailed kind identity io |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    ReleaseFailed kind identity io |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyErr ResourceError Unit (ReleaseFailed kind identity io));
@@ -258,7 +258,7 @@ fn double_release_after_second (outcome : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
   match outcome {
     Err error |-> double_release_second_error error;
-    Ok unit |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+    Ok unit |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyErr ResourceError Unit MalformedResource)

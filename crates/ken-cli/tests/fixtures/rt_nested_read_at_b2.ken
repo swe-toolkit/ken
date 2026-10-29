@@ -8,7 +8,7 @@ proc read_byte (cap : Cap APartial) (chosen : UInt8)
       (Result FileError Bytes)
       (readFile APartial cap (bytes_encode "ac0.bin")))
     (\read. match read {
-      Err _ |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+      Err _ |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         UInt8 chosen;
       Ok b2 |-> bind (Coproduct (FSOp APartial) AmbientOp)
@@ -18,14 +18,14 @@ proc read_byte (cap : Cap APartial) (chosen : UInt8)
           (Result FileError Bytes)
           (readFile APartial cap (bytes_encode "ac0.bin")))
         (\again. match again {
-          Err _ |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+          Err _ |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
             (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
             UInt8 50;
           Ok more |-> match bytes_at b2 0 {
-            None |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+            None |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         UInt8 52;
-            Some z |-> Ret (Coproduct (FSOp APartial) AmbientOp)
+            Some z |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         UInt8 z
           }

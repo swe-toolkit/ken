@@ -846,8 +846,8 @@ data LocalOp = Ping | Pong
 fn local_resp (_op : LocalOp) : Type = Unit
 proc target (_value : Unit)
   : ITree LocalOp local_resp Unit visits [Local] =
-  Vis LocalOp local_resp Unit Ping
-    (\_response. Ret LocalOp local_resp Unit MkUnit)
+  ITree.Vis LocalOp local_resp Unit Ping
+    (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#,
         ),
         "target",

@@ -12,7 +12,7 @@ proc selected_body (terminal : Bool) (message : String)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush Stdout))
-      (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit MkUnit)
   }

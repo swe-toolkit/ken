@@ -181,7 +181,7 @@ fn ac1b_itree_vis_dependent_branch_domain_elaborates() {
     let id = env
         .elaborate_decl(
             "fn unwrapRet (r : ITree (StateOp Nat) (resp_state Nat) Nat) : Nat = \
-             match r { Ret v |-> v ; Vis op k |-> Zero }",
+             match r { ITree.Ret v |-> v ; ITree.Vis op k |-> Zero }",
         )
         .expect(
             "match on ITree (Vis op k, k's domain `resp_state Nat op` depending on \

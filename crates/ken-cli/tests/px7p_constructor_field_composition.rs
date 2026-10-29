@@ -30,7 +30,7 @@ proc produce (as_ok : Bool)
     (Result IOError Unit) (Result Bytes Bytes)
     (host_console APartial (Result IOError Unit)
       (write Stdout (bytes_encode "seed:")))
-    (\written. Ret (Coproduct (FSOp APartial) AmbientOp)
+    (\written. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result Bytes Bytes)
       (match written {
@@ -67,7 +67,7 @@ proc produce
     (Result IOError Unit) (Result Bytes Bytes)
     (host_console APartial (Result IOError Unit)
       (write Stdout (bytes_encode "ignored")))
-    (\written. Ret (Coproduct (FSOp APartial) AmbientOp)
+    (\written. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result Bytes Bytes)
       (match written {
@@ -107,7 +107,7 @@ proc produce_dynamic (cap : Cap APartial) (path : Bytes)
     (inject_l (FSOp APartial) AmbientOp
       (fs_resp APartial) ambient_resp
       (Result FileError Bytes) (readFile APartial cap path))
-    (\read. Ret (Coproduct (FSOp APartial) AmbientOp)
+    (\read. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result Bytes Bytes)
       (match read {

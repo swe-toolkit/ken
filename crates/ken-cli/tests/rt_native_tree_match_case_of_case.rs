@@ -11,7 +11,7 @@ proc host_byte (chosen : UInt8) : HostIO APartial UInt8 visits [Console] =
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     Unit UInt8
     (host_console APartial Unit (print_line "seed"))
-    (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+    (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       UInt8 chosen)
 
@@ -68,14 +68,14 @@ proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit ExitCode
         (host_console APartial Unit (print_line "accepted"))
-        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
           ExitCode ExitCode.Success);
       ExitCode.Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit ExitCode
         (host_console APartial Unit (print_line "rejected"))
-        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
           ExitCode (ExitCode.Failure code))
     })
@@ -145,14 +145,14 @@ proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit ExitCode
         (host_console APartial Unit (print_line "some"))
-        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
           ExitCode (ExitCode.Failure 3));
       None |-> bind (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit ExitCode
         (host_console APartial Unit (print_line "none"))
-        (\_. Ret (Coproduct (FSOp APartial) AmbientOp)
+        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
           ExitCode (ExitCode.Failure 4))
     })

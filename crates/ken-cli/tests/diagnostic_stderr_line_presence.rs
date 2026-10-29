@@ -23,8 +23,8 @@ fn host_exit_source(bytes: &str, exit: &str) -> String {
     format!(
         "program capabilities FS APartial\n\
          proc act : IO Unit visits [Console] =\n\
-           Vis ConsoleOp console_resp Unit (Write Stderr (bytes_encode {bytes}))\n\
-             (\\_. Ret ConsoleOp console_resp Unit MkUnit)\n\
+           ITree.Vis ConsoleOp console_resp Unit (Write Stderr (bytes_encode {bytes}))\n\
+             (\\_. ITree.Ret ConsoleOp console_resp Unit MkUnit)\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode visits [Console] =\n\
            host_program_then APartial act {exit}\n"
@@ -74,7 +74,7 @@ fn post_execution_x_diagnostic_starts_on_its_own_line() {
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   bind (Coproduct (FSOp APartial) AmbientOp) (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) Unit ExitCode
-    (host_console APartial Unit (Vis ConsoleOp console_resp Unit (Write Stderr (bytes_encode "partial")) (\_. Ret ConsoleOp console_resp Unit MkUnit)))
+    (host_console APartial Unit (ITree.Vis ConsoleOp console_resp Unit (Write Stderr (bytes_encode "partial")) (\_. ITree.Ret ConsoleOp console_resp Unit MkUnit)))
     (\_ . match (intToInt8 (sub_int 0 128)) { Some m |-> (match (eq_int (int8_to_int (neg_int8 m)) 0) { True |-> host_exit APartial ExitCode.Success ; False |-> host_exit APartial ExitCode.Success }) ; None |-> host_exit APartial ExitCode.Success })
 "#,
     );

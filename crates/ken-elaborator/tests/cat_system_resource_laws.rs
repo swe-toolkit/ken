@@ -263,7 +263,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r))
           : Equal (HostIO a (Result FileError (ResourceBracketResult e r)))
             (withResource a e r cap path mode body)
-            (Vis (Coproduct (FSOp a) AmbientOp)
+            (ITree.Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result FileError (ResourceBracketResult e r))
               (Coproduct.InL (FSOp a) AmbientOp (PrivateFsOpen a cap path mode))
@@ -280,7 +280,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           : Equal (HostIO a (Result FileError (ResourceBracketResult e r)))
             (private_with_resource_after_open a e r body
               (Err FileError (Resource ResourceKind.FsHandle) open_error))
-            (Ret (Coproduct (FSOp a) AmbientOp)
+            (ITree.Ret (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result FileError (ResourceBracketResult e r))
               (Err FileError (ResourceBracketResult e r) open_error)) =
@@ -311,7 +311,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           (body : BufferHandle -> HostIO a (ResourceBodyResult e r))
           : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
             (withBuffer a e r capacity body)
-            (Vis (Coproduct (FSOp a) AmbientOp)
+            (ITree.Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
               (Coproduct.InL (FSOp a) AmbientOp (PrivateBufferAllocate a capacity))
@@ -328,7 +328,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
             (private_with_buffer_after_allocate a e r capacity body
               (Err ResourceError (Resource ResourceKind.Buffer) allocate_error))
-            (Ret (Coproduct (FSOp a) AmbientOp)
+            (ITree.Ret (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
               (Err ResourceError (ResourceBracketResult e r) allocate_error)) =
@@ -360,7 +360,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
           : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
             (withMapping a e r (Anonymous length) protection body)
-            (Vis (Coproduct (FSOp a) AmbientOp)
+            (ITree.Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
               (Coproduct.InL (FSOp a) AmbientOp
@@ -378,7 +378,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
           : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
             (withMapping a e r (FileBacked file length) protection body)
-            (Vis (Coproduct (FSOp a) AmbientOp)
+            (ITree.Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
               (Coproduct.InL (FSOp a) AmbientOp
@@ -396,7 +396,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
             (private_with_mapping_after_allocate a e r length body
               (Err ResourceError (Resource ResourceKind.Mapping) allocate_error))
-            (Ret (Coproduct (FSOp a) AmbientOp)
+            (ITree.Ret (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result ResourceError (ResourceBracketResult e r))
               (Err ResourceError (ResourceBracketResult e r) allocate_error)) =
@@ -428,7 +428,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
           (body_result : ResourceBodyResult e r)
           : Equal (HostIO a (Result o (ResourceBracketResult e r)))
             (release_if_live a o e r kind resource body_result)
-            (Vis (Coproduct (FSOp a) AmbientOp)
+            (ITree.Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result o (ResourceBracketResult e r))
               (Coproduct.InL (FSOp a) AmbientOp (PrivateBracketRelease a kind resource))

@@ -58,7 +58,7 @@ fn addTo (n : Nat) : ITree Op Resp Nat =
         Unit
         Nat
         (put Nat Eff RespEff (addNat prev n))
-        (λ_. Ret Op Resp Nat (addNat prev n)))
+        (λ_. ITree.Ret Op Resp Nat (addNat prev n)))
 
 fn eq_nat (a : Nat) (b : Nat) : Bool =
   match a {
@@ -105,7 +105,7 @@ const prog : ITree Op Resp Bool =
         Nat
         Bool
         (addTo three)
-        (λr2. Ret Op Resp Bool (and_bool (eq_nat r1 two) (eq_nat r2 five))))
+        (λr2. ITree.Ret Op Resp Bool (and_bool (eq_nat r1 two) (eq_nat r2 five))))
 
 const finalResult : ITree Eff RespEff (Pair Bool Nat) = run_state Nat Eff RespEff Bool Zero prog
 
@@ -118,8 +118,8 @@ const finalResult : ITree Eff RespEff (Pair Bool Nat) = run_state Nat Eff RespEf
 -- path.
 fn unwrapRet (r : ITree Eff RespEff (Pair Bool Nat)) : Pair Bool Nat =
   match r {
-    Ret v ↦ v;
-    Vis op k ↦ mk_pair Bool Nat False Zero
+    ITree.Ret v ↦ v;
+    ITree.Vis op k ↦ mk_pair Bool Nat False Zero
   }
 
 const finalBool : Bool = pair_fst Bool Nat (unwrapRet finalResult)

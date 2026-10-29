@@ -123,7 +123,7 @@ fn unrelated_example_keeps_the_baseline_semantics_and_hash() {
     let checked = compile_literate(&with_example)
         .expect("independent example remains valid")
         .package;
-    assert_eq!(baseline.core_semantic_hash, 0xb250_7f51_71d8_044c);
+    assert_eq!(baseline.core_semantic_hash, 0xa906_9212_3b5f_b224);
     assert_eq!(checked.core_semantic_hash, baseline.core_semantic_hash);
     assert_eq!(checked.artifact.semantic, baseline.artifact.semantic);
 }

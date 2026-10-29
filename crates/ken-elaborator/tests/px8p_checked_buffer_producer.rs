@@ -8,7 +8,7 @@ use ken_elaborator::{emit_checked_target_export, ElabEnv};
 const BUFFER_ONLY_PRODUCER: &str = r#"
 fn px8p_buffer_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)

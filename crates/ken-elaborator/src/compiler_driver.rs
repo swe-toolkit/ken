@@ -8735,7 +8735,7 @@ mod package_route_example_declarations {
         // is measured with their qualified checked constructor symbols.
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0x393e_e31c_ea25_53c9
+            0x6c92_44e9_4730_3a45
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8774,7 +8774,7 @@ mod package_route_example_declarations {
         // scratch unscoping restored the previous 0xf7c4_d11a_ab32_c343.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0x3b3b_60f5_21e9_f643
+            0xe158_b743_ec4d_6062
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

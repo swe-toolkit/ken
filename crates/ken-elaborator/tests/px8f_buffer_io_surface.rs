@@ -138,7 +138,7 @@ proc px8f_readsome_public_consumers
     (\read_outcome.
       match read_outcome {
         Err error ↦
-          Ret
+          ITree.Ret
             (Coproduct (FSOp a) AmbientOp)
             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
             (Result ResourceError Unit)
@@ -146,7 +146,7 @@ proc px8f_readsome_public_consumers
         Ok progress ↦
           match progress {
             ReadEof ↦
-              Ret
+              ITree.Ret
                 (Coproduct (FSOp a) AmbientOp)
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                 (Result ResourceError Unit)
@@ -310,7 +310,7 @@ theorem first_error_is_no_progress
   : Equal (HostIO a (Result ResourceError Unit))
       (private_write_all_step a offset span next
         (Err ResourceError WriteProgress NoProgress))
-      (Ret (Coproduct (FSOp a) AmbientOp)
+      (ITree.Ret (Coproduct (FSOp a) AmbientOp)
         (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
         (Result ResourceError Unit) (Err ResourceError Unit NoProgress)) =
   write_all_first_error_step a file offset buffer span next NoProgress

@@ -65,20 +65,20 @@
 const RT_PARITY_SOURCE: &str = r#"program capabilities FS AFull
 fn rt_body_ok (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
 (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn rt_expect_invalid_offset (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-Err InvalidOffset |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err InvalidOffset |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -86,13 +86,13 @@ Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
 fn rt_expect_invalid_bounds (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-Err InvalidBounds |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err InvalidBounds |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -100,13 +100,13 @@ Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
 fn rt_expect_write_invalid_offset (outcome : Result ResourceError WriteProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-Err InvalidOffset |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err InvalidOffset |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -133,13 +133,13 @@ fn rt_inner_bracket_result
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-Ok (ResourceBracketOk unit) |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok (ResourceBracketOk unit) |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Ok bracket |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok bracket |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -233,10 +233,10 @@ Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
   (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
   (writeAt AFull file (sub_int 0 1) buffer span)
   (\written. rt_expect_write_invalid_offset written);
-Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -271,13 +271,13 @@ fn rt_file_bracket_result
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-Ok (ResourceBracketOk unit) |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok (ResourceBracketOk unit) |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-Ok bracket |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok bracket |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -292,10 +292,10 @@ Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
   (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
   (writeAt AFull sink (sub_int 0 1) buffer span)
   (\written. rt_expect_write_invalid_offset written);
-Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
@@ -342,13 +342,13 @@ proc rt_write_writable_stage (cap : Cap AFull)
 fn rt_cap41_expect_eof (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-  Ok ReadEof |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+  Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-  Ok progress |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+  Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-  Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+  Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
