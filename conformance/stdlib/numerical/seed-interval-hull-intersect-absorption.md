@@ -94,8 +94,8 @@ theorem hull_intersect_inside_left_by_law
   interval_hull_intersect_inside_left left right
 
 theorem same_shape_hull_intersect_control
-    : IsTrue (interval_inside (interval_hull left (interval_intersect left right)) left) =
-  interval_hull_intersect_inside_left left right
+    : IsTrue (interval_inside (interval_hull (interval_intersect left right) left) left) =
+  Proved
 
 theorem moved_shared_argument_value
     : Equal Bool (interval_inside (interval_hull (interval_intersect left right) right) left) False =
@@ -137,12 +137,11 @@ theorem moved_shared_argument_value
 ## Isolated refused moved-argument claim
 
 Start from a fresh complete copy of the accepted client and append only
-`seed_neg`. The accepted same-shape control uses the correct shared `left`
-argument in the hull and applies `interval_hull_intersect_inside_left`.
-The refused claim changes that shared argument to `right` in the
-intersection. Its independently computed result is `[1,3]`, which is not
-inside `left = [0,2]`. Require refusal at `seed_neg`, not at an import or
-earlier declaration.
+`seed_neg`. The accepted same-shape control is the accepted theorem in the client
+above. It differs from the refused claim only in the outer hull's final
+argument: `left` rather than `right`. The refused claim's independently computed
+result is `[1,3]`, which is not inside `left = [0,2]`. Require refusal at
+`seed_neg`, not at an import or earlier declaration.
 
 ### `stdlib/numerical/reject-moved-shared-argument-absorption`
 
@@ -175,5 +174,7 @@ equal scratch trusted GlobalId sets (114 → 114). Its closed client used the
 same `[0,2]` and `[1,3]` intervals, checked all four public directions, and
 refused the moved-shared-argument claim after an accepted control. This D0
 is Architect-reported scratch evidence; it does not establish execution of
-this exact seed, the future catalog implementation or package test, official
-conformance-runner execution, CI, publication, landing or landed trust.
+this exact seed. The current candidate includes the §8 catalog
+implementation and a package-owned test; the test must be repinned to this
+control. This CV correction does not establish official conformance-runner
+execution, CI, publication, landing or landed trust.
