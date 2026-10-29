@@ -301,14 +301,16 @@ impl Fixture {
 
     fn alternative_error(&mut self, e: &str, actual: &EvalVal) -> EvalVal {
         match e {
-            "FileError" => self.eval_expr("MkFileError OpReadFile (None Bytes) Unsupported"),
+            "FileError" => {
+                self.eval_expr("MkFileError OpReadFile (None Bytes) IOError.Unsupported")
+            }
             "ResourceError" => {
                 let alternative = if matches!(actual, EvalVal::Ctor { id, .. }
-                    if *id == self.id("InvalidBounds"))
+                    if *id == self.id("ResourceError.InvalidBounds"))
                 {
-                    "Closed"
+                    "ResourceError.Closed"
                 } else {
-                    "InvalidBounds"
+                    "ResourceError.InvalidBounds"
                 };
                 self.ctor(alternative)
             }
@@ -316,9 +318,9 @@ impl Fixture {
                 let alternative = if matches!(actual, EvalVal::Ctor { id, .. }
                     if *id == self.ids.brokenpipe_id)
                 {
-                    "InvalidInput"
+                    "IOError.InvalidInput"
                 } else {
-                    "BrokenPipe"
+                    "IOError.BrokenPipe"
                 };
                 self.ctor(alternative)
             }
@@ -555,7 +557,7 @@ fn fs_file_error_bytes_hostio_inl() {
 fn fs_file_error_unit() {
     let mut f = Fixture::new();
     let mut host = host();
-    let policy = f.ctor("CreateNew");
+    let policy = f.ctor("CreatePolicy.CreateNew");
     let tree = f.fs_action(
         "write_file",
         [

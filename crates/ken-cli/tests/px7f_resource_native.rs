@@ -105,7 +105,7 @@ proc after_escape (bracket : ResourceBracketResult Unit (Resource ResourceKind.F
         (Result ResourceError FileMetadata) ExitCode
         (resourceMetadata AFull resource)
         (\used. match used {
-          Err Closed |-> host_exit AFull ExitCode.Success;
+          Err ResourceError.Closed |-> host_exit AFull ExitCode.Success;
           Err error |-> host_exit AFull (ExitCode.Failure 91);
           Ok metadata |-> host_exit AFull (ExitCode.Failure 92)
         });
@@ -163,22 +163,22 @@ proc metadata_body (resource : Resource ResourceKind.FsHandle)
 
 fn right_masks (error : ResourceError) : Bool =
   match error {
-    ResourceHostIO io |-> False;
-    Closed |-> False;
-    MalformedResource |-> False;
-    RightNotHeld required held |->
+    ResourceError.ResourceHostIO io |-> False;
+    ResourceError.Closed |-> False;
+    ResourceError.MalformedResource |-> False;
+    ResourceError.RightNotHeld required held |->
       match eq_int required 32 {
         True |-> eq_int held 1;
         False |-> False
       };
-    ReleaseFailed kind identity io |-> False;
-    ResourceKindMismatch expected actual |-> False;
-    BufferLimit |-> False;
-    AllocationFailed |-> False;
-    InvalidOffset |-> False;
-    InvalidBounds |-> False;
-    NoProgress |-> False;
-    MappingLimit |-> False
+    ResourceError.ReleaseFailed kind identity io |-> False;
+    ResourceError.ResourceKindMismatch expected actual |-> False;
+    ResourceError.BufferLimit |-> False;
+    ResourceError.AllocationFailed |-> False;
+    ResourceError.InvalidOffset |-> False;
+    ResourceError.InvalidBounds |-> False;
+    ResourceError.NoProgress |-> False;
+    ResourceError.MappingLimit |-> False
   }
 
 fn bracket_has_right_denial (bracket : ResourceBracketResult ResourceError Unit) : Bool =
@@ -224,34 +224,34 @@ fn double_release_unexpected (error : ResourceError)
 fn double_release_second_error (error : ResourceError)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
   match error {
-    Closed |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+    ResourceError.Closed |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
       (ResourceBodyOk ResourceError Unit MkUnit);
-    ResourceHostIO io |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+    ResourceError.ResourceHostIO io |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
-      (ResourceBodyErr ResourceError Unit (ResourceHostIO io));
-    MalformedResource |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+      (ResourceBodyErr ResourceError Unit (ResourceError.ResourceHostIO io));
+    ResourceError.MalformedResource |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
-      (ResourceBodyErr ResourceError Unit MalformedResource);
-    RightNotHeld required held |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+      (ResourceBodyErr ResourceError Unit ResourceError.MalformedResource);
+    ResourceError.RightNotHeld required held |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
-      (ResourceBodyErr ResourceError Unit (RightNotHeld required held));
-    ReleaseFailed kind identity io |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+      (ResourceBodyErr ResourceError Unit (ResourceError.RightNotHeld required held));
+    ResourceError.ReleaseFailed kind identity io |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
-      (ResourceBodyErr ResourceError Unit (ReleaseFailed kind identity io));
-    ResourceKindMismatch expected actual |->
-      double_release_unexpected (ResourceKindMismatch expected actual);
-    BufferLimit |-> double_release_unexpected BufferLimit;
-    AllocationFailed |-> double_release_unexpected AllocationFailed;
-    InvalidOffset |-> double_release_unexpected InvalidOffset;
-    InvalidBounds |-> double_release_unexpected InvalidBounds;
-    NoProgress |-> double_release_unexpected NoProgress;
-    MappingLimit |-> double_release_unexpected MappingLimit
+      (ResourceBodyErr ResourceError Unit (ResourceError.ReleaseFailed kind identity io));
+    ResourceError.ResourceKindMismatch expected actual |->
+      double_release_unexpected (ResourceError.ResourceKindMismatch expected actual);
+    ResourceError.BufferLimit |-> double_release_unexpected ResourceError.BufferLimit;
+    ResourceError.AllocationFailed |-> double_release_unexpected ResourceError.AllocationFailed;
+    ResourceError.InvalidOffset |-> double_release_unexpected ResourceError.InvalidOffset;
+    ResourceError.InvalidBounds |-> double_release_unexpected ResourceError.InvalidBounds;
+    ResourceError.NoProgress |-> double_release_unexpected ResourceError.NoProgress;
+    ResourceError.MappingLimit |-> double_release_unexpected ResourceError.MappingLimit
   }
 
 fn double_release_after_second (outcome : Result ResourceError Unit)
@@ -261,7 +261,7 @@ fn double_release_after_second (outcome : Result ResourceError Unit)
     Ok unit |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult ResourceError Unit)
-      (ResourceBodyErr ResourceError Unit MalformedResource)
+      (ResourceBodyErr ResourceError Unit ResourceError.MalformedResource)
   }
 
 proc double_release_after_first

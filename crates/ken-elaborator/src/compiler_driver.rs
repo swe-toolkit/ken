@@ -4690,6 +4690,9 @@ mod native_pre_source_stable_symbols {
             "Coproduct",
             "ITree",
             "Instant",
+            "IOError",
+            "CreatePolicy",
+            "ResourceError",
         ] {
             let family_id = env.globals[family_name];
             let family = env.env.inductive(family_id).expect("checked scoped family");
@@ -4725,6 +4728,33 @@ mod native_pre_source_stable_symbols {
                     "{family_name}: artifact leaf derives from the checked id"
                 );
                 assert_eq!(artifact.components.last(), Some(leaf));
+            }
+        }
+        // Constructor-private families retain checked leaves for artifact
+        // identity, but neither bare nor qualified source globals may expose
+        // their constructors after the prelude hides those checked IDs.
+        for family_name in ["BufferSpan", "TransferCount"] {
+            let family_id = env.globals[family_name];
+            let family = env
+                .env
+                .inductive(family_id)
+                .expect("checked private family");
+            let leaves = env
+                .module_state
+                .scoped_constructor_leaves(family_id)
+                .expect("private checked family leaves");
+            assert_eq!(leaves.len(), family.constructors.len());
+            for ctor in &family.constructors {
+                let leaf = &leaves[&ctor.id];
+                assert!(!env.globals.contains_key(leaf));
+                assert!(!env.globals.contains_key(&format!("{family_name}.{leaf}")));
+                assert_eq!(
+                    table.resolve_global(ctor.id),
+                    Ok(&StableSymbol::constructor(
+                        &symbols[&family_id],
+                        leaf.clone()
+                    ))
+                );
             }
         }
     }
@@ -8368,13 +8398,17 @@ mod d1b_role_c1_roster_identity {
             ),
             ("mapping_read_only", "ReadOnly", roles.mapping_read_only),
             ("mapping_read_write", "ReadWrite", roles.mapping_read_write),
-            ("create_new", "CreateNew", roles.create_new),
+            ("create_new", "CreatePolicy.CreateNew", roles.create_new),
             (
                 "create_or_truncate",
-                "CreateOrTruncate",
+                "CreatePolicy.CreateOrTruncate",
                 roles.create_or_truncate,
             ),
-            ("create_or_keep", "CreateOrKeep", roles.create_or_keep),
+            (
+                "create_or_keep",
+                "CreatePolicy.CreateOrKeep",
+                roles.create_or_keep,
+            ),
         ];
         for (field, spelling, id) in &entry_abi_roles {
             assert_eq!(
@@ -8817,10 +8851,13 @@ mod package_route_example_declarations {
         // because every scoped constructor's artifact symbol now uses its
         // checked family's bare leaf rather than a `T.C` source spelling.
         // Emptying only the late scoped-family loop on the same qualified
-        // source leaves this exact 0xfd9d_81f8_fbce_6ee8 vector unchanged.
+        // source left 0xfd9d_81f8_fbce_6ee8 unchanged before the FS/resource
+        // floor expansion. Six newly reserved checked families and their
+        // scoped source constructors change the compiler-owned pre-source
+        // closure. This fixed source now hashes to 0x5011_0ebe_49e0_1727.
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0xfd9d_81f8_fbce_6ee8
+            0x5011_0ebe_49e0_1727
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8857,10 +8894,12 @@ mod package_route_example_declarations {
         // Promise class: normative compatibility vector for the denotation.
         // The denotation vector similarly moves from the WIP
         // 0xe158_b743_ec4d_6062 with checked scoped-family artifact leaves.
-        // The same loop-empty control leaves 0x7886_43b9_b36c_aae3 unchanged.
+        // The same loop-empty control left 0x7886_43b9_b36c_aae3 unchanged
+        // before the six-family FS/resource floor expansion. The checked
+        // pre-source denotation closure now hashes to 0xa486_5cf9_3d62_dfec.
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0x7886_43b9_b36c_aae3
+            0xa486_5cf9_3d62_dfec
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

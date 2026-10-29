@@ -50,7 +50,7 @@ fn system_resource_is_opaque_and_only_the_bracket_mints_it() {
 fn resource_host_io_preserves_the_existing_host_io_identity() {
     let mut env = ElabEnv::empty().expect("PX7-F prelude bootstrap");
     let host_io = env.globals["HostIO"];
-    let resource_host_io = env.globals["ResourceHostIO"];
+    let resource_host_io = env.globals["ResourceError.ResourceHostIO"];
     assert_ne!(host_io, resource_host_io);
     assert!(env.env.transparent_body(host_io).is_some());
     assert!(env.env.constructor(resource_host_io).is_some());
@@ -69,6 +69,6 @@ fn resource_host_io_preserves_the_existing_host_io_identity() {
         "{error:?}"
     );
     assert_eq!(env.globals["HostIO"], host_io);
-    assert_eq!(env.globals["ResourceHostIO"], resource_host_io);
+    assert_eq!(env.globals["ResourceError.ResourceHostIO"], resource_host_io);
     assert!(!env.globals.contains_key("CollisionMutation"));
 }

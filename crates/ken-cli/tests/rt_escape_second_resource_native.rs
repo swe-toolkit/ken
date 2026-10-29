@@ -179,7 +179,7 @@ proc after_escape (bracket : ResourceBracketResult Unit (Resource ResourceKind.F
         (Result ResourceError FileMetadata) ExitCode
         (resourceMetadata AFull resource)
         (\used. match used {
-          Err Closed |-> host_exit AFull ExitCode.Success;
+          Err ResourceError.Closed |-> host_exit AFull ExitCode.Success;
           Err error |-> host_exit AFull (ExitCode.Failure 91);
           Ok metadata |-> host_exit AFull (ExitCode.Failure 92)
         });
@@ -396,18 +396,18 @@ fn body_from_freeze (r : Result ResourceError Bytes) : ResourceBodyResult Unit U
   match r {
     Ok bytes |-> ResourceBodyErr Unit Unit MkUnit;
     Err error |-> match error {
-      InvalidBounds |-> ResourceBodyOk Unit Unit MkUnit;
-      Closed |-> ResourceBodyErr Unit Unit MkUnit;
-      InvalidOffset |-> ResourceBodyErr Unit Unit MkUnit;
-      BufferLimit |-> ResourceBodyErr Unit Unit MkUnit;
-      AllocationFailed |-> ResourceBodyErr Unit Unit MkUnit;
-      NoProgress |-> ResourceBodyErr Unit Unit MkUnit;
-      MappingLimit |-> ResourceBodyErr Unit Unit MkUnit;
-      MalformedResource |-> ResourceBodyErr Unit Unit MkUnit;
-      RightNotHeld required held |-> ResourceBodyErr Unit Unit MkUnit;
-      ResourceHostIO io |-> ResourceBodyErr Unit Unit MkUnit;
-      ReleaseFailed kind identity io |-> ResourceBodyErr Unit Unit MkUnit;
-      ResourceKindMismatch expected actual |-> ResourceBodyErr Unit Unit MkUnit
+      ResourceError.InvalidBounds |-> ResourceBodyOk Unit Unit MkUnit;
+      ResourceError.Closed |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.InvalidOffset |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.BufferLimit |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.AllocationFailed |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.NoProgress |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.MappingLimit |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.MalformedResource |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.RightNotHeld required held |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.ResourceHostIO io |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.ReleaseFailed kind identity io |-> ResourceBodyErr Unit Unit MkUnit;
+      ResourceError.ResourceKindMismatch expected actual |-> ResourceBodyErr Unit Unit MkUnit
     }
   }
 

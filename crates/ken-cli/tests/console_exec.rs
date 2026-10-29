@@ -58,19 +58,19 @@ fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
                (write Stdout (bytes_encode \"{payload}\"))) \
              (\\r. match r {{ \
                Err e |-> match e {{ \
-                 BrokenPipe |-> host_exit APartial (ExitCode.Failure 17); \
-                 NotFound |-> host_exit APartial (ExitCode.Failure 18); \
-                 PermissionDenied |-> host_exit APartial (ExitCode.Failure 18); \
-                 CapabilityDenied |-> host_exit APartial (ExitCode.Failure 18); \
-                 Interrupted |-> host_exit APartial (ExitCode.Failure 18); \
-                 AlreadyExists |-> host_exit APartial (ExitCode.Failure 18); \
-                 InvalidInput |-> host_exit APartial (ExitCode.Failure 18); \
-                 IsDirectory |-> host_exit APartial (ExitCode.Failure 18); \
-                 NotDirectory |-> host_exit APartial (ExitCode.Failure 18); \
-                 NotEmpty |-> host_exit APartial (ExitCode.Failure 18); \
-                 Unsupported |-> host_exit APartial (ExitCode.Failure 18); \
-                 Revoked |-> host_exit APartial (ExitCode.Failure 18); \
-                 Other errno |-> host_exit APartial (ExitCode.Failure 18) \
+                 IOError.BrokenPipe |-> host_exit APartial (ExitCode.Failure 17); \
+                 IOError.NotFound |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.PermissionDenied |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.CapabilityDenied |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.Interrupted |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.AlreadyExists |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.InvalidInput |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.IsDirectory |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.NotDirectory |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.NotEmpty |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.Unsupported |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.Revoked |-> host_exit APartial (ExitCode.Failure 18); \
+                 IOError.Other errno |-> host_exit APartial (ExitCode.Failure 18) \
                }}; \
                Ok _ |-> host_exit APartial ExitCode.Success \
              }})\n"

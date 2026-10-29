@@ -117,7 +117,7 @@ pub theorem retry_advised_only_for_transient_idempotent
   }
 
 pub theorem error_transience_revoked_permanent
-    : Equal Transience (error_transience Revoked) Permanent =
+    : Equal Transience (error_transience IOError.Revoked) Permanent =
   Proved
 ```
 
@@ -129,19 +129,19 @@ canonical `IOError` identity without making a retry decision themselves.
 ```ken
 pub fn error_transience (identity : IOError) : Transience =
   match identity {
-    NotFound ↦ Permanent;
-    PermissionDenied ↦ Permanent;
-    CapabilityDenied ↦ Permanent;
-    BrokenPipe ↦ Permanent;
-    Interrupted ↦ Transient;
-    AlreadyExists ↦ Permanent;
-    InvalidInput ↦ Permanent;
-    IsDirectory ↦ Permanent;
-    NotDirectory ↦ Permanent;
-    NotEmpty ↦ Permanent;
-    Unsupported ↦ Permanent;
-    Revoked ↦ Permanent;
-    Other _ ↦ Permanent
+    IOError.NotFound ↦ Permanent;
+    IOError.PermissionDenied ↦ Permanent;
+    IOError.CapabilityDenied ↦ Permanent;
+    IOError.BrokenPipe ↦ Permanent;
+    IOError.Interrupted ↦ Transient;
+    IOError.AlreadyExists ↦ Permanent;
+    IOError.InvalidInput ↦ Permanent;
+    IOError.IsDirectory ↦ Permanent;
+    IOError.NotDirectory ↦ Permanent;
+    IOError.NotEmpty ↦ Permanent;
+    IOError.Unsupported ↦ Permanent;
+    IOError.Revoked ↦ Permanent;
+    IOError.Other _ ↦ Permanent
   }
 
 pub fn operation_idempotence (operation : Operation) : Idempotence =
@@ -186,7 +186,9 @@ revocation identity.
 
 ```ken example
 const revoked_retry : RetryGuidance =
-  retry_guidance (error_transience Revoked) (operation_idempotence (FilesystemOp OpReadFile))
+  retry_guidance
+    (error_transience IOError.Revoked)
+    (operation_idempotence (FilesystemOp OpReadFile))
 
 theorem revoked_retry_is_permanent : Equal RetryGuidance revoked_retry DoNotRetryPermanent =
   Proved

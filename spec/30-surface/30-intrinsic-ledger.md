@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative twenty-four-identity prelude and its exact constructor/companion
+> normative thirty-identity prelude and its exact constructor/companion
 > closure are `30-taxonomy §4`; resolution and protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
 > Once D0 proves both §4 witness clauses per name, a keyed, source-required
@@ -24,8 +24,9 @@ an unused catalog census name proves a global is safe to remove.
 
 For unruled candidate names below, the keying column names a **native
 reader to check**, not proof that the reader set is complete. The
-admitted entrypoint-ABI, effect/clock and ITree rows instead record
-ruled exact-ID keying and independent source need (`30 §4`'s conjunction).
+admitted entrypoint-ABI, effect/clock, ITree and FS/resource rows instead
+record ruled exact-ID keying and independent source need (`30 §4`'s
+conjunction).
 Both proven → reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
@@ -38,14 +39,15 @@ copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
 there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
-Apart from the internal-only `Empty` and the admitted entrypoint-ABI,
-effect/clock and ITree identities below, the candidate names in this table are
-**observed spellings**, not names approved for permanent reservation. Before
-a later slice admits a newly witnessed name, Spec checks that its spelling closely
-encloses its meaning (`30 §4`);
-`NotFound`, `Other`, `Unsupported`, `write` and `Stdout` are
-operator-named specificity probes, not an exhaustive list or preselected
-renames. `Instant` is admitted as a specific type spelling, while its
+Apart from internal-only `Empty` and the admitted entrypoint-ABI,
+effect/clock, ITree and six FS/resource families below, the candidate
+names in this table are **observed spellings**, not names approved for
+permanent reservation. Before a later slice admits a newly witnessed
+name, Spec checks that its spelling closely encloses its meaning
+(`30 §4`). For the admitted `IOError` family, `NotFound`, `Other` and
+`Unsupported` gain specificity through `IOError.C` qualification, not
+renaming or bare reservation. `write` and `Stdout` remain specificity
+probes for later slices. `Instant` is admitted as a specific type spelling, while its
 constructor is qualified `Instant.MkInstant`. `Success`/`Failure`
 are admitted only as qualified `ExitCode.Success`/`ExitCode.Failure`,
 not bare reservations. Spec owns public naming folds in `35`/`38`
@@ -53,8 +55,9 @@ and this ledger. Any necessary type/function rename lands atomically
 with floor admission and catalog/fixture clients. Qualification `T.C`
 is now normative in expressions and patterns for every data type
 (`32 §4`, `33 §3.3`, `34 §1`).
-It can make a generic constructor specific without reserving its bare name;
-this S0 assigns no replacement spelling to any type or function.
+It can make a generic constructor specific without reserving its bare
+name; this FS/resource slice assigns no replacement spelling to any
+type or function.
 
 ## Per-type constructor scope choices
 
@@ -69,17 +72,20 @@ constructor still has the same checked parent and `GlobalId`.
 |---|---|---|
 | `ResourceKind` (current floor) | Yes | `Buffer`, `Mapping`, `FsHandle` are generic bare names; their `ResourceKind.C` paths state their role. |
 | `Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, `Utf8Error` (current floor) | No | The settled bare constructor vocabulary remains available; in particular `True`/`False`, `Zero`/`Suc`, `Nil`/`Cons`, `None`/`Some`, `Ok`/`Err` stay bare. |
-| `IOError` | Yes if admitted | Error causes such as `NotFound`, `Other`, and `Unsupported` need their type qualifier. |
+| `IOError` (floor) | Yes | All thirteen causes use `IOError.C`; `NotFound`, `Other`, `Unsupported` and `Revoked` are not bare reservations. |
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
-| `ResourceError`, `ResourceBodyResult`, `ResourceBracketResult` | Yes if admitted | A result/error qualifier prevents generic error and status names becoming bare reservations. |
+| `ResourceError` (floor) | Yes | All twelve error causes use `ResourceError.C`; no bare error name is reserved. |
+| `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
 | `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
-| `Stream`, `CreatePolicy` | Yes if admitted | `Stdout`, `Stderr` and create-policy cases are specific only under their carrier; a generic type name may still need a rename. |
+| `Stream` (candidate) | Yes if admitted | `Stdout` and `Stderr` need their carrier; source need and keying remain to be ruled. |
+| `CreatePolicy` (floor) | Yes | The three cases use `CreatePolicy.C`, retaining their unchanged native artifact leaves. |
 | `ProcessInput` (floor) | No | Its `MkProcessInput` constructor is bare and reserved with its type. |
 | `Unit` (current floor) | No | `MkUnit` names its exact checked parent and remains bare and reserved. |
-| `FileError`, `BufferWindow` | No if admitted | `MkFileError` and `MkBufferWindow` name their carriers closely. |
+| `FileError` (floor) | No | `MkFileError` remains bare and reserved with its parent. |
+| `BufferWindow` (package) | No if later admitted | `MkBufferWindow` names its carrier, but neither is reserved now; strict-mode same-name source declarations remain legal. |
 | `ProgramCaps` (floor) | Yes | Its runner-minted `MkProgramCaps` does not reserve a bare spelling; constructor visibility remains unchanged. |
-| `BufferSpan`, `TransferCount` | Yes if admitted | Their minted constructor identities need no additional bare source spelling; private visibility stays intact. |
+| `BufferSpan`, `TransferCount` (floor) | Yes | Exact minted constructor IDs retain private visibility; neither bare spelling nor a public qualified constructor is admitted. |
 | `Coproduct` (current floor) | Yes | `InL`/`InR` are generic; only `Coproduct.InL`/`Coproduct.InR` resolve to the exact constructors. |
 | `Prod` (floor) | No | `MkProd` names its carrier and is bare and reserved; retargeting the constructor-backed runtime representation to floor `Pair` is not part of this slice. |
 
@@ -107,9 +113,12 @@ constructor producer and checks the parent type's independent source need.
 The entrypoint-ABI and `Empty` rows are re-grounded on landed
 `f3e71af9c`; the effect/clock rows are settled against the exact-ID
 producer/reader and source requirements in the keyed-effects D0.
+The six FS/resource families are admitted by the native constructor
+producer/reader and parent-ID probe on `fd2f57557` (Architect AC-0),
+paired with their independent `38` source need (Spec Leader AC-0).
 Other inventory citations retain their stated census base. Only
-marked witnessed entrypoint-ABI, effect/clock and ITree rows below join
-the floor; no other row alone reserves a name.
+marked witnessed entrypoint-ABI, effect/clock, ITree and FS/resource
+rows below join the floor; no other row alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
@@ -131,7 +140,7 @@ the floor; no other row alone reserves a name.
 | `leqChar` | Checked projection/comparison definition (`decimal_char.rs`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
 | `IO` | Checked Console-ITree alias (`prelude.rs`); confirm whether the effect reifier selects the alias ID or only the underlying constructors. |
-| `FS` | Checked Auth-indexed ITree alias (`prelude.rs`); confirm whether the reifier/runner selects its ID. |
+| `FS` (package, not floor) | Source-promised Auth-indexed ITree alias in `read_bytes`/`write_file` types (`38`); no native reader of this alias ID. The effect/capability label `FS` is a separate namespace. |
 | `ITree` (floor, scoped) | `PreludeEnv.itree_id` captures the checked pre-source inductive ID; effect lowering and the host interpreter select that family by exact ID. The surface requires source to name the canonical type and its constructors (`36 §2.1`, §2.4). A same-shaped source family does not replace it. |
 | `Ret` (qualified floor constructor) | `PreludeEnv.ret_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Ret`, never a reserved bare `Ret`. The constructor itself is not renamed. |
 | `Vis` (qualified floor constructor) | `PreludeEnv.vis_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Vis`, never a reserved bare `Vis`. The constructor itself is not renamed. |
@@ -142,65 +151,66 @@ the floor; no other row alone reserves a name.
 | `Stdin` | `Stream` constructor; trace the native stream selector and source requirement. |
 | `Stdout` | `Stream` constructor used by source `write`/`print_line`; trace native stream selection. |
 | `Stderr` | `Stream` constructor; trace the native selector independently. |
-| `read_bytes` | Checked FS call wrapper (`prelude.rs`); test whether the compiler keys on its ID or only on its emitted `Vis`/`ReadFile`. |
+| `read_bytes` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`ReadFile` identities, not this wrapper's ID. |
 | `write` | Checked Console call wrapper (`prelude.rs`); same independent test. |
-| `write_file` | Checked FS call wrapper (`prelude.rs`); same independent test. |
-| `FileError` | FS result carrier (`38 §1.3.1`); trace runtime construction and source-required error identity. |
-| `MkFileError` | `CanonicalRuntimeRoles::file_error` constructor; verify registered `FileError` parent. |
-| `IOError` | FS/Console cause carrier (`38 §1.3.1`); trace the runtime error-identity carrier. |
-| `AlreadyExists` | `CanonicalRuntimeRoles::io_error_already_exists`; parent `IOError`. |
-| `BrokenPipe` | `CanonicalRuntimeRoles::io_error_broken_pipe`; parent `IOError`. |
-| `CapabilityDenied` | `CanonicalRuntimeRoles::io_error_capability_denied`; parent `IOError`. |
-| `Interrupted` | `CanonicalRuntimeRoles::io_error_interrupted`; parent `IOError`. |
-| `InvalidInput` | `CanonicalRuntimeRoles::io_error_invalid_input`; parent `IOError`. |
-| `IsDirectory` | `CanonicalRuntimeRoles::io_error_is_directory`; parent `IOError`. |
-| `NotDirectory` | `CanonicalRuntimeRoles::io_error_not_directory`; parent `IOError`. |
-| `NotEmpty` | `CanonicalRuntimeRoles::io_error_not_empty`; parent `IOError`. |
-| `NotFound` | `CanonicalRuntimeRoles::io_error_not_found`; parent `IOError`. |
-| `Other` | `CanonicalRuntimeRoles::io_error_other`; parent `IOError`. |
-| `PermissionDenied` | `CanonicalRuntimeRoles::io_error_permission_denied`; parent `IOError`. |
-| `Revoked` | `CanonicalRuntimeRoles::io_error_revoked`; reconcile the single semantic identity required by `38 §1.8`. |
-| `Unsupported` | `CanonicalRuntimeRoles::io_error_unsupported`; parent `IOError`. |
+| `write_file` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`WriteFile` identities, not this wrapper's ID. |
+| `FileError` (floor, unscoped) | `38 §1.3.1` requires this public FS result carrier; native code mints the exact checked `MkFileError` constructor and thereby keys its parent. |
+| `MkFileError` (bare floor constructor) | `CanonicalRuntimeRoles::file_error` selects the checked `FileError` constructor; source keeps bare `MkFileError`. |
+| `IOError` (floor, scoped) | `38 §1.3.1` requires the cause carrier including `Revoked`; all thirteen checked cause IDs are produced by native code and fix their shared parent. Only `IOError.C` paths resolve. |
+| `AlreadyExists` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_already_exists`; parent `IOError`; source `IOError.AlreadyExists`, not bare. |
+| `BrokenPipe` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_broken_pipe`; parent `IOError`; source `IOError.BrokenPipe`, not bare. |
+| `CapabilityDenied` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_capability_denied`; parent `IOError`; source `IOError.CapabilityDenied`, not bare. |
+| `Interrupted` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_interrupted`; parent `IOError`; source `IOError.Interrupted`, not bare. |
+| `InvalidInput` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_invalid_input`; parent `IOError`; source `IOError.InvalidInput`, not bare. |
+| `IsDirectory` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_is_directory`; parent `IOError`; source `IOError.IsDirectory`, not bare. |
+| `NotDirectory` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_not_directory`; parent `IOError`; source `IOError.NotDirectory`, not bare. |
+| `NotEmpty` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_not_empty`; parent `IOError`; source `IOError.NotEmpty`, not bare. |
+| `NotFound` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_not_found`; parent `IOError`; source `IOError.NotFound`, not bare. |
+| `Other` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_other`; parent `IOError`; source `IOError.Other`, not bare. |
+| `PermissionDenied` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_permission_denied`; parent `IOError`; source `IOError.PermissionDenied`, not bare. |
+| `Revoked` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_revoked`; parent `IOError`; source `IOError.Revoked` names the single `38 §1.8` identity, not bare. |
+| `Unsupported` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_unsupported`; parent `IOError`; source `IOError.Unsupported`, not bare. |
 | `Instant` (floor, scoped) | Source names the canonical clock-response result (`36 §1.1`); the native clock response keys its checked `MkInstant` constructor and exact `Instant` parent. |
 | `MkInstant` (qualified floor constructor) | `CanonicalRuntimeRoles::mk_instant` selects the checked `Instant` constructor; only `Instant.MkInstant` resolves, not bare `MkInstant`. |
-| `CreatePolicy` | FS `WriteFile` request parameter (`prelude.rs::fs_resp`); test whether native operation needs this type's ID. |
-| `CreateNew` | `CreatePolicy` constructor; trace native create-policy discriminator. |
-| `CreateOrTruncate` | `CreatePolicy` constructor; trace native create-policy discriminator. |
-| `CreateOrKeep` | `CreatePolicy` constructor; trace native create-policy discriminator. |
-| `BufferSpan` | Constructor-private minted transfer span (`38 §1.7.1–2`); trace response-type and runtime span ID. |
-| `PrivateBufferSpan` | Exact `BufferSpan` constructor: trace host minting; parent admission never widens constructor-private visibility. |
-| `BufferWindow` | Public immutable request descriptor (`38 §1.7.1`); check identity reader separately from bounds checking. |
-| `MkBufferWindow` | `BufferWindow` constructor in request creation; check whether the runtime selects this exact ID. |
-| `TransferCount` | Positioned-transfer count carrier (`38 §1.7.2`); trace driver result identity. |
-| `PrivateTransferCount` | Exact `TransferCount` constructor: trace native minting; retain constructor-private visibility. |
-| `ResourceError` | Runtime resource refusal family (`38 §1.7–1.9`); trace host/reifier identity and public error carrier. |
-| `ResourceHostIO` | `ResourceError` constructor: trace native host-error wrapper ID. |
-| `Closed` | `ResourceError` constructor: trace native closed-token refusal ID. |
-| `MalformedResource` | `ResourceError` constructor: trace native malformed-token refusal ID. |
-| `RightNotHeld` | `ResourceError` constructor: trace native right-refusal ID. |
-| `ReleaseFailed` | `ResourceError` constructor: trace native release-error ID. |
-| `ResourceKindMismatch` | `CanonicalRuntimeRoles::resource_kind_mismatch`; exact parent `ResourceError`. |
-| `BufferLimit` | `CanonicalRuntimeRoles::resource_buffer_limit`; exact parent `ResourceError`. |
-| `AllocationFailed` | `CanonicalRuntimeRoles::resource_allocation_failed`; exact parent `ResourceError`. |
-| `InvalidOffset` | `CanonicalRuntimeRoles::resource_invalid_offset`; exact parent `ResourceError`. |
-| `InvalidBounds` | `CanonicalRuntimeRoles::resource_invalid_bounds`; exact parent `ResourceError`. |
-| `NoProgress` | `CanonicalRuntimeRoles::resource_no_progress`; exact parent `ResourceError`. |
-| `MappingLimit` | `CanonicalRuntimeRoles::resource_mapping_limit`; exact parent `ResourceError`. |
-| `ResourceBodyResult` | Bracket body result carrier (`38 §1.7.1`); trace bracket host and source identity. |
-| `ResourceBodyOk` | `ResourceBodyResult` constructor; trace host result discriminator. |
-| `ResourceBodyErr` | `ResourceBodyResult` constructor; trace host result discriminator. |
-| `ResourceBracketResult` | Settled bracket result carrier (`38 §1.7.1`); trace host result discriminator. |
-| `ResourceBracketOk` | `ResourceBracketResult` constructor; trace host result discriminator. |
-| `ResourceBracketBodyError` | `ResourceBracketResult` constructor; trace host result discriminator. |
-| `ResourceBracketReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
-| `ResourceBracketBodyAndReleaseError` | `ResourceBracketResult` constructor; trace host result discriminator. |
+| `CreatePolicy` (floor, scoped) | Source selects public `WriteFile` creation semantics (`38 §1.3.1`); the native interpreter reads its three exact constructor IDs. Source cases use `CreatePolicy.C`, with no type rename. |
+| `CreateNew` (qualified floor constructor) | Exact-ID native policy reader; source `CreatePolicy.CreateNew`, not bare. The native suffix reader still sees the unchanged `CreatePolicy::CreateNew` artifact leaf. |
+| `CreateOrTruncate` (qualified floor constructor) | Exact-ID native policy reader; source `CreatePolicy.CreateOrTruncate`, not bare; retain its native artifact leaf. |
+| `CreateOrKeep` (qualified floor constructor) | Exact-ID native policy reader; source `CreatePolicy.CreateOrKeep`, not bare; retain its native artifact leaf. |
+| `BufferSpan` (floor, scoped) | `38 §1.7.1–2` requires this exact bounded span across operations; native code mints `PrivateBufferSpan`, fixing its checked parent. |
+| `PrivateBufferSpan` (private floor constructor) | Exact checked `BufferSpan` constructor minted by the host; its parent is admitted without changing constructor privacy or reserving a bare name. |
+| `BufferWindow` (package, not floor) | Source-promised public request descriptor (`38 §1.7.1`); no native ID reader. Strict-mode same-name source declaration is accepted; legacy resolution is unchanged. |
+| `MkBufferWindow` (package constructor) | Checked request descriptor constructor; neither it nor its unkeyed parent enters B. |
+| `TransferCount` (floor, scoped) | `38 §1.7.2` exposes this exact progress carrier and its count view; native code mints `PrivateTransferCount`, fixing the checked parent. |
+| `PrivateTransferCount` (private floor constructor) | Exact checked `TransferCount` constructor minted by the host; constructor privacy and absence of a bare reservation remain. |
+| `ResourceError` (floor, scoped) | `38 §1.7–1.9` requires this public refusal family; native code produces all twelve exact checked constructor IDs, fixing their shared parent. Only `ResourceError.C` resolves. |
+| `ResourceHostIO` (qualified floor constructor) | Native host-error wrapper ID; parent `ResourceError`; source `ResourceError.ResourceHostIO`, not bare. |
+| `Closed` (qualified floor constructor) | Native closed-token refusal ID; parent `ResourceError`; source `ResourceError.Closed`, not bare. |
+| `MalformedResource` (qualified floor constructor) | Native malformed-token refusal ID; parent `ResourceError`; source `ResourceError.MalformedResource`, not bare. |
+| `RightNotHeld` (qualified floor constructor) | Native right-refusal ID; parent `ResourceError`; source `ResourceError.RightNotHeld`, not bare. |
+| `ReleaseFailed` (qualified floor constructor) | Native release-error ID; parent `ResourceError`; source `ResourceError.ReleaseFailed`, not bare. |
+| `ResourceKindMismatch` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_kind_mismatch`; parent `ResourceError`; source `ResourceError.ResourceKindMismatch`, not bare. |
+| `BufferLimit` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_buffer_limit`; parent `ResourceError`; source `ResourceError.BufferLimit`, not bare. |
+| `AllocationFailed` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_allocation_failed`; parent `ResourceError`; source `ResourceError.AllocationFailed`, not bare. |
+| `InvalidOffset` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_invalid_offset`; parent `ResourceError`; source `ResourceError.InvalidOffset`, not bare. |
+| `InvalidBounds` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_invalid_bounds`; parent `ResourceError`; source `ResourceError.InvalidBounds`, not bare. |
+| `NoProgress` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_no_progress`; parent `ResourceError`; source `ResourceError.NoProgress`, not bare. |
+| `MappingLimit` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_mapping_limit`; parent `ResourceError`; source `ResourceError.MappingLimit`, not bare. |
+| `ResourceBodyResult` (package, not floor) | Source-promised bracket body-result carrier (`38 §1.7.1`); no native reader or producer of its exact ID. |
+| `ResourceBodyOk` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
+| `ResourceBodyErr` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
+| `ResourceBracketResult` (package, not floor) | Source-promised settled bracket-result carrier (`38 §1.7.1`); no native reader or producer of its exact ID. |
+| `ResourceBracketOk` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
+| `ResourceBracketBodyError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
+| `ResourceBracketReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
+| `ResourceBracketBodyAndReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 
-The five entrypoint-ABI, three effect/clock and `ITree` type identities
-marked floor above join B alongside the original fifteen. Unscoped
-constructor families reserve bare names; scoped families retain exact
-IDs reachable only through `T.C`, without bare B entries. Other rows
-remain **outside** B. Capturing an ID proves keying, not independent source
-need. `Empty` is read by exact ID but remains internal-only;
+The five entrypoint-ABI, three effect/clock, `ITree` and six FS/resource
+type identities marked floor above join B alongside the original fifteen.
+Unscoped constructor families reserve bare names; scoped families retain
+exact IDs reachable only through `T.C` when public, without bare B entries.
+Private constructors stay hidden even when their parent type is scoped.
+Other rows remain **outside** B. Capturing an ID proves keying, not
+independent source need. `Empty` is read by exact ID but remains internal-only;
 `host_exit` is likewise keyed without independent source need. A future
 `36` contract requiring source to name that exact space identity needs
 separate Spec gates. If adopted, existing Q-B admits it
@@ -210,10 +220,12 @@ Both witnesses admit a type to B; its whole constructor family follows the
 scoped choice above. Without source need it is internal-only, and without
 keying it is package material if promised.
 For checked definitions the test remains per-name: `leqChar` does not inherit
-`eqChar`'s registry key. If `IOError` qualifies, its thirteen causes are one
-**scoped** family, not thirteen bare B names. D0 still names the native
-producer of each exact cause ID, never inferring all readers from one cause.
-`ITree` joins the type floor without adding bare `Ret` or `Vis` to B;
+`eqChar`'s registry key. `IOError`'s thirteen causes are one **scoped**
+family, not thirteen bare B names. Architect's D0 names each cause's
+native producer separately, without inferring all readers from one cause.
+The twelve `ResourceError` constructors likewise retain their exact IDs
+without bare reservations. `ITree` joins the type floor without adding bare
+`Ret` or `Vis` to B;
 source may bind either under ordinary non-B rules. The D0 resolved
 `Prod`/`MkProd` as a reserved unscoped family. A future
 representation change to kernel `Pair` would be a separate Runtime successor,

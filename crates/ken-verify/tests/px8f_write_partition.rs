@@ -124,7 +124,7 @@ proc input_body (cap : Cap AFull) (input : Resource ResourceKind.FsHandle)
     (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "output.bin")
-      (ResourceWriteCreate CreateOrTruncate) (output_body input))
+      (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (output_body input))
     (\outcome. after_output outcome)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))

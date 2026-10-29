@@ -502,7 +502,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreateOrTruncate) (dest_body cap))
+          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -635,7 +635,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreateOrTruncate) (dest_body cap))
+          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -835,7 +835,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreateOrTruncate) (dest_body cap))
+          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -1032,7 +1032,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreateOrTruncate) (dest_body cap))
+          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -1074,22 +1074,22 @@ fn sp_b_foreign_and_stale_window_reject_with_no_effect_interp() {
 const SP_B_PRECEDENCE: &str = r#"program capabilities FS AFull
 fn is_invalid_bounds (e : ResourceError) : Bool =
   match e {
-    ResourceHostIO io |-> False; Closed |-> False; MalformedResource |-> False;
-    RightNotHeld required held |-> False; ReleaseFailed kind identity io |-> False;
-    ResourceKindMismatch expected actual |-> False; BufferLimit |-> False;
-    AllocationFailed |-> False;
-    InvalidOffset |-> False; InvalidBounds |-> True; NoProgress |-> False;
-    MappingLimit |-> False
+    ResourceError.ResourceHostIO io |-> False; ResourceError.Closed |-> False; ResourceError.MalformedResource |-> False;
+    ResourceError.RightNotHeld required held |-> False; ResourceError.ReleaseFailed kind identity io |-> False;
+    ResourceError.ResourceKindMismatch expected actual |-> False; ResourceError.BufferLimit |-> False;
+    ResourceError.AllocationFailed |-> False;
+    ResourceError.InvalidOffset |-> False; ResourceError.InvalidBounds |-> True; ResourceError.NoProgress |-> False;
+    ResourceError.MappingLimit |-> False
   }
 
 fn is_invalid_offset (e : ResourceError) : Bool =
   match e {
-    ResourceHostIO io |-> False; Closed |-> False; MalformedResource |-> False;
-    RightNotHeld required held |-> False; ReleaseFailed kind identity io |-> False;
-    ResourceKindMismatch expected actual |-> False; BufferLimit |-> False;
-    AllocationFailed |-> False;
-    InvalidOffset |-> True; InvalidBounds |-> False; NoProgress |-> False;
-    MappingLimit |-> False
+    ResourceError.ResourceHostIO io |-> False; ResourceError.Closed |-> False; ResourceError.MalformedResource |-> False;
+    ResourceError.RightNotHeld required held |-> False; ResourceError.ReleaseFailed kind identity io |-> False;
+    ResourceError.ResourceKindMismatch expected actual |-> False; ResourceError.BufferLimit |-> False;
+    ResourceError.AllocationFailed |-> False;
+    ResourceError.InvalidOffset |-> True; ResourceError.InvalidBounds |-> False; ResourceError.NoProgress |-> False;
+    ResourceError.MappingLimit |-> False
   }
 
 fn ok_code (code : ExitCode) : ResourceBodyResult Unit ExitCode =
@@ -1211,7 +1211,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit ExitCode)) ExitCode
         (withResource AFull Unit ExitCode cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreateOrTruncate) (dest_body cap))
+          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;

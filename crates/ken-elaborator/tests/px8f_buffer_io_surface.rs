@@ -309,18 +309,18 @@ theorem first_error_is_no_progress
   (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit))
   : Equal (HostIO a (Result ResourceError Unit))
       (private_write_all_step a offset span next
-        (Err ResourceError WriteProgress NoProgress))
+        (Err ResourceError WriteProgress ResourceError.NoProgress))
       (ITree.Ret (Coproduct (FSOp a) AmbientOp)
         (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-        (Result ResourceError Unit) (Err ResourceError Unit NoProgress)) =
-  write_all_first_error_step a file offset buffer span next NoProgress
+        (Result ResourceError Unit) (Err ResourceError Unit ResourceError.NoProgress)) =
+  write_all_first_error_step a file offset buffer span next ResourceError.NoProgress
 "#;
     env.elaborate_decl(true_twin)
         .expect("the actual error must check against the named loop step");
 
     let wrong_error = true_twin.replace(
-        "(Err ResourceError Unit NoProgress)) =",
-        "(Err ResourceError Unit Closed)) =",
+        "(Err ResourceError Unit ResourceError.NoProgress)) =",
+        "(Err ResourceError Unit ResourceError.Closed)) =",
     );
     assert_ne!(
         wrong_error, true_twin,

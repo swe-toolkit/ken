@@ -415,6 +415,7 @@ fn pinned_interior_evidence(
     resolved: &BTreeSet<GlobalId>,
 ) -> BTreeSet<GlobalId> {
     const POSIX: &str = "Capability.Filesystem.Path.Posix";
+    const ERRORS: &str = "Capability.Filesystem.Errors";
     const LAWFUL: &str = "Core.Classes.LawfulClasses";
     const CLASS: &str = "DecEq";
     const HEAD: &str = "UInt8";
@@ -455,6 +456,41 @@ fn pinned_interior_evidence(
             "imported semigroup evidence must not become an ArgParse re-export"
         );
         return BTreeSet::from([identity]);
+    }
+
+    if module == ERRORS {
+        // The checked MkFileError destructor introduces its operation field's
+        // type into this renderer's core without a source-name FileOperation
+        // dependency. The separate System.Error package *does* name that type
+        // in its own declaration and must retain its strict refusal.
+        let operation = env.globals["FileOperation"];
+        let file_error = env
+            .env
+            .inductive(env.globals["FileError"])
+            .expect("checked file-error carrier");
+        let mk_file_error = env.globals["MkFileError"];
+        let constructor = file_error
+            .constructors
+            .iter()
+            .find(|ctor| ctor.id == mk_file_error)
+            .expect("file-error constructor must retain its checked parent");
+        let mut fields = BTreeSet::new();
+        for field_type in &constructor.args {
+            collect_term_globals(field_type, &mut fields);
+        }
+        assert!(
+            fields.contains(&operation),
+            "FileOperation enters through the checked MkFileError field type"
+        );
+        assert!(
+            resolved.contains(&operation),
+            "the renderer must actually retain the field type"
+        );
+        assert!(
+            !PRELUDE_FLOOR_NAMES.contains(&"FileOperation"),
+            "an unkeyed field type is not reserved"
+        );
+        return BTreeSet::from([operation]);
     }
 
     if module != POSIX {

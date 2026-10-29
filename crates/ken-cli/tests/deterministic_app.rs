@@ -27,7 +27,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                         (inject_l (FSOp AFull) AmbientOp
                           (fs_resp AFull) ambient_resp
                           (Result FileError Unit)
-                          (writeFile cap cwd CreateNew value))
+                          (writeFile cap cwd CreatePolicy.CreateNew value))
                         (\_ .
                           bind (Coproduct (FSOp AFull) AmbientOp)
                                (resp_coproduct (FSOp AFull) AmbientOp

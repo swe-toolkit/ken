@@ -1805,7 +1805,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 (Result FileError Unit) ExitCode
                 (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
                   (Result FileError Unit)
-                  (writeFile cap path CreateNew contents))
+                  (writeFile cap path CreatePolicy.CreateNew contents))
                 (\written. match written {
                   Err _ |-> host_exit AFull (ExitCode.Failure 23) ;
                   Ok _ |->
@@ -2113,19 +2113,19 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpReadDirectory |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
-                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
-                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
-                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
-                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
-                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
-                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
-                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
-                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
-                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
+                      IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      IOError.BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      IOError.Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      IOError.AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      IOError.InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IOError.IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      IOError.NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      IOError.NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      IOError.Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
                     OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
                     OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
@@ -2185,19 +2185,19 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpCreateDirectory |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
-                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
-                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
-                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
-                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
-                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
-                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
-                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
-                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
-                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
+                      IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      IOError.BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      IOError.Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      IOError.AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      IOError.InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IOError.IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      IOError.NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      IOError.NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      IOError.Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
                     OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
                     OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
@@ -2244,19 +2244,19 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpRemoveFile |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
-                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
-                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
-                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
-                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
-                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
-                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
-                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
-                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
-                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
+                      IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      IOError.BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      IOError.Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      IOError.AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      IOError.InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IOError.IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      IOError.NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      IOError.NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      IOError.Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
                     OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
                     OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
@@ -2304,19 +2304,19 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
                     OpRemoveDirectory |-> match cause {
-                      CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
-                      NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
-                      PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
-                      BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
-                      Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
-                      AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
-                      InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
-                      IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
-                      NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
-                      NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
-                      Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
-                      Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
-                      Other _ |-> host_exit AFull (ExitCode.Failure 56)
+                      IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                      IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                      IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                      IOError.BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                      IOError.Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                      IOError.AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                      IOError.InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                      IOError.IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                      IOError.NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                      IOError.NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                      IOError.Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                      IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
+                      IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
                     OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
                     OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
@@ -2357,24 +2357,24 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
               (Result FileError Unit) ExitCode
               (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
-                (Result FileError Unit) (writeFile cap path CreateNew path))
+                (Result FileError Unit) (writeFile cap path CreatePolicy.CreateNew path))
               (\written. match written {
                 Ok _ |-> host_exit AFull (ExitCode.Failure 43) ;
                 Err error |-> match error {
                   MkFileError _operation _path cause |-> match cause {
-                    CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
-                    NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
-                    PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
-                    BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
-                    Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
-                    AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
-                    InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
-                    IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
-                    NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
-                    NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
-                    Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
-                    Revoked |-> host_exit AFull (ExitCode.Failure 54) ;
-                    Other _ |-> host_exit AFull (ExitCode.Failure 55)
+                    IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
+                    IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
+                    IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
+                    IOError.BrokenPipe |-> host_exit AFull (ExitCode.Failure 47) ;
+                    IOError.Interrupted |-> host_exit AFull (ExitCode.Failure 48) ;
+                    IOError.AlreadyExists |-> host_exit AFull (ExitCode.Failure 49) ;
+                    IOError.InvalidInput |-> host_exit AFull (ExitCode.Failure 50) ;
+                    IOError.IsDirectory |-> host_exit AFull (ExitCode.Failure 51) ;
+                    IOError.NotDirectory |-> host_exit AFull (ExitCode.Failure 52) ;
+                    IOError.NotEmpty |-> host_exit AFull (ExitCode.Failure 53) ;
+                    IOError.Unsupported |-> host_exit AFull (ExitCode.Failure 54) ;
+                    IOError.Revoked |-> host_exit AFull (ExitCode.Failure 54) ;
+                    IOError.Other _ |-> host_exit AFull (ExitCode.Failure 55)
                   }
                 }
               })

@@ -40,7 +40,7 @@ fn px8p_error_body (_resource : BufferHandle)
   ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult ResourceError Unit)
-    (ResourceBodyErr ResourceError Unit InvalidBounds)
+    (ResourceBodyErr ResourceError Unit ResourceError.InvalidBounds)
 
 fn px8p_escape_body (resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit (BufferHandle)) =
@@ -68,7 +68,7 @@ proc px8p_after_escape_bracket
     ResourceBracketOk resource |-> px8p_private_release resource;
     ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (Err ResourceError Unit MalformedResource);
+      (Result ResourceError Unit) (Err ResourceError Unit ResourceError.MalformedResource);
     ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (Err ResourceError Unit error);
@@ -183,7 +183,7 @@ fn assert_outer_error(env: &ken_elaborator::ElabEnv, value: &EvalVal, error: &st
     assert_eq!(*id, env.globals["Err"]);
     assert!(matches!(
         &args[2],
-        EvalVal::Ctor { id, .. } if *id == env.globals[error]
+        EvalVal::Ctor { id, .. } if *id == env.globals[&format!("ResourceError.{error}")]
     ));
 }
 
@@ -225,7 +225,7 @@ fn positive_capacity_settles_normally_and_body_error_still_settles() {
         EvalVal::Ctor { id, args, .. }
             if *id == env.globals["ResourceBracketBodyError"]
                 && matches!(&args[2], EvalVal::Ctor { id, .. }
-                    if *id == env.globals["InvalidBounds"])
+                    if *id == env.globals["ResourceError.InvalidBounds"])
     ));
 }
 

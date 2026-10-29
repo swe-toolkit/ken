@@ -2949,6 +2949,20 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     register_resource_bracket_laws(elab)?;
     register_post_bracket_io(elab)?;
 
+    // Scope both private families only after the checked buffer helpers have
+    // used their original bare bindings, but before their IDs are hidden.
+    // The hide step below must select their qualified bindings so even a
+    // qualified source path cannot construct or project these private values.
+    for name in ["BufferSpan", "TransferCount"] {
+        let parent_id = elab.globals[name];
+        elab.module_state.scope_constructor_family(
+            &elab.env,
+            &mut elab.globals,
+            parent_id,
+            name,
+        )?;
+    }
+
     // No raw acquire or representation constructor is a public Ken identity.
     // Their GlobalIds remain reachable only through the checked definitions
     // above and the immutable `PreludeEnv` driver record.
@@ -2969,8 +2983,8 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "mapping_window_start",
         "mapping_window_length",
         "PrivateBufferHandle",
-        "PrivateBufferSpan",
-        "PrivateTransferCount",
+        "BufferSpan.PrivateBufferSpan",
+        "TransferCount.PrivateTransferCount",
         "buffer_handle_resource",
         "buffer_handle_capacity",
         "buffer_span_origin",
@@ -3417,7 +3431,16 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // Qualify the complete scoped families only after the prelude's own
     // declarations have been checked against their original bindings. The
     // effect/Clock constructors are registered before this capture as well.
-    for name in ["ExitCode", "ProgramCaps", "Coproduct", "ITree", "Instant"] {
+    for name in [
+        "ExitCode",
+        "ProgramCaps",
+        "Coproduct",
+        "ITree",
+        "Instant",
+        "IOError",
+        "CreatePolicy",
+        "ResourceError",
+    ] {
         let parent_id = elab.globals[name];
         elab.module_state.scope_constructor_family(
             &elab.env,

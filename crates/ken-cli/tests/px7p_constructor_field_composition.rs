@@ -114,19 +114,19 @@ proc produce_dynamic (cap : Cap APartial) (path : Bytes)
         Ok bytes |-> Ok Bytes Bytes bytes;
         Err error |-> match error {
           MkFileError _operation _path cause |-> match cause {
-            NotFound |-> Err Bytes Bytes (bytes_encode "not-found");
-            PermissionDenied |-> Err Bytes Bytes (bytes_encode "permission");
-            CapabilityDenied |-> Err Bytes Bytes (bytes_encode "capability");
-            BrokenPipe |-> Err Bytes Bytes (bytes_encode "broken-pipe");
-            Interrupted |-> Err Bytes Bytes (bytes_encode "interrupted");
-            AlreadyExists |-> Err Bytes Bytes (bytes_encode "exists");
-            InvalidInput |-> Err Bytes Bytes (bytes_encode "invalid");
-            IsDirectory |-> Err Bytes Bytes (bytes_encode "directory");
-            NotDirectory |-> Err Bytes Bytes (bytes_encode "not-directory");
-            NotEmpty |-> Err Bytes Bytes (bytes_encode "not-empty");
-            Unsupported |-> Err Bytes Bytes (bytes_encode "unsupported");
-            Revoked |-> Err Bytes Bytes (bytes_encode "revoked");
-            Other raw |-> match eq_int raw 36 {
+            IOError.NotFound |-> Err Bytes Bytes (bytes_encode "not-found");
+            IOError.PermissionDenied |-> Err Bytes Bytes (bytes_encode "permission");
+            IOError.CapabilityDenied |-> Err Bytes Bytes (bytes_encode "capability");
+            IOError.BrokenPipe |-> Err Bytes Bytes (bytes_encode "broken-pipe");
+            IOError.Interrupted |-> Err Bytes Bytes (bytes_encode "interrupted");
+            IOError.AlreadyExists |-> Err Bytes Bytes (bytes_encode "exists");
+            IOError.InvalidInput |-> Err Bytes Bytes (bytes_encode "invalid");
+            IOError.IsDirectory |-> Err Bytes Bytes (bytes_encode "directory");
+            IOError.NotDirectory |-> Err Bytes Bytes (bytes_encode "not-directory");
+            IOError.NotEmpty |-> Err Bytes Bytes (bytes_encode "not-empty");
+            IOError.Unsupported |-> Err Bytes Bytes (bytes_encode "unsupported");
+            IOError.Revoked |-> Err Bytes Bytes (bytes_encode "revoked");
+            IOError.Other raw |-> match eq_int raw 36 {
               False |-> Err Bytes Bytes (bytes_encode "other");
               True |-> Err Bytes Bytes (bytes_encode "other-36")
             }

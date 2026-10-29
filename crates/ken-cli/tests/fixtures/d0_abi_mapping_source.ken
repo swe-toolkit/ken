@@ -229,7 +229,7 @@ proc matrix_stage (_cap : Cap AFull)
 fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err InvalidBounds |-> body_ok_io;
+    Err ResourceError.InvalidBounds |-> body_ok_io;
     Err error |-> body_error_io;
     Ok bytes |-> body_error_io
   }
@@ -237,7 +237,7 @@ fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
 fn expect_invalid_bounds_unit (outcome : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err InvalidBounds |-> body_ok_io;
+    Err ResourceError.InvalidBounds |-> body_ok_io;
     Err error |-> body_error_io;
     Ok unit |-> body_error_io
   }
@@ -295,7 +295,7 @@ proc negative_window_stage (_cap : Cap AFull)
 fn expect_read_only_refusal (outcome : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err (RightNotHeld required held) |-> body_ok_io;
+    Err (ResourceError.RightNotHeld required held) |-> body_ok_io;
     Err error |-> body_error_io;
     Ok unit |-> body_error_io
   }
