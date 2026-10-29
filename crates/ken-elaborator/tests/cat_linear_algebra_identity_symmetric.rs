@@ -175,6 +175,9 @@ const expected_identity3 : Vec (Vec Nat three) three =
 fn full_seed_checks_literal_identity_and_refuses_false_square_symmetry() {
     let accepted = seed_case("identity_three_value");
     let refused = seed_case("seed_neg");
+    let mut env = loaded_matrix();
+    env.elaborate_file(accepted)
+        .expect("complete identity symmetry seed and same-form control check");
     let accepted_decls = parse_decls(accepted).expect("complete accepted §8 client parses");
     let fixture = accepted_decls
         .iter()
@@ -275,9 +278,6 @@ fn full_seed_checks_literal_identity_and_refuses_false_square_symmetry() {
         .elaborate_file(&typed_refusal)
         .expect("false square equality is well typed when assumed");
 
-    let mut env = loaded_matrix();
-    env.elaborate_file(accepted)
-        .expect("complete identity symmetry seed and same-form control check");
     for name in [
         "identity_three_value",
         "transpose_identity_three_value",
