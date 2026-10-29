@@ -150,6 +150,25 @@ mod tests {
         assert_ne!(flags & libc::MAP_ANONYMOUS, 0);
     }
 
+    /// Promise class: durable invariant (38 §1.9, typed allocation failure).
+    /// MEASURED: only ENOMEM classifies as native mapping allocation failure;
+    /// EINVAL and EACCES remain I/O identities. CLAIMED: mapping failure
+    /// classification does not mislabel non-allocation host errors. THE GAP:
+    /// ProcessHost composition and dispatch each have a separate named test.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn allocation_failure_classifies_only_enomem() {
+        assert!(is_allocation_failure(IoErrorIdentityV1::Other(
+            libc::ENOMEM
+        )));
+        assert!(!is_allocation_failure(IoErrorIdentityV1::Other(
+            libc::EINVAL
+        )));
+        assert!(!is_allocation_failure(IoErrorIdentityV1::Other(
+            libc::EACCES
+        )));
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn consumed_mapping_is_actually_unmapped() {

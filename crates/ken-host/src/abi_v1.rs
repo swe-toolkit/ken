@@ -737,17 +737,20 @@ impl HostEffectBackendV1 for ProcessHost {
         length: u64,
         protection: crate::MappingProtectionV1,
     ) -> Result<crate::MappingRegionV1, crate::SemanticErrorV1> {
-        crate::MappingRegionV1::try_new_mapped_anonymous(length, protection).map_err(|error| {
-            if crate::mapping_v1::is_allocation_failure(error) {
-                crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed)
-            } else {
-                crate::SemanticErrorV1::Io(error)
-            }
-        })
+        crate::MappingRegionV1::try_new_mapped_anonymous(length, protection)
+            .map_err(map_anonymous_error_v1)
     }
 
     fn resource_unmap(&mut self, region: crate::MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
         region.release_native()
+    }
+}
+
+fn map_anonymous_error_v1(error: IoErrorIdentityV1) -> crate::SemanticErrorV1 {
+    if crate::mapping_v1::is_allocation_failure(error) {
+        crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed)
+    } else {
+        crate::SemanticErrorV1::Io(error)
     }
 }
 
@@ -4264,6 +4267,97 @@ mod tests {
 
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         let _ = std::fs::remove_dir_all(directory);
+    }
+
+    /// Promise class: durable invariant (38 §1.9). MEASURED: an allocated
+    /// Mapping token mutated to a future generation reaches host dispatch and
+    /// produces MalformedResource in both the wire reply and the effect trace.
+    /// CLAIMED: malformed Mapping tokens retain their exact error identity at
+    /// the native ABI boundary. THE GAP: checked Ken cannot manufacture such a
+    /// token; this tests the host boundary directly.
+    #[test]
+    fn mapping_future_generation_reifies_malformed_resource() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-mapping-malformed-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 { data: std::ptr::null(), len: 0 },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let allocate = MappingAllocateRequestV1 { length: 8, protection: 1 };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context.cast_const(),
+                HostOpV1::MappingAllocate as u64,
+                (&allocate as *const MappingAllocateRequestV1).cast(),
+                std::mem::size_of::<MappingAllocateRequestV1>(),
+                (&mut reply as *mut HostReplyV1).cast(),
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(reply.tag, REPLY_RESOURCE);
+        let live = crate::ResourceTokenV1::from_erased_identity(reply.detail);
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        context.resources.identity(live).expect("live Mapping token");
+        let future = live
+            .erased_identity()
+            .checked_add(1_u64 << u32::BITS)
+            .expect("derived future generation");
+        let read = MappingReadViewRequestV1 { resource: future, start: 0, length: 1, span_origin: future };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context.cast_const(),
+                HostOpV1::MappingReadView as u64,
+                (&read as *const MappingReadViewRequestV1).cast(),
+                std::mem::size_of::<MappingReadViewRequestV1>(),
+                (&mut reply as *mut HostReplyV1).cast(),
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(reply.tag, REPLY_RESOURCE_ERROR);
+        assert_eq!(
+            decode_resource_error_reply(reply.detail, reply.resource_error),
+            Some(crate::ResourceErrorV1::MalformedResource)
+        );
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        let event = context.effect_trace.last().expect("view event recorded");
+        assert_eq!(event.operation, HostOpV1::MappingReadView);
+        assert_eq!(
+            event.outcome,
+            CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(
+                crate::ResourceErrorV1::MalformedResource
+            ))
+        );
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    /// Promise class: durable invariant (38 §1.9). MEASURED: native errno
+    /// ENOMEM becomes AllocationFailed, while other I/O failures retain their
+    /// identity. CLAIMED: ProcessHost's mapping error composition preserves
+    /// the exact typed distinction. THE GAP: dispatch propagation is tested
+    /// independently with an injected backend failure.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn map_anonymous_error_classifies_enomem_without_collapsing_io() {
+        assert_eq!(
+            map_anonymous_error_v1(IoErrorIdentityV1::Other(libc::ENOMEM)),
+            crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed),
+        );
+        assert_eq!(
+            map_anonymous_error_v1(IoErrorIdentityV1::Other(5)),
+            crate::SemanticErrorV1::Io(IoErrorIdentityV1::Other(5)),
+        );
+        assert_eq!(
+            map_anonymous_error_v1(IoErrorIdentityV1::InvalidInput),
+            crate::SemanticErrorV1::Io(IoErrorIdentityV1::InvalidInput),
+        );
     }
 
     #[test]
