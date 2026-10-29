@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT
 title: "Spec 66 states that normalize preserves evaluation and that poly_eq is preserved by derivative and by substitution, but no law lets a client differentiate or substitute into a normal form in place of the original. Rule from a checked D0 at zero trust that both operations agree on an expression and its normal form under poly_eq, for every expression, and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
