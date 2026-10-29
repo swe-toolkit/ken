@@ -205,9 +205,11 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 /// MEASURED: the primitive producer traversal yields exactly eight signature
 /// identities, and Nat, Pair, five kernel-keyed proposition/equality members,
 /// five source-required entrypoint-ABI identities, three effect/clock identities,
-/// and ITree close the type inventory to twenty-four. The separately configured companion
-/// inventory has three checked-transparent constants keyed to the exact Pair
-/// identity. CLAIMED: type and binding membership are independent closed
+/// ITree, and six FS/resource families (BufferSpan, CreatePolicy, FileError,
+/// IOError, ResourceError, TransferCount) close the type inventory to thirty.
+/// The separately configured companion inventory has three checked-transparent
+/// constants keyed to the exact Pair identity. CLAIMED: type and binding
+/// membership are independent closed
 /// inventories rather than one compiler-global allow-list. THE GAP: source
 /// resolution through these inventories is pinned independently below.
 #[test]
