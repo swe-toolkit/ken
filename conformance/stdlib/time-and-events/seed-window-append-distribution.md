@@ -117,6 +117,10 @@ theorem swapped_windows_do_not_start_at_five :
   the results in original input order.
 - gap: one finite Bool instance does not prove the universal law for every
   payload, bound pair, or trace.
+- maintenance: Adding payload types, bounds, or trace operations while
+  preserving §8's half-open, order-preserving filtering must leave this fixed
+  Bool instance green. A change to that contract requires deliberate spec and
+  seed review, not a snapshot refresh.
 - why: the explicit unordered witness prevents this instance from silently
   testing only an ordered input; separate `Refl` values keep the law application
   from serving as its own output oracle.
@@ -131,7 +135,7 @@ the refusals: the first rejection would mask the second.
 ### stdlib/time-and-events/reject-swapped-window-append-by-refl
 
 - spec: `spec/50-stdlib/69-time-and-events.md` §8.1.
-- promise class: discriminating.
+- promise class: durable invariant.
 - given: the accepted client above followed by only the false equality theorem
   below.
 - expect: the prefix accepts and the appended `Refl` claim is refused. Do not
@@ -140,6 +144,10 @@ the refusals: the first rejection would mask the second.
   the two windows swapped on this input.
 - gap: this finite refusal does not prove the generic law or establish every
   possible counterexample.
+- maintenance: Adding payload types, bounds, or time laws while preserving
+  §8's half-open filtering and stored input order must leave this false swapped
+  equality refused. Changing those semantics requires deliberate spec and seed
+  review, not a snapshot refresh.
 - why: the left side is `[e5,e3]` and the swapped right side is `[e3,e5]`; the
   independent observer confirms the swapped side starts at time 3, not 5.
 
@@ -156,7 +164,7 @@ theorem reject_swapped_window_append_by_refl :
 ### stdlib/time-and-events/reject-swapped-window-append-by-public-law
 
 - spec: `spec/50-stdlib/69-time-and-events.md` §8.1.
-- promise class: discriminating.
+- promise class: durable invariant.
 - given: a separate fresh copy of the accepted client above, followed by only
   the false equality theorem below.
 - expect: the prefix accepts and the theorem body using the public law is
@@ -165,6 +173,10 @@ theorem reject_swapped_window_append_by_refl :
   right-hand windows are swapped.
 - gap: this closed application does not prove the generic law or every false
   reordered claim.
+- maintenance: Adding payload types, bounds, or time laws while preserving
+  the public law and stored input order must leave this false swapped
+  application refused. Changing the §8 law or ordering contract requires
+  deliberate spec and seed review, not a snapshot refresh.
 - why: the public law concludes the unswapped structural equality; the swapped
   right side has the opposite first event, as the independent observer shows.
 
