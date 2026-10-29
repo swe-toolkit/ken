@@ -534,8 +534,8 @@ unrelated `ElabEnv` does not satisfy them.
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked uses of all thirty roster types in
-     contract-appropriate positions, every source-visible constructor through
+  1. entry `Floor` contains checked uses of all thirty prelude roster identities
+     in contract-appropriate positions, every source-visible constructor through
      values and exhaustive matches, all three Pair companion bindings,
      `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, a
      `bytes_decode` use matched as `Result Utf8Error String`, and functions
@@ -1158,7 +1158,7 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | all thirty type ids and source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control |
+| floor/global | all thirty roster identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
