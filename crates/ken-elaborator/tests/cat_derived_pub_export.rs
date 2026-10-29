@@ -277,6 +277,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
                 "import Data.Collections.Derived (length)\n\
                  import Data.Numeric.Nat.Arithmetic (add)\n"
             }
+            "filter::append" => "import Data.Collections.Derived (list_append)\n",
             "insert::count" => "import Data.Collections.Derived (count)\n",
             "sort::perm" => "import Data.Collections.Derived (Perm)\n",
             "insert::sorted" | "sort::sorted" => {
@@ -358,6 +359,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "count_right_first".to_owned(),
             "eq_from_ord".to_owned(),
             "filter".to_owned(),
+            "filter::append".to_owned(),
             "filter_sorted".to_owned(),
             "filter_starts_after".to_owned(),
             "length".to_owned(),
