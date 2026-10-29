@@ -6,7 +6,8 @@
 > SPEC-TIME-MERGE-MEMBERSHIP §4;
 > SPEC-TIME-WINDOW-COMPOSITION §5;
 > SPEC-TIME-MERGE-ASSOCIATIVITY §6;
-> SPEC-TIME-WINDOW-ADJACENT-SPLIT §7).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-ADJACENT-SPLIT §7;
+> SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -39,7 +40,13 @@
 > spec author's base. This assembled candidate adds the checked law
 > and a package-owned test of the complete accepted seed and isolated
 > swapped refusal; that test is not official conformance-runner
-> execution, CI, publication, landing or landed trust.
+> execution, CI, publication, landing or landed trust. Section 8
+> specifies a premise-free structural append/window law over arbitrary
+> traces and bounds. Architect's D0 on `70982b77e` checked the generic
+> Derived prerequisite and time proof as scratch design evidence only;
+> the separately owned catalog, seed and test need exact-tip review in
+> the assembled candidate. No official conformance-runner execution,
+> CI, publication, landing or landed trust follows from this spec turn.
 
 ## 1. Finite event traces over natural times
 
@@ -744,3 +751,98 @@ or official conformance. The separately owned package test now reads
 the complete seed, checks the export and private-helper boundary,
 and compares exact trusted identity sets; those candidate-local checks
 remain distinct from CI, publication and landed trust.
+
+## 8. Windowing distributes over trace append
+
+> **Section 8 status: DRAFT v0
+> (SPEC-TIME-WINDOW-APPEND-DISTRIBUTION).** Architect's isolated D0 on
+> main base `70982b77eb020e920dfc4406c025504de9e2ebb9` checked the
+> generic proof and public client in scratch, without a new `Axiom` or
+> change to scratch `trusted_base()` GlobalIds (114 → 114). The Derived
+> and EventTrace catalog additions, conformance seed and package test
+> are separately owned parts of the assembled candidate; this spec-only
+> turn does not establish their delivery, official conformance-runner
+> execution, CI, publication, landing or landed trust.
+
+### 8.1 Public law and generic prerequisite
+
+`Data.Time.EventTrace` exports one new public Transparent theorem,
+placed immediately after `trace_window_split` and before
+`trace_merge_nil_left`. Its arguments follow `trace_window p lo hi`
+and then supply the two traces; no premise restricts their ordering
+or the bounds:
+
+```ken
+pub theorem trace_window_append
+      (p : Type) (lo : Nat) (hi : Nat) (xs : List (Event p)) (ys : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo hi (list_append (Event p) xs ys))
+        (list_append (Event p) (trace_window p lo hi xs) (trace_window p lo hi ys))
+```
+
+The equality is structural equality of the lists of stored events in
+order, including their payloads and duplicate timestamps. It holds
+for arbitrary `xs` and `ys`, even when either trace or their append
+is not `time_ordered`. It also holds for empty or inverted windows:
+when `lo ≥ hi`, both sides are empty. The law does not assert that
+windowing sorts events, preserves the length of an input trace, or
+commutes with `trace_merge` without §3's ordered-input premises.
+Unlike §7's adjacent split, it needs no relationship among `lo`,
+`hi` and the event times.
+
+The proof applies the public generic list law `filter::append` from
+`Data.Collections.Derived` once, with element type `Event p` and
+predicate `event_in_window p lo hi`. The EventTrace body is exactly
+one application:
+
+```ken
+(proof append for filter) (Event p) (event_in_window p lo hi) xs ys
+```
+
+The prerequisite is exported as `pub proof append for filter`,
+immediately after Derived's `filter`, with arguments
+`(a : Type) (keep : a → Bool) (xs : List a) (ys : List a)`:
+
+```ken
+Equal
+  (List a)
+  (filter a keep (list_append a xs ys))
+  (list_append a (filter a keep xs) (filter a keep ys))
+```
+
+It is proved by induction on the first list, with a private
+`filter_keep_step_append` helper in Derived to carry the head
+predicate decision through the append. EventTrace adds no helper
+or import: its existing import of `filter` brings its attached
+proof. `filter::append` is a Derived export, not a second §69 public
+law. The existing §7-private `window_keep` and `window_keep_append`
+remain as they are. All §1–§7 operation and law types are unchanged;
+no new axiom, primitive, kernel rule or effect is needed.
+
+### 8.2 Closed controls and evidence boundary
+
+The assigned seed uses `[e5,e1]` for `xs` (unordered), `[e3,e8]`
+for `ys`, and the half-open window `[2,6)`. With distinct Bool
+payloads, windowing the two traces retains `[e5]` and `[e3]`, and
+windowing their append retains `[e5,e3]`; `Refl` checks each closed
+calculation. Applying `trace_window_append` agrees with an independent
+same-shape `Refl` control. An independently defined first-event time
+observer confirms that the first event of the swapped append
+`list_append (Event Bool) (trace_window Bool 2 6 ys)
+(trace_window Bool 2 6 xs)` is time 3, not time 5. The false swapped
+claim is refused in isolation after a fresh accepted prefix, both
+with `Refl` and with the true law as its body. The refused `Refl`
+diagnostic's wording is not itself the oracle; refusal of that
+well-formed false equality is. These closed checks rule out a
+swapped-order reading but do not prove the generic law.
+
+Architect's D0 checked the generic Derived and EventTrace proof bodies,
+their owner-local Transparent exports, an accepted public client,
+and refusal of an attempted import of the private helper. Its
+candidate-local package checks include the Derived export inventory
+fix needed to import `list_append` when probing `filter::append`.
+Those are scratch findings, not a checked-in seed run or official
+conformance. The separate catalog and conformance owners must deliver
+and test the same contract on the assembled exact tip before their
+respective reviews; no D0 result transfers to CI or landed trust.
