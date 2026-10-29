@@ -4725,6 +4725,17 @@ mod native_pre_source_stable_symbols {
                 assert_eq!(artifact.components.last(), Some(leaf));
             }
         }
+    }
+
+    /// Promise class: durable invariant. MEASURED: the artifact table looked
+    /// up by ITree's checked Ret id displays the native-recognized suffix.
+    /// CLAIMED: source qualification does not change the native Ret identity.
+    /// THE GAP: the sibling inventory pin covers the other scoped families.
+    #[test]
+    fn itree_ret_artifact_symbol_keeps_native_checked_suffix() {
+        let env = ElabEnv::new().expect("complete pre-source registration");
+        let (_, table) =
+            stable_symbols_for_env("itree-symbol-control", &env, true).expect("artifact symbols");
         let ret = table
             .resolve_global(env.prelude_env.ret_id)
             .expect("checked ITree Ret symbol");
