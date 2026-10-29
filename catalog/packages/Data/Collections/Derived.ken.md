@@ -368,6 +368,23 @@ fn filter_keep_step (a : Type) (h : a) (kept : List a) (decision : Bool) : List 
     False ↦ kept
   }
 
+theorem filter_keep_step_append
+      (a : Type)
+      (h : a)
+      (whole : List a)
+      (left : List a)
+      (right : List a)
+      (split : Equal (List a) whole (list_append a left right))
+      (decision : Bool)
+    : Equal
+        (List a)
+        (filter_keep_step a h whole decision)
+        (list_append a (filter_keep_step a h left decision) right) =
+  match decision {
+    True ↦ cong (List a) (List a) whole (list_append a left right) (λrest. Cons a h rest) split;
+    False ↦ split
+  }
+
 theorem list_elem_filter_sound_cons
       (a : Type)
       (keep : a → Bool)
@@ -496,7 +513,10 @@ both directions.
 The `map::id`, `map::fusion`, and `map::append` proofs use structural
 induction and `cong` to lift the tail equation under `Cons`. The first two
 cite `idf` and `comp` from `Core.Function.Combinators`; all three live beside
-the operation they justify.
+the operation they justify. The `filter::append` proof inducts on the first
+list. Its private `filter_keep_step_append` helper passes the computed head
+predicate as a Boolean decision and lifts the tail equation through either
+branch of `filter_keep_step`.
 
 Migrated here per the attached-proof ownership rule — an attached proof
 `f::law` belongs to the module that defines `f` — the three `list_append`
@@ -564,6 +584,25 @@ pub fn filter (a : Type) (p : a → Bool) (xs : List a) : List a =
         True ↦ Cons a h (filter a p t);
         False ↦ filter a p t
       }
+  }
+
+pub proof append for filter
+      (a : Type) (keep : a → Bool) (xs : List a) (ys : List a)
+    : Equal
+        (List a)
+        (filter a keep (list_append a xs ys))
+        (list_append a (filter a keep xs) (filter a keep ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons head tail ↦
+      filter_keep_step_append
+        a
+        head
+        (filter a keep (list_append a tail ys))
+        (filter a keep tail)
+        (filter a keep ys)
+        ((proof append for filter) a keep tail ys)
+        (keep head)
   }
 
 pub fn is_sorted (a : Type) (leq : a → a → Bool) (xs : List a) : Omega =
@@ -3451,7 +3490,7 @@ reference implementation.
    `map`, `nth`, `reverse`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
    `list_append::right_unit`, `list_append::length`, `map::append`,
-   `map::fusion`, `map::id`, `nth::at_or_beyond_is_none`,
+   `map::fusion`, `map::id`, `filter::append`, `nth::at_or_beyond_is_none`,
    `nth::some_below_length`,
    `reverse::involutive`. Generic sorting adds the operations `Perm`, `insert`,
    and `sort`, with attached proofs `insert::sorted`, `insert::count`,

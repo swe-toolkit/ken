@@ -280,6 +280,14 @@ pub theorem trace_window_split
               Refl
   }
 
+pub theorem trace_window_append
+      (p : Type) (lo : Nat) (hi : Nat) (xs : List (Event p)) (ys : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo hi (list_append (Event p) xs ys))
+        (list_append (Event p) (trace_window p lo hi xs) (trace_window p lo hi ys)) =
+  (proof append for filter) (Event p) (event_in_window p lo hi) xs ys
+
 pub theorem trace_merge_nil_left
       (p : Type) (ys : List (Event p))
     : Equal (List (Event p)) (trace_merge p (Nil (Event p)) ys) ys =
@@ -3007,6 +3015,11 @@ midpoint, ordering forces the left subwindow empty and the whole window to
 match the right. The nine split helpers remain private, and the theorem
 requires both bound-order premises.
 
+Windowing distributes over appending arbitrary traces, including unordered
+traces and inverted window bounds. The checked `trace_window_append` proof
+instantiates the collections provider's public `filter::append` law with the
+half-open event predicate; no additional helper or import is needed.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -3028,7 +3041,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and fourteen checked law contracts.
+  — the carrier, half-open boundary, left-bias and fifteen checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -3037,7 +3050,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the fourteen laws form the package surface.
+   `trace_merge`, and the fifteen laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -3058,7 +3071,9 @@ merging, not window multiplicity.
    new private support theorems; it needs no ordered-input premise. The
    adjacent-window split reuses the checked `list_append` provider and nine
    new private proof helpers under ordered-trace and bound-order premises.
-4. **Trusted-base delta.** Zero: all fourteen exported laws have checked proof
+   Window append reuses the public `filter::append` proof from Derived with
+   the existing event predicate, without a new helper or import.
+4. **Trusted-base delta.** Zero: all fifteen exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3067,11 +3082,14 @@ merging, not window multiplicity.
    [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md),
    [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md),
    [composition seed](../../../../conformance/stdlib/time-and-events/seed-window-composition.md),
-   [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md)
-   and [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md)
+   [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md),
+   [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md)
+   and [window-append seed](../../../../conformance/stdlib/time-and-events/seed-window-append-distribution.md)
    supply independent closed values and refused claims; these clients
    complement, not replace, the generic proofs. Package tests run the
    merge-membership and composition seeds, including their pinned refusals.
    The adjacent-split package test root-loads the checked generic law,
-   accepts the complete seed and refuses its isolated swapped claim;
-   neither test is official conformance-runner execution or CI.
+   accepts the complete seed and refuses its isolated swapped claim.
+   The `cat_time_window_append` package test checks the §8 law and the
+   complete accepted window-append seed with both isolated swapped refusals.
+   These tests are not official conformance-runner execution or CI.
