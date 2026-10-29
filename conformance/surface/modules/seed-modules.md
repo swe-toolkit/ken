@@ -275,8 +275,8 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
 
 ### surface/modules/unkeyed-buffer-window-stays-bindable-and-legacy-stable
 
-- promise class: **discriminating** — strict mode leaves the unkeyed package
-  name bindable while refusing its admitted sibling
+- promise class: **normative compatibility vector** — the strict name boundary
+  and cut-base legacy identity are contract values
 - spec: `30-taxonomy §4` (`BufferWindow` is outside B; `BufferSpan` is in the
   floor), `33 §3.3`, and `39 §2.0`
 - given: use separate fresh strict-roots units with no explicit package import:
@@ -309,6 +309,12 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   name. Adding `BufferWindow` to the floor roster must make the accepting arm
   refuse. The `BufferSpan` refusal stays as the paired admitted-name control.
   Compare legacy results by identity, not spelling or type shape.
+- maintenance contract: unrelated additions that preserve
+  `BufferWindow` outside B, `BufferSpan` in B, the strict local identity
+  distinct from the cut-base identity, and both legacy routes' exact cut-base
+  `BufferWindow` `GlobalId` must stay green. Changing any of those outcomes
+  requires a §30/§33 loader-contract revision and deliberate vector update,
+  never a snapshot-only refresh.
 - why: this is AC-1's package-row boundary and AC-4's family-label mutant. A
   blanket buffer-family reservation would reject the `BufferWindow` arm while
   the admitted `BufferSpan` refusal remains correct.
