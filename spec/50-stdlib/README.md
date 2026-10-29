@@ -428,11 +428,12 @@ execution, CI, publication, landing or landed trust. A sorted-list normal
 form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–7 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–8 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
 SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER;
 SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY;
-SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY).
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY;
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -476,10 +477,22 @@ Section 7 specifies public `assoc for min` and `assoc for max` selectors
 and unconditional structural `intersect_assoc` and `hull_assoc` laws.
 Architect's isolated D0 checked the four generic proofs on `372a6a1a6`
 with no new `Axiom` and unchanged scratch trust identities 114 → 114.
-The §7 catalog exports are not landed on this base; its authored closed
-seed and D0 do not establish shipped §7 execution, official conformance,
-CI, publication, landing or landed trust. The existing box-congruence
-helpers remain private.
+The §7 catalog exports, closed seed and package-owned test are now on
+main; the earlier D0 and candidate-local checks are not official
+conformance or landed trust. Section 8 specifies the public Nat
+Order selectors `absorb for min` and `absorb for max` and the
+unconditional structural `intersect_hull_absorb` and
+`hull_intersect_absorb` box equalities, including inverted boxes.
+The common operand `a` stays on the left; neither law equates
+arbitrary boxes sharing a point set. The existing box-congruence
+helpers remain private. Architect's D0 on `439fa7bb7` checked all
+four generic proofs without a new `Axiom` and with equal scratch
+trusted identities 114 → 114. The §8 catalog exports were absent
+on the spec author's base; this assembled candidate adds their
+checked proofs and a package-owned test of the complete accepted
+seed and isolated false claim. Neither scratch D0 nor these
+candidate-local checks are official conformance-runner execution,
+CI, publication, landing or landed trust.
 Signed-coordinate geometry, Euclidean and floating-point distance,
 other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
