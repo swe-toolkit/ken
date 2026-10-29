@@ -1,7 +1,7 @@
 ---
 id: RT-ITREE-ROLE-IDENTITY-NOT-SPELLING
 title: "The native backend recognises the ITree Ret and Vis roles by a suffix or substring match on the constructor's symbol spelling at about 35 production sites, so a change of artifact spelling silently changes which role a constructor plays. Recognise them by the resolved itree_ret and itree_vis identities instead, and pin that no production ITree spelling match remains"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION
 title: "Spec 68 states hull and intersection as tightest bounds under interval_inside, but no law relates the two operations. Rule from a checked D0 at zero trust that each absorbs the other as endpoint-value mutual inclusion, for every two intervals including inverted ones, and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
