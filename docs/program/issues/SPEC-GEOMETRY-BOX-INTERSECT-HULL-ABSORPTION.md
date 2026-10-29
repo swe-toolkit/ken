@@ -67,9 +67,11 @@ separate Foundation WP built from the D0.
 - **AC-2.** The seed's accepted client uses two distinct boxes that overlap
   but neither contains the other.
   - It applies both laws.
-  - It checks both sides of each equation independently by `Proved`.
-  - Its refused block pins one false mixed claim on the same boxes:
-    `intersect (hull a b) b` equal to `a`. Its left side is `b`.
+  - It checks both sides of each equation independently, by `Refl` for the
+    closed `Equal Box` controls and by `Proved` for the closed Nat-value
+    controls (Architect AC-0 `evt_1637h9b5snrqm`).
+  - Its refused block pins one false mixed claim on the same boxes, by
+    `Refl`: `intersect (hull a b) b` equal to `a`. Its left side is `b`.
 
 ## Stop conditions
 

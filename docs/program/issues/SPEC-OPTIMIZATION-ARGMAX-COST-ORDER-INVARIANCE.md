@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE
 title: "Spec 72 section 1.5 states that argmin is unchanged when its cost is composed with a function that preserves and reflects the strict Nat order, but section 3 has no such law for argmax. Rule from a checked D0 at zero trust the argmax counterpart, including on ties, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
