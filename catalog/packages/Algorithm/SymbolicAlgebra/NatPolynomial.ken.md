@@ -58,7 +58,10 @@ Private Taylor, natural-arithmetic, and product-summand proofs support them.
 The independent-variable law proves zero derivative under semantic invariance;
 the derivative-after-substitution law proves equal evaluated derivatives when
 the distinguished replacement has slope one and all other replacements have
-slope zero at the given environment.
+slope zero at the given environment. Three further public laws state that the
+ordered normalization is transparent to `poly_eq` itself, to differentiation,
+and to substitution. The latter two follow from the first and the existing
+`poly_eq`-preservation laws.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -1120,6 +1123,19 @@ pub theorem deriv_substitute
           (eval_substitute env s a)
           (deriv_substitute v s b env hv hw))
   }
+
+pub theorem normalize_poly_eq (e : Expr) : IsTrue (poly_eq (normalize e) e) =
+  poly_eq_complete (normalize e) e (λenv. normalize_sound env e)
+
+pub theorem deriv_normalize
+      (v : Nat) (e : Expr)
+    : IsTrue (poly_eq (deriv v (normalize e)) (deriv v e)) =
+  poly_eq_deriv v (normalize e) e (normalize_poly_eq e)
+
+pub theorem substitute_normalize
+      (s : Nat → Expr) (e : Expr)
+    : IsTrue (poly_eq (substitute s (normalize e)) (substitute s e)) =
+  poly_eq_substitute s (normalize e) e (normalize_poly_eq e)
 
 theorem expr_add_cong
       (a1 : Expr)
@@ -2802,6 +2818,13 @@ then lifts the induction hypotheses through multiplication and addition
 congruence. Both new comparison helpers remain private; no equality of
 expression trees or every-environment substitution claim follows.
 
+`normalize_poly_eq` composes `normalize_sound` with `poly_eq_complete` to show
+that the normalized expression and its source have the same polynomial
+function. `deriv_normalize` and `substitute_normalize` apply the existing
+preservation laws to that result; they add no hypotheses and do not export
+value-level laws. Clients derive pointwise evaluation equalities with
+`poly_eq_sound` when needed.
+
 ## 5. Design notes
 
 A variable index is a `Nat`, and the evaluator's environment is a total
@@ -2843,18 +2866,19 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–8 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–9 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
 [composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md),
 [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md),
 [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
-[independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md)
-and [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md)
+[independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md),
+[derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md), and
+[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md)
 specify the public surface and closed observations. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and nineteen checked theorems; Horner, substitution and differentiation expose
+and twenty-two checked theorems; Horner, substitution and differentiation expose
 no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
