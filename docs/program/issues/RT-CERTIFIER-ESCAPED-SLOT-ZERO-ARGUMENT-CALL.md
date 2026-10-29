@@ -1,7 +1,7 @@
 ---
 id: RT-CERTIFIER-ESCAPED-SLOT-ZERO-ARGUMENT-CALL
 title: "The finished-CLIF Result certifier keeps a stale Exact state whenever a pointer to the tracked slot is in hand but no consumer's partial evidence shows it: a pointer reloaded from a container slot with stack_load, or an escaped slot before a zero-argument call. Close both with a stored-values read rule in the slot walk and one leak predicate for calls; retention before an unknown store is a stated residual"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1
