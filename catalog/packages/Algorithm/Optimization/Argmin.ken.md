@@ -3,7 +3,8 @@
 `argmin` and `argmax` select existing candidates with the least and greatest
 natural-number costs, respectively, retaining the earliest candidate on a
 tie. `argmin_option` and `argmax_option` select from possibly empty lists,
-returning `None` for `Nil`.
+returning `None` for `Nil`. Both nonempty choices are unchanged by a cost
+transform that preserves and reflects every strict natural-cost comparison.
 
 ## Contents
 
@@ -27,7 +28,7 @@ tail. On a possibly empty `List`, each Option selector returns no value on
 ## Definition
 
 The minimum selector and its eight laws lead, followed by its Option selector
-and four laws. The maximum selector and its seven laws follow, then its Option
+and four laws. The maximum selector and its eight laws follow, then its Option
 selector and four laws. Private shared selection helpers, inductive proofs and
 Option proof helpers close the definition. Two generic Nat-order facts come
 from their canonical owner, `Data.Numeric.Nat.Order`.
@@ -135,7 +136,7 @@ pub theorem argmin_cost_order_invariant
       (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
       (xs : NonEmpty a)
     : Equal a (argmin a (comp a Nat Nat f cost) xs) (argmin a cost xs) =
-  select_from_cost_order a cost f same_order (nonempty_head a xs) (nonempty_tail a xs)
+  select_from_cost_order a cost lt_nat f same_order (nonempty_head a xs) (nonempty_tail a xs)
 
 pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
   match xs {
@@ -244,6 +245,22 @@ pub theorem argmax_takes_tail
         (argmax a cost (nonempty_cons a x (Cons a y ys)))
         (argmax a cost (nonempty_cons a y ys)) =
   choose_yes a (costlier (cost (argmax_from a cost y ys)) (cost x)) (argmax_from a cost y ys) x
+
+pub theorem argmax_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : NonEmpty a)
+    : Equal a (argmax a (comp a Nat Nat f cost) xs) (argmax a cost xs) =
+  select_from_cost_order
+    a
+    cost
+    costlier
+    f
+    (λi. λj. same_order j i)
+    (nonempty_head a xs)
+    (nonempty_tail a xs)
 
 pub fn argmax_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
   match xs {
@@ -409,13 +426,14 @@ theorem choose_yes
 theorem select_from_cost_order
       (a : Type)
       (cost : a → Nat)
+      (better : Nat → Nat → Bool)
       (f : Nat → Nat)
-      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (same_better : (i : Nat) → (j : Nat) → Equal Bool (better (f i) (f j)) (better i j))
       (x : a)
       (rest : List a)
     : Equal a
-        (select_from a (comp a Nat Nat f cost) lt_nat x rest)
-        (select_from a cost lt_nat x rest) =
+        (select_from a (comp a Nat Nat f cost) better x rest)
+        (select_from a cost better x rest) =
   match rest {
     Nil ↦ Refl;
     Cons y ys ↦
@@ -425,36 +443,38 @@ theorem select_from_cost_order
             a
             (choose
               a
-              (lt_nat
-                (f (cost (select_from a (comp a Nat Nat f cost) lt_nat y ys)))
+              (better
+                (f (cost (select_from a (comp a Nat Nat f cost) better y ys)))
                 (f (cost x)))
-              (select_from a (comp a Nat Nat f cost) lt_nat y ys)
+              (select_from a (comp a Nat Nat f cost) better y ys)
               x)
-            (choose a (lt_nat (cost r) (cost x)) r x))
+            (choose a (better (cost r) (cost x)) r x))
         (choose_cost_order
           a
           cost
+          better
           f
-          same_order
-          (select_from a (comp a Nat Nat f cost) lt_nat y ys)
+          same_better
+          (select_from a (comp a Nat Nat f cost) better y ys)
           x)
-        (select_from_cost_order a cost f same_order y ys)
+        (select_from_cost_order a cost better f same_better y ys)
   }
 
 theorem choose_cost_order
       (a : Type)
       (cost : a → Nat)
+      (better : Nat → Nat → Bool)
       (f : Nat → Nat)
-      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (same_better : (i : Nat) → (j : Nat) → Equal Bool (better (f i) (f j)) (better i j))
       (yes : a)
       (no : a)
     : Equal a
-        (choose a (lt_nat (f (cost yes)) (f (cost no))) yes no)
-        (choose a (lt_nat (cost yes) (cost no)) yes no) =
+        (choose a (better (f (cost yes)) (f (cost no))) yes no)
+        (choose a (better (cost yes) (cost no)) yes no) =
   J
-    (λb _. Equal a (choose a (lt_nat (f (cost yes)) (f (cost no))) yes no) (choose a b yes no))
+    (λb _. Equal a (choose a (better (f (cost yes)) (f (cost no))) yes no) (choose a b yes no))
     Refl
-    (same_order (cost yes) (cost no))
+    (same_better (cost yes) (cost no))
 
 theorem choose_le_no
       (a : Type) (cost : a → Nat) (yes : a) (no : a) (b : Bool)
@@ -613,7 +633,10 @@ head only when its cost is strictly lower for `argmin`, or strictly higher for
 `argmax`. For a possibly empty `List`, call `argmin_option` for least cost or
 `argmax_option` for greatest cost. Each returns `None` for `Nil`; on `Some y`,
 its corollaries establish membership and the corresponding cost bound on the
-original list.
+original list. For a total cost transform preserving every strict comparison
+in both directions, `argmin_cost_order_invariant` and
+`argmax_cost_order_invariant` identify the same input candidate before and
+after transforming its costs, including the earlier winner of a tie.
 
 ## Laws & proofs
 
@@ -653,6 +676,13 @@ cost by the selected cost. `argmax_no_costlier` uses the checked Nat-order
 bridge. `argmax_head_on_tie` uses the greatest bound and the strict-order
 bridge to keep the head, even when a tail candidate ties it. The singleton
 and both strict-comparison branch laws fix the choice on every input.
+`argmax_cost_order_invariant` uses the same public strict-order comparison
+premise as its minimum counterpart, swapping the indices when passing it to
+the private `costlier` comparison. The shared `select_from_cost_order`
+induction and `choose_cost_order` transport each choice across the cost
+transform for either selector. Equal original costs remain tied, including a
+maximum tied away from the head; flattening distinct costs is excluded by the
+premise.
 
 `argmax_option_nil` and `argmax_option_cons` reduce the maximum selector on
 both list constructors. The existing private `option_member` assigns `Top`
@@ -670,15 +700,19 @@ false comparison, including ties. The shared membership proof depends only
 on selection from the two candidates, not on cost direction. Membership is
 propositionally truncated: it certifies that the chosen value was present but
 is not an index or a Boolean equality on arbitrary candidate values. Neither
-nonempty selector promises a complexity bound. Each Option selector handles
-an empty list by returning `None`, without another selection algorithm.
+nonempty selector promises a complexity bound. The cost-order proof helpers
+are private and parameterized by the existing strict comparison, so the
+minimum and maximum laws share the induction without changing either
+selector's tie behavior or the minimum law's public type. Each Option
+selector handles an empty list by returning `None`, without another selection
+algorithm.
 
 ## References
 
 - **Arg max — Wikipedia** — https://en.wikipedia.org/wiki/Arg_max —
   orientation on maximum-argument selection and ties among maximizers.
 - **Ken optimization contract** — `spec/50-stdlib/72-optimization.md` §§1, 3 —
-  the nonempty selectors, their laws and proof boundaries.
+  the nonempty selectors, cost-order laws and proof boundaries.
 - **Ken natural order** — `Data.Numeric.Nat.Order` — the canonical strict
   comparison and its checked non-strict bridges.
 
@@ -688,8 +722,9 @@ an empty list by returning `None`, without another selection algorithm.
 `argmin_cost_order_invariant`; `argmin_option` and
 its four §1.4 laws; `argmax` and the seven §3.2 laws `argmax_member`,
 `argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
-`argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`; and
-`argmax_option` with its four §3.4 laws `argmax_option_nil`,
+`argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`, plus
+`argmax_cost_order_invariant`; and `argmax_option` with its four §3.4 laws
+`argmax_option_nil`,
 `argmax_option_cons`, `argmax_option_member` and `argmax_option_greatest`.
 Selection helpers, branch proofs, the shared membership induction and all
 Option proof helpers are private. The carrier, list view, membership predicate and
@@ -733,4 +768,11 @@ positive client before refusing the false equality.
 `conformance/stdlib/optimization/seed-argmax-option.md` supplies empty,
 singleton and non-head earliest-tie cases, instances of all four Option laws,
 and five isolated false-result refusals. Its package test checks the full
-positive client and then each refusal against a fresh accepted prefix.
+positive client and then each refusal against a fresh accepted prefix. The
+[§3.5 cost-order seed](../../../../conformance/stdlib/optimization/seed-argmax-cost-order-invariance.md)
+adds four labelled costs with a non-head earliest tied maximum, an open
+strict-order proof, both independently checked shifted/original selections,
+and a constant-cost false equality. The package-owned §3.5 test root-loads the
+checked generic law and the complete accepted seed before refusing the
+isolated false claim. These are candidate-local checks, not official
+conformance-runner execution, CI, publication, landing or landed trust.

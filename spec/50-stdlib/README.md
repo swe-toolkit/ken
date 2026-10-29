@@ -614,11 +614,13 @@ strict Nat cost comparisons leaves the earliest tied maximum
 unchanged after composing the cost with `f`. The checked D0 on
 `6e778c2d5` reused generalized private selector helpers and
 measured no new `Axiom` and equal scratch trusted identities
-114 → 114. §1.5's public type and proof boundary remain unchanged;
-the §3.5 catalog export and seed are absent on this base. D0
-alone is not shipped §3.5 execution, official conformance, CI,
-publication, landing or landed trust.
-Earlier D0 alone established no CI or landed trust measurement. Continuous or
+114 → 114. §1.5's public type and proof boundary remain unchanged.
+The §3.5 export was absent on the spec author's base; this assembled
+candidate adds the checked law and a package-owned test of the
+complete accepted seed and isolated false claim. These candidate-local
+checks are not official conformance-runner execution, CI, publication,
+landing or landed trust. Earlier D0 alone established no CI or landed
+trust measurement. Continuous or
 implicit search, heuristics, approximation, arbitrary-order or
 multi-objective costs, top-k and complexity claims remain deferred.
 

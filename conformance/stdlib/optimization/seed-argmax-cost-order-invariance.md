@@ -152,6 +152,9 @@ theorem seed_neg
 Architect's isolated AC-0 on landed base
 `6e778c2d5288219287884de49eb53fb278ba98ea` checked the generic law and its
 closed client as scratch observations. The §3.5 catalog export was absent
-on this seed's base, so this authored seed has not been executed against a
-shipped export. Scratch D0 is not official conformance-runner execution,
-CI, publication, landing or landed trust.
+on the seed author's base; this assembled candidate's package-owned
+`cat_optimization_argmax_cost_order` test root-loads its checked law and
+runs the complete accepted client and isolated false claim. Its exact
+trusted GlobalId comparison is candidate-local, not landed trust.
+Neither scratch D0 nor the package test is official conformance-runner
+execution, CI, publication or landing.

@@ -24,9 +24,12 @@
 > measurement. Section 3.5 specifies a conditional argmax cost-order
 > invariance law; the Architect checked its generic proof in isolated
 > D0 on this base with unchanged scratch trusted identities 114 → 114.
-> Its catalog export and seed are not yet on main. The §2.4 checked law
-> and package-owned seed test are on main; their local execution is not
-> official conformance-runner execution or a landed trust measurement.
+> The §3.5 catalog export was absent on the spec author's base; this
+> assembled candidate adds the checked law and a package-owned test of
+> the complete accepted seed and isolated false claim. Those are not
+> official conformance-runner execution, CI or landed trust. The §2.4
+> checked law and package-owned seed test are on main; their local
+> execution is not official conformance or landed trust.
 
 ## 1. Least-cost candidate
 
@@ -794,9 +797,10 @@ status, three private import refusals, and equal scratch
 and separately refused flattened-cost claim also checked as expected;
 the existing five named optimization package-test binaries passed
 in that scratch overlay. Those are Architect D0 observations, not
-shipped §3.5 execution. The §3.5 catalog export and seed are absent
-on this base. CV owns the closed seed, then Foundation owns the
-catalog law, helper generalization, catalog proof-count prose and
-package-owned test in this candidate. Neither scratch D0 nor an
-authored seed establishes official conformance-runner execution,
-CI, publication, landing or a landed trust measurement.
+shipped §3.5 execution. The catalog export was absent on the spec
+author's base; this assembled candidate adds its checked proof and
+a package-owned test that root-loads the complete accepted seed and
+refuses the isolated false claim. The generalized helpers remain
+private, and §1.5's public type is unchanged. Neither scratch D0 nor
+these candidate-local checks establish official conformance-runner
+execution, CI, publication, landing or a landed trust measurement.
