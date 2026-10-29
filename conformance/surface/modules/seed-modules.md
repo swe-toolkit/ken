@@ -633,8 +633,9 @@ sentinel beside the current contract.
 
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
-- promise class: **durable invariant** — availability changes, canonical
-  identity and trust do not
+- promise class: **normative compatibility vector** — the exact thirty-name
+  roster and each constructor's scope are contract values; reuse of checked
+  identities, allocator accounting, and trust remain durable relations
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
   of all thirty names: `Auth`, `Bool`, `Bottom`, `BufferSpan`, `Char`,
@@ -707,6 +708,16 @@ sentinel beside the current contract.
   distinguish a replacement family, and a source-only positive that never uses
   the byte/capability/resource primitives would not prove their public result
   and parameter types are nameable.
+- maintenance contract: adding unrelated non-trusted checked packages or
+  definitions outside the floor, or ordinary checked source declarations
+  outside B, preserves the exact thirty-name roster, the listed constructor
+  scopes and per-run checked parent ids, no-allocation floor installation,
+  and unchanged `trusted_base()` identities.
+  A new witnessed floor member, a removed member, or a changed constructor
+  scope/visibility is a **contract change**, not routine test maintenance:
+  revise `30-taxonomy §4` and `33 §3.3` together and deliberately update this
+  vector and its source-resolution pairs. Never refresh the roster or
+  constructor table merely because the implementation reports a new value.
 - **MEASURED (carried from old base):** the nine-type floor reused its recorded
   ids and preserved accounting and trust at the old base
   `c1945c6fbbd7b0d8422123904fc6f7138fc85df9`; the four transparent Pair-family
@@ -804,22 +815,25 @@ sentinel beside the current contract.
 
 ### surface/modules/prelude-protected-name-bindings-and-lookalike-matrix
 
-- promise class: **durable invariant** — the enumerated parent and bare
-  constructor names, `Char`, and Pair-family names are protected from source
-  declarations
+- promise class: **normative compatibility vector** — the enumerated parent
+  and bare constructor names, `Char`, and Pair-family names are protected
+  contract values; each collision/renaming pair is a durable relation
 - spec: `33 §3.3` (protected-name introduction ban), `39 §2.0`
 - given: use a fresh strict-roots environment for every row. The preceding table
-  has sixteen inductive parent rows: `Auth`, `Bool`, `Coproduct`, `List`, `Nat`,
-  `Option`, `ResourceKind`, `ExitCode`, `Instant`, `ITree`, `ProcessInput`,
-  `Prod`, `ProgramCaps`, `Result`, `Unit`, and `Utf8Error`. For each parent,
+  has twenty-two inductive parent rows: `Auth`, `Bool`, `BufferSpan`,
+  `Coproduct`, `CreatePolicy`, `FileError`, `IOError`, `List`, `Nat`, `Option`,
+  `ResourceError`, `ResourceKind`, `ExitCode`, `Instant`, `ITree`, `ProcessInput`,
+  `Prod`, `ProgramCaps`, `Result`, `TransferCount`, `Unit`, and `Utf8Error`.
+  For each parent,
   pair a same-shaped declaration retaining only that protected parent spelling
   with the same declaration changing only the parent to a fresh local name; use
   fresh local constructor names in both arms.
-  For each bare constructor in the ten unscoped families
-  (`Auth`: `ANone`/`APartial`/`AFull`; `Bool`: `True`/`False`; `List`:
-  `Nil`/`Cons`; `Nat`: `Zero`/`Suc`; `Option`: `None`/`Some`; `Result`:
-  `Err`/`Ok`; `Utf8Error`: `InvalidUtf8`; `ProcessInput`: `MkProcessInput`;
-  `Prod`: `MkProd`; `Unit`: `MkUnit`), use a fresh local parent and rename
+  For each bare constructor in the eleven unscoped families
+  (`Auth`: `ANone`/`APartial`/`AFull`; `Bool`: `True`/`False`;
+  `FileError`: `MkFileError`; `List`: `Nil`/`Cons`; `Nat`: `Zero`/`Suc`;
+  `Option`: `None`/`Some`; `Result`: `Err`/`Ok`; `Utf8Error`: `InvalidUtf8`;
+  `ProcessInput`: `MkProcessInput`; `Prod`: `MkProd`; `Unit`: `MkUnit`),
+  use a fresh local parent and rename
   every other constructor. Pair the one-name refusal with the same production
   changing only the target constructor to a fresh local name. In particular:
   - `Unit` parent: `data Unit = LocalMkUnit` rejects; the same production
@@ -836,8 +850,17 @@ sentinel beside the current contract.
     `data LocalProd = LocalMkProd` accepts.
   - `ITree` parent: `data ITree = LocalNode` rejects; the same production
     `data LocalITree = LocalNode` accepts.
+  - `IOError` parent: `data IOError = LocalCause` rejects;
+    `data LocalIOError = LocalCause` accepts. The independent accepted
+    `IOError.NotFound` / refused bare `NotFound` pair below distinguishes
+    parent reservation from constructor scoping.
+  - `FileError` parent: `data FileError = LocalMkFileError` rejects;
+    `data LocalFileError = LocalMkFileError` accepts. Its unscoped constructor
+    `MkFileError` refuses in `data LocalFileError = MkFileError`, while the
+    same production with `LocalMkFileError` accepts.
   Do not include scoped constructors from `ResourceKind`, `ExitCode`,
-  `ProgramCaps`, `Coproduct`, `Instant`, or `ITree` in the bare-name
+  `ProgramCaps`, `Coproduct`, `Instant`, `ITree`, `IOError`, `CreatePolicy`,
+  or `ResourceError` in the bare-name
   population; their parent-name rows remain included. For constructor-free
   `Char`, pair `def Char = Int` with `def LocalChar = Int`. For transparent
   `Pair` and its three companion bindings, use the separate matrix in
@@ -852,8 +875,14 @@ sentinel beside the current contract.
   parser, positivity checker, or wrong binding. Parent-name and constructor-name
   rows vary one name at a time while holding the production fixed. Scoped
   constructor paths are not bare B names, so their names are excluded from the
-  bare collision set. This matrix is bounded to the rows named here; it does not
-  claim to cover every member or binding form in B.
+  bare collision set. `BufferSpan` and `TransferCount` reserve their parents
+  without exposing either private constructor. This matrix is bounded to the
+  rows named here; it does not claim to cover every member or binding form in B.
+- maintenance contract: adding ordinary local declarations outside B without
+  colliding with these fixtures preserves every pair. Changing the admitted
+  parent roster, bare/scoped status, or constructor visibility requires a
+  deliberate `30-taxonomy §4` / `33 §3.3` contract revision and a vector
+  update, not a new guessed count or an unnoticed omission.
 - **MEASURED (prior root-loading probe):** the tested all-renamed same-shape
   family elaborated under distinct ids; the tested same-spelling floor
   declaration also passed the root loader. The probe did not measure the full
@@ -865,6 +894,111 @@ sentinel beside the current contract.
   declarations are outside this case. The separate Pair matrix covers only its
   explicitly listed forms. This case does not discharge the full `33 §3.3`
   binding ban or pin allocator movement.
+
+### surface/modules/fs-resource-scoped-constructors-and-local-lookalikes
+
+- promise class: **normative compatibility vector** — the exact scoped
+  constructor inventories, private-constructor exclusions, and admitted
+  parent-name boundary belong to the thirty-name floor contract
+- spec: `30-taxonomy §4` (six newly admitted families), `33 §3.3`
+  (scope and protected names), `34 §1.1` (qualified constructor identity)
+- given: in each fresh route (strict roots, legacy roots, legacy single-file),
+  elaborate this accepted prefix without an explicit package import:
+
+  ```ken
+  const qualified_not_found : IOError = IOError.NotFound
+
+  const qualified_policy : CreatePolicy = CreatePolicy.CreateNew
+
+  const qualified_resource : ResourceError = ResourceError.Closed
+
+  fn keep_file (x : FileError) : FileError = x
+
+  fn keep_span (x : BufferSpan) : BufferSpan = x
+
+  fn keep_count (x : TransferCount) : TransferCount = x
+  ```
+
+  In a fresh unit of the same route, elaborate that same accepted prefix,
+  then append only this declaration:
+
+  ```ken
+  const bare_not_found : IOError = NotFound
+  ```
+
+  The accepted prefix must complete first; the negative is isolated to the
+  one removed `IOError.` qualifier, not a missing type, import, or parser
+  failure. In separate fresh units, change only `IOError` to `LocalIOError`
+  in the parent-name declaration pair above, and check that the protected
+  name rejects while the renamed local family accepts. In another fresh
+  unit, `data LocalCause = NotFound` and
+  `const local : LocalCause = NotFound` accept; adding
+  `const still_checked : IOError = IOError.NotFound` selects the original
+  checked constructor, not the local same-leaf ID.
+- expect: every accepted prefix resolves the six types to their recorded
+  pre-source IDs, and the three qualified values to constructors with their
+  respective checked parents. Bare `NotFound` rejects at surface name
+  resolution **after** the accepted prefix. The `IOError` declaration is a
+  protected-name refusal at introduction, independent of any later use; the
+  paired `LocalIOError` declaration and local `NotFound` source constructor
+  accept without replacing the canonical `IOError.NotFound` ID. No route
+  changes `trusted_base()` or allocates a replacement floor family.
+- controls: admitting `IOError` unscoped accepts the isolated bare
+  `NotFound` arm and **must redden this case** while the qualified positive
+  remains accepted. Reserving every spelling of `NotFound` instead rejects
+  `LocalCause` and fails its opposite control. Removing the whole `IOError`
+  family fails the accepted prefix and the parent-ID comparison; a parser
+  that rejects every test unit cannot pass the positives.
+- family closure: reuse the accepted all-constructor source arm of
+  `closed-floor-accepts-arbitrary-global-does-not` above and the exact
+  public constructor inventories in
+  `prelude-floor-reuses-exact-types-and-constructors`. For each of the
+  thirteen `IOError.C`, three `CreatePolicy.C`, and twelve
+  `ResourceError.C` paths, in a fresh route
+  retain its accepted typed expression or exhaustive pattern and remove
+  **only that occurrence's family qualifier**, leaving constructor arguments,
+  type context, other constructors, and accepted prefix unchanged. The
+  isolated bare use must reject at surface name resolution; its qualified
+  control must still resolve to the same recorded checked ID. For the
+  `CreatePolicy.CreateNew` and `ResourceError.Closed` value forms above this
+  yields `const bare_policy : CreatePolicy = CreateNew` and
+  `const bare_resource : ResourceError = Closed`. A source-local same-leaf
+  constructor in a separate unit may bind under ordinary non-B rules; it
+  must not change the meaning of the checked `T.C` path.
+- privacy boundary: the accepted `keep_span` and `keep_count` functions make
+  the two public types nameable. In separate fresh units, reject both
+  `PrivateBufferSpan` and `BufferSpan.PrivateBufferSpan` as patterns on a
+  `BufferSpan`, with `origin start budget` fields. Likewise reject both
+  `PrivateTransferCount` and `TransferCount.PrivateTransferCount` with
+  `predecessor remaining` fields on a `TransferCount`. For example, one
+  private negative has the otherwise correctly typed pattern:
+
+  ```ken
+  fn illegal_span (x : BufferSpan) : BufferSpan =
+    match x {
+      BufferSpan.PrivateBufferSpan origin start budget ↦ x
+    }
+  ```
+
+  The bare variant removes only `BufferSpan.`; the TransferCount variants
+  use the two recorded fields instead. Reject at surface resolution, not an
+  arity mismatch: qualification never widens private constructors. The bare
+  `MkFileError` remains the exact checked constructor and is protected as a
+  bare name by the parent matrix above.
+- maintenance contract: non-trusted additions outside B that preserve the
+  six per-run checked parent IDs, each public constructor's scoped path,
+  both private families, and unchanged trust keep all pairs green. A
+  floor-membership, scope, constructor-visibility or constructor-inventory
+  change requires a
+  deliberate `30-taxonomy §4` / `33 §3.3` contract revision and vector
+  update; do not rebaseline only the failing negative fixture.
+- why: the first pair is AC-4's unscoped-`IOError` discriminator, which
+  qualified-only positives cannot catch. The parent and local-lookalike
+  pairs separate protected types from unreserved scoped leaves. The
+  all-constructor variants keep the per-name rule honest; the private
+  pattern rows reject both routes around visibility rather than relying
+  on absence from a Rust name table. No official conformance-runner result
+  is claimed by stating these cases.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
