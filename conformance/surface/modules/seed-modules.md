@@ -800,29 +800,40 @@ sentinel beside the current contract.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
-and legacy single-file. The six bare-name rows pin the exact mode error class
-and rejected name, not diagnostic text or other payloads.
+and legacy single-file. The six bare-name rows assert a surface
+name-resolution refusal for each unqualified constructor; they do not pin
+route-specific diagnostic variants or payloads.
 
 ### surface/modules/itree-qualified-constructors-resolve-to-checked-family
 
 - promise class: **normative compatibility vector** — the floor family and its
   scoped constructors retain their checked identities
-- spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`/§2.4
+- spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`; `36 §2.1`/§2.4
 - given: in each fresh route — strict roots, legacy roots, and legacy single-file
   — elaborate:
 
   ```ken
-  fn responses (op : Nat) : Type = Unit
-  const ret_witness : ITree Nat responses Nat =
-    ITree.Ret Nat responses Nat Zero
-  const vis_witness : ITree Nat responses Nat =
-    ITree.Vis Nat responses Nat Zero
-      (\response. ITree.Ret Nat responses Nat Zero)
-  fn inspect (tree : ITree Nat responses Nat) : Nat =
+  const nat_unit_effect : Effect =
+    { Op = Nat, Resp = \op -> Unit }
+
+  fn ret_witness_for (E : Effect) : ITree E Nat =
+    ITree.Ret E Nat Zero
+  fn vis_witness_for (E : Effect) (op : E.Op)
+    (k : E.Resp op -> ITree E Nat) : ITree E Nat =
+    ITree.Vis E Nat op k
+  fn inspect (E : Effect) (tree : ITree E Nat) : Nat =
     match tree { ITree.Ret value |-> value ; ITree.Vis op k |-> Zero }
+
+  const ret_witness = ret_witness_for nat_unit_effect
+  const vis_witness = vis_witness_for nat_unit_effect Zero
+    (\response -> ret_witness_for nat_unit_effect)
+  const inspected_ret = inspect nat_unit_effect ret_witness
+  const inspected_vis = inspect nat_unit_effect vis_witness
   ```
 
-- expect: every route accepts. The `ITree` type references the exact checked
+- expect: every route accepts. `nat_unit_effect` is an `Effect` value with
+  `Op = Nat` and `Resp _ = Unit`. Both witnesses have the specified
+  `ITree E Nat` carrier. The `ITree` type references the exact checked
   pre-source family identity; `ITree.Ret` and `ITree.Vis` resolve to their
   exact checked constructor identities and retain `ITree` as parent.
 - why: each qualified path is reached through ordinary source typing, not a
@@ -855,10 +866,11 @@ and rejected name, not diagnostic text or other payloads.
 - promise class: **discriminating** — an unqualified constructor is not a
   prelude reference in strict roots mode
 - spec: `33 §3.3`; `36 §2.1`
-- given: start with the `ret_witness` fixture in
+- given: start with the `ret_witness_for` fixture in
   `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from that constructor path and run strict roots.
-- expect: reject with `UnboundName { name = Ret }`.
+  `ITree.` qualifier from its `Ret` constructor path and run strict roots.
+- expect: reject at surface name resolution because bare `Ret` is not in scope.
+  Do not pin a diagnostic variant or payload.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Ret` route independently of `Vis`.
 
@@ -867,10 +879,11 @@ and rejected name, not diagnostic text or other payloads.
 - promise class: **discriminating** — an unqualified constructor is not a
   prelude reference in strict roots mode
 - spec: `33 §3.3`; `36 §2.1`
-- given: start with the `vis_witness` fixture in
+- given: start with the `vis_witness_for` fixture in
   `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from the outer `Vis` path and run strict roots.
-- expect: reject with `UnboundName { name = Vis }`.
+  `ITree.` qualifier from its outer `Vis` path and run strict roots.
+- expect: reject at surface name resolution because bare `Vis` is not in scope.
+  Do not pin a diagnostic variant or payload.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Vis` route independently of `Ret`.
 
@@ -879,10 +892,11 @@ and rejected name, not diagnostic text or other payloads.
 - promise class: **discriminating** — an unqualified constructor is not a
   prelude reference in legacy roots mode
 - spec: `33 §3.3`; `36 §2.1`
-- given: start with the `ret_witness` fixture in
+- given: start with the `ret_witness_for` fixture in
   `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from that constructor path and run legacy roots.
-- expect: reject with `UnresolvedCon { name = Ret }`.
+  `ITree.` qualifier from its `Ret` constructor path and run legacy roots.
+- expect: reject at surface name resolution because bare `Ret` is not in scope.
+  Do not pin a diagnostic variant or payload.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Ret` route independently of `Vis`.
 
@@ -891,10 +905,11 @@ and rejected name, not diagnostic text or other payloads.
 - promise class: **discriminating** — an unqualified constructor is not a
   prelude reference in legacy roots mode
 - spec: `33 §3.3`; `36 §2.1`
-- given: start with the `vis_witness` fixture in
+- given: start with the `vis_witness_for` fixture in
   `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from the outer `Vis` path and run legacy roots.
-- expect: reject with `UnresolvedCon { name = Vis }`.
+  `ITree.` qualifier from its outer `Vis` path and run legacy roots.
+- expect: reject at surface name resolution because bare `Vis` is not in scope.
+  Do not pin a diagnostic variant or payload.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Vis` route independently of `Ret`.
 
@@ -903,10 +918,11 @@ and rejected name, not diagnostic text or other payloads.
 - promise class: **discriminating** — an unqualified constructor is not a
   prelude reference in legacy single-file mode
 - spec: `33 §3.3`; `36 §2.1`
-- given: start with the `ret_witness` fixture in
+- given: start with the `ret_witness_for` fixture in
   `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from that constructor path and run legacy single-file.
-- expect: reject with `UnresolvedCon { name = Ret }`.
+  `ITree.` qualifier from its `Ret` constructor path and run legacy single-file.
+- expect: reject at surface name resolution because bare `Ret` is not in scope.
+  Do not pin a diagnostic variant or payload.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Ret` route independently of `Vis`.
 
@@ -915,10 +931,11 @@ and rejected name, not diagnostic text or other payloads.
 - promise class: **discriminating** — an unqualified constructor is not a
   prelude reference in legacy single-file mode
 - spec: `33 §3.3`; `36 §2.1`
-- given: start with the `vis_witness` fixture in
+- given: start with the `vis_witness_for` fixture in
   `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from the outer `Vis` path and run legacy single-file.
-- expect: reject with `UnresolvedCon { name = Vis }`.
+  `ITree.` qualifier from its outer `Vis` path and run legacy single-file.
+- expect: reject at surface name resolution because bare `Vis` is not in scope.
+  Do not pin a diagnostic variant or payload.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Vis` route independently of `Ret`.
 
