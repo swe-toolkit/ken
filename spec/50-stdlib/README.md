@@ -456,8 +456,9 @@ source, and differentiation and substitution each preserve that
 agreement. No structural `Equal Expr` or new value-level law is
 exported. Architect's D0 on `757b2bd12` checked all three generic
 bodies with no new `Axiom` and equal scratch trusted identities
-114 → 114; the §9 catalog exports, seed and package-owned test are
-separately owned candidate work, not delivered by this spec turn.
+114 → 114; this assembled candidate adds the §9 catalog exports, seed
+and package-owned test, which are not official conformance, CI or
+landed trust.
 A sorted-list normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in

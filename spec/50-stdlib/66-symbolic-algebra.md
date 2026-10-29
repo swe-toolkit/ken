@@ -18,8 +18,10 @@
 > and substitution each preserve that equivalence. Architect's D0
 > on `757b2bd12` checked the generic compositions with no new
 > `Axiom` and equal scratch trusted identities 114 → 114.
-> The §9 catalog export, seed and test are separately owned candidate
-> work, not established by this spec-only turn.
+> This assembled candidate adds the three §9 checked exports, the
+> closed seed and a package-owned test of the complete seed and its
+> isolated refusal; those candidate-local checks are not official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -834,9 +836,10 @@ official conformance and landed trust.
 > (SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT).** Architect's
 > isolated D0 on main `757b2bd12fdaeba5c7ed5da3ca5b5a0d7c588232`
 > checked the three generic proofs and a client with no new `Axiom`
-> and equal scratch trusted GlobalId sets 114 → 114. This spec-only
-> turn does not deliver the catalog exports, conformance seed, or
-> package-owned test; none of that scratch evidence is official
+> and equal scratch trusted GlobalId sets 114 → 114. The assembled
+> candidate adds the three checked exports, the closed seed and a
+> package-owned test of the complete seed and its isolated refusal.
+> Neither the scratch D0 nor those candidate-local checks are official
 > conformance, CI, publication or landed trust.
 
 ### 9.1 Three public checked laws
@@ -876,8 +879,8 @@ syntax. The value-level equalities at an arbitrary environment follow
 from `poly_eq_sound` applied to either new law; they are not further
 public names. No §1–8 operation or law type changes, new premise,
 postulate, primitive, kernel rule or surface feature is required.
-Once the catalog half lands, the package has twenty-two public
-checked theorems rather than the nineteen present on this base.
+With these three laws the package has twenty-two public checked
+theorems; nineteen cover §§1–8.
 
 ### 9.2 Closed discrimination and evidence boundary
 
@@ -911,6 +914,6 @@ for the moved-variable `poly_eq`, and the distinct natural values
 isolate the false claim. Append each refusal to a **fresh fully
 accepted prefix** so its rejection occurs at that claim, not at a
 prior fixture or unrelated proof. These closed observations do not
-prove the generic theorems: their checked bodies, catalog visibility,
-and the seed's own execution belong to subsequent independently
-reviewed candidate turns, not this spec-only commit.
+prove the generic theorems: those rest on the checked bodies above,
+whose catalog export and package-owned seed test this assembled
+candidate adds.
