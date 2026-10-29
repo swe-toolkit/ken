@@ -96,25 +96,45 @@ The loader proceeds as follows:
    it at most once in the run; later edges reuse that result.
 4. Construct a fresh scope for each unit from exactly its local declarations,
    explicit imports, kernel and built-in vocabulary, and the closed prelude
-   floor. Its exact prelude-floor name set is `{Auth, Bool, Bottom, Char, Equal,
-   List, Nat, Option, Pair, Prop, Proved, ResourceKind, Result, Top,
-   Utf8Error}`. Constructors are admitted only when the kernel records the
-   exact corresponding floor parent: `ANone`/`APartial`/
-   `AFull → Auth`, `True`/`False → Bool`, `Nil`/`Cons → List`, `Zero`/`Suc →
-   Nat`, `None`/`Some → Option`, `Err`/`Ok → Result`, and
-   `InvalidUtf8 → Utf8Error`. These constructor families remain bare and
-   reserved. `ResourceKind` is scoped: admit `ResourceKind.FsHandle`,
-   `ResourceKind.Buffer`, and `ResourceKind.Mapping` only at the exact
-   `ResourceKind` parent; their bare spellings are not floor names. `Char` and
-   transparent `Pair` have no constructors. Admit the separate Pair
-   companion-binding inventory `{mk_pair, pair_fst, pair_snd}` only at the three
-   exact pre-source identities whose checked types reference the exact floor
-   `Pair`. Imports are non-transitive in both directions, as required by
-   `33 §3.3`: a unit neither borrows its caller's imports nor exports its own
-   imports merely because it was loaded. An unresolved bare name does not fall
-   through to arbitrary implementation globals outside that scope. Pair's four
-   names enter through the witnessed closed floor inventories, never because
-   the compiler global map happens to contain them.
+   floor. Its exact prelude-floor name set is `{Auth, Bool, Bottom, BufferSpan,
+   Char, Coproduct, CreatePolicy, Equal, ExitCode, FileError, HostIO, IOError,
+   ITree, Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
+   Prop, Proved, ResourceError, ResourceKind, Result, Top, TransferCount, Unit,
+   Utf8Error}` (`30-taxonomy §4`; `33 §3.3`). These thirty identities are not
+   thirty types: `Top` and `Bottom` are proposition constants, `Proved` is a
+   proof binding, and `HostIO` is a type-level function. Admit a floor
+   constructor only at its exact checked parent and subject to its per-type
+   scoped-constructors property and visibility. `Auth`'s
+   `ANone`/`APartial`/`AFull`, `Bool`'s `True`/`False`, `List`'s `Nil`/`Cons`,
+   `Nat`'s `Zero`/`Suc`, `Option`'s `None`/`Some`, `Result`'s `Err`/`Ok`, and
+   `Utf8Error`'s `InvalidUtf8` remain bare and reserved. `ProcessInput`,
+   `Prod`, `Unit`, and `FileError` are also unscoped: `MkProcessInput`,
+   `MkProd`, `MkUnit`, and `MkFileError` are bare names in the protected set B.
+   `ResourceKind` is scoped: `ResourceKind.FsHandle`,
+   `ResourceKind.Buffer`, and `ResourceKind.Mapping` use its exact parent;
+   their bare spellings are not reserved. `ExitCode.Success` and
+   `ExitCode.Failure` are scoped; `ProgramCaps.MkProgramCaps` is scoped
+   but remains runner-minted and is not made public by qualification.
+   `Coproduct.InL`, `Coproduct.InR`, `Instant.MkInstant`, `ITree.Ret`, and
+   `ITree.Vis` use their exact scoped identities, not bare B names.
+   `IOError`'s complete thirteen-cause family, `CreatePolicy`'s three cases
+   and `ResourceError`'s complete twelve-case family are scoped: their
+   public constructor paths are `IOError.C`, `CreatePolicy.CreateNew` /
+   `CreatePolicy.CreateOrTruncate` / `CreatePolicy.CreateOrKeep`, and
+   `ResourceError.C`, never their bare names. `BufferSpan` and
+   `TransferCount` are scoped; `PrivateBufferSpan` and
+   `PrivateTransferCount` are constructor-private and accessible by
+   neither bare nor qualified source path. `Char`, `HostIO`, transparent
+   `Pair`, and the proposition/equality members have no constructors.
+   Admit the separate Pair companion-binding inventory
+   `{mk_pair, pair_fst, pair_snd}` only at the three exact pre-source
+   identities whose checked types reference the exact floor `Pair`.
+   Imports are non-transitive in both directions, as required by `33 §3.3`:
+   a unit neither borrows its caller's imports nor exports its own imports
+   merely because it was loaded. An unresolved bare name does not fall
+   through to arbitrary implementation globals outside that scope. Pair's
+   four names enter through the witnessed closed floor inventories, never
+   because the compiler global map happens to contain them.
 5. Resolve every imported or re-exported name through the provider's public
    interface to the provider declaration's existing canonical identity. Enforce
    privacy, ambiguity, and re-export clashes before emitting the caller. An
@@ -124,21 +144,23 @@ The loader proceeds as follows:
    receives the same flat append-only `Σ` as the fully qualified one-file
    program, with an identical `trusted_base()` delta.
 
-Installing either kind of floor member is a resolution operation over
-declarations that already exist. The loader reuses all fifteen exact checked
-prelude-floor identities, including `Proved`'s proof-term identity, the exact
-constructor ids derived from their recorded parentage, and the exact three
-Pair companion ids. It allocates no declaration and adds no `trusted_base()`
-entry. A same-spelling top-level declaration for a floor name, an unscoped
-floor constructor, or a Pair companion collides with the immutable floor and
-is rejected before admission. A scoped constructor's bare spelling is not
-reserved by the floor; a source declaration may introduce it under the
-ordinary non-B clash rules of `33 §3.3`. A separately named same-shaped family
-has distinct identities and cannot satisfy a reference to its floor
-counterpart. Failure to find a canonical floor identity or companion, a
-constructor-parent or companion-type identity mismatch, or any name outside
-the closed inventories is a surface error; none falls back to a lookalike or
-arbitrary implementation global.
+Installing a floor member or Pair companion is a resolution operation over
+declarations that already exist. The loader reuses all thirty exact checked
+prelude-floor identities, including `Top` and `Bottom` as proposition constants
+and `Proved`'s proof-term identity, the exact constructor IDs derived from
+recorded parentage, and the exact three Pair companion IDs. It allocates no
+declaration and adds no `trusted_base()` entry. A same-spelling top-level
+declaration for a floor name, an unscoped floor constructor, or a Pair
+companion collides with the immutable B set and is rejected before admission.
+In particular, a same-name `BufferSpan` declaration is rejected even though
+its private constructor is not available to source under either spelling.
+A scoped constructor's bare spelling is not reserved by the floor; a source
+declaration may introduce it under the ordinary non-B clash rules of
+`33 §3.3`. A separately named same-shaped family has distinct identities and
+cannot satisfy a reference to its floor counterpart. Failure to find a
+canonical floor identity or companion, a constructor-parent or companion-type
+identity mismatch, or any name outside the closed inventories is a surface
+error; none falls back to a lookalike or arbitrary implementation global.
 
 A same-shaped local definition does not change this rule. Resolution binds its
 new identity, while any already-checked declaration that contains the floor
