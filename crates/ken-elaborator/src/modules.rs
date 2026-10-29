@@ -20,7 +20,7 @@
 //! unit-local collision admission) → rewrite (qualify free `RCon`/pattern-ctor
 //! references via the active import scope) → `elaborate_rdecl_v1` (unchanged).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
@@ -409,6 +409,21 @@ impl ModuleState {
         self.constructor_members.insert(parent_id, members);
         self.scoped_constructor_types.insert(parent_id);
         Ok(())
+    }
+
+    /// The bare leaf of each constructor of a scoped family, keyed by its
+    /// checked id. Scoping changes only source bindings (`34 §1.1`), so
+    /// artifact symbols are formed from these leaves, not from `T.C`.
+    pub(crate) fn scoped_constructor_leaves(
+        &self,
+        parent_id: ken_kernel::GlobalId,
+    ) -> Option<BTreeMap<ken_kernel::GlobalId, String>> {
+        if !self.scoped_constructor_types.contains(&parent_id) {
+            return None;
+        }
+        self.constructor_members
+            .get(&parent_id)
+            .map(|members| members.iter().map(|(leaf, id)| (*id, leaf.clone())).collect())
     }
 
     pub(crate) fn capture_strict_builtin_names(

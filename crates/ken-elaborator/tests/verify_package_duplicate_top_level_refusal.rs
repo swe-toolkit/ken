@@ -107,10 +107,9 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
 
 /// Promise class: normative compatibility vector for this package. MEASURED:
 /// an unrelated checked example is excluded from the emitted package and
-/// leaves its canonical semantic hash unchanged. Coproduct and Instant already
-/// carried scoped pre-source symbols in the landed base. This slice scopes
-/// ITree after role capture; unscoping only ITree restores the previous
-/// 0xb250_7f51_71d8_044c package hash.
+/// leaves its canonical semantic hash unchanged. The WIP vector
+/// 0xa906_9212_3b5f_b224 moves when scoped constructor artifact symbols
+/// take their checked family leaf rather than their `T.C` source spelling.
 /// CLAIMED: unrelated example checking is still legal, without shifting
 /// admitted declaration identity. THE GAP: this fixes the package-name-
 /// dependent baseline vector for this one package, not every package name.
@@ -123,7 +122,7 @@ fn unrelated_example_keeps_the_baseline_semantics_and_hash() {
     let checked = compile_literate(&with_example)
         .expect("independent example remains valid")
         .package;
-    assert_eq!(baseline.core_semantic_hash, 0xa906_9212_3b5f_b224);
+    assert_eq!(baseline.core_semantic_hash, 0x10e0_c33e_cb2a_7c2a);
     assert_eq!(checked.core_semantic_hash, baseline.core_semantic_hash);
     assert_eq!(checked.artifact.semantic, baseline.artifact.semantic);
 }
