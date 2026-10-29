@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-MAIN-BASED-CLOSURE
 title: "Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation."
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
@@ -11,6 +11,22 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's OPERATIVE base is a separate value living in frame 4a-pin and MAY DIFFER from this SHA -- it already does."
 ---
+
+> # CLOSED 2026-10-29: increment C ruled (Z), already satisfied.
+>
+> The Architect's AC-C0 (`evt_fge5r2byetm2`, base `610a2d84a`) found the
+> following on main:
+> - the frame writer is deleted, and no lowering site emits a detached
+>   consumer;
+> - the one detached row (`rt_write_writable_stage`) returns the producer's
+>   result to the creation-site seat, with realization checked on the
+>   finished CLIF and native and interpreter traces equal.
+>
+> C closes without code, and HS18 closes with it, with increments A
+> (`bd5c64ed1`) and B (`afc5e0fae`) merged. Control 1 (the `0x0f09` tag query
+> on a file-backed Mapping) is not observable on main and moves to
+> `RT-D5B-MAPPING-AVAILABILITY-FLIP`. The census in frame §6e is superseded by
+> the ruling's §1.
 
 > # INCREMENT C, released after RT-CERTIFIER-FRAME-CALL-EXEMPT-CALLER-PIN.
 >
