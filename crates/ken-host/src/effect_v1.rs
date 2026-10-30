@@ -170,22 +170,10 @@ impl HostOpV1 {
     /// `RepresentedUnavailable` -- a plausible-looking default, which is what
     /// let it survive review. Classification is now explicit per operation.
     ///
-    /// **`RepresentedUnavailable` is a claim about NATIVE PARITY EVIDENCE, not
-    /// about executability.** It means the artifact differential that would
-    /// promote the operation has not been produced yet. Every one of the ten
-    /// has a real executing arm in the switch below; the label records what has
-    /// not been *proven*, never what has not been *built*.
-    ///
-    /// **Two boundaries read this, and they ask different questions:**
-    ///
-    /// - `abi_v1::require_native_operation_v1` (consumed at the FFI entry) asks
-    ///   *has native/interpreter parity been differentially confirmed?* — ten
-    ///   operations answer no.
-    /// - [`dispatch_host_op_v1`] asks *may a Ken program cause this to
-    ///   execute?* — and uses this classifier because `ken-host` cannot depend
-    ///   on the language surface without a layering inversion. Only four of the
-    ///   ten are reachable from Ken source today, so the executor gate is
-    ///   deliberately wider than the reachable set.
+    /// `RepresentedUnavailable` means native parity evidence has not been
+    /// produced. The native ABI requires `NativeTested`; reference-interpreter
+    /// execution instead uses [`Self::executor_admits`]. PX10's seven operations
+    /// are executor-admitted without being promoted to native availability.
     ///
     /// Relabelling an operation therefore does not merely relabel it: it opens
     /// the native ABI path on the strength of a label whose job is to record
@@ -231,6 +219,25 @@ impl HostOpV1 {
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
             | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::RepresentedUnavailable,
+        }
+    }
+
+    /// May a Ken program execute the operation through the reference host?
+    /// Unlike native availability, the PX10 Process and pipe operations are
+    /// admitted here while native emission and the native ABI refuse them.
+    pub const fn executor_admits(self) -> bool {
+        match self.availability() {
+            HostOpAvailabilityV1::NativeTested => true,
+            HostOpAvailabilityV1::RepresentedUnavailable => matches!(
+                self,
+                Self::ResourceStreamRead
+                    | Self::ResourceStreamWrite
+                    | Self::ProcessPlanOpen
+                    | Self::ProcessPlanPush
+                    | Self::ProcessSpawn
+                    | Self::ProcessTakePipe
+                    | Self::ProcessWait
+            ),
         }
     }
 
@@ -2868,8 +2875,9 @@ impl HostOpV1 {
 }
 
 /// The executor entry: every path by which a Ken program can cause a host
-/// operation to run arrives here, and a `RepresentedUnavailable` operation is
-/// refused before any validation, admission, or backend leaf is reached.
+/// operation to run arrives here. An operation not admitted by
+/// [`HostOpV1::executor_admits`] is refused before validation or a backend leaf.
+/// Native ABI admission separately requires `NativeTested`.
 ///
 /// The refusal is `TerminalErrorV1::OperationUnavailable`, the same variant and
 /// payload the other two refusal sites produce (`host_effect_wire_layout_v1`
@@ -2891,23 +2899,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     resource: ResourceInputsV1,
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
-    // Process runs in the reference interpreter in this slice. Native entry
-    // refuses these represented operations before object emission, and the
-    // native ABI separately requires NativeTested. This one semantic switch
-    // remains shared; an interpreter call does not promote native availability.
-    let interpreter_process = matches!(
-        operation,
-        HostOpV1::ResourceStreamRead
-            | HostOpV1::ResourceStreamWrite
-            | HostOpV1::ProcessPlanOpen
-            | HostOpV1::ProcessPlanPush
-            | HostOpV1::ProcessSpawn
-            | HostOpV1::ProcessTakePipe
-            | HostOpV1::ProcessWait
-    );
-    if operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable
-        && !interpreter_process
-    {
+    if !operation.executor_admits() {
         return Err(TerminalErrorV1::OperationUnavailable(operation));
     }
     dispatch_host_op_v1_for_promotion_evidence(
@@ -5697,14 +5689,14 @@ mod tests {
     /// function can have an opinion. A gate that refused only well-formed
     /// requests would leave the malformed path executing.
     #[test]
-    fn every_represented_unavailable_operation_is_refused_by_the_executor_entry() {
+    fn every_executor_unadmitted_operation_is_refused_by_the_executor_entry() {
         let capabilities = CapabilityTableV1::default();
         let revocation = RevocationDomain::default();
         let mut backend = AllOpsBackend::default();
         let mut refused = 0usize;
 
         for operation in HostOpV1::ALL {
-            if operation.availability() != HostOpAvailabilityV1::RepresentedUnavailable {
+            if operation.executor_admits() {
                 continue;
             }
             let mut resources = ResourceTableV1::default();
@@ -5721,7 +5713,7 @@ mod tests {
             assert_eq!(
                 result,
                 Err(TerminalErrorV1::OperationUnavailable(operation)),
-                "{operation:?} is RepresentedUnavailable, so dispatch_host_op_v1 \
+                "{operation:?} is not executor-admitted, so dispatch_host_op_v1 \
                  must refuse it before any other check"
             );
             refused += 1;
@@ -5744,6 +5736,37 @@ mod tests {
              observed {:?}",
             backend.0
         );
+    }
+
+    /// Promise: durable invariant. MEASURED: the full HostOp inventory's
+    /// interpreter-only admitted set is exactly PX10's seven operations.
+    /// CLAIMED: native-unavailable operations do not silently gain executor
+    /// admission. THE GAP: the shared dispatcher must use executor_admits.
+    #[test]
+    fn executor_admits_exactly_native_tested_plus_px10_interpreter_set() {
+        use std::collections::BTreeSet;
+        let widened = HostOpV1::ALL
+            .into_iter()
+            .filter(|op| {
+                op.executor_admits()
+                    && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            widened,
+            BTreeSet::from([
+                HostOpV1::ResourceStreamRead,
+                HostOpV1::ResourceStreamWrite,
+                HostOpV1::ProcessPlanOpen,
+                HostOpV1::ProcessPlanPush,
+                HostOpV1::ProcessSpawn,
+                HostOpV1::ProcessTakePipe,
+                HostOpV1::ProcessWait,
+            ])
+        );
+        assert!(HostOpV1::ALL.into_iter().all(|op| {
+            op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
+        }));
     }
 
     #[test]

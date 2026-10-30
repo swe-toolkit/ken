@@ -2943,48 +2943,6 @@ pub fn compile_native_program_sources(
     complete_native_program_preparation(preparation, output_dir, profile)
 }
 
-// Inspect the exact selected, erased executable bodies before object emission.
-// This walks expressions rather than the whole host-op inventory: an unused
-// prelude operation is not a native-build refusal for an unrelated program.
-fn first_unavailable_native_host_op(expr: &ken_runtime::RuntimeExpr) -> Option<ken_host::HostOpV1> {
-    use ken_runtime::RuntimeExpr as Expr;
-    match expr {
-        Expr::Effect { operation, args, .. } => {
-            (operation.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable)
-                .then_some(*operation)
-                .or_else(|| args.iter().find_map(first_unavailable_native_host_op))
-        }
-        Expr::CheckedBracketFinalizer { body, .. }
-        | Expr::CheckedJoinSite { body, .. }
-        | Expr::CheckedSubcontinuationFrame { body, .. }
-        | Expr::CheckedRecursiveInvocation { body, .. }
-        | Expr::CheckedComputationalIHSlots { body, .. }
-        | Expr::CheckedComputationalIHInvocation { body, .. }
-        | Expr::Closure { body, .. } => first_unavailable_native_host_op(body),
-        Expr::Let { value, body } => first_unavailable_native_host_op(value)
-            .or_else(|| first_unavailable_native_host_op(body)),
-        Expr::If { scrutinee, then_expr, else_expr } => first_unavailable_native_host_op(scrutinee)
-            .or_else(|| first_unavailable_native_host_op(then_expr))
-            .or_else(|| first_unavailable_native_host_op(else_expr)),
-        Expr::Match { scrutinee, cases, .. } => first_unavailable_native_host_op(scrutinee)
-            .or_else(|| cases.iter().find_map(|case| first_unavailable_native_host_op(&case.body))),
-        Expr::ComputationalMatch { scrutinee, cases, .. } => first_unavailable_native_host_op(scrutinee)
-            .or_else(|| cases.iter().find_map(|case| first_unavailable_native_host_op(&case.body))),
-        Expr::PrimitiveCall { args, .. } | Expr::Construct { args, .. } =>
-            args.iter().find_map(first_unavailable_native_host_op),
-        Expr::Record { fields } => fields.iter()
-            .find_map(|(_, value)| first_unavailable_native_host_op(value)),
-        Expr::Project { record, .. } => first_unavailable_native_host_op(record),
-        Expr::LexicalClosure { captures, body, .. } => captures.iter()
-            .find_map(first_unavailable_native_host_op)
-            .or_else(|| first_unavailable_native_host_op(body)),
-        Expr::Call { callee, args } => first_unavailable_native_host_op(callee)
-            .or_else(|| args.iter().find_map(first_unavailable_native_host_op)),
-        Expr::Value(_) | Expr::Var(_) | Expr::DeclarationRef { .. }
-        | Expr::ImportedDeclarationRef { .. } | Expr::Trap(_) => None,
-    }
-}
-
 /// Consume the compiler-owned preparation by value and finish object emission.
 /// Keeping this operation private prevents callers from supplying a plan while
 /// preserving object identity for the closure-bearing Runtime program.
@@ -2994,20 +2952,26 @@ fn complete_native_program_preparation(
     output_dir: impl AsRef<Path>,
     profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
-    if let Some(operation) = preparation.runtime_program.declarations.iter().find_map(|declaration| {
-        match &declaration.kind {
-            ken_runtime::RuntimeDeclarationKind::Transparent { body } => first_unavailable_native_host_op(body),
-            ken_runtime::RuntimeDeclarationKind::Primitive { .. }
-            | ken_runtime::RuntimeDeclarationKind::Data { .. }
-            | ken_runtime::RuntimeDeclarationKind::Record { .. }
-            | ken_runtime::RuntimeDeclarationKind::RecursiveGroup { .. }
-            | ken_runtime::RuntimeDeclarationKind::EffectBoundary { .. }
-            | ken_runtime::RuntimeDeclarationKind::MetadataOnly => None,
-        }
-    }) {
+    // Every public Process and pipe-stream operation requires the checked
+    // Process grant; no FS-only program has it. Refuse on that stable authority
+    // before object emission, not on generic host response alternatives (which
+    // include all operations) or on a particular bracket-lowering shape.
+    if preparation.plan.process_declared {
+        let unavailable = ken_host::HostOpV1::ALL
+            .into_iter()
+            .filter(|operation| {
+                operation.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
+                    && operation.executor_admits()
+            })
+            .map(|operation| format!("{operation:?}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
             "host_effect_lowering_unavailable",
-            format!("host operation {operation:?} is RepresentedUnavailable for native build"),
+            format!(
+                "declared Process capability requires host operations {unavailable}, \
+                 which are RepresentedUnavailable for native build"
+            ),
         )));
     }
     let plan = preparation.plan.as_ref();
