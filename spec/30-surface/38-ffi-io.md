@@ -1014,42 +1014,112 @@ without EXECUTE cannot spawn. The child runs outside Ken's capability
 confinement, so this declaration acknowledges the OS authority the child
 can exercise; the parent's FS root is **not** a child sandbox.
 
-`withChild` is the bracketed acquisition route. It uses the pure plan
-to start one child and passes the live child resource to its body. Its
-pipe endpoints are resources owned by that bracket. A selected pipe's
-parent end can be taken **once**; attempting another take or taking an
-unselected endpoint is `IOError.InvalidInput`. The resource kinds are
+The public child and pipe operations have these exact checked signatures.
+The `Cap a` passed to `withChild` is the existing FS capability; there is
+no second Process-capability argument and no `Cap AFull` type. The runner
+adds EXECUTE to that capability only under the declaration above. A missing
+or attenuated EXECUTE right returns
+`Err (ResourceHostIO IOError.CapabilityDenied)` before the child starts.
+
+```ken
+proc withChild (a : Auth) (e : Type) (r : Type)
+    (cap : Cap a) (plan : SpawnPlan)
+    (body : Resource ResourceKind.ChildProcess -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Process]
+
+proc take_stdin (a : Auth) (child : Resource ResourceKind.ChildProcess)
+  : HostIO a (Result ResourceError (Resource ResourceKind.PipeWrite)) visits [Process]
+proc take_stdout (a : Auth) (child : Resource ResourceKind.ChildProcess)
+  : HostIO a (Result ResourceError (Resource ResourceKind.PipeRead)) visits [Process]
+proc take_stderr (a : Auth) (child : Resource ResourceKind.ChildProcess)
+  : HostIO a (Result ResourceError (Resource ResourceKind.PipeRead)) visits [Process]
+
+proc read_pipe (a : Auth) (pipe : Resource ResourceKind.PipeRead)
+    (buffer : BufferHandle) (window : BufferWindow)
+  : HostIO a (Result ResourceError ReadProgress) visits [Process]
+proc write_pipe (a : Auth) (pipe : Resource ResourceKind.PipeWrite)
+    (buffer : BufferHandle) (span : BufferSpan)
+  : HostIO a (Result ResourceError WriteProgress) visits [Process]
+
+proc close_pipe_write (a : Auth) (pipe : Resource ResourceKind.PipeWrite)
+  : HostIO a (Result ResourceError Unit) visits [Process]
+proc close_pipe_read (a : Auth) (pipe : Resource ResourceKind.PipeRead)
+  : HostIO a (Result ResourceError Unit) visits [Process]
+
+proc wait_child (a : Auth) (child : Resource ResourceKind.ChildProcess)
+  : HostIO a (Result ResourceError ChildExit) visits [Process]
+```
+
+`withChild` is the sole public child-acquisition route. It uses the pure
+plan to start one child and passes the live child resource to its body;
+the private host plan resource never reaches source. Plan admission or
+spawn failure skips the body, releases the private plan, and creates no
+child. On success the result uses the existing `ResourceBracketResult`
+four-way distinction between body success/error and release error.
+Pipe endpoints are resources owned by the child bracket. The body
+obtains ends only through the three fixed-direction `take_*`
+operations: `take_stdin` yields `PipeWrite`, while `take_stdout` and
+`take_stderr` yield `PipeRead`. Each selected `ChildPipe` end can be taken
+**once**. Taking it again, or taking a `ChildNull` or `ChildInherit` end,
+returns `Err (ResourceHostIO IOError.InvalidInput)`. No take accepts an
+arbitrary descriptor index. The resource kinds are
 `ResourceKind.SpawnPlan` for the host-side encoded plan,
 `ResourceKind.ChildProcess` for the live child, `ResourceKind.PipeRead`
 for a parent stdout/stderr end, and `ResourceKind.PipeWrite` for a parent
 stdin end. Together with `ResourceKind.FsHandle`,
 `ResourceKind.Buffer`, and `ResourceKind.Mapping`, these are the complete
 seven-kind inventory of this slice. All seven constructors are scoped
-`ResourceKind.C` paths; none is a bare reserved name. A `read_pipe`
-requires a `PipeRead`, and a `write_pipe` requires a `PipeWrite`;
-they expose bounded buffer/progress results, not raw file descriptors
-or pointers. A write to a closed pipe reports
-`IOError.BrokenPipe` rather than terminating the Ken edge by SIGPIPE.
+`ResourceKind.C` paths; none is a bare reserved name. `read_pipe` uses
+an existing `BufferHandle` and admitted `BufferWindow`, yielding
+`ReadSome` with a bounded span and count or `ReadEof`. `write_pipe` uses
+a `BufferSpan` from that same buffer acquisition and returns `Wrote`
+with the actual count; a short write remains the caller's work. Neither
+exposes a raw file descriptor or pointer. A pipe client also needs the
+existing `withBuffer` bracket and its `[FS]` effect, so its combined
+row is `[FS, Process]`. A write after the child closes its read end
+returns `Err (ResourceHostIO IOError.BrokenPipe)` without terminating
+the Ken edge by SIGPIPE.
 
-`wait_child` blocks until the child exits or is killed by a signal,
-returning exactly `Exited code` or `Signaled signal`,
-with the observed code or signal number as `UInt8`. Stopped and continued
-states are not wait results. At bracket settlement, taken and untaken
-pipe ends are released **before** the child; an unwaited child is reaped.
-On terminal-error finalization an unreaped child is killed and reaped,
-not left as a zombie. Revoking the originating grant does **not** signal
-the child; later plan, child and pipe operations report the existing
-`IOError.Revoked` identity. A failed spawn creates no child to wait for
-or release.
+`close_pipe_write` lets a child reading stdin see EOF before a wait;
+`close_pipe_read` is the symmetric early close. Both are non-idempotent:
+closing an end invalidates every copy, and a repeated close returns
+`Closed`. The bracket still owns and settles an end closed early by the
+body. `wait_child` blocks until the child exits or is killed by a signal,
+returning `Exited code` or `Signaled signal`, with the observed code or
+signal number as `UInt8`. Its successful result is cached: another
+`wait_child` on that live child returns the same `ChildExit`. Stopped and
+continued states are not wait results. At bracket settlement, taken and
+untaken pipe ends are released **before** the child, in reverse
+acquisition order; an unwaited child is reaped. On terminal-error
+finalization an unreaped child is killed and reaped, not left as a
+zombie. Revoking the originating grant does **not** signal the child;
+later plan, child and pipe host operations retain `IOError.Revoked` via
+`ResourceHostIO`. After settlement, resource use returns `Closed`.
 
 #### 1.11.3 Process errors and the inherited signal boundary
 
 The existing `Capability.System.Error` surface extends its operation
 classification with `ProcessOp ProcessOperation` and its resource
-classification with `ProcessResource (Option Bytes)`. When known, the
-latter carries the program bytes; it does not expose a raw pid or fd.
-Spawn, pipe and wait failures keep their operation-specific error
-identity in the existing `SystemError` envelope. There is no parallel
+classification with `ProcessResource (Option Bytes)`. The public
+`ProcessOperation` constructors and the catalog-side lift are:
+
+```ken
+export ProcessOperation, SpawnChild, TakePipe, ReadPipe, WritePipe, ClosePipe, WaitChild
+
+data ProcessOperation = SpawnChild | TakePipe | ReadPipe | WritePipe | ClosePipe | WaitChild
+
+pub fn process_error_to_system
+    (operation : ProcessOperation) (program : Option Bytes) (cause : IOError)
+  : SystemError =
+  MkSystemError (ProcessOp operation) (ProcessResource program) cause NoSafeContext
+```
+
+When known, `ProcessResource` carries the program bytes; it does not
+expose a raw pid or fd. The public Process operations return the existing
+`ResourceError` family: a host-I/O failure uses `ResourceHostIO IOError`.
+Only that cause is passed to `process_error_to_system` with the operation
+identity. `Closed`, `ResourceKindMismatch`, and `InvalidBounds` remain
+resource-discipline errors, not `SystemError` causes. There is no parallel
 `SpawnError` family or a new `Revoked` identity. Causes use the already
 checked `IOError` identities:
 
@@ -1074,9 +1144,10 @@ contract is the observed descriptor, signal, result and authority
 boundary, not a requirement to expose the host's spawn machinery.
 
 A launcher that ignores SIGCHLD may cause the OS to auto-reap the child.
-Then `wait_child` can return ECHILD as `IOError.Other 10` instead of a
-`ChildExit`; Ken does not reset SIGCHLD or promise a successful wait in
-that environment. This is a measured residual, not permission to change
+Then `wait_child` can return ECHILD as
+`Err (ResourceHostIO (IOError.Other 10))` instead of a `ChildExit`;
+Ken does not reset SIGCHLD or promise a successful wait in that
+environment. This is a measured residual, not permission to change
 the inherited-disposition rule of §1.10. Outside that residual, the
 AC-1 observations include an argv/environment echo through a stdout
 pipe followed by `Exited 0`, and a self-SIGTERM child yielding
