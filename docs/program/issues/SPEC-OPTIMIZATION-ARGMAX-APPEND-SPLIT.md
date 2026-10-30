@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT
 title: "Spec 72 §1.6 splits argmin over two appended non-empty lists and names the argmax mirror as a separate successor, but §3 has no such law: a client cannot split a greatest-cost selection and combine the parts. Rule from a checked D0 at zero trust the two branch laws for argmax over nonempty_append, keeping the earlier part on a tie, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
