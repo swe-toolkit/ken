@@ -233,15 +233,17 @@ For checked definitions the test remains per-name: `leqChar` does not
 inherit `eqChar`'s registry key. The five source-promised but unkeyed
 names `IO`, `write`, `print_line`, `charToInt`, and `leqChar` remain
 package identities with their exact pre-source IDs, not new copies.
-Roots-loaded clients, including the legacy-roots conformance route,
-import their explicit providers; without an import, a bare use of any
-of the five is unbound. The standalone legacy entries enumerated in
-`33 §3.3` keep bare access to those same five pre-source IDs until the
-L2-4 strict-entry flip, as a separate flip-owned census class. This is
-a closed route exception, not general implementation-global fallback
-or an implicit import. The `ConsoleStream` rename and scoped constructor
-paths apply in both populations; no CLI roots route, standalone roots
-loading, or strict-default flip is introduced. `IOError`'s thirteen causes are
+Strict roots refuse an unimported bare use of each of the five with
+`UnboundName`; explicit provider imports resolve to their exact IDs.
+Legacy roots resolve explicit imports to those IDs too, but a bare
+unimported use has no promised identity or refusal. Standalone Legacy
+entries named in `33 §3.3` guarantee bare access to the five exact
+pre-source IDs until the L2-4 strict-entry flip, as a separate census
+class. Other Legacy bare globals may resolve but are neither guaranteed
+nor refused; the catalog import edits are migration, not a restriction
+on Legacy resolution. The `ConsoleStream` rename and scoped constructor
+paths apply in every mode; no CLI roots route, standalone roots loading,
+or strict-default flip is introduced. `IOError`'s thirteen causes are
 one **scoped** family, not thirteen bare B names. Architect's D0 names each cause's
 native producer separately, without inferring all readers from one cause.
 The twelve `ResourceError` constructors likewise retain their exact IDs

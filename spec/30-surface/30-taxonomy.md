@@ -441,17 +441,23 @@ operations or aliases remain package identities: `IO`, `write`, and
 `Capability.Console.Text`; `charToInt` and `leqChar` by
 `Core.Classes.LawfulClasses`. These existing homes export the captured
 checked IDs, not copied definitions or synthetic substitute globals.
-Roots-loaded clients, including the legacy-roots conformance route, import
-those providers explicitly; without an import, a bare use of any of the
-five is unbound in that route. Until the L2-4 strict-entry flip, the
-standalone legacy entries named in `33 §3.3` (`elaborate_file_v1`,
-`elaborate_ken_md_file_v1`, `elaborate_decl`, CLI paths outside
-`catalog/packages/`, examples, and inline sources) keep bare access to
-those five exact pre-source package IDs. This closed transitional route
-is not general implementation-global fallback or a roots-loader import.
-The `ConsoleStream` rename and qualified constructor paths apply to
-both routes. This slice changes neither CLI routing nor standalone roots
-loading, and does not include the strict-default flip.
+Catalog clients migrate to explicit provider imports on both roots routes.
+Strict roots (`elaborate_module_from_roots_strict`) refuse an unimported
+bare use of any of the five with `UnboundName`; importing the provider
+resolves each to its exact pre-source ID. Legacy roots
+(`elaborate_module_from_roots` and `_v1`) also resolve explicit imports
+to those exact IDs, but an unimported bare use is neither promised nor
+refused and carries no exact-ID guarantee. Until the L2-4 strict-entry
+flip, standalone Legacy entries (`elaborate_file_v1`,
+`elaborate_ken_md_file_v1`, `elaborate_decl`, and CLI paths outside
+`catalog/packages/`) guarantee bare access to the five exact pre-source
+package IDs. Examples and inline sources using those entries follow the
+same route. Other bare Legacy globals may resolve, but their availability
+is neither guaranteed nor refused by the surface contract. This does not
+make those names floor members or expand Strict resolution. The
+`ConsoleStream` rename and qualified constructor paths apply in every
+mode. This slice changes neither CLI routing nor standalone roots loading
+and does not include the strict-default flip.
 
 The implementer's token-aware census classified 1,045 candidate rows
 across 164 paths. It predicts 127 ambient-pair deletions, not 127

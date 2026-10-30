@@ -262,31 +262,36 @@ is a **surface error** (`24`) — it never reaches the kernel:
   lookup order, capitalization, nor an identical target ID breaks the tie.
   Qualified and aliased module imports otherwise preserve the imported
   declaration's identity. Selectively imported or renamed names do too.
-- **Strict roots-loaded resolution.** For a unit reached through the roots
-  loader (`39 §2.0`), resolve a source name through its lexical locals
-  (including declarations already admitted to the same incremental session),
-  explicit imports,
-  the kernel/built-in vocabulary, or the closed prelude of `30-taxonomy §4`.
-  The roots elaboration APIs and CLI entries under `catalog/packages/` use
-  this route. No implementation-global fallback makes a spelling visible:
-  loading a dependency does not import it, and neither unit inherits the
-  other's imports. In particular, the package identities `IO`, `write`,
-  `print_line`, `charToInt`, and `leqChar` require explicit public imports
-  from `Capability.Console.Text` and `Core.Classes.LawfulClasses` as
-  appropriate. An unimported bare use of any of the five is unbound in a
-  roots-loaded unit, including a legacy-roots entry.
-- **Closed transitional standalone route.** Until the L2-4 strict-entry
-  flip, `elaborate_file_v1`, `elaborate_ken_md_file_v1`, and
-  `elaborate_decl`, CLI entries outside `catalog/packages/`, examples,
-  and inline source strings keep legacy bare resolution for exactly those
-  five package spellings, each bound to its existing pre-source `GlobalId`.
-  This does not import a provider, add a floor or B name, create a second
-  identity, or authorize arbitrary compiler globals as source names. The
-  checked `ConsoleStream` name and its qualified `ConsoleStream.Stdin`,
-  `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` paths apply in both
-  routes; bare constructor spellings are not restored. This slice neither
-  changes the CLI routes nor installs standalone roots loading. L2-4 owns
-  that route and the strict-default flip.
+- **Strict roots resolution.** `elaborate_module_from_roots_strict`
+  resolves each unit's names through lexical locals, explicit imports,
+  kernel/built-in vocabulary, or the closed prelude of `30-taxonomy §4`.
+  This is the complete scope: no lookup in an implementation-global table
+  makes another spelling visible. A loaded dependency is not implicitly
+  imported and units do not inherit each other's imports. The five package
+  identities `IO`, `write`, `print_line`, `charToInt`, and `leqChar` need
+  explicit public imports from `Capability.Console.Text` and
+  `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
+  to the exact pre-source `GlobalId`; without it, an unimported bare use
+  raises `UnboundName` in Strict roots.
+- **Transitional Legacy resolution.** Until the L2-4 strict-entry flip,
+  `elaborate_module_from_roots` and `_v1` use Legacy roots. Explicit
+  provider imports there also resolve each of the five to its exact ID.
+  Bare unimported uses in Legacy roots are not required to be refused,
+  but neither their availability nor their identity is promised: a
+  loaded declaration may take over a spelling in the flat global table.
+  Catalog clients import their providers as a migration obligation, not
+  because Legacy roots enforce the Strict no-import rule. Standalone
+  `elaborate_file_v1`, `elaborate_ken_md_file_v1`, `elaborate_decl`, and
+  CLI entries outside `catalog/packages/` retain bare access to the five
+  exact pre-source IDs. Examples and inline sources using these entries
+  follow the same route. Other bare implementation globals may resolve
+  in Legacy mode but are neither guaranteed nor refused by this contract.
+  Legacy mode neither adds a floor/B name nor creates a second ID.
+  `ConsoleStream` and its scoped `ConsoleStream.Stdin`,
+  `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` paths apply in every
+  mode; the bare constructor spellings are not restored. This slice
+  changes no CLI route or standalone roots loader. L2-4 owns that route
+  and the strict-default flip.
 - **Closed built-in name set B.** For resolution and name protection, B is the
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
