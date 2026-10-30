@@ -589,28 +589,27 @@ fn pair_floor_beta_eta_are_definitional() {
     }
 }
 
-/// Promise class: transition sentinel. Fresh Strict execution re-derives the
-/// frontier after the Pair floor and the checked Conjunction import. Compare
-/// now closes; the remaining four reach the next unavailable `charToInt`.
-/// Retire this frontier vector when a checked import closes that dependency;
-/// no Legacy success or blanket catalog closure is inferred.
+/// Promise class: durable invariant. MEASURED: five named catalog roots load
+/// under Strict after the LawfulClasses home grants its checked charToInt ID;
+/// their Pair floor IDs and trust posture stay fixed, while a distinct bare
+/// non-floor global still refuses. CLAIMED: the provider home and explicit
+/// import routes close this former frontier without making ambient globals
+/// available. THE GAP: the Console/Char home-import suite separately pins the
+/// exact checked provider IDs; these five roots are not a catalog-wide claim.
 #[test]
 fn pair_floor_closure_is_rederived_after_realization() {
     let root = catalog_root();
-    let expected_failures = BTreeSet::from([
+    for module in [
         "Algorithm.Numeric.Gcd",
         "Core.Classes.LawfulClasses",
+        "Core.Logic.Compare",
         "Data.Collections.Derived",
         "Data.Numeric.Nat.Order",
-    ]);
-    let expected_successes = BTreeSet::from(["Core.Logic.Compare"]);
-    let mut observed_failures = BTreeSet::new();
-    let mut observed_successes = BTreeSet::new();
-
-    for module in expected_failures.union(&expected_successes) {
+    ] {
         let mut env = ElabEnv::new().expect("base environment");
         let pair_bindings = PAIR_BINDINGS.map(|name| env.globals[name]);
         let result = env.elaborate_module_from_roots_strict(&[root.clone()], module);
+        assert!(result.is_ok(), "{module} must load through its checked providers: {result:?}");
         assert_eq!(
             PAIR_BINDINGS.map(|name| env.globals[name]),
             pair_bindings,
@@ -622,22 +621,7 @@ fn pair_floor_closure_is_rederived_after_realization() {
                 "{module} must not trust a Pair-floor declaration"
             );
         }
-        match result {
-            Err(ElabError::UnboundName { name, .. })
-                if expected_failures.contains(module) && name == "charToInt" =>
-            {
-                observed_failures.insert(*module);
-            }
-            Ok(_) if expected_successes.contains(module) => {
-                observed_successes.insert(*module);
-            }
-            other => panic!(
-                "{module} must match its checked Conjunction/charToInt Strict frontier, got {other:?}"
-            ),
-        }
     }
-    assert_eq!(observed_failures, expected_failures);
-    assert_eq!(observed_successes, expected_successes);
 
     let prod = strict_one("def X = Prod Bool Bool")
         .expect("Prod is a distinct floor member with its own checked identity");
