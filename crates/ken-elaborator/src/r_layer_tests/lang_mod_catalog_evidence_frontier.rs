@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::modules::{
     PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
 };
@@ -89,6 +90,26 @@ fn parse_source(path: &Path) -> Vec<SurfaceDecl> {
     } else {
         parser::parse_decls(&source).expect("catalog Ken must parse")
     }
+}
+
+/// Every identifier or constructor segment the unit's own source writes.
+/// Lexical, so it over-approximates the source's references: a spelling
+/// coincidence can only keep an identity a prerequisite, never explain one.
+fn written_segments(path: &Path) -> BTreeSet<String> {
+    let source = fs::read_to_string(path).expect("catalog source must be readable UTF-8");
+    let code = if path.to_string_lossy().ends_with(".ken.md") {
+        literate::extract_ken_md(&source).expect("literate extraction").source
+    } else {
+        source
+    };
+    Lexer::lex(&code)
+        .expect("catalog Ken must lex")
+        .into_iter()
+        .filter_map(|(token, _)| match token {
+            Token::Ident(name) | Token::ConId(name) => Some(name),
+            _ => None,
+        })
+        .collect()
 }
 
 fn collect_imports(
@@ -641,9 +662,27 @@ fn legacy_evidence(
             })
         })
         .collect();
+    let import_exported: BTreeSet<GlobalId> = unit
+        .direct_imports
+        .iter()
+        .flat_map(|provider| env.module_state.package_export_ids(provider))
+        .collect();
+    explained_seed.extend(resolved.intersection(&import_exported).copied());
     explained_seed.extend(resolved.intersection(&strict_available).copied());
     explained_seed.extend(resolved.intersection(&home_granted).copied());
     let explained_reached = explained_identity_closure(&env, explained_seed);
+    // The closure explains identities that elaboration or a checked
+    // dependency introduces. A name the root's own source writes is explained
+    // only directly: by an import, the floor, a home grant, or ownership.
+    let written = written_segments(&unit.path);
+    let source_writes = |identity: &GlobalId| {
+        names
+            .get(identity)
+            .into_iter()
+            .chain(base_names.get(identity))
+            .flatten()
+            .any(|name| written.contains(name.rsplit('.').next().unwrap_or(name)))
+    };
     let mut prerequisites = BTreeSet::new();
 
     for identity in resolved.iter().copied() {
@@ -657,9 +696,10 @@ fn legacy_evidence(
             || entry_start.is_some_and(|start| identity.0 >= start)
             || strict_available.contains(&identity)
             || home_granted.contains(&identity)
+            || import_exported.contains(&identity)
             || base_support.contains(identity)
             || interior_evidence.contains(&identity)
-            || explained_reached.contains(&identity)
+            || (explained_reached.contains(&identity) && !source_writes(&identity))
             || matches!(
                 env.env.lookup(identity),
                 Some(Decl::Primitive {
@@ -838,13 +878,14 @@ fn validate_evidence_frontier(rows: &[UnitCensusRow]) -> Result<(), String> {
 /// CLAIMED: this is the current evidence frontier and nothing more. THE GAP:
 /// unavailable rows intentionally name no provider or migration and prevent every
 /// completeness claim. A prerequisite is an identity the unit's source reaches
-/// without an explaining direct import. Identities that enter the checked core
-/// only through the checked types or bodies of identities the unit's direct
-/// imports provide are transitive dependencies, not prerequisites. The
-/// compiler's exact floor and this root's own checked home grants likewise
-/// explain their identities and the checked dependencies they bring. THE GAP:
-/// this census does not guard Strict resolution against fallback; the Strict
-/// resolver suites do.
+/// without an explaining direct import. Identities the root's source does not
+/// write may be explained by the checked types and bodies of directly explained
+/// identities. A written identity needs a direct explanation. THE GAP: this
+/// census does not guard Strict resolution against fallback; the Strict
+/// resolver suites do. Provider-wide export sets can over-explain selective
+/// imports on Strict-success rows; Strict resolution guards that boundary.
+/// Operators are absent from lexical written segments and may be explained by
+/// closure. Lexical spelling coincidences can only make the census louder.
 #[test]
 fn catalog_evidence_frontier_is_closed_and_honest() {
     let root = catalog_root();
@@ -981,6 +1022,109 @@ fn console_home_grants_and_char_literal_dependency_are_explained() {
             );
         }
         other => panic!("Console.Text must have exact legacy evidence: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: Property succeeds under Strict and keeps the exact List.length
+/// identity reached through Derived's checked re-export in its Legacy core.
+/// CLAIMED: an explicitly imported facade explains what it exports by checked
+/// identity, even when the defining module and import spelling differ.
+/// THE GAP: the full frontier enumerates every other catalog root.
+#[test]
+fn facade_exported_length_is_directly_import_explained() {
+    let root = catalog_root();
+    let units = discover_units(&root);
+    let module = "Tooling.Testing.Property";
+    assert!(units[module]
+        .direct_imports
+        .contains("Data.Collections.Derived"));
+    assert_eq!(observe_strict(&root, module), LoaderObservation::Succeeded);
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[root.clone()], module)
+        .expect("legacy Property loads");
+    let length = env.globals["Data.Collections.List.length"];
+    assert!(env
+        .module_state
+        .package_export_ids("Data.Collections.Derived")
+        .contains(&length));
+    let evidence = legacy_evidence(&root, module, &units[module], &units);
+    assert_eq!(
+        validate_evidence_frontier(&[UnitCensusRow {
+            canonical_module: module.to_string(),
+            parsed_direct_imports: units[module].direct_imports.clone(),
+            strict_observation: LoaderObservation::Succeeded,
+            legacy_observation: LoaderObservation::Succeeded,
+            legacy_identity_evidence: evidence.clone(),
+        }]),
+        Ok(()),
+        "Property facade import: {evidence:?}"
+    );
+    match evidence {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(resolved_globals.contains(&length));
+            assert!(identity_grounded_prerequisites.is_empty());
+        }
+        other => panic!("Property must have exact legacy evidence: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: System.Error refuses in Strict roots; its Legacy core retains
+/// the checked FileOperation ID as an unmet CanonicalHome prerequisite.
+/// CLAIMED: a directly written unimported name is not explained merely by
+/// its presence in the checked type of an unrelated floor identity. THE GAP:
+/// facade re-exports need the independent checked-export identity pin above.
+#[test]
+fn system_error_written_file_operation_stays_a_prerequisite() {
+    let root = catalog_root();
+    let units = discover_units(&root);
+    let module = "Capability.System.Error";
+    assert!(!units[module]
+        .direct_imports
+        .contains("Capability.Filesystem.Errors"));
+    assert_eq!(
+        observe_strict(&root, module),
+        LoaderObservation::Refused {
+            stage: PipelineStage::Resolution,
+        }
+    );
+    let env = ElabEnv::new().expect("base environment");
+    let file_operation = env.globals["FileOperation"];
+    let evidence = legacy_evidence(&root, module, &units[module], &units);
+    let row = UnitCensusRow {
+        canonical_module: module.to_string(),
+        parsed_direct_imports: units[module].direct_imports.clone(),
+        strict_observation: LoaderObservation::Refused {
+            stage: PipelineStage::Resolution,
+        },
+        legacy_observation: LoaderObservation::Succeeded,
+        legacy_identity_evidence: evidence.clone(),
+    };
+    assert_eq!(
+        validate_evidence_frontier(&[row]),
+        Ok(()),
+        "System.Error written prerequisite: {evidence:?}"
+    );
+    match evidence {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(resolved_globals.contains(&file_operation));
+            assert!(identity_grounded_prerequisites.contains(&IdentityPrerequisite::CanonicalHome {
+                identity: file_operation,
+                current_names: vec!["FileOperation".to_string()],
+            }));
+        }
+        other => panic!("System.Error must have exact legacy evidence: {other:?}"),
     }
 }
 

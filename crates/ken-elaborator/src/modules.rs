@@ -497,6 +497,17 @@ impl ModuleState {
         self.package_home_ids.get(module).map_or(&[], Vec::as_slice)
     }
 
+    /// Checked identities `package` publishes in this run, including selected
+    /// facade identities; empty for a package the run has not loaded.
+    pub(crate) fn package_export_ids(&self, package: &str) -> HashSet<ken_kernel::GlobalId> {
+        self.file_export_ids
+            .get(package)
+            .or_else(|| self.export_provenance.get(package).map(|p| &p.member_ids))
+            .into_iter()
+            .flat_map(|tables| tables.values().flat_map(|members| members.values().copied()))
+            .collect()
+    }
+
     pub(crate) fn capture_strict_builtin_names(
         &mut self,
         env: &ken_kernel::GlobalEnv,
@@ -2064,11 +2075,7 @@ fn refresh_carried_instance_admission(elab: &mut ElabEnv) {
     };
     let public_ids: HashSet<ken_kernel::GlobalId> = admitted
         .iter()
-        .filter_map(|package| {
-            elab.module_state.file_export_ids.get(package)
-                .or_else(|| elab.module_state.export_provenance.get(package).map(|p| &p.member_ids))
-        })
-        .flat_map(|tables| tables.values().flat_map(|members| members.values().copied()))
+        .flat_map(|package| elab.module_state.package_export_ids(package))
         .collect();
     let carried: Vec<ken_kernel::GlobalId> = elab
         .class_env
