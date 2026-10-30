@@ -15014,13 +15014,10 @@ fn elab_str_lit(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let str_id = cx
-        .globals
-        .get("String")
-        .copied()
-        .ok_or_else(|| ElabError::UnresolvedCon {
-            name: "String".to_owned(),
-            span: span.clone(),
-        })?;
+        .numeric_env
+        .literal_carriers()
+        .ok_or_else(|| ElabError::Internal("literal carriers have not been registered".into()))?
+        .0;
     let str_ty = Term::const_(str_id, vec![]);
     if let Some(exp) = expected {
         unify_types(&mut cx.metas, exp, &str_ty);
@@ -15046,15 +15043,7 @@ fn elab_str_lit(
 /// emits an ordinary, type-checked IntLit at the Int-compatible Char carrier;
 /// the immutable core value itself drives conversion, interpreter and native.
 fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term), ElabError> {
-    let char_id = cx
-        .globals
-        .get("Char")
-        .copied()
-        .ok_or_else(|| ElabError::UnresolvedCon {
-            name: "Char".to_owned(),
-            span: span.clone(),
-        })?;
-    let char_ty = Term::const_(char_id, vec![]);
+    let char_ty = Term::const_(cx.numeric_env.char_id, vec![]);
     let literal = ken_kernel::check::checked_char_literal(cx.env, c as u32)
         .map_err(|error| ElabError::KernelRejected {
             error,
@@ -15069,13 +15058,10 @@ fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term),
 /// mechanism, carrying the decoded byte vector instead of an `NfcString`.
 fn elab_bytes_lit(cx: &mut ElabCtx, bytes: &[u8], span: &Span) -> Result<(Term, Term), ElabError> {
     let bytes_id = cx
-        .globals
-        .get("Bytes")
-        .copied()
-        .ok_or_else(|| ElabError::UnresolvedCon {
-            name: "Bytes".to_owned(),
-            span: span.clone(),
-        })?;
+        .numeric_env
+        .literal_carriers()
+        .ok_or_else(|| ElabError::Internal("literal carriers have not been registered".into()))?
+        .1;
     let bytes_ty = Term::const_(bytes_id, vec![]);
     let lit_id = declare_primitive(cx.env, vec![], bytes_ty.clone(), PrimReduction::Literal)
         .map_err(|e| ElabError::KernelRejected {
@@ -20349,10 +20335,13 @@ fn elaborate_foreign_decl(
         cx.metas.zonk_term(&ty_c)
     };
 
-    let bytes_id = globals
-        .get("Bytes")
-        .copied()
-        .ok_or_else(|| ElabError::Internal("Bytes not registered before foreign layer".into()))?;
+    // FFI marshalling is keyed by the same pre-source Bytes carrier that
+    // literal plans use. A source `def Bytes = Int` may rebind the flat map,
+    // but cannot turn the new Int alias into a Bytes pointer ABI.
+    let bytes_id = numeric_env
+        .literal_carriers()
+        .ok_or_else(|| ElabError::Internal("Bytes carrier not registered before foreign layer".into()))?
+        .1;
 
     // Foreign ensures → runtime check obligations (AC4).
     let ensures_strs: Vec<String> = rdecl.ensures.iter().map(|e| format!("{:?}", e)).collect();
@@ -23846,12 +23835,6 @@ enum LiteralListElementComparator {
     ThroughIntView { view: GlobalId, eq_int: GlobalId },
 }
 
-fn literal_builtin(cx: &ElabCtx<'_>, name: &str) -> Result<GlobalId, ElabError> {
-    cx.globals.get(name).copied().ok_or_else(|| {
-        ElabError::Internal(format!("literal comparator builtin '{name}' is missing"))
-    })
-}
-
 fn literal_expected_is(cx: &ElabCtx<'_>, expected: &Term, carrier: GlobalId) -> bool {
     let expected = cx.metas.zonk_term(expected);
     convert_type(cx.env, &cx.ctx, &expected, &Term::const_(carrier, vec![]))
@@ -23918,23 +23901,33 @@ fn plan_literal_comparator(
                         ));
                     }
 
-                    let fixed_views = [
-                        (cx.numeric_env.int8_id, "int8_to_int"),
-                        (cx.numeric_env.int16_id, "int16_to_int"),
-                        (cx.numeric_env.int32_id, "int32_to_int"),
-                        (cx.numeric_env.int64_id, "int64_to_int"),
-                        (cx.numeric_env.uint8_id, "uint8_to_int"),
-                        (cx.numeric_env.uint16_id, "uint16_to_int"),
-                        (cx.numeric_env.uint32_id, "uint32_to_int"),
-                        (cx.numeric_env.uint64_id, "uint64_to_int"),
+                    let fixed_carriers = [
+                        cx.numeric_env.int8_id,
+                        cx.numeric_env.int16_id,
+                        cx.numeric_env.int32_id,
+                        cx.numeric_env.int64_id,
+                        cx.numeric_env.uint8_id,
+                        cx.numeric_env.uint16_id,
+                        cx.numeric_env.uint32_id,
+                        cx.numeric_env.uint64_id,
                     ];
-                    for (carrier, view_name) in fixed_views {
+                    for carrier in fixed_carriers {
                         if literal_expected_is(cx, expected, carrier) {
+                            let view = cx.numeric_env.fixed_widen_view(carrier).ok_or_else(|| {
+                                ElabError::Internal(
+                                    "fixed-width literal view is unregistered".into(),
+                                )
+                            })?;
+                            let eq_int = cx
+                                .numeric_env
+                                .classify_eq(&Term::const_(cx.numeric_env.int_id, vec![]))
+                                .expect("Int has a registered value comparator")
+                                .op_id;
                             return Ok((
                                 LiteralComparatorValue::Integer(value.clone()),
                                 LiteralComparatorPlan::FixedWidth {
-                                    view: literal_builtin(cx, view_name)?,
-                                    eq_int: literal_builtin(cx, "eq_int")?,
+                                    view,
+                                    eq_int,
                                     literal: literal_core,
                                 },
                             ));
@@ -23978,7 +23971,12 @@ fn plan_literal_comparator(
         }
         LiteralPat::String(value) => {
             let _checked = elab_str_lit(cx, value, Some(expected), span)?;
-            let string_id = literal_builtin(cx, "String")?;
+            let ids = cx.numeric_env.literal_plan_ids().ok_or_else(|| {
+                ElabError::Internal("literal plan IDs have not been registered".into())
+            })?;
+            let (string_id, _) = cx.numeric_env.literal_carriers().ok_or_else(|| {
+                ElabError::Internal("literal carriers have not been registered".into())
+            })?;
             if literal_expected_is(cx, expected, string_id) {
                 let normalized = crate::NfcString::new(value);
                 let mut elements = Vec::new();
@@ -23988,7 +23986,7 @@ fn plan_literal_comparator(
                 return Ok((
                     LiteralComparatorValue::String(normalized),
                     LiteralComparatorPlan::String {
-                        view: literal_builtin(cx, "string_to_list_char")?,
+                        view: ids.string_to_list_char_id,
                         eq_char: cx
                             .numeric_env
                             .classify_eq(&Term::const_(cx.numeric_env.char_id, vec![]))
@@ -24020,7 +24018,12 @@ fn plan_literal_comparator(
         LiteralPat::Bytes(value) => {
             let (checked, literal_ty) = elab_bytes_lit(cx, value, span)?;
             unify_types(&mut cx.metas, expected, &literal_ty);
-            let bytes_id = literal_builtin(cx, "Bytes")?;
+            let ids = cx.numeric_env.literal_plan_ids().ok_or_else(|| {
+                ElabError::Internal("literal plan IDs have not been registered".into())
+            })?;
+            let (_, bytes_id) = cx.numeric_env.literal_carriers().ok_or_else(|| {
+                ElabError::Internal("literal carriers have not been registered".into())
+            })?;
             if literal_expected_is(cx, expected, bytes_id) {
                 let uint8_ty = Term::const_(cx.numeric_env.uint8_id, vec![]);
                 let mut elements = Vec::with_capacity(value.len());
@@ -24036,9 +24039,18 @@ fn plan_literal_comparator(
                 return Ok((
                     LiteralComparatorValue::Bytes(value.clone()),
                     LiteralComparatorPlan::Bytes {
-                        view: literal_builtin(cx, "bytes_to_list")?,
-                        uint8_to_int: literal_builtin(cx, "uint8_to_int")?,
-                        eq_int: literal_builtin(cx, "eq_int")?,
+                        view: ids.bytes_to_list_id,
+                        uint8_to_int: cx
+                            .numeric_env
+                            .fixed_widen_view(cx.numeric_env.uint8_id)
+                            .ok_or_else(|| {
+                                ElabError::Internal("UInt8 literal view is unregistered".into())
+                            })?,
+                        eq_int: cx
+                            .numeric_env
+                            .classify_eq(&Term::const_(cx.numeric_env.int_id, vec![]))
+                            .expect("Int has a registered value comparator")
+                            .op_id,
                         elements,
                     },
                 ));
@@ -24178,9 +24190,12 @@ fn build_literal_list_test(
     comparator: LiteralListElementComparator,
     scrutinee: Term,
 ) -> Result<Term, ElabError> {
-    let list_id = literal_builtin(cx, "List")?;
-    let nil_id = literal_builtin(cx, "Nil")?;
-    let cons_id = literal_builtin(cx, "Cons")?;
+    let ids = cx.numeric_env.literal_plan_ids().ok_or_else(|| {
+        ElabError::Internal("literal plan IDs have not been registered".into())
+    })?;
+    let list_id = ids.list_id;
+    let nil_id = ids.nil_id;
+    let cons_id = ids.cons_id;
     let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
     let list_ty = Term::app(Term::indformer(list_id, vec![]), element_ty.clone());
     let motive = Term::Ascript(

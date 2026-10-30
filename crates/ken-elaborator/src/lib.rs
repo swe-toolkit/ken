@@ -416,6 +416,10 @@ impl ElabEnv {
             module_state: modules::ModuleState::default(),
             refinement_facts: elab::RefinementFacts::default(),
         };
+        // The Bytes registrar finishes before prelude source can use String
+        // literal values (e.g. the ABI-range error names).
+        elab.numeric_env
+            .install_literal_carriers(elab.bytes_env.string_id, elab.bytes_env.bytes_id);
         // L3 prelude: Peano `Nat` (replaces the placeholder postulate) + the
         // collection inductives + Ω constants (`37`). Registered via the landed
         // `data` / postulate machinery — no new kernel rule.
@@ -427,6 +431,15 @@ impl ElabEnv {
         elab.with_owner("prelude::safe_bytes".into(), |elab| {
             bytes::register_safe_bytes_ops(&mut elab.env, &mut elab.globals, &mut elab.bytes_env)
         })?;
+        // Literal plans read the registered carriers/views and the prelude's
+        // checked List family, never the source-mutable flat globals map.
+        elab.numeric_env.install_literal_plan_ids(numbers::LiteralPlanIds {
+            string_to_list_char_id: elab.prelude_env.string_to_list_char_id,
+            bytes_to_list_id: elab.bytes_env.bytes_to_list_id,
+            list_id: elab.prelude_env.list_id,
+            nil_id: elab.prelude_env.nil_id,
+            cons_id: elab.prelude_env.cons_id,
+        });
         // Lc typeclass env: pre-declare RecordNil + record_nil_val (`33 §5`).
         let class_env = elab.with_owner("prelude::classes".into(), |elab| {
             elab::init_class_env(&mut elab.env, &mut elab.globals)

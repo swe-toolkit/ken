@@ -155,6 +155,7 @@ pub fn register_conversions(elab: &mut ElabEnv) -> Result<(), ElabError> {
             ty_id,
             int_id,
         )?;
+        elab.numeric_env.record_fixed_widen_view(ty_id, widen_id);
 
         let narrow_raw_name = format!("int_to_{}_raw", spec.snake);
         let narrow_raw_id = reg_unop(
