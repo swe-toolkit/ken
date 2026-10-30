@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT
 title: "Spec 72 fixes argmin on a head and its tail, but no law relates argmin of two appended non-empty lists to the argmin of each part, so a client cannot split a selection and combine the results. Rule from a checked D0 at zero trust the two branch laws for argmin over nonempty_append, keeping the earlier part on a tie, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
