@@ -334,8 +334,9 @@ fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
 /// Promise class: transition sentinel. The span fixture's completed plan
 /// records eight installed Specialized rows and its one deferred Vis.
 /// MEASURED: the real build produces a linked artifact and planner diagnostics.
-/// CLAIMED: owner 4 retains only returned Vis528; owner 6 and Vis1079 keep
-/// their distinct planning dispositions. THE GAP: compilation alone does not
+/// CLAIMED: the installed BufferFreeze owner retains exactly its deferred
+/// non-relay continuation, while release rows stay on the bracket plane.
+/// THE GAP: compilation alone does not
 /// prove source-drive execution; the separately unignored native row does.
 #[cfg(target_os = "linux")]
 #[test]
@@ -371,22 +372,31 @@ fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
         assert_eq!(bracket, plan.bracket_settlement_vis_origins.iter().copied().collect(),
             "every moved Vis belongs to an authenticated bracket S");
         assert!(plan.bracket_response_rows.iter().all(|row| row.operation == "ResourceRelease"));
-        let freeze_owner = plan.static_response_owners.iter().find(|owner|
+        let freeze_rows = plan.all_static_response_rows.iter()
+            .filter(|row| row.operation == "BufferFreeze")
+            .collect::<Vec<_>>();
+        assert_eq!(freeze_rows.len(), 1, "one checked BufferFreeze source has an installed owner");
+        let freeze_origin = freeze_rows[0].vis_origin;
+        assert!(plan.static_response_owners.iter().any(|owner|
             plan.all_static_response_rows.get(owner.response as usize)
-                .is_some_and(|row| row.vis_origin == 1158))
-            .expect("the non-bracket freeze owner remains installed");
-        let freeze_origin = plan.all_static_response_rows[freeze_owner.response as usize].vis_origin;
+                .is_some_and(|row| row.vis_origin == freeze_origin)),
+            "the named BufferFreeze source has an installed ordinary owner");
+        let deferred = plan.static_response_deferred.as_slice();
+        assert!(matches!(deferred, [row]
+            if row.operation == "BufferFreeze" && row.sub_case == "ContinuationBodyTail"
+                && row.handler_owner.is_none()),
+            "the non-relay BufferFreeze stays Deferred: {deferred:?}");
         let returned = plan.settled_returned_vis_protocols.iter()
             .find(|(owner, _)| *owner == freeze_origin)
             .map(|(_, members)| members.as_slice())
             .expect("span freeze owner retains a pending-Vis protocol after source drive");
-        assert_eq!(returned, &[1090], "span freeze owner returns only its non-relay Vis");
-        assert!(plan.bracket_response_rows.iter().any(|row| row.vis_origin == 754),
-            "the old owner-6 Vis is now in the authenticated bracket plane");
-        assert!(matches!(plan.static_response_deferred.as_slice(), [row]
-            if row.vis_origin == 1090 && row.sub_case == "ContinuationBodyTail"
-                && row.handler_owner.is_none()),
-            "Vis1090 stays Deferred with no handler owner: {:?}", plan.static_response_deferred);
+        assert_eq!(returned, &[deferred[0].vis_origin],
+            "the installed freeze owner must return exactly the independently classified Deferred Vis");
+        assert!(plan.bracket_response_rows.iter()
+            .filter(|row| row.operation == "ResourceRelease"
+                && row.k_identity.contains("emission_owner: Predeclared("))
+            .count() >= 2,
+            "both checked predeclared release continuations remain on the bracket plane");
     });
 }
 

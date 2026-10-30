@@ -159,45 +159,66 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
     use ken_runtime::SettlementFootprintEvent as Event;
     use std::collections::BTreeMap;
     let authenticated = &diagnostics[0].bracket_settlement_vis_origins;
+    let selected = diagnostics[0].bracket_response_rows.iter()
+        .filter(|row| row.operation == "ResourceRelease"
+            && row.k_identity.contains("emission_owner: Predeclared("))
+        .map(|row| row.vis_origin).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(selected.len(), 1,
+        "the checked predeclared release must identify one settled Tail");
+    let consumed_origin = *selected.iter().next().unwrap();
+    assert!(authenticated.contains(&consumed_origin),
+        "the checked release must belong to an authenticated bracket");
     if std::env::var_os("RT_FOOTPRINT_DETERMINISM").is_some() {
         eprintln!("RT_SETTLEMENT_FOOTPRINT_SEQUENCE {sequence:?}");
     }
-    let consumed = Event::Consumed { settlement: 1, construct: 717 };
-    let arrival = Event::ResidualArrival { origin: 523 };
-    let route = Event::Route1 { origin: 889, route1: true };
-    let mut segments = vec![BTreeMap::<Event, usize>::new()];
-    let mut non_consumed = BTreeMap::<Event, usize>::new();
+    let mut segments = vec![BTreeMap::<&str, usize>::new()];
+    let mut non_consumed = BTreeMap::<&str, usize>::new();
+    let mut arrivals = std::collections::BTreeSet::new();
+    let mut routes = std::collections::BTreeSet::new();
     for &event in &sequence {
-        if let Event::Consumed { construct, .. } = event {
-            assert_eq!(event, consumed, "only settlement 1 owns this Tail");
-            assert!(authenticated.contains(&construct),
-                "branched Tail Vis {construct} was not authenticated");
-            segments.push(BTreeMap::new());
-        } else {
-            *non_consumed.entry(event).or_default() += 1;
+        let kind = match event {
+            Event::Consumed { settlement: 1, construct } if construct == consumed_origin => {
+                segments.push(BTreeMap::new());
+                "Consumed"
+            }
+            Event::ResidualArrival { origin } => {
+                arrivals.insert(origin);
+                "ResidualArrival"
+            }
+            Event::Route1 { origin, route1: true } => {
+                routes.insert(origin);
+                "Route1"
+            }
+            _ => panic!("unclassified branched settlement event: {event:?}"),
+        };
+        if kind != "Consumed" {
+            *non_consumed.entry(kind).or_default() += 1;
         }
-        *segments.last_mut().expect("segment zero exists").entry(event).or_default() += 1;
+        *segments.last_mut().expect("segment zero exists").entry(kind).or_default() += 1;
     }
     // Transition sentinel. MEASURED: the complete unified lowering event log,
-    // including site-A arrival 523 between Consumed and Route1(889,true).
-    // CLAIMED: only the authenticated Tail produces two exact segment footprints
-    // and the ordinary d26 event population stays empty. THE GAP: this is
-    // compile-time work, not executed native semantics; the settlement forward
-    // edge retires both footprint events together.
-    // (a) Exact authenticated settlement count.
+    // each segment carrying one authenticated release, one residual arrival,
+    // and one route-1 decision. CLAIMED: those categories recur at one source
+    // origin each, and no other ordinary event remains. THE GAP: the arrival
+    // and route origins are not keyed to a separate checked-source plane;
+    // they are pinned for consistent recurrence, not absolute identity.
+    assert_eq!(arrivals.len(), 1, "one constructor site supplies the residual arrival");
+    assert_eq!(routes.len(), 1, "one checked source site supplies route 1");
+    assert!(arrivals.is_disjoint(&routes) && !arrivals.contains(&consumed_origin)
+        && !routes.contains(&consumed_origin),
+        "arrival, route and settled Vis must name distinct source constructs");
     assert_eq!(segments.len(), 3, "two settlement-consumed branched Tails");
-    // (b) Segment zero and both complete segments as measured (not adjacency).
-    assert!(segments[0].is_empty(), "the d26 ordinary prefix is empty");
-    let expected = BTreeMap::from([(consumed, 1), (arrival, 1), (route, 1)]);
+    assert!(segments[0].is_empty(), "the ordinary prefix must be empty");
+    let expected = BTreeMap::from([
+        ("Consumed", 1), ("ResidualArrival", 1), ("Route1", 1),
+    ]);
     for (index, segment) in segments.iter().enumerate().skip(1) {
         assert_eq!(*segment, expected,
-            "branched segment {index} changed from its measured full multiset");
+            "branched segment {index} changed from its complete footprint");
     }
-    // (c) F is the complete M-2' delta and its removal leaves no ordinary
-    // events; do not project away the residual arrival or any route event.
-    for footprint in [arrival, route] {
-        assert_eq!(non_consumed.remove(&footprint), Some(2),
-            "branched counterfactual footprint member changed: {footprint:?}");
+    for footprint in ["ResidualArrival", "Route1"] {
+        assert_eq!(non_consumed.remove(footprint), Some(2),
+            "branched counterfactual footprint member changed: {footprint}");
     }
     assert!(non_consumed.is_empty(),
         "branched non-footprint entries changed: {non_consumed:?}");

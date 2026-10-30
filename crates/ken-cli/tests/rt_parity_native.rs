@@ -290,6 +290,27 @@ fn in_generated_entry_stack_thread(name: &'static str, body: fn()) {
         .expect("generated-entry fixture thread");
 }
 
+/// Canonicalize only allocation ordinals, preserving every equality and alias
+/// relation among checked source constructs in the complete debug key. A
+/// prelude extension may renumber origins but must not change their roles.
+fn key_shape_without_origin_ordinals(text: &str) -> String {
+    let mut canonical = String::new();
+    let mut names = std::collections::BTreeMap::<u32, usize>::new();
+    let mut rest = text;
+    while let Some((prefix, tail)) = rest.split_once("StaticOriginId(") {
+        canonical.push_str(prefix);
+        let (number, suffix) = tail.split_once(')')
+            .expect("complete checked source origin in specialization key");
+        let origin: u32 = number.parse().expect("numeric source-origin ordinal");
+        let next = names.len();
+        let name = *names.entry(origin).or_insert(next);
+        canonical.push_str(&format!("StaticOriginId(source#{name})"));
+        rest = suffix;
+    }
+    canonical.push_str(rest);
+    canonical
+}
+
 fn parse_static_origin_id(rendered: &str) -> u32 {
     rendered
         .strip_prefix("StaticOriginId(")
@@ -2562,14 +2583,16 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
         let (write, write_applications, write_availability) = compile("write", "rt_write_writable_stage");
         assert_eq!(read_availability.len(), 1);
         let census = &read_availability[0];
-        // Promise class: transition sentinel. The checked read fixture's
-        // complete keys were re-recorded after the confined bracket-release
-        // constructor shifted checked prelude origins. Specialization identity
-        // remains unchanged up to origin numbering, and the vector includes
-        // availability drafts. Re-record only when specialization identity
-        // intentionally changes or another lawful normalization shifts origins.
-        assert_eq!(census.interned_keys.join("\n"),
-            include_str!("rt_per_emitter_read_keys.private_bracket_release.txt"));
+        // Promise class: transition sentinel. The complete checked key shape
+        // retains every source-origin alias relation and availability draft;
+        // only numeric planner allocation ordinals are canonicalized. MEASURED:
+        // source-key identities remain stable under prelude-origin renumbering.
+        // CLAIMED: specialization structure remains fixed for this checked
+        // fixture. THE GAP: shape alone cannot distinguish two source constructs
+        // whose origins are swapped consistently throughout the entire key.
+        assert_eq!(key_shape_without_origin_ordinals(&census.interned_keys.join("\n")),
+            key_shape_without_origin_ordinals(include_str!(
+                "rt_per_emitter_read_keys.private_bracket_release.txt")));
         assert_eq!(census.materializations.len(), 7);
         assert_eq!(census.unclassified.len(), 6);
         let points_by_specialization = census.materializations.iter()
@@ -2604,14 +2627,17 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
                 ("Predeclared(PredeclaredFunctionId(5))", (9, 0)),
                 ("Specialization(ContinuationSpecializationId(2))", (41, 7)),
             ].into());
-        let destination = census.materializations.iter().find(|point| {
-            point.specialization == 1
-                && point.emission_origin == 745
-                && point.kind == "CheckedIhTransportDestination"
-                && point.owner == "Specialization(ContinuationSpecializationId(2))"
-        }).expect("Vis745 has one checked-IH transport destination for spec 1");
-        assert_eq!(destination.owner_id,
-            ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2));
+        let destinations = census.materializations.iter().filter(|point| {
+            point.kind == "CheckedIhTransportDestination"
+                && point.captures.len() == 14
+                && point.captures.iter().any(|capture| capture.run == "Worker")
+        }).collect::<Vec<_>>();
+        assert_eq!(destinations.len(), 1,
+            "the checked source has one 14-capture IH transport destination");
+        let destination = destinations[0];
+        assert!(matches!(destination.owner_id,
+            ken_runtime::PerEmitterOwnerDiagnostic::Specialization(_)),
+            "the transport destination belongs to a checked specialization");
         assert_eq!(destination.captures.len(), 14);
         assert_eq!(destination.captures.iter().filter(|capture| capture.run == "Worker").count(), 8);
         assert_eq!(destination.captures.iter().filter(|capture| capture.run == "Context").count(), 6);
@@ -2619,7 +2645,7 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             assert_eq!(capture.run, if index < 8 { "Worker" } else { "Context" });
             assert_eq!(capture.ordinal, if index < 8 { index as u32 } else { (index - 8) as u32 });
             assert!(capture.result.starts_with("FinalizedTransport("),
-                "Vis745 receives its own finalized W/C transport claim: {capture:?}");
+                "the checked destination receives its own finalized W/C transport claim: {capture:?}");
             assert_eq!(capture.unfinalizable_owner, None,
                 "a finalized transport claim cannot borrow an unfinalizable owner");
         }
@@ -3389,7 +3415,7 @@ macro_rules! generated_entry_split_checked_case {
 
 // Promise class: transition sentinel. MEASURED: all three D1 marker producers
 // in the child's complete settlement-delimited log. CLAIMED: only authenticated
-// Vis 745 accounts for the temporarily reached read-route producers. THE GAP:
+// the checked read-route release accounts for the temporarily reached producers. THE GAP:
 // these are compile-time producer events, not executed cross-engine semantics;
 // the child's separate differential test guards denotation. The settlement
 // forward edge retires this base-path footprint, not the ordinary D1 controls.
@@ -3404,9 +3430,14 @@ fn assert_d1_settlement_footprint(
     const CONSUMED_PREFIX: &str = "RT_BRACKET_SETTLEMENT_CONSUMED_TAIL ";
     const RECURSOR_PREFIX: &str = "RT_ITREE_D1_RECURSOR_APPLIED ";
     const CONTROL_PREFIX: &str = "RT_ITREE_D1_CONTROL_APPLIED ";
-    let consumed = "RT_BRACKET_SETTLEMENT_CONSUMED_TAIL settlement=1 construct=745";
-    assert!(stderr.contains("RT_D1_AUTHENTICATED_SETTLEMENT_VIS=745"),
-        "{mode}: the D1 child's diagnostic did not authenticate Vis 745: {stderr}");
+    let authenticated = stderr.lines()
+        .filter_map(|line| line.strip_prefix("RT_D1_AUTHENTICATED_SETTLEMENT_VIS="))
+        .map(|value| value.parse::<u32>().expect("numeric checked read-release origin"))
+        .collect::<Vec<_>>();
+    assert_eq!(authenticated.len(), 1,
+        "{mode}: the D1 child must authenticate one checked read release: {stderr}");
+    let consumed = format!("RT_BRACKET_SETTLEMENT_CONSUMED_TAIL settlement=1 construct={}",
+        authenticated[0]);
     let mut footprint = BTreeMap::<String, usize>::new();
     if let Some(recursor) = recursor {
         footprint.insert(format!("RT_ITREE_D1_RECURSOR_APPLIED mode={recursor} frame=1"), 16);
@@ -3436,7 +3467,7 @@ fn assert_d1_settlement_footprint(
     // (a) Consumed count + authenticated construct; (b) every complete segment.
     assert_eq!(segments.len(), 17, "{mode}: exactly sixteen settlement tails");
     assert!(segments[0].is_empty(), "{mode}: segment zero is ordinary d26");
-    let mut expected_segment = BTreeMap::from([(consumed.to_owned(), 1usize)]);
+    let mut expected_segment = BTreeMap::from([(consumed, 1usize)]);
     for line in footprint.keys() {
         expected_segment.insert(line.clone(), 1);
     }
@@ -4135,10 +4166,10 @@ fn assert_generated_entry_capsule_mutation_child() {
     }
 }
 
-// The planner's exact-edge refusal when neither materialization authority
-// selects the performing response owner. This text is not a runtime trap oracle.
+// The planner's BufferAllocate route refusal when neither materialization
+// authority selects the performing owner. The source ordinal is not an oracle.
 const MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL: &str =
-    "relay: forwarded host op BufferAllocate from source StaticOriginId(1300) has no performing route";
+    "relay: forwarded host op BufferAllocate from source StaticOriginId(";
 const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
 
 // Build only: suppressing ETR can leave a mixed response-owner plane that
@@ -4183,79 +4214,102 @@ fn assert_execute_then_resume_rekey_child() {
         if std::env::var_os("RT_FOOTPRINT_DETERMINISM").is_some() {
             eprintln!("RT_SETTLEMENT_FOOTPRINT_SEQUENCE {sequence:?}");
         }
-        let consumed = Event::Consumed { settlement: 2, construct: 983 };
-        let arrival = |origin| Event::ResidualArrival { origin };
-        let route = |origin| Event::Route1 { origin, route1: true };
-        let mut segments = vec![BTreeMap::<Event, usize>::new()];
-        let mut non_consumed = BTreeMap::<Event, usize>::new();
+        let checked_release = diagnostics[0].bracket_response_rows.iter()
+            .filter(|row| row.operation == "ResourceRelease"
+                && row.k_identity.contains("emission_owner: Predeclared("))
+            .map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(checked_release.len(), 1,
+            "one checked predeclared release owns the capsule Tail");
+        let consumed_origin = *checked_release.iter().next().unwrap();
+        assert!(authenticated.contains(&consumed_origin),
+            "the checked release must belong to an authenticated bracket");
+        #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+        enum Role { Consumed, Arrival(usize), Route(usize) }
+        let mut arrival_sources = BTreeMap::<u32, usize>::new();
+        let mut route_sources = BTreeMap::<u32, usize>::new();
+        let mut segments = vec![BTreeMap::<Role, usize>::new()];
+        let mut non_consumed = BTreeMap::<Role, usize>::new();
         let mut arrivals = 0;
         for &event in &sequence {
-            if let Event::Consumed { construct, .. } = event {
-                assert_eq!(event, consumed, "only settlement 2 may own the capsule Tail");
-                assert!(authenticated.contains(&construct),
-                    "capsule Tail Vis {construct} was not authenticated by its response plan");
-                segments.push(BTreeMap::new());
-            } else {
-                *non_consumed.entry(event).or_default() += 1;
+            let role = match event {
+                Event::Consumed { settlement: 2, construct } if construct == consumed_origin => {
+                    segments.push(BTreeMap::new());
+                    Role::Consumed
+                }
+                Event::ResidualArrival { origin } => {
+                    let next = arrival_sources.len();
+                    let name = *arrival_sources.entry(origin).or_insert(next);
+                    arrivals += 1;
+                    Role::Arrival(name)
+                }
+                Event::Route1 { origin, route1: true } => {
+                    let next = route_sources.len();
+                    Role::Route(*route_sources.entry(origin).or_insert(next))
+                }
+                _ => panic!("unclassified capsule Tail event: {event:?}"),
+            };
+            if role != Role::Consumed {
+                *non_consumed.entry(role).or_default() += 1;
             }
-            if matches!(event, Event::ResidualArrival { .. }) { arrivals += 1; }
-            *segments.last_mut().expect("segment zero exists").entry(event).or_default() += 1;
+            *segments.last_mut().expect("segment zero exists").entry(role).or_default() += 1;
         }
-        // Promise class: transition sentinel. MEASURED: the complete four-kind
-        // source-lowering sequence, not a projection to site-A or its adjacency.
-        // CLAIMED: every consumed Tail is authenticated, each settlement segment
-        // has the measured members, and subtracting the complete M-2' delta
-        // leaves the exact ordinary population (the RA subset is d26).
-        // THE GAP: compiler lowering order is not runtime execution; the future
-        // settlement forward edge deliberately retires this temporary footprint.
-        // (a) Authenticate the exact eight settlement delimited segments.
+        assert_eq!(arrival_sources.len(), 3, "three distinct constructor sites produce arrivals");
+        assert_eq!(route_sources.len(), 4, "four distinct checked source sites produce routes");
+        assert!(arrival_sources.keys().all(|origin| *origin != consumed_origin
+            && !route_sources.contains_key(origin)),
+            "residual, route and settled sources remain distinct");
+        assert!(!route_sources.contains_key(&consumed_origin));
+        // Promise class: transition sentinel. MEASURED: the complete source-
+        // lowering sequence canonicalized by first appearance only for residual
+        // and route node ordinals. CLAIMED: the consumed Tail matches an
+        // independently checked release; the other sources preserve alias
+        // relationships, segment multisets and the ordinary remainder.
+        // THE GAP: a consistent source-origin substitution preserving all
+        // aliases is not discriminated; runtime behavior is tested separately.
         assert_eq!(segments.len(), 9, "eight authenticated capsule Tail consumptions");
-        // (b) Exact per-segment multisets. Ordinary entries are kept even when
-        // interleaved inside an authenticated segment; no log event is filtered.
-        assert_eq!(segments[0], BTreeMap::from([(route(1278), 1)]),
+        assert_eq!(segments[0], BTreeMap::from([(Role::Route(0), 1)]),
             "capsule segment zero must equal its ordinary prefix");
         for (index, segment) in segments.iter().enumerate().skip(1) {
             let mut expected = BTreeMap::from([
-                (consumed, 1), (arrival(771), 1), (route(1286), 1),
+                (Role::Consumed, 1), (Role::Arrival(0), 1), (Role::Route(1), 1),
             ]);
             match index {
                 1 | 5 => {
-                    expected.insert(route(1277), 1);
-                    expected.insert(route(1278), 1);
+                    expected.insert(Role::Route(2), 1);
+                    expected.insert(Role::Route(0), 1);
                 }
-                2 | 3 | 6 | 7 => { expected.insert(route(1278), 1); }
+                2 | 3 | 6 | 7 => { expected.insert(Role::Route(0), 1); }
                 4 => {
-                    expected.insert(arrival(994), 1);
-                    expected.insert(route(1278), 1);
+                    expected.insert(Role::Arrival(1), 1);
+                    expected.insert(Role::Route(0), 1);
                 }
                 8 => {
-                    expected.insert(arrival(548), 2);
-                    expected.insert(route(1308), 2);
+                    expected.insert(Role::Arrival(2), 2);
+                    expected.insert(Role::Route(3), 2);
                 }
                 _ => unreachable!("exactly eight authenticated segments"),
             }
             assert_eq!(*segment, expected,
                 "capsule segment {index} changed from its full measured multiset");
         }
-        // (c) F is the WHOLE measured M-2' delta, not just the site-A slice:
-        // eight RA771 and eight Route1(1286,true) disappear under classification
-        // fallthrough; the 15-entry remainder equals the counterfactual log.
-        for footprint in [arrival(771), route(1286)] {
+        // F is the whole measured counterfactual delta, not only site A.
+        for footprint in [Role::Arrival(0), Role::Route(1)] {
             assert_eq!(non_consumed.remove(&footprint), Some(8),
                 "capsule measured footprint member changed: {footprint:?}");
         }
         let ordinary = BTreeMap::from([
-            (arrival(548), 2), (arrival(994), 1),
-            (route(1277), 2), (route(1278), 8), (route(1308), 2),
+            (Role::Arrival(2), 2), (Role::Arrival(1), 1),
+            (Role::Route(2), 2), (Role::Route(0), 8), (Role::Route(3), 2),
         ]);
         assert_eq!(non_consumed, ordinary,
-            "all non-footprint capsule entries must equal the complete M-2' population");
+            "all non-footprint capsule entries must equal the complete ordinary population");
         let ordinary_site_a = non_consumed.iter().filter_map(|(event, count)| {
-            if let Event::ResidualArrival { origin } = event { Some((*origin, *count)) }
+            if let Role::Arrival(origin) = event { Some((*origin, *count)) }
             else { None }
         }).collect::<BTreeMap<_, _>>();
-        assert_eq!(ordinary_site_a, BTreeMap::from([(548, 2), (994, 1)]),
-            "ordinary site-A arrivals must independently reproduce d26");
+        assert_eq!(ordinary_site_a, BTreeMap::from([(1, 1), (2, 2)]),
+            "ordinary site-A arrivals must independently reproduce the control");
         eprintln!("RT_RESIDUAL_LOWERING_COUNTERS {residual_counters:?}");
         assert_eq!(arrivals, residual_counters.site_a_none_arrivals,
             "the sequence must include every counter arrival");
@@ -4626,32 +4680,45 @@ fn composed_return_ret_sink_population_is_unique() {
             "rt_write_writable_stage",
             "write",
         );
-        // Exact d26 ordinary members + the authenticated settled Ret bodies.
-        let expected_read = [(12, 343, 0), (350, 524, 0), (529, 564, 0), (750, 817, 0)];
-        let expected_write = [
-            (25, 356, 0), (363, 537, 0), (542, 577, 0), (584, 760, 0),
-            (765, 800, 0), (806, 983, 0), (988, 1136, 0),
-        ];
-        for (label, (observations, plan_rows, diagnostics), expected, settled) in [
-            ("read", read, expected_read.as_slice(), (745, 350, 524)),
-            ("write", write, expected_write.as_slice(), (983, 584, 760)),
+        // The fixture's sink population is local to its checked read/write
+        // source, not to the size of the shared prelude. The settled member is
+        // keyed through the separate bracket-response operation plane.
+        for (label, (observations, plan_rows, diagnostics), expected_count) in [
+            ("read", read, 4usize), ("write", write, 7usize),
         ] {
-            let (vis, frame, body) = settled;
+            let checked_releases = diagnostics.iter()
+                .flat_map(|plan| plan.bracket_response_rows.iter())
+                .filter(|row| row.operation == "ResourceRelease")
+                .map(|row| row.vis_origin)
+                .collect::<std::collections::BTreeSet<_>>();
+            let settled = plan_rows.iter()
+                .flat_map(|row| row.forward_ret_coordinates.iter())
+                .filter(|coordinate| checked_releases.contains(
+                    &forward_ret_source_construct(&coordinate.source_call_identity)))
+                .collect::<Vec<_>>();
+            assert_eq!(settled.len(), 1,
+                "{label}: one checked release must own the settled Ret sink");
+            let coordinate = settled[0];
+            let vis = forward_ret_source_construct(&coordinate.source_call_identity);
             assert!(diagnostics.iter().any(|plan|
                 plan.bracket_settlement_vis_origins.contains(&vis)),
-                "{label}: the response plan did not authenticate settled Vis {vis}");
-            assert!(plan_rows.iter().flat_map(|row| &row.forward_ret_coordinates)
-                .any(|coordinate| {
-                    coordinate.source_call_identity.contains(&format!(
-                        "producer_construct_origin: StaticOriginId({vis})"))
-                        && coordinate.entry_binding.contains(&format!(
-                            "frame_origin: StaticOriginId({frame}),"))
-                }),
-                "{label}: settled Vis {vis} does not bind the sink's frame {frame}");
-            assert!(observations.iter().any(|row|
-                parse_static_origin_id(&row.active_frame_origin) == frame
-                    && parse_static_origin_id(&row.ret_case_body_origin) == body),
-                "{label}: authenticated frame {frame} has no Ret sink at {body}");
+                "{label}: the checked release was not authenticated");
+            let entry_frame = coordinate.entry_binding
+                .split_once("frame_origin: StaticOriginId(")
+                .and_then(|(_, tail)| tail.split_once(')'))
+                .map(|(number, _)| number.parse::<u32>().expect("numeric entry-frame origin"))
+                .expect("checked source coordinate carries its entry frame");
+            let settled_sinks = diagnostics.iter()
+                .flat_map(|plan| plan.bracket_response_rows.iter())
+                .filter(|source| source.operation == "ResourceRelease"
+                    && source.k_identity.contains("emission_owner: Specialization("))
+                .filter(|source| observations.iter().any(|sink|
+                    parse_static_origin_id(&sink.active_frame_origin) == entry_frame
+                        && parse_static_origin_id(&sink.ret_case_body_origin)
+                            == source.vis_origin))
+                .collect::<Vec<_>>();
+            assert_eq!(settled_sinks.len(), 1,
+                "{label}: the checked release and independently emitted sink must meet at the selected entry frame");
             let semantic_coordinates = observations
                 .iter()
                 .map(|row| {
@@ -4662,10 +4729,9 @@ fn composed_return_ret_sink_population_is_unique() {
                     )
                 })
                 .collect::<std::collections::BTreeSet<_>>();
-            assert_eq!(semantic_coordinates,
-                expected.iter().copied().collect::<std::collections::BTreeSet<_>>(),
-                "{label}: exact d26 ordinary and authenticated settled sink members changed");
-            let expected_semantic_count = expected.len();
+            assert_eq!(semantic_coordinates.len(), expected_count,
+                "{label}: the checked fixture's ordinary and settled Ret sink count changed");
+            let expected_semantic_count = expected_count;
             assert!(
                 semantic_coordinates
                     .iter()
@@ -4888,13 +4954,48 @@ fn forward_ret_source_construct(identity: &str) -> u32 {
         .0.parse().expect("numeric forward-Ret source construct")
 }
 
+/// Select expected forward-Ret sources by their checked host operation on a
+/// separate static-response plane, never by planner allocation ordinal.
+fn checked_forward_ret_sources(
+    planned: &std::collections::BTreeSet<u32>,
+    diagnostics: &[ken_runtime::StaticResponseFeasibilityDiagnostic],
+    label: &str,
+) -> (u32, u32) {
+    let ordinary_operation = if label.contains("read") { "FsReadAt" }
+        else if label.contains("write") { "BufferAllocate" }
+        else { panic!("unregistered forward-Ret source fixture {label}") };
+    let ordinary = diagnostics.iter()
+        .flat_map(|plan| plan.all_static_response_rows.iter())
+        .filter(|row| row.operation == ordinary_operation)
+        .map(|row| row.vis_origin)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(ordinary.len(), 1,
+        "{label}: one ordinary source must be the checked {ordinary_operation} operation");
+    let bracket = diagnostics.iter()
+        .flat_map(|plan| plan.bracket_response_rows.iter())
+        .filter(|row| row.operation == "ResourceRelease")
+        .map(|row| row.vis_origin)
+        .collect::<std::collections::BTreeSet<_>>();
+    let consumed = planned.intersection(&bracket).copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(consumed.len(), 1,
+        "{label}: one planned source must be a checked bracket ResourceRelease");
+    assert_eq!(*planned, ordinary.union(&consumed).copied().collect(),
+        "{label}: all planned sources must be the checked ordinary or release operations");
+    let consumed_origin = *consumed.iter().next().unwrap();
+    assert!(diagnostics.iter().any(|plan|
+        plan.bracket_settlement_vis_origins.contains(&consumed_origin)),
+        "{label}: the checked release must be authenticated by its bracket");
+    (*ordinary.iter().next().unwrap(), consumed_origin)
+}
+
 fn assert_forward_ret_consumption_partition(
     planned_coordinates: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
     planned_reaches: usize,
     formed: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
     settled: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
     edge_authorities: impl IntoIterator<Item = ken_runtime::ComposedReturnForwardRetCoordinateObservation>,
-    authenticated_vis: impl IntoIterator<Item = u32>,
+    diagnostics: &[ken_runtime::StaticResponseFeasibilityDiagnostic],
     label: &str,
 ) {
     let planned = planned_coordinates
@@ -4920,17 +5021,14 @@ fn assert_forward_ret_consumption_partition(
             forward_ret_source_construct(&coordinate.source_call_identity))
             .collect::<std::collections::BTreeSet<_>>()
     };
-    let (ordinary, consumed) = if label.contains("read") { (856, 745) }
-        else if label.contains("write") { (1300, 983) }
-        else { panic!("unregistered fixed forward-Ret fixture {label}") };
+    let (ordinary, consumed) = checked_forward_ret_sources(
+        &constructs(&planned), diagnostics, label);
     assert_eq!(constructs(&planned), [ordinary, consumed].into_iter().collect(),
-        "{label}: exact ordinary and settled planned source members changed");
+        "{label}: exact checked ordinary and settled planned source members changed");
     assert_eq!(constructs(&formed_set), [ordinary].into_iter().collect(),
         "{label}: only the ordinary planned source may form a forward edge");
     assert_eq!(constructs(&settled_set), [consumed].into_iter().collect(),
         "{label}: the moved read/write Vis must be consumed by settlement");
-    assert!(authenticated_vis.into_iter().any(|vis| vis == consumed),
-        "{label}: the response plan did not authenticate settled Vis {consumed}");
 
     assert!(!formed.is_empty(), "{label}: no formed forward-Ret edge");
     assert_eq!(
@@ -5066,7 +5164,7 @@ fn composed_return_forward_ret_proof_consumption_partition_is_exact() {
                         .expect("a settlement outcome must carry its proof coordinate")
                 }),
             exact_rows.iter().map(|row| row.coordinate.clone()),
-            diagnostics.iter().flat_map(|plan| plan.bracket_settlement_vis_origins.iter().copied()),
+            &diagnostics,
             "exact read fixture",
         );
         // (A) ruling evt_h0vgd11g5xfb: formation is unnarrowed, so the read
@@ -5227,7 +5325,7 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
                             .expect("a settlement outcome must carry its proof coordinate")
                     }),
                 authorities.iter().map(|row| row.coordinate.clone()),
-                diagnostics.iter().flat_map(|plan| plan.bracket_settlement_vis_origins.iter().copied()),
+                &diagnostics,
                 label,
             );
             assert_eq!(
@@ -5422,29 +5520,27 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             .iter()
             .map(|row| row.coordinate.clone())
             .collect::<Vec<_>>();
-        if mutation == Mutation::Exact && result.is_ok() {
+        let sources = if mutation == Mutation::Exact && result.is_ok() {
             let planned = expected.iter().map(|row|
                 forward_ret_source_construct(&row.source_call_identity))
                 .collect::<std::collections::BTreeSet<_>>();
             let formed = actual.iter().map(|row|
                 forward_ret_source_construct(&row.source_call_identity))
                 .collect::<std::collections::BTreeSet<_>>();
-            let (ordinary, consumed) = if label.starts_with("read") { (856, 745) }
-                else { (1300, 983) };
+            let (ordinary, consumed) = checked_forward_ret_sources(
+                &planned, &diagnostics, label);
             assert_eq!(planned, [ordinary, consumed].into_iter().collect(),
                 "{label}: exact planned ordinary and settled forward-Ret members changed");
             assert_eq!(formed, [ordinary].into_iter().collect(),
                 "{label}: only the ordinary proof may form an edge");
-            assert!(diagnostics.iter().any(|plan|
-                plan.bracket_settlement_vis_origins.contains(&consumed)),
-                "{label}: moved Vis {consumed} lacks authenticated settlement");
-        }
-        (root, result, expected, actual, applications)
+            Some((ordinary, consumed))
+        } else { None };
+        (root, result, expected, actual, applications, sources)
     };
     macro_rules! validate_removal {
         ($side:literal, $target:expr, $expected:expr, $actual:expr, $applications:expr, $entry:literal) => {{
             let target = $target;
-            let (_root, result, removed_expected, removed_actual, applications) = compile(
+            let (_root, result, removed_expected, removed_actual, applications, _) = compile(
                 &format!("{}-remove-{target}", $side),
                 Mutation::RemoveTailAuthorityAt(target),
                 $entry,
@@ -5481,7 +5577,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
 
     match arm {
         ForwardRetPopulationArm::Population => {
-            let (_root, exact, expected, actual, exact_applications) =
+            let (_root, exact, expected, actual, exact_applications, read_sources) =
                 compile("read-exact", Mutation::Exact, "rt_read_offset_stage");
             exact.expect("the exact Tail authority population must compile");
             let expected_set = expected
@@ -5504,8 +5600,8 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             assert_eq!(actual_set.iter().map(|row|
                 forward_ret_source_construct(&row.source_call_identity))
                 .collect::<std::collections::BTreeSet<_>>(),
-                [856].into_iter().collect(),
-                "read: the moved Vis 745 must not form an ordinary edge");
+                [read_sources.expect("checked read sources").0].into_iter().collect(),
+                "read: the checked release must not form an ordinary edge");
             assert!(exact_applications > actual.len(),
                 "read: settlement-consumed reaches remain in the plan count");
             assert!(
@@ -5525,7 +5621,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
                 "every planned Tail member must pair distinct generated-entry E and producer-source S coordinates"
             );
 
-            let (_write_root, write_exact, write_expected, write_actual, write_applications) =
+            let (_write_root, write_exact, write_expected, write_actual, write_applications, write_sources) =
                 compile("write-exact", Mutation::Exact, "rt_write_writable_stage");
             write_exact.expect("the exact write-side Tail authority population must compile");
             let write_expected_set = write_expected
@@ -5541,8 +5637,8 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             assert_eq!(write_actual_set.iter().map(|row|
                 forward_ret_source_construct(&row.source_call_identity))
                 .collect::<std::collections::BTreeSet<_>>(),
-                [1300].into_iter().collect(),
-                "write: the moved Vis 983 must not form an ordinary edge");
+                [write_sources.expect("checked write sources").0].into_iter().collect(),
+                "write: the checked release must not form an ordinary edge");
             assert!(write_applications > write_actual.len(),
                 "write: settlement-consumed reaches remain in the plan count");
             assert_eq!(
@@ -5552,7 +5648,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             );
 
             let duplicate_target = 0; // the only reached formed-source index
-            let (_duplicate_root, result, duplicate_expected, duplicated, applications) = compile(
+            let (_duplicate_root, result, duplicate_expected, duplicated, applications, _) = compile(
                 "read-duplicate",
                 Mutation::DuplicateTailAuthorityAt(duplicate_target),
                 "rt_read_offset_stage",
@@ -5572,7 +5668,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             assert!(ken_runtime::composed_return_forward_ret_authority_mutation_is_exact());
         }
         ForwardRetPopulationArm::ReadRemoval(stripe) => {
-            let (_root, exact, expected, actual, exact_applications) =
+            let (_root, exact, expected, actual, exact_applications, _) =
                 compile("read-exact", Mutation::Exact, "rt_read_offset_stage");
             exact.expect("the exact read-side Tail population must compile");
             let expected_set = expected
@@ -5590,7 +5686,7 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             }
         }
         ForwardRetPopulationArm::WriteRemoval(stripe) => {
-            let (_root, exact, expected, actual, exact_applications) =
+            let (_root, exact, expected, actual, exact_applications, _) =
                 compile("write-exact", Mutation::Exact, "rt_write_writable_stage");
             exact.expect("the exact write-side Tail population must compile");
             let expected_set = expected
@@ -6076,10 +6172,18 @@ fn assert_d1_route_control_child() {
     if matches!(mode.as_str(),
         "drop-read" | "unknown-read" | "ordinary-read" | "direct-read" | "misroute-direct-read")
     {
+        let checked_read_release = diagnostics.iter()
+            .flat_map(|plan| plan.bracket_response_rows.iter())
+            .filter(|row| row.operation == "ResourceRelease"
+                && row.k_identity.contains("emission_owner: Predeclared("))
+            .map(|row| row.vis_origin).collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(checked_read_release.len(), 1,
+            "the read route must identify one predeclared ResourceRelease continuation");
+        let vis = *checked_read_release.iter().next().unwrap();
         assert!(diagnostics.iter().any(|plan|
-            plan.bracket_settlement_vis_origins.contains(&745)),
-            "the D1 child's authenticated read settlement must contain Vis 745");
-        eprintln!("RT_D1_AUTHENTICATED_SETTLEMENT_VIS=745");
+            plan.bracket_settlement_vis_origins.contains(&vis)),
+            "the D1 child's checked read release must be authenticated");
+        eprintln!("RT_D1_AUTHENTICATED_SETTLEMENT_VIS={vis}");
     }
     // Relocation (Architect re-rule evt_2427xbynt1d2e, Q2). SSA response
     // specialization statically supersedes the runtime route control for the
@@ -6399,13 +6503,9 @@ fn suppressing_both_materialization_authorities_refuses_at_the_relay_edge() {
             packaging.source_cause,
             Some(ken_runtime::LoweringCause::PlannerInvariant)
         );
-        assert!(
-            packaging
-                .reason
-                .contains(MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL),
-            "wrong exact-edge refusal: {}",
-            packaging.reason
-        );
+        assert!(packaging.reason.contains(MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL)
+            && packaging.reason.contains("has no performing route"),
+            "wrong checked BufferAllocate-route refusal: {}", packaging.reason);
         assert!(ken_runtime::suppressed_execute_then_resume_response_is_exact());
     });
 }
