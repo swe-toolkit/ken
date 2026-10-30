@@ -121,20 +121,90 @@ fn strict_frozen_corpus_gate_is_green() {
 /// authority needed by its checked ProgramCaps AFull. THE GAP: this exercises
 /// one Process entrypoint and does not enumerate all runnable programs.
 #[test]
+fn every_checked_runnable_root_declares_its_fs_authority() {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut roots = Vec::new();
+    for directory in ["catalog", "examples", "conformance", "crates"] {
+        let directory = repository.join(directory);
+        collect(&directory, ".ken", &mut roots);
+        collect(&directory, ".ken.md", &mut roots);
+    }
+    roots.sort();
+    roots.dedup();
+
+    let mut runnable = Vec::new();
+    for path in &roots {
+        let source = fs::read_to_string(path).unwrap();
+        if !source.contains("ProgramCaps") && !source.contains("HostIO") {
+            continue;
+        }
+        runnable.push(path);
+        assert!(
+            source.lines().any(|line| {
+                let Some(capabilities) = line.trim().strip_prefix("program capabilities ") else {
+                    return false;
+                };
+                let mut fs_count = 0;
+                for member in capabilities.split(',') {
+                    let mut words = member.split_ascii_whitespace();
+                    if words.next() == Some("FS") {
+                        let authority = words.next();
+                        if !matches!(authority, Some("ANone" | "APartial" | "AFull"))
+                            || words.next().is_some()
+                        {
+                            return false;
+                        }
+                        fs_count += 1;
+                    }
+                }
+                fs_count == 1
+            }),
+            "runnable Ken root lacks exactly one declared FS authority: {}",
+            path.display()
+        );
+    }
+    assert!(!runnable.is_empty(), "runnable corpus must not be empty");
+}
+
+#[test]
 fn process_program_requires_its_declared_fs_authority() {
     let source = include_str!("fixtures/px10_child_wait_smoke.ken");
     let admitted = fixture("px10_process_with_fs.ken", source);
-    let output = Command::new(ken_bin()).arg("run").arg(&admitted).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let output = Command::new(ken_bin())
+        .arg("run")
+        .arg(&admitted)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
-    let no_fs = source.replacen("program capabilities FS AFull, Process", "program capabilities Process", 1);
-    assert_ne!(no_fs, source, "control must remove the declared FS authority");
+    let no_fs = source.replacen(
+        "program capabilities FS AFull, Process",
+        "program capabilities Process",
+        1,
+    );
+    assert_ne!(
+        no_fs, source,
+        "control must remove the declared FS authority"
+    );
     let rejected = fixture("px10_process_without_fs.ken", &no_fs);
-    let output = Command::new(ken_bin()).arg("run").arg(&rejected).output().unwrap();
-    assert!(!output.status.success(), "removing required FS authority was admitted");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("MissingCapability { effect = FS }"),
+    let output = Command::new(ken_bin())
+        .arg("run")
+        .arg(&rejected)
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "removing required FS authority was admitted"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("MissingCapability { effect = FS }"),
         "the admission failure must name the missing FS grant: {}",
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn collect(directory: &Path, suffix: &str, out: &mut Vec<PathBuf>) {
