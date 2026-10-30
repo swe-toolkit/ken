@@ -620,7 +620,7 @@ fn legacy_evidence(
     let interior_evidence = pinned_interior_evidence(module, unit, all_units, &env, &resolved);
     let mut modules_longest_first: Vec<_> = all_units.keys().cloned().collect();
     modules_longest_first.sort_by_key(|name| std::cmp::Reverse(name.len()));
-    let imported_seed = resolved
+    let imported_seed: BTreeSet<GlobalId> = resolved
         .iter()
         .copied()
         .filter(|identity| {
