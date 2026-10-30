@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION
 title: "Spec 65 publishes vector_scale as one of its seven exact operations, but states no law about scaling itself: only dot_scale and matrix_vector_homogeneous mention it. Rule from a checked D0 at zero trust that natural scaling distributes over vector_add, distributes over a sum of factors, composes through mul and is the identity at one, and state the four laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
