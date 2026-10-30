@@ -238,6 +238,21 @@ fn package_internal_and_bare_leaf_names_are_not_reserved() {
     }
 }
 
+/// MEASURED: a strict roots client accepts a same-name `ConsoleOp` declaration
+/// and assigns it a fresh local ID, leaving the checked family untouched.
+/// CLAIMED: the compiler-internal ConsoleOp is not admitted by family label.
+/// THE GAP: a floor-addition mutation must reach this declaration and refuse
+/// it here, not fail earlier during prelude initialization.
+#[test]
+fn compiler_internal_console_op_same_name_local_accepts_in_strict_roots() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let original = env.globals["ConsoleOp"];
+    load(&mut env, "const ConsoleOp : Nat = Zero", "strict-roots")
+        .expect("internal ConsoleOp leaves the same-name local available");
+    assert_ne!(env.globals["Entry.ConsoleOp"], original);
+    assert_eq!(env.globals["ConsoleOp"], original);
+}
+
 /// MEASURED: strict and legacy roots clients import all five exact-ID home
 /// exports and use the ConsoleStream.Stdout family in `write`; their checked
 /// bodies mention the pre-source IDs captured from a fresh environment.
