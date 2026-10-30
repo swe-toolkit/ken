@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY
 title: "Spec 68 §6 regroups interval addition and multiplication by endpoint-value inclusion, but no section regroups hull or intersection: Algorithm.Numeric.RationalInterval has commutativity, bounds and absorption for both and no associativity. Rule from a checked D0 at zero trust that each grouping of a hull, and of an intersection, is inside the other, and state the four laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
