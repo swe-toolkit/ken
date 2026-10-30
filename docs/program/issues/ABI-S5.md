@@ -1,7 +1,7 @@
 ---
 id: ABI-S5
 title: "Spec 38 says nothing about signal disposition, although both run paths ignore SIGPIPE and the CLI worker catches SIGSEGV/SIGBUS. PX10 cannot state what a spawned child inherits until the executable edge's disposition is a contract. Rule from a measured inventory what the edge establishes and what a child must be reset to, state it as spec 38 §1.10 with a seed, and witness the posture on the running process"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1
