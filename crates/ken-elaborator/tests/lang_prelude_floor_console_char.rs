@@ -103,7 +103,7 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     for (_, name) in PACKAGED {
         assert!(!floor.contains(name), "{name}: package, never floor");
     }
-    assert_eq!(PRELUDE_PACKAGE_HOMES, PACKAGED);
+    assert_eq!(PRELUDE_PACKAGE_HOMES.as_slice(), PACKAGED.as_slice());
     assert_eq!(env.globals["ConsoleStream"], env.prelude_env.stream_id);
     assert!(
         !env.globals.contains_key("Stream"),
