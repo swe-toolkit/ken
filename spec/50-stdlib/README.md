@@ -404,7 +404,7 @@ CI, publication, landing or landed trust. No rational or `Float`
 tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–9 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–10 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
@@ -412,7 +412,8 @@ SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION;
-SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT). The §1
+SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT;
+SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -478,10 +479,19 @@ source, and differentiation and substitution each preserve that
 agreement. No structural `Equal Expr` or new value-level law is
 exported. Architect's D0 on `757b2bd12` checked all three generic
 bodies with no new `Axiom` and equal scratch trusted identities
-114 → 114; this assembled candidate adds the §9 catalog exports, seed
-and package-owned test, which are not official conformance, CI or
-landed trust.
-A sorted-list normal form and signed/field arithmetic remain deferred.
+114 → 114; the §9 catalog exports, seed and package-owned test are
+present on this base, not evidence of official conformance or landed
+trust. Section 10 states two direct public checked congruence contracts
+for canonical `poly_eq` under `EAdd` and `EMul`, each with exactly two
+`IsTrue (poly_eq _ _)` premises. These are derivable from the already
+public soundness/completeness laws and Nat congruence; they do not add
+symmetry, transitivity, reflexivity or a new logical capability.
+Architect's isolated AC-0 on `b557bac0a` checked both generic bodies
+with no new `Axiom` and equal scratch trusted identity sets 114 → 114.
+This spec-only child adds no §10 catalog export or conformance seed and
+establishes no candidate execution, official conformance, CI,
+publication, landing or landed trust. A sorted-list normal form and
+signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–9 (SPEC-GEOMETRY-EXACT-CONTRACT;

@@ -8,20 +8,24 @@
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION §6;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE §7;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION §8;
-> SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT §9).** The §1–8
-> catalog operations, checked laws and authored seeds are present on
-> main; historical scratch D0 and package checks do not establish
-> official conformance or landed trust. Section 8's conditional
+> SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT §9;
+> SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10).** The §1–9 catalog
+> operations, checked laws and authored seeds are present on this base;
+> historical scratch D0 and package checks do not establish official
+> conformance or landed trust. Section 8's conditional
 > derivative-after-substitution law keeps both derivative-value
-> premises. Section 9 specifies three premise-free checked laws:
-> normalization preserves `poly_eq` with the source, and derivative
-> and substitution each preserve that equivalence. Architect's D0
-> on `757b2bd12` checked the generic compositions with no new
-> `Axiom` and equal scratch trusted identities 114 → 114.
-> This assembled candidate adds the three §9 checked exports, the
-> closed seed and a package-owned test of the complete seed and its
-> isolated refusal; those candidate-local checks are not official
-> conformance-runner execution, CI, publication, landing or landed trust.
+> premises. Section 9's three premise-free checked laws preserve
+> `poly_eq` through normalization, derivative and substitution; its
+> checked exports, seed and package-owned test are present on this base.
+> Architect's §9 D0 on `757b2bd12` checked the generic compositions
+> with no new `Axiom` and equal scratch trusted identities 114 → 114.
+> Section 10 specifies two direct public congruence contracts for
+> `poly_eq` under `EAdd` and `EMul`. Architect's isolated AC-0 on
+> `b557bac0a` checked both generic proofs with no new `Axiom` and
+> equal scratch trusted identity sets 114 → 114. This spec-only child
+> adds neither §10 catalog exports nor a §10 conformance seed; no
+> candidate execution, official conformance, CI, publication, landing
+> or landed trust is claimed.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -915,5 +919,58 @@ isolate the false claim. Append each refusal to a **fresh fully
 accepted prefix** so its rejection occurs at that claim, not at a
 prior fixture or unrelated proof. These closed observations do not
 prove the generic theorems: those rest on the checked bodies above,
-whose catalog export and package-owned seed test this assembled
-candidate adds.
+whose catalog export and package-owned seed test are present on
+this base.
+
+## 10. Canonical equality under expression constructors
+
+> **Section 10 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE).** Architect's isolated
+> AC-0 on `b557bac0a` checked both generic proof bodies with no new
+> `Axiom` and equal scratch trusted identity sets 114 → 114. This
+> spec-only child states the two public contracts; the catalog exports
+> and conformance seed are separate serial turns. The scratch result
+> does not establish candidate execution, official conformance, CI,
+> publication, landing or landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export two public
+Transparent checked theorems. Their arguments are the four expressions
+in operand-pair order, then exactly the two canonical-equality facts:
+
+```ken
+pub theorem poly_eq_add
+    (a1 : Expr) (a2 : Expr) (b1 : Expr) (b2 : Expr)
+    (ha : IsTrue (poly_eq a1 a2))
+    (hb : IsTrue (poly_eq b1 b2))
+  : IsTrue (poly_eq (EAdd a1 b1) (EAdd a2 b2))
+
+pub theorem poly_eq_mul
+    (a1 : Expr) (a2 : Expr) (b1 : Expr) (b2 : Expr)
+    (ha : IsTrue (poly_eq a1 a2))
+    (hb : IsTrue (poly_eq b1 b2))
+  : IsTrue (poly_eq (EMul a1 b1) (EMul a2 b2))
+```
+
+These laws concern §2's Boolean canonical comparison, not structural
+`Equal Expr` or equality of §1's ordered monomial lists. For either
+constructor, §2's `poly_eq_sound` turns each premise into equality of
+evaluations at every total environment; congruence of the existing
+checked Nat `add` or `mul` combines those equalities, and §2's
+`poly_eq_complete` returns the claimed `IsTrue`. The Nat congruence
+proofs and the existing expression-structural congruence proofs remain
+private; the latter prove a different relation. No new helper, axiom,
+premise, Nat law, kernel or surface change, or §1–§9 operation or law
+type is required. Clients could already compose the public soundness
+and completeness laws with Nat congruence; the two exports state those
+direct contracts rather than enabling an otherwise unavailable result.
+
+The assigned closed seed applies both laws to `x0_sum` and
+`two_times_x0` as the first pair and `x1` twice as the second pair,
+with both premises true. A refused claim compares
+`EMul x0_sum x1` with `EAdd two_times_x0 x1`: at the all-ones
+environment their values are two and three, while both operand-pair
+premises remain true. The refused block must start from a fresh
+accepted prefix so the outer-constructor mismatch, not an earlier
+fixture or a false premise, causes rejection. Symmetry, transitivity
+and reflexivity of `poly_eq` are relational laws, not the constructor
+preservation laws specified here; §10 exports none of them.
