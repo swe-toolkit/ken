@@ -172,9 +172,19 @@ theorem seed_neg
 
 This seed was first authored on the spec-only child, before the §9
 catalog exports were present; no Ken check or package test was run on
-that authoring child. This seed-only correction adds the direct §9.1
-selector clients, but no Ken check or package test was run on this
-correction. Architect's AC-0 results are scratch evidence, not execution
-of this seed or an official conformance-runner result. The closed
-examples do not replace the checked generic proofs. No CI, publication,
-landing or landed trust is claimed.
+that authoring child.
+
+On exact parent `2aed54397a23e0aa8f21f090af35ff1a6bd9399f`, Foundation QA
+ran the named `cat_geometry_box_intersect_hull_distributivity` target:
+2/2 passed. QA then changed only `seed_neg`'s false right side to the
+true right side of `intersect_hull_distrib`; the mutated run had 1
+passing test, and the other failed at the intended refusal assertion. After restoration from
+the candidate blob,
+the target passed 2/2 again. The `include_str!` target rebuilt; the old-
+RHS anchor count went 1→0 and the true-neighbor count went 2→3. This
+population-side mutation distinguished the false regrouping from its
+nearest true neighbor. These are package-test results, not an official
+conformance-runner result. Architect's
+AC-0 results remain scratch evidence. The closed examples do not replace
+the checked generic proofs. No CI, publication, landing or landed trust
+is claimed.
