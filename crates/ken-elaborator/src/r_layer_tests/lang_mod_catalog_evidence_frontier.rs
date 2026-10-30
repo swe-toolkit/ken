@@ -1130,6 +1130,90 @@ fn system_error_written_file_operation_stays_a_prerequisite() {
 
 /// Promise class: durable invariant.
 ///
+/// MEASURED: a non-home Legacy client directly writes lowercase `write`,
+/// while the body of its only imported provider also reaches the checked
+/// `write` ID. The identity remains a CanonicalHome prerequisite. CLAIMED:
+/// an imported checked dependency cannot excuse a name the client writes
+/// without importing that name. THE GAP: the ConId sibling is exercised by
+/// System.Error; this fixture isolates the Ident branch of the lexical guard.
+#[test]
+fn written_lowercase_name_is_not_hidden_by_imported_closure() {
+    let nonce = format!(
+        "ken-catalog-ident-written-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos()
+    );
+    let root = std::env::temp_dir()
+        .join(nonce)
+        .join("catalog")
+        .join("packages");
+    fs::create_dir_all(root.join("Test")).expect("create fixture package root");
+    fs::write(
+        root.join("Test/Provider.ken"),
+        "pub proc provider_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n",
+    )
+    .expect("write checked provider body");
+    fs::write(
+        root.join("Test/Consumer.ken"),
+        "import Test.Provider (provider_write)\nproc via_provider (payload : Bytes) : IO (Result IOError Unit) visits [Console] = provider_write payload\nproc direct_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n",
+    )
+    .expect("write direct lowercase consumer");
+
+    let units = discover_units(&root);
+    assert_eq!(
+        units["Test.Consumer"].direct_imports,
+        BTreeSet::from(["Test.Provider".to_string()])
+    );
+    assert_eq!(
+        observe_legacy(&root, "Test.Consumer"),
+        LoaderObservation::Succeeded
+    );
+    let mut env = ElabEnv::new().expect("base environment");
+    let write_id = env.globals["write"];
+    env.elaborate_module_from_roots(&[root.clone()], "Test.Consumer")
+        .expect("legacy consumer loads");
+    let provider_id = env.globals["Test.Provider.provider_write"];
+    assert!(
+        explained_identity_closure(&env, BTreeSet::from([provider_id])).contains(&write_id),
+        "the imported provider's checked body must reach write"
+    );
+    assert!(env
+        .module_state
+        .package_export_ids("Test.Provider")
+        .contains(&provider_id));
+    assert!(!env
+        .module_state
+        .package_export_ids("Test.Provider")
+        .contains(&write_id));
+    assert!(env.module_state.package_home_ids("Test.Consumer").is_empty());
+    assert!(!strict_available_ids(&env).contains(&write_id));
+
+    match legacy_evidence(&root, "Test.Consumer", &units["Test.Consumer"], &units) {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(resolved_globals.contains(&write_id));
+            assert!(identity_grounded_prerequisites.contains(&IdentityPrerequisite::CanonicalHome {
+                identity: write_id,
+                current_names: vec!["write".to_string()],
+            }));
+        }
+        other => panic!("direct lowercase client must retain exact evidence: {other:?}"),
+    }
+    let fixture_top = root
+        .parent()
+        .and_then(Path::parent)
+        .expect("fixture has temporary top");
+    fs::remove_dir_all(fixture_top).expect("remove fixture tree");
+}
+
+/// Promise class: durable invariant.
+///
 /// MEASURED: a real legacy-loaded fixture retains a provider's checked
 /// identity while a known-answer missing-import-edge variant supplies only
 /// an unrelated bridge to the classifier. CLAIMED: the imported-identity
