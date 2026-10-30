@@ -15,6 +15,8 @@ reducible without an encoder assumption.
 ```ken
 import Data.Collections.Derived (list_append, map)
 
+import Core.Classes.LawfulClasses (charToInt)
+
 pub data AsciiTag : Type where {
   Ascii0;
   Ascii1;

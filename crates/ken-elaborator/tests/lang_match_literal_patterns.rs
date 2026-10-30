@@ -79,6 +79,49 @@ fn contains_proof_equality(term: &Term) -> bool {
     ) || term.children().into_iter().any(contains_proof_equality)
 }
 
+/// Promise class: durable exact-ID invariant. MEASURED: an unrelated checked
+/// Char comparator whose result is always True takes over the flat `eqChar`
+/// spelling, but the same-length unequal string literal still falls through;
+/// an unrelated Nat comparator taking that spelling also cannot cause a
+/// kernel type error. CLAIMED: String literal planning selects Char's
+/// registered comparator, not a mutable global spelling. THE GAP: the
+/// deliberately different results on `"xy"` and `"xx"` establish that the
+/// false row actually reaches and distinguishes the comparator plan.
+#[test]
+fn string_literal_comparison_uses_char_registered_id_despite_flat_name_takeover() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let original = env.globals["eqChar"];
+    let trust = env.env.trusted_base();
+    let fake = elaborate(
+        &mut env,
+        "fn always_true_char_eq (_x : Char) (_y : Char) : Bool = True",
+    );
+    assert_ne!(original, fake);
+    env.globals.insert("eqChar".to_string(), fake);
+    elaborate(
+        &mut env,
+        "fn char_plan (x : String) : Nat = match x { \"xx\" |-> Suc Zero ; _ |-> Zero }",
+    );
+    let different = elaborate(&mut env, "const different : Nat = char_plan \"xy\"");
+    let matching = elaborate(&mut env, "const matching : Nat = char_plan \"xx\"");
+    assert_eq!(eval_nat(&env, different), 0);
+    assert_eq!(eval_nat(&env, matching), 1);
+    assert_eq!(env.env.trusted_base(), trust);
+
+    let mut other = ElabEnv::new().expect("prelude");
+    let nat_fake = elaborate(&mut other, "fn nat_eq (_x : Nat) (_y : Nat) : Bool = True");
+    other.globals.insert("eqChar".to_string(), nat_fake);
+    elaborate(
+        &mut other,
+        "fn string_plan (x : String) : Nat = match x { \"xx\" |-> Suc Zero ; _ |-> Zero }",
+    );
+    let different = elaborate(
+        &mut other,
+        "const other_different : Nat = string_plan \"xy\"",
+    );
+    assert_eq!(eval_nat(&other, different), 0);
+}
+
 #[test]
 fn every_supported_carrier_selects_and_falls_through_by_value() {
     // MEASURED: each row returns distinct Nat payloads for equal and unequal
@@ -326,8 +369,7 @@ fn comparator_semantic_duplicates_are_subsumed_and_finite_sets_stay_open() {
     }
 
     let mut broad = ElabEnv::new().expect("base environment");
-    let broad_source =
-        "fn broad_first (x : Int) : Nat = match x { _ |-> Zero ; 0 |-> Suc Zero }";
+    let broad_source = "fn broad_first (x : Int) : Nat = match x { _ |-> Zero ; 0 |-> Suc Zero }";
     match broad.elaborate_decl(broad_source) {
         Err(ElabError::ReachabilityError {
             cause: ArmDeadCause::Subsumed { first, rest },
@@ -438,7 +480,9 @@ fn boolean_constructor_patterns_and_general_top_catchall_refusal_are_unchanged()
     assert_eq!(eval_nat(&booleans, selected), 1);
 
     let mut wildcard = ElabEnv::new().expect("base environment");
-    match wildcard.elaborate_decl("const top_wildcard_still_refused : Nat = match true { _ |-> Zero }") {
+    match wildcard
+        .elaborate_decl("const top_wildcard_still_refused : Nat = match true { _ |-> Zero }")
+    {
         Err(ElabError::Internal(reason)) => {
             assert!(reason.contains("wildcard/var not yet supported"));
         }

@@ -11,15 +11,15 @@ proc send_pair (left : Bytes) (right : Bytes)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
-      (write Stdout (bytes_encode "begin:")))
+      (write ConsoleStream.Stdout (bytes_encode "begin:")))
     (\_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
-      (host_console APartial (Result IOError Unit) (write Stdout left))
+      (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout left))
       (\_. bind (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         (Result IOError Unit) ExitCode
-        (host_console APartial (Result IOError Unit) (write Stdout right))
+        (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout right))
         (\_. host_exit APartial ExitCode.Success)))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
@@ -34,11 +34,11 @@ proc send_and_exit (bytes : Bytes) (code : ExitCode)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
-      (write Stdout (bytes_encode "begin:")))
+      (write ConsoleStream.Stdout (bytes_encode "begin:")))
     (\_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
-      (host_console APartial (Result IOError Unit) (write Stdout bytes))
+      (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
       (\_. host_exit APartial code))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)

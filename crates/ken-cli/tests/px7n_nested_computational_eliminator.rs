@@ -10,7 +10,7 @@ proc wrap_result (as_ok : Bool)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) (Result Bytes Bytes)
     (host_console APartial (Result IOError Unit)
-      (write Stdout (bytes_encode "seed:")))
+      (write ConsoleStream.Stdout (bytes_encode "seed:")))
     (\written. match written {
       Err _ |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
@@ -30,11 +30,11 @@ proc write_then_exit (bytes : Bytes) (code : ExitCode)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
-    (host_console APartial (Result IOError Unit) (write Stdout bytes))
+    (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
     (\_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_exit APartial code))
 
 proc wrap_again (body : Unit -> HostIO APartial (Result Bytes Bytes))

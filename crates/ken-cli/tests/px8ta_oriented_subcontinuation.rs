@@ -17,7 +17,7 @@ proc countdown (fuel : Nat)
       (resp_coproduct (FSOp APartial) AmbientOp
         (fs_resp APartial) ambient_resp)
       Bool (Result Int Bool)
-      (host_console APartial Bool (is_terminal Stdout))
+      (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
       (\terminal. match terminal {
         False |-> countdown rest;
         True |-> countdown rest
@@ -58,7 +58,7 @@ proc buffer_body (_buffer : BufferHandle)
     (resp_coproduct (FSOp APartial) AmbientOp
       (fs_resp APartial) ambient_resp)
     Bool (ResourceBodyResult Unit Unit)
-    (host_console APartial Bool (is_terminal Stdout))
+    (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. selected_buffer_body terminal)
 
 fn finish_buffer

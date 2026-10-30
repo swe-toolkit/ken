@@ -22,7 +22,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
     // They give the clients an independently authored expected tree and byte
     // expression. A package law has to convert to each client's statement.
     env.elaborate_decl(
-        r"fn client_console_tree (stream : Stream) (payload : Bytes)
+        r"fn client_console_tree (stream : ConsoleStream) (payload : Bytes)
              : IO (Result IOError Unit) =
            ITree.Vis ConsoleOp console_resp (Result IOError Unit)
              (Write stream payload)
@@ -43,7 +43,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
             r"theorem client_print_write_tree (text : String)
                  : Equal (IO (Result IOError Unit))
                      (print text)
-                     (client_console_tree Stdout (bytes_encode text)) =
+                     (client_console_tree ConsoleStream.Stdout (bytes_encode text)) =
                print_write_tree text",
         ),
         (
@@ -51,7 +51,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
             r"theorem client_print_line_write_tree (text : String)
                  : Equal (IO (Result IOError Unit))
                      (printLine text)
-                     (client_console_tree Stdout (client_console_line_bytes text)) =
+                     (client_console_tree ConsoleStream.Stdout (client_console_line_bytes text)) =
                print_line_write_tree text",
         ),
         (
@@ -59,7 +59,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
             r"theorem client_eprint_write_tree (text : String)
                  : Equal (IO (Result IOError Unit))
                      (eprint text)
-                     (client_console_tree Stderr (bytes_encode text)) =
+                     (client_console_tree ConsoleStream.Stderr (bytes_encode text)) =
                eprint_write_tree text",
         ),
         (
@@ -67,7 +67,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
             r"theorem client_eprint_line_write_tree (text : String)
                  : Equal (IO (Result IOError Unit))
                      (eprintLine text)
-                     (client_console_tree Stderr (client_console_line_bytes text)) =
+                     (client_console_tree ConsoleStream.Stderr (client_console_line_bytes text)) =
                eprint_line_write_tree text",
         ),
     ];

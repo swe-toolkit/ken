@@ -11,12 +11,13 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 30] = [
+const TYPE_FLOOR: [&str; 32] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
+    "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
     "Equal",
@@ -42,6 +43,7 @@ const TYPE_FLOOR: [&str; 30] = [
     "TransferCount",
     "Unit",
     "Utf8Error",
+    "eqChar",
 ];
 
 const COMPANIONS: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
@@ -206,7 +208,8 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 /// identities, and Nat, Pair, five kernel-keyed proposition/equality members,
 /// five source-required entrypoint-ABI identities, three effect/clock identities,
 /// ITree, and six FS/resource families (BufferSpan, CreatePolicy, FileError,
-/// IOError, ResourceError, TransferCount) close the type inventory to thirty.
+/// IOError, ResourceError, TransferCount), ConsoleStream, and the separate
+/// checked Char comparator eqChar close the floor to thirty-two entries.
 /// The separately configured companion inventory has three checked-transparent
 /// constants keyed to the exact Pair identity. CLAIMED: type and binding
 /// membership are independent closed
@@ -229,6 +232,8 @@ fn prelude_signature_inventory_is_executable_and_closed() {
                 "Nat"
                     | "Pair"
                     | "Coproduct"
+                    | "ConsoleStream"
+                    | "eqChar"
                     | "Instant"
                     | "ITree"
                     | "Unit"
@@ -258,6 +263,8 @@ fn prelude_signature_inventory_is_executable_and_closed() {
         "Nat",
         "Pair",
         "Coproduct",
+        "ConsoleStream",
+        "eqChar",
         "Instant",
         "ITree",
         "Unit",

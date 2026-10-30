@@ -104,7 +104,7 @@ fn result_payload(value: &EvalVal, expected_ctor: GlobalId) -> &EvalVal {
 fn console_surface_and_package_are_zero_trust_definitions() {
     let mut elab = ken_elaborator::ElabEnv::new().expect("prelude registers");
     for name in [
-        "Stream",
+        "ConsoleStream",
         "ConsoleOp",
         "ReadResult",
         "console_resp",

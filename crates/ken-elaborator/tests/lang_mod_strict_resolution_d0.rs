@@ -279,6 +279,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Bottom",
             "BufferSpan",
             "Char",
+            "ConsoleStream",
             "Coproduct",
             "CreatePolicy",
             "Equal",
@@ -304,6 +305,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "TransferCount",
             "Unit",
             "Utf8Error",
+            "eqChar",
         ]
         .as_slice()
     );
@@ -431,10 +433,31 @@ fn vector_strict_floor_provider_transition_sentinel() {
     assert_eq!(names, expected_vector_strict_floor_names());
 }
 
+/// Durable provider-edge check. MEASURED: the three direct homes/consumer
+/// modules elaborate with only the configured floor and their declared
+/// imports. CLAIMED: each Console/Char home removes its old ambient need.
+/// THE GAP: this does not prove every inherited transitive client; the
+/// transition census below checks the full exact set independently.
+#[test]
+fn console_char_home_and_derived_consumer_need_no_ambient_names() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    for entry in [
+        "Capability.Console.Text",
+        "Core.Classes.LawfulClasses",
+        "Data.Collections.Derived",
+    ] {
+        let names = ambient_dependencies(&root, entry)
+            .unwrap_or_else(|e| panic!("{entry}: root-loaded import closure must work: {e}"));
+        assert!(names.is_empty(), "{entry}: still relies on {names:?}");
+    }
+}
+
 /// Transition sentinel for catalog migration: this is a behavioral census,
-/// not a source-text census. The twenty-three-type floor removes its newly
-/// admitted families and constructors from these residual dependency vectors;
-/// every remaining name still requires an explicit provider migration.
+/// not a source-text census. The Console/Char floor and the two explicit
+/// package homes remove their old ambient dependencies; every remaining name
+/// still requires a separate provider migration.
 #[test]
 fn catalog_ambient_passthrough_migration_census() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -461,7 +484,11 @@ fn catalog_ambient_passthrough_migration_census() {
         }
     }
 
-    let expected = vec![
+    // Preserve the last-cut exact baseline as the independent behavioral
+    // census oracle. The Console/Char slice predicts only these explicit
+    // deletions: the checked home edges and the scoped/floor spellings remove
+    // their former ambient dependencies, without adding another convenience.
+    let prior: Vec<(String, Vec<String>)> = vec![
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
             // Core.Classes.LawfulClasses in this import closure.
@@ -1062,9 +1089,36 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
     ];
+    let removed = [
+        "IO",
+        "Stderr",
+        "Stdout",
+        "write",
+        "charToInt",
+        "eqChar",
+        "leqChar",
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    let mut newly_clean = BTreeSet::new();
+    let expected = prior
+        .into_iter()
+        .filter_map(|(entry, names)| {
+            let remaining = names
+                .into_iter()
+                .filter(|name| !removed.contains(name.as_str()))
+                .collect::<Vec<_>>();
+            if remaining.is_empty() {
+                newly_clean.insert(entry);
+                None
+            } else {
+                Some((entry, remaining))
+            }
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
         census, expected,
-        "WP-4 migration sentinel: ambient dependencies changed"
+        "Console/Char migration: only the predicted exact ambient pairs disappear"
     );
 
     let ambient = census
@@ -1102,6 +1156,7 @@ fn catalog_ambient_passthrough_migration_census() {
     ]
     .into_iter()
     .map(str::to_string)
+    .chain(newly_clean)
     .collect::<BTreeSet<_>>();
     let expected_residuals = BTreeSet::<String>::new();
     assert_eq!(clean, expected_clean, "WP-4 strict-floor-clean sentinel");

@@ -55,7 +55,7 @@ fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
                 (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) \
                 (Result IOError Unit) ExitCode \
              (host_console APartial (Result IOError Unit) \
-               (write Stdout (bytes_encode \"{payload}\"))) \
+               (write ConsoleStream.Stdout (bytes_encode \"{payload}\"))) \
              (\\r. match r {{ \
                Err e |-> match e {{ \
                  IOError.BrokenPipe |-> host_exit APartial (ExitCode.Failure 17); \

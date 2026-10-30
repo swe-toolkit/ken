@@ -77,7 +77,7 @@ import Capability.Parsing.Decoder
     decoder_seq,
     decoder_seq_preserves)
 
-import Core.Classes.LawfulClasses (bytes_to_list_injective, leq_nat)
+import Core.Classes.LawfulClasses (bytes_to_list_injective, charToInt, leq_nat)
 
 import Core.Logic.Transport (cong, sym, trans)
 

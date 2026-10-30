@@ -37,7 +37,7 @@ proc px7f_export_resource (cap : Cap AFull) (path : Bytes)
 const ORDINARY_PRODUCER: &str = r#"
 proc px7f_export_ordinary (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
-  host_console AFull (Result IOError Unit) (flush Stdout)
+  host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#;
 
 fn checked_export(source: &str, target: &str, temporal: Vec<TEntry>) -> BehavioralExport {

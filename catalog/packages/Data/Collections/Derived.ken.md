@@ -69,7 +69,7 @@ import Data.Numeric.Nat.Order (min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat, leqChar)
 
 import Core.Logic.And (And as Conj)
 

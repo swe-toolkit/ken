@@ -41,7 +41,7 @@ impl Drop for ClientRoot {
 
 const COMPLETE_CLIENT: &str = r#"
 import Capability.Console.Text
-  (print, printLine, eprint, eprintLine,
+  (IO, write, print, printLine, eprint, eprintLine,
    print_write_tree, print_line_write_tree,
    eprint_write_tree, eprint_line_write_tree, console_line_payload)
 
@@ -57,37 +57,37 @@ proc client_eprint_line (text : String) : IO (Result IOError Unit) visits [Conso
 fn client_payload (text : String) : Bytes = console_line_payload text
 
 theorem client_print_write_tree (text : String)
-  : Equal (IO (Result IOError Unit)) (print text) (write Stdout (bytes_encode text)) =
+  : Equal (IO (Result IOError Unit)) (print text) (write ConsoleStream.Stdout (bytes_encode text)) =
   print_write_tree text
 
 theorem client_print_line_write_tree (text : String)
   : Equal (IO (Result IOError Unit))
-      (printLine text) (write Stdout (console_line_payload text)) =
+      (printLine text) (write ConsoleStream.Stdout (console_line_payload text)) =
   print_line_write_tree text
 
 theorem client_eprint_write_tree (text : String)
-  : Equal (IO (Result IOError Unit)) (eprint text) (write Stderr (bytes_encode text)) =
+  : Equal (IO (Result IOError Unit)) (eprint text) (write ConsoleStream.Stderr (bytes_encode text)) =
   eprint_write_tree text
 
 theorem client_eprint_line_write_tree (text : String)
   : Equal (IO (Result IOError Unit))
-      (eprintLine text) (write Stderr (console_line_payload text)) =
+      (eprintLine text) (write ConsoleStream.Stderr (console_line_payload text)) =
   eprint_line_write_tree text
 "#;
 
 const STDOUT_LINE_CLIENT: &str = r#"
-import Capability.Console.Text (printLine, print_line_write_tree, console_line_payload)
+import Capability.Console.Text (IO, write, printLine, print_line_write_tree, console_line_payload)
 theorem client_stdout_line (text : String)
   : Equal (IO (Result IOError Unit))
-      (printLine text) (write Stdout (console_line_payload text)) =
+      (printLine text) (write ConsoleStream.Stdout (console_line_payload text)) =
   print_line_write_tree text
 "#;
 
 const STDERR_LINE_CLIENT: &str = r#"
-import Capability.Console.Text (eprintLine, eprint_line_write_tree, console_line_payload)
+import Capability.Console.Text (IO, write, eprintLine, eprint_line_write_tree, console_line_payload)
 theorem client_stderr_line (text : String)
   : Equal (IO (Result IOError Unit))
-      (eprintLine text) (write Stderr (console_line_payload text)) =
+      (eprintLine text) (write ConsoleStream.Stderr (console_line_payload text)) =
   eprint_line_write_tree text
 "#;
 

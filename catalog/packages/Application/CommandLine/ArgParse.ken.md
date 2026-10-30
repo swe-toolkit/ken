@@ -48,6 +48,8 @@ import Capability.Parsing.Decoder
 
 import Core.Logic.Transport (cong, sym, trans)
 
+import Core.Classes.LawfulClasses (charToInt)
+
 import Data.Collections.Derived (list_append, map)
 
 import Data.Collections.NonEmpty

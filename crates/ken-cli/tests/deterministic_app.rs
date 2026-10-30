@@ -34,7 +34,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                                  (fs_resp AFull) ambient_resp)
                                (Result IOError Unit) ExitCode
                             (host_console AFull (Result IOError Unit)
-                              (write Stdout argument))
+                              (write ConsoleStream.Stdout argument))
                             (\_ . host_exit AFull ExitCode.Success))
                   }
               }

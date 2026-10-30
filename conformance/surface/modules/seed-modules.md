@@ -1059,6 +1059,89 @@ sentinel beside the current contract.
   on absence from a Rust name table. No official conformance-runner result
   is claimed by stating these cases.
 
+The Console/Char cases below implement the two-witness `30-taxonomy §4`
+pre-flip slice. Their three source routes are strict roots, legacy roots, and
+legacy single-file. Package imports belong to roots-loaded clients only;
+legacy single-file clients retain bare pre-source package references until
+the strict-entry flip. No row adds trust or duplicates a checked definition.
+
+### surface/modules/console-stream-checked-family-and-char-comparator
+
+- promise class: **normative compatibility vector** — the original checked
+  carrier and comparator identities survive surface admission
+- spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`; `36 §1`
+- given: in each of the three fresh source routes, elaborate:
+
+  ```ken
+  fn keep_stream (stream : ConsoleStream) : ConsoleStream = stream
+  const input : ConsoleStream = ConsoleStream.Stdin
+  const output : ConsoleStream = ConsoleStream.Stdout
+  const errors : ConsoleStream = ConsoleStream.Stderr
+  const same : Bool = eqChar 65 65
+  ```
+
+- expect: each route accepts with `ConsoleStream` selecting the pre-source
+  checked `Stream` family ID, each qualified constructor retaining its own
+  original ID and that family as parent, and `eqChar` selecting Char's
+  registered checked comparator ID. `trusted_base()` is identical before
+  and after. The carrier's native artifact symbol remains `Stream`, not a
+  second family or rewritten native role.
+- controls: independently remove either newly admitted floor member; its
+  same-name declaration refusal below must turn into acceptance or the
+  corresponding checked-reference row above must reject. Keeping one
+  other member green does not certify the removed member.
+
+### surface/modules/console-stream-floor-and-unreserved-case-pairs
+
+- promise class: **durable discriminator** — checked parents are reserved,
+  scoped case leaves are not; old `Stream` is internal
+- spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`
+- given: in separate fresh units for all three routes, compare
+  `const ConsoleStream : Nat = Zero` and `const eqChar : Nat = Zero`
+  against their accepted one-name controls `const LocalStream : Nat = Zero`
+  and `const local_char_eq : Nat = Zero`. For each leaf `C` of `Stdin`,
+  `Stdout`, `Stderr`, compare `const value : ConsoleStream = C` with the
+  accepting same-leaf local control `data LocalCase = C`, followed by
+  `const local : LocalCase = C` and
+  `const still_checked : ConsoleStream = ConsoleStream.C`.
+  Independently declare `data Stream = MkStream` as a non-floor local.
+- expect: both admitted-name declarations reject at introduction; their
+  unrelated local controls accept. Each bare floor use refuses at surface
+  resolution, each local leaf accepts with a different parent and ID, and
+  the qualified checked case still resolves after the local declaration.
+  The local `Stream` accepts without replacing the ConsoleStream family.
+  No row allocates a replacement floor identity or adds trust.
+- controls: erroneously reserving any bare case makes its same-leaf local
+  control reject while the qualified positive still passes. Adding `Stream`
+  to the floor makes its local-family acceptance reject; this is independent
+  of the `ConsoleStream` reservation control.
+
+### surface/modules/console-char-package-homes-export-original-ids
+
+- promise class: **durable provider-edge invariant** — a home export and a
+  client import select checked identities rather than mutable spellings
+- spec: `30-taxonomy §4`; `33 §3.2`–§3.3; `36 §1`; `37 §5`
+- given: one roots-loaded `Capability.Console.Text` file performs only
+  `export IO, write, print_line`, and another roots-loaded
+  `Core.Classes.LawfulClasses` file performs only
+  `export charToInt, leqChar`. A strict client imports all five selectively,
+  uses `IO` as an effect result carrier, calls
+  `write ConsoleStream.Stdout payload` and `print_line message`, and applies
+  `charToInt 65` and `leqChar 65 66`. Repeat the import in legacy roots mode
+  after an unrelated checked declaration has taken over flat
+  `globals["write"]` with a fresh ID. Independently test a strict client
+  with no import and a non-home file with `export IO`.
+- expect: the strict client's five uses select exactly the original
+  pre-source checked IDs, with no added trust. The legacy imported `write`
+  still selects its original ID, not the replacement flat-global ID. The
+  no-import client and non-home publisher refuse at surface resolution.
+  Standalone legacy files continue bare resolution in this slice; they are
+  not strict clients and do not gain implicit package roots.
+- controls: deleting any one of the five compiler-owned home grants makes
+  that home's ordinary `export` and its strict client import reject. A
+  same-name local declaration inside a home must refuse as ambiguous,
+  instead of replacing the compiler-owned exported identity.
+
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
 and legacy single-file. Each of the six bare-name rows reuses the full accepted

@@ -9,11 +9,11 @@ proc write_then_exit (bytes : Bytes) (code : ExitCode)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
-    (host_console APartial (Result IOError Unit) (write Stdout bytes))
+    (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
     (\_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_exit APartial code))
 
 proc finish (outer : Result IOError (Result Bytes Bytes))
@@ -31,7 +31,7 @@ proc run_case (as_ok : Bool) : HostIO APartial ExitCode visits [Console] =
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
-      (write Stdout (bytes_encode "seed:")))
+      (write ConsoleStream.Stdout (bytes_encode "seed:")))
     (\written. finish (match written {
       Err io |-> Err IOError (Result Bytes Bytes) io;
       Ok _ |-> match as_ok {
@@ -62,7 +62,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
-      (write Stdout (bytes_encode "ignored")))
+      (write ConsoleStream.Stdout (bytes_encode "ignored")))
     (\written. match written {
       Err _ |-> host_exit APartial (ExitCode.Failure 3);
       Ok _ |-> host_exit APartial ExitCode.Success

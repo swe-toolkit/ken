@@ -103,7 +103,7 @@ proc target (value : Unit) : Unit visits [Console] = value
         r#"
 proc target (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
-  host_console AFull (Result IOError Unit) (flush Stdout)
+  host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#,
     )
     .expect("real ordinary perform");
@@ -148,7 +148,7 @@ fn same_family_host_operations_have_distinct_signatures_and_hashes() {
         r#"
 proc target (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
-  host_console AFull (Result IOError Unit) (flush Stdout)
+  host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#,
     )
     .expect("ConsoleFlush export");
@@ -156,7 +156,7 @@ proc target (_value : Unit)
         r#"
 proc target (_value : Unit)
   : HostIO AFull Bool visits [Console] =
-  host_console AFull Bool (is_terminal Stdout)
+  host_console AFull Bool (is_terminal ConsoleStream.Stdout)
 "#,
     )
     .expect("ConsoleIsTerminal export");
@@ -242,7 +242,7 @@ fn target_closure_follows_callback_and_excludes_unused_sibling() {
     let closure = r#"
 proc after_flush (_outcome : Result IOError Unit)
   : HostIO AFull Bool visits [Console] =
-  host_console AFull Bool (is_terminal Stdout)
+  host_console AFull Bool (is_terminal ConsoleStream.Stdout)
 
 proc unused_sibling (_value : Unit)
   : HostIO AFull Instant visits [Clock] =
@@ -253,7 +253,7 @@ proc target (_value : Unit)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result IOError Unit) Bool
-    (host_console AFull (Result IOError Unit) (flush Stdout))
+    (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
     (\outcome. after_flush outcome)
 "#;
     let without_unused = closure.replace(
@@ -290,7 +290,7 @@ proc walk (fuel : Nat)
     Suc smaller |-> bind (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result IOError Unit) Instant
-      (host_console AFull (Result IOError Unit) (flush Stdout))
+      (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_outcome. walk smaller)
   }
 
