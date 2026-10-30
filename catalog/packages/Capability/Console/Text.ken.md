@@ -28,7 +28,10 @@ pub proc eprintLine (text : String) : IO (Result IOError Unit) visits [Console] 
 
 pub theorem print_write_tree
       (text : String)
-    : Equal (IO (Result IOError Unit)) (print text) (write ConsoleStream.Stdout (bytes_encode text)) =
+    : Equal
+        (IO (Result IOError Unit))
+        (print text)
+        (write ConsoleStream.Stdout (bytes_encode text)) =
   console_tree_refl (IO (Result IOError Unit)) (print text)
 
 pub theorem print_line_write_tree
@@ -41,7 +44,10 @@ pub theorem print_line_write_tree
 
 pub theorem eprint_write_tree
       (text : String)
-    : Equal (IO (Result IOError Unit)) (eprint text) (write ConsoleStream.Stderr (bytes_encode text)) =
+    : Equal
+        (IO (Result IOError Unit))
+        (eprint text)
+        (write ConsoleStream.Stderr (bytes_encode text)) =
   console_tree_refl (IO (Result IOError Unit)) (eprint text)
 
 pub theorem eprint_line_write_tree
