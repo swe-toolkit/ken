@@ -7,7 +7,8 @@
 > SPEC-GEOMETRY-BOX-INSIDE-ORDER §5;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY §6;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY §7;
-> SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION §8).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION §8;
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY §9).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -26,11 +27,13 @@
 > selector absorptions and two structural box equalities. Architect D0
 > checked their generic proofs on `439fa7bb7` without a new `Axiom`
 > and with equal scratch trusted identities 114 → 114. The exports
-> were absent on the spec author's base; this assembled candidate adds
-> them with a package-owned test of the complete accepted seed and
-> isolated false claim. Neither D0 nor these candidate-local checks
-> establish official conformance-runner execution, CI, publication,
-> landing or landed trust.
+> and a package-owned seed test are present on main. Neither the D0
+> nor the package test establishes official conformance-runner execution
+> or a landed trust measurement. Section 9 specifies two further Nat
+> selectors and structural box laws; Architect checked their generic
+> proofs in scratch, but the catalog exports and seed are not yet part
+> of this spec-only child. No official conformance, CI, publication,
+> landing or landed trust follows from this author turn.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -891,8 +894,98 @@ of the existing private box helpers, and a counterexample to swapping
 a lower-corner selector; the new private Nat helper also refused
 selective import. Its patch SHA-256 is
 `440df27e96f94cb4796e0723cf280781dec2bce2ff2a6ac47b75e6408daca9d7`.
-The D0 measurements are scratch-only. This assembled candidate's
-package-owned test root-loads the checked exports, runs the complete
-accepted seed and refuses its isolated false equality after a fresh
-accepted prefix. Those checks are not official conformance-runner
-execution, CI, publication, landing or landed trust.
+The D0 measurements are scratch-only. The §8 checked exports and
+package-owned test are now on main. The package test root-loads the
+exports, runs the complete accepted seed and refuses its isolated false
+equality after a fresh accepted prefix. Neither the D0 nor that test
+establishes official conformance-runner execution or landed trust.
+
+## 9. Distribution of box intersection over hull and conversely
+
+> **Section 9 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY).** Architect's
+> isolated AC-0 on `db6d0fee4` checked all four generic laws below
+> with rc 0, no new `Axiom`, and equal scratch `trusted_base()` identity
+> sets 114 → 114 → 114. This spec-only child does not add their catalog
+> exports or a conformance seed. D0 is not official conformance, CI,
+> publication, landing or a landed trust measurement.
+
+### 9.1 Distribution selectors in Nat Order
+
+`Data.Numeric.Nat.Order` must export these two public Transparent checked
+proof selectors for the existing `min` and `max`, without an order
+premise. The `min` selector follows private `idempotent for min` and
+precedes `pub fn max`; the `max` selector follows `absorb for max` and
+precedes `pub fn sub`. The argument order is `m`, `n`, `k` in both.
+
+```ken
+pub proof distrib for min
+    (m : Nat) (n : Nat) (k : Nat)
+  : Equal Nat (min m (max n k)) (max (min m n) (min m k))
+
+pub proof distrib for max
+    (m : Nat) (n : Nat) (k : Nat)
+  : Equal Nat (max m (min n k)) (min (max m n) (max m k))
+```
+
+Clients apply `(proof distrib for min) m n k` and
+`(proof distrib for max) m n k`. Each equates a mixed nested
+extremum with the corresponding extremum of two selected terms for
+all naturals. Unlike §8's absorption, neither returns `m` in general.
+The proof uses the existing checked order interface; there is no new
+public helper. `idempotent for min` remains private, as do existing
+box-congruence helpers. The §6–§8 selectors and operation types stay
+unchanged.
+
+### 9.2 Two structural box equalities
+
+`Algorithm.Geometry.NatBox` must export these public Transparent
+checked theorems after `hull_intersect_absorb` and before
+`manhattan_symm`:
+
+```ken
+pub theorem intersect_hull_distrib
+    (a : Box) (b : Box) (c : Box)
+  : Equal Box (intersect a (hull b c)) (hull (intersect a b) (intersect a c))
+
+pub theorem hull_intersect_distrib
+    (a : Box) (b : Box) (c : Box)
+  : Equal Box (hull a (intersect b c)) (intersect (hull a b) (hull a c))
+```
+
+Both laws hold unconditionally for every three boxes, including
+inverted boxes and disjoint intersections. They equate stored corners
+by `Equal Box`, not point sets or areas. Intersection selects `max` on
+lower corners and `min` on upper corners; hull selects the reverse.
+For `intersect_hull_distrib`, each lower coordinate uses
+`distrib for max` and each upper coordinate uses `distrib for min`.
+For `hull_intersect_distrib`, the selectors swap roles. The existing
+private `point_equal` and `box_equal` assemble those four Nat
+equalities into structural equality. No validity premise, canonical
+empty-box representation, new private helper, or §1–§8 operation or
+law-type change is introduced.
+
+The closed seed's fixed triple is `a=(1,1)–(4,4)`,
+`b=(3,0)–(6,2)`, `c=(0,3)–(2,3)`. The first law's two sides
+both compute to `(1,1)–(4,3)`, which is not any input. The second
+law's two sides both compute to `a` because `intersect b c` is the
+inverted box `(3,3)–(2,2)`; checking both sides independently does
+not make them distinct from the inputs. The false mixed regrouping
+`intersect a (hull b c) = hull (intersect a b) c` instead compares
+`(1,1)–(4,3)` to `(0,1)–(4,3)`. Its refusal must follow a fresh
+accepted prefix and a same-form true equality, so the false lower-x
+coordinate, not the shape of an `Equal Box` proof, is tested. These
+closed computations delimit the claim; they do not replace the
+checked generic laws.
+
+Architect's isolated D0 on `db6d0fee4` checked both packages with
+`ken check` and `ken fmt --check` rc 0, four owned Transparent
+exports, no new `Axiom`, and unchanged scratch trusted identity sets
+114 → 114 → 114. Generic clients applied all four laws; importing
+private helpers was refused. The wrong Nat selector was refused with
+`KernelRejected TypeMismatch`, while the same-form true box claim
+was accepted and the false mixed claim refused. These results are
+Architect-reported scratch evidence, not tests run in this author
+turn. The catalog additions and closed seed belong to later serial
+turns of this candidate. No official conformance-runner execution,
+CI, publication, landing or landed trust is claimed.
