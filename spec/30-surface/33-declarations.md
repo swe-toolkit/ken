@@ -262,15 +262,31 @@ is a **surface error** (`24`) — it never reaches the kernel:
   lookup order, capitalization, nor an identical target ID breaks the tie.
   Qualified and aliased module imports otherwise preserve the imported
   declaration's identity. Selectively imported or renamed names do too.
-- **One strict mode, for every source unit.** Resolve a source name through its
-  lexical locals (including declarations already admitted to the same
-  incremental session), explicit imports, the kernel/built-in vocabulary, or
-  the closed prelude of `30-taxonomy §4`. The same rule applies to roots-loaded
-  and isolated-file compilation and to incremental elaboration. No other
-  lookup in an implementation-global table can make a spelling visible. A
-  loaded dependency is not implicitly imported and neither unit inherits the
-  other's imports. A registered convenience outside the prelude needs an
-  explicit public provider import; without one it is unbound.
+- **Strict roots-loaded resolution.** For a unit reached through the roots
+  loader (`39 §2.0`), resolve a source name through its lexical locals
+  (including declarations already admitted to the same incremental session),
+  explicit imports,
+  the kernel/built-in vocabulary, or the closed prelude of `30-taxonomy §4`.
+  The roots elaboration APIs and CLI entries under `catalog/packages/` use
+  this route. No implementation-global fallback makes a spelling visible:
+  loading a dependency does not import it, and neither unit inherits the
+  other's imports. In particular, the package identities `IO`, `write`,
+  `print_line`, `charToInt`, and `leqChar` require explicit public imports
+  from `Capability.Console.Text` and `Core.Classes.LawfulClasses` as
+  appropriate. An unimported bare use of any of the five is unbound in a
+  roots-loaded unit, including a legacy-roots entry.
+- **Closed transitional standalone route.** Until the L2-4 strict-entry
+  flip, `elaborate_file_v1`, `elaborate_ken_md_file_v1`, and
+  `elaborate_decl`, CLI entries outside `catalog/packages/`, examples,
+  and inline source strings keep legacy bare resolution for exactly those
+  five package spellings, each bound to its existing pre-source `GlobalId`.
+  This does not import a provider, add a floor or B name, create a second
+  identity, or authorize arbitrary compiler globals as source names. The
+  checked `ConsoleStream` name and its qualified `ConsoleStream.Stdin`,
+  `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` paths apply in both
+  routes; bare constructor spellings are not restored. This slice neither
+  changes the CLI routes nor installs standalone roots loading. L2-4 owns
+  that route and the strict-default flip.
 - **Closed built-in name set B.** For resolution and name protection, B is the
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact

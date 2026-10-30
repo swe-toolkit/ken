@@ -441,11 +441,17 @@ operations or aliases remain package identities: `IO`, `write`, and
 `Capability.Console.Text`; `charToInt` and `leqChar` by
 `Core.Classes.LawfulClasses`. These existing homes export the captured
 checked IDs, not copied definitions or synthetic substitute globals.
-Roots-loaded clients import those providers. Standalone legacy files
-and inline sources continue resolving the five package names bare in
-this slice, recorded separately for the later strict flip; no CLI
-roots route or strict-default flip is included. The `ConsoleStream`
-rename and scoped constructor paths apply in both entry populations.
+Roots-loaded clients, including the legacy-roots conformance route, import
+those providers explicitly; without an import, a bare use of any of the
+five is unbound in that route. Until the L2-4 strict-entry flip, the
+standalone legacy entries named in `33 §3.3` (`elaborate_file_v1`,
+`elaborate_ken_md_file_v1`, `elaborate_decl`, CLI paths outside
+`catalog/packages/`, examples, and inline sources) keep bare access to
+those five exact pre-source package IDs. This closed transitional route
+is not general implementation-global fallback or a roots-loader import.
+The `ConsoleStream` rename and qualified constructor paths apply to
+both routes. This slice changes neither CLI routing nor standalone roots
+loading, and does not include the strict-default flip.
 
 The implementer's token-aware census classified 1,045 candidate rows
 across 164 paths. It predicts 127 ambient-pair deletions, not 127

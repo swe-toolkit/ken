@@ -233,11 +233,15 @@ For checked definitions the test remains per-name: `leqChar` does not
 inherit `eqChar`'s registry key. The five source-promised but unkeyed
 names `IO`, `write`, `print_line`, `charToInt`, and `leqChar` remain
 package identities with their exact pre-source IDs, not new copies.
-Roots-loaded clients import their explicit providers; standalone legacy
-files and inline sources still use those five bare in this slice, as a
-separate flip-owned census class. The `ConsoleStream` rename and scoped
-constructor paths apply in both populations; no CLI roots route or
-strict-default flip is introduced. `IOError`'s thirteen causes are
+Roots-loaded clients, including the legacy-roots conformance route,
+import their explicit providers; without an import, a bare use of any
+of the five is unbound. The standalone legacy entries enumerated in
+`33 §3.3` keep bare access to those same five pre-source IDs until the
+L2-4 strict-entry flip, as a separate flip-owned census class. This is
+a closed route exception, not general implementation-global fallback
+or an implicit import. The `ConsoleStream` rename and scoped constructor
+paths apply in both populations; no CLI roots route, standalone roots
+loading, or strict-default flip is introduced. `IOError`'s thirteen causes are
 one **scoped** family, not thirteen bare B names. Architect's D0 names each cause's
 native producer separately, without inferring all readers from one cause.
 The twelve `ResourceError` constructors likewise retain their exact IDs

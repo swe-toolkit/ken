@@ -94,13 +94,14 @@ The loader proceeds as follows:
    raises `ImportCycle` before either cyclic unit's declarations are admitted.
    Cache each successfully completed unit by canonical module path and elaborate
    it at most once in the run; later edges reuse that result.
-4. Construct a fresh scope for each unit from exactly its local declarations,
-   explicit imports, kernel and built-in vocabulary, and the closed prelude
-   floor. Its exact prelude-floor name set is `{Auth, Bool, Bottom, BufferSpan,
-   Char, ConsoleStream, Coproduct, CreatePolicy, Equal, ExitCode, FileError,
-   HostIO, IOError, ITree, Instant, List, Nat, Option, Pair, ProcessInput,
-   Prod, ProgramCaps, Prop, Proved, ResourceError, ResourceKind, Result, Top,
-   TransferCount, Unit, Utf8Error, eqChar}` (`30-taxonomy §4`; `33 §3.3`).
+4. For each roots-loaded unit, construct a fresh scope from exactly its local
+   declarations, explicit imports, kernel and built-in vocabulary, and the
+   closed prelude floor. Its exact prelude-floor name set is `{Auth, Bool,
+   Bottom, BufferSpan, Char, ConsoleStream, Coproduct, CreatePolicy,
+   Equal, ExitCode, FileError, HostIO, IOError, ITree, Instant, List,
+   Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
+   ResourceError, ResourceKind, Result, Top, TransferCount, Unit,
+   Utf8Error, eqChar}` (`30-taxonomy §4`; `33 §3.3`).
    These thirty-two identities are not thirty-two types: `Top` and `Bottom`
    are proposition constants, `Proved` is a proof binding, `HostIO` is a
    type-level function, and `eqChar` is a checked comparator operation.
@@ -138,10 +139,13 @@ The loader proceeds as follows:
    identities whose checked types reference the exact floor `Pair`.
    Imports are non-transitive in both directions, as required by `33 §3.3`:
    a unit neither borrows its caller's imports nor exports its own imports
-   merely because it was loaded. An unresolved bare name does not fall
-   through to arbitrary implementation globals outside that scope. Pair's
-   four names enter through the witnessed closed floor inventories, never
-   because the compiler global map happens to contain them.
+   merely because it was loaded. In particular, roots-loaded uses of `IO`,
+   `write`, `print_line`, `charToInt`, and `leqChar` need their explicit
+   package-provider imports; unimported bare uses are unbound, including on
+   the legacy-roots entry. An unresolved bare name does not fall through to
+   arbitrary implementation globals outside that scope. Pair's four names
+   enter through the witnessed closed floor inventories, never because the
+   compiler global map happens to contain them.
 5. Resolve every imported or re-exported name through the provider's public
    interface to the provider declaration's existing canonical identity. Enforce
    privacy, ambiguity, and re-export clashes before emitting the caller. An
@@ -179,9 +183,14 @@ identities and allocates no replacement (`34 §"Canonical non-dependent pair
 floor family"`).
 
 A front end checking a source entry uses this loader whenever that entry is
-addressed through a catalog root. Reading the entry as an isolated file is not a
-substitute: it cannot establish the entry-rooted dependency graph or the
-per-unit visibility and scope contract above.
+addressed through a catalog root. Reading the entry as an isolated file is not
+a substitute: it cannot establish the entry-rooted dependency graph or the
+per-unit visibility and scope contract above. Until L2-4, the standalone
+entries enumerated in `33 §3.3` retain bare resolution of the five exact
+pre-source package identities without using this loader. This exception does
+not add a general implementation-global fallback to the roots-loader rule.
+`ConsoleStream` and its scoped constructor paths apply in both routes. This
+transitional exception adds no floor member, CLI roots route, or strict flip.
 
 ### 2.1 Proof-returning dependent `match` motives
 
