@@ -107,6 +107,7 @@ impl<'a> Collector<'a> {
             self.prelude.private_buffer_allocate_id,
             self.prelude.private_mapping_allocate_id,
             self.prelude.private_mapping_acquire_file_id,
+            self.prelude.px10_op_ids[2],
         ]
         .contains(&op)
         {

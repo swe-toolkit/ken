@@ -209,9 +209,9 @@ pub fn file_error_to_system (error : FileError) : SystemError =
   }
 
 pub fn process_error_to_system
-    (operation : ProcessOperation) (program : Option Bytes) (cause : IOError)
+    (operation : ProcessOperation) (program_bytes : Option Bytes) (cause : IOError)
   : SystemError =
-  MkSystemError (ProcessOp operation) (ProcessResource program) cause NoSafeContext
+  MkSystemError (ProcessOp operation) (ProcessResource program_bytes) cause NoSafeContext
 ```
 
 ## Using it

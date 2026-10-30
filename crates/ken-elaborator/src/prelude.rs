@@ -2088,28 +2088,28 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         .ok_or_else(|| ElabError::Internal("prelude PrivateSpawnPlan missing".into()))?;
     elab.globals.insert("PrivateSpawnPlan".into(), private_spawn_plan_id);
     elab.elaborate_decl(
-        "fn spawn_plan (program : Bytes) (arguments : List Bytes) : SpawnPlan = \
-         PrivateSpawnPlan program arguments (Nil (Prod Bytes Bytes)) ChildNull ChildNull ChildNull",
+        "fn spawn_plan (executable : Bytes) (arguments : List Bytes) : SpawnPlan = \
+         PrivateSpawnPlan executable arguments (Nil (Prod Bytes Bytes)) ChildNull ChildNull ChildNull",
     ).map_err(|e| ElabError::Internal(format!("prelude spawn_plan failed: {e}")))?;
     elab.elaborate_decl(
         "fn with_environment (plan : SpawnPlan) (env : List (Prod Bytes Bytes)) : SpawnPlan = \
-         match plan { PrivateSpawnPlan program arguments old_env stdin stdout stderr |-> \
-           PrivateSpawnPlan program arguments env stdin stdout stderr }",
+         match plan { PrivateSpawnPlan executable arguments old_env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env stdin stdout stderr }",
     ).map_err(|e| ElabError::Internal(format!("prelude with_environment failed: {e}")))?;
     elab.elaborate_decl(
         "fn with_stdin (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan = \
-         match plan { PrivateSpawnPlan program arguments env stdin stdout stderr |-> \
-           PrivateSpawnPlan program arguments env target stdout stderr }",
+         match plan { PrivateSpawnPlan executable arguments env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env target stdout stderr }",
     ).map_err(|e| ElabError::Internal(format!("prelude with_stdin failed: {e}")))?;
     elab.elaborate_decl(
         "fn with_stdout (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan = \
-         match plan { PrivateSpawnPlan program arguments env stdin stdout stderr |-> \
-           PrivateSpawnPlan program arguments env stdin target stderr }",
+         match plan { PrivateSpawnPlan executable arguments env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env stdin target stderr }",
     ).map_err(|e| ElabError::Internal(format!("prelude with_stdout failed: {e}")))?;
     elab.elaborate_decl(
         "fn with_stderr (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan = \
-         match plan { PrivateSpawnPlan program arguments env stdin stdout stderr |-> \
-           PrivateSpawnPlan program arguments env stdin stdout target }",
+         match plan { PrivateSpawnPlan executable arguments env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env stdin stdout target }",
     ).map_err(|e| ElabError::Internal(format!("prelude with_stderr failed: {e}")))?;
     elab.elaborate_decl("data ResourceTraceIdentity = PrivateResourceTraceIdentity Int Int")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceTraceIdentity failed: {e}")))?;
@@ -2619,7 +2619,7 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateMappingReadView mapping start length span_origin |-> Result ResourceError Bytes; \
            PrivateMappingWriteView mapping start bytes span_origin |-> Result ResourceError Unit; \
            PrivateMappingAcquireFile file length protection |-> Result ResourceError (Resource ResourceKind.Mapping); \
-           PrivateProcessPlanOpen cap program |-> Result ResourceError (Resource ResourceKind.SpawnPlan); \
+           PrivateProcessPlanOpen cap executable |-> Result ResourceError (Resource ResourceKind.SpawnPlan); \
            PrivateProcessPlanPush plan field first second scalar |-> Result ResourceError Unit; \
            PrivateProcessSpawn plan |-> Result ResourceError (Resource ResourceKind.ChildProcess); \
            PrivateProcessTakePipeWrite child |-> Result ResourceError (Resource ResourceKind.PipeWrite); \
@@ -3063,6 +3063,7 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     .map_err(|e| ElabError::Internal(format!("prelude withMapping failed: {e}")))?;
     register_resource_bracket_laws(elab)?;
     register_post_bracket_io(elab)?;
+    process::register_prelude_process(elab)?;
 
     // Scope both private families only after the checked buffer helpers have
     // used their original bare bindings, but before their IDs are hidden.
@@ -3261,7 +3262,6 @@ fn register_prelude_resource_protocol(elab: &mut ElabEnv, auth_t: &Term, cap_id:
     register_prelude_fs_operations(elab)?;
 
     register_prelude_brackets(elab)?;
-    process::register_prelude_process(elab)?;
 
     register_prelude_program(elab, auth_t, cap_id)?;
 
