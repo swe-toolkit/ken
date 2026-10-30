@@ -34,6 +34,7 @@ pub struct BoundProcessEntrypoint {
     pub program_caps_constructor: RuntimeSymbol,
     pub authority: u8,
     pub fs_root_spec: ken_host::FsRootSpec,
+    pub process_declared: bool,
     pub fs_root_binding: u64,
     pub plan_hash: u64,
     pub allow_root_execution: bool,
@@ -1165,6 +1166,7 @@ pub fn build_bound_process_starter_executable_artifact(
             entrypoint.allow_root_execution,
             crate::process_exit_status(crate::ProcessExitCode::Failure(0)).status,
             &entrypoint.fs_root_spec,
+            entrypoint.process_declared,
             &profile,
         ),
     )
@@ -2290,7 +2292,7 @@ int main(void) {{
 pub(crate) fn process_starter_c_stub(
     profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
-    process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), profile)
+    process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), false, profile)
 }
 
 fn process_starter_c_stub_for_authority(
@@ -2299,6 +2301,7 @@ fn process_starter_c_stub_for_authority(
     allow_root_execution: bool,
     root_denied_exit_status: i32,
     fs_root_spec: &ken_host::FsRootSpec,
+    process_declared: bool,
     profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
     r#"#include <stdint.h>
@@ -2366,6 +2369,7 @@ extern long long ken_host_invocation_v1_init(
     uint64_t authority,
     uint64_t plan_hash,
     uint64_t allow_root_execution,
+    uint64_t process_declared,
     long long root_denied_exit_status,
     const unsigned char *target_abi_hash,
     const unsigned char *host_effect_abi_hash,
@@ -2494,6 +2498,7 @@ int main(int argc, char **argv, char **envp) {
         __KEN_AUTHORITY__,
         KEN_ENTRYPOINT_PLAN_HASH,
         __KEN_ALLOW_ROOT_EXECUTION__,
+        __KEN_PROCESS_DECLARED__,
         __KEN_ROOT_DENIED_EXIT_STATUS__,
         KEN_TARGET_ABI_HASH,
         KEN_HOST_EFFECT_ABI_HASH,
@@ -2616,6 +2621,7 @@ int main(int argc, char **argv, char **envp) {
         "__KEN_ALLOW_ROOT_EXECUTION__",
         &u8::from(allow_root_execution).to_string(),
     )
+    .replace("__KEN_PROCESS_DECLARED__", &u8::from(process_declared).to_string())
     .replace(
         "__KEN_ROOT_DENIED_EXIT_STATUS__",
         &root_denied_exit_status.to_string(),
@@ -5401,6 +5407,7 @@ mod tests {
             authority: 2,
             fs_root_binding: fs_root_plan_binding_v1(plan_hash, &fs_root_spec),
             fs_root_spec,
+            process_declared: false,
             plan_hash,
             allow_root_execution: false,
             root_execution_binding: root_execution_plan_binding_v1(plan_hash, false),
@@ -5422,6 +5429,7 @@ mod tests {
             authority: 2,
             fs_root_binding: fs_root_plan_binding_v1(plan_hash, &original),
             fs_root_spec: original,
+            process_declared: false,
             plan_hash,
             allow_root_execution: false,
             root_execution_binding: root_execution_plan_binding_v1(plan_hash, false),

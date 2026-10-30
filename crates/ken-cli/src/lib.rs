@@ -223,7 +223,11 @@ where
         &admitted.fs_root_spec,
         effective_uid,
     ) {
-        Ok(cap) => ken_interp::EvalVal::Cap(cap),
+        Ok(cap) => ken_interp::EvalVal::Cap(if admitted.process_declared {
+            cap.with_declared_process_grant()
+        } else {
+            cap
+        }),
         Err(error) => {
             let Some(failure) = error
                 .get_ref()
@@ -345,7 +349,8 @@ fn map_program_admission_error(
         | ProgramAdmissionError::DuplicateCapability { effect } => RunError::MissingCapability {
             effect: effect.to_string(),
         },
-        ProgramAdmissionError::UnsupportedEffectRow => RunError::InvalidEntrypoint {
+        ProgramAdmissionError::ProcessRequiresFullFs
+        | ProgramAdmissionError::UnsupportedEffectRow => RunError::InvalidEntrypoint {
             authority: "declared",
         },
         ProgramAdmissionError::InvalidMainAbi { authority } => RunError::InvalidEntrypoint {

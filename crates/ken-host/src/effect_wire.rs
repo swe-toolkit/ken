@@ -463,6 +463,7 @@ fn fs_operation_tag(operation: FsCapabilityOperationV1) -> u8 {
         FsCapabilityOperationV1::GetInheritance => 14,
         FsCapabilityOperationV1::SetInheritance => 15,
         FsCapabilityOperationV1::Duplicate => 16,
+        FsCapabilityOperationV1::Spawn => 17,
     }
 }
 
@@ -559,8 +560,10 @@ fn capacity_scope_resource_is_valid(
     match (scope, resource) {
         (Scope::Runtime, Resource::InvocationEpochs)
         | (Scope::Invocation, Resource::EventGenerations | Resource::LivePendingSlots)
-        | (Scope::Invocation | Scope::Persistent,
-            Resource::Nodes | Resource::Words | Resource::DataBytes | Resource::NativeIntLimbs) => true,
+        | (
+            Scope::Invocation | Scope::Persistent,
+            Resource::Nodes | Resource::Words | Resource::DataBytes | Resource::NativeIntLimbs,
+        ) => true,
         _ => false,
     }
 }
@@ -587,13 +590,16 @@ pub fn encode_linked_effect_trace(
                 return Err(EffectTraceWireError);
             }
             put_u8(&mut out, 4);
-            put_u8(&mut out, match fault {
-                crate::SelectedCallIntegrityFaultV1::WrongActivation => 0,
-                crate::SelectedCallIntegrityFaultV1::InvalidSlot => 1,
-                crate::SelectedCallIntegrityFaultV1::StaleGeneration => 2,
-                crate::SelectedCallIntegrityFaultV1::Spent => 3,
-                crate::SelectedCallIntegrityFaultV1::WrongTarget => 4,
-            });
+            put_u8(
+                &mut out,
+                match fault {
+                    crate::SelectedCallIntegrityFaultV1::WrongActivation => 0,
+                    crate::SelectedCallIntegrityFaultV1::InvalidSlot => 1,
+                    crate::SelectedCallIntegrityFaultV1::StaleGeneration => 2,
+                    crate::SelectedCallIntegrityFaultV1::Spent => 3,
+                    crate::SelectedCallIntegrityFaultV1::WrongTarget => 4,
+                },
+            );
         }
         Some(crate::TerminalErrorV1::CapacityExhausted(failure)) => {
             if !capacity_scope_resource_is_valid(failure.scope, failure.resource)
@@ -1172,14 +1178,16 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
             if terminal_value != crate::SELECTED_CALL_INTEGRITY_STATUS_V1 {
                 return Err(EffectTraceWireError);
             }
-            Some(crate::TerminalErrorV1::SelectedCallIntegrity(match cursor.u8()? {
-                0 => crate::SelectedCallIntegrityFaultV1::WrongActivation,
-                1 => crate::SelectedCallIntegrityFaultV1::InvalidSlot,
-                2 => crate::SelectedCallIntegrityFaultV1::StaleGeneration,
-                3 => crate::SelectedCallIntegrityFaultV1::Spent,
-                4 => crate::SelectedCallIntegrityFaultV1::WrongTarget,
-                _ => return Err(EffectTraceWireError),
-            }))
+            Some(crate::TerminalErrorV1::SelectedCallIntegrity(
+                match cursor.u8()? {
+                    0 => crate::SelectedCallIntegrityFaultV1::WrongActivation,
+                    1 => crate::SelectedCallIntegrityFaultV1::InvalidSlot,
+                    2 => crate::SelectedCallIntegrityFaultV1::StaleGeneration,
+                    3 => crate::SelectedCallIntegrityFaultV1::Spent,
+                    4 => crate::SelectedCallIntegrityFaultV1::WrongTarget,
+                    _ => return Err(EffectTraceWireError),
+                },
+            ))
         }
         3 => {
             let scope = match cursor.u8()? {
@@ -1375,17 +1383,29 @@ mod tests {
         let tag_at = MAGIC.len() + 8 + 32 + 32 + 8;
         let mut malformed = encoded.clone();
         malformed[tag_at] = 5;
-        assert_eq!(decode_linked_effect_trace(&malformed), Err(EffectTraceWireError));
+        assert_eq!(
+            decode_linked_effect_trace(&malformed),
+            Err(EffectTraceWireError)
+        );
         malformed[tag_at] = 4;
         malformed[tag_at + 1] = 5;
-        assert_eq!(decode_linked_effect_trace(&malformed), Err(EffectTraceWireError));
+        assert_eq!(
+            decode_linked_effect_trace(&malformed),
+            Err(EffectTraceWireError)
+        );
         let mut wrong_status = encoded;
         let status_at = MAGIC.len() + 8 + 32 + 32;
         wrong_status[status_at..status_at + 8].copy_from_slice(&(-1i64).to_le_bytes());
-        assert_eq!(decode_linked_effect_trace(&wrong_status), Err(EffectTraceWireError));
+        assert_eq!(
+            decode_linked_effect_trace(&wrong_status),
+            Err(EffectTraceWireError)
+        );
         let mut inconsistent = trace;
         inconsistent.terminal_value = -1;
-        assert_eq!(encode_linked_effect_trace(&inconsistent), Err(EffectTraceWireError));
+        assert_eq!(
+            encode_linked_effect_trace(&inconsistent),
+            Err(EffectTraceWireError)
+        );
     }
 
     /// ABI-S3 AC-3b. No cancellation surface exists on the sleep operation --

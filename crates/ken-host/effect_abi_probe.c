@@ -55,6 +55,13 @@ struct MappingAllocateRequestV1 { uint64_t length; uint8_t protection; };
 struct MappingReadViewRequestV1 { uint64_t resource; uint64_t start; uint64_t length; uint64_t span_origin; };
 struct MappingWriteViewRequestV1 { uint64_t resource; uint64_t start; struct SliceV1 bytes; uint64_t span_origin; };
 struct MappingAcquireFileRequestV1 { uint64_t resource; uint64_t length; uint8_t protection; };
+struct ResourceStreamReadRequestV1 { uint64_t stream; uint64_t buffer; uint64_t buffer_start; uint64_t length; };
+struct ResourceStreamWriteRequestV1 { uint64_t stream; uint64_t buffer; uint64_t buffer_start; uint64_t length; uint64_t span_origin; };
+struct ProcessPlanOpenRequestV1 { uint64_t capability; struct SliceV1 program; };
+struct ProcessPlanPushRequestV1 { uint64_t plan; uint64_t field; struct SliceV1 first; struct SliceV1 second; uint64_t scalar; };
+struct ProcessSpawnRequestV1 { uint64_t plan; };
+struct ProcessTakePipeRequestV1 { uint64_t child; uint64_t fd; };
+struct ProcessWaitRequestV1 { uint64_t child; };
 struct ResourceErrorReplyV1 {
     uint64_t schema_version;
     uint64_t resource_kind;
@@ -113,6 +120,13 @@ int main(void) {
     FACT_SIZE(MappingReadViewRequestV1); FACT_ALIGN(MappingReadViewRequestV1); FACT_OFFSET(MappingReadViewRequestV1, resource); FACT_OFFSET(MappingReadViewRequestV1, start); FACT_OFFSET(MappingReadViewRequestV1, length); FACT_OFFSET(MappingReadViewRequestV1, span_origin);
     FACT_SIZE(MappingWriteViewRequestV1); FACT_ALIGN(MappingWriteViewRequestV1); FACT_OFFSET(MappingWriteViewRequestV1, resource); FACT_OFFSET(MappingWriteViewRequestV1, start); FACT_OFFSET(MappingWriteViewRequestV1, bytes); FACT_OFFSET(MappingWriteViewRequestV1, span_origin);
     FACT_SIZE(MappingAcquireFileRequestV1); FACT_ALIGN(MappingAcquireFileRequestV1); FACT_OFFSET(MappingAcquireFileRequestV1, resource); FACT_OFFSET(MappingAcquireFileRequestV1, length); FACT_OFFSET(MappingAcquireFileRequestV1, protection);
+    FACT_SIZE(ResourceStreamReadRequestV1); FACT_ALIGN(ResourceStreamReadRequestV1); FACT_OFFSET(ResourceStreamReadRequestV1, stream); FACT_OFFSET(ResourceStreamReadRequestV1, buffer); FACT_OFFSET(ResourceStreamReadRequestV1, buffer_start); FACT_OFFSET(ResourceStreamReadRequestV1, length);
+    FACT_SIZE(ResourceStreamWriteRequestV1); FACT_ALIGN(ResourceStreamWriteRequestV1); FACT_OFFSET(ResourceStreamWriteRequestV1, stream); FACT_OFFSET(ResourceStreamWriteRequestV1, buffer); FACT_OFFSET(ResourceStreamWriteRequestV1, buffer_start); FACT_OFFSET(ResourceStreamWriteRequestV1, length); FACT_OFFSET(ResourceStreamWriteRequestV1, span_origin);
+    FACT_SIZE(ProcessPlanOpenRequestV1); FACT_ALIGN(ProcessPlanOpenRequestV1); FACT_OFFSET(ProcessPlanOpenRequestV1, capability); FACT_OFFSET(ProcessPlanOpenRequestV1, program);
+    FACT_SIZE(ProcessPlanPushRequestV1); FACT_ALIGN(ProcessPlanPushRequestV1); FACT_OFFSET(ProcessPlanPushRequestV1, plan); FACT_OFFSET(ProcessPlanPushRequestV1, field); FACT_OFFSET(ProcessPlanPushRequestV1, first); FACT_OFFSET(ProcessPlanPushRequestV1, second); FACT_OFFSET(ProcessPlanPushRequestV1, scalar);
+    FACT_SIZE(ProcessSpawnRequestV1); FACT_ALIGN(ProcessSpawnRequestV1); FACT_OFFSET(ProcessSpawnRequestV1, plan);
+    FACT_SIZE(ProcessTakePipeRequestV1); FACT_ALIGN(ProcessTakePipeRequestV1); FACT_OFFSET(ProcessTakePipeRequestV1, child); FACT_OFFSET(ProcessTakePipeRequestV1, fd);
+    FACT_SIZE(ProcessWaitRequestV1); FACT_ALIGN(ProcessWaitRequestV1); FACT_OFFSET(ProcessWaitRequestV1, child);
     FACT_SIZE(ResourceErrorReplyV1); FACT_ALIGN(ResourceErrorReplyV1); FACT_OFFSET(ResourceErrorReplyV1, schema_version); FACT_OFFSET(ResourceErrorReplyV1, resource_kind); FACT_OFFSET(ResourceErrorReplyV1, identity); FACT_OFFSET(ResourceErrorReplyV1, io); FACT_OFFSET(ResourceErrorReplyV1, required); FACT_OFFSET(ResourceErrorReplyV1, held); FACT_OFFSET(ResourceErrorReplyV1, expected_kind); FACT_OFFSET(ResourceErrorReplyV1, actual_kind);
     FACT_SIZE(HostReplyV1); FACT_ALIGN(HostReplyV1); FACT_OFFSET(HostReplyV1, tag); FACT_OFFSET(HostReplyV1, detail); FACT_OFFSET(HostReplyV1, bytes); FACT_OFFSET(HostReplyV1, resource_error); FACT_OFFSET(HostReplyV1, effective_request);
     return 0;

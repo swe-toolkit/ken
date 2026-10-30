@@ -48,7 +48,14 @@ pub enum HostOpV1 {
     MappingReadView = 0x0405,
     MappingWriteView = 0x0406,
     MappingAcquireFile = 0x0407,
+    ResourceStreamRead = 0x0408,
+    ResourceStreamWrite = 0x0409,
     EntropyRandomBytes = 0x0501,
+    ProcessPlanOpen = 0x0601,
+    ProcessPlanPush = 0x0602,
+    ProcessSpawn = 0x0603,
+    ProcessTakePipe = 0x0604,
+    ProcessWait = 0x0605,
 }
 
 impl HostOpV1 {
@@ -144,8 +151,15 @@ impl HostOpV1 {
             Self::MappingAllocate => Some(Self::MappingReadView),
             Self::MappingReadView => Some(Self::MappingWriteView),
             Self::MappingWriteView => Some(Self::MappingAcquireFile),
-            Self::MappingAcquireFile => Some(Self::EntropyRandomBytes),
-            Self::EntropyRandomBytes => None,
+            Self::MappingAcquireFile => Some(Self::ResourceStreamRead),
+            Self::ResourceStreamRead => Some(Self::ResourceStreamWrite),
+            Self::ResourceStreamWrite => Some(Self::EntropyRandomBytes),
+            Self::EntropyRandomBytes => Some(Self::ProcessPlanOpen),
+            Self::ProcessPlanOpen => Some(Self::ProcessPlanPush),
+            Self::ProcessPlanPush => Some(Self::ProcessSpawn),
+            Self::ProcessSpawn => Some(Self::ProcessTakePipe),
+            Self::ProcessTakePipe => Some(Self::ProcessWait),
+            Self::ProcessWait => None,
         }
     }
 
@@ -213,7 +227,10 @@ impl HostOpV1 {
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
+            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
+            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
 
@@ -257,7 +274,10 @@ impl HostOpV1 {
             Self::MappingReadView => false,
             Self::MappingWriteView => false,
             Self::MappingAcquireFile => false,
+            Self::ResourceStreamRead | Self::ResourceStreamWrite => false,
             Self::EntropyRandomBytes => true,
+            Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
+            | Self::ProcessTakePipe | Self::ProcessWait => false,
         }
     }
 }
@@ -1974,9 +1994,9 @@ impl ResourceTableV1 {
         }
         Self::vacate_released_slot(slot, identity);
         Ok(ResourceReleaseReadinessV1::Ready(PendingResourceCloseV1 {
-                owner,
-                kind,
-                identity,
+            owner,
+            kind,
+            identity,
         }))
     }
 
@@ -2761,8 +2781,8 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             HostOpV1::ConsoleFlush,
             CanonicalRequestV1::ConsoleFlush { .. }
         ) | (
-                HostOpV1::ConsoleIsTerminal,
-                CanonicalRequestV1::ConsoleIsTerminal { .. }
+            HostOpV1::ConsoleIsTerminal,
+            CanonicalRequestV1::ConsoleIsTerminal { .. }
         ) | (HostOpV1::ClockWallNow, CanonicalRequestV1::ClockWallNow)
             | (
                 HostOpV1::ClockMonotonicNow,
@@ -3508,6 +3528,7 @@ fn map_capability_denial(error: crate::CapabilityDenied) -> CapabilityDeniedV1 {
                         FsCapabilityOperationV1::SetInheritance
                     }
                     crate::FsCapabilityOperation::Duplicate => FsCapabilityOperationV1::Duplicate,
+                    crate::FsCapabilityOperation::Spawn => FsCapabilityOperationV1::Spawn,
                 },
                 held_rights,
             }
@@ -3751,6 +3772,7 @@ pub enum FsCapabilityOperationV1 {
     GetInheritance,
     SetInheritance,
     Duplicate,
+    Spawn,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -4561,12 +4583,10 @@ mod tests {
             capabilities.resolve(child_token).unwrap().revocation_node
                 == capabilities.resolve(copy_token).unwrap().revocation_node
         );
-        assert!(
-            capabilities
+        assert!(capabilities
             .resolve(root_token)
             .unwrap()
-                .revoke(&mut revocation)
-        );
+            .revoke(&mut revocation));
         assert!(
             !revocation.is_admissible(capabilities.resolve(root_token).unwrap().revocation_node)
         );
@@ -4739,12 +4759,10 @@ mod tests {
             &request,
         )
         .unwrap();
-        assert!(
-            live_capabilities
+        assert!(live_capabilities
             .resolve(live_token)
             .unwrap()
-                .revoke(&mut live_revocation)
-        );
+            .revoke(&mut live_revocation));
         assert_eq!(
             live.outcome,
             CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(Vec::new()))
@@ -4771,12 +4789,10 @@ mod tests {
 
         let (mut revoked_domain, revoked_capabilities, revoked_token) =
             read_grant_fixture(crate::AUTH_PARTIAL);
-        assert!(
-            revoked_capabilities
+        assert!(revoked_capabilities
             .resolve(revoked_token)
             .unwrap()
-                .revoke(&mut revoked_domain)
-        );
+            .revoke(&mut revoked_domain));
         let mut revoked_backend = AllOpsBackend::default();
         let revoked = dispatch_host_op_v1(
             &mut revoked_backend,
@@ -5578,72 +5594,56 @@ mod tests {
             Ok(())
         );
         for row in HOST_EFFECT_ABI_V1_CATALOG {
-            assert!(
-                HOST_EFFECT_ABI_V1_FACTS
+            assert!(HOST_EFFECT_ABI_V1_FACTS
                 .iter()
-                    .any(|(name, _)| *name == format!("SIZE_{}", row.3))
-            );
-            assert!(
-                HOST_EFFECT_ABI_V1_FACTS
+                .any(|(name, _)| *name == format!("SIZE_{}", row.3)));
+            assert!(HOST_EFFECT_ABI_V1_FACTS
                 .iter()
-                    .any(|(name, _)| *name == format!("ALIGN_{}", row.3))
-            );
-            assert!(
-                HOST_EFFECT_ABI_V1_FACTS
+                .any(|(name, _)| *name == format!("ALIGN_{}", row.3)));
+            assert!(HOST_EFFECT_ABI_V1_FACTS
                 .iter()
-                    .any(|(name, _)| *name == format!("SIZE_{}", row.5))
-            );
-            assert!(
-                HOST_EFFECT_ABI_V1_FACTS
+                .any(|(name, _)| *name == format!("SIZE_{}", row.5)));
+            assert!(HOST_EFFECT_ABI_V1_FACTS
                 .iter()
-                    .any(|(name, _)| *name == format!("ALIGN_{}", row.5))
-            );
+                .any(|(name, _)| *name == format!("ALIGN_{}", row.5)));
         }
 
         let mut producer_only = producer.clone();
         producer_only.insert(0x7fff);
-        assert!(
-            verify_host_effect_inventory_v1(
+        assert!(verify_host_effect_inventory_v1(
             &as_vec(&producer_only),
             &as_vec(&registry),
             &as_vec(&observer),
             &as_vec(&consumers),
         )
-            .is_err()
-        );
+        .is_err());
         let mut registry_only = registry.clone();
         registry_only.remove(&(HostOpV1::ConsoleWrite as u16));
-        assert!(
-            verify_host_effect_inventory_v1(
+        assert!(verify_host_effect_inventory_v1(
             &as_vec(&producer),
             &as_vec(&registry_only),
             &as_vec(&observer),
             &as_vec(&consumers),
         )
-            .is_err()
-        );
+        .is_err());
         let mut observer_only = observer.clone();
         observer_only.insert(0x7ffe);
-        assert!(
-            verify_host_effect_inventory_v1(
+        assert!(verify_host_effect_inventory_v1(
             &as_vec(&producer),
             &as_vec(&registry),
             &as_vec(&observer_only),
             &as_vec(&consumers),
         )
-            .is_err()
-        );
+        .is_err());
         let mut consumer_only = consumers.clone();
         consumer_only.remove(&(HostOpV1::FsRename as u16));
-        assert!(
-            verify_host_effect_inventory_v1(
+        assert!(verify_host_effect_inventory_v1(
             &as_vec(&producer),
             &as_vec(&registry),
             &as_vec(&observer),
             &as_vec(&consumer_only),
         )
-            .is_err()
-        );
+        .is_err());
     }
 
     #[test]
@@ -5845,11 +5845,9 @@ mod tests {
         let (token, identity) =
             table.insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
         assert_eq!(identity, ResourceTraceIdentityV1(1));
-        assert!(
-            table
+        assert!(table
             .resolve_fs_handle(token, crate::RightSet::METADATA)
-                .is_ok()
-        );
+            .is_ok());
 
         let pending = table.begin_release(token).unwrap();
         assert!(matches!(
@@ -7219,18 +7217,18 @@ mod tests {
         let metadata_request = CanonicalRequestV1::FsHandleMetadata;
         let metadata_operation =
             |backend: &mut RealResourceBackend, resources: &mut ResourceTableV1, token| {
-            dispatch_host_op_v1(
-                backend,
-                &capabilities,
-                &revocation,
-                resources,
-                HostOpV1::FsHandleMetadata,
-                None,
-                ResourceInputsV1::Target(token),
-                &metadata_request,
-            )
-            .unwrap()
-        };
+                dispatch_host_op_v1(
+                    backend,
+                    &capabilities,
+                    &revocation,
+                    resources,
+                    HostOpV1::FsHandleMetadata,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &metadata_request,
+                )
+                .unwrap()
+            };
 
         let live = metadata_operation(&mut backend, &mut resources, grandchild_resource);
         assert_eq!(
@@ -7245,18 +7243,18 @@ mod tests {
         assert!(child.revoke(&mut revocation));
         let metadata_operation =
             |backend: &mut RealResourceBackend, resources: &mut ResourceTableV1, token| {
-            dispatch_host_op_v1(
-                backend,
-                &capabilities,
-                &revocation,
-                resources,
-                HostOpV1::FsHandleMetadata,
-                None,
-                ResourceInputsV1::Target(token),
-                &metadata_request,
-            )
-            .unwrap()
-        };
+                dispatch_host_op_v1(
+                    backend,
+                    &capabilities,
+                    &revocation,
+                    resources,
+                    HostOpV1::FsHandleMetadata,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &metadata_request,
+                )
+                .unwrap()
+            };
         let copied_resource_token = grandchild_resource;
         let denied = metadata_operation(&mut backend, &mut resources, copied_resource_token);
         assert_eq!(
@@ -7301,8 +7299,8 @@ mod tests {
         assert_eq!(
             insufficient.outcome,
             CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
-                    required: crate::RightSet::METADATA.bits(),
-                    held: crate::RightSet::READ.bits(),
+                required: crate::RightSet::METADATA.bits(),
+                held: crate::RightSet::READ.bits(),
             }))
         );
 
@@ -7345,18 +7343,18 @@ mod tests {
 
         let release =
             |backend: &mut RealResourceBackend, resources: &mut ResourceTableV1, token| {
-            dispatch_host_op_v1(
-                backend,
-                &capabilities,
-                &revocation,
-                resources,
-                HostOpV1::ResourceRelease,
-                None,
-                ResourceInputsV1::Target(token),
-                &CanonicalRequestV1::ResourceRelease,
-            )
-            .unwrap()
-        };
+                dispatch_host_op_v1(
+                    backend,
+                    &capabilities,
+                    &revocation,
+                    resources,
+                    HostOpV1::ResourceRelease,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &CanonicalRequestV1::ResourceRelease,
+                )
+                .unwrap()
+            };
         assert!(matches!(
             release(&mut backend, &mut resources, grandchild_resource).outcome,
             CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
@@ -8567,12 +8565,10 @@ mod tests {
             let write_lease = resources
                 .admit_resources(&revocation, &[admitted_file, admitted_buffer])
                 .expect("live ancestry admits the positioned write");
-            assert!(
-                capabilities
+            assert!(capabilities
                 .resolve(capability)
                 .unwrap()
-                    .revoke(&mut revocation)
-            );
+                .revoke(&mut revocation));
 
             let revoke_wins = dispatch_host_op_v1(
                 &mut backend,
