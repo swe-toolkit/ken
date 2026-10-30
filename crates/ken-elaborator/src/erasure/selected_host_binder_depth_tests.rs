@@ -178,7 +178,9 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
         file_operation_set_inheritance: unused.clone(),
         file_operation_duplicate: unused.clone(),
         resource_mapping_limit: unused.clone(),
-        resource_kind_mapping: unused,
+        resource_kind_mapping: unused.clone(),
+        px10_kind_symbols: std::array::from_fn(|_| unused.clone()),
+        px10_exit_symbols: std::array::from_fn(|_| unused.clone()),
         bracket_finalizer_constructor: None,
         operations,
     };
