@@ -4684,6 +4684,7 @@ mod native_pre_source_stable_symbols {
         let (symbols, table) =
             stable_symbols_for_env("itree-symbol-control", &env, true).expect("artifact symbols");
         for family_name in [
+            "ConsoleStream",
             "ResourceKind",
             "ExitCode",
             "ProgramCaps",
