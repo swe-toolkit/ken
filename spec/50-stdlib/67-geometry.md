@@ -31,9 +31,10 @@
 > nor the package test establishes official conformance-runner execution
 > or a landed trust measurement. Section 9 specifies two further Nat
 > selectors and structural box laws; Architect checked their generic
-> proofs in scratch, but the catalog exports and seed are not yet part
-> of this spec-only child. No official conformance, CI, publication,
-> landing or landed trust follows from this author turn.
+> proofs in scratch. This assembled candidate includes the §9 Nat Order
+> and NatBox checked exports, AC-2 seed and package-owned test. Neither
+> scratch D0 nor candidate-local checks establish official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -906,9 +907,12 @@ establishes official conformance-runner execution or landed trust.
 > (SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY).** Architect's
 > isolated AC-0 on `db6d0fee4` checked all four generic laws below
 > with rc 0, no new `Axiom`, and equal scratch `trusted_base()` identity
-> sets 114 → 114 → 114. This spec-only child does not add their catalog
-> exports or a conformance seed. D0 is not official conformance, CI,
-> publication, landing or a landed trust measurement.
+> sets 114 → 114 → 114. This assembled candidate includes both Nat Order
+> selectors, both NatBox laws, the AC-2 seed and a package-owned test.
+> The candidate-local target passes 2/2, and the isolated false claim's
+> true-neighbor mutation fails at its behavioral refusal assertion.
+> Neither scratch D0 nor these candidate-local checks establish official
+> conformance-runner execution, CI, publication, landing or landed trust.
 
 ### 9.1 Distribution selectors in Nat Order
 

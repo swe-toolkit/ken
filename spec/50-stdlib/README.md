@@ -531,9 +531,10 @@ and unconditional structural `intersect_hull_distrib` and
 `hull_intersect_distrib` box equalities, including inverted boxes.
 Architect checked all four generic laws on `db6d0fee4` with rc 0,
 no new `Axiom`, and unchanged scratch trust identity sets
-114 → 114 → 114. This spec-only child does not supply §9 catalog
-exports, a conformance seed, official conformance, CI, publication,
-landing or a landed trust measurement.
+114 → 114 → 114. This assembled candidate includes the §9 Nat Order
+and NatBox checked exports, AC-2 seed and package-owned test. Scratch
+D0 and candidate-local checks are not official conformance-runner
+execution, CI, publication, landing or landed trust.
 Signed-coordinate geometry, Euclidean and floating-point distance,
 other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
