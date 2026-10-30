@@ -1,107 +1,93 @@
 ---
 id: LANG-STRICT-CATALOG-FLIP
-title: "Spec 33 §3.3 says every source unit resolves in one strict mode, but ResolutionMode defaults to Legacy and no production caller selects Strict: ken check reaches the catalog through the legacy roots entry and isolated files through the default scope. With every ledger candidate ruled, move ken check's catalog and isolated-file routes to Strict, migrating every unit Strict refuses, so that no production elaboration resolves a bare name through the flat globals map"
+title: "Spec 33 §3.3 says every source unit resolves in one strict mode, but ken check reaches the catalog through the Legacy roots entry, and five catalog units refuse under Strict because the prelude-source names they use have no import home, which the Transparent-only package-home gate cannot give an inductive family. Extend package homes to checked inductive families, home those names in the five units that wrap them, and move ken check's catalog route to Strict"
 status: ready
 owner: language
 size: L
 tier: T1
 gate: architect
 depends_on: [LANG-PRELUDE-FLOOR-CONSOLE-AND-CHAR]
-blocks: []
+blocks: [LANG-STRICT-ISOLATED-ROUTES]
 github: null
-origin: "Operator 2026-09-25: one resolution mode; strict admits only the minimal prelude; legacy passthrough deleted; binding a prelude name anywhere is an error. lanes.md L2 orders the floor additions, then the flip and enforce (L2-4). LANG-PRELUDE-FLOOR-CONSOLE-AND-CHAR rules the last ledger candidate, which is the flip's entry condition. This is the flip's first slice; local-binder enforcement and deleting Legacy are its successors. Steward-filed per COORDINATION section 2."
+origin: "Operator 2026-09-25: one resolution mode; strict admits only the minimal prelude; legacy passthrough deleted; binding a prelude name anywhere is an error. Recut to the catalog route by Steward evt_7tgtgt0vc3q3c on Architect AC-0 evt_6069bcfays9wq, which found the import-only migration premise false; the isolated routes and ken run are LANG-STRICT-ISOLATED-ROUTES. Steward-filed per COORDINATION section 2."
 ---
 
 # The catalog resolves in strict mode
 
 ## Objective
 
-`ken check` elaborates every catalog unit, and every isolated `.ken` or
-`.ken.md` file, in `ResolutionMode::Strict`. Each one that checks today
-still checks, and each one resolves every bare name through its own
-declarations, explicit imports, kernel names or the prelude floor.
+`ken check` elaborates every catalog unit through the strict roots entry.
+Each unit that checks today still checks, and resolves every bare name
+through its own declarations, explicit imports, kernel names or the
+prelude floor. Legacy results are unchanged.
 
-## Settled inputs (main `05a15edee`; re-measure on the cut base)
+## Settled inputs (main `614203948`, Architect AC-0 evt_6069bcfays9wq)
 
-- **The contract.** "One strict mode, for every source unit", including
-  roots-loaded and isolated-file compilation (`33-declarations.md:265`,
-  `:268-270`). An unresolved bare name never falls through to
-  implementation globals (`39-elaboration.md:134-136`).
-- **The mode.** `ResolutionMode` defaults to `Legacy`
-  (`modules.rs:685-687`). One roots run cannot mix modes (`:136`).
-  The strict entry is `elaborate_module_from_roots_strict` (`:2436`).
-  Its doc says the real catalog caller moves to it only after the
-  dependency census is migrated.
-- **The production callers are all Legacy.**
-  - `ken check` reaches catalog paths through
-    `elaborate_module_from_roots_v1` (`ken-cli/src/main.rs:477`).
-  - It reaches `.ken.md` and plain files through
-    `elaborate_ken_md_file_v1` and `elaborate_file_v1` (`:485`, `:487`),
-    which use the default scope.
-  - `ken run` (`main.rs:540`) is not yet traced.
-- **What Legacy admits.** `resolve_ref` returns an unbound bare name
-  as-is, to be found in `cx.globals` (`modules.rs:916`). For an
-  untracked attached proof, `resolve_attached_ref` (`:1143`) falls back to
-  the ambient path only under `Legacy` (`:1170`). Strict refuses both.
-- **The population.** 81 catalog `.ken.md` files, 16 files under
-  `examples/` and 15 under `conformance/`. No count says how many need an
-  ambient name. `catalog_evidence_frontier_is_closed_and_honest`
-  (`r_layer_tests/lang_mod_catalog_evidence_frontier.rs:890`) records,
-  for each catalog unit, whether Strict succeeds or refuses and at which
-  stage. It asserts no count.
-- **Carried into the flip.** `lanes.md` L2 lists the Architect's carries
-  from SESSION-SCOPE and the floor slices. Two examples are the remaining
-  `globals` writes (`evt_74ac7bpmpcd0c`) and Parsing's ambient
-  `charToInt` (`evt_7001gdwsnh1q1`).
-- **Carried from LANG-LITERAL-PLAN-CHECKED-IDS** (merged `cfb3c7569`,
-  AC-3 sweep `evt_19t2etkgfmbsr`). No literal-key `globals.get` remains
-  in `elab.rs`. Two source-owned `main` lookups remain: the fence
-  snapshot and restore (`lib.rs:823`) and the entry-point choice
-  (`program_admission.rs:88`). The sweep was syntactic, so dynamic
-  `globals.get(name)` families are not censused; AC-0's trace covers
-  them on the routes it flips.
+- **The frontier.** `catalog_evidence_frontier_is_closed_and_honest`
+  (`r_layer_tests/lang_mod_catalog_evidence_frontier.rs:890`) has 79
+  rows. Legacy succeeds on all 79. Strict succeeds on 74 and refuses 5,
+  all at Resolution, and no catalog unit imports any of the 5:
+  - `Capability.Filesystem.Authority`: `FS`, `read_bytes`, `write_file`;
+  - `Capability.System.Buffer`: the `BufferWindow` family,
+    `buffer_span_budget`, `buffer_span_length`, `transfer_count_*`;
+  - `Capability.System.Error`: `FileOperation` and its 16 constructors;
+  - `Capability.System.IO`: `buffer_span_budget`, `transfer_count_*`;
+  - `Capability.System.Resource`: the `ResourceBodyResult` and
+    `ResourceBracketResult` families.
+- **The cause.** Each name is a prelude-source declaration with no
+  catalog export. `PRELUDE_PACKAGE_HOMES` has 5 entries, and
+  `capture_strict_builtin_names` refuses a home whose identity is not
+  `Decl::Transparent` (`modules.rs:631-635`), so an inductive family
+  cannot be homed as written.
+- **The precedent.** Floor families carry `constructor_members` with a
+  completeness check (`modules.rs:597-611`).
+- **The route.** `ken check` reaches catalog paths through
+  `elaborate_module_from_roots_v1` (`ken-cli/src/main.rs:477`); the
+  strict entry is `elaborate_module_from_roots_strict`
+  (`modules.rs:2436`).
+- **Carries.** Parsing's ambient `charToInt` is closed on this base.
+  The `globals` test-harness writes, the two `main` lookups (`lib.rs:823`,
+  `program_admission.rs:88`) and the 54 dynamic `globals.get(name)` sites
+  stay with the successors.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-1. **AC-0 first (Architect, on the cut base).**
-   - Run the evidence frontier, and give the units Strict refuses, each
-     with its cause.
-   - Trace `ken run`'s route.
-   - Rule which of the L2 carries this slice must close for the routes to
-     flip, and which stay with the successors.
-   - If the refusal population is too large for one candidate, name the
-     split. Each part must leave every route that has moved resolving
-     strictly.
-2. **One language branch.** Each refusing unit is migrated token-aware
-   to explicit imports, with no new floor name. Then `main.rs:477`,
-   `:485` and `:487`, and `ken run`'s route if AC-0 names it, select
-   Strict. Legacy stays reachable only from tests, for the successor to
-   delete. The Spec co-turn owns `spec/`, and CV votes on `spec/` and
-   `conformance/`.
+One language branch:
+
+1. The package-home mechanism accepts a checked inductive family, keyed
+   on its parent GlobalId with the complete constructor set. The
+   Transparent-only gate stays for non-inductive homes.
+2. The measured names are homed in the five units above, each published
+   by that unit's `export`. The Spec co-turn writes the 33 §3.3 home
+   text, and CV votes on `spec/` and `conformance/`.
+3. `main.rs:477` selects the strict roots entry. Legacy stays reachable
+   from tests and the isolated routes, for the successors.
 
 ## Acceptance
 
-- **AC-1.** On the candidate, the evidence frontier reports no unit that
-  Strict refuses, and the test asserts that count.
-- **AC-2.** `ken check` on a file that uses a non-floor prelude name
-  without importing it refuses with the strict unbound-name error. The
-  same file with the explicit import is accepted. Both are tested through
-  the CLI binary, on a catalog path and on an isolated file.
+- **AC-1.** The frontier reports no unit that Strict refuses, and the
+  test asserts that count. A row pins that each homed name still
+  resolves bare under Legacy to the same identity.
+- **AC-2.** `ken check`, through the CLI binary on a catalog path, refuses
+  a non-floor prelude name used without its import with the strict
+  unbound-name error, and accepts it with the explicit import.
 - **AC-3 (mutation, QA).** Restoring the Legacy entry at `main.rs:477`
-  makes AC-2's catalog refusal row accept.
+  makes AC-2's refusal row accept.
 
 ## Stop conditions
 
 - A unit that needs a new floor name, an identity clone, or an ambient
   fallback to check.
+- A home that changes a homed name's identity, or any Legacy result.
 - A kernel or trust change, or a change to a spec 36 to 38 operation
   type.
 
-Checks: 3 fired: the population counts cover `catalog/`, `examples/`
-and `conformance/` on `05a15edee`. They are files, not consumers, and
-AC-0's frontier run replaces them. 8 fired: AC-2's refusal row accepts
-under Legacy, because `resolve_ref` returns the bare name, so AC-3's
-mutant reddens it.
+Checks: 4 fired: the import-only premise was replaced by the measured
+obligation; the home gate refuses inductives (`modules.rs:631-635`), so
+the mechanism change is in scope. 6 fired: the population is the five
+refusals the frontier measured at the strict seam. 8 fired: AC-2's
+refusal row accepts under Legacy, because `resolve_ref` returns the bare
+name, so AC-3's mutant reddens it.
