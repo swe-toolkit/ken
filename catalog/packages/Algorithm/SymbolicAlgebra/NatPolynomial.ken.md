@@ -40,11 +40,13 @@ so a reader can find each contract before its supporting proofs. The
 additional `Poly` carrier stores coefficients in a recursive Horner form;
 `canonicalize` builds it from distributed monomials, and `poly_eq` decides
 whether two expressions denote the same value under every total environment.
-Its three operations and five public laws follow the original definitions in
+Its three operations and seven public laws follow the original definitions in
 the same module; the remaining Horner helpers and proof invariants are private.
-Substitution is a simultaneous single pass: an inserted expression is not
-substituted again. `compose_env` evaluates each variable's replacement under
-the original environment, and two laws relate that operation to evaluation
+Canonical equality is preserved under `EAdd` and `EMul` when both corresponding
+operand pairs compare equal. Substitution is a simultaneous single pass: an
+inserted expression is not substituted again. `compose_env` evaluates each
+variable's replacement under the original environment, and two laws relate
+that operation to evaluation
 and the forward direction of polynomial equality. These laws do not claim
 that substitution preserves a `False` answer. `compose_subst` applies its
 second argument first and then its first argument to each inserted expression.
@@ -759,6 +761,46 @@ pub theorem poly_eq_false_refutes
     True
     (sym Bool (poly_eq e1 e2) False hf)
     (poly_eq_complete e1 e2 h)
+
+pub theorem poly_eq_add
+      (a1 : Expr)
+      (a2 : Expr)
+      (b1 : Expr)
+      (b2 : Expr)
+      (ha : IsTrue (poly_eq a1 a2))
+      (hb : IsTrue (poly_eq b1 b2))
+    : IsTrue (poly_eq (EAdd a1 b1) (EAdd a2 b2)) =
+  poly_eq_complete
+    (EAdd a1 b1)
+    (EAdd a2 b2)
+    (λenv.
+      add_cong
+        (eval env a1)
+        (eval env a2)
+        (eval env b1)
+        (eval env b2)
+        (poly_eq_sound a1 a2 ha env)
+        (poly_eq_sound b1 b2 hb env))
+
+pub theorem poly_eq_mul
+      (a1 : Expr)
+      (a2 : Expr)
+      (b1 : Expr)
+      (b2 : Expr)
+      (ha : IsTrue (poly_eq a1 a2))
+      (hb : IsTrue (poly_eq b1 b2))
+    : IsTrue (poly_eq (EMul a1 b1) (EMul a2 b2)) =
+  poly_eq_complete
+    (EMul a1 b1)
+    (EMul a2 b2)
+    (λenv.
+      mul_cong
+        (eval env a1)
+        (eval env a2)
+        (eval env b1)
+        (eval env b2)
+        (poly_eq_sound a1 a2 ha env)
+        (poly_eq_sound b1 b2 hb env))
 
 pub fn compose_env (env : Nat → Nat) (s : Nat → Expr) (v : Nat) : Nat = eval env (s v)
 
@@ -2783,6 +2825,11 @@ to semantic equality; `poly_eq_false_refutes` rules out a false answer when a
 proof of agreement under every environment is supplied. It does not construct
 an environment witnessing inequality.
 
+`poly_eq_add` and `poly_eq_mul` turn each operand-pair premise into equal
+evaluations with `poly_eq_sound`, combine them with the private Nat
+`add_cong` or `mul_cong`, and return the result through `poly_eq_complete`;
+they add no hypothesis beyond the two `poly_eq` premises.
+
 `eval_substitute` follows the expression constructors: constant and variable
 cases reduce directly, while the sum and product cases lift both induction
 hypotheses with private addition and multiplication congruence. In
@@ -2874,11 +2921,12 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md),
 [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
 [independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md),
-[derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md), and
-[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md)
+[derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
+[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md), and
+[congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md)
 specify the public surface and closed observations. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and twenty-two checked theorems; Horner, substitution and differentiation expose
+and twenty-four checked theorems; Horner, substitution and differentiation expose
 no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
