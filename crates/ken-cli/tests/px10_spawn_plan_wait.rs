@@ -49,6 +49,8 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
 /// artifact exists. CLAIMED: native Process never silently falls through to
 /// the unfinished bracket planner. THE GAP: a scratch build with the successor
 /// return-fold repair must yield this same refusal, not a changed planner text.
+/// THE GAP: the gate keys on the declared grant, so a program declaring
+/// Process without using it is also conservatively refused.
 #[test]
 fn native_process_op_is_unavailable_before_object_emission() {
     use ken_elaborator::compiler_driver::NativeProgramBuildError;
