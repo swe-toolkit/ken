@@ -238,14 +238,13 @@ fn package_internal_and_bare_leaf_names_are_not_reserved() {
     }
 }
 
-/// MEASURED: a strict client imports all five exact-ID home exports, uses the
-/// ConsoleStream.Stdout family in the `write` call, and its checked bodies
-/// mention exactly the pre-source IDs captured from a fresh environment.
+/// MEASURED: strict and legacy roots clients import all five exact-ID home
+/// exports and use the ConsoleStream.Stdout family in `write`; their checked
+/// bodies mention the pre-source IDs captured from a fresh environment.
 /// CLAIMED: the home grant is an import edge, not a spelling alias or trust.
 /// THE GAP: refusals without that edge and a mutable-global takeover are
 /// separate tests; the real Console.Text home also has its own client suite.
-#[test]
-fn strict_home_imports_select_all_five_pre_source_ids() {
+fn check_home_imports_select_all_five(mode: &str) {
     let root = tempfile::tempdir().expect("roots");
     write_home(root.path());
     fs::write(
@@ -264,8 +263,17 @@ fn strict_home_imports_select_all_five_pre_source_ids() {
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     let expected = PACKAGED.map(|(_, name)| (name, env.globals[name]));
     let stdout = env.globals["ConsoleStream.Stdout"];
-    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
-        .expect("strict home and client load");
+    match mode {
+        "strict-roots" => {
+            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+                .expect("strict home and client load");
+        }
+        "legacy-roots" => {
+            env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")
+                .expect("legacy home and client load");
+        }
+        _ => panic!("unknown home import mode: {mode}"),
+    }
     for (source, id) in [
         ("Entry.send", expected[1].1),
         ("Entry.line", expected[2].1),
@@ -281,16 +289,23 @@ fn strict_home_imports_select_all_five_pre_source_ids() {
             "{source} must select the pre-source ID"
         );
     }
-    assert!(contains_id(
-        &checked_body(&env, "strict-roots", "send"),
-        stdout
-    ));
+    assert!(contains_id(&checked_body(&env, mode, "send"), stdout));
     let (_, ty) = env
         .env
         .const_type(env.globals["Entry.send"])
         .expect("send type");
     assert!(contains_id(&ty, expected[0].1), "IO in checked result type");
     assert_eq!(before, env.env.trusted_base().into_iter().collect());
+}
+
+#[test]
+fn strict_home_imports_select_all_five_pre_source_ids() {
+    check_home_imports_select_all_five("strict-roots");
+}
+
+#[test]
+fn legacy_home_imports_select_all_five_pre_source_ids() {
+    check_home_imports_select_all_five("legacy-roots");
 }
 
 /// MEASURED: no import cannot select `IO` in strict mode and another unit's
