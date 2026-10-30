@@ -1535,6 +1535,7 @@ fn validate_fs_mutation_observation(
     };
     let expected_exit_status = match expected_error {
         None => 0,
+        Some(ken_host::IoErrorIdentityV1::CapabilityDenied) => 44,
         Some(ken_host::IoErrorIdentityV1::NotFound) => 45,
         Some(ken_host::IoErrorIdentityV1::PermissionDenied) => 46,
         Some(ken_host::IoErrorIdentityV1::BrokenPipe) => 47,
