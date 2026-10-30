@@ -4600,14 +4600,21 @@ fn stable_symbols_for_env(
 }
 
 // Kernel-checked String payload is the single authority for native lowering;
-// Char literals are core IntLit values, and unrelated numeric literals retain
-// the elaborator's original side table.
+// Char literals are core IntLit values, and Int/Bytes literals retain the
+// elaborator's original side table.
 fn literal_native_symbol(env: &ElabEnv, id: GlobalId) -> Option<String> {
     match env.env.checked_literal(id) {
         Some(value) => Some(format!("lit_string_{}", value.as_str())),
         None => match env.num_values.get(&id) {
             Some(crate::NumericLitVal::Int(value)) => Some(format!("lit_int_{value}")),
             Some(crate::NumericLitVal::Str(value)) => Some(format!("lit_string_{value}")),
+            Some(crate::NumericLitVal::Bytes(value)) => Some(format!(
+                "lit_bytes_hex_{}",
+                value
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>(),
+            )),
             _ => None,
         },
     }
@@ -6728,6 +6735,42 @@ proc main
             literal_native_symbol(&env, literal).as_deref(),
             Some("lit_string_az")
         );
+    }
+
+    /// Promise class: normative compatibility vector. Bytes literal symbols
+    /// encode the checked payload as lowercase hex, including empty bytes.
+    /// MEASURED: two distinct checked literal IDs map to the ABI decoder's
+    /// nonempty and empty symbols. CLAIMED: native compilation preserves raw
+    /// Bytes literals. THE GAP: object emission and execution remain separate;
+    /// the PX10 native smoke exercises them after the bracket planner is fixed.
+    #[test]
+    fn native_bytes_literals_have_exact_symbols_including_empty() {
+        let mut env = ElabEnv::new().expect("prelude");
+        for (name, source, expected) in [
+            (
+                "zz_bytes",
+                r#"const zz_bytes : Bytes = b"\x0a\xff""#,
+                "lit_bytes_hex_0aff",
+            ),
+            (
+                "zz_empty",
+                r#"const zz_empty : Bytes = b"""#,
+                "lit_bytes_hex_",
+            ),
+        ] {
+            env.elaborate_decl(source).expect("Bytes literal checks");
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals[name])
+                .expect("constant body");
+            let ken_kernel::Term::Const { id: literal, .. } = body else {
+                panic!("{name} must be backed by a checked Bytes literal");
+            };
+            assert_eq!(
+                literal_native_symbol(&env, literal).as_deref(),
+                Some(expected)
+            );
+        }
     }
 
     const GATE_4A_EQUALITY_SOURCE: &str = r#"program capabilities FS APartial
