@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REVERSE-REACHABILITY
 title: "Spec 62 decides what a vertex reaches, but gives no way to ask what reaches it: Algorithm.Graphs.Dependency has no reversed graph, so a reverse-dependency query has no checked route. Rule from a checked D0 at zero trust a public graph_reverse whose edges are the original's flipped, a walk reversal into it, and the law that a walk in g makes its start reachable from its end in the reversed graph, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
