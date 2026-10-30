@@ -131,11 +131,11 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
 
 /// MEASURED: all three source entry routes resolve admitted references to the
 /// checked carrier, three qualified cases and eqChar IDs; wrong bare leaves
-/// and same-name admitted declarations fail in each route. CLAIMED: floor
+/// fail in each route. CLAIMED: floor
 /// admission is complete, exact, and no bare constructor is reserved.
 /// THE GAP: internal/package acceptance is the separate negative axis below.
 #[test]
-fn admitted_console_char_resolve_and_refuse_shadows_in_each_entry_mode() {
+fn admitted_console_char_resolves_qualified_family_in_each_entry_mode() {
     for mode in MODES {
         let mut env = ElabEnv::new().expect("prelude");
         let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
@@ -167,17 +167,34 @@ fn admitted_console_char_resolve_and_refuse_shadows_in_each_entry_mode() {
             );
         }
         assert_eq!(before, env.env.trusted_base().into_iter().collect());
-        for name in ["ConsoleStream", "eqChar"] {
-            let mut separate = ElabEnv::new().expect("prelude");
-            let source = format!("const {name} : Nat = Zero");
-            let err = load(&mut separate, &source, mode).expect_err("admitted shadow refused");
-            assert!(format!("{err:?}").contains(name), "{mode}: {name}: {err:?}");
-        }
         for leaf in ["Stdin", "Stdout", "Stderr"] {
             let mut separate = ElabEnv::new().expect("prelude");
             let source = format!("const probe : ConsoleStream = {leaf}");
             let err = load(&mut separate, &source, mode).expect_err("bare leaf refused");
             assert!(format!("{err:?}").contains(leaf), "{mode}: {leaf}: {err:?}");
+        }
+    }
+}
+
+/// MEASURED: a source declaration of either newly admitted member is
+/// refused in each entry mode; an unrelated one-token local remains legal.
+/// CLAIMED: precisely the two checked names, not a spelling family, are
+/// reserved. THE GAP: the checked use and constructor scope have an
+/// independent positive row, so a broken parser cannot pass on rejection.
+#[test]
+fn admitted_console_char_refuse_same_name_declarations_in_each_entry_mode() {
+    for mode in MODES {
+        for (name, control) in [
+            ("ConsoleStream", "LocalStream"),
+            ("eqChar", "local_char_eq"),
+        ] {
+            let mut env = ElabEnv::new().expect("prelude");
+            let source = format!("const {name} : Nat = Zero");
+            let err = load(&mut env, &source, mode).expect_err("admitted shadow refused");
+            assert!(format!("{err:?}").contains(name), "{mode}: {name}: {err:?}");
+            let mut env = ElabEnv::new().expect("prelude");
+            load(&mut env, &format!("const {control} : Nat = Zero"), mode)
+                .unwrap_or_else(|e| panic!("{mode}: unrelated control must accept: {e:?}"));
         }
     }
 }
