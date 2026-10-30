@@ -101,8 +101,13 @@ base, stop and report the mismatch; do not build around it.
 - **AC-4 (mutation, QA).**
   - Removing an admitted name from `PRELUDE_FLOOR_NAMES` reddens its AC-1
     refusal row.
-  - Adding `Stream` to `PRELUDE_FLOOR_NAMES` reddens its strict
-    acceptance row.
+  - Adding the compiler-internal `ConsoleOp` to `PRELUDE_FLOOR_NAMES`
+    reddens its strict acceptance row, a same-name
+    `const ConsoleOp : Nat = Zero` that the candidate accepts. The ruled
+    rename removes the source key `Stream` before floor capture, so a
+    `Stream` mutant fails at prelude initialization and never reaches a
+    strict row (`evt_118n43a02a1q6`). It may stay as a fail-closed
+    control, but it does not satisfy this bullet.
 
 ## Stop conditions
 
@@ -117,5 +122,5 @@ deletes them, and the remaining nine are this slice. 3 fired: the
 spelling counts span catalog, examples, conformance and `crates/*/tests`.
 They are not the migration population, which deliverable 2 measures on
 the cut base. 8 fired: AC-1's strict acceptance row for an internal name
-fails if the slice admits by family label, and AC-4's `Stream` mutant
+fails if the slice admits by family label, and AC-4's `ConsoleOp` mutant
 makes that failure observable.
