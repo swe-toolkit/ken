@@ -51,10 +51,10 @@
 > Section 9 states a public empty-window law for arbitrary traces whenever
 > `hi ≤ lo`, including equal bounds. Architect's isolated AC-0 on
 > `f97544426` checked the generic proof with rc 0, no `Axiom`, and
-> identical scratch trusted GlobalId sets 114 → 114. This spec-only
-> turn adds no §9 catalog theorem or conformance seed and establishes
-> no candidate execution, official conformance, CI, publication,
-> landing or landed trust.
+> identical scratch trusted GlobalId sets 114 → 114. The assembled
+> candidate carries the §9 catalog export, its package test and the
+> conformance seed; none of these establishes official conformance-runner
+> execution, CI, publication, landing or landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -862,9 +862,12 @@ respective reviews; no D0 result transfers to CI or landed trust.
 > `f975444269fd5c3863973fcb1fcde3f638cac2d6` checked the generic
 > proof and closed controls with rc 0, no `Axiom`, and unchanged
 > scratch `trusted_base()` GlobalId identities (114 → 114). This
-> spec-only child adds no checked §9 catalog export or conformance seed.
-> D0 does not establish candidate execution, official conformance,
-> CI, publication, landing or landed trust.
+> assembled candidate has the checked `trace_window_inverted_empty`
+> export with its private `event_in_window_inverted` helper, the
+> package-owned `cat_time_inverted_window_empty` test and the authored
+> `conformance/stdlib/time-and-events/seed-inverted-window-empty.md`.
+> None of these establishes official conformance-runner execution, CI,
+> publication, landing or landed trust.
 
 `Data.Time.EventTrace` must export one public Transparent theorem
 immediately after `trace_window_append` and before `trace_merge_nil_left`.

@@ -709,9 +709,9 @@ private `event_in_window_inverted` helper and the existing private
 `event_in_window_past` and `window_keep`; no ordering premise enters.
 Architect's isolated AC-0 on `f97544426` checked the generic proof
 without an `Axiom` and with equal scratch trusted GlobalId sets
-114 → 114. This spec-only §9 turn adds no catalog theorem or seed;
-it establishes no candidate execution, official conformance, CI,
-publication, landing or landed trust. Clock effects, durations,
+114 → 114. Its catalog export, seed and package test are present in the
+assembled candidate; they establish no official conformance-runner
+execution, CI, publication, landing or landed trust. Clock effects, durations,
 causality, infinite streams, premise-free structural window/merge
 distribution and k-way merge remain deferred.
 
