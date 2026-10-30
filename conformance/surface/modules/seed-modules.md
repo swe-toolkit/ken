@@ -1060,10 +1060,13 @@ sentinel beside the current contract.
   is claimed by stating these cases.
 
 The Console/Char cases below implement the two-witness `30-taxonomy §4`
-pre-flip slice. Their three source routes are strict roots, legacy roots, and
-legacy single-file. Package imports belong to roots-loaded clients only;
-legacy single-file clients retain bare pre-source package references until
-the strict-entry flip. No row adds trust or duplicates a checked definition.
+pre-flip slice. Their three source routes are strict-roots, legacy-roots,
+and legacy single-file. Strict-roots and legacy-roots are both roots-loaded:
+all five package names require explicit provider imports in either route.
+Only the named standalone legacy entries retain bare access to those same
+pre-source IDs until L2-4. This exception grants neither roots fallback nor
+general implementation-global lookup. No row adds trust or duplicates a
+checked definition.
 
 ### surface/modules/console-stream-checked-family-and-char-comparator
 
@@ -1124,23 +1127,34 @@ the strict-entry flip. No row adds trust or duplicates a checked definition.
 - given: one roots-loaded `Capability.Console.Text` file performs only
   `export IO, write, print_line`, and another roots-loaded
   `Core.Classes.LawfulClasses` file performs only
-  `export charToInt, leqChar`. A strict client imports all five selectively,
-  uses `IO` as an effect result carrier, calls
-  `write ConsoleStream.Stdout payload` and `print_line message`, and applies
-  `charToInt 65` and `leqChar 65 66`. Repeat the import in legacy roots mode
-  after an unrelated checked declaration has taken over flat
-  `globals["write"]` with a fresh ID. Independently test a strict client
-  with no import and a non-home file with `export IO`.
-- expect: the strict client's five uses select exactly the original
-  pre-source checked IDs, with no added trust. The legacy imported `write`
-  still selects its original ID, not the replacement flat-global ID. The
-  no-import client and non-home publisher refuse at surface resolution.
-  Standalone legacy files continue bare resolution in this slice; they are
-  not strict clients and do not gain implicit package roots.
+  `export charToInt, leqChar`. Strict-roots and legacy-roots clients each
+  import all five names selectively, use `IO` as an effect result carrier,
+  call `write ConsoleStream.Stdout payload` and `print_line message`, and
+  apply `charToInt 65` and `leqChar 65 66`. Repeat the imported
+  `legacy-roots` client after an unrelated checked declaration has taken
+  over flat `globals["write"]` with a fresh ID. In each roots route, use
+  five separate fresh no-import clients, each naming one of the five bare
+  package names. In both roots routes, independently test a non-home
+  file with `export IO`. Also exercise a no-roots standalone legacy
+  `elaborate_file_v1` input
+  using all five package names bare. This case does not measure the other
+  standalone legacy entries listed by `33 §3.3`.
+- expect: both roots clients' imported uses select exactly the original
+  pre-source checked IDs, with no added trust. The imported legacy-roots
+  `write` still selects its original ID, not the replacement flat-global
+  ID. Every no-import roots client and the non-home publisher refuse at
+  surface resolution. The named standalone `elaborate_file_v1` input
+  accepts the five bare uses, each resolving to its original pre-source
+  ID; this does not grant bare access in either roots route or authorize
+  arbitrary implementation globals.
 - controls: deleting any one of the five compiler-owned home grants makes
-  that home's ordinary `export` and its strict client import reject. A
+  that home's ordinary `export` and its roots-client import reject. A
   same-name local declaration inside a home must refuse as ambiguous,
-  instead of replacing the compiler-owned exported identity.
+  instead of replacing the compiler-owned exported identity. The other
+  standalone legacy entries enumerated by `33 §3.3`—
+  `elaborate_ken_md_file_v1`, `elaborate_decl`, CLI entries outside
+  `catalog/packages/`, examples, and inline source strings—remain
+  uncovered by this seed row; this case does not certify them.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
