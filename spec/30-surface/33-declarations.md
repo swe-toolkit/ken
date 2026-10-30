@@ -273,6 +273,64 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
   to the exact pre-source `GlobalId`; without it, an unimported bare use
   raises `UnboundName` in Strict roots.
+- **Checked package homes for the Strict catalog route.** The five catalog
+  units that otherwise fail at resolution under Strict roots have the
+  following explicit-import homes for their already-checked pre-source
+  declarations. Each listed binding retains its exact pre-source
+  `GlobalId`; a home does not copy a definition, mint another identity,
+  or place a name in the closed prelude floor or protected set B.
+  The owning unit publishes only its intended names with ordinary
+  `export`, and another catalog unit imports that public interface.
+  No unit inherits an unrelated unit's imports or consults the flat
+  implementation-global name table to resolve a missing import.
+
+  - `Capability.Filesystem.Authority` homes `FS`, `read_bytes`, and
+    `write_file`. Its checked FS clients use these identities through
+    this unit, not through a second FS family or an ambient Strict name.
+  - `Capability.System.Buffer` homes the `BufferWindow` family with its
+    exact `MkBufferWindow` constructor, the checked projections
+    `buffer_span_budget` and `buffer_span_length`, and
+    `transfer_count_int`, `transfer_count_nat`,
+    `transfer_count_positive`, `transfer_count_positive_prop`,
+    `transfer_count_remaining`, `transfer_count_nat_succ`, and
+    `transfer_count_predecessor`. This does not publish either private
+    constructor of the floor `BufferSpan` or `TransferCount` family.
+  - `Capability.System.Error` homes `FileOperation` and its complete
+    sixteen-constructor checked family: `OpReadFile`, `OpWriteFile`,
+    `OpAppendFile`, `OpMetadata`, `OpReadDirectory`,
+    `OpCreateDirectory`, `OpRemoveFile`, `OpRemoveDirectory`,
+    `OpRename`, `OpChangeMode`, `OpSeek`, `OpSetLength`, `OpSync`,
+    `OpGetInheritance`, `OpSetInheritance`, and `OpDuplicate`.
+  - `Capability.System.IO` is the fifth affected catalog unit. It
+    must import its checked Buffer projections and transfer-count facts
+    from `Capability.System.Buffer`; their use in IO does not give a
+    second unit ownership of the same identities. Its locally defined
+    `write_all_*` laws remain that unit's own checked declarations.
+  - `Capability.System.Resource` homes both `ResourceBodyResult`
+    with `ResourceBodyOk` and `ResourceBodyErr`, and
+    `ResourceBracketResult` with `ResourceBracketOk`,
+    `ResourceBracketBodyError`, `ResourceBracketReleaseError`, and
+    `ResourceBracketBodyAndReleaseError`. These are the complete
+    checked constructor sets of their respective families.
+
+  A checked inductive home is keyed on its exact pre-source parent
+  identity and registers its **complete** checked constructor set.
+  Admission refuses a missing or substitute parent, a missing,
+  additional or wrong-parent constructor, or a constructor ID that
+  differs from the registered family. Constructor registration does
+  not implicitly export constructors: a client sees only the exact
+  names explicitly published by the home, subject to §4.1–§4.3
+  visibility. Non-inductive homes retain the checked-Transparent
+  admission requirement; the inductive exception does not admit
+  opaque, primitive or lookalike non-family declarations as homes.
+  Explicit imports of these names through their home preserve the
+  exact checked identities in both roots modes. Legacy resolution
+  continues to admit their existing bare uses; this home migration
+  neither removes those Legacy meanings nor makes them floor names.
+  This Part 1 rule concerns catalog roots only. Standalone file,
+  literate, declaration, REPL, and non-catalog CLI routes retain the
+  transitional Legacy contract below; their Strict flip and any
+  isolated-file import loader are separate successor work.
 - **Transitional Legacy resolution.** Until the L2-4 strict-entry flip,
   `elaborate_module_from_roots` and `_v1` use Legacy roots. Explicit
   provider imports there also resolve each of the five to its exact ID.
