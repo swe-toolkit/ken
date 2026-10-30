@@ -637,9 +637,15 @@ including inverted intervals, without structural `Equal Interval`.
 The proofs need only existing public interval laws, with no new helper
 or Rational export. Architect's isolated AC-0 on `903b06068` checked
 all four generic proofs without an `Axiom` and with equal scratch
-trusted identities 114 → 114. This spec-only turn adds no §9 catalog
-export, conformance seed or package test, and claims no official
-conformance, CI, publication, landing or landed trust. Signed
+trusted identities 114 → 114. This assembled candidate has four
+checked §9 catalog exports, a package-owned test and the authored
+`conformance/stdlib/numerical/seed-interval-hull-intersect-associativity.md`.
+The named `cat_numeric_interval_hull_intersect_associativity` target
+passed 2/2 with reported candidate-local trusted identity sets
+114 → 114. CV statically checked the seed but did not run it as Ken or
+through the official conformance runner. D0 remains scratch evidence;
+neither D0 nor candidate-local checks establish official conformance,
+CI, publication, landing or landed trust. Signed
 arithmetic, division, `Float`, rounding, width and structural
 hull/intersection equalities remain deferred.
 

@@ -51,9 +51,14 @@
 > Section 9 specifies four premise-free hull/intersection regrouping laws
 > by mutual endpoint-value inclusion. Architect's isolated AC-0 on
 > `903b06068` checked the four generic proofs without an `Axiom` and with
-> unchanged scratch trusted GlobalId identities (114 → 114). This
-> spec-only turn adds no catalog export, conformance seed or package test;
-> it claims no official conformance, CI, publication, landing or landed
+> unchanged scratch trusted GlobalId identities (114 → 114). The
+> assembled candidate has four checked §9 catalog exports, the authored
+> seed and a package-owned test. The named
+> `cat_numeric_interval_hull_intersect_associativity` target passed 2/2
+> with reported candidate-local trusted identity sets 114 → 114. CV
+> statically checked the seed but did not run it as Ken or through the
+> official conformance runner. Neither D0 nor candidate-local checks
+> establish official conformance, CI, publication, landing or landed
 > trust.
 
 ## 1. Exact intervals over non-negative rationals
@@ -938,10 +943,15 @@ is not official conformance-runner execution.
 > isolated AC-0 on `903b06068d7c67c74ab9d979513c31c0c7572b31`
 > checked all four generic obligations and closed controls with rc 0,
 > no `Axiom`, and equal scratch `trusted_base()` GlobalId sets
-> (114 → 114). This spec-only child adds neither checked catalog exports
-> nor a conformance seed or package test. The D0 does not establish
-> official conformance-runner execution, CI, publication, landing or
-> landed trust.
+> (114 → 114). This assembled candidate has the four checked catalog
+> exports, a package-owned test and the authored
+> `conformance/stdlib/numerical/seed-interval-hull-intersect-associativity.md`.
+> The named `cat_numeric_interval_hull_intersect_associativity` test
+> passed 2/2 with reported candidate-local trusted identity sets
+> 114 → 114. CV checked the new seed statically, not with Ken or the
+> official conformance runner. D0 remains isolated scratch evidence;
+> these results establish neither official conformance, CI,
+> publication, landing nor landed trust.
 
 For every three intervals `i`, `j`, `k`, including inverted intervals,
 `Algorithm.Numeric.RationalInterval` must export the following four
@@ -986,12 +996,14 @@ Rational law or endpoint case split is required; private `equiv_leq` and
 `rational_distrib_r` remain private and unused. Sections 1–8 retain all
 operation and law types. There is no new axiom, kernel or surface rule.
 
-The separate CV seed will reuse `i=[1/2,1]`, `j=[1/3,2]` and
+The authored CV seed uses `i=[1/2,1]`, `j=[1/3,2]` and
 `k=[3/2,3]` to apply each public law. Its isolated refusal drops `k`
 from the asserted containing hull: `interval_hull i (interval_hull j k)` is
 `[1/3,3]`, whereas `interval_hull i j` is `[1/3,2]`. The former is
 not inside the latter by endpoint value. Architect's D0 separately
 accepted the `False` value for that inclusion and refused its `IsTrue`
 claim at the theorem, while also checking an inverted interval in each
-operand position. Those are isolated scratch results and planned seed
-controls, not execution of a shipped §9 seed or catalog export.
+operand position. Those D0 observations remain isolated scratch
+results. CV statically checked the authored seed but did not run it as
+Ken or through the official conformance runner; the package-owned
+test is candidate-local evidence, not execution of that seed.
