@@ -938,10 +938,15 @@ reset SIGPIPE rather than relying on a particular Rust runtime's spawn choice.
 
 ### 1.11 Bracketed child spawn plans and wait (PX10-SPAWN-PLAN-WAIT)
 
-> **Section 1.11 status: contract-pinned, not shipped.** The Architect's
-> AC-0 on `40fa3de6c` measured the host descriptor and signal mechanisms;
-> the Spec Leader ruled the public contract. This section does not claim
-> checked catalog exports, implemented host operations, conformance-runner
+> **Section 1.11 status: interpreter slice implemented; native refused.**
+> The Architect's AC-0 on `40fa3de6c` measured the host descriptor and
+> signal mechanisms; the Spec Leader ruled the public contract. This first
+> slice implements the plan, spawn, pipe and wait operations in the host
+> and the checked interpreter, where the checked acceptance programs
+> observe AC-1 to AC-3. A native build of a program that declares
+> `Process` is refused before object emission with a typed availability
+> refusal naming the operations that remain RepresentedUnavailable; native
+> parity is successor work. This section does not claim conformance-runner
 > execution, CI, publication, landing or a trust measurement. The first
 > PX10 slice adds no axiom or kernel rule; trust growth is an operator stop.
 
@@ -1151,17 +1156,19 @@ environment. This is a measured residual, not permission to change
 the inherited-disposition rule of §1.10. Outside that residual, the
 AC-1 observations include an argv/environment echo through a stdout
 pipe followed by `Exited 0`, and a self-SIGTERM child yielding
-`Signaled 15`, with interpreter/native parity. AC-2 observes the live
+`Signaled 15`, under the checked interpreter. AC-2 observes the live
 child's three descriptors, default SIGPIPE and inherited mask while a
 non-CLOEXEC parent descriptor is present. Deny-by-default descriptors
 and SIGPIPE reset are independent obligations: removing either must
-change its corresponding live-child observation. These are acceptance
-criteria for the later assembled candidate, not results of this Spec
-Author turn.
+change its corresponding live-child observation. In this slice a native
+build refuses a `Process`-declaring program before object emission, so
+these are interpreter observations; native parity is an obligation of
+the successor slice.
 
-Cwd attachments, credentials, namespaces, cgroups, rlimits, PATH
-search, process groups, pidfd signalling and non-blocking wait are
-successor work, not implicit fields or behaviors of this first slice.
+Native Process parity, cwd attachments, credentials, namespaces,
+cgroups, rlimits, PATH search, process groups, pidfd signalling and
+non-blocking wait are successor work, not implicit fields or behaviors
+of this first slice.
 
 ## 2. The FFI surface — the `foreign` declaration
 
