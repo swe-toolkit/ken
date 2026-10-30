@@ -9433,6 +9433,12 @@ mod px7l_tests {
                         | ken_host::HostOpV1::MappingReadView
                         | ken_host::HostOpV1::MappingWriteView
                         | ken_host::HostOpV1::MappingAcquireFile
+                        | ken_host::HostOpV1::ResourceStreamRead
+                        | ken_host::HostOpV1::ResourceStreamWrite
+                        | ken_host::HostOpV1::ProcessPlanPush
+                        | ken_host::HostOpV1::ProcessSpawn
+                        | ken_host::HostOpV1::ProcessTakePipe
+                        | ken_host::HostOpV1::ProcessWait
                         | ken_host::HostOpV1::ResourceRelease
                 );
             assert_eq!(
