@@ -1,0 +1,112 @@
+program capabilities FS AFull, Process
+
+proc drain_pipe (fuel : Nat) (pipe : Resource ResourceKind.PipeRead) (buffer : BufferHandle)
+  : HostIO AFull (Result ResourceError Unit) visits [FS, Process] =
+  match fuel {
+    Zero |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (Err ResourceError Unit ResourceError.InvalidBounds);
+    Suc rest |-> bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (Result ResourceError Unit)
+    (read_pipe AFull pipe buffer (MkBufferWindow (0 : Int) (256 : Int)))
+    (\read_result. match read_result {
+      Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError Unit) (Err ResourceError Unit error);
+      Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError Unit) (Ok ResourceError Unit MkUnit);
+      Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError Bytes) (Result ResourceError Unit)
+        (spanBytes AFull buffer span)
+        (\frozen. match frozen {
+          Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (Result ResourceError Unit) (Err ResourceError Unit error);
+          Ok _ |-> drain_pipe rest pipe buffer
+        })
+    })
+  }
+
+proc child_body (buffer : BufferHandle) (child : Resource ResourceKind.ChildProcess)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS, Process] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (Resource ResourceKind.PipeRead)) (ResourceBodyResult Unit Unit)
+    (take_stdout AFull child)
+    (\taken. match taken {
+      Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      Ok pipe |-> bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+        (drain_pipe (Suc (Suc (Suc (Suc Zero)))) pipe buffer)
+        (\drained. match drained {
+          Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+          Ok _ |-> bind (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (Result ResourceError ChildExit) (ResourceBodyResult Unit Unit)
+            (wait_child AFull child)
+            (\waited. match waited {
+              Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+                (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+              Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+                (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+            })
+        })
+    })
+
+proc buffer_body (cap : Cap AFull) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS, Process] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withChild AFull Unit Unit cap
+      (with_stdout
+        (with_environment
+          (with_environment
+            (spawn_plan (bytes_encode "PX10_CHILD_PROBE_PATH")
+              (Cons Bytes (bytes_encode "caller-zero")
+                (Cons Bytes (bytes_encode "argv-env")
+                  (Cons Bytes (bytes_encode "payload") (Nil Bytes)))))
+            (Cons (Prod Bytes Bytes)
+              (MkProd Bytes Bytes (bytes_encode "PX10_REPLACED") (bytes_encode "old"))
+              (Nil (Prod Bytes Bytes))))
+          (Cons (Prod Bytes Bytes)
+            (MkProd Bytes Bytes (bytes_encode "PX10_SELECTED") (bytes_encode "chosen"))
+            (Nil (Prod Bytes Bytes))))
+        ChildPipe)
+      (child_body buffer))
+    (\outcome. match outcome {
+      Ok (ResourceBracketOk _) |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+      Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+    })
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS, Process] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+        (withBuffer AFull Unit Unit (256 : Int) (buffer_body cap))
+        (\outcome. match outcome {
+          Ok (ResourceBracketOk _) |-> host_exit AFull ExitCode.Success;
+          Ok _ |-> host_exit AFull (ExitCode.Failure 73);
+          Err _ |-> host_exit AFull (ExitCode.Failure 74)
+        })
+  }
