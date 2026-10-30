@@ -491,11 +491,14 @@ with no new `Axiom` and equal scratch trusted identity sets 114 → 114.
 This assembled candidate contains both checked §10 catalog laws, a
 package-owned test and CV's authored closed seed. Foundation's named
 package test passed 2/2 on implementation parent `b5cd7a0`, with equal
-candidate-local trusted GlobalId identity sets 114 → 114; its three
-mutation controls are package-test evidence. CV has not Ken-checked or
-officially conformance-run the seed. Architect's AC-0 remains separate
-scratch evidence; no assembled-tip test, CI, publication, landing or
-landed trust is claimed. A sorted-list normal form and
+candidate-local trusted GlobalId identity sets 114 → 114 and three
+red/restored fixture mutations. QA independently ran the named target
+2/2, measured equal trusted identity sets 114 → 114, and reddened and
+restored three refusal-control mutations on assembled tip `073725e`.
+Those checks were not rerun on catalog-prose-only child `dd6f1`.
+CV has not Ken-checked or officially conformance-run the seed;
+Architect's AC-0 remains separate scratch evidence. No CI,
+publication, landing or landed trust is claimed. A sorted-list normal form and
 signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in

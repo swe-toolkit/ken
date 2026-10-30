@@ -23,12 +23,15 @@
 > now have checked catalog exports, a package-owned test and an authored
 > seed in this assembled candidate. Architect's isolated AC-0 on
 > `b557bac0a` checked both generic proofs with no new `Axiom` and
-> equal scratch trusted identity sets 114 → 114. Foundation reported
-> the named package test 2/2 and equal candidate-local trusted GlobalId
-> identity sets 114 → 114 on parent `b5cd7a0`; its three mutation
-> controls are package-test evidence, not seed execution. CV authored
-> the seed but did not Ken-check or officially conformance-run it. No
-> assembled-tip test, CI, publication, landing or landed trust is claimed.
+> equal scratch trusted identity sets 114 → 114. Foundation's named
+> package test passed 2/2 with equal trusted GlobalId identity sets
+> 114 → 114 on parent `b5cd7a0`; its three fixture mutations reddened
+> and were restored. QA independently ran the named test 2/2 with equal
+> trusted identity sets 114 → 114 and three refusal-control mutations
+> red/restored on assembled tip `073725e`. No test or mutation reran
+> on the subsequent catalog-prose-only `dd6f1` child. CV authored the
+> seed but did not Ken-check or officially conformance-run it. No CI,
+> publication, landing or landed trust is claimed.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -934,11 +937,14 @@ this base.
 > assembled candidate contains both checked §10 catalog theorems, the
 > package-owned test and CV's closed seed. Foundation's named package
 > test passed 2/2 at implementation parent `b5cd7a0`, with equal
-> candidate-local trusted GlobalId identity sets 114 → 114; its three
-> mutation controls are package-test evidence. The authored seed has
-> not been Ken-checked or run through official conformance. Neither
-> the isolated AC-0 nor the parent test establishes assembled-tip test
-> execution, CI, publication, landing or landed trust.
+> candidate-local trusted GlobalId identity sets 114 → 114 and three
+> red/restored fixture mutations. QA separately ran the named test
+> 2/2, measured equal trusted identity sets 114 → 114, and reddened
+> and restored three refusal-control mutations on exact assembled tip
+> `073725e`. The catalog-prose-only `dd6f1` child did not rerun them.
+> The authored seed has not been Ken-checked or run through official
+> conformance. Isolated AC-0 scratch and these package checks establish
+> no CI, publication, landing or landed trust.
 
 `Algorithm.SymbolicAlgebra.NatPolynomial` must export two public
 Transparent checked theorems. Their arguments are the four expressions
