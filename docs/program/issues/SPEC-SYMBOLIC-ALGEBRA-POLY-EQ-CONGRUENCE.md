@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE
 title: "Spec 66 §2 decides semantic equality of polynomial expressions with poly_eq, but a client that knows two subterms are poly_eq cannot conclude that the larger expressions built from them are: Algorithm.SymbolicAlgebra.NatPolynomial keeps its expression congruence proofs private. Rule from a checked D0 at zero trust that poly_eq is preserved by EAdd and EMul, and state the two laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
