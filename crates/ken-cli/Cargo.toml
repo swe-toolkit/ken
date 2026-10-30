@@ -15,6 +15,12 @@ path = "src/lib.rs"
 name = "ken"
 path = "src/main.rs"
 
+# Linux child used by the checked PX10 interpreter acceptance tests.
+[[bin]]
+name = "px10-child-probe"
+path = "tests/support/px10_child_probe.rs"
+test = false
+
 [features]
 dasm-c2-observation = ["ken-runtime/dasm-c2-observation"]
 
