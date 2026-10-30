@@ -300,8 +300,10 @@ a partial constructor family, and each constructor's parent remains the exact
 floor identity. Abstract or constructor-private visibility still applies
 (`33 §4.2`); qualification cannot expose a hidden constructor. The existing
 `ResourceKind` floor is scoped: `ResourceKind.FsHandle`,
-`ResourceKind.Buffer`, and `ResourceKind.Mapping` are the public constructor
-paths, not three additional bare names in B. `ExitCode` is scoped:
+`ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
+`ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and
+`ResourceKind.PipeWrite` are the seven public constructor paths, not
+additional bare names in B. `ExitCode` is scoped:
 `ExitCode.Success` and `ExitCode.Failure` are available, not bare
 `Success`/`Failure`. `ProgramCaps` is scoped: its runner-minted
 `MkProgramCaps` has no bare reservation; when visible, it uses the

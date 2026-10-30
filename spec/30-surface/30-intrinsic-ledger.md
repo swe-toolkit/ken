@@ -70,7 +70,7 @@ constructor still has the same checked parent and `GlobalId`.
 
 | Type | Scoped? | Specificity judgment |
 |---|---|---|
-| `ResourceKind` (current floor) | Yes | `Buffer`, `Mapping`, `FsHandle` are generic bare names; their `ResourceKind.C` paths state their role. |
+| `ResourceKind` (current floor) | Yes | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite` are the seven public paths; none of their leaf names is reserved bare by this family. |
 | `Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, `Utf8Error` (current floor) | No | The settled bare constructor vocabulary remains available; in particular `True`/`False`, `Zero`/`Suc`, `Nil`/`Cons`, `None`/`Some`, `Ok`/`Err` stay bare. |
 | `IOError` (floor) | Yes | All thirteen causes use `IOError.C`; `NotFound`, `Other`, `Unsupported` and `Revoked` are not bare reservations. |
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |

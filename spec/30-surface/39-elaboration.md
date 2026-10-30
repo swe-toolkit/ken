@@ -111,8 +111,10 @@ The loader proceeds as follows:
    `Prod`, `Unit`, and `FileError` are also unscoped: `MkProcessInput`,
    `MkProd`, `MkUnit`, and `MkFileError` are bare names in the protected set B.
    `ResourceKind` is scoped: `ResourceKind.FsHandle`,
-   `ResourceKind.Buffer`, and `ResourceKind.Mapping` use its exact parent;
-   their bare spellings are not reserved. `ExitCode.Success` and
+   `ResourceKind.Buffer`, `ResourceKind.Mapping`,
+   `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
+   `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite` use its exact
+   parent; their bare spellings are not reserved. `ExitCode.Success` and
    `ExitCode.Failure` are scoped; `ProgramCaps.MkProgramCaps` is scoped
    but remains runner-minted and is not made public by qualification.
    `Coproduct.InL`, `Coproduct.InR`, `Instant.MkInstant`, `ITree.Ret`, and
