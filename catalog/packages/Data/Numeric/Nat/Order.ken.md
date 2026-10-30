@@ -156,6 +156,29 @@ proof idempotent for min (n : Nat) : Equal Nat (min n n) n =
     Suc n2 ↦ cong Nat Nat (min n2 n2) n2 Suc ((proof idempotent for min) n2)
   }
 
+pub proof distrib for min
+      (m : Nat) (n : Nat) (k : Nat)
+    : Equal Nat (min m (max n k)) (max (min m n) (min m k)) =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Refl;
+        Suc n2 ↦
+          match k {
+            Zero ↦ Refl;
+            Suc k2 ↦
+              cong
+                Nat
+                Nat
+                (min m2 (max n2 k2))
+                (max (min m2 n2) (min m2 k2))
+                Suc
+                ((proof distrib for min) m2 n2 k2)
+          }
+      }
+  }
+
 pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
@@ -252,6 +275,47 @@ pub proof absorb for max (m : Nat) (n : Nat) : Equal Nat (max m (min m n)) m =
       match n {
         Zero ↦ Refl;
         Suc n2 ↦ cong Nat Nat (max m2 (min m2 n2)) m2 Suc ((proof absorb for max) m2 n2)
+      }
+  }
+
+pub proof distrib for max
+      (m : Nat) (n : Nat) (k : Nat)
+    : Equal Nat (max m (min n k)) (min (max m n) (max m k)) =
+  match m {
+    Zero ↦ Refl;
+    Suc m2 ↦
+      match n {
+        Zero ↦
+          sym Nat (min (Suc m2) (max (Suc m2) k)) (Suc m2) ((proof absorb for min) (Suc m2) k);
+        Suc n2 ↦
+          match k {
+            Zero ↦
+              sym
+                Nat
+                (Suc (min (max m2 n2) m2))
+                (Suc m2)
+                (cong
+                  Nat
+                  Nat
+                  (min (max m2 n2) m2)
+                  m2
+                  Suc
+                  (trans
+                    Nat
+                    (min (max m2 n2) m2)
+                    (min m2 (max m2 n2))
+                    m2
+                    ((proof comm for min) (max m2 n2) m2)
+                    ((proof absorb for min) m2 n2)));
+            Suc k2 ↦
+              cong
+                Nat
+                Nat
+                (max m2 (min n2 k2))
+                (min (max m2 n2) (max m2 k2))
+                Suc
+                ((proof distrib for max) m2 n2 k2)
+          }
       }
   }
 
@@ -939,9 +1003,11 @@ arms with `Proved` for `min` and `Refl` for `max`. The public
 `min::absorb` and `max::absorb` proofs show that a nested opposite
 extremum restores its left operand without an order hypothesis. The
 successor/zero branch of `min::absorb` reuses a private checked
-idempotence step; that helper is not another exported law. The private
-`compare`
-proofs
+idempotence step; that helper is not another exported law. The public
+`min::distrib` and `max::distrib` selectors prove the two mixed extremum
+identities by structural recursion; the successor/zero branch of
+`max::distrib` also reuses the checked `min::comm` and `min::absorb` proofs.
+The private `compare` proofs
 establish the missing result directions: self-comparison is `Eq`, a strict
 left side gives `Lt`, and `Lt` reverses to `Gt`. The three public `compare`
 agreements return the forward order for `Lt`, propositional equality for `Eq`,
@@ -1002,8 +1068,8 @@ argument and its bridge exposes the canonical successor relation.
    facts; fourteen attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
    positive-right-multiplication order transports; the six `min`/`max` bounds
-   and their six selectors (`comm`, `assoc`, and `absorb` for each); the three
-   `compare` agreements;
+   and their eight selectors (`comm`, `assoc`, `absorb`, and `distrib` for each);
+   the three `compare` agreements;
    and the five inductive `sub` proofs, including `sub::add_cancel`.
    `OrdResult` remains package-local.
 2. **Source map.**
@@ -1030,8 +1096,8 @@ argument and its bridge exposes the canonical successor relation.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
    package's checked laws use structural recursion for the strict-order and
    successor/weakening/addition bounds, `min`/`max` bounds and their
-   commutativity, associativity and absorption selectors, and subtraction theory,
-   including cancellation; and case analysis on the canonical relation
+   commutativity, associativity, absorption and distribution selectors, and
+   subtraction theory, including cancellation; and case analysis on the canonical relation
    for the `compare` agreements. The equality arm closes through
    `leq_nat::antisym`. The order-scaling family proves equality of Boolean
    comparisons by induction and transports it in both directions through
@@ -1049,7 +1115,10 @@ argument and its bridge exposes the canonical successor relation.
    three natural arguments; its package test root-loads the checked laws.
    The [geometry absorption seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-absorption.md)
    applies both public absorption selectors and independently checks their
-   Nat results; its package-owned test root-loads the checked proofs. These
+   Nat results; its package-owned test root-loads the checked proofs. The
+   [geometry distribution seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-distributivity.md)
+   applies both public distribution selectors; its package-owned test checks
+   their generic clients and exact trusted GlobalId inventory. These
    candidate-local checks are not official conformance-runner execution, CI,
    publication, landing or landed trust. These controls are not Strict
    evidence; Strict closure and the identity assertions rerun after
