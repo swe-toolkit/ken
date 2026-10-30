@@ -20,9 +20,10 @@ witness is `crates/ken-cli/tests/abi_s5_terminal_signal_disposition.rs`.
 ## surface/ffi-io/run-worker-signal-posture
 
 - promise class: normative compatibility vector for the executable edge
-- given: launch `ken run` from a clean baseline (signals 1–31 default, empty
-  mask), hold stdin open, and inspect the actual worker once a Ken program is
-  blocked in `read(0)`. Inspect the worker, not only the CLI parent.
+- given: launch `ken run` from a clean baseline (all catchable signals
+  1–64 except glibc-reserved 32 and 33 set to `SIG_DFL`, empty mask), hold
+  stdin open, and inspect the actual worker once a Ken program is blocked in
+  `read(0)`. Inspect the worker, not only the CLI parent.
 - expect: over signals 1–31, ignored is exactly `{SIGPIPE}` and caught is
   exactly `{SIGSEGV, SIGBUS}`. Every worker thread has an empty `SigBlk`.
   Ignored signals from 32 upward are absent; caught signals from 32 upward
