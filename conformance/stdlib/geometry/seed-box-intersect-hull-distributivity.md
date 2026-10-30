@@ -8,13 +8,16 @@ The fixed boxes are `a=(1,1)–(4,4)`, `b=(3,0)–(6,2)`, and
 `c=(0,3)–(2,3)`. The two sides of the first law both compute to
 `(1,1)–(4,3)`, which is not any input box. The two sides of the second
 law both compute to `a`: `intersect b c` is the inverted box
-`(3,3)–(2,2)`. The accepted client applies both public laws and checks
-each side independently with `Refl`. These closed values delimit the
-generic laws; they do not prove them.
+`(3,3)–(2,2)`. The accepted client directly applies both Nat Order
+selectors at their generic `Equal Nat` types, then applies both Box laws
+and checks each side independently with `Refl`. These closed values
+delimit the generic laws; they do not prove them.
 
 ## Accepted client
 
 ```ken
+import Data.Numeric.Nat.Order (min, max)
+
 import Algorithm.Geometry.NatBox
   (Box, MkPoint, MkBox, intersect, hull, intersect_hull_distrib,
    hull_intersect_distrib)
@@ -30,6 +33,14 @@ const three : Nat = Suc two
 const four : Nat = Suc three
 
 const six : Nat = Suc (Suc (Suc three))
+
+theorem min_distrib_client (m : Nat) (n : Nat) (k : Nat)
+  : Equal Nat (min m (max n k)) (max (min m n) (min m k)) =
+  (proof distrib for min) m n k
+
+theorem max_distrib_client (m : Nat) (n : Nat) (k : Nat)
+  : Equal Nat (max m (min n k)) (min (max m n) (max m k)) =
+  (proof distrib for max) m n k
 
 const box_a : Box = MkBox (MkPoint one one) (MkPoint four four)
 
@@ -90,9 +101,23 @@ theorem mixed_right_value
   Refl
 ```
 
+### `stdlib/geometry/nat-order-distribution-selectors`
+
+- spec: §9.1.
+- promise class: durable invariant.
+- given: the generic `min_distrib_client` and `max_distrib_client`
+  declarations in the accepted client, for arbitrary `m`, `n`, and `k`.
+- expect: each public selector checks at its exact stated `Equal Nat`
+  type: `min_distrib_client` applies `distrib for min`, and
+  `max_distrib_client` applies `distrib for max`.
+- measured: when run, both arbitrary-variable applications typecheck
+  against their stated Nat equality types.
+- why: the public Nat Order API must be exercised directly; the Box
+  theorem applications do not stand in for these selector clients.
+
 ### `stdlib/geometry/box-intersection-hull-distribution`
 
-- spec: §9.1–§9.2.
+- spec: §9.2.
 - promise class: durable invariant.
 - given: the fixed three boxes above, including their inverted
   `intersect box_b box_c` result.
@@ -145,9 +170,11 @@ theorem seed_neg
 
 ## Evidence boundary
 
-This seed was authored on the spec-only child, which does not yet
-contain the §9 catalog exports. No Ken check or package test was run
-on this child. Architect's AC-0 results are scratch evidence, not
-execution of this seed or an official conformance-runner result. The
-closed examples do not replace the checked generic proofs. No CI,
-publication, landing or landed trust is claimed.
+This seed was first authored on the spec-only child, before the §9
+catalog exports were present; no Ken check or package test was run on
+that authoring child. This seed-only correction adds the direct §9.1
+selector clients, but no Ken check or package test was run on this
+correction. Architect's AC-0 results are scratch evidence, not execution
+of this seed or an official conformance-runner result. The closed
+examples do not replace the checked generic proofs. No CI, publication,
+landing or landed trust is claimed.
