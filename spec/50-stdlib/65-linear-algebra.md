@@ -7,7 +7,8 @@
 > SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC §5;
 > SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY §6;
 > SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT §7;
-> SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC §8).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC §8;
+> SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION §9).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -17,11 +18,14 @@
 > transpose-of-identity helper to a public law without a wrapper or
 > new proof body. Architect's isolated D0 on `18e269f32` checked its
 > public visibility and equal scratch trusted identities 109 → 109.
-> The §8 export and seed were absent on the spec author's base. This
-> assembled candidate adds the checked export and a package-owned test
-> of the accepted seed and isolated false claim. Neither scratch D0 nor
-> these candidate-local checks establish official conformance-runner
-> execution, CI, publication, landing or landed trust.
+> The §8 checked export, seed and package-owned test are on main. Neither
+> scratch D0 nor that test establishes official conformance-runner
+> execution or landed trust. Section 9 specifies four new checked vector
+> scaling laws. Architect's isolated D0 checked their generic proofs
+> with unchanged scratch trusted identity sets 114 → 114, but this
+> spec-only child does not add the §9 catalog exports or seed. No
+> official conformance, CI, publication, landing or landed trust is
+> established by this author turn.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -681,9 +685,9 @@ semiring-general, or approximate matrix law is asserted.
 > D0 on exact landed base `18e269f3205be0d6c1d0ab3e776960a824ae2646`
 > checked the existing theorem with public visibility, `ken check` and
 > `ken fmt --check` rc 0, and equal scratch `trusted_base()` identity
-> sets 109 → 109. Its public catalog export and closed seed are absent
-> on this base. D0 is not shipped §8 execution, official conformance,
-> CI, publication, landing or landed trust.
+> sets 109 → 109. Its public catalog export, closed seed and package-owned
+> test are on main. Neither D0 nor the package test is official
+> conformance-runner execution or a landed trust measurement.
 
 ### 8.1 One checked law, promoted in place
 
@@ -755,7 +759,103 @@ matching one-name update: twenty-nine to thirty public names with
 §8 test checks the complete accepted seed and its isolated false claim. The D0 patch
 SHA-256 is
 `74cff3e2237167533ec8324c0193ab140b871662e3cd7cf394635f46f0a1db4a`.
-These scratch checks are not package-test execution on the assembled
-candidate, official conformance, CI, publication, landing or landed
-trust. Neither this visibility promotion nor a closed symmetric
-example grants symmetry to an arbitrary matrix.
+These scratch checks are not package-test execution on the landed
+§8 source or official conformance. The §8 checked export, seed and
+package-owned test are on main; the historical D0 does not establish
+a landed trust measurement. Neither this visibility promotion nor a
+closed symmetric example grants symmetry to an arbitrary matrix.
+
+## 9. Natural scaling acts on vector sums and scalar products
+
+> **Section 9 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION).** Architect's isolated
+> AC-0 on `524ea2cfd` checked four generic proofs with rc 0, no new
+> `Axiom` or premise, and equal scratch `trusted_base()` identity sets
+> 114 → 114. This spec-only child does not yet deliver the checked
+> catalog exports or closed seed. D0 is not official conformance,
+> CI, publication, landing or a landed trust measurement.
+
+### 9.1 Four public checked-law obligations
+
+`Algorithm.LinearAlgebra.NatMatrix` must export exactly these four
+public Transparent theorems. The argument order follows
+`vector_scale n factor xs`: the dimension comes first, then natural
+factors and then the length-indexed vectors. They belong together
+after `vector_add_assoc` and before `matrix_vector_additive`, without
+moving any §1–§8 declaration or changing its type.
+
+```ken
+pub theorem vector_scale_distrib
+    (n : Nat) (x : Nat) (u : Vec Nat n) (v : Vec Nat n)
+  : Equal
+      (Vec Nat n)
+      (vector_scale n x (vector_add n u v))
+      (vector_add n (vector_scale n x u) (vector_scale n x v))
+
+pub theorem vector_scale_factor_distrib
+    (n : Nat) (x : Nat) (y : Nat) (u : Vec Nat n)
+  : Equal
+      (Vec Nat n)
+      (vector_scale n (add x y) u)
+      (vector_add n (vector_scale n x u) (vector_scale n y u))
+
+pub theorem vector_scale_compose
+    (n : Nat) (x : Nat) (y : Nat) (u : Vec Nat n)
+  : Equal
+      (Vec Nat n)
+      (vector_scale n (mul x y) u)
+      (vector_scale n x (vector_scale n y u))
+
+pub theorem vector_scale_one
+    (n : Nat) (u : Vec Nat n)
+  : Equal (Vec Nat n) (vector_scale n (Suc Zero) u) u
+```
+
+The first law scales each component of `vector_add n u v` and equals
+adding the separately scaled vectors. The second distributes a sum of
+natural factors over one vector; it is not a second vector-argument
+law. The third composes two scalar actions in the written `x` then `y`
+order, matching `mul x y` on the left. The last identifies the
+`Suc Zero` action. Every law is structural `Equal (Vec Nat n)` for
+all `n`, including zero, without a nonempty-vector premise. These
+are not additional operations or runtime-cost claims, and a closed
+example cannot establish their generic proof bodies.
+
+### 9.2 Proof boundary and closed discriminator
+
+`vector_scale` is the existing map of `mul factor`, while
+`vector_add` zips componentwise `add`. The checked Nat laws
+`mul_add_distrib_r`, `mul_add_distrib_l`, `assoc for mul` (in the
+symmetric direction), and `one_l for mul` supply the four head
+steps respectively. The single new helper `vector_cons_eq` transports
+equal heads and tails through `VCons` and remains private in the
+module's helper tail, immediately before `fn prepend` after
+`vector_add_cons`. A client cannot import it. The proof needs no new
+import, axiom, primitive, kernel or surface rule; all §1–§8
+operations and public law types remain unchanged. Adding the four
+public laws takes the package from eight operations and twenty-two
+laws (thirty names) to eight operations and twenty-six laws (thirty-four
+names); the package's public-inventory test must be updated when the
+catalog half is assembled.
+
+The closed seed uses `n=2`, factors `x=2` and `y=3`, and vectors
+`u=[1,2]`, `v=[3,0]`. Applying each public law and independently
+computing both sides with `Refl` gives `[8,4]`, `[5,10]`, `[6,12]`,
+and `[1,2]` in order. On the same inputs,
+`vector_add two (vector_scale two two u) u` computes to `[3,6]`,
+not `[5,10]`. The isolated dropped-scale claim about
+`vector_scale two (add two three) u` must be refused at its own
+`Refl` after a fresh accepted prefix; a same-scope true claim with
+the second scaled operand restored must be accepted. This separates
+false content from a proof-shape or scope failure. The finite
+calculations delimit the law but do not replace its generic proof.
+
+Architect's isolated D0 on `524ea2cfd` checked the four generic
+bodies and public clients, confirmed Transparent module ownership,
+no new `Axiom` or premise, equal scratch trusted identity sets
+114 → 114, and selective-import refusal for `vector_cons_eq`. The
+scratch accepted client and false-claim refusal are AC-0 evidence,
+not a shipped §9 conformance run. The catalog code, inventory update,
+closed seed and package test belong to later serial turns of this
+candidate; no author-run Ken test, official conformance, CI,
+publication, landing or landed trust is claimed here.

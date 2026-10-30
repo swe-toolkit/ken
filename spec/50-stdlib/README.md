@@ -328,7 +328,7 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–8
+**`65-linear-algebra.md`** §§1–9
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
@@ -336,7 +336,8 @@ SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
 SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC;
 SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY;
 SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT;
-SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC).
+SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC;
+SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -374,12 +375,18 @@ law without a wrapper: the transpose of `identity n` is structurally
 four direct helpers remain private; no §1–§7 public type changes.
 Architect's D0 on `18e269f32` checked the visibility promotion at
 unchanged scratch trusted identities 109 → 109, with no new `Axiom`.
-The §8 public export and seed were absent on the spec author's base;
-this assembled candidate adds the checked public law and a package-owned
-test of the accepted seed and isolated false claim. Scratch D0 and
-candidate-local checks are not official conformance-runner execution,
-CI, publication, landing or landed trust. No rational or `Float` tier
-is claimed.
+The §8 checked export, seed and package-owned test are on main;
+neither historical D0 nor the package test establishes official
+conformance-runner execution or landed trust. Section 9 specifies
+four public Transparent scaling theorems over the existing `Vec Nat n`:
+vector-argument distribution, factor-sum distribution, factor
+composition and the one action. A single new `vector_cons_eq` helper
+stays private. Architect's isolated AC-0 on `524ea2cfd` checked all
+four generic proofs with rc 0, no new `Axiom` or premise, and equal
+scratch trusted GlobalId sets 114 → 114. This spec-only child has no
+§9 catalog exports or closed seed; D0 is not official conformance,
+CI, publication, landing or landed trust. No rational or `Float`
+tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–9 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
