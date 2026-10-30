@@ -1067,12 +1067,13 @@ sentinel beside the current contract.
   on absence from a Rust name table. No official conformance-runner result
   is claimed by stating these cases.
 
-The Console/Char cases below implement the two-witness `30-taxonomy §4`
-pre-flip slice. Their source-resolution rows cover strict roots, legacy roots,
-and one standalone `elaborate_file_v1` entry. Both roots routes require explicit
-provider imports for the five package identities. Strict roots alone assert
-no-import refusals. The standalone row asserts bare access to those five exact
-pre-source IDs; it does not cover the other standalone Legacy entries. Other
+The Console/Char rows implement the two-witness `30-taxonomy §4`
+pre-flip slice. They cover strict and legacy roots plus the promised standalone
+routes: `elaborate_file_v1`, `elaborate_ken_md_file_v1`, `elaborate_decl`,
+non-catalog CLI `check`/`run`/`native-build`, literate example fences, and
+inline REPL submissions. Roots require explicit imports; Strict roots alone
+assert missing-import refusals. Each accepted standalone route asserts the five
+original IDs itself; one route's result does not stand in for another. Other
 unimported Legacy bare implementation globals, including `ConsoleOp`, are
 unspecified: neither promised nor refused. The scoped ConsoleStream constructor
 rows below retain their every-route contract. No row adds trust or duplicates a
@@ -1136,37 +1137,146 @@ checked definition.
 - promise class: **durable provider-edge invariant** — a home export and a
   client import select checked identities rather than mutable spellings
 - spec: `30-taxonomy §4`; `33 §3.2`–§3.3; `36 §1`; `37 §5`
-- given: one roots-loaded `Capability.Console.Text` file performs only
-  `export IO, write, print_line`, and another roots-loaded
-  `Core.Classes.LawfulClasses` file performs only
-  `export charToInt, leqChar`. Strict-roots and legacy-roots clients each
-  import all five names selectively, use `IO` as an effect result carrier,
-  call `write ConsoleStream.Stdout payload` and `print_line message`, and
-  apply `charToInt 65` and `leqChar 65 66`. Repeat the imported
-  `legacy-roots` client after an unrelated checked declaration has taken
-  over flat `globals["write"]` with a fresh ID. In strict roots only, use five
-  separate fresh no-import clients, each naming one of the five bare package
-  names, and test a non-home file with `export IO`. Assert no no-import
-  Legacy-roots outcome. Also exercise a no-roots standalone legacy
-  `elaborate_file_v1` input using all five package names bare. This case does
-  not measure the other standalone legacy entries listed by `33 §3.3`.
-- expect: both roots clients' imported uses select exactly the original
-  pre-source checked IDs, with no added trust. The imported legacy-roots
-  `write` still selects its original ID, not the replacement flat-global
-  ID. Each strict-roots no-import client raises `UnboundName`; the strict-roots
-  non-home publisher fails surface resolution. No bare Legacy-roots outcome
-  is asserted. The named standalone `elaborate_file_v1` input accepts the five
-  bare uses, each resolving to its original pre-source ID. This does not
-  guarantee those bare names in either roots route or establish behavior for
-  other Legacy globals.
-- controls: deleting any one of the five compiler-owned home grants makes
-  that home's ordinary `export` and its roots-client import reject. A
-  same-name local declaration inside a home must refuse as ambiguous,
-  instead of replacing the compiler-owned exported identity. The other
-  standalone legacy entries enumerated by `33 §3.3`—
-  `elaborate_ken_md_file_v1`, `elaborate_decl`, CLI entries outside
-  `catalog/packages/`, examples, and inline source strings—remain
-  uncovered by this seed row; this case does not certify them.
+- given: one roots-loaded `Capability.Console.Text` file exports
+  `IO, write, print_line`, and another roots-loaded
+  `Core.Classes.LawfulClasses` file exports `charToInt, leqChar`. The
+  Strict-roots and Legacy-roots clients each have these selective imports and
+  this complete body:
+
+  ```ken
+  import Capability.Console.Text (IO, write, print_line)
+  import Core.Classes.LawfulClasses (charToInt, leqChar)
+  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+    write ConsoleStream.Stdout payload
+  proc line_probe (message : String) : IO Unit visits [Console] =
+    print_line message
+  const char_code_probe : Int = charToInt 65
+  const char_order_probe : Bool = leqChar 65 66
+  ```
+
+  Repeat the imported Legacy-roots client after an unrelated checked
+  declaration has taken over flat `globals["write"]` with a fresh ID. In Strict
+  roots, make five fresh variants of this complete client: omit exactly one of
+  the five selected names from its provider import in each variant and retain
+  the other four names. Also
+  test a non-home file that has no import and attempts `export IO`. Assert no
+  no-import Legacy-roots outcome. For the standalone `elaborate_file_v1` route,
+  use the same four declarations without either import.
+- expect: both roots clients accept and every occurrence of the five imported
+  names selects its exact original pre-source ID, with no added trust. The
+  imported Legacy-roots `write` still selects its original ID, not the
+  replacement flat-global ID. Each Strict-roots variant rejects with
+  `UnboundName` naming exactly its omitted import; the non-home `export IO`
+  rejects with `UnboundName(IO)` before interface admission. No bare
+  Legacy-roots outcome is asserted. The standalone `elaborate_file_v1` input
+  accepts all four declarations, with each of the five references resolving to
+  its original pre-source ID.
+- controls: the all-imported client is the accepted control for the five
+  one-import-omitted Strict-roots variants. Deleting any compiler-owned home
+  grant makes that home's ordinary export and the corresponding roots-client
+  import reject. A same-name local declaration inside a home must refuse as
+  ambiguous instead of replacing the compiler-owned exported identity.
+
+### surface/modules/legacy-literate-entry-preserves-five-package-identities
+
+- promise class: **durable standalone-entry invariant** — a literate source
+  resolves the five package identities without a catalog root
+- spec: `30-taxonomy §4`; `31` literate fence roles; `33 §3.3`
+- given: in fresh no-roots inputs with no source imports, pass each of these
+  two `.ken.md` files to `elaborate_ken_md_file_v1`: one file has a single
+  `ken` fence and the other has a single `ken example` fence. Each fence body
+  is this complete source:
+
+  ```ken
+  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+    write ConsoleStream.Stdout payload
+  proc line_probe (message : String) : IO Unit visits [Console] =
+    print_line message
+  const char_code_probe : Int = charToInt 65
+  const char_order_probe : Bool = leqChar 65 66
+  ```
+
+- expect: both fresh inputs accept. In each result, `IO`, `write`,
+  `print_line`, `charToInt`, and `leqChar` resolve to their exact original
+  pre-source IDs. The `write` and `print_line` procedures declare
+  `visits [Console]`; their parameters are bound, and no failure on an
+  unrelated free name or missing effect row can satisfy the case.
+- controls: the two fence roles are separate accepted inputs. A green `ken`
+  fence does not stand in for the `ken example` fence.
+
+### surface/modules/legacy-elaborate-decl-and-inline-repl-preserve-identities
+
+- promise class: **durable standalone-entry invariant** — declaration and
+  inline-source entry paths retain the five exact package identities
+- spec: `30-taxonomy §4`; `33 §3.3`
+- given: submit each of these four declarations separately to
+  `elaborate_decl`, using a fresh prelude environment for each declaration.
+  Repeat the four single-declaration submissions as inline input to a fresh
+  REPL session:
+
+  ```ken
+  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload
+  proc line_probe (message : String) : IO Unit visits [Console] = print_line message
+  const char_code_probe : Int = charToInt 65
+  const char_order_probe : Bool = leqChar 65 66
+  ```
+
+  Each direct declaration invocation starts from a fresh standalone Legacy
+  environment; the REPL receives the four lines in one fresh session. Neither
+  path uses imports. The procedures bind their parameters and declare the
+  required Console row.
+- expect: all four declarations accept through each named path. Across each
+  path's own results, `IO`, `write`, `print_line`, `charToInt`, and `leqChar`
+  resolve to their exact original pre-source IDs. The REPL result is not
+  inferred from the direct `elaborate_decl` result.
+- controls: the four source declarations are the accepted controls for their
+  respective entry; each route is observed independently.
+
+### surface/modules/legacy-noncatalog-cli-entrypoints-preserve-identities
+
+- promise class: **durable standalone-entry invariant** — CLI source entry
+  points outside `catalog/packages/` retain the five exact package IDs
+- spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`
+- given: outside every `catalog/packages/` ancestor, exercise `ken check` on
+  a `.ken.md` file under `examples/` with the complete declarations below in a
+  single `ken example` fence and on a separate `.ken` file. Also give the
+  declarations to `ken run` and `ken native-build` on separate `.ken` files.
+  For `ken run` and `ken native-build`, prepend
+  `program capabilities FS APartial` and add this entry point:
+
+  ```ken
+  proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+      : HostIO APartial ExitCode visits [Console] =
+    host_program APartial (print_line "legacy CLI")
+  ```
+
+  The complete declarations are:
+
+  ```ken
+  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+    write ConsoleStream.Stdout payload
+  proc line_probe (message : String) : IO Unit visits [Console] =
+    print_line message
+  const char_code_probe : Int = charToInt 65
+  const char_order_probe : Bool = leqChar 65 66
+  ```
+
+  `ken native-build` receives this valid bounded profile; its limits are
+  fixture setup, not the property under test:
+
+  ```json
+  {"runtime":{"invocation_epochs":1024},"call_events":{"event_generations":2048,"live_pending_slots":1024},"invocation":{"nodes":100000,"words":100000,"data_bytes":1000000,"native_int_limbs":100000},"persistent":{"nodes":100000,"words":100000,"data_bytes":1000000,"native_int_limbs":100000}}
+  ```
+
+- expect: each CLI entry accepts its input, and the checked declarations for
+  that entry resolve all five names to their exact original pre-source IDs.
+  The `ken run` host is non-root with its normal Console capability available.
+  Runtime output and native execution output are not asserted here; a
+  successful compile or exit alone does not satisfy the identity assertion.
+- controls: each command receives the same closed declarations in a fresh
+  standalone environment. A failure for a missing entry point, unbound
+  `payload` or `message`, or a missing `[Console]` row cannot be credited as
+  the route's result.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructor and protected type-name
