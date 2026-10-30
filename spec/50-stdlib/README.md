@@ -462,12 +462,13 @@ landed trust.
 A sorted-list normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–8 (SPEC-GEOMETRY-EXACT-CONTRACT;
+**`67-geometry.md`** §§1–9 (SPEC-GEOMETRY-EXACT-CONTRACT;
 SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
 SPEC-GEOMETRY-BOX-AREA; SPEC-GEOMETRY-BOX-INSIDE-ORDER;
 SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY;
 SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY;
-SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION).
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION;
+SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -521,12 +522,19 @@ The common operand `a` stays on the left; neither law equates
 arbitrary boxes sharing a point set. The existing box-congruence
 helpers remain private. Architect's D0 on `439fa7bb7` checked all
 four generic proofs without a new `Axiom` and with equal scratch
-trusted identities 114 → 114. The §8 catalog exports were absent
-on the spec author's base; this assembled candidate adds their
-checked proofs and a package-owned test of the complete accepted
-seed and isolated false claim. Neither scratch D0 nor these
-candidate-local checks are official conformance-runner execution,
-CI, publication, landing or landed trust.
+trusted identities 114 → 114. The §8 catalog exports, seed and
+package-owned test are present on main; neither scratch D0 nor the
+package test establishes official
+conformance-runner execution or landed trust. Section 9 specifies
+public Nat Order `distrib for min` and `distrib for max` selectors
+and unconditional structural `intersect_hull_distrib` and
+`hull_intersect_distrib` box equalities, including inverted boxes.
+Architect checked all four generic laws on `db6d0fee4` with rc 0,
+no new `Axiom`, and unchanged scratch trust identity sets
+114 → 114 → 114. This assembled candidate includes the §9 Nat Order
+and NatBox checked exports, AC-2 seed and package-owned test. Scratch
+D0 and candidate-local checks are not official conformance-runner
+execution, CI, publication, landing or landed trust.
 Signed-coordinate geometry, Euclidean and floating-point distance,
 other dimensions, canonical empty boxes and point-set equality remain
 outside scope.

@@ -656,6 +656,122 @@ pub theorem hull_intersect_absorb (a : Box) (b : Box) : Equal Box (hull a (inter
       }
   }
 
+pub theorem intersect_hull_distrib
+      (a : Box) (b : Box) (c : Box)
+    : Equal Box (intersect a (hull b c)) (hull (intersect a b) (intersect a c)) =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match c {
+            MkBox clo chi ↦
+              match alo {
+                MkPoint alx aly ↦
+                  match ahi {
+                    MkPoint ahx ahy ↦
+                      match blo {
+                        MkPoint blx bly ↦
+                          match bhi {
+                            MkPoint bhx bhy ↦
+                              match clo {
+                                MkPoint clx cly ↦
+                                  match chi {
+                                    MkPoint chx chy ↦
+                                      box_equal
+                                        (MkPoint
+                                          (max alx (min blx clx))
+                                          (max aly (min bly cly)))
+                                        (MkPoint
+                                          (min (max alx blx) (max alx clx))
+                                          (min (max aly bly) (max aly cly)))
+                                        (MkPoint
+                                          (min ahx (max bhx chx))
+                                          (min ahy (max bhy chy)))
+                                        (MkPoint
+                                          (max (min ahx bhx) (min ahx chx))
+                                          (max (min ahy bhy) (min ahy chy)))
+                                        (point_equal
+                                          (max alx (min blx clx))
+                                          (min (max alx blx) (max alx clx))
+                                          (max aly (min bly cly))
+                                          (min (max aly bly) (max aly cly))
+                                          ((proof distrib for max) alx blx clx)
+                                          ((proof distrib for max) aly bly cly))
+                                        (point_equal
+                                          (min ahx (max bhx chx))
+                                          (max (min ahx bhx) (min ahx chx))
+                                          (min ahy (max bhy chy))
+                                          (max (min ahy bhy) (min ahy chy))
+                                          ((proof distrib for min) ahx bhx chx)
+                                          ((proof distrib for min) ahy bhy chy))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem hull_intersect_distrib
+      (a : Box) (b : Box) (c : Box)
+    : Equal Box (hull a (intersect b c)) (intersect (hull a b) (hull a c)) =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match c {
+            MkBox clo chi ↦
+              match alo {
+                MkPoint alx aly ↦
+                  match ahi {
+                    MkPoint ahx ahy ↦
+                      match blo {
+                        MkPoint blx bly ↦
+                          match bhi {
+                            MkPoint bhx bhy ↦
+                              match clo {
+                                MkPoint clx cly ↦
+                                  match chi {
+                                    MkPoint chx chy ↦
+                                      box_equal
+                                        (MkPoint
+                                          (min alx (max blx clx))
+                                          (min aly (max bly cly)))
+                                        (MkPoint
+                                          (max (min alx blx) (min alx clx))
+                                          (max (min aly bly) (min aly cly)))
+                                        (MkPoint
+                                          (max ahx (min bhx chx))
+                                          (max ahy (min bhy chy)))
+                                        (MkPoint
+                                          (min (max ahx bhx) (max ahx chx))
+                                          (min (max ahy bhy) (max ahy chy)))
+                                        (point_equal
+                                          (min alx (max blx clx))
+                                          (max (min alx blx) (min alx clx))
+                                          (min aly (max bly cly))
+                                          (max (min aly bly) (min aly cly))
+                                          ((proof distrib for min) alx blx clx)
+                                          ((proof distrib for min) aly bly cly))
+                                        (point_equal
+                                          (max ahx (min bhx chx))
+                                          (min (max ahx bhx) (max ahx chx))
+                                          (max ahy (min bhy chy))
+                                          (min (max ahy bhy) (max ahy chy))
+                                          ((proof distrib for max) ahx bhx chx)
+                                          ((proof distrib for max) ahy bhy chy))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
 pub theorem manhattan_symm (p : Point) (q : Point) : Equal Nat (manhattan p q) (manhattan q p) =
   match p {
     MkPoint px py ↦
@@ -2114,6 +2230,14 @@ use the checked saturation law separately for either axis. The private
 intersection-area bounds apply `area_inside` to the existing
 `intersect_inside_left` and `intersect_inside_right` laws.
 
+`intersect_hull_distrib` uses `max::distrib` for each lower coordinate and
+`min::distrib` for each upper coordinate. `hull_intersect_distrib` reverses
+those selectors. Both reuse private `point_equal` and `box_equal` to lift
+four checked Nat equalities to structural box equality, even for inverted
+bounds. The [distribution seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-distributivity.md)
+checks both sides of each law on one fixed triple and refuses an invalid
+mixed regrouping; its closed cases do not prove the generic laws.
+
 ## 5. Design notes
 
 No validity bit or special empty constructor is needed. A box with inverted
@@ -2129,9 +2253,11 @@ its corners despite having no points. Its converse law therefore requires
 a member of the inner box. The corner order is transitive; intersection is a
 greatest lower bound and hull a least upper bound for that order. The two
 mixed absorption laws return structural `Equal Box` to their shared left
-operand, without identifying boxes merely because they have the same points
-or claiming that either operation distributes over the other. Different
-inverted boxes can have the same zero area without being structurally equal.
+operand, without identifying boxes merely because they have the same points.
+The separate distribution laws prove both mixed operations distribute over
+each other by structural equality, not by identifying point-set equivalents.
+Different inverted boxes can have the same zero area without being structurally
+equal.
 Signed orientation remains outside this interface.
 
 ## 6. References
@@ -2145,14 +2271,15 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–8](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and twenty-seven public checked law types,
-   including the two structural absorption laws.
+1. **Contract.** [Exact geometry, §§1–9](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and twenty-nine public checked law types,
+   including the two structural distribution laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
    `intersect_comm`, `hull_comm`, `intersect_assoc`, `hull_assoc`,
-   `intersect_hull_absorb`, `hull_intersect_absorb`, `manhattan_symm`,
+   `intersect_hull_absorb`, `hull_intersect_absorb`,
+   `intersect_hull_distrib`, `hull_intersect_distrib`, `manhattan_symm`,
    `manhattan_self`,
    `manhattan_triangle`, `manhattan_zero_equal`, `inside`,
    `inside_sound`, `inside_refl`, `intersect_inside_left`,
@@ -2203,6 +2330,11 @@ Signed orientation remains outside this interface.
    checks both Nat selectors, independent overlapping-box and inverted-box
    results, and a same-form true control before refusing a false equality to
    the other box; its package-owned test checks the complete accepted client
-   against the root-loaded laws. These candidate-local tests are not official
-   conformance-runner execution, CI, publication, landing or landed trust. All
-   eight seeds supplement rather than replace the checked generic law bodies.
+   against the root-loaded laws. The
+   [distribution seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-distributivity.md)
+   checks both box distribution laws and independently computed sides on a
+   fixed triple, then refuses a false mixed regrouping; its package test
+   also checks both Nat selectors. These candidate-local tests are not
+   official conformance-runner execution, CI, publication, landing or landed
+   trust. All nine seeds supplement rather than replace the checked generic
+   law bodies.
