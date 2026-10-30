@@ -347,7 +347,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 33] = [
+    [ken_host::HostOpV1; 26] = [
     ken_host::HostOpV1::ConsoleRead,
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
@@ -374,13 +374,6 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::MappingReadView,
     ken_host::HostOpV1::MappingWriteView,
     ken_host::HostOpV1::MappingAcquireFile,
-    ken_host::HostOpV1::ResourceStreamRead,
-    ken_host::HostOpV1::ResourceStreamWrite,
-    ken_host::HostOpV1::ProcessPlanOpen,
-    ken_host::HostOpV1::ProcessPlanPush,
-    ken_host::HostOpV1::ProcessSpawn,
-    ken_host::HostOpV1::ProcessTakePipe,
-    ken_host::HostOpV1::ProcessWait,
 ];
 
 /// The seat contract of one admitted operation at one semantic ordinal.
