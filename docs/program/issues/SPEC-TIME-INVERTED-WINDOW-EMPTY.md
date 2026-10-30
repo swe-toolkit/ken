@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-INVERTED-WINDOW-EMPTY
 title: "Spec 69 §1.2 says a window with lo ≥ hi returns the empty list, and §5, §8 and the package's design notes lean on that, but no law checks it: Data.Time.EventTrace has no theorem that an equal or inverted window selects nothing. Rule from a checked D0 at zero trust a public law that trace_window p lo hi tr is Nil whenever hi ≤ lo, for every trace, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
