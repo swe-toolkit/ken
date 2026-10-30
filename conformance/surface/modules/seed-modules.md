@@ -1068,16 +1068,18 @@ sentinel beside the current contract.
   is claimed by stating these cases.
 
 The Console/Char rows implement the two-witness `30-taxonomy §4`
-pre-flip slice. They cover strict and legacy roots plus the promised standalone
-routes: `elaborate_file_v1`, `elaborate_ken_md_file_v1`, `elaborate_decl`,
-non-catalog CLI `check`/`run`/`native-build`, literate example fences, and
-inline REPL submissions. Roots require explicit imports; Strict roots alone
-assert missing-import refusals. Each accepted standalone route asserts the five
-original IDs itself; one route's result does not stand in for another. Other
-unimported Legacy bare implementation globals, including `ConsoleOp`, are
-unspecified: neither promised nor refused. The scoped ConsoleStream constructor
-rows below retain their every-route contract. No row adds trust or duplicates a
-checked definition.
+pre-flip slice. They cover strict and legacy roots plus the promised direct
+standalone routes: `elaborate_file_v1`, `elaborate_ken_md_file_v1`,
+`elaborate_decl`, literate example fences, and inline REPL submissions.
+Roots require explicit imports; Strict roots alone assert missing-import
+refusals. Each accepted direct standalone API route asserts the five original
+IDs itself; one route's result does not stand in for another. The CLI promise
+remains normative, but this seed declares an observation gap for non-catalog
+`check`, `run`, and `native-build`; see the gap below. Other unimported Legacy
+bare implementation globals, including `ConsoleOp`, are unspecified: neither
+promised nor refused. The scoped ConsoleStream constructor rows below retain
+their every-route contract. No row adds trust or duplicates a checked
+definition.
 
 ### surface/modules/console-stream-checked-family-and-char-comparator
 
@@ -1232,51 +1234,20 @@ checked definition.
 - controls: the four source declarations are the accepted controls for their
   respective entry; each route is observed independently.
 
-### surface/modules/legacy-noncatalog-cli-entrypoints-preserve-identities
+### surface/modules/legacy-cli-exact-id-observation-gap
 
-- promise class: **durable standalone-entry invariant** — CLI source entry
-  points outside `catalog/packages/` retain the five exact package IDs
-- spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`
-- given: outside every `catalog/packages/` ancestor, exercise `ken check` on
-  a `.ken.md` file under `examples/` with the complete declarations below in a
-  single `ken example` fence and on a separate `.ken` file. Also give the
-  declarations to `ken run` and `ken native-build` on separate `.ken` files.
-  For `ken run` and `ken native-build`, prepend
-  `program capabilities FS APartial` and add this entry point:
-
-  ```ken
-  proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
-      : HostIO APartial ExitCode visits [Console] =
-    host_program APartial (print_line "legacy CLI")
-  ```
-
-  The complete declarations are:
-
-  ```ken
-  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
-    write ConsoleStream.Stdout payload
-  proc line_probe (message : String) : IO Unit visits [Console] =
-    print_line message
-  const char_code_probe : Int = charToInt 65
-  const char_order_probe : Bool = leqChar 65 66
-  ```
-
-  `ken native-build` receives this valid bounded profile; its limits are
-  fixture setup, not the property under test:
-
-  ```json
-  {"runtime":{"invocation_epochs":1024},"call_events":{"event_generations":2048,"live_pending_slots":1024},"invocation":{"nodes":100000,"words":100000,"data_bytes":1000000,"native_int_limbs":100000},"persistent":{"nodes":100000,"words":100000,"data_bytes":1000000,"native_int_limbs":100000}}
-  ```
-
-- expect: each CLI entry accepts its input, and the checked declarations for
-  that entry resolve all five names to their exact original pre-source IDs.
-  The `ken run` host is non-root with its normal Console capability available.
-  Runtime output and native execution output are not asserted here; a
-  successful compile or exit alone does not satisfy the identity assertion.
-- controls: each command receives the same closed declarations in a fresh
-  standalone environment. A failure for a missing entry point, unbound
-  `payload` or `message`, or a missing `[Console]` row cannot be credited as
-  the route's result.
+- status: declared coverage gap; no executable CLI case is claimed
+- spec: `33 §3.3`; `39 §2.0`
+- normative promise: CLI entries outside `catalog/packages/` retain bare
+  access to the exact pre-source IDs `IO`, `write`, `print_line`,
+  `charToInt`, and `leqChar`.
+- gap: no specified observation for `ken check`, `ken run`, or
+  `ken native-build` reports the identities resolved by that route.
+  Process success, program output, or a native artifact cannot distinguish
+  a type-compatible wrong identity. The direct elaboration, literate, and
+  REPL cases above do not stand in for these CLI paths.
+- successor: `LANG-CLI-RESOLUTION-REPORT`. Add CLI exact-ID cases after
+  that route's observation contract is specified.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructor and protected type-name
