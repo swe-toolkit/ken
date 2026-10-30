@@ -28,8 +28,15 @@ fn launch_clean(command: &mut Command) -> io::Result<Child> {
     // this callback touches no Rust allocation or synchronization state.
     unsafe {
         command.pre_exec(|| {
-            for number in 1..=31 {
-                if number == libc::SIGKILL || number == libc::SIGSTOP {
+            // Linux's /proc signal masks cover signals 1..=64. Reset all
+            // catchable dispositions, including inherited real-time ignores;
+            // glibc reserves 32 and 33 and refuses changes to their actions.
+            for number in 1..=64 {
+                if number == libc::SIGKILL
+                    || number == libc::SIGSTOP
+                    || number == 32
+                    || number == 33
+                {
                     continue;
                 }
                 if libc::signal(number, libc::SIG_DFL) == libc::SIG_ERR {
