@@ -3628,6 +3628,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             N::nullary(R::ResourceKindFsHandle),
             N::nullary(R::ResourceKindBuffer),
             N::nullary(R::ResourceKindMapping),
+            N::nullary(R::ResourceKindSpawnPlan),
+            N::nullary(R::ResourceKindChildProcess),
+            N::nullary(R::ResourceKindPipeRead),
+            N::nullary(R::ResourceKindPipeWrite),
         ]));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 

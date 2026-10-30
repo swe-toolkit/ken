@@ -227,10 +227,10 @@ impl HostOpV1 {
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
-            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::NativeTested,
+            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
-            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
+            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
 
@@ -299,7 +299,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -326,13 +326,6 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
     HostOpV1::MappingReadView,
     HostOpV1::MappingWriteView,
     HostOpV1::MappingAcquireFile,
-    HostOpV1::ResourceStreamRead,
-    HostOpV1::ResourceStreamWrite,
-    HostOpV1::ProcessPlanOpen,
-    HostOpV1::ProcessPlanPush,
-    HostOpV1::ProcessSpawn,
-    HostOpV1::ProcessTakePipe,
-    HostOpV1::ProcessWait,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -2898,7 +2891,23 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     resource: ResourceInputsV1,
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
-    if operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable {
+    // Process runs in the reference interpreter in this slice. Native entry
+    // refuses these represented operations before object emission, and the
+    // native ABI separately requires NativeTested. This one semantic switch
+    // remains shared; an interpreter call does not promote native availability.
+    let interpreter_process = matches!(
+        operation,
+        HostOpV1::ResourceStreamRead
+            | HostOpV1::ResourceStreamWrite
+            | HostOpV1::ProcessPlanOpen
+            | HostOpV1::ProcessPlanPush
+            | HostOpV1::ProcessSpawn
+            | HostOpV1::ProcessTakePipe
+            | HostOpV1::ProcessWait
+    );
+    if operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable
+        && !interpreter_process
+    {
         return Err(TerminalErrorV1::OperationUnavailable(operation));
     }
     dispatch_host_op_v1_for_promotion_evidence(
