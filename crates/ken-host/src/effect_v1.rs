@@ -5468,16 +5468,24 @@ mod tests {
             HostOpV1::MappingWriteView,
             HostOpV1::MappingAcquireFile,
         ];
-        let native_pre_resource = HostOpV1::ALL
+        let px10_process = [
+            HostOpV1::ResourceStreamRead,
+            HostOpV1::ResourceStreamWrite,
+            HostOpV1::ProcessPlanOpen,
+            HostOpV1::ProcessPlanPush,
+            HostOpV1::ProcessSpawn,
+            HostOpV1::ProcessTakePipe,
+            HostOpV1::ProcessWait,
+        ];
+        let pre_resource = HostOpV1::ALL
             .into_iter()
             .filter(|operation| {
-                operation.availability() == HostOpAvailabilityV1::NativeTested
-                    && !RESOURCE_BEARING.contains(operation)
+                !RESOURCE_BEARING.contains(operation) && !px10_process.contains(operation)
             })
             .collect::<Vec<_>>();
         assert_eq!(backend.0, requested, "every listed request uses the shared dispatch");
-        assert_eq!(requested, native_pre_resource,
-            "the explicit requests cover exactly the native-tested pre-resource inventory");
+        assert_eq!(requested, pre_resource,
+            "the explicit requests cover the pre-resource inventory apart from the process plan");
     }
 
     /// ABI-S3 AC-4. The two halves are not equally load-bearing.
@@ -6593,18 +6601,14 @@ mod tests {
         assert!(!HostOpV1::MappingAcquireFile.is_ambient());
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: D4 occupies the
-    /// next Mapping-band identity, is native-tested and non-ambient, admits one
+    /// Promise class: normative compatibility vector. MEASURED: D4 retains its
+    /// assigned 0x0407 Mapping identity, is native-tested and non-ambient, admits one
     /// Target resource, and has no capability seat. CLAIMED: file-backed
     /// acquisition is a native Mapping operation. THE GAP: the real-artifact
     /// differential independently exercises its admission and trace.
     #[test]
     fn abi_s6_d5b_file_acquire_identity_and_available_posture_are_pinned() {
         assert_eq!(HostOpV1::try_from(0x0407), Ok(HostOpV1::MappingAcquireFile));
-        assert_eq!(
-            HostOpV1::MappingAcquireFile.next_in_inventory(),
-            Some(HostOpV1::ResourceStreamRead)
-        );
         assert_eq!(
             HostOpV1::MappingAcquireFile.availability(),
             HostOpAvailabilityV1::NativeTested

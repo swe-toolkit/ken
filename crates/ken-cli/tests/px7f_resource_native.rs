@@ -730,7 +730,9 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
     let ordinary = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
         .collect::<Vec<_>>();
     assert_eq!(ordinary.len(), 1, "this fixture has exactly one ordinary response owner");
-    assert_eq!(ordinary[0].vis_origin, 695, "E4 observes the non-bracket owner");
+    assert_eq!(ordinary[0].operation, "ResourceRelease",
+        "E4 observes the checked ordinary release owner");
+    let owner_vis = ordinary[0].vis_origin;
     // Promise class: durable invariant. MEASURED: the actual generated K
     // context query returns None for the ordinary owner with no completed
     // detached-return boundary. CLAIMED: the declared Result contract must
@@ -738,7 +740,7 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
     // has a response row and owner but no completed boundary; the companion
     // fixed-product pin proves a completed boundary retains Some(Ret).
     for plan in &plans {
-        for row in plan.all_static_response_rows.iter().filter(|row| row.vis_origin == 695) {
+        for row in plan.all_static_response_rows.iter().filter(|row| row.vis_origin == owner_vis) {
             let contracts = plan.generated_context_result_contracts.iter()
                 .filter(|(context, _)| *context == row.k_context)
                 .collect::<Vec<_>>();
@@ -747,10 +749,15 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
                 "E4 has no completed return boundary and must not demand Ret: {contracts:?}");
         }
     }
-    assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
-        .any(|row| row.vis_origin == 603), "the distinct bracket S remains plane-owned");
-    assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
-        .all(|row| row.vis_origin != 695), "the E4 owner cannot be bracket-owned");
+    let bracket = plans.iter().flat_map(|plan| &plan.bracket_response_rows)
+        .filter(|row| row.operation == "ResourceRelease")
+        .collect::<Vec<_>>();
+    assert_eq!(bracket.len(), 1, "the distinct checked release remains bracket-owned");
+    assert_ne!(bracket[0].vis_origin, owner_vis,
+        "the E4 ordinary release owner cannot also be bracket-owned");
+    assert!(plans.iter().any(|plan|
+        plan.bracket_settlement_vis_origins.contains(&bracket[0].vis_origin)),
+        "the bracket release must be independently authenticated");
     assert_eq!(pairs.len(), 2, "both source parameter captures must reach the response emitter");
     let source_positions = pairs.iter().map(|(source, _, _)| *source)
         .collect::<std::collections::BTreeSet<_>>();

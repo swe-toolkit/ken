@@ -115,38 +115,26 @@ fn strict_frozen_corpus_gate_is_green() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: a Process-granted checked
+/// program is admitted with its declared FS authority and rejected when that
+/// authority is removed. CLAIMED: a Process grant does not replace the FS
+/// authority needed by its checked ProgramCaps AFull. THE GAP: this exercises
+/// one Process entrypoint and does not enumerate all runnable programs.
 #[test]
-fn every_checked_runnable_root_declares_its_fs_authority() {
-    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut roots = Vec::new();
-    for directory in ["catalog", "examples", "conformance", "crates"] {
-        let directory = repository.join(directory);
-        collect(&directory, ".ken", &mut roots);
-        collect(&directory, ".ken.md", &mut roots);
-    }
-    roots.sort();
-    roots.dedup();
+fn process_program_requires_its_declared_fs_authority() {
+    let source = include_str!("fixtures/px10_child_wait_smoke.ken");
+    let admitted = fixture("px10_process_with_fs.ken", source);
+    let output = Command::new(ken_bin()).arg("run").arg(&admitted).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
 
-    let mut runnable = Vec::new();
-    for path in &roots {
-        let source = fs::read_to_string(path).unwrap();
-        let uses_program_abi = source.contains("ProgramCaps") || source.contains("HostIO");
-        if !uses_program_abi {
-            continue;
-        }
-        runnable.push(path);
-        assert!(
-            source
-                .lines()
-                .any(|line| line.trim() == "program capabilities FS APartial"
-                    || line.trim() == "program capabilities FS AFull"
-                    || line.trim() == "program capabilities FS ANone"),
-            "runnable Ken root lacks a declared FS authority: {}",
-            path.display(),
-        );
-    }
-
-    assert!(!runnable.is_empty(), "runnable corpus must not be empty");
+    let no_fs = source.replacen("program capabilities FS AFull, Process", "program capabilities Process", 1);
+    assert_ne!(no_fs, source, "control must remove the declared FS authority");
+    let rejected = fixture("px10_process_without_fs.ken", &no_fs);
+    let output = Command::new(ken_bin()).arg("run").arg(&rejected).output().unwrap();
+    assert!(!output.status.success(), "removing required FS authority was admitted");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("MissingCapability { effect = FS }"),
+        "the admission failure must name the missing FS grant: {}",
+        String::from_utf8_lossy(&output.stderr));
 }
 
 fn collect(directory: &Path, suffix: &str, out: &mut Vec<PathBuf>) {

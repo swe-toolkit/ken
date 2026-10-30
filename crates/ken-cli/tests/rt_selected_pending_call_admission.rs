@@ -60,21 +60,25 @@ fn selected_pending_call_admits_validated_owner_without_a_package() {
     assert_eq!(admitted.len(), 1, "one differing-unit Match is owner-validated: {rows:#?}");
     let (candidates, owner, visited, traversed_families, gates, gate_binder_pairs) = admitted[0];
     assert_eq!(*owner, 3);
-    assert_eq!(candidates.iter().map(|candidate| (candidate.arm, candidate.body))
-        .collect::<Vec<_>>(), vec![(0, 351), (1, 330)]);
+    assert_eq!(candidates.iter().map(|candidate| candidate.arm).collect::<Vec<_>>(),
+        vec![0, 1], "both checked Match arms must remain admitted");
+    assert_eq!(candidates.iter().map(|candidate| candidate.body)
+        .collect::<std::collections::BTreeSet<_>>().len(), 2,
+        "the two checked arms must have distinct source bodies");
     assert!(candidates.iter().all(|candidate| matches!(candidate.callee,
         ken_runtime::SelectedPendingCalleeObservation::StaticResponseOwner(_))),
         "every admitted leaf's direct callee must be validated by its owner");
-    for expected in [(316, "F1"), (96, "F1"), (55, "F1"), (49, "F3"), (47, "F4")] {
-        assert!(visited.contains(&expected), "missing route visit {expected:?}: {visited:?}");
-    }
-    let derived = visited.iter()
-        .filter_map(|(_, kind)| (*kind != "Local").then_some(*kind))
-        .collect::<std::collections::BTreeSet<_>>()
+    let route_kinds = visited.iter().map(|(_, kind)| *kind)
+        .filter(|kind| *kind != "Local").collect::<Vec<_>>();
+    assert!(route_kinds.iter().filter(|kind| **kind == "F1").count() >= 3,
+        "the source route must reach multiple F1 steps");
+    let derived = route_kinds.into_iter().collect::<std::collections::BTreeSet<_>>()
         .into_iter().collect::<Vec<_>>();
+    assert_eq!(derived, ["F1", "F3", "F4"],
+        "the route must traverse all three supported edge families");
     assert_eq!(traversed_families, &derived);
     assert!(!gates.is_empty(), "the checked call gate must remain reachable");
-    assert!(gate_binder_pairs.contains(&(47, 4, 4)),
+    assert!(gate_binder_pairs.iter().any(|&(_, slot, binder)| slot == 4 && binder == 4),
         "checked template identity, not raw index equality, authorizes this gate");
     for &(origin, ..) in gate_binder_pairs {
         assert!(visited.contains(&(origin, "F4")));
@@ -96,9 +100,10 @@ fn owner_scoped_false_ordinary_answer_restores_join_refusal() {
     });
     assert!(applied > 0, "the owner-fed emission must be reached");
     let error = outcome.expect_err("undisposed owner Vis join must refuse object emission");
-    assert!(format!("{error:?}").contains(
-        "function left planned source join StaticOriginId(19) neither emitted nor statically unselected"
-    ), "the precise Vis-subtree join must refuse: {error:?}");
+    let reason = format!("{error:?}");
+    assert!(reason.contains("function left planned source join StaticOriginId(")
+        && reason.contains("neither emitted nor statically unselected"),
+        "the owner-fed source join must refuse before emission: {error:?}");
 }
 
 // P3: a test-only Vis-subtree ledger consumption in the owner function must

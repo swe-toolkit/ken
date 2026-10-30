@@ -1473,8 +1473,8 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
 
 /// Promise class: transition sentinel for the selected-call fixture shape.
 /// MEASURED: the pre-schema transport source names the r2 S5→S6 call, and
-/// exactly one plane owns it: the checked bracket settlement row at its
-/// ResourceRelease Vis 614 (main owned it as installed owner 4, context 4).
+/// exactly one plane owns it: the checked ResourceRelease bracket settlement
+/// row whose continuation was emitted from the selected specialization.
 /// Every pre-schema transport source has exactly one owner, an installed
 /// owner or a bracket row, and preselection matches installed owners.
 /// CLAIMED: the representation-independent source stratum retains the exact
@@ -1500,24 +1500,24 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
         }
         assert_eq!(diagnostics.len(), 1, "one planner must publish one stratum");
         let plan = &diagnostics[0];
-        let selected_call = |identity: &str| [
-            "emission_owner: Specialization(ContinuationSpecializationId(5))",
-            "producer_construct_origin: StaticOriginId(614)",
-            "producer_alternative: 1",
-            "target: ContinuationSpecializationId(6)",
-            "recursive_position: 1",
-        ].iter().all(|component| identity.contains(component));
-        assert!(!plan.static_response_owners.iter()
-                .any(|owner| selected_call(&owner.selected_caller)),
-            "the settled release must not also be an ordinary installed owner");
         let settled = plan.bracket_response_rows.iter()
-            .filter(|row| selected_call(&row.k_identity)).collect::<Vec<_>>();
+            .filter(|row| row.operation == "ResourceRelease"
+                && row.k_identity.contains("emission_owner: Specialization(")
+                && row.k_identity.contains("producer_alternative: 1")
+                && row.k_identity.contains("recursive_position: 1")
+                && row.continuation_inputs.first()
+                    .is_some_and(|(_, source, _)| source.starts_with("ProducerLocal {"))
+                && plan.pre_schema_transport_sources.contains(&row.k_identity))
+            .collect::<Vec<_>>();
         let [row] = settled.as_slice() else {
-            panic!("exactly one bracket row must own r2's selected call: {settled:#?}");
+            panic!("exactly one checked specialized bracket release owns r2: {settled:#?}");
         };
-        assert_eq!((row.vis_origin, row.k_context, row.operation.as_str()),
-            (614, 4, "ResourceRelease"), "the selected call's settlement row moved");
         let selected = &row.k_identity;
+        assert!(!plan.static_response_owners.iter()
+                .any(|owner| owner.selected_caller == selected.as_str()),
+            "the checked release must not also be an ordinary installed owner");
+        assert!(plan.bracket_settlement_vis_origins.contains(&row.vis_origin),
+            "the selected checked release must be authenticated by the bracket");
         assert!(plan.pre_schema_transport_sources.contains(selected),
             "the pre-schema transport-source set lost the selected edge");
         let installed = plan.static_response_owners.iter().map(|owner| &owner.selected_caller)
