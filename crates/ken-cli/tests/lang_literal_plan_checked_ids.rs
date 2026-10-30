@@ -1,7 +1,7 @@
 //! LANG-LITERAL-PLAN-CHECKED-IDS: source takeovers must not redirect checked
 //! literal-comparison plans on either the CLI or single-declaration route.
 //!
-//! Promise class: durable invariant. MEASURED: each of five source declarations
+//! Promise class: durable invariant. MEASURED: each of five source spellings
 //! takes over one flat global spelling, yet a false literal-match theorem is
 //! rejected with and without takeover, and the true theorem checks with it.
 //! CLAIMED: plans use their carriers' registered comparison/view identities.
@@ -38,6 +38,17 @@ const EQ_INT: Case = Case {
         "theorem u8_three_is_reflexive : Equal Nat (u8_plan three_u8) (u8_plan three_u8) = Refl",
     miss_call: "const missed : Nat = u8_plan five_u8",
     hit_call: "const hit : Nat = u8_plan three_u8",
+};
+const EQ_INT_BYTES: Case = Case {
+    name: "eq_int",
+    takeover: "fn eq_int (_x : Int) (_y : Int) : Bool = True",
+    value: "const one_byte : Bytes = 0x[01]",
+    plan: "fn eq_bytes_plan (x : Bytes) : Nat = match x { 0x[00] |-> Suc Zero ; _ |-> Zero }",
+    matching_value: "const zero_byte : Bytes = 0x[00]",
+    false_theorem: "theorem eq_bytes_one_is_one : Equal Nat (eq_bytes_plan one_byte) (Suc Zero) = Proved",
+    true_theorem: "theorem eq_bytes_zero_is_reflexive : Equal Nat (eq_bytes_plan zero_byte) (eq_bytes_plan zero_byte) = Refl",
+    miss_call: "const missed : Nat = eq_bytes_plan one_byte",
+    hit_call: "const hit : Nat = eq_bytes_plan zero_byte",
 };
 const STRING_VIEW: Case = Case {
     name: "string_to_list_char",
@@ -249,6 +260,11 @@ fn check_case(case: &Case) {
 #[test]
 fn eq_int_source_takeover_does_not_redirect_fixed_width_match() {
     check_case(&EQ_INT);
+}
+
+#[test]
+fn eq_int_source_takeover_does_not_redirect_bytes_match() {
+    check_case(&EQ_INT_BYTES);
 }
 
 #[test]
