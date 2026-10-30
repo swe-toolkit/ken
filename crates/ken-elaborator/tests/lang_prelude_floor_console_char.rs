@@ -308,24 +308,43 @@ fn legacy_home_imports_select_all_five_pre_source_ids() {
     check_home_imports_select_all_five("legacy-roots");
 }
 
-/// MEASURED: no import cannot select `IO` in strict mode and another unit's
-/// in-scope export cannot publish it. CLAIMED: a home-only edge does not grant
-/// an ambient or arbitrary-publisher escape. THE GAP: a missing home grant
-/// must turn the strict positive row red (population-side AC-4 mutation).
+/// MEASURED: a strict client without the right import cannot select any of
+/// the five package identities, and a non-home file cannot publish any of
+/// them. CLAIMED: the home grant creates neither ambient fallback nor an
+/// arbitrary publisher. THE GAP: the all-name imported client is the paired
+/// positive, and the grant-removal mutation must redden that positive row.
 #[test]
-fn strict_unimported_and_non_home_publisher_refuse_io() {
-    let mut missing = ElabEnv::new().expect("prelude");
-    let err = load(
-        &mut missing,
-        "fn no_import (x : IO Nat) : IO Nat = x",
-        "strict-roots",
-    )
-    .expect_err("IO is package, not floor");
-    assert!(format!("{err:?}").contains("IO"), "{err:?}");
-    let mut non_home = ElabEnv::new().expect("prelude");
-    let err = load(&mut non_home, "export IO", "strict-roots")
-        .expect_err("Entry cannot publish the pre-source IO ID");
-    assert!(format!("{err:?}").contains("IO"), "{err:?}");
+fn strict_unimported_and_non_home_publisher_refuse_each_package_identity() {
+    for (name, source) in [
+        ("IO", "fn no_io (x : IO Nat) : IO Nat = x"),
+        ("write", "const no_write = write"),
+        ("print_line", "const no_print = print_line"),
+        ("charToInt", "const no_code : Int = charToInt 65"),
+        ("leqChar", "const no_order : Bool = leqChar 65 66"),
+    ] {
+        let mut missing = ElabEnv::new().expect("prelude");
+        let err = load(&mut missing, source, "strict-roots")
+            .expect_err("package name is unavailable without import");
+        assert!(
+            matches!(
+                err,
+                ElabError::UnboundName { .. } | ElabError::UnresolvedCon { .. }
+            ),
+            "{name}: unexpected failure: {err:?}"
+        );
+        assert!(format!("{err:?}").contains(name), "{name}: {err:?}");
+        let mut non_home = ElabEnv::new().expect("prelude");
+        let err = load(&mut non_home, &format!("export {name}"), "strict-roots")
+            .expect_err("non-home cannot publish a pre-source package identity");
+        assert!(
+            matches!(
+                err,
+                ElabError::UnboundName { .. } | ElabError::UnresolvedCon { .. }
+            ),
+            "{name}: unexpected export failure: {err:?}"
+        );
+        assert!(format!("{err:?}").contains(name), "{name}: {err:?}");
+    }
 }
 
 /// MEASURED: a checked same-name local in the exact home cannot silently
