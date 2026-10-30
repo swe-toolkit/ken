@@ -433,19 +433,23 @@ fn vector_strict_floor_provider_transition_sentinel() {
     assert_eq!(names, expected_vector_strict_floor_names());
 }
 
-/// Durable provider-edge check. MEASURED: the three direct homes/consumer
-/// modules elaborate with only the configured floor and their declared
-/// imports. CLAIMED: each Console/Char home removes its old ambient need.
+/// Durable provider-edge check. MEASURED: both homes and all five direct
+/// catalog consumers elaborate with only the floor and declared imports.
+/// CLAIMED: each Console/Char identity loses its old ambient dependency.
 /// THE GAP: this does not prove every inherited transitive client; the
 /// transition census below checks the full exact set independently.
 #[test]
-fn console_char_home_and_derived_consumer_need_no_ambient_names() {
+fn console_char_homes_and_all_direct_catalog_consumers_need_no_ambient_names() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join("catalog/packages");
     for entry in [
+        "Application.CommandLine.ArgParse",
         "Capability.Console.Text",
+        "Capability.Parsing.Numeric",
+        "Capability.Parsing.Parsing",
         "Core.Classes.LawfulClasses",
+        "Data.Binary.BytesPrimitiveContracts",
         "Data.Collections.Derived",
     ] {
         let names = ambient_dependencies(&root, entry)
