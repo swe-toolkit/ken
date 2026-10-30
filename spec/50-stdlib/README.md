@@ -305,9 +305,15 @@ walk from `s` to `t` with `target s = True` makes `s` reachable from
 `t` in the reversed graph, not necessarily in the original graph.
 Architect's isolated AC-0 on `77d13c94b` checked the four generic
 forms without an `Axiom` and with equal scratch trusted identities
-114 → 114; this spec-only turn adds no catalog export or conformance
-seed and does not claim official conformance, CI, publication, landing
-or landed trust.
+114 → 114. This assembled candidate has all four checked catalog
+exports, a package-owned test and the authored
+`conformance/stdlib/graphs/seed-reachability-reverse.md`. The named
+`cat_graphs_reverse_reachability` target passed 2/2 with reported
+candidate-local trusted identities 114 → 114. CV performed static checks
+of the new seed, not a Ken or official conformance run;
+`cat_graphs_dependency` timed out without a verdict. Neither D0 nor
+candidate-local checks establish official conformance, CI, publication,
+landing or landed trust.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;

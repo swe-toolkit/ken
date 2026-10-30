@@ -30,10 +30,15 @@
 > these candidate-local checks are not official conformance-runner execution,
 > CI, publication, landing or landed trust. No kernel, trust, or surface-syntax
 > change or revision to §61 §2 is required. Section 8 specifies four
-> public reverse-graph and reachability forms. Its generic proof and
-> seed controls were checked only in Architect's isolated AC-0 D0; this
-> spec-only child adds no catalog export or conformance seed and claims no
-> official conformance, CI, publication, landing or landed trust.
+> public reverse-graph and reachability forms. This assembled candidate
+> has all four checked catalog exports, a package-owned test and the
+> authored §8 seed. The named `cat_graphs_reverse_reachability` test
+> passed 2/2 with reported candidate-local trusted identities 114 → 114.
+> Architect's AC-0 remains isolated scratch evidence; CV statically checked the
+> new seed but did not run it as Ken or through the official conformance
+> runner. The separate `cat_graphs_dependency` run timed out without a
+> verdict. No official conformance, CI, publication, landing or landed
+> trust is claimed.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -748,10 +753,15 @@ delivery, official conformance, CI, publication, landing, or landed trust.
 > (SPEC-GRAPHS-REVERSE-REACHABILITY).** Architect's isolated AC-0 on
 > `77d13c94b22f7b9f7886edf610d8a7c3b6db31b9` checked the four
 > generic forms and seed controls with rc 0, no `Axiom`, and unchanged
-> scratch `trusted_base()` identities (114 → 114). This spec-only turn
-> states the contract; it adds no checked catalog export or conformance
-> seed and does not establish official conformance-runner execution, CI,
-> publication, landing or landed trust.
+> scratch `trusted_base()` identities (114 → 114). This assembled
+> candidate has the four checked catalog forms, a package-owned test,
+> and the authored `conformance/stdlib/graphs/seed-reachability-reverse.md`.
+> The named `cat_graphs_reverse_reachability` test passed 2/2, with
+> reported candidate-local trusted identities 114 → 114. CV's seed
+> checks were static only: no Ken or official conformance run of that
+> seed. `cat_graphs_dependency` timed out without a verdict. Neither
+> the isolated D0 nor candidate-local results establish official
+> conformance, CI, publication, landing or landed trust.
 
 `Algorithm.Graphs.Dependency` must export the following four public
 Transparent forms, in this order, immediately after
