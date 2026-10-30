@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-FLOOR-CONSOLE-AND-CHAR
 title: "Give the last keyed candidates in the intrinsic ledger, the Console group and the three Char operations, a ruled disposition from both witnesses, admitting to the strict floor only an identity with a native exact-id reader and an independent source need, so that no ledger candidate row is unruled before the flip"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1
