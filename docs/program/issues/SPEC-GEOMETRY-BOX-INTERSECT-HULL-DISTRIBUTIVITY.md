@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY
 title: "Spec 67 states that box intersection and hull commute, associate and absorb each other, and §7 says explicitly that none of this implies either operation distributes over the other. Rule from a checked D0 at zero trust that each distributes over the other as a structural box equality, through public min and max distribution selectors in Nat Order, and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
