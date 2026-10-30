@@ -898,6 +898,43 @@ surface, the 4 KiB page-rounding against a host-page-derived or byte-granular
 rule, and the opacity/bounds discipline against an address-exposing or unchecked
 view.
 
+### 1.10 Terminal and signal disposition at the executable edge (ABI-S5)
+
+The existing `proc is_terminal (stream : Stream) : IO Bool visits [Console]`
+returns `True` exactly when that stream's descriptor is a terminal, and `False`
+otherwise. It is total: its result is `Bool`, not `Result IOError Bool`. This
+states the already-shipped Console operation, not a new operation or a new
+capability.
+
+The signal posture depends on the executable path. In `ken run`, the CLI parent
+re-executes a worker child, and the Ken program runs in the worker. Rust's
+startup ignores SIGPIPE before `main` in both parent and worker. Rust's
+stack-overflow guard catches SIGSEGV and SIGBUS in both; the worker chains a
+fault recorder over those actions. In the C-started native artifact, Ken's
+entry posture ignores SIGPIPE, but does not catch SIGSEGV or SIGBUS. An internal
+caught signal 33 in the threaded worker is glibc's reservation, not a
+Ken-established disposition or public signal contract. The fatal re-raise
+paths terminate the process; they leave no live edge state for a child.
+
+Ignoring SIGPIPE allows a closed stdout to reach the existing
+`IOError.BrokenPipe` result path, rather than terminating the program by
+SIGPIPE. Both `ken run` and the C-started artifact have their own tested
+closed-stdout path. Ken changes no signal mask on either path. With a clean
+launch, all masks are empty; dispositions and masks established by the launcher
+that Ken does not change pass through unchanged. In particular, an inherited
+ignored SIGHUP or SIGINT and a blocked SIGUSR1 are not cleared by Ken.
+
+A child process spawned from either live edge starts with the dispositions and
+mask that edge inherited, except that every disposition Ken established is
+returned to `SIG_DFL`. In the current inventory this requires an explicit
+SIGPIPE reset on both paths: an ignored action survives `exec`. Caught
+SIGSEGV/SIGBUS actions on the `ken run` path return to `SIG_DFL` automatically
+on `exec`; the artifact has no caught actions. A glibc-internal caught signal
+33 also resets on `exec` and is not a Ken setting. The child inherits its
+signal mask unchanged: neither a blanket empty-mask reset nor a
+`SETSIGMASK` spawn action follows from this contract. PX10 must explicitly
+reset SIGPIPE rather than relying on a particular Rust runtime's spawn choice.
+
 ## 2. The FFI surface — the `foreign` declaration
 
 A **`foreign`** declaration binds a Ken name to an external (C-ABI) symbol,

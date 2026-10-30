@@ -1,0 +1,11 @@
+program capabilities FS APartial
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    (Result IOError ReadResult) ExitCode
+    (host_console APartial (Result IOError ReadResult) (read Stdin 1))
+    (\r. match r {
+      Ok _ |-> host_exit APartial (ExitCode.Failure 41) ;
+      Err _ |-> host_exit APartial (ExitCode.Failure 42)
+    })
