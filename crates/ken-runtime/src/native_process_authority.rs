@@ -676,6 +676,13 @@ fn native_process_symbols_from_record(
         file_operation_duplicate: spine.file_operation_duplicate.clone(),
         resource_mapping_limit: spine.resource_mapping_limit.clone(),
         resource_kind_mapping: spine.resource_kind_mapping.clone(),
+        px10_kind_symbols: [
+            spine.px10_kind_spawn_plan.clone(),
+            spine.px10_kind_child_process.clone(),
+            spine.px10_kind_pipe_read.clone(),
+            spine.px10_kind_pipe_write.clone(),
+        ],
+        px10_exit_symbols: [spine.px10_exit_exited.clone(), spine.px10_exit_signaled.clone()],
     }
 }
 

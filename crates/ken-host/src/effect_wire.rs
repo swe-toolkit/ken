@@ -302,6 +302,20 @@ fn put_request(
             put_u64(out, *length);
             put_mapping_protection(out, *protection);
         }
+        CanonicalRequestV1::ResourceStreamRead { buffer_start, length } => {
+            put_u8(out, 35); put_u64(out, *buffer_start); put_u64(out, *length);
+        }
+        CanonicalRequestV1::ResourceStreamWrite { buffer_start, length } => {
+            put_u8(out, 36); put_u64(out, *buffer_start); put_u64(out, *length);
+        }
+        CanonicalRequestV1::ProcessPlanOpen { program } => { put_u8(out, 37); put_bytes(out, program)?; }
+        CanonicalRequestV1::ProcessPlanPush { field, first, second, scalar } => {
+            put_u8(out, 38); put_u64(out, *field); put_bytes(out, first)?;
+            put_bytes(out, second)?; put_u64(out, *scalar);
+        }
+        CanonicalRequestV1::ProcessSpawn => put_u8(out, 39),
+        CanonicalRequestV1::ProcessTakePipe { fd } => { put_u8(out, 40); put_u64(out, *fd); }
+        CanonicalRequestV1::ProcessWait => put_u8(out, 41),
     }
     Ok(())
 }
@@ -390,6 +404,13 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
             put_u64(out, transferred.get());
             put_u64(out, transferred.effective_request());
         }
+        CanonicalReplyV1::ChildExit(exit) => {
+            put_u8(out, 15);
+            match exit {
+                crate::ChildExitV1::Exited(code) => { put_u8(out, 0); put_u8(out, *code); }
+                crate::ChildExitV1::Signaled(signal) => { put_u8(out, 1); put_u8(out, *signal); }
+            }
+        }
         CanonicalReplyV1::FilePosition(position) => {
             put_u8(out, 13);
             put_u64(out, *position);
@@ -407,6 +428,10 @@ fn put_resource_kind(out: &mut Vec<u8>, kind: ResourceKindV1) {
         ResourceKindV1::FsHandle => put_u8(out, 0),
         ResourceKindV1::Buffer => put_u8(out, 1),
         ResourceKindV1::Mapping => put_u8(out, 2),
+        ResourceKindV1::SpawnPlan => put_u8(out, 3),
+        ResourceKindV1::ChildProcess => put_u8(out, 4),
+        ResourceKindV1::PipeRead => put_u8(out, 5),
+        ResourceKindV1::PipeWrite => put_u8(out, 6),
     }
 }
 
@@ -427,6 +452,7 @@ fn put_io_error(out: &mut Vec<u8>, error: IoErrorIdentityV1) {
     let (tag, raw) = match error {
         IoErrorIdentityV1::NotFound => (0, None),
         IoErrorIdentityV1::PermissionDenied => (1, None),
+        IoErrorIdentityV1::CapabilityDenied => (12, None),
         IoErrorIdentityV1::BrokenPipe => (2, None),
         IoErrorIdentityV1::Interrupted => (3, None),
         IoErrorIdentityV1::AlreadyExists => (4, None),
@@ -932,6 +958,13 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
             length: cursor.u64()?,
             protection: get_mapping_protection(cursor)?,
         },
+        35 => CanonicalRequestV1::ResourceStreamRead { buffer_start: cursor.u64()?, length: cursor.u64()? },
+        36 => CanonicalRequestV1::ResourceStreamWrite { buffer_start: cursor.u64()?, length: cursor.u64()? },
+        37 => CanonicalRequestV1::ProcessPlanOpen { program: cursor.bytes()? },
+        38 => CanonicalRequestV1::ProcessPlanPush { field: cursor.u64()?, first: cursor.bytes()?, second: cursor.bytes()?, scalar: cursor.u64()? },
+        39 => CanonicalRequestV1::ProcessSpawn,
+        40 => CanonicalRequestV1::ProcessTakePipe { fd: cursor.u64()? },
+        41 => CanonicalRequestV1::ProcessWait,
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -951,6 +984,7 @@ fn validate_transfer_request_bound(
         None => Ok(()),
         Some(crate::TransferRequestBoundV1::ReadAt(transferred)) => match request {
             CanonicalRequestV1::FsReadAt { length, .. }
+            | CanonicalRequestV1::ResourceStreamRead { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -959,6 +993,7 @@ fn validate_transfer_request_bound(
         },
         Some(crate::TransferRequestBoundV1::WriteAt(transferred)) => match request {
             CanonicalRequestV1::FsWriteAt { length, .. }
+            | CanonicalRequestV1::ResourceStreamWrite { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -979,6 +1014,11 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
         12 => CanonicalReplyV1::MonotonicInstant(cursor.bytes()?),
         13 => CanonicalReplyV1::FilePosition(cursor.u64()?),
         14 => CanonicalReplyV1::FdInheritancePolicy(get_inheritance_policy(cursor)?),
+        15 => CanonicalReplyV1::ChildExit(match cursor.u8()? {
+            0 => crate::ChildExitV1::Exited(cursor.u8()?),
+            1 => crate::ChildExitV1::Signaled(cursor.u8()?),
+            _ => return Err(EffectTraceWireError),
+        }),
         6 => CanonicalReplyV1::FileMetadata(FileMetadataV1 {
             size: cursor.u64()?,
             kind: get_node_kind(cursor)?,
@@ -1041,6 +1081,10 @@ fn get_resource_kind(cursor: &mut Cursor<'_>) -> Result<ResourceKindV1, EffectTr
         0 => Ok(ResourceKindV1::FsHandle),
         1 => Ok(ResourceKindV1::Buffer),
         2 => Ok(ResourceKindV1::Mapping),
+        3 => Ok(ResourceKindV1::SpawnPlan),
+        4 => Ok(ResourceKindV1::ChildProcess),
+        5 => Ok(ResourceKindV1::PipeRead),
+        6 => Ok(ResourceKindV1::PipeWrite),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1077,6 +1121,7 @@ fn get_io_error(cursor: &mut Cursor<'_>) -> Result<IoErrorIdentityV1, EffectTrac
         9 => IoErrorIdentityV1::Unsupported,
         10 => IoErrorIdentityV1::Other(cursor.i32()?),
         11 => IoErrorIdentityV1::Revoked,
+        12 => IoErrorIdentityV1::CapabilityDenied,
         _ => return Err(EffectTraceWireError),
     })
 }
