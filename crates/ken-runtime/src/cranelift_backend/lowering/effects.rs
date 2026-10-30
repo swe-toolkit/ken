@@ -272,6 +272,8 @@ fn runtime_producible_constructors(
         file_operation_duplicate,
         resource_mapping_limit,
         resource_kind_mapping,
+        px10_kind_symbols,
+        px10_exit_symbols,
     } = symbols;
     // The checked ITree/Coproduct spine is constructed by the program; the
     // host never synthesizes Ret, Vis or InL as a response. Keep these three
@@ -348,6 +350,8 @@ fn runtime_producible_constructors(
     // The `IOError` alternatives are a run rather than a single field, and the
     // whole run is host-produced.
     producible.extend(io_errors.iter().cloned());
+    producible.extend(px10_kind_symbols.iter().cloned());
+    producible.extend(px10_exit_symbols.iter().cloned());
     producible
 }
 
@@ -3343,7 +3347,8 @@ impl<'a> Lowering<'a> {
             | ken_host::HostOpV1::FsMetadata
             | ken_host::HostOpV1::FsRename
             | ken_host::HostOpV1::FsChangeMode
-            | ken_host::HostOpV1::FsOpen => {
+            | ken_host::HostOpV1::FsOpen
+            | ken_host::HostOpV1::ProcessPlanOpen => {
                 // Lowered and claimed above, with every other operand, so the
                 // claim group's window contains no operand lowering.
                 let (capability_record, capability_operand) =
@@ -3793,7 +3798,50 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(span_origin, request, request_offset(4));
             }
-            ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::FsWriteAt => {
+            ken_host::HostOpV1::ProcessPlanPush => {
+                if capability.is_some() {
+                    return Err(unsupported(LoweringCause::Fragment, "Effect", "ProcessPlanPush carried a capability"));
+                }
+                let plan = self.lower_resource_token_seat(builder, seats.operand(SEAT_0)?.1,
+                    "ProcessPlanPush", "plan")?;
+                let (field, field_valid) = self.narrow_positioned_int_seat(builder, &seats, 1, "plan field")?;
+                let first = self.wire_bytes_seat(builder, &seats, SEAT_2)?;
+                let second = self.wire_bytes_seat(builder, &seats, SEAT_3)?;
+                for span in [&first, &second] {
+                    if let Some((invalid, resource_code)) = span.refusal {
+                        let detail = io_error_other_detail(builder, resource_code);
+                        record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                    }
+                }
+                let (scalar, scalar_valid) = self.narrow_positioned_int_seat(builder, &seats, 4, "plan scalar")?;
+                let valid = builder.ins().band(field_valid, scalar_valid);
+                let invalid = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0);
+                let detail = builder.ins().iconst(types::I64, IO_ERROR_INVALID_INPUT_DISCRIMINATOR);
+                record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                for (index, value) in [plan, field, first.pointer, first.len, second.pointer, second.len, scalar]
+                    .into_iter().enumerate() {
+                    builder.ins().stack_store(value, request, request_offset(index));
+                }
+            }
+            ken_host::HostOpV1::ProcessSpawn
+            | ken_host::HostOpV1::ProcessWait
+            | ken_host::HostOpV1::ProcessTakePipe => {
+                if capability.is_some() {
+                    return Err(unsupported(LoweringCause::Fragment, "Effect", "process resource operation carried a capability"));
+                }
+                let resource_token = self.lower_resource_token_seat(builder, seats.operand(SEAT_0)?.1,
+                    "process resource operation", "plan/child")?;
+                builder.ins().stack_store(resource_token, request, request_offset(0));
+                if operation == ken_host::HostOpV1::ProcessTakePipe {
+                    let (fd, valid) = self.narrow_positioned_int_seat(builder, &seats, 1, "child pipe index")?;
+                    let invalid = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0);
+                    let detail = builder.ins().iconst(types::I64, IO_ERROR_INVALID_INPUT_DISCRIMINATOR);
+                    record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                    builder.ins().stack_store(fd, request, request_offset(1));
+                }
+            }
+            ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::FsWriteAt
+            | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::ResourceStreamWrite => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
@@ -3824,18 +3872,23 @@ impl<'a> Lowering<'a> {
                 // `(value, valid)` into the operation's existing
                 // narrow-failure lane below. No second carried `Int` decode is
                 // spelled.
-                let (file_offset, file_offset_valid) =
-                    self.narrow_positioned_int_seat(builder, &seats, 1, "file offset")?;
+                let stream = matches!(operation,
+                    ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::ResourceStreamWrite);
+                let (file_offset, file_offset_valid) = if stream {
+                    (builder.ins().iconst(types::I64, 0), builder.ins().iconst(types::I64, 1))
+                } else {
+                    self.narrow_positioned_int_seat(builder, &seats, 1, "file offset")?
+                };
                 let buffer = self.lower_resource_token_seat(
                     builder,
-                    seats.operand(EffectSeatSlot::Argument(2))?.1,
+                    seats.operand(EffectSeatSlot::Argument(if stream { 1 } else { 2 }))?.1,
                     "positioned resource operation",
                     "buffer",
                 )?;
                 let (buffer_start, buffer_start_valid) =
-                    self.narrow_positioned_int_seat(builder, &seats, 3, "buffer start")?;
+                    self.narrow_positioned_int_seat(builder, &seats, if stream { 2 } else { 3 }, "buffer start")?;
                 let (length, length_valid) =
-                    self.narrow_positioned_int_seat(builder, &seats, 4, "length")?;
+                    self.narrow_positioned_int_seat(builder, &seats, if stream { 3 } else { 4 }, "length")?;
                 positioned_bounds = Some((buffer_start, length));
                 let file_offset_invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
@@ -3861,29 +3914,34 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, bounds_invalid, resource_error_reply_tag, detail);
-                if operation == ken_host::HostOpV1::FsWriteAt {
+                if matches!(operation, ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite) {
                     // PX8-SPAN-PROV: `FsWriteAt` carries the trailing
                     // `span_origin` acquisition token; `FsReadAt` mints the span
                     // and has no origin operand.
                     let span_origin = self.lower_resource_token_seat(
                         builder,
-                        seats.operand(EffectSeatSlot::Argument(5))?.1,
+                        seats.operand(EffectSeatSlot::Argument(if stream { 4 } else { 5 }))?.1,
                         "positioned resource operation",
                         "span origin",
                     )?;
-                    for (index, value) in
-                        [file, buffer, file_offset, buffer_start, length, span_origin]
-                            .into_iter()
-                            .enumerate()
+                    let fields = if stream {
+                        vec![file, buffer, buffer_start, length, span_origin]
+                    } else {
+                        vec![file, buffer, file_offset, buffer_start, length, span_origin]
+                    };
+                    for (index, value) in fields.into_iter().enumerate()
                     {
                         builder
                             .ins()
                             .stack_store(value, request, request_offset(index));
                     }
                 } else {
-                    for (index, value) in [file, buffer, file_offset, buffer_start, length]
-                        .into_iter()
-                        .enumerate()
+                    let fields = if stream {
+                        vec![file, buffer, buffer_start, length]
+                    } else {
+                        vec![file, buffer, file_offset, buffer_start, length]
+                    };
+                    for (index, value) in fields.into_iter().enumerate()
                     {
                         builder
                             .ins()
@@ -4064,7 +4122,10 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::FsReadDirectory => {
                     wire.reply_bytes_tag
                 }
-                ken_host::HostOpV1::FsOpen => wire.reply_resource_tag,
+                ken_host::HostOpV1::FsOpen
+                | ken_host::HostOpV1::ProcessPlanOpen
+                | ken_host::HostOpV1::ProcessSpawn
+                | ken_host::HostOpV1::ProcessTakePipe => wire.reply_resource_tag,
                 ken_host::HostOpV1::FsMetadata | ken_host::HostOpV1::FsHandleMetadata => {
                     wire.reply_metadata_tag
                 }
@@ -4076,8 +4137,9 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::BufferFreeze | ken_host::HostOpV1::MappingReadView => {
                     wire.reply_bytes_tag
                 }
-                ken_host::HostOpV1::FsReadAt => wire.reply_read_progress_tag,
-                ken_host::HostOpV1::FsWriteAt => wire.reply_write_progress_tag,
+                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::ResourceStreamRead => wire.reply_read_progress_tag,
+                ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite => wire.reply_write_progress_tag,
+                ken_host::HostOpV1::ProcessWait => wire.reply_child_exit_tag,
                 _ => wire.reply_unit_tag,
             } as i64;
             let accepted_tags = match operation {
@@ -4100,6 +4162,12 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::BufferFreeze
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
+                | ken_host::HostOpV1::ProcessPlanPush
+                | ken_host::HostOpV1::ProcessSpawn
+                | ken_host::HostOpV1::ProcessTakePipe
+                | ken_host::HostOpV1::ProcessWait
+                | ken_host::HostOpV1::ResourceStreamRead
+                | ken_host::HostOpV1::ResourceStreamWrite
                 | ken_host::HostOpV1::MappingAllocate
                 | ken_host::HostOpV1::MappingAcquireFile
                 | ken_host::HostOpV1::MappingReadView
@@ -4381,6 +4449,13 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::MappingWriteView
                     | ken_host::HostOpV1::FsReadAt
                     | ken_host::HostOpV1::FsWriteAt
+                    | ken_host::HostOpV1::ProcessPlanPush
+                    | ken_host::HostOpV1::ProcessSpawn
+                    | ken_host::HostOpV1::ProcessTakePipe
+                    | ken_host::HostOpV1::ProcessWait
+                    | ken_host::HostOpV1::ResourceStreamRead
+                    | ken_host::HostOpV1::ResourceStreamWrite
+                    | ken_host::HostOpV1::ProcessPlanOpen
             ) {
                 let generic = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
@@ -4462,6 +4537,34 @@ impl<'a> Lowering<'a> {
                                         this.process_symbols.resource_kind_mapping.clone(),
                                         Vec::new(),
                                         &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin, node, 3,
+                                        wire.resource_kind_spawn_plan as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindSpawnPlan,
+                                        this.process_symbols.px10_kind_symbols[0].clone(),
+                                        Vec::new(), &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin, node, 4,
+                                        wire.resource_kind_child_process as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindChildProcess,
+                                        this.process_symbols.px10_kind_symbols[1].clone(),
+                                        Vec::new(), &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin, node, 5,
+                                        wire.resource_kind_pipe_read as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindPipeRead,
+                                        this.process_symbols.px10_kind_symbols[2].clone(),
+                                        Vec::new(), &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin, node, 6,
+                                        wire.resource_kind_pipe_write as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindPipeWrite,
+                                        this.process_symbols.px10_kind_symbols[3].clone(),
+                                        Vec::new(), &seats,
                                     )?,
                                 ],
                             },
@@ -4778,7 +4881,9 @@ impl<'a> Lowering<'a> {
                     wire.reply_bytes_len_offset,
                     success,
                 )
-            } else if operation == ken_host::HostOpV1::FsOpen {
+            } else if matches!(operation,
+                ken_host::HostOpV1::FsOpen | ken_host::HostOpV1::ProcessPlanOpen
+                | ken_host::HostOpV1::ProcessSpawn | ken_host::HostOpV1::ProcessTakePipe) {
                 Lowered::ResourceToken { value: detail }
             } else if operation == ken_host::HostOpV1::FsMetadata {
                 let kind_tag = builder.ins().stack_load(
@@ -4870,7 +4975,32 @@ impl<'a> Lowering<'a> {
                     wire.reply_bytes_len_offset,
                     success,
                 )
-            } else if operation == ken_host::HostOpV1::FsReadAt {
+            } else if operation == ken_host::HostOpV1::ProcessWait {
+                let exit_tag = builder.ins().band_imm(detail, 0xff);
+                let exit_value = builder.ins().ushr_imm(detail, 8);
+                let width_valid = builder.ins().band_imm(exit_value, !0xff);
+                Self::require_i64(builder, width_valid, 0);
+                Self::require_one_of_i64(builder, exit_tag, &[0, 1]);
+                let scalar = self.lower_dynamic_small_int(builder, exit_value);
+                Lowered::DynamicConstructor(DynamicConstructorV1 {
+                    discriminator: exit_tag,
+                    alternatives: vec![
+                        self.synthesized_dynamic_alternative(
+                            static_origin, &ok_root, 0, 0,
+                            SynthesizedFixedConstructorRole::ChildExitExited,
+                            self.process_symbols.px10_exit_symbols[0].clone(),
+                            vec![SynthesizedArgument::Scalar(scalar.clone())], &seats,
+                        )?,
+                        self.synthesized_dynamic_alternative(
+                            static_origin, &ok_root, 1, 1,
+                            SynthesizedFixedConstructorRole::ChildExitSignaled,
+                            self.process_symbols.px10_exit_symbols[1].clone(),
+                            vec![SynthesizedArgument::Scalar(scalar)], &seats,
+                        )?,
+                    ],
+                })
+            } else if matches!(operation,
+                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::ResourceStreamRead) {
                 let reply_data = builder.ins().stack_load(
                     pointer_type,
                     reply,
@@ -4937,7 +5067,8 @@ impl<'a> Lowering<'a> {
                 // before this node widened. The two edits are one semantic unit;
                 // splitting them ships a diff that greens nothing.
                 let span_argument =
-                    self.site_operand_argument(builder, static_origin, 2, &seats)?;
+                    self.site_operand_argument(builder, static_origin,
+                        if operation == ken_host::HostOpV1::ResourceStreamRead { 1 } else { 2 }, &seats)?;
                 let span = self.synthesized_constructor(
                     static_origin,
                     &ok_root.alternative(1).field(0),
@@ -5003,7 +5134,8 @@ impl<'a> Lowering<'a> {
                         )?,
                     ],
                 })
-            } else if operation == ken_host::HostOpV1::FsWriteAt {
+            } else if matches!(operation,
+                ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite) {
                 let (request_start, request_length) = positioned_bounds
                     .expect("positioned request bounds were narrowed before dispatch");
                 let effective_request = builder.ins().stack_load(

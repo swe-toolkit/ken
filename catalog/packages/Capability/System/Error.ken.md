@@ -4,8 +4,8 @@
 from a transient error paired with an idempotent operation. The checked
 [converse theorem](#classification-laws) proves the "only from" direction,
 and the [revoked theorem](#classification-laws) proves that
-`error_transience Revoked = Permanent`. The envelope currently wraps
-filesystem errors without changing the canonical `IOError` identities.
+`error_transience Revoked = Permanent`. The envelope wraps filesystem and child-process errors without changing the
+canonical `IOError` identities.
 Import this surface as `Capability.System.Error`, beside `Capability.System.IO`.
 
 ## Contents
@@ -55,13 +55,17 @@ export RetryGuidance, RetryAdvised, RetryUnsafeNonIdempotent, DoNotRetryPermanen
 
 data RetryGuidance = RetryAdvised | RetryUnsafeNonIdempotent | DoNotRetryPermanent
 
-export Operation, FilesystemOp
+export ProcessOperation, SpawnChild, TakePipe, ReadPipe, WritePipe, ClosePipe, WaitChild
 
-data Operation = FilesystemOp FileOperation
+data ProcessOperation = SpawnChild | TakePipe | ReadPipe | WritePipe | ClosePipe | WaitChild
 
-export ResourceRef, FilesystemResource
+export Operation, FilesystemOp, ProcessOp
 
-data ResourceRef = FilesystemResource (Option Bytes)
+data Operation = FilesystemOp FileOperation | ProcessOp ProcessOperation
+
+export ResourceRef, FilesystemResource, ProcessResource
+
+data ResourceRef = FilesystemResource (Option Bytes) | ProcessResource (Option Bytes)
 
 export SafeContext, NoSafeContext, RedactedSafeContext
 
@@ -164,6 +168,15 @@ pub fn operation_idempotence (operation : Operation) : Idempotence =
         OpGetInheritance ↦ Idempotent;
         OpSetInheritance ↦ Idempotent;
         OpDuplicate ↦ NonIdempotent
+      };
+    ProcessOp process_operation ↦
+      match process_operation {
+        SpawnChild ↦ NonIdempotent;
+        TakePipe ↦ NonIdempotent;
+        ReadPipe ↦ NonIdempotent;
+        WritePipe ↦ NonIdempotent;
+        ClosePipe ↦ NonIdempotent;
+        WaitChild ↦ Idempotent
       }
   }
 
@@ -176,6 +189,11 @@ pub fn file_error_to_system (error : FileError) : SystemError =
         identity
         NoSafeContext
   }
+
+pub fn process_error_to_system
+    (operation : ProcessOperation) (program : Option Bytes) (cause : IOError)
+  : SystemError =
+  MkSystemError (ProcessOp operation) (ProcessResource program) cause NoSafeContext
 ```
 
 ## Using it
@@ -234,7 +252,8 @@ pub theorem retry_guidance_idempotence_flip
 ## Design notes
 
 `SystemError` preserves an operation, a resource reference, the canonical
-`IOError` identity, and a safe context. `file_error_to_system` wraps each
+`IOError` identity, and a safe context. `ProcessResource` carries known program
+bytes rather than a pid or descriptor; `None` preserves an unknown resource. `file_error_to_system` wraps each
 `FileError` field without interpreting or replacing its cause. A safe context
 contains no authority-sensitive bytes; the current constructors carry no
 payload. Classification is pure checked Ken, not a host retry policy.
@@ -250,7 +269,7 @@ payload. Classification is pure checked Ken, not a host retry policy.
 
 ## Trust and derivation
 
-All seven data families, four classifier/bridge functions and seven laws are
+The data families, classifier and bridge functions, and seven laws are
 ordinary checked declarations. The package adds **zero** entries to
 `trusted_base()`. It uses the prelude's existing `FileError`, `FileOperation`,
 `IOError`, `Revoked`, `Equal`, `And` and `Proved` identities; it introduces no

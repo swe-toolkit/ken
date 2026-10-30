@@ -286,6 +286,13 @@ runtime_host_spine_v1! {
     resource_mapping_limit,
     // ABI-S6 D5a makes the third resource kind native-reifiable.
     resource_kind_mapping,
+    // PX10 typed resource kinds and wait results, appended to preserve prior roles.
+    px10_kind_spawn_plan,
+    px10_kind_child_process,
+    px10_kind_pipe_read,
+    px10_kind_pipe_write,
+    px10_exit_exited,
+    px10_exit_signaled,
 }
 
 /// The decoded, validated checked-runtime role record.

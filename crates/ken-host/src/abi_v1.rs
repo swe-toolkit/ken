@@ -349,6 +349,45 @@ struct MappingAcquireFileRequestV1 {
 }
 
 #[repr(C)]
+struct ResourceStreamReadRequestV1 {
+    stream: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+}
+
+#[repr(C)]
+struct ResourceStreamWriteRequestV1 {
+    stream: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+    span_origin: u64,
+}
+
+#[repr(C)]
+struct ProcessPlanOpenRequestV1 {
+    capability: u64,
+    program: SliceV1,
+}
+
+#[repr(C)]
+struct ProcessPlanPushRequestV1 {
+    plan: u64,
+    field: u64,
+    first: SliceV1,
+    second: SliceV1,
+    scalar: u64,
+}
+
+#[repr(C)]
+struct ProcessSpawnRequestV1 { plan: u64 }
+#[repr(C)]
+struct ProcessTakePipeRequestV1 { child: u64, fd: u64 }
+#[repr(C)]
+struct ProcessWaitRequestV1 { child: u64 }
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {
     schema_version: u64,
@@ -382,6 +421,7 @@ const REPLY_METADATA: u64 = 5;
 const REPLY_RESOURCE_ERROR: u64 = 6;
 const REPLY_READ_PROGRESS: u64 = 7;
 const REPLY_WRITE_PROGRESS: u64 = 8;
+const REPLY_CHILD_EXIT: u64 = 9;
 
 struct ProcessContext {
     _posture: ProcessPostureV1,
@@ -1111,7 +1151,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_finish(
     // SAFETY: the starter supplies the unique init result exactly once after
     // Ken entry returns; no borrowed response is used after this call.
     let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
-    context.finalize_resources();
+    context.finalize_resources(terminal_value < 0);
     if let Some(mut sink) = context.observation.take() {
         if write_observation(&mut sink, &context, terminal_value).is_err() {
             return -1;
@@ -1139,7 +1179,7 @@ pub unsafe fn ken_host_invocation_v1_finish_with_capacity(
         return -1;
     }
     let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
-    context.finalize_resources();
+    context.finalize_resources(true);
     if let Some(mut sink) = context.observation.take() {
         if write_observation_with_terminal(
             &mut sink,
@@ -1168,7 +1208,7 @@ pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
         return -1;
     }
     let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
-    context.finalize_resources();
+    context.finalize_resources(true);
     if let Some(mut sink) = context.observation.take() {
         if write_observation_with_terminal(
             &mut sink,
@@ -1183,10 +1223,10 @@ pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
 }
 
 impl ProcessContext {
-    fn finalize_resources(&mut self) {
+    fn finalize_resources(&mut self, terminal_error: bool) {
         let settlements = {
             let host = &mut self.host;
-            self.resources.finalize_all_with(host)
+            self.resources.finalize_all_with_mode(host, terminal_error)
         };
         self.record_resource_settlements(settlements);
     }
@@ -1373,6 +1413,14 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 reply.detail = 0;
             }
         },
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::ChildExit(exit)) => {
+            reply.tag = REPLY_CHILD_EXIT;
+            // Low byte is the constructor tag; next byte is its UInt8 value.
+            reply.detail = match exit {
+                crate::ChildExitV1::Exited(code) => u64::from(code) << 8,
+                crate::ChildExitV1::Signaled(signal) => (u64::from(signal) << 8) | 1,
+            };
+        }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::WriteProgress(progress)) => {
             let crate::WriteProgressV1::Wrote(transferred) = progress;
             reply.tag = REPLY_WRITE_PROGRESS;
@@ -1422,26 +1470,14 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 } => {
                     reply.detail = 3;
                     reply.resource_error.schema_version = u64::from(schema_version);
-                    reply.resource_error.resource_kind = match resource_kind {
-                        crate::ResourceKindV1::FsHandle => 0,
-                        crate::ResourceKindV1::Buffer => 1,
-                        crate::ResourceKindV1::Mapping => 2,
-                    };
+                    reply.resource_error.resource_kind = resource_kind_tag(resource_kind);
                     reply.resource_error.identity = identity.0;
                     reply.resource_error.io = io_error_tag(io);
                 }
                 crate::ResourceErrorV1::ResourceKindMismatch { expected, actual } => {
                     reply.detail = 4;
-                    reply.resource_error.expected_kind = match expected {
-                        crate::ResourceKindV1::FsHandle => 0,
-                        crate::ResourceKindV1::Buffer => 1,
-                        crate::ResourceKindV1::Mapping => 2,
-                    };
-                    reply.resource_error.actual_kind = match actual {
-                        crate::ResourceKindV1::FsHandle => 0,
-                        crate::ResourceKindV1::Buffer => 1,
-                        crate::ResourceKindV1::Mapping => 2,
-                    };
+                    reply.resource_error.expected_kind = resource_kind_tag(expected);
+                    reply.resource_error.actual_kind = resource_kind_tag(actual);
                 }
                 crate::ResourceErrorV1::BufferLimit => reply.detail = 5,
                 crate::ResourceErrorV1::InvalidOffset => reply.detail = 6,
@@ -1469,10 +1505,23 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
     }
 }
 
+fn resource_kind_tag(kind: crate::ResourceKindV1) -> u64 {
+    match kind {
+        crate::ResourceKindV1::FsHandle => 0,
+        crate::ResourceKindV1::Buffer => 1,
+        crate::ResourceKindV1::Mapping => 2,
+        crate::ResourceKindV1::SpawnPlan => 3,
+        crate::ResourceKindV1::ChildProcess => 4,
+        crate::ResourceKindV1::PipeRead => 5,
+        crate::ResourceKindV1::PipeWrite => 6,
+    }
+}
+
 fn io_error_tag(error: IoErrorIdentityV1) -> u64 {
     match error {
         IoErrorIdentityV1::NotFound => 0,
         IoErrorIdentityV1::PermissionDenied => 1,
+        IoErrorIdentityV1::CapabilityDenied => 2,
         IoErrorIdentityV1::BrokenPipe => 3,
         IoErrorIdentityV1::Interrupted => 4,
         IoErrorIdentityV1::AlreadyExists => 5,
@@ -1501,6 +1550,7 @@ fn io_error_from_tag(encoded: u64) -> Option<IoErrorIdentityV1> {
     Some(match discriminator {
         0 => IoErrorIdentityV1::NotFound,
         1 => IoErrorIdentityV1::PermissionDenied,
+        2 => IoErrorIdentityV1::CapabilityDenied,
         3 => IoErrorIdentityV1::BrokenPipe,
         4 => IoErrorIdentityV1::Interrupted,
         5 => IoErrorIdentityV1::AlreadyExists,
@@ -1525,6 +1575,10 @@ fn decode_resource_error_reply(
         0 => Some(crate::ResourceKindV1::FsHandle),
         1 => Some(crate::ResourceKindV1::Buffer),
         2 => Some(crate::ResourceKindV1::Mapping),
+        3 => Some(crate::ResourceKindV1::SpawnPlan),
+        4 => Some(crate::ResourceKindV1::ChildProcess),
+        5 => Some(crate::ResourceKindV1::PipeRead),
+        6 => Some(crate::ResourceKindV1::PipeWrite),
         _ => None,
     };
     let all_zero = payload == ResourceErrorReplyV1::default();
@@ -2065,6 +2119,58 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                     bytes: bytes.to_vec(),
                 },
             )
+        }
+        HostOpV1::ProcessPlanOpen if request_size == std::mem::size_of::<ProcessPlanOpenRequestV1>() => {
+            if !request.cast::<ProcessPlanOpenRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessPlanOpenRequestV1>() };
+            let Some(program) = (unsafe { borrowed_slice(&wire.program) }) else { return -1 };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ProcessPlanOpen { program: program.to_vec() },
+            )
+        }
+        HostOpV1::ProcessPlanPush if request_size == std::mem::size_of::<ProcessPlanPushRequestV1>() => {
+            if !request.cast::<ProcessPlanPushRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessPlanPushRequestV1>() };
+            let (Some(first), Some(second)) = (unsafe { borrowed_slice(&wire.first) }, unsafe { borrowed_slice(&wire.second) }) else { return -1 };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.plan)),
+                CanonicalRequestV1::ProcessPlanPush { field: wire.field, first: first.to_vec(), second: second.to_vec(), scalar: wire.scalar },
+            )
+        }
+        HostOpV1::ProcessSpawn if request_size == std::mem::size_of::<ProcessSpawnRequestV1>() => {
+            if !request.cast::<ProcessSpawnRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessSpawnRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.plan)), CanonicalRequestV1::ProcessSpawn)
+        }
+        HostOpV1::ProcessTakePipe if request_size == std::mem::size_of::<ProcessTakePipeRequestV1>() => {
+            if !request.cast::<ProcessTakePipeRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessTakePipeRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessTakePipe { fd: wire.fd })
+        }
+        HostOpV1::ProcessWait if request_size == std::mem::size_of::<ProcessWaitRequestV1>() => {
+            if !request.cast::<ProcessWaitRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessWaitRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessWait)
+        }
+        HostOpV1::ResourceStreamRead if request_size == std::mem::size_of::<ResourceStreamReadRequestV1>() => {
+            if !request.cast::<ResourceStreamReadRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ResourceStreamReadRequestV1>() };
+            (None, crate::ResourceInputsV1::FileBuffer {
+                file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+            }, CanonicalRequestV1::ResourceStreamRead { buffer_start: wire.buffer_start, length: wire.length })
+        }
+        HostOpV1::ResourceStreamWrite if request_size == std::mem::size_of::<ResourceStreamWriteRequestV1>() => {
+            if !request.cast::<ResourceStreamWriteRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ResourceStreamWriteRequestV1>() };
+            (None, crate::ResourceInputsV1::FileBufferSpan {
+                file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+            }, CanonicalRequestV1::ResourceStreamWrite { buffer_start: wire.buffer_start, length: wire.length })
         }
         _ => return -3,
     };
@@ -3788,6 +3894,7 @@ mod tests {
                 2,
                 1,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -3821,6 +3928,7 @@ mod tests {
                 2,
                 1,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 wrong.as_ptr(),
@@ -3851,6 +3959,7 @@ mod tests {
                 2,
                 0,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -3874,6 +3983,7 @@ mod tests {
             FsRootSpec::default(),
             AUTH_FULL,
             1,
+            false,
             &[],
             Err(PostureErrorV1::HostPostureUnavailable),
             Some(EffectiveUidSnapshotV1::scripted(1000)),
@@ -3958,6 +4068,7 @@ mod tests {
                 FsRootSpec::EffectiveUserHome(b"data".to_vec()),
                 AUTH_FULL,
                 31,
+                false,
                 &[],
                 establish_process_posture_v1(Ok(EffectiveUidSnapshotV1::scripted(1000)), false),
                 Some(EffectiveUidSnapshotV1::scripted(1000)),
@@ -4030,6 +4141,7 @@ mod tests {
             FsRootSpec::EffectiveUserHome(b"data".to_vec()),
             AUTH_FULL,
             41,
+            false,
             &[],
             establish_process_posture_v1(Ok(uid), false),
             Some(uid),
@@ -4082,6 +4194,7 @@ mod tests {
                 2,
                 19,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -4118,6 +4231,7 @@ mod tests {
                 2,
                 19,
                 1,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),

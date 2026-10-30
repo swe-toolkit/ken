@@ -961,7 +961,7 @@ fn collect_checked_perform_nodes(
                         {
                             crate::export::HostOpFamilyV1::Clock => self.clock_family.clone(),
                             crate::export::HostOpFamilyV1::Console => self.console_family.clone(),
-                            crate::export::HostOpFamilyV1::Fs => self.fs_family.clone(),
+                            crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => self.fs_family.clone(),
                             crate::export::HostOpFamilyV1::Entropy => self.entropy_family.clone(),
                         };
                         self.nodes.insert(CheckedPerformNodeV1::Host {
@@ -3028,6 +3028,8 @@ fn complete_native_program_preparation(
                 file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
                 resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
+                px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
+                px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -4112,6 +4114,14 @@ fn checked_host_spine_v1(
             prelude.private_mapping_acquire_file_id,
             ken_host::HostOpV1::MappingAcquireFile,
         ),
+        (prelude.px10_op_ids[0], ken_host::HostOpV1::ProcessPlanOpen),
+        (prelude.px10_op_ids[1], ken_host::HostOpV1::ProcessPlanPush),
+        (prelude.px10_op_ids[2], ken_host::HostOpV1::ProcessSpawn),
+        (prelude.px10_op_ids[3], ken_host::HostOpV1::ProcessTakePipe),
+        (prelude.px10_op_ids[4], ken_host::HostOpV1::ProcessTakePipe),
+        (prelude.px10_op_ids[5], ken_host::HostOpV1::ProcessWait),
+        (prelude.px10_op_ids[6], ken_host::HostOpV1::ResourceStreamRead),
+        (prelude.px10_op_ids[7], ken_host::HostOpV1::ResourceStreamWrite),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }
@@ -4157,6 +4167,16 @@ fn checked_host_spine_v1(
         file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
         resource_kind_mapping: resolve_id(roles.resource_kind_mapping)?,
+        px10_kind_symbols: [
+            resolve_id(prelude.px10_kind_ids[0])?,
+            resolve_id(prelude.px10_kind_ids[1])?,
+            resolve_id(prelude.px10_kind_ids[2])?,
+            resolve_id(prelude.px10_kind_ids[3])?,
+        ],
+        px10_exit_symbols: [
+            resolve_id(prelude.px10_exit_ids[0])?,
+            resolve_id(prelude.px10_exit_ids[1])?,
+        ],
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -4415,6 +4435,12 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.resource_mapping_limit,
         // ABI-S6 D5a appends the now-native Mapping resource-kind role.
         &spine.resource_kind_mapping,
+        &spine.px10_kind_symbols[0],
+        &spine.px10_kind_symbols[1],
+        &spine.px10_kind_symbols[2],
+        &spine.px10_kind_symbols[3],
+        &spine.px10_exit_symbols[0],
+        &spine.px10_exit_symbols[1],
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());

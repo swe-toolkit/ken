@@ -245,6 +245,26 @@ impl ChildProcessV1 {
     }
 }
 
+pub fn stream_read_v1(fd: &OwnedFd, bytes: &mut [u8]) -> io::Result<usize> {
+    // SAFETY: the fd is owned and the slice remains live for the synchronous read.
+    let result = unsafe { libc::read(fd.as_raw_fd(), bytes.as_mut_ptr().cast(), bytes.len()) };
+    if result < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(result as usize)
+    }
+}
+
+pub fn stream_write_v1(fd: &OwnedFd, bytes: &[u8]) -> io::Result<usize> {
+    // SAFETY: the fd is owned and the slice remains live for the synchronous write.
+    let result = unsafe { libc::write(fd.as_raw_fd(), bytes.as_ptr().cast(), bytes.len()) };
+    if result < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(result as usize)
+    }
+}
+
 fn invalid_input() -> io::Error {
     io::Error::from(io::ErrorKind::InvalidInput)
 }
