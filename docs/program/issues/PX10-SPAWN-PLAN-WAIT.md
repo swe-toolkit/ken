@@ -65,17 +65,19 @@ base, stop and report the mismatch; do not build around it.
    - **Trust and scope.** Any trust growth is an operator stop. Anything
      beyond spawn and wait is a named successor.
 2. **One spec+crates+catalog branch.** It holds the spec section, the
-   host operations on both engines, the catalog surface under
+   host operations on the interpreter, the catalog surface under
    `Capability.Process`, a seed under `conformance/surface/ffi-io/`, and
-   native tests. The Spec co-turn owns `spec/`, and CV votes on `spec/`
-   and `conformance/`.
+   tests. Native parity is the successor `PX10-NATIVE-SPAWN-PARITY`
+   (Steward recut, evt_15ra8z0j0typg); the new operations stay
+   `RepresentedUnavailable` for native until it lands. The Spec co-turn
+   owns `spec/`, and CV votes on `spec/` and `conformance/`.
 
 ## Acceptance
 
-- **AC-1.** On both engines, in parity, a Ken program spawns a child
-  that writes its argv and selected environment to a stdout pipe. The
-  parent reads exactly those bytes, and the wait returns `Exited 0`. A
-  second child that kills itself with SIGTERM returns `Signaled 15`.
+- **AC-1.** On the interpreter, a Ken program spawns a child that
+  writes its argv and selected environment to a stdout pipe. The parent
+  reads exactly those bytes, and the wait returns `Exited 0`. A second
+  child that kills itself with SIGTERM returns `Signaled 15`.
 - **AC-2 (inheritance, live process).** While the child blocks, the test
   reads `/proc/<child>/fd` and `/proc/<child>/status`.
   - The child holds exactly descriptors 0, 1 and 2, although the parent
@@ -85,6 +87,16 @@ base, stop and report the mismatch; do not build around it.
 - **AC-3 (mutation, QA).** Each of two mutants reddens AC-2:
   - one that inherits the parent's descriptors;
   - one that skips the SIGPIPE reset.
+- **AC-4 (native boundary).** A native build of a `withChild` program
+  refuses before object emission through the `RepresentedUnavailable`
+  availability path, naming the process operation, with no artifact.
+  One named test pins it. It must not pin the planner-invariant message,
+  and it still passes on a scratch copy with the successor's return-fold
+  repair applied (Architect evt_41svb4r6fg8qk). Every positional or
+  exhaustive consumer of the widened closed sets is migrated, and
+  `rt_native_bracket_body_once`, `px7f_resource_native`,
+  `rt_escape_second_resource_native` and `rt_bracket_control_region_d0`
+  are green.
 
 ## Stop conditions
 
