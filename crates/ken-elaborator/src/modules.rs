@@ -9883,7 +9883,6 @@ mod namespace_effect_tests {
 #[cfg(test)]
 #[path = "modules_reused_env_tests.rs"]
 mod reused_env_identity_scrub_tests;
-
 #[cfg(test)]
 mod strict_catalog_home_tests {
     use super::*;
@@ -9962,9 +9961,13 @@ mod strict_catalog_home_tests {
             env.module_state.strict_builtin_names.clone(),
         );
         for &(home, name) in &PRELUDE_PACKAGE_HOMES {
-            let id = env.module_state.package_home_ids(home)
-                .iter().find(|(spelling, _)| spelling == name)
-                .map(|(_, id)| *id).expect("captured home ID");
+            let id = env
+                .module_state
+                .package_home_ids(home)
+                .iter()
+                .find(|(spelling, _)| spelling == name)
+                .map(|(_, id)| *id)
+                .expect("captured home ID");
             assert_eq!(env.globals.get(name), Some(&id), "{home}.{name}");
             if !name.contains("::") {
                 let resolved = resolve_ref(&scope, &HashMap::new(), name, &Span::zero())
