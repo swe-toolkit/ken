@@ -5429,6 +5429,10 @@ mod tests {
                 CanonicalRequestV1::EntropyRandomBytes { count: 8 },
             ),
         ];
+        // The explicit request inventory is independent of HostOpV1::ALL.
+        // A newly native-tested pre-resource operation must gain a request
+        // here rather than entering the expected set by enumeration alone.
+        let requested = requests.iter().map(|(operation, _)| *operation).collect::<Vec<_>>();
         let mut backend = AllOpsBackend::default();
         let mut resources = ResourceTableV1::default();
         for (operation, request) in requests {
@@ -5464,11 +5468,16 @@ mod tests {
             HostOpV1::MappingWriteView,
             HostOpV1::MappingAcquireFile,
         ];
-        let pre_resource = HostOpV1::ALL
+        let native_pre_resource = HostOpV1::ALL
             .into_iter()
-            .filter(|operation| !RESOURCE_BEARING.contains(operation))
+            .filter(|operation| {
+                operation.availability() == HostOpAvailabilityV1::NativeTested
+                    && !RESOURCE_BEARING.contains(operation)
+            })
             .collect::<Vec<_>>();
-        assert_eq!(backend.0, pre_resource);
+        assert_eq!(backend.0, requested, "every listed request uses the shared dispatch");
+        assert_eq!(requested, native_pre_resource,
+            "the explicit requests cover exactly the native-tested pre-resource inventory");
     }
 
     /// ABI-S3 AC-4. The two halves are not equally load-bearing.
@@ -6594,7 +6603,7 @@ mod tests {
         assert_eq!(HostOpV1::try_from(0x0407), Ok(HostOpV1::MappingAcquireFile));
         assert_eq!(
             HostOpV1::MappingAcquireFile.next_in_inventory(),
-            Some(HostOpV1::EntropyRandomBytes)
+            Some(HostOpV1::ResourceStreamRead)
         );
         assert_eq!(
             HostOpV1::MappingAcquireFile.availability(),
