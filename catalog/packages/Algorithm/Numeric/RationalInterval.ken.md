@@ -40,7 +40,8 @@ transitivity of inclusion and operand-swap inclusion for addition,
 multiplication, hull and intersection. Four further checked laws establish
 both regroupings of addition and multiplication by mutual inclusion. Two
 more checked laws give the least outer bound of a hull and the greatest
-inner bound of an intersection, including inverted intervals.
+inner bound of an intersection, including inverted intervals. Four additional
+laws regroup hull and intersection in both directions by endpoint inclusion.
 
 ```ken
 import Core.Logic.Conjunction (And, and_intro)
@@ -1059,6 +1060,118 @@ pub theorem interval_hull_intersect_inside_left
     (interval_inside_refl i)
     (interval_intersect_inside_left i j)
 
+pub theorem interval_hull_assoc_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_hull i (interval_hull j k))
+          (interval_hull (interval_hull i j) k)) =
+  interval_hull_least
+    i
+    (interval_hull j k)
+    (interval_hull (interval_hull i j) k)
+    (interval_inside_trans
+      i
+      (interval_hull i j)
+      (interval_hull (interval_hull i j) k)
+      (interval_inside_hull_left i j)
+      (interval_inside_hull_left (interval_hull i j) k))
+    (interval_hull_least
+      j
+      k
+      (interval_hull (interval_hull i j) k)
+      (interval_inside_trans
+        j
+        (interval_hull i j)
+        (interval_hull (interval_hull i j) k)
+        (interval_inside_hull_right i j)
+        (interval_inside_hull_left (interval_hull i j) k))
+      (interval_inside_hull_right (interval_hull i j) k))
+
+pub theorem interval_hull_assoc_rev_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_hull (interval_hull i j) k)
+          (interval_hull i (interval_hull j k))) =
+  interval_hull_least
+    (interval_hull i j)
+    k
+    (interval_hull i (interval_hull j k))
+    (interval_hull_least
+      i
+      j
+      (interval_hull i (interval_hull j k))
+      (interval_inside_hull_left i (interval_hull j k))
+      (interval_inside_trans
+        j
+        (interval_hull j k)
+        (interval_hull i (interval_hull j k))
+        (interval_inside_hull_left j k)
+        (interval_inside_hull_right i (interval_hull j k))))
+    (interval_inside_trans
+      k
+      (interval_hull j k)
+      (interval_hull i (interval_hull j k))
+      (interval_inside_hull_right j k)
+      (interval_inside_hull_right i (interval_hull j k)))
+
+pub theorem interval_intersect_assoc_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_intersect i (interval_intersect j k))
+          (interval_intersect (interval_intersect i j) k)) =
+  interval_intersect_greatest
+    (interval_intersect i (interval_intersect j k))
+    (interval_intersect i j)
+    k
+    (interval_intersect_greatest
+      (interval_intersect i (interval_intersect j k))
+      i
+      j
+      (interval_intersect_inside_left i (interval_intersect j k))
+      (interval_inside_trans
+        (interval_intersect i (interval_intersect j k))
+        (interval_intersect j k)
+        j
+        (interval_intersect_inside_right i (interval_intersect j k))
+        (interval_intersect_inside_left j k)))
+    (interval_inside_trans
+      (interval_intersect i (interval_intersect j k))
+      (interval_intersect j k)
+      k
+      (interval_intersect_inside_right i (interval_intersect j k))
+      (interval_intersect_inside_right j k))
+
+pub theorem interval_intersect_assoc_rev_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_intersect (interval_intersect i j) k)
+          (interval_intersect i (interval_intersect j k))) =
+  interval_intersect_greatest
+    (interval_intersect (interval_intersect i j) k)
+    i
+    (interval_intersect j k)
+    (interval_inside_trans
+      (interval_intersect (interval_intersect i j) k)
+      (interval_intersect i j)
+      i
+      (interval_intersect_inside_left (interval_intersect i j) k)
+      (interval_intersect_inside_left i j))
+    (interval_intersect_greatest
+      (interval_intersect (interval_intersect i j) k)
+      j
+      k
+      (interval_inside_trans
+        (interval_intersect (interval_intersect i j) k)
+        (interval_intersect i j)
+        j
+        (interval_intersect_inside_left (interval_intersect i j) k)
+        (interval_intersect_inside_right i j))
+      (interval_intersect_inside_right (interval_intersect i j) k))
+
 theorem equiv_leq
       (x : Rational) (y : Rational)
     : rational_equiv x y → IsTrue (rational_leq x y) =
@@ -1193,6 +1306,14 @@ Each partner direction is an instance of one of those two inclusion laws, so
 both absorptions hold as mutual endpoint-value inclusion, not structural
 equality.
 
+Hull regrouping uses `interval_hull_least` to gather each operand into the
+other grouping: the left hull is included directly, while the inner hull is
+included by its two operands. Intersection regrouping uses
+`interval_intersect_greatest` to bound each nested intersection by the other
+grouping's two operands. Transitivity connects each nested inclusion. This
+argument does not require an interval to have an ordered pair of endpoints,
+and proves mutual endpoint-value inclusion, not structural equality.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -1236,13 +1357,13 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and thirty-six checked interval
+   `interval_intersect`, `interval_inside` and forty checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
-   including endpoint inclusion, its witnessed converse and the four
-   distributivity/factoring inclusions.
+   including endpoint inclusion, its witnessed converse, the four
+   distributivity/factoring inclusions and hull/intersection regrouping.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -1253,8 +1374,9 @@ API.
    four distributive inclusions reuse Rational's checked `distrib_l` and
    `comm` laws through two private proof stages. Inclusion transitivity reuses
    Rational order transitivity; the four swap inclusions reuse Rational
-   commutativity or public min/max bounds without a new helper.
-4. **Trusted-base delta.** Zero: all thirty-six laws have checked proof bodies,
+   commutativity or public min/max bounds without a new helper. Hull and
+   intersection regrouping reuse only the public bound and transitivity laws.
+4. **Trusted-base delta.** Zero: all forty laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1277,6 +1399,9 @@ API.
    accepted bound-laws seed and refuses its isolated false hull claim.
    The §8 `cat_numeric_interval_hull_intersect_absorption` package test checks
    the complete accepted absorption seed and its isolated moved-argument
-   refusal against the two new public laws.
+   refusal against the two new public laws. The §9 package test checks four
+   generic regrouping exports, three-interval computations, inverted inputs
+   and the dropped-third-operand refusal. Its own fixture is not an official
+   conformance seed.
    These package tests do not establish official conformance-runner execution,
    CI, publication or landing.
