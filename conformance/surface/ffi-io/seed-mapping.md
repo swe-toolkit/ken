@@ -2,28 +2,18 @@
 
 Format: `../../README.md`. These pin the normative Mapping-surface contract of
 `spec/30-surface/38-ffi-io.md §1.9` (opaque runtime-owned regions and bounded
-byte views; authority `docs/program/10-linux-abi-completion.md §4`). The cases
-net the *discriminating* form of each property — each reds a plausible
-non-conforming implementation — not the prose. The Mapping surface splits
-across two runtime gates. The **anonymous** window-direct surface — the
-`withMapping` bracket, `MappingHandle`/`MappingWindow`, the window-direct
-`mapBytes`/`mapWrite`, the `Mapping` resource kind, and the 4 KiB granule
-accounting — is **ABI-S6 / D5a**, discharged by the **D1** increment: cases 2
-and 3 (4 KiB granule; opacity + bounds) are **RED-UNTIL-BUILT /
-BLOCKED-ON-ABI-S6-D5a** and lift to green on the D1 candidate. **File-backed
-copy-on-write** — a `FileBacked` mapping acquired via `MappingAcquireFile` — is
-the **ABI-S6 / D5b** successor, so case 1 (MAP_PRIVATE file COW) is **(gated:
-D5b)** and stays RED across the D5b interval: what blocks it is file-backed
-*acquisition*, not the window-direct `mapWrite` it uses, which D1 lands.
-
-The staged gate stays honest because a live sibling enforces the posture across
-the whole interval: while case 1's file-backed COW flip is dormant, the D5a
-opacity/bounds case and every case's native==interpreter parity assertion keep
-opacity, bounds-not-clamp, and native/interp agreement enforced from the moment
-D1 lands — a fully-gated axis with no live enforcer would leave the posture
-unguarded until D5b; this one does not. The seed is staged now as the control
-that makes §1.9's negatives testable, for D5a/D1 to build against and D5b to
-extend.
+byte views; authority `docs/program/10-linux-abi-completion.md §4`). The
+cases pin the *discriminating* form of each property: each describes an
+observation a plausible non-conforming implementation gets wrong.
+Anonymous window-direct access and fixed-granule accounting (cases 2 and 3)
+have named D5a witnesses on main. The D5b candidate supplies a named
+file-backed copy-on-write witness for case 1, with `ResourceRead` source
+admission; case 1 still needs independent QA's measured write-through
+mutation before claiming its discriminator is proven. These references
+identify executable tests, not official conformance-runner execution or
+an approval of the assembled candidate. The source mapping is private;
+window-direct `mapWrite` alone does not establish that writes stay off the
+backing file.
 
 ## Reading disciplines
 
@@ -42,18 +32,28 @@ inspected a raw address would be testing a surface §1.9 forbids.
 - promise class: **normative property** — file mappings are private
   (copy-on-write); process-local writes never reach the file
 - spec: `38 §1.9` (MAP_PRIVATE isolation); `38 §1.3`
-- given: a file with known original bytes; a program that acquires a
-  `FileBacked` mapping over it via `withMapping … ReadWrite`, `mapWrite`s
-  different bytes at an in-range `offset` (write range `[offset, offset+len
-  bytes)`), then — after the bracket settles — reads the same file through the
-  ordinary `§1.3` file API.
-- expect: **RED — (gated: D5b)** — the post-write file read returns the
-  **original** bytes, not the mapped write. The in-mapping read view observes the
-  write (process-local visibility) while the file is unchanged.
-- fixture: **BLOCKED-ON-ABI-S6-D5b** — `FileBacked` acquisition
-  (`MappingAcquireFile`) is the copy-on-write successor capability, deferred to
-  D5b. D1 lands the window-direct `mapWrite` this case uses, but not file-backed
-  acquisition; the gate is the `FileBacked` mapping, not the write.
+- given: a file with known original bytes opened with `ResourceRead`; a
+  program that acquires a `FileBacked` mapping over that source via
+  `withMapping … ReadWrite`, `mapWrite`s different bytes at an in-range
+  `offset` (write range `[offset, offset+len bytes)`), then — after the
+  bracket settles — reads the same file through the ordinary `§1.3`
+  file API. `ResourceRead` supplies source READ authority, not a
+  WRITE|READ mode; private mapping writes use the acquired mapping's
+  own `ReadWrite` protection, not file-write authority.
+- expect: the post-write file read returns the **original** bytes, not
+  the mapped write. The in-mapping read view observes the write
+  (process-local visibility) while the file is unchanged.
+- fixture: `crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed_cow.ken`.
+  The exact witness is:
+
+  ```text
+  crates/ken-cli/tests/abi_s6_mapping_file_backed_cow_native.rs::file_backed_mapping_write_is_private_on_both_engines
+  ```
+
+  The Runtime implementer's checkpoint reports 1/1 named test passing,
+  with assertions for both engines; independent QA and the
+  disk-changing write-through mutation remain outstanding. This is
+  candidate-local evidence only.
 - control: a `MAP_SHARED`/write-through implementation reds — it propagates the
   mapped write to the file, so the post-write file read returns the mapped bytes
   instead of the original. A lone "the write is visible in the mapping" positive
@@ -71,10 +71,17 @@ inspected a raw address would be testing a surface §1.9 forbids.
   `../../../docs/program/10-linux-abi-completion.md §4`
 - given: mappings acquired at 1 byte, 4096 bytes, and 4097 bytes, each observed
   through the `Mapping` resource-kind accounting.
-- expect: **RED-UNTIL-BUILT** — the charged sizes are exactly `4096`, `4096`, and
-  `8192` (`ceil(n / 4096) * 4096`); a zero-length mapping is not admitted; the
-  native and interpreted paths charge the identical values.
-- fixture: **BLOCKED-ON-ABI-S6-D5a**.
+- expect: the charged sizes are exactly `4096`, `4096`, and `8192`
+  (`ceil(n / 4096) * 4096`); a zero-length mapping is not admitted;
+  the native and interpreted paths charge the identical values.
+- fixture: the landed `crates/ken-host/src/effect_v1.rs` test
+  `abi_s6_d5a_mapping_accounting_is_fixed_4kib_and_buffer_is_byte_granular`
+  pins exact charges at the resource table. The landed test
+  `fixed_accounting_boundary_lengths_reach_both_engines` in
+  `crates/ken-cli/tests/abi_s6_mapping_surface_native.rs` checks the
+  source-constructible 1- and 4097-byte acquisitions and engine parity.
+  The trace does not expose a live-capacity counter; exact charges are
+  not inferred from parity alone.
 - control: a `sysconf(_SC_PAGESIZE)`-derived or byte-granular implementation reds
   — on a 16 KiB-page host a host-derived rule charges `16384` for the 1-byte
   mapping, and a byte-granular rule charges `1`/`4096`/`4097`; both differ from
@@ -94,14 +101,23 @@ inspected a raw address would be testing a surface §1.9 forbids.
 - given: an acquired `MappingHandle`; a `mapBytes` on an in-range
   `MappingWindow` and one on a window past the mapping extent; and a live
   `Mapping` token supplied to a buffer-only operation (and the reverse).
-- expect: **RED-UNTIL-BUILT** — no raw address, pointer, or page reference is
-  observable in any Ken value or the resource token (only the opaque handle, the
-  window descriptor, and the scalar extent); the in-range access copies bytes,
-  the out-of-range window returns a fail-visible `ResourceError` rather than an
-  unchecked or clamped access, and a wrong-kind token returns
-  `ResourceKindMismatch` naming the `Mapping` identity (with same-kind controls
-  succeeding).
-- fixture: **BLOCKED-ON-ABI-S6-D5a**.
+- expect: no raw address, pointer, or page reference is observable in
+  any Ken value or the resource token (only the opaque handle, the window
+  descriptor, and the scalar extent); the in-range access copies bytes,
+  the out-of-range window returns a fail-visible `ResourceError` rather
+  than an unchecked or clamped access, and a wrong-kind token returns
+  `ResourceKindMismatch` naming the `Mapping` identity (with same-kind
+  controls succeeding).
+- fixture: in `crates/ken-cli/tests/abi_s6_mapping_surface_native.rs`,
+  `window_direct_map_bytes_executes_natively_and_matches_the_interpreter`
+  and `out_of_range_window_is_invalid_bounds_not_clamped` cover in-range
+  copy, out-of-range refusal, and engine parity. The landed host tests
+  `abi_s6_d1_mapping_is_opaque_lineage_bound_and_terminally_unmapped`
+  and `abi_s6_d2_mapping_views_share_bounds_and_enforce_origin_rights_and_lifetime`
+  in `crates/ken-host/src/effect_v1.rs` cover opaque resource tokens,
+  Mapping-as-Buffer and Buffer-as-Mapping mismatch, and same-kind
+  admission. They do not themselves prove that every source value
+  excludes a pointer.
 - control: an implementation that projects the raw region address into a Ken
   value, that forges a `MappingHandle` outside `withMapping`, or that reads an
   out-of-range window without a fail-visible error, reds; a triplicated or

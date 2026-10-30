@@ -1,0 +1,94 @@
+program capabilities FS AFull
+
+fn body_err_io (code : UInt8) : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult UInt8 Unit)
+    (ResourceBodyErr UInt8 Unit code)
+
+fn after_read (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  match outcome {
+    Err _ |-> body_err_io 81;
+    Ok _ |-> body_err_io 60
+  }
+
+proc after_write (mapping : MappingHandle)
+  (outcome : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult UInt8 Unit) visits [FS] =
+  match outcome {
+    Err _ |-> body_err_io 82;
+    Ok _ |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Bytes) (ResourceBodyResult UInt8 Unit)
+      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
+      (\read. after_read read)
+  }
+
+proc mapping_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult UInt8 Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Unit) (ResourceBodyResult UInt8 Unit)
+    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
+    (\outcome. after_write mapping outcome)
+
+fn after_mapping
+  (outcome : Result ResourceError (ResourceBracketResult UInt8 Unit))
+  : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  match outcome {
+    Err _ |-> body_err_io 91;
+    Ok bracket |-> match bracket {
+      ResourceBracketOk _ |-> body_err_io 60;
+      ResourceBracketBodyError code |-> body_err_io code;
+      ResourceBracketReleaseError _ |-> body_err_io 93;
+      ResourceBracketBodyAndReleaseError _ _ |-> body_err_io 94
+    }
+  }
+
+proc file_body (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult UInt8 Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (withMapping AFull UInt8 Unit (FileBacked file (8 : Int)) ReadWrite mapping_body)
+    (\outcome. after_mapping outcome)
+
+fn finish_file_read (code : UInt8) (outcome : Result FileError Bytes)
+  : HostIO AFull ExitCode =
+  match outcome {
+    Err _ |-> host_exit AFull (ExitCode.Failure 95);
+    Ok _ |-> host_exit AFull (ExitCode.Failure code)
+  }
+
+proc finish (cap : Cap AFull)
+  (outcome : Result FileError (ResourceBracketResult UInt8 Unit))
+  : HostIO AFull ExitCode visits [FS] =
+  match outcome {
+    Err _ |-> host_exit AFull (ExitCode.Failure 71);
+    Ok bracket |-> match bracket {
+      ResourceBracketOk _ |-> host_exit AFull ExitCode.Success;
+      ResourceBracketBodyError code |-> bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result FileError Bytes) ExitCode
+        (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
+          (Result FileError Bytes)
+          (readFile AFull cap (bytes_encode "mapped.bin")))
+        (\read. finish_file_read code read);
+      ResourceBracketReleaseError _ |-> host_exit AFull (ExitCode.Failure 73);
+      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (ExitCode.Failure 74)
+    }
+  }
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result FileError (ResourceBracketResult UInt8 Unit)) ExitCode
+        (withResource AFull UInt8 Unit cap (bytes_encode "mapped.bin")
+          ResourceRead file_body)
+        (\outcome. finish cap outcome)
+  }

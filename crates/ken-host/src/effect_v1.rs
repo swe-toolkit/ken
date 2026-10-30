@@ -3228,7 +3228,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             };
             let acquired = (|| {
                 let (handle, source_identity, _, provenance) = resources
-                    .resolve_fs_handle_with_provenance(source, protection.rights())
+                    .resolve_fs_handle_with_provenance(source, crate::RightSet::READ)
                     .map_err(SemanticErrorV1::Resource)?;
                 resource_bindings.push((ResourceBindingRole::Target, source_identity));
                 resources
@@ -4232,6 +4232,7 @@ mod tests {
 
     #[derive(Default)]
     struct MappingReleaseBackend {
+        map_error: Option<SemanticErrorV1>,
         unmap_calls: usize,
         close_calls: usize,
         unmap_error: Option<IoErrorIdentityV1>,
@@ -4295,6 +4296,9 @@ mod tests {
             length: u64,
             protection: MappingProtectionV1,
         ) -> Result<MappingRegionV1, SemanticErrorV1> {
+            if let Some(error) = self.map_error.clone() {
+                return Err(error);
+            }
             MappingRegionV1::try_new_anonymous(length, protection)
                 .map_err(SemanticErrorV1::Resource)
         }
@@ -6436,26 +6440,33 @@ mod tests {
     }
 
     /// Promise class: durable discriminator. MEASURED: otherwise-identical
-    /// file acquisitions refuse missing write rights, over-cap length, and a
-    /// short source with their exact distinct identities and no token; the
-    /// admitted request loops exact reads from offset zero, owns FileBacked
-    /// bytes, inherits the source lineage, and returns its capacity on release.
-    /// CLAIMED: D4 composes FsHandle authority/lifetime with the bounded Mapping
-    /// representation without a new backend acquisition seam. THE GAP: a future
-    /// native mmap promotion must independently prove its zero-copy OS path.
+    /// file acquisitions admit a read-only source with writable private
+    /// protection, refuse a source without read rights before any file read,
+    /// and distinguish over-cap length from a short source. The admitted
+    /// request loops exact reads from offset zero, owns FileBacked bytes,
+    /// inherits source lineage, and returns capacity on release. CLAIMED: D4
+    /// composes source read authority with private Mapping rights and lifetime.
+    /// THE GAP: external changes after copy-in are not witnessed here.
     #[cfg(target_os = "linux")]
     #[test]
     fn abi_s6_d4_file_acquire_enforces_rights_exact_length_lineage_and_capacity() {
         let (read_root, read_owner) = resource_fixture("mapping-read-source");
+        let (write_root, write_owner) = resource_fixture("mapping-write-source");
         let (full_root, full_owner) = resource_fixture("mapping-full-source");
         let mut revocation = RevocationDomain::default();
         let read_lineage = revocation.mint_root();
+        let write_lineage = revocation.mint_root();
         let full_lineage = revocation.mint_root();
         let mut resources = ResourceTableV1::with_buffer_limits(
             BufferLimitsV1::new(8, 4096, 4096).expect("valid mapping limits"),
         );
-        let (read_source, _) =
+        let (read_source, read_source_identity) =
             resources.insert_fs_handle(read_owner, crate::RightSet::READ, read_lineage);
+        let (write_source, _) = resources.insert_fs_handle(
+            write_owner,
+            crate::RightSet::WRITE.union(crate::RightSet::CREATE),
+            write_lineage,
+        );
         let (full_source, full_source_identity) = resources.insert_fs_handle(
             full_owner,
             crate::RightSet::READ.union(crate::RightSet::WRITE),
@@ -6485,21 +6496,49 @@ mod tests {
             .expect("represented file mapping dispatch")
         };
 
+        let admitted = acquire(
+            &mut backend,
+            &mut resources,
+            read_source,
+            8,
+            MappingProtectionV1::Writable,
+        );
+        let mapping = admitted
+            .resource_token
+            .expect("READ-only source admits private write");
+        assert!(matches!(admitted.outcome, CanonicalOutcomeV1::Success(_)));
+        assert_eq!(admitted.resource_bindings[0].1, read_source_identity);
+        assert_eq!(backend.read_calls, 3, "copy-in reads only from the source");
+        let (region, _) = resources
+            .resolve_mapping(mapping, crate::RightSet::WRITE)
+            .expect("private mapping retains destination write right");
+        assert_eq!(region.backing(), MappingBackingV1::FileBacked);
+        let pending = resources
+            .begin_release(mapping)
+            .expect("release private mapping");
+        ResourceTableV1::finish_release_with(pending, &mut backend)
+            .expect("READ-only source mapping releases");
+        assert_eq!(resources.live_owned_capacity, 0);
+        backend.read_calls = 0;
+
         assert_eq!(
             acquire(
                 &mut backend,
                 &mut resources,
-                read_source,
+                write_source,
                 8,
                 MappingProtectionV1::Writable,
             )
             .outcome,
             CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
-                required: crate::RightSet::READ.union(crate::RightSet::WRITE).bits(),
-                held: crate::RightSet::READ.bits(),
+                required: crate::RightSet::READ.bits(),
+                held: crate::RightSet::WRITE.union(crate::RightSet::CREATE).bits(),
             }))
         );
-        assert_eq!(backend.read_calls, 0, "rights refuse before file reads");
+        assert_eq!(
+            backend.read_calls, 0,
+            "missing READ refuses before file I/O"
+        );
 
         assert_eq!(
             acquire(
@@ -6593,7 +6632,48 @@ mod tests {
 
         drop(resources);
         std::fs::remove_dir_all(read_root).unwrap();
+        std::fs::remove_dir_all(write_root).unwrap();
         std::fs::remove_dir_all(full_root).unwrap();
+    }
+
+    /// Promise class: durable invariant (38 §1.9, typed resource failure).
+    /// MEASURED: either injected backend mapping error is preserved as its
+    /// exact variant, without minting a mapping or charging capacity. CLAIMED:
+    /// dispatch does not collapse allocation failure into host I/O or vice
+    /// versa. THE GAP: the native errno classifier is pinned separately.
+    #[test]
+    fn backend_map_failure_reifies_exact_variant_and_mints_nothing() {
+        for error in [
+            SemanticErrorV1::Resource(ResourceErrorV1::AllocationFailed),
+            SemanticErrorV1::Io(IoErrorIdentityV1::Other(5)),
+        ] {
+            let mut backend = MappingReleaseBackend {
+                map_error: Some(error.clone()),
+                ..MappingReleaseBackend::default()
+            };
+            let capabilities = CapabilityTableV1::default();
+            let revocation = RevocationDomain::default();
+            let mut resources = ResourceTableV1::with_buffer_limits(
+                BufferLimitsV1::new(8, 4096, 4096).expect("valid mapping limits"),
+            );
+            let dispatched = dispatch_host_op_v1_for_promotion_evidence(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                HostOpV1::MappingAllocate,
+                None,
+                ResourceInputsV1::None,
+                &CanonicalRequestV1::MappingAllocate {
+                    length: 8,
+                    protection: MappingProtectionV1::Writable,
+                },
+            )
+            .expect("represented mapping dispatch");
+            assert_eq!(dispatched.outcome, CanonicalOutcomeV1::Error(error));
+            assert_eq!(dispatched.resource_token, None, "no mapping minted");
+            assert_eq!(resources.live_owned_capacity, 0, "no capacity charged");
+        }
     }
 
     /// Promise class: durable invariant. MEASURED: the production read-at seam
