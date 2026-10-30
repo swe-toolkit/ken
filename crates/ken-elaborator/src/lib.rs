@@ -475,6 +475,24 @@ impl ElabEnv {
             }
         }
         elab.prelude_env.pre_source_names = pre_source;
+        // The checked Console carrier was declared as `Stream` so its native
+        // stable symbol and the three constructor symbols stay unchanged.
+        // Source alone now names that same parent `ConsoleStream`, with the
+        // entire checked constructor family scoped to `ConsoleStream.C`.
+        // Capture original artifact names first, then move only the surface
+        // binding before installing the closed floor and source-unit scopes.
+        let console_stream_id = elab.module_state.rename_prelude_source_type(
+            &elab.env,
+            &mut elab.globals,
+            "Stream",
+            "ConsoleStream",
+        )?;
+        elab.module_state.scope_constructor_family(
+            &elab.env,
+            &mut elab.globals,
+            console_stream_id,
+            "ConsoleStream",
+        )?;
         elab.module_state.install_prelude_floor();
         elab.module_state.capture_strict_builtin_names(
             &elab.env,

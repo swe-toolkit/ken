@@ -136,6 +136,9 @@ pub struct ModuleState {
     /// One roots-loader run cannot mix legacy and strict units: the loaded-unit
     /// cache records elaborated results rather than unresolved source.
     roots_resolution_mode: Option<ResolutionMode>,
+    /// Home module -> checked pre-source package identities bound in that
+    /// module's scope, never in unrelated clients or the strict ambient set.
+    package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>>,
 }
 
 type FileExportTables = HashMap<String, HashMap<String, HashMap<String, String>>>;
@@ -236,13 +239,14 @@ impl ModuleState {
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 30] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 32] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
     "Coproduct",
+    "ConsoleStream",
     "CreatePolicy",
     "Equal",
     "ExitCode",
@@ -267,6 +271,18 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 30] = [
     "TransferCount",
     "Unit",
     "Utf8Error",
+    "eqChar",
+];
+
+/// Each checked package identity has exactly one explicit-import home. The
+/// pre-source ID is bound only in that home's scope, then published by its
+/// ordinary `export`; it does not become an ambient floor binding.
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 5] = [
+    ("Capability.Console.Text", "IO"),
+    ("Capability.Console.Text", "write"),
+    ("Capability.Console.Text", "print_line"),
+    ("Core.Classes.LawfulClasses", "charToInt"),
+    ("Core.Classes.LawfulClasses", "leqChar"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
@@ -345,6 +361,46 @@ impl ModuleState {
             .into_iter()
             .map(str::to_string)
             .collect();
+    }
+
+    /// Rename only the surface binding of an already checked prelude type.
+    /// The pre-source names and artifact symbols were captured before this
+    /// move; the kernel family and all constructor IDs remain unchanged.
+    pub(crate) fn rename_prelude_source_type(
+        &mut self,
+        env: &ken_kernel::GlobalEnv,
+        globals: &mut HashMap<String, ken_kernel::GlobalId>,
+        from: &str,
+        to: &str,
+    ) -> Result<ken_kernel::GlobalId, ElabError> {
+        let id = globals.get(from).copied().ok_or_else(|| {
+            ElabError::Internal(format!("prelude source type `{from}` is missing"))
+        })?;
+        if env.inductive(id).is_none() || globals.contains_key(to) {
+            return Err(ElabError::Internal(format!(
+                "prelude source type `{from}` cannot move to `{to}`"
+            )));
+        }
+        let root = &mut self.root_scope;
+        if root.bindings.get(from).map(String::as_str) != Some(from)
+            || root.checked_local_ids.get(from) != Some(&id)
+            || root.bindings.contains_key(to)
+        {
+            return Err(ElabError::Internal(format!(
+                "prelude source type `{from}` has inconsistent root binding"
+            )));
+        }
+        root.bindings.remove(from);
+        root.locals.remove(from);
+        root.current_local_names.remove(from);
+        root.checked_local_ids.remove(from);
+        root.binding_ids.remove(from);
+        root.bindings.insert(to.to_string(), to.to_string());
+        root.locals.insert(to.to_string());
+        root.checked_local_ids.insert(to.to_string(), id);
+        globals.remove(from);
+        globals.insert(to.to_string(), id);
+        Ok(id)
     }
 
     /// Move one entire checked family's constructor bindings to `T.C`.
@@ -546,6 +602,31 @@ impl ModuleState {
         }
         self.prelude_binding_names.insert("Proved".to_string());
         self.strict_builtin_names.insert("Proved".to_string());
+
+        let mut package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>> =
+            HashMap::new();
+        for (home, name) in PRELUDE_PACKAGE_HOMES {
+            let id = globals.get(name).copied().ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "package identity `{name}` for `{home}` has no pre-source identity"
+                ))
+            })?;
+            if !matches!(env.lookup(id), Some(ken_kernel::Decl::Transparent { .. })) {
+                return Err(ElabError::Internal(format!(
+                    "package identity `{name}` for `{home}` is not checked-transparent"
+                )));
+            }
+            if is_prelude_floor_name(name) || self.strict_builtin_names.contains(name) {
+                return Err(ElabError::Internal(format!(
+                    "package identity `{name}` for `{home}` is also strict ambient"
+                )));
+            }
+            package_home_ids
+                .entry(home.to_string())
+                .or_default()
+                .push((name.to_string(), id));
+        }
+        self.package_home_ids = package_home_ids;
         Ok(())
     }
 }
@@ -2157,6 +2238,15 @@ fn load_unit(
 
         let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
         scope.private_ids.clone_from(&elab.module_state.private_ids);
+        // Only the approved file unit owns these pre-source IDs. An ordinary
+        // export publishes them through its provider table; other units must
+        // import that provider, never resolve the live process-global spelling.
+        if let Some(granted) = elab.module_state.package_home_ids.get(module) {
+            for (name, id) in granted {
+                scope.bindings.insert(name.clone(), name.clone());
+                scope.binding_ids.insert(name.clone(), *id);
+            }
+        }
         let mut unit_definitions = HashSet::new();
         let mut ordered_inline_modules = HashSet::new();
         let (results, exports) = expand_scope(
