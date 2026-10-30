@@ -151,10 +151,16 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     /// Checked process-root ExitCode roles share the source constructor identity plane.
     ExitSuccess,
     ExitFailure,
+    ResourceKindSpawnPlan,
+    ResourceKindChildProcess,
+    ResourceKindPipeRead,
+    ResourceKindPipeWrite,
+    ChildExitExited,
+    ChildExitSignaled,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 53] = [
+    pub(super) const ALL: [Self; 59] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -208,6 +214,12 @@ impl SynthesizedFixedConstructorRole {
         Self::ResourceKindMapping,
         Self::ExitSuccess,
         Self::ExitFailure,
+        Self::ResourceKindSpawnPlan,
+        Self::ResourceKindChildProcess,
+        Self::ResourceKindPipeRead,
+        Self::ResourceKindPipeWrite,
+        Self::ChildExitExited,
+        Self::ChildExitSignaled,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -265,6 +277,12 @@ impl SynthesizedFixedConstructorRole {
             Self::FileOperationDuplicate => &symbols.file_operation_duplicate,
             Self::ResourceMappingLimit => &symbols.resource_mapping_limit,
             Self::ResourceKindMapping => &symbols.resource_kind_mapping,
+            Self::ResourceKindSpawnPlan => &symbols.px10_kind_symbols[0],
+            Self::ResourceKindChildProcess => &symbols.px10_kind_symbols[1],
+            Self::ResourceKindPipeRead => &symbols.px10_kind_symbols[2],
+            Self::ResourceKindPipeWrite => &symbols.px10_kind_symbols[3],
+            Self::ChildExitExited => &symbols.px10_exit_symbols[0],
+            Self::ChildExitSignaled => &symbols.px10_exit_symbols[1],
         }
     }
 }

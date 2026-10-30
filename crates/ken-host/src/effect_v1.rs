@@ -227,10 +227,10 @@ impl HostOpV1 {
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
-            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::NativeTested,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
-            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::RepresentedUnavailable,
+            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
         }
     }
 
@@ -299,7 +299,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -326,6 +326,13 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
     HostOpV1::MappingReadView,
     HostOpV1::MappingWriteView,
     HostOpV1::MappingAcquireFile,
+    HostOpV1::ResourceStreamRead,
+    HostOpV1::ResourceStreamWrite,
+    HostOpV1::ProcessPlanOpen,
+    HostOpV1::ProcessPlanPush,
+    HostOpV1::ProcessSpawn,
+    HostOpV1::ProcessTakePipe,
+    HostOpV1::ProcessWait,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -393,6 +400,7 @@ pub struct HostEffectWireLayoutV1 {
     pub reply_resource_error_tag: u64,
     pub reply_read_progress_tag: u64,
     pub reply_write_progress_tag: u64,
+    pub reply_child_exit_tag: u64,
     pub resource_error_closed: u64,
     pub resource_error_malformed: u64,
     pub resource_error_right_not_held: u64,
@@ -406,6 +414,10 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_kind_fs_handle: u64,
     pub resource_kind_buffer: u64,
     pub resource_kind_mapping: u64,
+    pub resource_kind_spawn_plan: u64,
+    pub resource_kind_child_process: u64,
+    pub resource_kind_pipe_read: u64,
+    pub resource_kind_pipe_write: u64,
     pub resource_error_reply_schema: u64,
     pub resource_error_mapping_limit: u64,
 }
@@ -564,6 +576,35 @@ pub fn host_effect_wire_layout_v1(
             checked_u32(field("length")?)?,
             checked_u32(field("span_origin")?)?,
         ],
+        HostOpV1::ResourceStreamRead => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("buffer")?)?,
+            checked_u32(field("buffer_start")?)?,
+            checked_u32(field("length")?)?,
+        ],
+        HostOpV1::ResourceStreamWrite => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("buffer")?)?,
+            checked_u32(field("buffer_start")?)?,
+            checked_u32(field("length")?)?,
+            checked_u32(field("span_origin")?)?,
+        ],
+        HostOpV1::ProcessPlanOpen => {
+            let program = slice("program")?;
+            vec![checked_u32(field("capability")?)?, program[0], program[1]]
+        }
+        HostOpV1::ProcessPlanPush => {
+            let first = slice("first")?;
+            let second = slice("second")?;
+            vec![
+                checked_u32(field("plan")?)?, checked_u32(field("field")?)?,
+                first[0], first[1], second[0], second[1],
+                checked_u32(field("scalar")?)?,
+            ]
+        }
+        HostOpV1::ProcessSpawn => vec![checked_u32(field("plan")?)?],
+        HostOpV1::ProcessTakePipe => vec![checked_u32(field("child")?)?, checked_u32(field("fd")?)?],
+        HostOpV1::ProcessWait => vec![checked_u32(field("child")?)?],
         HostOpV1::BufferAllocate => vec![checked_u32(field("capacity")?)?],
         HostOpV1::BufferFreeze | HostOpV1::MappingReadView => vec![
             checked_u32(field("resource")?)?,
@@ -662,6 +703,7 @@ pub fn host_effect_wire_layout_v1(
         reply_resource_error_tag: generated_binding("tag", "reply.resource_error")?,
         reply_read_progress_tag: generated_binding("tag", "reply.read_progress")?,
         reply_write_progress_tag: generated_binding("tag", "reply.write_progress")?,
+        reply_child_exit_tag: generated_binding("tag", "reply.child_exit")?,
         resource_error_closed: generated_binding("error", "resource.Closed")?,
         resource_error_malformed: generated_binding("error", "resource.MalformedResource")?,
         resource_error_right_not_held: generated_binding("error", "resource.RightNotHeld")?,
@@ -675,6 +717,10 @@ pub fn host_effect_wire_layout_v1(
         resource_kind_fs_handle: generated_binding("tag", "resource_kind.FsHandle")?,
         resource_kind_buffer: generated_binding("tag", "resource_kind.Buffer")?,
         resource_kind_mapping: generated_binding("tag", "resource_kind.Mapping")?,
+        resource_kind_spawn_plan: generated_binding("tag", "resource_kind.SpawnPlan")?,
+        resource_kind_child_process: generated_binding("tag", "resource_kind.ChildProcess")?,
+        resource_kind_pipe_read: generated_binding("tag", "resource_kind.PipeRead")?,
+        resource_kind_pipe_write: generated_binding("tag", "resource_kind.PipeWrite")?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
         resource_error_mapping_limit: generated_binding("error", "resource.MappingLimit")?,
     })
@@ -875,6 +921,10 @@ pub enum ResourceKindV1 {
     FsHandle,
     Buffer,
     Mapping,
+    SpawnPlan,
+    ChildProcess,
+    PipeRead,
+    PipeWrite,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -1259,6 +1309,16 @@ pub enum ResourceOwnerV1 {
     FsHandle(crate::ResourceHandleV1),
     Buffer(BufferRegionV1),
     Mapping(MappingRegionV1),
+    SpawnPlan(crate::SpawnPlanV1),
+    Child(ChildOwnerV1),
+    PipeRead(std::os::fd::OwnedFd),
+    PipeWrite(std::os::fd::OwnedFd),
+}
+
+#[derive(Debug)]
+pub struct ChildOwnerV1 {
+    process: crate::ChildProcessV1,
+    taken_pipes: Vec<ResourceTokenV1>,
 }
 
 pub const RESOURCE_OBSERVATION_SCHEMA_VERSION_V1: u16 = 1;
@@ -1401,6 +1461,28 @@ impl ResourceTableV1 {
         (ResourceTokenV1 { slot, generation }, identity)
     }
 
+    fn insert_plan(
+        &mut self,
+        plan: crate::SpawnPlanV1,
+        provenance: crate::revocation_v1::RevocationNodeId,
+    ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
+        self.insert_owner(
+            ResourceOwnerV1::SpawnPlan(plan), ResourceKindV1::SpawnPlan,
+            crate::RightSet::EXECUTE, Some(provenance),
+        )
+    }
+
+    fn insert_child(
+        &mut self,
+        child: crate::ChildProcessV1,
+        provenance: crate::revocation_v1::RevocationNodeId,
+    ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
+        self.insert_owner(
+            ResourceOwnerV1::Child(ChildOwnerV1 { process: child, taken_pipes: Vec::new() }),
+            ResourceKindV1::ChildProcess, crate::RightSet::EXECUTE, Some(provenance),
+        )
+    }
+
     fn insert_fs_handle(
         &mut self,
         owner: crate::ResourceHandleV1,
@@ -1485,6 +1567,90 @@ impl ResourceTableV1 {
         );
         self.live_owned_capacity = total;
         Ok(inserted)
+    }
+
+    fn typed_owner(
+        &self, token: ResourceTokenV1, expected: ResourceKindV1,
+    ) -> Result<(&ResourceOwnerV1, ResourceTraceIdentityV1, Option<crate::revocation_v1::RevocationNodeId>), ResourceErrorV1> {
+        let slot = self.lookup(token)?;
+        match &slot.state {
+            ResourceSlotStateV1::Live { owner, kind, identity, provenance, .. } => {
+                if *kind != expected {
+                    return Err(ResourceErrorV1::ResourceKindMismatch { expected, actual: *kind });
+                }
+                Ok((owner, *identity, *provenance))
+            }
+            ResourceSlotStateV1::Closing { .. } | ResourceSlotStateV1::Retired { .. } => Err(ResourceErrorV1::Closed),
+            ResourceSlotStateV1::Vacant { .. } => Err(ResourceErrorV1::MalformedResource),
+        }
+    }
+
+    fn typed_owner_mut(
+        &mut self, token: ResourceTokenV1, expected: ResourceKindV1,
+    ) -> Result<(&mut ResourceOwnerV1, ResourceTraceIdentityV1, Option<crate::revocation_v1::RevocationNodeId>), ResourceErrorV1> {
+        self.lookup(token)?;
+        let slot = &mut self.slots[token.slot as usize];
+        match &mut slot.state {
+            ResourceSlotStateV1::Live { owner, kind, identity, provenance, .. } => {
+                if *kind != expected {
+                    return Err(ResourceErrorV1::ResourceKindMismatch { expected, actual: *kind });
+                }
+                Ok((owner, *identity, *provenance))
+            }
+            ResourceSlotStateV1::Closing { .. } | ResourceSlotStateV1::Retired { .. } => Err(ResourceErrorV1::Closed),
+            ResourceSlotStateV1::Vacant { .. } => Err(ResourceErrorV1::MalformedResource),
+        }
+    }
+
+    fn take_plan(&mut self, token: ResourceTokenV1) -> Result<(crate::SpawnPlanV1, ResourceTraceIdentityV1, crate::revocation_v1::RevocationNodeId), ResourceErrorV1> {
+        let (_, identity, provenance) = self.typed_owner(token, ResourceKindV1::SpawnPlan)?;
+        let provenance = provenance.ok_or(ResourceErrorV1::MalformedResource)?;
+        let pending = self.begin_release(token)?;
+        let ResourceOwnerV1::SpawnPlan(plan) = pending.owner else {
+            unreachable!("validated plan owner changed before release")
+        };
+        Ok((plan, identity, provenance))
+    }
+
+    fn take_child_pipe(
+        &mut self, child_token: ResourceTokenV1, fd: u8,
+    ) -> Result<(ResourceTokenV1, ResourceTraceIdentityV1, ResourceTraceIdentityV1), SemanticErrorV1> {
+        let (owner, child_identity, provenance) = self
+            .typed_owner_mut(child_token, ResourceKindV1::ChildProcess)
+            .map_err(SemanticErrorV1::Resource)?;
+        let provenance = provenance.ok_or(ResourceErrorV1::MalformedResource).map_err(SemanticErrorV1::Resource)?;
+        let ResourceOwnerV1::Child(child) = owner else { unreachable!("validated child kind") };
+        let pipe = child.process.take_pipe(fd).map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error)))?;
+        let kind = if fd == 0 { ResourceKindV1::PipeWrite } else { ResourceKindV1::PipeRead };
+        let owner = if fd == 0 { ResourceOwnerV1::PipeWrite(pipe) } else { ResourceOwnerV1::PipeRead(pipe) };
+        let (token, identity) = self.insert_owner(owner, kind, crate::RightSet::from_bits(0), Some(provenance));
+        let (owner, _, _) = self.typed_owner_mut(child_token, ResourceKindV1::ChildProcess)
+            .expect("child remains live while taking a pipe");
+        let ResourceOwnerV1::Child(child) = owner else { unreachable!("validated child kind") };
+        child.taken_pipes.push(token);
+        Ok((token, identity, child_identity))
+    }
+
+    fn settle_child_pipes(
+        &mut self, child_token: ResourceTokenV1, backend: &mut impl HostEffectBackendV1,
+    ) -> Result<(), ResourceErrorV1> {
+        let (owner, _, _) = self.typed_owner(child_token, ResourceKindV1::ChildProcess)?;
+        let ResourceOwnerV1::Child(child) = owner else { unreachable!("validated child kind") };
+        let mut tokens = child.taken_pipes.clone();
+        tokens.reverse();
+        let mut first_error = None;
+        for token in tokens {
+            match self.begin_release(token) {
+                Ok(pending) => {
+                    if let Err(error) = Self::finish_release_with(pending, backend) {
+                        first_error.get_or_insert(error);
+                    }
+                }
+                Err(ResourceErrorV1::Closed) => {} // Closed early by the body.
+                Err(error) => { first_error.get_or_insert(error); }
+            }
+        }
+        first_error.map_or(Ok(()), Err)
     }
 
     pub fn resolve_fs_handle(
@@ -2002,7 +2168,11 @@ impl ResourceTableV1 {
 
     fn owned_capacity(owner: &ResourceOwnerV1) -> Option<u64> {
         match owner {
-            ResourceOwnerV1::FsHandle(_) => None,
+            ResourceOwnerV1::FsHandle(_)
+            | ResourceOwnerV1::SpawnPlan(_)
+            | ResourceOwnerV1::Child(_)
+            | ResourceOwnerV1::PipeRead(_)
+            | ResourceOwnerV1::PipeWrite(_) => None,
             ResourceOwnerV1::Buffer(buffer) => Some(buffer.capacity() as u64),
             ResourceOwnerV1::Mapping(region) => Some(
                 mapping_accounted_capacity(region.length() as u64)
@@ -2036,6 +2206,9 @@ impl ResourceTableV1 {
             ResourceOwnerV1::FsHandle(handle) => backend.resource_close(handle),
             ResourceOwnerV1::Buffer(_) => Ok(()),
             ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
+            ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
+            | ResourceOwnerV1::PipeWrite(_) => Ok(()),
+            ResourceOwnerV1::Child(child) => backend.process_settle(child.process, false),
         };
         match closed {
             Ok(()) => Ok(ResourceSettlementObservationV1 {
@@ -2057,7 +2230,15 @@ impl ResourceTableV1 {
         &mut self,
         backend: &mut impl HostEffectBackendV1,
     ) -> Vec<ResourceSettlementObservationV1> {
-        let tokens = self
+        self.finalize_all_with_mode(backend, false)
+    }
+
+    pub fn finalize_all_with_mode(
+        &mut self,
+        backend: &mut impl HostEffectBackendV1,
+        terminal_error: bool,
+    ) -> Vec<ResourceSettlementObservationV1> {
+        let mut tokens = self
             .slots
             .iter()
             .enumerate()
@@ -2068,6 +2249,16 @@ impl ResourceTableV1 {
                 })
             })
             .collect::<Vec<_>>();
+        if tokens.iter().any(|token| matches!(self.typed_owner(*token, ResourceKindV1::ChildProcess), Ok(_))) {
+            // Child settlement follows every taken pipe close, regardless of
+            // slot reuse. Reverse acquisition order also closes untaken ends
+            // before wait inside ChildProcess::settle.
+            tokens.sort_by_key(|token| {
+                let slot = &self.slots[token.slot as usize];
+                let ResourceSlotStateV1::Live { kind, identity, .. } = &slot.state else { unreachable!() };
+                (*kind == ResourceKindV1::ChildProcess, std::cmp::Reverse(identity.0))
+            });
+        }
         tokens
             .into_iter()
             .filter_map(|token| {
@@ -2078,6 +2269,9 @@ impl ResourceTableV1 {
                     ResourceOwnerV1::FsHandle(handle) => backend.resource_close(handle),
                     ResourceOwnerV1::Buffer(_) => Ok(()),
                     ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
+                    ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
+                    | ResourceOwnerV1::PipeWrite(_) => Ok(()),
+                    ResourceOwnerV1::Child(child) => backend.process_settle(child.process, terminal_error),
                 };
                 Some(match closed {
                     Ok(()) => ResourceSettlementObservationV1 {
@@ -2112,7 +2306,9 @@ impl ResourceTableV1 {
             return Err(ResourceErrorV1::ResourceKindMismatch {
                 expected: match actual {
                     ResourceKindV1::FsHandle => ResourceKindV1::Buffer,
-                    ResourceKindV1::Buffer | ResourceKindV1::Mapping => ResourceKindV1::FsHandle,
+                    ResourceKindV1::Buffer | ResourceKindV1::Mapping
+                    | ResourceKindV1::SpawnPlan | ResourceKindV1::ChildProcess
+                    | ResourceKindV1::PipeRead | ResourceKindV1::PipeWrite => ResourceKindV1::FsHandle,
                 },
                 actual: *actual,
             });
@@ -2199,6 +2395,34 @@ impl ResourceTableV1 {
             ));
         };
         f(file_owner, *file_identity, buffer_owner, *buffer_identity)
+    }
+
+    fn with_pipe_and_buffer_mut<R>(
+        &mut self, pipe: ResourceTokenV1, kind: ResourceKindV1,
+        buffer: ResourceTokenV1,
+        f: impl FnOnce(&std::os::fd::OwnedFd, ResourceTraceIdentityV1,
+                       &mut BufferRegionV1, ResourceTraceIdentityV1) -> Result<R, SemanticErrorV1>,
+    ) -> Result<R, SemanticErrorV1> {
+        let (pipe_slot, buffer_slot) = self.two_live_slots_mut(pipe, buffer).map_err(SemanticErrorV1::Resource)?;
+        let ResourceSlotStateV1::Live { owner: pipe_owner, kind: pipe_kind, identity: pipe_identity, .. } = &mut pipe_slot.state else {
+            return Err(SemanticErrorV1::Resource(ResourceErrorV1::Closed));
+        };
+        if *pipe_kind != kind {
+            return Err(SemanticErrorV1::Resource(ResourceErrorV1::ResourceKindMismatch { expected: kind, actual: *pipe_kind }));
+        }
+        let fd = match pipe_owner {
+            ResourceOwnerV1::PipeRead(fd) if kind == ResourceKindV1::PipeRead => fd,
+            ResourceOwnerV1::PipeWrite(fd) if kind == ResourceKindV1::PipeWrite => fd,
+            _ => return Err(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource)),
+        };
+        let ResourceSlotStateV1::Live { owner: buffer_owner, kind: buffer_kind, identity: buffer_identity, .. } = &mut buffer_slot.state else {
+            return Err(SemanticErrorV1::Resource(ResourceErrorV1::Closed));
+        };
+        if *buffer_kind != ResourceKindV1::Buffer {
+            return Err(SemanticErrorV1::Resource(ResourceErrorV1::ResourceKindMismatch { expected: ResourceKindV1::Buffer, actual: *buffer_kind }));
+        }
+        let ResourceOwnerV1::Buffer(region) = buffer_owner else { return Err(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource)) };
+        f(fd, *pipe_identity, region, *buffer_identity)
     }
 
     #[cfg(test)]
@@ -2347,6 +2571,26 @@ pub trait HostEffectBackendV1 {
                 },
             })
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+    }
+
+    fn process_spawn(&mut self, plan: crate::SpawnPlanV1) -> Result<crate::ChildProcessV1, IoErrorIdentityV1> {
+        crate::process_spawn_v1(plan).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn process_wait(&mut self, child: &mut crate::ChildProcessV1) -> Result<crate::ChildExitV1, IoErrorIdentityV1> {
+        crate::process_wait_v1(child).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn process_settle(&mut self, child: crate::ChildProcessV1, terminal_error: bool) -> Result<(), IoErrorIdentityV1> {
+        child.settle(terminal_error).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn resource_stream_read(&mut self, fd: &std::os::fd::OwnedFd, bytes: &mut [u8]) -> Result<usize, IoErrorIdentityV1> {
+        crate::process_stream_read_v1(fd, bytes).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn resource_stream_write(&mut self, fd: &std::os::fd::OwnedFd, bytes: &[u8]) -> Result<usize, IoErrorIdentityV1> {
+        crate::process_stream_write_v1(fd, bytes).map_err(|error| io_error_identity_v1(&error))
     }
 
     fn fs_resource_read_at(
@@ -2544,6 +2788,10 @@ impl HostOpV1 {
                 crate::AUTH_FULL,
             ),
             Self::FsOpen => CapabilityRequirementV1::FsOpen,
+            Self::ProcessPlanOpen => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::Spawn,
+                crate::AUTH_FULL,
+            ),
             Self::ConsoleRead
             | Self::ConsoleWrite
             | Self::ConsoleFlush
@@ -2567,6 +2815,12 @@ impl HostOpV1 {
             | Self::MappingReadView
             | Self::MappingWriteView
             | Self::MappingAcquireFile
+            | Self::ResourceStreamRead
+            | Self::ResourceStreamWrite
+            | Self::ProcessPlanPush
+            | Self::ProcessSpawn
+            | Self::ProcessTakePipe
+            | Self::ProcessWait
             | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
         }
     }
@@ -2580,9 +2834,12 @@ impl HostOpV1 {
             | Self::BufferFreeze
             | Self::MappingReadView
             | Self::MappingWriteView
-            | Self::MappingAcquireFile => ResourceAdmissionRequirementV1::Target,
-            Self::FsReadAt => ResourceAdmissionRequirementV1::FileBuffer,
-            Self::FsWriteAt => ResourceAdmissionRequirementV1::FileBufferSpan,
+            | Self::MappingAcquireFile
+            | Self::ProcessPlanPush
+            | Self::ProcessTakePipe
+            | Self::ProcessWait => ResourceAdmissionRequirementV1::Target,
+            Self::FsReadAt | Self::ResourceStreamRead => ResourceAdmissionRequirementV1::FileBuffer,
+            Self::FsWriteAt | Self::ResourceStreamWrite => ResourceAdmissionRequirementV1::FileBufferSpan,
             Self::FsSeek
             | Self::FsSetLength
             | Self::FsSync
@@ -2608,6 +2865,8 @@ impl HostOpV1 {
             | Self::FsRename
             | Self::FsChangeMode
             | Self::FsOpen
+            | Self::ProcessPlanOpen
+            | Self::ProcessSpawn
             | Self::ResourceRelease
             | Self::BufferAllocate
             | Self::MappingAllocate => ResourceAdmissionRequirementV1::None,
@@ -2695,25 +2954,37 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
     let (grant, _admission_lease) = match (required, capability) {
         (None, None) => (None, None),
         (None, Some(_)) | (Some(_), None) => {
-            return Ok(denied(
-                operation,
-                request,
-                CapabilityDeniedV1::MalformedCapability,
-            ));
+            return Ok(if operation == HostOpV1::ProcessPlanOpen {
+                error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied))
+            } else {
+                denied(operation, request, CapabilityDeniedV1::MalformedCapability)
+            });
         }
         (Some((op, authority)), Some(token)) => match capabilities.resolve(token) {
             Ok(grant) => {
                 let Some(lease) = revocation.admit(grant.revocation_node) else {
-                    return Ok(revoked(operation, request));
+                    return Ok(if operation == HostOpV1::ProcessPlanOpen {
+                        error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
+                    } else {
+                        revoked(operation, request)
+                    });
                 };
                 match crate::capability::check_fs_capability(&grant.capability, op, authority) {
                     Ok(_) => (Some(grant), Some(lease)),
                     Err(error) => {
-                        return Ok(denied(operation, request, map_capability_denial(error)));
+                        return Ok(if operation == HostOpV1::ProcessPlanOpen {
+                            error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied))
+                        } else {
+                            denied(operation, request, map_capability_denial(error))
+                        });
                     }
                 }
             }
-            Err(error) => return Ok(denied(operation, request, error)),
+            Err(error) => return Ok(if operation == HostOpV1::ProcessPlanOpen {
+                error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied))
+            } else {
+                denied(operation, request, error)
+            }),
         },
     };
     let resource_shape_matches = matches!(
@@ -2735,8 +3006,9 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             HostOpV1::MappingReadView | HostOpV1::MappingWriteView,
             ResourceInputsV1::MappingSpanTarget { .. }
         ) | (HostOpV1::MappingAcquireFile, ResourceInputsV1::Target(_))
-            | (HostOpV1::FsReadAt, ResourceInputsV1::FileBuffer { .. })
-            | (HostOpV1::FsWriteAt, ResourceInputsV1::FileBufferSpan { .. })
+            | (HostOpV1::FsReadAt | HostOpV1::ResourceStreamRead, ResourceInputsV1::FileBuffer { .. })
+            | (HostOpV1::FsWriteAt | HostOpV1::ResourceStreamWrite, ResourceInputsV1::FileBufferSpan { .. })
+            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait, ResourceInputsV1::Target(_))
             | (
                 HostOpV1::BufferAllocate
                     | HostOpV1::MappingAllocate
@@ -2758,7 +3030,8 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     | HostOpV1::FsRemoveDirectory
                     | HostOpV1::FsRename
                     | HostOpV1::FsChangeMode
-                    | HostOpV1::FsOpen,
+                    | HostOpV1::FsOpen
+                    | HostOpV1::ProcessPlanOpen,
                 ResourceInputsV1::None
             )
     );
@@ -2828,6 +3101,13 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 CanonicalRequestV1::FsChangeMode { .. }
             )
             | (HostOpV1::FsOpen, CanonicalRequestV1::FsOpen { .. })
+            | (HostOpV1::ResourceStreamRead, CanonicalRequestV1::ResourceStreamRead { .. })
+            | (HostOpV1::ResourceStreamWrite, CanonicalRequestV1::ResourceStreamWrite { .. })
+            | (HostOpV1::ProcessPlanOpen, CanonicalRequestV1::ProcessPlanOpen { .. })
+            | (HostOpV1::ProcessPlanPush, CanonicalRequestV1::ProcessPlanPush { .. })
+            | (HostOpV1::ProcessSpawn, CanonicalRequestV1::ProcessSpawn)
+            | (HostOpV1::ProcessTakePipe, CanonicalRequestV1::ProcessTakePipe { .. })
+            | (HostOpV1::ProcessWait, CanonicalRequestV1::ProcessWait)
             | (
                 HostOpV1::FsHandleMetadata,
                 CanonicalRequestV1::FsHandleMetadata
@@ -3444,16 +3724,144 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 },
             )
         }
+        (HostOpV1::ProcessPlanOpen, CanonicalRequestV1::ProcessPlanOpen { program }) => {
+            crate::SpawnPlanV1::new(program.clone())
+                .map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error)))
+                .map(|plan| {
+                    let (token, identity) = resources.insert_plan(
+                        plan, grant.expect("validated Process capability").revocation_node,
+                    );
+                    minted_resource = Some(token);
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    CanonicalReplyV1::ResourceAcquired {
+                        schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                        resource_kind: ResourceKindV1::SpawnPlan, identity,
+                    }
+                })
+        }
+        (HostOpV1::ProcessPlanPush, CanonicalRequestV1::ProcessPlanPush { field, first, second, scalar }) => {
+            let ResourceInputsV1::Target(plan) = resource else { unreachable!("validated resource shape") };
+            let pushed = (|| {
+                let (owner, identity, _) = resources.typed_owner_mut(plan, ResourceKindV1::SpawnPlan)
+                    .map_err(SemanticErrorV1::Resource)?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let ResourceOwnerV1::SpawnPlan(plan) = owner else { unreachable!("validated plan kind") };
+                let invalid = || SemanticErrorV1::Io(IoErrorIdentityV1::InvalidInput);
+                match *field {
+                    0 if second.is_empty() && *scalar == 0 => plan.push_argument(first.clone()).map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error))),
+                    1 if *scalar == 0 => plan.push_environment(first.clone(), second.clone()).map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error))),
+                    2 if first.is_empty() && second.is_empty() && *scalar < 0x500 => {
+                        let fd = (*scalar & 0xff) as u8;
+                        let target = match *scalar >> 8 {
+                            0 => crate::ChildStdioV1::Pipe,
+                            1 => crate::ChildStdioV1::Null,
+                            2..=4 => crate::ChildStdioV1::Inherit((*scalar >> 8) as u8 - 2),
+                            _ => return Err(invalid()),
+                        };
+                        plan.set_stdio(fd, target).map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error)))
+                    }
+                    _ => Err(invalid()),
+                }
+            })();
+            pushed.map(|()| CanonicalReplyV1::Unit)
+        }
+        (HostOpV1::ProcessSpawn, CanonicalRequestV1::ProcessSpawn) => {
+            let ResourceInputsV1::Target(token) = resource else { unreachable!("validated resource shape") };
+            (|| {
+                let (_, identity, provenance) = resources.typed_owner(token, ResourceKindV1::SpawnPlan)
+                    .map_err(SemanticErrorV1::Resource)?;
+                let provenance = provenance.ok_or(ResourceErrorV1::MalformedResource).map_err(SemanticErrorV1::Resource)?;
+                let _lease = revocation.admit(provenance).ok_or(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let (plan, _, provenance) = resources.take_plan(token).map_err(SemanticErrorV1::Resource)?;
+                let child = backend.process_spawn(plan).map_err(SemanticErrorV1::Io)?;
+                let (child_token, child_identity) = resources.insert_child(child, provenance);
+                minted_resource = Some(child_token);
+                resource_bindings.push((ResourceBindingRole::File, child_identity));
+                Ok(CanonicalReplyV1::ResourceAcquired {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: ResourceKindV1::ChildProcess, identity: child_identity,
+                })
+            })()
+        }
+        (HostOpV1::ProcessTakePipe, CanonicalRequestV1::ProcessTakePipe { fd }) => {
+            let ResourceInputsV1::Target(child) = resource else { unreachable!("validated resource shape") };
+            (|| {
+                let fd = u8::try_from(*fd).map_err(|_| SemanticErrorV1::Io(IoErrorIdentityV1::InvalidInput))?;
+                let (token, identity, child_identity) = resources.take_child_pipe(child, fd)?;
+                minted_resource = Some(token);
+                resource_bindings.extend([
+                    (ResourceBindingRole::Target, child_identity),
+                    (ResourceBindingRole::Buffer, identity),
+                ]);
+                Ok(CanonicalReplyV1::ResourceAcquired {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: if fd == 0 { ResourceKindV1::PipeWrite } else { ResourceKindV1::PipeRead },
+                    identity,
+                })
+            })()
+        }
+        (HostOpV1::ProcessWait, CanonicalRequestV1::ProcessWait) => {
+            let ResourceInputsV1::Target(child) = resource else { unreachable!("validated resource shape") };
+            (|| {
+                let (owner, identity, _) = resources.typed_owner_mut(child, ResourceKindV1::ChildProcess)
+                    .map_err(SemanticErrorV1::Resource)?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let ResourceOwnerV1::Child(child) = owner else { unreachable!("validated child kind") };
+                backend.process_wait(&mut child.process).map(CanonicalReplyV1::ChildExit).map_err(SemanticErrorV1::Io)
+            })()
+        }
+        (HostOpV1::ResourceStreamRead, CanonicalRequestV1::ResourceStreamRead { buffer_start, length }) => {
+            let ResourceInputsV1::FileBuffer { file: stream, buffer } = resource else { unreachable!("validated resource shape") };
+            resources.with_pipe_and_buffer_mut(stream, ResourceKindV1::PipeRead, buffer, |fd, stream_id, region, buffer_id| {
+                resource_bindings.extend([(ResourceBindingRole::File, stream_id), (ResourceBindingRole::Buffer, buffer_id)]);
+                let (start, effective) = checked_buffer_range(region.capacity(), *buffer_start, *length).map_err(SemanticErrorV1::Resource)?;
+                region.clear_window();
+                let count = backend.resource_stream_read(fd, &mut region.bytes[start..start + effective]).map_err(SemanticErrorV1::Io)?;
+                if count > effective { return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds)); }
+                if count == 0 { Ok(CanonicalReplyV1::ReadProgress(ReadProgressV1::ReadEof)) }
+                else {
+                    region.install_window(start, count);
+                    Ok(CanonicalReplyV1::ReadProgress(ReadProgressV1::ReadSome {
+                        span: BufferSpanV1 { start: start as u64, length: count as u64 },
+                        transferred: TransferCountV1::new(count as u64, effective as u64).expect("positive bounded pipe read"),
+                    }))
+                }
+            })
+        }
+        (HostOpV1::ResourceStreamWrite, CanonicalRequestV1::ResourceStreamWrite { buffer_start, length }) => {
+            let ResourceInputsV1::FileBufferSpan { file: stream, target_buffer, span_origin } = resource else { unreachable!("validated resource shape") };
+            resources.with_pipe_and_buffer_mut(stream, ResourceKindV1::PipeWrite, target_buffer, |fd, stream_id, region, buffer_id| {
+                resource_bindings.extend([(ResourceBindingRole::File, stream_id), (ResourceBindingRole::Buffer, buffer_id)]);
+                let (start, effective) = checked_buffer_range(region.capacity(), *buffer_start, *length).map_err(SemanticErrorV1::Resource)?;
+                checked_span_origin(target_buffer, span_origin).map_err(SemanticErrorV1::Resource)?;
+                let bytes = region.initialized_slice(start, effective).map_err(SemanticErrorV1::Resource)?;
+                let count = backend.resource_stream_write(fd, bytes).map_err(SemanticErrorV1::Io)?;
+                if count == 0 { return Err(SemanticErrorV1::Resource(ResourceErrorV1::NoProgress)); }
+                if count > effective { return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds)); }
+                Ok(CanonicalReplyV1::WriteProgress(WriteProgressV1::Wrote(
+                    TransferCountV1::new(count as u64, effective as u64).expect("positive bounded pipe write"),
+                )))
+            })
+        }
         (HostOpV1::ResourceRelease, CanonicalRequestV1::ResourceRelease) => {
             let ResourceInputsV1::Target(token) = resource else {
                 unreachable!("resource shape validated")
             };
+            let pipe_error = if resources.typed_owner(token, ResourceKindV1::ChildProcess).is_ok() {
+                resources.settle_child_pipes(token, backend).err()
+            } else {
+                None
+            };
             match resources.begin_release(token) {
                 Ok(pending) => {
                     resource_bindings.push((ResourceBindingRole::Target, pending.identity));
-                    ResourceTableV1::finish_release_with(pending, backend)
-                        .map(CanonicalReplyV1::ResourceSettlement)
-                        .map_err(SemanticErrorV1::Resource)
+                    let settlement = ResourceTableV1::finish_release_with(pending, backend);
+                    if let Some(error) = pipe_error {
+                        Err(SemanticErrorV1::Resource(error))
+                    } else {
+                        settlement.map(CanonicalReplyV1::ResourceSettlement).map_err(SemanticErrorV1::Resource)
+                    }
                 }
                 Err(error) => Err(SemanticErrorV1::Resource(error)),
             }
@@ -3750,6 +4158,13 @@ pub enum CanonicalRequestV1 {
         length: u64,
         protection: MappingProtectionV1,
     },
+    ResourceStreamRead { buffer_start: u64, length: u64 },
+    ResourceStreamWrite { buffer_start: u64, length: u64 },
+    ProcessPlanOpen { program: Vec<u8> },
+    ProcessPlanPush { field: u64, first: Vec<u8>, second: Vec<u8>, scalar: u64 },
+    ProcessSpawn,
+    ProcessTakePipe { fd: u64 },
+    ProcessWait,
     ResourceRelease,
 }
 
@@ -3779,6 +4194,7 @@ pub enum FsCapabilityOperationV1 {
 pub enum IoErrorIdentityV1 {
     NotFound,
     PermissionDenied,
+    CapabilityDenied,
     BrokenPipe,
     Interrupted,
     AlreadyExists,
@@ -3860,6 +4276,7 @@ pub enum CanonicalReplyV1 {
     ResourceSettlement(ResourceSettlementObservationV1),
     ReadProgress(ReadProgressV1),
     WriteProgress(WriteProgressV1),
+    ChildExit(crate::ChildExitV1),
     MonotonicInstant(Vec<u8>),
     FilePosition(u64),
     FdInheritancePolicy(FdInheritancePolicyV1),
@@ -3971,6 +4388,7 @@ impl CanonicalOutcomeV1 {
                 | CanonicalReplyV1::DirectoryEntries(_)
                 | CanonicalReplyV1::ResourceAcquired { .. }
                 | CanonicalReplyV1::ResourceSettlement(_)
+                | CanonicalReplyV1::ChildExit(_)
                 | CanonicalReplyV1::MonotonicInstant(_)
                 | CanonicalReplyV1::FilePosition(_)
                 | CanonicalReplyV1::FdInheritancePolicy(_) => None,
