@@ -650,10 +650,12 @@ arithmetic, division, `Float`, rounding, width and structural
 hull/intersection equalities remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–7 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–9 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
 SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION;
-SPEC-TIME-MERGE-ASSOCIATIVITY; SPEC-TIME-WINDOW-ADJACENT-SPLIT).
+SPEC-TIME-MERGE-ASSOCIATIVITY; SPEC-TIME-WINDOW-ADJACENT-SPLIT;
+SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8;
+SPEC-TIME-INVERTED-WINDOW-EMPTY §9).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -697,9 +699,21 @@ identities 114 → 114. The §7 export was absent on the spec author's
 base; this assembled candidate adds the checked law and a package test
 for the complete accepted seed and isolated refusal. These candidate-
 local checks are not official conformance-runner execution, CI,
-publication, landing or landed trust. Clock effects, durations, causality,
-infinite streams, premise-free structural window/merge distribution and k-way merge
-remain deferred.
+publication, landing or landed trust. Section 8 states premise-free
+`trace_window_append` distribution over arbitrary traces and bounds;
+its catalog export, seed and package test are present on this base.
+Section 9 specifies `trace_window_inverted_empty p lo hi tr`: under
+`Equal Bool (leq_nat hi lo) True`, even an unordered trace yields
+`Nil (Event p)`, including equal bounds. The proof uses one new
+private `event_in_window_inverted` helper and the existing private
+`event_in_window_past` and `window_keep`; no ordering premise enters.
+Architect's isolated AC-0 on `f97544426` checked the generic proof
+without an `Axiom` and with equal scratch trusted GlobalId sets
+114 → 114. This spec-only §9 turn adds no catalog theorem or seed;
+it establishes no candidate execution, official conformance, CI,
+publication, landing or landed trust. Clock effects, durations,
+causality, infinite streams, premise-free structural window/merge
+distribution and k-way merge remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;

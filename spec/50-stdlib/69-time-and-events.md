@@ -7,7 +7,8 @@
 > SPEC-TIME-WINDOW-COMPOSITION §5;
 > SPEC-TIME-MERGE-ASSOCIATIVITY §6;
 > SPEC-TIME-WINDOW-ADJACENT-SPLIT §7;
-> SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8;
+> SPEC-TIME-INVERTED-WINDOW-EMPTY §9).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -47,6 +48,13 @@
 > the separately owned catalog, seed and test need exact-tip review in
 > the assembled candidate. No official conformance-runner execution,
 > CI, publication, landing or landed trust follows from this spec turn.
+> Section 9 states a public empty-window law for arbitrary traces whenever
+> `hi ≤ lo`, including equal bounds. Architect's isolated AC-0 on
+> `f97544426` checked the generic proof with rc 0, no `Axiom`, and
+> identical scratch trusted GlobalId sets 114 → 114. This spec-only
+> turn adds no §9 catalog theorem or conformance seed and establishes
+> no candidate execution, official conformance, CI, publication,
+> landing or landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -846,3 +854,61 @@ Those are scratch findings, not a checked-in seed run or official
 conformance. The separate catalog and conformance owners must deliver
 and test the same contract on the assembled exact tip before their
 respective reviews; no D0 result transfers to CI or landed trust.
+
+## 9. Equal or inverted windows select no events
+
+> **Section 9 status: DRAFT v0 (SPEC-TIME-INVERTED-WINDOW-EMPTY).**
+> Architect's isolated AC-0 on
+> `f975444269fd5c3863973fcb1fcde3f638cac2d6` checked the generic
+> proof and closed controls with rc 0, no `Axiom`, and unchanged
+> scratch `trusted_base()` GlobalId identities (114 → 114). This
+> spec-only child adds no checked §9 catalog export or conformance seed.
+> D0 does not establish candidate execution, official conformance,
+> CI, publication, landing or landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent theorem
+immediately after `trace_window_append` and before `trace_merge_nil_left`.
+It follows `trace_window`'s argument order, then takes exactly the
+bound-order premise:
+
+```ken
+pub theorem trace_window_inverted_empty
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : Equal Bool (leq_nat hi lo) True
+      → Equal (List (Event p)) (trace_window p lo hi tr) (Nil (Event p))
+```
+
+The premise `hi ≤ lo` includes equal bounds as well as strictly
+inverted ones. The result is structural equality of event lists: an
+empty half-open window selects no event in **any** trace, including an
+unordered trace and one with repeated timestamps or arbitrary payloads.
+There is no `time_ordered p tr` or other premise. This is the checked
+form of §1.2's total empty-window behavior, not a law about only the
+ordered traces accepted by §7's adjacent split.
+
+The proof descends through the list. At each event time `t`, if
+`lo ≤ t`, transitivity with `hi ≤ lo` gives `hi ≤ t`, so the existing
+private `event_in_window_past` makes `event_in_window` false. If
+`lo ≤ t` is false, `bool_and False _` already makes it false.
+The Boolean decision is bound with its equality **before** matching,
+so the match refines the actual `leq_nat lo t`; matching a computed
+expression alone does not supply that equality. Existing private
+`window_keep` then drops the event, and induction gives the empty
+windowed tail. One new helper, `event_in_window_inverted`, stays private
+beside `event_in_window_past`; `event_in_window_past` and `window_keep`
+stay private too. The ordered-trace-only `trace_window_past` is not
+needed. No new import or change to any §1–§8 operation or law type is
+required; no Axiom, kernel or surface change is admitted.
+
+The separate CV seed will apply the law to `[4,4)` and `[7,4)` over a
+trace with events at times 1, 4 and 7, and also to the unordered
+permutation at `[7,4)`. The value `trace_window Bool 4 4 tr = Nil`
+is a true `Equal` goal discharged by `Proved`, **not** `Refl`; the
+accepted nonempty `[4,5)` control keeps the time-4 event and uses
+`Refl`. An isolated refused `[4,5)`-equals-`Nil` claim must use the
+same well-formed `Proved` proof form as the true empty-window value:
+otherwise `Refl` would reject even a true `Nil` goal and conceal the
+false-window boundary. A separate refused law application at `[4,5)`
+needs the absent `leq_nat 5 4 = True` premise. Architect observed these
+accept/refuse pairs in scratch D0; this Spec Author turn does not run
+or deliver the §9 seed or catalog theorem.
