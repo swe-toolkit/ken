@@ -1073,9 +1073,10 @@ and one standalone `elaborate_file_v1` entry. Both roots routes require explicit
 provider imports for the five package identities. Strict roots alone assert
 no-import refusals. The standalone row asserts bare access to those five exact
 pre-source IDs; it does not cover the other standalone Legacy entries. Other
-unimported Legacy bare globals, including `ConsoleOp`, are unspecified:
-neither promised nor refused. No row adds trust or duplicates a checked
-definition.
+unimported Legacy bare implementation globals, including `ConsoleOp`, are
+unspecified: neither promised nor refused. The scoped ConsoleStream constructor
+rows below retain their every-route contract. No row adds trust or duplicates a
+checked definition.
 
 ### surface/modules/console-stream-checked-family-and-char-comparator
 
@@ -1112,23 +1113,23 @@ definition.
   names `ConsoleStream` and `eqChar` with their accepted one-name controls:
   `const ConsoleStream : Nat = Zero` and `const eqChar : Nat = Zero` against
   `const LocalStream : Nat = Zero` and `const local_char_eq : Nat = Zero`.
-  In separate strict-roots units only, for each leaf `C` of `Stdin`,
+  In separate fresh units for each route, for each leaf `C` of `Stdin`,
   `Stdout`, and `Stderr`, compare `const value : ConsoleStream = C` with the
   accepting same-leaf local control `data LocalCase = C`, followed by
   `const local : LocalCase = C` and
   `const still_checked : ConsoleStream = ConsoleStream.C`.
-  Independently declare `data Stream = MkStream` in strict roots.
+  Independently declare `data Stream = MkStream` in each route.
 - expect: in all three routes, both admitted-name declarations reject at
-  introduction and their unrelated local controls accept. In strict roots,
-  each bare floor use refuses at surface resolution, each local leaf accepts
-  with a different parent and ID, and the qualified checked case still
-  resolves after the local declaration. The local `Stream` accepts there
-  without replacing the ConsoleStream family. No Legacy bare-leaf outcome is
-  asserted. No row allocates a replacement floor identity or adds trust.
-- controls: in strict roots, erroneously reserving any bare case makes its
+  introduction and their unrelated local controls accept. Each bare scoped
+  constructor use refuses at surface resolution, each same-leaf local
+  constructor accepts with a different parent and ID, and the qualified checked
+  case still resolves after the local declaration. The local `Stream` accepts
+  in each route without replacing the ConsoleStream family. No row allocates a
+  replacement floor identity or adds trust.
+- controls: in each route, erroneously reserving any bare case makes its
   same-leaf local control reject while the qualified positive still passes.
-  Adding `Stream` to the floor makes its strict-roots local-family acceptance
-  reject; this is independent of the `ConsoleStream` reservation control.
+  Adding `Stream` to the floor makes its local-family acceptance reject in each
+  route; this is independent of the `ConsoleStream` reservation control.
 
 ### surface/modules/console-char-package-homes-export-original-ids
 
