@@ -115,11 +115,11 @@ fn strict_frozen_corpus_gate_is_green() {
     );
 }
 
-/// Promise class: durable invariant. MEASURED: a Process-granted checked
-/// program is admitted with its declared FS authority and rejected when that
-/// authority is removed. CLAIMED: a Process grant does not replace the FS
-/// authority needed by its checked ProgramCaps AFull. THE GAP: this exercises
-/// one Process entrypoint and does not enumerate all runnable programs.
+/// Promise class: durable invariant. MEASURED: every runnable Ken root in
+/// the catalog, examples, conformance and crate fixture corpus declares exactly
+/// one FS authority in its capabilities header. CLAIMED: adding a runnable root
+/// cannot silently omit its FS authority. THE GAP: roots outside this corpus or
+/// without the ProgramCaps/HostIO marker are not enumerated by this gate.
 #[test]
 fn every_checked_runnable_root_declares_its_fs_authority() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -166,6 +166,11 @@ fn every_checked_runnable_root_declares_its_fs_authority() {
     assert!(!runnable.is_empty(), "runnable corpus must not be empty");
 }
 
+/// Promise class: durable invariant. MEASURED: a Process-granted checked
+/// program is admitted with its declared FS authority and rejected when that
+/// authority is removed. CLAIMED: a Process grant does not replace the FS
+/// authority needed by its checked ProgramCaps AFull. THE GAP: this exercises
+/// one Process entrypoint and does not enumerate all runnable programs.
 #[test]
 fn process_program_requires_its_declared_fs_authority() {
     let source = include_str!("fixtures/px10_child_wait_smoke.ken");
