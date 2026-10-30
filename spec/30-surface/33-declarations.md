@@ -275,16 +275,17 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
-  BufferSpan, Char, Coproduct, CreatePolicy, Equal, ExitCode, FileError,
-  HostIO, IOError, ITree, Instant, List, Nat, Option, Pair, ProcessInput,
-  Prod, ProgramCaps, Prop, Proved, ResourceError, ResourceKind, Result,
-  Top, TransferCount, Unit, Utf8Error}`. This floor subset contains thirty
-  exact identities: the prior fifteen, five entrypoint-ABI identities,
-  three effect/clock identities, `ITree`, and six FS/resource families
-  (`30-taxonomy §4`). These are not thirty types: `Top` and `Bottom` are
-  proposition constants, `Proved` is a proof binding, and `HostIO` is a
-  type-level function, not an inductive type or constructor family. For
-  an inductive floor type, its per-type
+  BufferSpan, Char, ConsoleStream, Coproduct, CreatePolicy, Equal,
+  ExitCode, FileError, HostIO, IOError, ITree, Instant, List, Nat,
+  Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
+  ResourceError, ResourceKind, Result, Top, TransferCount, Unit,
+  Utf8Error, eqChar}`. This floor subset contains thirty-two exact
+  identities: the prior thirty plus `ConsoleStream` and `eqChar`
+  (`30-taxonomy §4`). These are not thirty-two types: `Top` and
+  `Bottom` are proposition constants, `Proved` is a proof binding,
+  `HostIO` is a type-level function, and `eqChar` is a checked
+  comparator operation, not an inductive type or constructor family.
+  For an inductive floor type, its per-type
   **scoped constructors** property determines whether its whole exact
   constructor family also occupies bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
@@ -302,6 +303,12 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `ITree` is scoped: `ITree.Ret` and `ITree.Vis` resolve to the unchanged
   checked constructor IDs; bare `Ret` and `Vis` are not reserved and
   may be bound by other source declarations under ordinary non-B rules.
+  `ConsoleStream` is scoped: its complete exact checked family resolves
+  as `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
+  `ConsoleStream.Stderr`. Of this family, only `ConsoleStream` enters
+  the counted floor; bare `Stdin`, `Stdout`, `Stderr`, and the old
+  generic `Stream` spelling are not reserved by it. No constructor ID
+  is renamed.
   `FileError` is unscoped: `MkFileError` remains bare and reserved with
   its exact parent. `IOError` is scoped as a complete thirteen-cause
   family: only public `IOError.C` paths resolve, including

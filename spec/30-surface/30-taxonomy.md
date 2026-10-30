@@ -113,19 +113,23 @@ that a source declaration cannot recreate. That identity may originate at the
 kernel boundary or in the compiler bootstrap: both are language internals that
 the prelude bridges to the surface. This is the surface analog of the kernel's
 `Top`/`Bottom`/`tt` prelude (`64 §1`): fixed Ken vocabulary excluded from
-`trusted_base()` yet always present in a closed set.
+`trusted_base()` yet always present in a closed set. The
+internal-provision arm also admits a checked operation when an exact-ID
+native reader and independent source-name need both hold; it is not
+limited to inductive type identities.
 
 > **Prelude membership rule (normative, checkable).** A Ken-defined,
-> source-resolved type is in the prelude **iff** at least one of these arms has a
-> witness:
+> source-resolved identity is in the prelude **iff** at least one of these
+> arms has a witness:
 >
 > 1. **Signature arm.** A built-in primitive's type signature names the type.
 > 2. **Internal-provision arm.** Before source-unit elaboration, the
 >    implementation has installed one canonical identity through ordinary
 >    kernel checking, and a **native mechanism is keyed to that exact
->    identity** — the kernel, the effect reifier, erasure/lowering, or the host
->    runner — so that a source declaration of the same structure allocates a
->    distinct `GlobalId` that **fails to interoperate** with that mechanism
+>    identity** — the kernel, the elaborator's exact-ID reader, the effect
+>    reifier, erasure/lowering, or the host runner — so that a source
+>    declaration of the same structure allocates a distinct `GlobalId`
+>    that **fails to interoperate** with that mechanism
 >    rather than reproducing the identity. The witness records which mechanism
 >    does the keying and whether the origin is the kernel boundary or the
 >    compiler bootstrap. The surface contract independently requires programs to
@@ -139,10 +143,11 @@ the prelude bridges to the surface. This is the surface analog of the kernel's
 > is not an internal-provision witness. Each member has an explicit internal
 > origin and exact pre-source identity; a missing or substituted identity fails
 > closed. A signature-arm type that no primitive signature names is bloat. An
-> internal-provision type with no independent source-reachability requirement,
-> or whose identity source can reproduce, is likewise bloat. A missing witnessed
-> member is a gap. Kernel syntax and native formers remain built-ins and are
-> referenced directly rather than duplicated as prelude bindings.
+> internal-provision identity with no independent source-reachability
+> requirement, or whose identity source can reproduce, is likewise
+> bloat. A missing witnessed member is a gap. Kernel syntax and native
+> formers remain built-ins and are referenced directly rather than
+> duplicated as prelude bindings.
 >
 > A companion operation joins an internal-provision member's floor-binding
 > closure only when that member's surface contract names it, its checked type is
@@ -158,9 +163,12 @@ specific by type qualification; a generic name not covered by that route
 needs a rename before admission. Spec owns public spelling in `35`/`38`
 and the [ledger](30-intrinsic-ledger.md); any rename lands atomically with
 the floor identity, roster/count, catalog callers and fixtures.
-`NotFound`, `Other` and `Unsupported` are now admitted only as
-`IOError.C` paths, with no bare reservation or rename. `write` and
-`Stdout` remain specificity probes, with no replacement names decided.
+`NotFound`, `Other` and `Unsupported` are admitted only as
+`IOError.C` paths, with no bare reservation or rename. `write` is a
+package name, not a reserved floor spelling; package qualification
+resolves its specificity probe. The Console carrier is source-renamed
+from generic `Stream` to `ConsoleStream`; its `Stdout` case resolves
+only as `ConsoleStream.Stdout`, not as a bare reservation.
 `Instant` passes specificity as a type with a scoped `Instant.MkInstant`
 constructor, not a bare `MkInstant` reservation.
 `Success` and `Failure` have passed it as the qualified paths
@@ -263,15 +271,38 @@ six families. None is a new primitive or a trusted-base entry. Native
 `CreatePolicy::CreateNew` (and its sibling policy leaves); constructor
 scoping changes source paths, not these checked identities or leaves.
 
-Thus the closed **floor-identity roster** has thirty names:
-**`{Auth, Bool, Bottom, BufferSpan, Char, Coproduct, CreatePolicy, Equal,
-ExitCode, FileError, HostIO, IOError, ITree, Instant, List, Nat, Option,
-Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved, ResourceError,
-ResourceKind, Result, Top, TransferCount, Unit, Utf8Error}`**. The
-original fifteen, five entrypoint identities, three effect/clock
-identities, `ITree` and six FS/resource identities remain re-checked;
-floor admission alone adds no postulate or `trusted_base()` entry.
-Constructor and companion closures are separate from this 30-name count.
+The Console stream carrier and the character comparator meet the same
+internal-provision conjunction. The host interpreter selects the exact
+checked `Stdin`, `Stdout`, and `Stderr` constructor IDs and their parent;
+native lowering reads their pre-source stable-symbol leaves from an
+operand typed by the canonical Console carrier. Source must name that
+carrier and its selectors for console input and output. The generic
+source spelling `Stream` conflicts with the distinct §37 library
+`Stream`, so the admitted source type is `ConsoleStream`, with the
+complete constructor family available only as `ConsoleStream.Stdin`,
+`ConsoleStream.Stdout`, and `ConsoleStream.Stderr`. The native artifact
+leaves retain their pre-source `Stream::C` spelling and exact checked
+IDs; this source rename does not allocate another family.
+`eqChar` is a checked comparator operation, not a type: the Char
+`==` plan and character literal matching select its registered exact
+ID, while §34's literal equality and §37's character operations
+require the canonical comparator to be source-nameable. String
+literal patterns must read that same registered ID rather than a
+mutable spelling lookup. The candidate rekeys that reader, so a
+same-spelling source declaration cannot change its comparator.
+
+Thus the closed **floor-identity roster** has thirty-two names:
+**`{Auth, Bool, Bottom, BufferSpan, Char, ConsoleStream, Coproduct,
+CreatePolicy, Equal, ExitCode, FileError, HostIO, IOError, ITree,
+Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
+Prop, Proved, ResourceError, ResourceKind, Result, Top, TransferCount,
+Unit, Utf8Error, eqChar}`**. The earlier thirty identities plus
+`ConsoleStream` and `eqChar` remain re-checked; floor admission alone
+adds no postulate or `trusted_base()` entry. The three scoped Console
+constructors and the Pair companions are separate from this 32-name
+count. These identities are not all types: `Top` and `Bottom` are
+proposition constants, `Proved` is a proof binding, `HostIO` a
+type-level function, and `eqChar` a checked comparator operation.
 The definable `And`/`Dec`/`Yes`/`No` stay **out**
 (source-constructible, with a `Core/Logic` package home, and no
 internal-provision witness). The `Empty` needed by `space` desugaring
@@ -312,6 +343,11 @@ their exact checked constructor IDs, whereas bare `InL`, `InR` and
 `MkInstant` do not enter B. `ITree` is scoped as a complete family:
 `ITree.Ret` and `ITree.Vis` retain their exact constructor IDs, while
 bare `Ret` and `Vis` do not enter B and may be bound by source.
+`ConsoleStream` is scoped as a complete family: only the type name
+enters the counted floor, while `ConsoleStream.Stdin`,
+`ConsoleStream.Stdout`, and `ConsoleStream.Stderr` reach their exact
+pre-source constructor IDs. Bare `Stdin`, `Stdout`, and `Stderr` do not
+enter B; the unrelated source name `Stream` is not reserved.
 `FileError` is unscoped: `MkFileError` is bare and reserved. `IOError`
 is scoped as the complete thirteen-cause family: each source path is
 `IOError.C` (including `IOError.NotFound`, `IOError.Other`,
@@ -327,17 +363,20 @@ visibility, with no bare reservation or newly public qualified path.
 `ProcessInput`, `Prod` and `Unit` are unscoped: their whole constructor
 families, respectively `MkProcessInput`, `MkProd` and `MkUnit`, are bare
 reserved names. `HostIO`, `Char`, and transparent `Pair` have no
-constructor family. A same-shaped source family or definition has a
-different identity and is not the floor member. Every floor type,
-constructor, and companion is re-checked and **out** of `trusted_base()`.
+constructor family; `eqChar` is an operation, not a family. A
+same-shaped source family or definition has a different identity and
+is not the floor member. Every floor identity, constructor, and
+companion is re-checked and **out** of `trusted_base()`.
 
 **Other effect-surface and Program-I identities remain candidates.** The
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
 also holds. `Unit`, `Coproduct`, `Instant` and `ITree` are admitted on exact-ID
-keying and independent `36` source needs; the six FS/resource families above
-are admitted on exact-ID keying and independent `38` source needs. Mere
-registration does not admit any type. A source wrapper over an ABI (for example
+keying and independent `36` source needs; the six FS/resource families
+above are admitted on exact-ID keying and independent `38` source
+needs. `ConsoleStream`'s constructor family and `eqChar` also have
+separate exact-ID keying and source-need witnesses. Mere registration
+does not admit any identity. A source wrapper over an ABI (for example
 `Capability/Process/Exit`'s `exit_with`/`exit_from_result`) does not become
 an intrinsic identity by using one. `host_exit` is keyed but has no independent
 source-name requirement: it remains compiler-internal; an example using that
@@ -368,7 +407,7 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the thirty-identity set above and that candidate has no new
+remains the thirty-two-identity set above and that candidate has no new
 ambient availability. `BufferWindow`, `ResourceBodyResult`,
 `ResourceBracketResult`, the `FS` source alias, `read_bytes` and `write_file`
 are source-promised but unkeyed: they remain outside B as package material,
@@ -391,15 +430,30 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the thirty-identity
-floor and Pair's three checked companions as the current target. The prior
-fifteen, five entrypoint-ABI identities, three effect/clock identities and
-`ITree` form the earlier twenty-four; this co-turn admits the six witnessed
-FS/resource families with their whole scoped or unscoped constructor
-families, atomically with the roster/count and existing-source migration.
-It does not establish QA, CI or landing. Other candidates need both D0
-witness clauses before admission. No implementation gap authorizes a
-second identity or fallback route.
+**Implementation staging.** The specification fixes the
+thirty-two-identity floor and Pair's three checked companions as the
+current target. The thirty prior identities are present on this base;
+this candidate adds `ConsoleStream` and `eqChar`, the complete scoped
+Console constructor family, and the source-name migration atomically
+with the roster/count. The five unkeyed, source-promised Console/Char
+operations or aliases remain package identities: `IO`, `write`, and
+`print_line` are exported at their exact pre-source IDs by
+`Capability.Console.Text`; `charToInt` and `leqChar` by
+`Core.Classes.LawfulClasses`. These existing homes export the captured
+checked IDs, not copied definitions or synthetic substitute globals.
+Roots-loaded clients import those providers. Standalone legacy files
+and inline sources continue resolving the five package names bare in
+this slice, recorded separately for the later strict flip; no CLI
+roots route or strict-default flip is included. The `ConsoleStream`
+rename and scoped constructor paths apply in both entry populations.
+
+The implementer's token-aware census classified 1,045 candidate rows
+across 164 paths. It predicts 127 ambient-pair deletions, not 127
+observed deletions; seven directly affected catalog roots were measured
+with zero ambient names, but the full-catalog transition sentinel was
+not run locally. This Spec co-turn does not establish independent QA,
+official conformance, CI, publication or landed trust. No implementation
+gap authorizes a second identity or fallback route.
 
 ## 5. The standard-package tier — the dissolved stdlib
 

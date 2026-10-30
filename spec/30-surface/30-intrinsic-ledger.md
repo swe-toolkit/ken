@@ -1,8 +1,9 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative thirty-identity prelude and its exact constructor/companion
-> closure are `30-taxonomy §4`; resolution and protected names are `33 §3.3`.
+> normative thirty-two-identity prelude and its exact
+> constructor/companion closure are `30-taxonomy §4`; resolution and
+> protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
 > Once D0 proves both §4 witness clauses per name, a keyed, source-required
 > identity joins the reserved floor with an atomic roster/count change.
@@ -24,10 +25,10 @@ an unused catalog census name proves a global is safe to remove.
 
 For unruled candidate names below, the keying column names a **native
 reader to check**, not proof that the reader set is complete. The
-admitted entrypoint-ABI, effect/clock, ITree and FS/resource rows instead
-record ruled exact-ID keying and independent source need (`30 §4`'s
-conjunction).
-Both proven → reserved, always-present floor. Keyed but no independent source
+admitted entrypoint-ABI, effect/clock, ITree, FS/resource,
+`ConsoleStream` and `eqChar` rows instead record ruled exact-ID keying
+and independent source need (`30 §4`'s conjunction). Both proven →
+reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
 explicit-import Ken package. Unkeyed and unpromised → remove only after the
 full unit reach is measured. `Empty` has a measured native reader and no
@@ -40,24 +41,29 @@ there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
 Apart from internal-only `Empty` and the admitted entrypoint-ABI,
-effect/clock, ITree and six FS/resource families below, the candidate
-names in this table are **observed spellings**, not names approved for
-permanent reservation. Before a later slice admits a newly witnessed
-name, Spec checks that its spelling closely encloses its meaning
-(`30 §4`). For the admitted `IOError` family, `NotFound`, `Other` and
-`Unsupported` gain specificity through `IOError.C` qualification, not
-renaming or bare reservation. `write` and `Stdout` remain specificity
-probes for later slices. `Instant` is admitted as a specific type spelling, while its
-constructor is qualified `Instant.MkInstant`. `Success`/`Failure`
-are admitted only as qualified `ExitCode.Success`/`ExitCode.Failure`,
-not bare reservations. Spec owns public naming folds in `35`/`38`
-and this ledger. Any necessary type/function rename lands atomically
-with floor admission and catalog/fixture clients. Qualification `T.C`
+effect/clock, ITree, six FS/resource families, the `ConsoleStream`
+family and `eqChar` below, the other names in this table are
+**observed spellings**, not names approved for permanent reservation.
+Before a later slice admits a newly witnessed name, Spec checks that
+its spelling closely encloses its meaning (`30 §4`). For the admitted
+`IOError` family, `NotFound`, `Other` and `Unsupported` gain
+specificity through `IOError.C` qualification, not
+renaming or bare reservation. `write` is package material; `Stdout`
+is admitted only as `ConsoleStream.Stdout`. The earlier specificity
+probes are resolved by package qualification and constructor
+qualification, respectively. `Instant` is admitted as a specific type
+spelling, while its constructor is qualified `Instant.MkInstant`.
+`Success`/`Failure` are admitted only as qualified
+`ExitCode.Success`/`ExitCode.Failure`, not bare reservations. Spec owns
+public naming folds in `35`/`38` and this ledger. Any necessary
+renaming lands atomically with floor admission and catalog/fixture
+clients. Qualification `T.C`
 is now normative in expressions and patterns for every data type
 (`32 §4`, `33 §3.3`, `34 §1`).
 It can make a generic constructor specific without reserving its bare
-name; this FS/resource slice assigns no replacement spelling to any
-type or function.
+name; this Console/Char slice renames only the source-visible `Stream`
+carrier to `ConsoleStream`, preserving its pre-source constructor IDs
+and native stable-symbol leaves.
 
 ## Per-type constructor scope choices
 
@@ -78,7 +84,7 @@ constructor still has the same checked parent and `GlobalId`.
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
 | `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
-| `Stream` (candidate) | Yes if admitted | `Stdout` and `Stderr` need their carrier; source need and keying remain to be ruled. |
+| `ConsoleStream` (floor) | Yes | The complete checked console-selector family uses only `ConsoleStream.Stdin`, `ConsoleStream.Stdout` and `ConsoleStream.Stderr` in source; bare leaves and generic `Stream` are not reserved. |
 | `CreatePolicy` (floor) | Yes | The three cases use `CreatePolicy.C`, retaining their unchanged native artifact leaves. |
 | `ProcessInput` (floor) | No | Its `MkProcessInput` constructor is bare and reserved with its type. |
 | `Unit` (current floor) | No | `MkUnit` names its exact checked parent and remains bare and reserved. |
@@ -89,12 +95,11 @@ constructor still has the same checked parent and `GlobalId`.
 | `Coproduct` (current floor) | Yes | `InL`/`InR` are generic; only `Coproduct.InL`/`Coproduct.InR` resolve to the exact constructors. |
 | `Prod` (floor) | No | `MkProd` names its carrier and is bare and reserved; retargeting the constructor-backed runtime representation to floor `Pair` is not part of this slice. |
 
-The dedicated L2 qualified-constructor/scoped-property slice precedes L2-3
-floor additions. It also migrates uses of the existing `ResourceKind` family
-from bare to qualified form; the change must not strand catalog or fixture
-clients. L2-3 then admits only D0-witnessed types with the property selected
-above. A scoped type's constructor rows below identify exact parent and
-possible native reader, **not** additional bare names to add to B.
+The earlier qualified-constructor/scoped-property slice established the
+per-type choice and migrated `ResourceKind` to qualified paths. Each
+later admission still needs both §4 witnesses and a complete constructor
+family; a scoped type's constructor rows below identify exact parent
+and native reader, **not** additional bare names to add to B.
 
 ## Reserved entrypoint names, other candidates, and internal identities
 
@@ -117,8 +122,9 @@ The six FS/resource families are admitted by the native constructor
 producer/reader and parent-ID probe on `fd2f57557` (Architect AC-0),
 paired with their independent `38` source need (Spec Leader AC-0).
 Other inventory citations retain their stated census base. Only
-marked witnessed entrypoint-ABI, effect/clock, ITree and FS/resource
-rows below join the floor; no other row alone reserves a name.
+marked witnessed entrypoint-ABI, effect/clock, ITree, FS/resource,
+`ConsoleStream` and `eqChar` rows below join the floor; no other row
+alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
 |---|---|
@@ -136,10 +142,10 @@ rows below join the floor; no other row alone reserves a name.
 | `Prod` (floor, unscoped) | `ProcessInput`'s environment field names `List (Prod Bytes Bytes)`; its exact constructor-backed runtime identity is source-required. Floor `Pair` cannot replace its representation in this slice. |
 | `MkProd` (bare floor constructor) | Native environment-pair consumers select its exact ID; the whole unscoped `Prod` family is reserved. |
 | `host_exit` (internal-only) | Native entrypoint machinery keys this exact ID, but `33 §3.2.1` does not require programs to name it. An example use does not confer source need; the example migrates in the same build. |
-| `eqChar` | `decimal_char.rs::set_eq_entry` captures the checked definition's ID for literal/comparator selection (`33 §6.2`); confirm every reader. |
-| `leqChar` | Checked projection/comparison definition (`decimal_char.rs`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
-| `charToInt` | Checked `Char → Int` projection (`18a §5.9.1`); **no identity reader yet confirmed**, so default to package if D0 finds none. |
-| `IO` | Checked Console-ITree alias (`prelude.rs`); confirm whether the effect reifier selects the alias ID or only the underlying constructors. |
+| `eqChar` (floor operation) | `decimal_char.rs::set_eq_entry` captures its checked ID; the Char `==` plan and character literal patterns read that registration. The string-literal-pattern reader is rekeyed to the same exact ID instead of a mutable spelling lookup. §34 literal equality and §37 Char/string operations require the canonical comparator in source. It is a checked operation, not a type or constructor family. |
+| `leqChar` (package) | No native exact-ID reader; §37 Char ordering still requires this checked comparison. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import, with no copied definition. |
+| `charToInt` (package) | No native exact-ID reader; §18a §5.9.1 and §38 ASCII/parsing use its checked `Char → Int` projection. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import. |
+| `IO` (package) | Checked Console-ITree alias. The effect reifier selects `ITree` and `ConsoleOp` checked IDs, not the `IO` alias ID. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `FS` (package, not floor) | Source-promised Auth-indexed ITree alias in `read_bytes`/`write_file` types (`38`); no native reader of this alias ID. The effect/capability label `FS` is a separate namespace. |
 | `ITree` (floor, scoped) | `PreludeEnv.itree_id` captures the checked pre-source inductive ID; effect lowering and the host interpreter select that family by exact ID. The surface requires source to name the canonical type and its constructors (`36 §2.1`, §2.4). A same-shaped source family does not replace it. |
 | `Ret` (qualified floor constructor) | `PreludeEnv.ret_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Ret`, never a reserved bare `Ret`. The constructor itself is not renamed. |
@@ -147,12 +153,13 @@ rows below join the floor; no other row alone reserves a name.
 | `Coproduct` (floor, scoped) | `PreludeEnv.coproduct_id` identifies the checked effect-signature sum; native composition keys the exact injection parents and source needs the family (`36 §2.3`, §4.5.7). |
 | `InL` (qualified floor constructor) | `CanonicalRuntimeRoles::in_l` selects the exact `Coproduct` constructor; only `Coproduct.InL` resolves, not bare `InL`. |
 | `InR` (qualified floor constructor) | `CanonicalRuntimeRoles::in_r` selects the exact `Coproduct` constructor; only `Coproduct.InR` resolves, not bare `InR`. |
-| `Stream` | Console stream carrier; trace `ConsoleOp` response/reifier identity and source use before reserving its complete constructor family. |
-| `Stdin` | `Stream` constructor; trace the native stream selector and source requirement. |
-| `Stdout` | `Stream` constructor used by source `write`/`print_line`; trace native stream selection. |
-| `Stderr` | `Stream` constructor; trace the native selector independently. |
+| `ConsoleStream` (renamed from `Stream`; floor, scoped) | Native interpreter and lowering select the exact checked constructor family and parent. Source `read` and the console output package require its canonical type. The specific source name avoids collision with §37's distinct `Stream`; its pre-source native `Stream::C` artifact leaves stay unchanged. |
+| `Stdin` (qualified floor constructor) | Interpreter selects its exact checked ID; source `read` names `ConsoleStream.Stdin`, never bare `Stdin`. |
+| `Stdout` (qualified floor constructor) | Interpreter selects its exact checked ID; output source names `ConsoleStream.Stdout`, never bare `Stdout`. |
+| `Stderr` (qualified floor constructor) | Interpreter selects its exact checked ID; output source names `ConsoleStream.Stderr`, never bare `Stderr`. |
 | `read_bytes` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`ReadFile` identities, not this wrapper's ID. |
-| `write` | Checked Console call wrapper (`prelude.rs`); same independent test. |
+| `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
+| `print_line` (package) | Checked Console helper promised by §38 and existing programs, with no native exact-ID reader. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `write_file` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`WriteFile` identities, not this wrapper's ID. |
 | `FileError` (floor, unscoped) | `38 §1.3.1` requires this public FS result carrier; native code mints the exact checked `MkFileError` constructor and thereby keys its parent. |
 | `MkFileError` (bare floor constructor) | `CanonicalRuntimeRoles::file_error` selects the checked `FileError` constructor; source keeps bare `MkFileError`. |
@@ -204,10 +211,13 @@ rows below join the floor; no other row alone reserves a name.
 | `ResourceBracketReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 | `ResourceBracketBodyAndReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 
-The five entrypoint-ABI, three effect/clock, `ITree` and six FS/resource
-type identities marked floor above join B alongside the original fifteen.
-Unscoped constructor families reserve bare names; scoped families retain
-exact IDs reachable only through `T.C` when public, without bare B entries.
+The five entrypoint-ABI, three effect/clock, `ITree`, six FS/resource,
+`ConsoleStream`, and `eqChar` identities marked floor above join B
+alongside the original fifteen: thirty-two counted identities. The
+three Console constructors retain their exact IDs and scoped paths but
+are not separate `PRELUDE_FLOOR_NAMES` entries. Unscoped constructor
+families reserve bare names; scoped families retain exact IDs reachable
+only through `T.C` when public, without bare B entries.
 Private constructors stay hidden even when their parent type is scoped.
 Other rows remain **outside** B. Capturing an ID proves keying, not
 independent source need. `Empty` is read by exact ID but remains internal-only;
@@ -219,9 +229,16 @@ change and retirement of the catalog `Empty`; it adds nothing to today's floor.
 Both witnesses admit a type to B; its whole constructor family follows the
 scoped choice above. Without source need it is internal-only, and without
 keying it is package material if promised.
-For checked definitions the test remains per-name: `leqChar` does not inherit
-`eqChar`'s registry key. `IOError`'s thirteen causes are one **scoped**
-family, not thirteen bare B names. Architect's D0 names each cause's
+For checked definitions the test remains per-name: `leqChar` does not
+inherit `eqChar`'s registry key. The five source-promised but unkeyed
+names `IO`, `write`, `print_line`, `charToInt`, and `leqChar` remain
+package identities with their exact pre-source IDs, not new copies.
+Roots-loaded clients import their explicit providers; standalone legacy
+files and inline sources still use those five bare in this slice, as a
+separate flip-owned census class. The `ConsoleStream` rename and scoped
+constructor paths apply in both populations; no CLI roots route or
+strict-default flip is introduced. `IOError`'s thirteen causes are
+one **scoped** family, not thirteen bare B names. Architect's D0 names each cause's
 native producer separately, without inferring all readers from one cause.
 The twelve `ResourceError` constructors likewise retain their exact IDs
 without bare reservations. `ITree` joins the type floor without adding bare
@@ -230,6 +247,13 @@ source may bind either under ordinary non-B rules. The D0 resolved
 `Prod`/`MkProd` as a reserved unscoped family. A future
 representation change to kernel `Pair` would be a separate Runtime successor,
 not a second source-visible ABI in this slice.
+
+The implementer's token-aware baseline classified 1,045 candidate rows
+across 164 paths. The 127 ambient `(module, name)` pair deletions are
+predicted, not observed: seven directly affected catalog roots were
+measured zero-ambient, but the full-catalog transition sentinel was not
+run locally. These candidate-local controls do not establish QA,
+official conformance, CI, publication or landed trust.
 
 ## Checked laws and helpers are not intrinsic candidates
 

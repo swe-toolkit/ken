@@ -97,14 +97,15 @@ The loader proceeds as follows:
 4. Construct a fresh scope for each unit from exactly its local declarations,
    explicit imports, kernel and built-in vocabulary, and the closed prelude
    floor. Its exact prelude-floor name set is `{Auth, Bool, Bottom, BufferSpan,
-   Char, Coproduct, CreatePolicy, Equal, ExitCode, FileError, HostIO, IOError,
-   ITree, Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
-   Prop, Proved, ResourceError, ResourceKind, Result, Top, TransferCount, Unit,
-   Utf8Error}` (`30-taxonomy §4`; `33 §3.3`). These thirty identities are not
-   thirty types: `Top` and `Bottom` are proposition constants, `Proved` is a
-   proof binding, and `HostIO` is a type-level function. Admit a floor
-   constructor only at its exact checked parent and subject to its per-type
-   scoped-constructors property and visibility. `Auth`'s
+   Char, ConsoleStream, Coproduct, CreatePolicy, Equal, ExitCode, FileError,
+   HostIO, IOError, ITree, Instant, List, Nat, Option, Pair, ProcessInput,
+   Prod, ProgramCaps, Prop, Proved, ResourceError, ResourceKind, Result, Top,
+   TransferCount, Unit, Utf8Error, eqChar}` (`30-taxonomy §4`; `33 §3.3`).
+   These thirty-two identities are not thirty-two types: `Top` and `Bottom`
+   are proposition constants, `Proved` is a proof binding, `HostIO` is a
+   type-level function, and `eqChar` is a checked comparator operation.
+   Admit a floor constructor only at its exact checked parent and
+   subject to its per-type scoped-constructors property and visibility. `Auth`'s
    `ANone`/`APartial`/`AFull`, `Bool`'s `True`/`False`, `List`'s `Nil`/`Cons`,
    `Nat`'s `Zero`/`Suc`, `Option`'s `None`/`Some`, `Result`'s `Err`/`Ok`, and
    `Utf8Error`'s `InvalidUtf8` remain bare and reserved. `ProcessInput`,
@@ -117,9 +118,15 @@ The loader proceeds as follows:
    but remains runner-minted and is not made public by qualification.
    `Coproduct.InL`, `Coproduct.InR`, `Instant.MkInstant`, `ITree.Ret`, and
    `ITree.Vis` use their exact scoped identities, not bare B names.
-   `IOError`'s complete thirteen-cause family, `CreatePolicy`'s three cases
-   and `ResourceError`'s complete twelve-case family are scoped: their
-   public constructor paths are `IOError.C`, `CreatePolicy.CreateNew` /
+   `ConsoleStream`'s entire checked family is scoped:
+   `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
+   `ConsoleStream.Stderr` resolve to its three exact constructor IDs;
+   bare `Stdin`, `Stdout`, `Stderr`, and the old generic `Stream`
+   spelling do not enter B. The scoped constructors do not increase the
+   thirty-two-name count. `IOError`'s complete thirteen-cause family,
+   `CreatePolicy`'s three cases and `ResourceError`'s complete
+   twelve-case family are scoped: their public constructor paths are
+   `IOError.C`, `CreatePolicy.CreateNew` /
    `CreatePolicy.CreateOrTruncate` / `CreatePolicy.CreateOrKeep`, and
    `ResourceError.C`, never their bare names. `BufferSpan` and
    `TransferCount` are scoped; `PrivateBufferSpan` and
@@ -145,10 +152,11 @@ The loader proceeds as follows:
    program, with an identical `trusted_base()` delta.
 
 Installing a floor member or Pair companion is a resolution operation over
-declarations that already exist. The loader reuses all thirty exact checked
-prelude-floor identities, including `Top` and `Bottom` as proposition constants
-and `Proved`'s proof-term identity, the exact constructor IDs derived from
-recorded parentage, and the exact three Pair companion IDs. It allocates no
+declarations that already exist. The loader reuses all thirty-two exact
+checked prelude-floor identities, including `Top` and `Bottom` as proposition
+constants, `Proved`'s proof-term identity, and the registered `eqChar`
+comparator ID, along with exact constructor IDs derived from recorded
+parentage and the exact three Pair companion IDs. It allocates no
 declaration and adds no `trusted_base()` entry. A same-spelling top-level
 declaration for a floor name, an unscoped floor constructor, or a Pair
 companion collides with the immutable B set and is rejected before admission.
