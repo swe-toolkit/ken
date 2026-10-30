@@ -148,6 +148,11 @@ pub struct NumericEnv {
     pub abi_scalar_conversion_trusted_delta: Vec<GlobalId>,
 
     fixed_int_literal_descriptors: Vec<FixedIntLiteralDescriptor>,
+    /// Non-numeric literal roles captured from their pre-source registrars.
+    literal_plan_ids: Option<LiteralPlanIds>,
+    /// Bytes registrar's two carrier IDs, available before prelude source is
+    /// elaborated (which itself contains string literal values).
+    literal_carriers: Option<(GlobalId, GlobalId)>,
 
     // --- `+` dispatch table (keyed by the type's GlobalId) ---
     add_table: HashMap<GlobalId, AddEntry>,
@@ -170,12 +175,27 @@ struct FixedIntLiteralDescriptor {
     type_name: &'static str,
     min: BigInt,
     max: BigInt,
+    /// Filled from the conversion registrar's returned primitive identity.
+    widen_view_id: Option<GlobalId>,
+}
+
+/// IDs supplied by the Bytes and prelude registrars for literal planning.
+/// Captured once after registration, before any user source can rebind a name.
+#[derive(Clone, Copy)]
+pub(crate) struct LiteralPlanIds {
+    pub string_to_list_char_id: GlobalId,
+    pub bytes_to_list_id: GlobalId,
+    pub list_id: GlobalId,
+    pub nil_id: GlobalId,
+    pub cons_id: GlobalId,
 }
 
 impl NumericEnv {
     pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<GlobalId>) {
-        self.fixed_int_literal_descriptors
-            .retain(|descriptor| !removed.contains(&descriptor.type_id));
+        self.fixed_int_literal_descriptors.retain(|descriptor| {
+            !removed.contains(&descriptor.type_id)
+                && !descriptor.widen_view_id.is_some_and(|id| removed.contains(&id))
+        });
         self.add_table.retain(|id, _| !removed.contains(id));
         self.eq_table.retain(|id, _| !removed.contains(id));
         self.sub_table.retain(|id, _| !removed.contains(id));
@@ -197,6 +217,45 @@ impl NumericEnv {
                     &descriptor.max,
                 )
             })
+    }
+
+    /// Record the conversion primitive returned by the owner of this carrier.
+    pub(crate) fn record_fixed_widen_view(&mut self, carrier: GlobalId, view: GlobalId) {
+        let descriptor = self
+            .fixed_int_literal_descriptors
+            .iter_mut()
+            .find(|descriptor| descriptor.type_id == carrier)
+            .expect("conversion carrier must have a registered literal descriptor");
+        descriptor.widen_view_id = Some(view);
+    }
+
+    pub(crate) fn fixed_widen_view(&self, carrier: GlobalId) -> Option<GlobalId> {
+        self.fixed_int_literal_descriptors
+            .iter()
+            .find(|descriptor| descriptor.type_id == carrier)
+            .and_then(|descriptor| descriptor.widen_view_id)
+    }
+
+    pub(crate) fn install_literal_carriers(&mut self, string: GlobalId, bytes: GlobalId) {
+        assert!(
+            self.literal_carriers.replace((string, bytes)).is_none(),
+            "literal carriers are captured once"
+        );
+    }
+
+    pub(crate) fn literal_carriers(&self) -> Option<(GlobalId, GlobalId)> {
+        self.literal_carriers
+    }
+
+    pub(crate) fn install_literal_plan_ids(&mut self, ids: LiteralPlanIds) {
+        assert!(
+            self.literal_plan_ids.replace(ids).is_none(),
+            "literal IDs are captured once"
+        );
+    }
+
+    pub(crate) fn literal_plan_ids(&self) -> Option<LiteralPlanIds> {
+        self.literal_plan_ids
     }
 
     /// Register (or replace) the `+` dispatch entry for `ty_id` — used by
@@ -641,6 +700,7 @@ pub fn register_numeric_env(
             type_name,
             min: -boundary.clone(),
             max: boundary - 1,
+            widen_view_id: None,
         }
     };
     let unsigned_descriptor =
@@ -650,6 +710,7 @@ pub fn register_numeric_env(
                 type_name,
                 min: BigInt::from(0u8),
                 max: (BigInt::from(1u8) << bits) - 1,
+                widen_view_id: None,
             }
         };
     let fixed_int_literal_descriptors = vec![
@@ -674,6 +735,8 @@ pub fn register_numeric_env(
         abi_scalar_retract_ids: Vec::new(),
         abi_scalar_conversion_trusted_delta: Vec::new(),
         fixed_int_literal_descriptors,
+        literal_plan_ids: None,
+        literal_carriers: None,
         add_table,
         eq_table,
         sub_table,
