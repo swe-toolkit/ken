@@ -325,10 +325,10 @@ fn collect_decl_globals(decl: &Decl, out: &mut BTreeSet<GlobalId>) {
     }
 }
 
-/// Checked declarations brought in by a direct import also bring their
-/// checked types and bodies. Those dependencies are not additional source
-/// prerequisites of the importing unit.
-fn imported_identity_closure(env: &ElabEnv, seed: BTreeSet<GlobalId>) -> BTreeSet<GlobalId> {
+/// Direct imports, prelude-floor identities, and grants to this package home
+/// also bring their checked types and bodies. Those dependencies are not
+/// additional source prerequisites of the importing unit.
+fn explained_identity_closure(env: &ElabEnv, seed: BTreeSet<GlobalId>) -> BTreeSet<GlobalId> {
     let mut reached = seed;
     let mut pending = reached.iter().copied().collect::<Vec<_>>();
     while let Some(identity) = pending.pop() {
@@ -564,6 +564,12 @@ fn legacy_evidence(
 ) -> LegacyIdentityEvidence {
     let mut env = ElabEnv::new().expect("base environment");
     let strict_available = strict_available_ids(&env);
+    let home_granted: BTreeSet<GlobalId> = env
+        .module_state
+        .package_home_ids(module)
+        .iter()
+        .map(|(_, id)| *id)
+        .collect();
     let base_names = names_by_id(&env);
     let base_support = CompilerInternalBaseSupportAuthority::from_base(&env, &base_names);
     let entry_ids = match env.elaborate_module_from_roots(&[root.to_path_buf()], module) {
@@ -620,7 +626,7 @@ fn legacy_evidence(
     let interior_evidence = pinned_interior_evidence(module, unit, all_units, &env, &resolved);
     let mut modules_longest_first: Vec<_> = all_units.keys().cloned().collect();
     modules_longest_first.sort_by_key(|name| std::cmp::Reverse(name.len()));
-    let imported_seed: BTreeSet<GlobalId> = resolved
+    let mut explained_seed: BTreeSet<GlobalId> = resolved
         .iter()
         .copied()
         .filter(|identity| {
@@ -635,7 +641,9 @@ fn legacy_evidence(
             })
         })
         .collect();
-    let import_reached = imported_identity_closure(&env, imported_seed);
+    explained_seed.extend(resolved.intersection(&strict_available).copied());
+    explained_seed.extend(resolved.intersection(&home_granted).copied());
+    let explained_reached = explained_identity_closure(&env, explained_seed);
     let mut prerequisites = BTreeSet::new();
 
     for identity in resolved.iter().copied() {
@@ -648,9 +656,10 @@ fn legacy_evidence(
         if owned.contains(&identity)
             || entry_start.is_some_and(|start| identity.0 >= start)
             || strict_available.contains(&identity)
+            || home_granted.contains(&identity)
             || base_support.contains(identity)
             || interior_evidence.contains(&identity)
-            || import_reached.contains(&identity)
+            || explained_reached.contains(&identity)
             || matches!(
                 env.env.lookup(identity),
                 Some(Decl::Primitive {
@@ -831,7 +840,9 @@ fn validate_evidence_frontier(rows: &[UnitCensusRow]) -> Result<(), String> {
 /// completeness claim. A prerequisite is an identity the unit's source reaches
 /// without an explaining direct import. Identities that enter the checked core
 /// only through the checked types or bodies of identities the unit's direct
-/// imports provide are transitive dependencies, not prerequisites. THE GAP:
+/// imports provide are transitive dependencies, not prerequisites. The
+/// compiler's exact floor and this root's own checked home grants likewise
+/// explain their identities and the checked dependencies they bring. THE GAP:
 /// this census does not guard Strict resolution against fallback; the Strict
 /// resolver suites do.
 #[test]
@@ -919,6 +930,62 @@ fn minimisation_indirect_length_is_not_a_source_prerequisite() {
 
 /// Promise class: durable invariant.
 ///
+/// MEASURED: the real Console.Text unit succeeds under Strict; its full legacy
+/// core retains the checked isScalar, IO, and write IDs while the source
+/// prerequisite set is empty. CLAIMED: the unit's exact home grants and the
+/// checked Char floor type explain these identities without new imports.
+/// THE GAP: the non-home Legacy write fixture separately guards grant scope.
+#[test]
+fn console_home_grants_and_char_literal_dependency_are_explained() {
+    let root = catalog_root();
+    let units = discover_units(&root);
+    let module = "Capability.Console.Text";
+    assert!(units[module].direct_imports.is_empty());
+    assert_eq!(observe_strict(&root, module), LoaderObservation::Succeeded);
+    let env = ElabEnv::new().expect("base environment");
+    let scalar = env.globals["isScalar"];
+    let io = env.globals["IO"];
+    let write = env.globals["write"];
+    let home_ids = env
+        .module_state
+        .package_home_ids(module)
+        .iter()
+        .map(|(_, id)| *id)
+        .collect::<BTreeSet<_>>();
+    assert!(home_ids.contains(&io) && home_ids.contains(&write));
+    let evidence = legacy_evidence(&root, module, &units[module], &units);
+    assert_eq!(
+        validate_evidence_frontier(&[UnitCensusRow {
+            canonical_module: module.to_string(),
+            parsed_direct_imports: units[module].direct_imports.clone(),
+            strict_observation: LoaderObservation::Succeeded,
+            legacy_observation: LoaderObservation::Succeeded,
+            legacy_identity_evidence: evidence.clone(),
+        }]),
+        Ok(()),
+        "Console.Text prerequisites: {evidence:?}"
+    );
+    match evidence {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            for identity in [scalar, io, write] {
+                assert!(resolved_globals.contains(&identity), "retain {identity}");
+            }
+            assert_eq!(
+                identity_grounded_prerequisites,
+                BTreeSet::new(),
+                "home grants and Char floor must explain the exact identities"
+            );
+        }
+        other => panic!("Console.Text must have exact legacy evidence: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant.
+///
 /// MEASURED: a real legacy-loaded fixture retains a provider's checked
 /// identity while a known-answer missing-import-edge variant supplies only
 /// an unrelated bridge to the classifier. CLAIMED: the imported-identity
@@ -998,6 +1065,65 @@ fn missing_direct_import_edge_keeps_provider_identity_a_prerequisite() {
             );
         }
         other => panic!("Consumer must have exact legacy evidence: {other:?}"),
+    }
+    let fixture_top = root
+        .parent()
+        .and_then(Path::parent)
+        .expect("fixture has temporary top");
+    fs::remove_dir_all(fixture_top).expect("remove fixture tree");
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: an unrelated module with no imports uses the checked pre-source
+/// write ID through the Legacy fallback, while Strict roots refuse it.
+/// CLAIMED: a home grant explains an identity only inside its exact home;
+/// unrelated clients do not inherit that grant. THE GAP: the Console.Text
+/// real-root positive above independently measures the home exemption.
+#[test]
+fn bare_legacy_write_outside_its_home_stays_a_prerequisite() {
+    let nonce = format!(
+        "ken-catalog-console-nonhome-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos()
+    );
+    let root = std::env::temp_dir()
+        .join(nonce)
+        .join("catalog")
+        .join("packages");
+    fs::create_dir_all(&root).expect("create fixture root");
+    fs::write(
+        root.join("Consumer.ken"),
+        "proc use_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n",
+    )
+    .expect("write non-home fixture");
+    let units = discover_units(&root);
+    assert!(units["Consumer"].direct_imports.is_empty());
+    assert_eq!(observe_legacy(&root, "Consumer"), LoaderObservation::Succeeded);
+    assert_eq!(
+        observe_strict(&root, "Consumer"),
+        LoaderObservation::Refused {
+            stage: PipelineStage::Resolution,
+        }
+    );
+    let env = ElabEnv::new().expect("base environment");
+    let write_id = env.globals["write"];
+    match legacy_evidence(&root, "Consumer", &units["Consumer"], &units) {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(resolved_globals.contains(&write_id));
+            assert!(identity_grounded_prerequisites.contains(&IdentityPrerequisite::CanonicalHome {
+                identity: write_id,
+                current_names: vec!["write".to_string()],
+            }));
+        }
+        other => panic!("non-home Consumer must have exact legacy evidence: {other:?}"),
     }
     let fixture_top = root
         .parent()

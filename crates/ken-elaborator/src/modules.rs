@@ -491,6 +491,12 @@ impl ModuleState {
         })
     }
 
+    /// Checked pre-source package identities granted in `module`'s own
+    /// scope; empty for every other module.
+    pub(crate) fn package_home_ids(&self, module: &str) -> &[(String, ken_kernel::GlobalId)] {
+        self.package_home_ids.get(module).map_or(&[], Vec::as_slice)
+    }
+
     pub(crate) fn capture_strict_builtin_names(
         &mut self,
         env: &ken_kernel::GlobalEnv,
@@ -2241,11 +2247,9 @@ fn load_unit(
         // Only the approved file unit owns these pre-source IDs. An ordinary
         // export publishes them through its provider table; other units must
         // import that provider, never resolve the live process-global spelling.
-        if let Some(granted) = elab.module_state.package_home_ids.get(module) {
-            for (name, id) in granted {
-                scope.bindings.insert(name.clone(), name.clone());
-                scope.binding_ids.insert(name.clone(), *id);
-            }
+        for (name, id) in elab.module_state.package_home_ids(module) {
+            scope.bindings.insert(name.clone(), name.clone());
+            scope.binding_ids.insert(name.clone(), *id);
         }
         let mut unit_definitions = HashSet::new();
         let mut ordered_inline_modules = HashSet::new();
