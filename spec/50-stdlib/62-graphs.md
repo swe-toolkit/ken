@@ -817,11 +817,12 @@ only the walk or only the target would not establish this result. All
 §§1–7 operation and law types remain unchanged, and no `Axiom`, kernel,
 surface change or second fixed-point search is needed.
 
-The §8 conformance seed belongs under `conformance/stdlib/graphs/` in
-the separate CV turn. Its planned three-vertex chain has a checked walk
-V0 → V1 → V2. Reversing it makes V2 reach target V0 in the reversed
-graph. The same reachability claim on the forward chain is false because
-no edge leaves V2; an accepted
-reversed-graph value control in the same scope distinguishes the refusal
-from a mere unprovable spelling. These are AC-2 obligations for the
-separate CV turn, not seed execution or candidate QA in this spec turn.
+The authored §8 seed is
+`conformance/stdlib/graphs/seed-reachability-reverse.md`. Its accepted
+client constructs a two-edge walk V0 → V1 → V2 and states that its
+reverse makes V2 reach target V0 in the reversed graph. An accepted
+reversed-graph value control accompanies the isolated refusal of the
+same reachability claim on the forward chain, where no edge leaves V2.
+CV statically checked the seed but did not run it as Ken or through the
+official conformance runner. Seed authorship and static checks are not
+candidate QA or a conformance-execution result.
