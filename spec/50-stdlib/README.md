@@ -562,7 +562,7 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–8
+**`68-numerical.md`** §§1–9
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
@@ -570,7 +570,8 @@ SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
 SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER;
 SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
 SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
-SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8). The §1–2
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -630,8 +631,23 @@ This assembled candidate adds both §8 checked catalog exports, the
 corrected CV seed and a package-owned test. Architect's D0 remains
 scratch evidence; reported candidate-local tests and mutations are not
 official conformance-runner execution, CI, publication, landing or
-landed trust. Signed arithmetic, division, `Float`, rounding, width
-and structural hull/intersection equalities remain deferred.
+landed trust. Section 9 specifies four premise-free public laws for
+mutual endpoint-value inclusion of hull and intersection regroupings,
+including inverted intervals, without structural `Equal Interval`.
+The proofs need only existing public interval laws, with no new helper
+or Rational export. Architect's isolated AC-0 on `903b06068` checked
+all four generic proofs without an `Axiom` and with equal scratch
+trusted identities 114 → 114. This assembled candidate has four
+checked §9 catalog exports, a package-owned test and the authored
+`conformance/stdlib/numerical/seed-interval-hull-intersect-associativity.md`.
+The named `cat_numeric_interval_hull_intersect_associativity` target
+passed 2/2 with reported candidate-local trusted identity sets
+114 → 114. CV statically checked the seed but did not run it as Ken or
+through the official conformance runner. D0 remains scratch evidence;
+neither D0 nor candidate-local checks establish official conformance,
+CI, publication, landing or landed trust. Signed
+arithmetic, division, `Float`, rounding, width and structural
+hull/intersection equalities remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–7 (SPEC-TIME-EVENT-TRACE-CONTRACT;
