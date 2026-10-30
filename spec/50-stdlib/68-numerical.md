@@ -7,7 +7,9 @@
 > SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER §5;
 > SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
-> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9).** The §1–2
+> operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -46,6 +48,13 @@
 > laws, the corrected CV seed and a package-owned test. D0 remains scratch;
 > reported candidate-local tests and mutations do not establish official
 > conformance-runner execution, CI, publication, landing or landed trust.
+> Section 9 specifies four premise-free hull/intersection regrouping laws
+> by mutual endpoint-value inclusion. Architect's isolated AC-0 on
+> `903b06068` checked the four generic proofs without an `Axiom` and with
+> unchanged scratch trusted GlobalId identities (114 → 114). This
+> spec-only turn adds no catalog export, conformance seed or package test;
+> it claims no official conformance, CI, publication, landing or landed
+> trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -921,3 +930,68 @@ prove the generic laws. The package-owned
 `cat_numeric_interval_hull_intersect_absorption` test checks the seed's
 accepted client and isolated refusal against the two §8 catalog laws; it
 is not official conformance-runner execution.
+
+## 9. Hull and intersection regroup by endpoint-value inclusion
+
+> **Section 9 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY).** Architect's
+> isolated AC-0 on `903b06068d7c67c74ab9d979513c31c0c7572b31`
+> checked all four generic obligations and closed controls with rc 0,
+> no `Axiom`, and equal scratch `trusted_base()` GlobalId sets
+> (114 → 114). This spec-only child adds neither checked catalog exports
+> nor a conformance seed or package test. The D0 does not establish
+> official conformance-runner execution, CI, publication, landing or
+> landed trust.
+
+For every three intervals `i`, `j`, `k`, including inverted intervals,
+`Algorithm.Numeric.RationalInterval` must export the following four
+public Transparent laws in the displayed order, immediately after
+`interval_hull_intersect_inside_left` and before private `equiv_leq`.
+Arguments are `i`, `j`, `k`; there are no premises:
+
+```ken
+pub theorem interval_hull_assoc_inside (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside (interval_hull i (interval_hull j k)) (interval_hull (interval_hull i j) k))
+
+pub theorem interval_hull_assoc_rev_inside (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside (interval_hull (interval_hull i j) k) (interval_hull i (interval_hull j k)))
+
+pub theorem interval_intersect_assoc_inside (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside (interval_intersect i (interval_intersect j k)) (interval_intersect (interval_intersect i j) k))
+
+pub theorem interval_intersect_assoc_rev_inside (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside (interval_intersect (interval_intersect i j) k) (interval_intersect i (interval_intersect j k)))
+```
+
+As in §6, plain `_assoc_inside` puts the **right-nested** result inside
+the left-nested one; `_assoc_rev_inside` states the reverse. Two laws
+per operation are public, rather than expecting clients to derive a
+missing direction from a single export. §3.1's `interval_inside`
+compares the corresponding exact rational endpoint **values**, not
+interval spellings or member sets. The results give mutual
+endpoint-value inclusion for both hull and intersection regroupings,
+even when
+an input is inverted. They do not assert structural `Equal Interval`
+between the regroupings or require ordered, nonempty or otherwise
+valid inputs. The §2.2 warning against structural hull/intersection
+associativity remains in force.
+
+The proofs compose only existing public interval facts: §7's
+`interval_hull_least` and `interval_intersect_greatest`, §3's left and
+right hull/intersection inclusions, and `interval_inside_trans`.
+Hull least collects the two nested operands after transitive inclusion;
+intersection greatest bounds the nested result by both operands.
+Reversing the grouping reverses those compositions. No new helper,
+Rational law or endpoint case split is required; private `equiv_leq` and
+`rational_distrib_r` remain private and unused. Sections 1–8 retain all
+operation and law types. There is no new axiom, kernel or surface rule.
+
+The separate CV seed will reuse `i=[1/2,1]`, `j=[1/3,2]` and
+`k=[3/2,3]` to apply each public law. Its isolated refusal drops `k`
+from the asserted containing hull: `interval_hull i (interval_hull j k)` is
+`[1/3,3]`, whereas `interval_hull i j` is `[1/3,2]`. The former is
+not inside the latter by endpoint value. Architect's D0 separately
+accepted the `False` value for that inclusion and refused its `IsTrue`
+claim at the theorem, while also checking an inverted interval in each
+operand position. Those are isolated scratch results and planned seed
+controls, not execution of a shipped §9 seed or catalog export.
