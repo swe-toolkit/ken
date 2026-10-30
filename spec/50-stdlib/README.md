@@ -253,8 +253,9 @@ The **Layer-3 graphs and dependency contract** is pinned in
 (SPEC-GRAPHS-WALK-COMPOSITION-ORDER), and §4
 (SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC), §5
 (SPEC-GRAPHS-REACHABILITY-ALONG-WALK), §6
-(SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE), and §7
-(SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE). A graph has Boolean directed adjacency
+(SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE), §7
+(SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE), and §8
+(SPEC-GRAPHS-REVERSE-REACHABILITY). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
@@ -298,7 +299,21 @@ The §7 seed is assigned at
 this assembled candidate adds that seed, the catalog export and a
 package-owned test. Scratch D0 and spec authorship do not establish
 official conformance, CI, publication, landing or landed trust. No second
-fixed point is added.
+fixed point is added. Section 8 specifies `graph_reverse`, its public
+edge-flip law, `walk_reverse` and `graph_reachable_reverse`. A checked
+walk from `s` to `t` with `target s = True` makes `s` reachable from
+`t` in the reversed graph, not necessarily in the original graph.
+Architect's isolated AC-0 on `77d13c94b` checked the four generic
+forms without an `Axiom` and with equal scratch trusted identities
+114 → 114. This assembled candidate has all four checked catalog
+exports, a package-owned test and the authored
+`conformance/stdlib/graphs/seed-reachability-reverse.md`. The named
+`cat_graphs_reverse_reachability` target passed 2/2 with reported
+candidate-local trusted identities 114 → 114. CV performed static checks
+of the new seed, not a Ken or official conformance run;
+`cat_graphs_dependency` timed out without a verdict. Neither D0 nor
+candidate-local checks establish official conformance, CI, publication,
+landing or landed trust.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;

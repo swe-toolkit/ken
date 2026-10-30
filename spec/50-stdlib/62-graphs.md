@@ -6,7 +6,8 @@
 > SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC §4;
 > SPEC-GRAPHS-REACHABILITY-ALONG-WALK §5;
 > SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE §6;
-> SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE §7).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE §7;
+> SPEC-GRAPHS-REVERSE-REACHABILITY §8).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -28,7 +29,16 @@
 > adds the §7 catalog export, its authored seed and a package-owned test;
 > these candidate-local checks are not official conformance-runner execution,
 > CI, publication, landing or landed trust. No kernel, trust, or surface-syntax
-> change or revision to §61 §2 is required.
+> change or revision to §61 §2 is required. Section 8 specifies four
+> public reverse-graph and reachability forms. This assembled candidate
+> has all four checked catalog exports, a package-owned test and the
+> authored §8 seed. The named `cat_graphs_reverse_reachability` test
+> passed 2/2 with reported candidate-local trusted identities 114 → 114.
+> Architect's AC-0 remains isolated scratch evidence; CV statically checked the
+> new seed but did not run it as Ken or through the official conformance
+> runner. The separate `cat_graphs_dependency` run timed out without a
+> verdict. No official conformance, CI, publication, landing or landed
+> trust is claimed.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -736,3 +746,83 @@ seven closed Bool rows refuse `Refl`; their proof form is `Proved`.
 These finite cases discriminate direction but do not prove the generic
 law. The D0's checked development is scratch evidence, not catalog
 delivery, official conformance, CI, publication, landing, or landed trust.
+
+## 8. Reverse a directed graph and its walks
+
+> **Section 8 status: DRAFT v0
+> (SPEC-GRAPHS-REVERSE-REACHABILITY).** Architect's isolated AC-0 on
+> `77d13c94b22f7b9f7886edf610d8a7c3b6db31b9` checked the four
+> generic forms and seed controls with rc 0, no `Axiom`, and unchanged
+> scratch `trusted_base()` identities (114 → 114). This assembled
+> candidate has the four checked catalog forms, a package-owned test,
+> and the authored `conformance/stdlib/graphs/seed-reachability-reverse.md`.
+> The named `cat_graphs_reverse_reachability` test passed 2/2, with
+> reported candidate-local trusted identities 114 → 114. CV's seed
+> checks were static only: no Ken or official conformance run of that
+> seed. `cat_graphs_dependency` timed out without a verdict. Neither
+> the isolated D0 nor candidate-local results establish official
+> conformance, CI, publication, landing or landed trust.
+
+`Algorithm.Graphs.Dependency` must export the following four public
+Transparent forms, in this order, immediately after
+`graph_reachable_graph_monotone` and before `contains`. Their checked
+signatures are:
+
+```ken
+pub fn graph_reverse (q : Type) (g : Graph q) : Graph q
+
+pub theorem graph_reverse_edge
+      (q : Type) (g : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_reverse q g) s t) (edge q g t s)
+
+pub fn walk_reverse
+      (q : Type) (g : Graph q) (s : q) (t : q) (walk : Walk q g s t)
+    : Walk q (graph_reverse q g) t s
+
+pub theorem graph_reachable_reverse
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (target : q → Bool)
+      (walk : Walk q g s t)
+    : Equal Bool (target s) True
+      → Equal Bool (graph_reachable q fq (graph_reverse q g) t target) True
+```
+
+`graph_reverse q g` flips the directed adjacency without changing the
+carrier: its edge from `s` to `t` is `edge q g t s`. The public
+`graph_reverse_edge` law states this equation as `Equal Bool`, closed by
+`Refl`; callers need not inspect the reversed graph's representation.
+Neither construction nor the edge law requires `Finite q` or `DecEq q`.
+
+`walk_reverse` is a public **function returning `Walk` data**, not a
+proposition about a walk. A `WalkHere` reverses to `WalkHere`; a
+`WalkStep` from `prev` to `end` uses its edge proof as the first edge
+from `end` to `prev` in the reversed graph, prepended to the recursively
+reversed prefix. The existing `walk_prepend` helper stays private;
+the same definitional edge flip that closes `graph_reverse_edge` by
+`Refl` lets the existing checked edge proof serve the reversed step.
+No new helper or alternative graph carrier is introduced.
+
+`graph_reachable_reverse` consumes the supplied walk from `s` to `t`;
+its **only** remaining premise is `Equal Bool (target s) True`. The
+reversed walk starts at `t` and ends at `s`, so §1.2's existing public
+`graph_reachable_complete` yields affirmative reachability from `t` in
+`graph_reverse q g`, under the same `fq` and `target`. A walk is an
+argument, not an additional propositional premise. There is no claim
+that `s` is reachable from `t` in the original directed graph; reversing
+only the walk or only the target would not establish this result. All
+§§1–7 operation and law types remain unchanged, and no `Axiom`, kernel,
+surface change or second fixed-point search is needed.
+
+The authored §8 seed is
+`conformance/stdlib/graphs/seed-reachability-reverse.md`. Its accepted
+client constructs a two-edge walk V0 → V1 → V2 and states that its
+reverse makes V2 reach target V0 in the reversed graph. An accepted
+reversed-graph value control accompanies the isolated refusal of the
+same reachability claim on the forward chain, where no edge leaves V2.
+CV statically checked the seed but did not run it as Ken or through the
+official conformance runner. Seed authorship and static checks are not
+candidate QA or a conformance-execution result.
