@@ -27,7 +27,7 @@ tail. On a possibly empty `List`, each Option selector returns no value on
 
 ## Definition
 
-The minimum selector and its eight laws lead, followed by its Option selector
+The minimum selector and its ten laws lead, followed by its Option selector
 and four laws. The maximum selector and its eight laws follow, then its Option
 selector and four laws. Private shared selection helpers, inductive proofs and
 Option proof helpers close the definition. Two generic Nat-order facts come
@@ -40,9 +40,11 @@ import Core.Function.Combinators (comp)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
+import Core.Logic.Transport (cong, sym, trans)
+
 import Data.Numeric.Nat.Order (lt_nat)
 
-import Data.Collections.Derived (list_elem, list_elem_head, list_elem_later)
+import Data.Collections.Derived (list_append, list_elem, list_elem_head, list_elem_later)
 
 import Data.Collections.NonEmpty
   (NonEmpty,
@@ -51,7 +53,8 @@ import Data.Collections.NonEmpty
     nonempty_head,
     nonempty_tail,
     nonempty_to_list,
-    nonempty_to_list_shape)
+    nonempty_to_list_shape,
+    nonempty_append)
 
 pub fn argmin (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmin_from a cost (nonempty_head a xs) (nonempty_tail a xs)
@@ -137,6 +140,50 @@ pub theorem argmin_cost_order_invariant
       (xs : NonEmpty a)
     : Equal a (argmin a (comp a Nat Nat f cost) xs) (argmin a cost xs) =
   select_from_cost_order a cost lt_nat f same_order (nonempty_head a xs) (nonempty_tail a xs)
+
+pub theorem argmin_append_keeps_left
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal Bool (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs))) False
+      → Equal a (argmin a cost (nonempty_append a xs ys)) (argmin a cost xs) =
+  λh.
+    trans
+      a
+      (argmin a cost (nonempty_append a xs ys))
+      (choose
+        a
+        (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+        (argmin a cost ys)
+        (argmin a cost xs))
+      (argmin a cost xs)
+      (argmin_append_choice a cost xs ys)
+      (choose_no
+        a
+        (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+        (argmin a cost ys)
+        (argmin a cost xs)
+        h)
+
+pub theorem argmin_append_takes_right
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal Bool (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs))) True
+      → Equal a (argmin a cost (nonempty_append a xs ys)) (argmin a cost ys) =
+  λh.
+    trans
+      a
+      (argmin a cost (nonempty_append a xs ys))
+      (choose
+        a
+        (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+        (argmin a cost ys)
+        (argmin a cost xs))
+      (argmin a cost ys)
+      (argmin_append_choice a cost xs ys)
+      (choose_yes
+        a
+        (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+        (argmin a cost ys)
+        (argmin a cost xs)
+        h)
 
 pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
   match xs {
@@ -423,6 +470,232 @@ theorem choose_yes
     False ↦ λh. absurd h
   }
 
+fn argmin_view (a : Type) (cost : a → Nat) (fallback : a) (l : List a) : a =
+  match l {
+    Nil ↦ fallback;
+    Cons x rest ↦ argmin_from a cost x rest
+  }
+
+theorem argmin_via_view
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a)
+    : Equal a
+        (argmin a cost xs)
+        (argmin_view a cost (nonempty_head a xs) (nonempty_to_list a xs)) =
+  J
+    (λl _. Equal a (argmin a cost xs) (argmin_view a cost (nonempty_head a xs) l))
+    Refl
+    (sym
+      (List a)
+      (nonempty_to_list a xs)
+      (Cons a (nonempty_head a xs) (nonempty_tail a xs))
+      (nonempty_to_list_shape a xs))
+
+theorem argmin_append_choice
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal a
+        (argmin a cost (nonempty_append a xs ys))
+        (choose
+          a
+          (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+          (argmin a cost ys)
+          (argmin a cost xs)) =
+  let d : a =
+    nonempty_head a (nonempty_append a xs ys)
+  in
+    trans
+      a
+      (argmin a cost (nonempty_append a xs ys))
+      (argmin_view a cost d (nonempty_to_list a (nonempty_append a xs ys)))
+      (choose
+        a
+        (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+        (argmin a cost ys)
+        (argmin a cost xs))
+      (argmin_via_view a cost (nonempty_append a xs ys))
+      (trans
+        a
+        (argmin_view a cost d (nonempty_to_list a (nonempty_append a xs ys)))
+        (argmin_view a cost d (list_append a (nonempty_to_list a xs) (nonempty_to_list a ys)))
+        (choose
+          a
+          (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+          (argmin a cost ys)
+          (argmin a cost xs))
+        (cong
+          (List a)
+          a
+          (nonempty_to_list a (nonempty_append a xs ys))
+          (list_append a (nonempty_to_list a xs) (nonempty_to_list a ys))
+          (λl. argmin_view a cost d l)
+          ((proof list_view for nonempty_append) a xs ys))
+        (trans
+          a
+          (argmin_view a cost d (list_append a (nonempty_to_list a xs) (nonempty_to_list a ys)))
+          (argmin_view
+            a
+            cost
+            d
+            (list_append
+              a
+              (Cons a (nonempty_head a xs) (nonempty_tail a xs))
+              (Cons a (nonempty_head a ys) (nonempty_tail a ys))))
+          (choose
+            a
+            (lt_nat (cost (argmin a cost ys)) (cost (argmin a cost xs)))
+            (argmin a cost ys)
+            (argmin a cost xs))
+          (J
+            (λl _.
+              Equal
+                a
+                (argmin_view
+                  a
+                  cost
+                  d
+                  (list_append a (nonempty_to_list a xs) (nonempty_to_list a ys)))
+                (argmin_view
+                  a
+                  cost
+                  d
+                  (list_append a (Cons a (nonempty_head a xs) (nonempty_tail a xs)) l)))
+            (cong
+              (List a)
+              a
+              (nonempty_to_list a xs)
+              (Cons a (nonempty_head a xs) (nonempty_tail a xs))
+              (λl. argmin_view a cost d (list_append a l (nonempty_to_list a ys)))
+              (nonempty_to_list_shape a xs))
+            (nonempty_to_list_shape a ys))
+          (argmin_from_append
+            a
+            cost
+            (nonempty_head a xs)
+            (nonempty_tail a xs)
+            (nonempty_head a ys)
+            (nonempty_tail a ys))))
+
+theorem argmin_from_append
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a) (y : a) (more : List a)
+    : Equal a
+        (argmin_from a cost x (list_append a rest (Cons a y more)))
+        (choose
+          a
+          (lt_nat (cost (argmin_from a cost y more)) (cost (argmin_from a cost x rest)))
+          (argmin_from a cost y more)
+          (argmin_from a cost x rest)) =
+  match rest {
+    Nil ↦ Refl;
+    Cons z zs ↦
+      J
+        (λt _.
+          Equal
+            a
+            (choose a (lt_nat (cost t) (cost x)) t x)
+            (choose
+              a
+              (lt_nat
+                (cost (argmin_from a cost y more))
+                (cost (argmin_from a cost x (Cons a z zs))))
+              (argmin_from a cost y more)
+              (argmin_from a cost x (Cons a z zs))))
+        (choose_earliest_assoc
+          a
+          cost
+          x
+          (argmin_from a cost z zs)
+          (argmin_from a cost y more)
+          (lt_nat (cost (argmin_from a cost z zs)) (cost x))
+          (lt_nat (cost (argmin_from a cost y more)) (cost (argmin_from a cost z zs)))
+          Refl
+          Refl)
+        (sym
+          a
+          (argmin_from a cost z (list_append a zs (Cons a y more)))
+          (choose
+            a
+            (lt_nat (cost (argmin_from a cost y more)) (cost (argmin_from a cost z zs)))
+            (argmin_from a cost y more)
+            (argmin_from a cost z zs))
+          (argmin_from_append a cost z zs y more))
+  }
+
+theorem choose_earliest_assoc
+      (a : Type) (cost : a → Nat) (x : a) (l : a) (r : a) (b1 : Bool) (b2 : Bool)
+    : Equal Bool (lt_nat (cost l) (cost x)) b1
+      → Equal Bool (lt_nat (cost r) (cost l)) b2
+      → Equal a
+        (choose a (lt_nat (cost (choose a b2 r l)) (cost x)) (choose a b2 r l) x)
+        (choose a (lt_nat (cost r) (cost (choose a b1 l x))) r (choose a b1 l x)) =
+  match b1 {
+    True ↦
+      match b2 {
+        True ↦
+          λh1.
+            λh2.
+              trans
+                a
+                (choose a (lt_nat (cost r) (cost x)) r x)
+                r
+                (choose a (lt_nat (cost r) (cost l)) r l)
+                (choose_yes
+                  a
+                  (lt_nat (cost r) (cost x))
+                  r
+                  x
+                  ((proof trans for lt_nat) (cost r) (cost l) (cost x) h2 h1))
+                (sym
+                  a
+                  (choose a (lt_nat (cost r) (cost l)) r l)
+                  r
+                  (choose_yes a (lt_nat (cost r) (cost l)) r l h2));
+        False ↦
+          λh1.
+            λh2.
+              trans
+                a
+                (choose a (lt_nat (cost l) (cost x)) l x)
+                l
+                (choose a (lt_nat (cost r) (cost l)) r l)
+                (choose_yes a (lt_nat (cost l) (cost x)) l x h1)
+                (sym
+                  a
+                  (choose a (lt_nat (cost r) (cost l)) r l)
+                  l
+                  (choose_no a (lt_nat (cost r) (cost l)) r l h2))
+      };
+    False ↦
+      match b2 {
+        True ↦ λh1. λh2. Refl;
+        False ↦
+          λh1.
+            λh2.
+              trans
+                a
+                (choose a (lt_nat (cost l) (cost x)) l x)
+                x
+                (choose a (lt_nat (cost r) (cost x)) r x)
+                (choose_no a (lt_nat (cost l) (cost x)) l x h1)
+                (sym
+                  a
+                  (choose a (lt_nat (cost r) (cost x)) r x)
+                  x
+                  (choose_no
+                    a
+                    (lt_nat (cost r) (cost x))
+                    r
+                    x
+                    ((proof leq_not_lt for lt_nat)
+                      (cost x)
+                      (cost r)
+                      ((proof trans for leq_nat)
+                        (cost x)
+                        (cost l)
+                        (cost r)
+                        ((proof false_reverse_leq for lt_nat) (cost l) (cost x) h1)
+                        ((proof false_reverse_leq for lt_nat) (cost r) (cost l) h2)))))
+      }
+  }
+
 theorem select_from_cost_order
       (a : Type)
       (cost : a → Nat)
@@ -636,7 +909,11 @@ its corollaries establish membership and the corresponding cost bound on the
 original list. For a total cost transform preserving every strict comparison
 in both directions, `argmin_cost_order_invariant` and
 `argmax_cost_order_invariant` identify the same input candidate before and
-after transforming its costs, including the earlier winner of a tie.
+after transforming its costs, including the earlier winner of a tie. For two
+non-empty parts, `argmin_append_keeps_left` retains the left choice when the
+right minimum is not strictly cheaper, including ties;
+`argmin_append_takes_right` selects the right choice when it is strictly
+cheaper.
 
 ## Laws & proofs
 
@@ -661,6 +938,15 @@ a cost transform that merges two costs turns them into a tie that keeps the
 earlier candidate. The generic strict/non-strict order bridges are public
 proofs attached to `lt_nat` in `Data.Numeric.Nat.Order`, not
 additional optimization laws or duplicated local recursion.
+
+`argmin_append_keeps_left` and `argmin_append_takes_right` split on the
+strict comparison of the right part's minimum cost against the left part's.
+The private `argmin_view` transports `argmin` through `nonempty_to_list_shape`,
+then `argmin_append_choice` uses the public `nonempty_append` list-view proof
+to combine the two parts. `argmin_from_append` inducts over the left tail;
+`choose_earliest_assoc` preserves the earliest tied choice across the split.
+Both public laws finish by selecting the corresponding branch of the private
+`choose`. No constructor of `NonEmpty` is exposed in these proofs.
 
 `argmin_option_nil` and `argmin_option_cons` reduce the selector on both list
 constructors. The private `option_member` and `option_least` predicates assign
@@ -718,8 +1004,9 @@ algorithm.
 
 ## Trust & derivation
 
-**Public API:** `argmin`, its seven §1.2 theorems and
-`argmin_cost_order_invariant`; `argmin_option` and
+**Public API:** `argmin`, its seven §1.2 theorems,
+`argmin_cost_order_invariant`, `argmin_append_keeps_left` and
+`argmin_append_takes_right`; `argmin_option` and
 its four §1.4 laws; `argmax` and the seven §3.2 laws `argmax_member`,
 `argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
 `argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`, plus
@@ -739,7 +1026,9 @@ Nat order retain their provider identities.
 
 **Derivation:** `NonEmpty` and its checked list-view equality are provided by
 `Data.Collections.NonEmpty`; `list_elem` and its introduction lemmas by
-`Data.Collections.Derived`; `IsTrue` and `leq_nat` by
+`Data.Collections.Derived`; `nonempty_append` and its list-view proof by
+`Data.Collections.NonEmpty`; `cong`, `sym` and `trans` by
+`Core.Logic.Transport`; `IsTrue` and `leq_nat` by
 `Core.Classes.LawfulClasses`; `comp` by `Core.Function.Combinators`; and
 `lt_nat` with its two attached bridges by `Data.Numeric.Nat.Order`. The
 selectors add no axiom, primitive, postulate or opaque constant.
@@ -755,8 +1044,12 @@ adds a four-label non-head earliest tie, an open strict-order proof,
 and a flattened-cost false result on the same input. The candidate's
 `cat_optimization_argmin_cost_order` package test root-loads the
 checked public law, checks the whole accepted seed client and refuses
-the isolated false claim. This is not official conformance-runner
-execution, CI, publication or landing.
+the isolated false claim. The
+[§1.6 append-split seed](../../../../conformance/stdlib/optimization/seed-argmin-append-split.md)
+exercises the tied-left and strictly-cheaper-right cases; its package-owned
+test checks the complete accepted client and refuses the isolated later-tie
+claim. These are candidate-local checks, not official conformance-runner
+execution, CI, publication, landing or landed trust.
 `conformance/stdlib/optimization/seed-argmin-option.md` adds empty,
 singleton and non-degenerate tie cases, instances of the four Option laws,
 and an isolated false `Some`-on-`Nil` refusal. The Option target root-loads
