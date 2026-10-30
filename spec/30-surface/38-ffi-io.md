@@ -775,8 +775,9 @@ mapping/lifetime/bounded-access substrate L2-8 MMIO later builds on, and it is
 what keeps raw pointers out of application Ken
 (`../../docs/program/10-linux-abi-completion.md §4`, §6).
 
-The closed Ken resource-kind inventory becomes
-`ResourceKind.FsHandle | ResourceKind.Buffer | ResourceKind.Mapping`. A
+At this ABI-S6 stage, the closed Ken resource-kind inventory is
+`ResourceKind.FsHandle | ResourceKind.Buffer | ResourceKind.Mapping`;
+§1.11 extends that inventory with four child-process kinds. A
 wrong-kind live token reports `ResourceKindMismatch` (`§1.7`) with the `Mapping`
 wire tag (Ken's `ResourceKind.Mapping` constructor) in the offending
 position, under the same non-degenerate accept/reject discipline (a mapping
@@ -934,6 +935,162 @@ on `exec`; the artifact has no caught actions. A glibc-internal caught signal
 signal mask unchanged: neither a blanket empty-mask reset nor a
 `SETSIGMASK` spawn action follows from this contract. PX10 must explicitly
 reset SIGPIPE rather than relying on a particular Rust runtime's spawn choice.
+
+### 1.11 Bracketed child spawn plans and wait (PX10-SPAWN-PLAN-WAIT)
+
+> **Section 1.11 status: contract-pinned, not shipped.** The Architect's
+> AC-0 on `40fa3de6c` measured the host descriptor and signal mechanisms;
+> the Spec Leader ruled the public contract. This section does not claim
+> checked catalog exports, implemented host operations, conformance-runner
+> execution, CI, publication, landing or a trust measurement. The first
+> PX10 slice adds no axiom or kernel rule; trust growth is an operator stop.
+
+#### 1.11.1 A pure plan and its closed initial descriptor targets
+
+`SpawnPlan` is a public type of immutable, pure Ken values. Its
+constructor is private: source cannot construct a plan by positional
+fields or project a host plan resource from it. Its **public builders**
+leave the representation open for later attachments without changing a
+public constructor. The first builder
+and setters have these checked shapes:
+
+```ken
+pub data ChildStdio = ChildPipe | ChildNull | ChildInherit Stream
+export ChildPipe, ChildNull, ChildInherit
+pub data ChildExit = Exited UInt8 | Signaled UInt8
+export Exited, Signaled
+
+pub fn spawn_plan (program : Bytes) (arguments : List Bytes) : SpawnPlan
+pub fn with_environment
+  (plan : SpawnPlan) (env : List (Prod Bytes Bytes)) : SpawnPlan
+pub fn with_stdin (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
+pub fn with_stdout (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
+pub fn with_stderr (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
+```
+
+`spawn_plan` sets the environment to empty and all three child streams to
+`ChildNull`. `with_environment` replaces, rather than adds to, the plan's
+environment; each stdio builder sets its named target. A plan is inert until
+an authorized spawn. The program is a path of bytes passed directly to the
+OS, with **no PATH search**. The argument list is passed verbatim, including
+its caller-supplied first entry as `argv[0]`; Ken does not synthesize one.
+The environment is exactly the plan's entries, not an overlay on the
+parent's environment. An empty argument list is invalid when spawning.
+Program, argument, key and value bytes containing NUL are invalid; an
+environment key is also invalid when empty or containing `=`.
+
+`ChildStdio` has only the three displayed choices. `ChildInherit` names one
+of the parent's three `Stream` values, not an arbitrary host descriptor.
+`ChildNull` connects the corresponding child stream to the null device.
+`ChildPipe` creates a fresh pipe for that stream: child stdin gives the
+parent a **write** end, while child stdout or stderr gives the parent a
+**read** end. Unselected streams stay null. The child inherits no other
+parent descriptor, even a parent descriptor without close-on-exec. Its
+observable descriptor set at start is exactly `{0, 1, 2}`. A descriptor
+outside stdin/stdout/stderr or a duplicate descriptor entry in the
+host-side plan is invalid. The immutable Ken builders do not expose an
+arbitrary descriptor map or a raw descriptor constructor.
+
+This base still calls the pre-source stream family `Stream`; the separate
+Console/Char admission renames that **same checked family** to
+`ConsoleStream`, with public paths `ConsoleStream.Stdin`,
+`ConsoleStream.Stdout` and `ConsoleStream.Stderr`. Once that WP lands,
+`ChildInherit Stream` migrates to `ChildInherit ConsoleStream` as one
+spelling change. It does not create a second family or preserve the old
+`Stream` spelling as an alias. Do not apply that migration to this
+pre-landing base by guessing the publisher outcome.
+
+#### 1.11.2 Explicit Process grant and resource lifetime
+
+Spawn, wait and pipe operations declare `visits [Process]`, not `[FS]`.
+They obey the ordinary `36 §1.4` effect-row and escape checks. A `Process`
+effect is not ambient spawn authority. The program explicitly declares
+`program capabilities Process` as well as the existing
+`program capabilities FS AFull`. Admission rejects a Process declaration
+without that full FS declaration. Only a declared Process grant causes
+the runner to mint the additional EXECUTE right on its FS capability;
+`FS AFull` alone does not provide EXECUTE. An attenuated capability
+without EXECUTE cannot spawn. The child runs outside Ken's capability
+confinement, so this declaration acknowledges the OS authority the child
+can exercise; the parent's FS root is **not** a child sandbox.
+
+`withChild` is the bracketed acquisition route. It uses the pure plan
+to start one child and passes the live child resource to its body. Its
+pipe endpoints are resources owned by that bracket. A selected pipe's
+parent end can be taken **once**; attempting another take or taking an
+unselected endpoint is `IOError.InvalidInput`. The resource kinds are
+`ResourceKind.SpawnPlan` for the host-side encoded plan,
+`ResourceKind.ChildProcess` for the live child, `ResourceKind.PipeRead`
+for a parent stdout/stderr end, and `ResourceKind.PipeWrite` for a parent
+stdin end. Together with `ResourceKind.FsHandle`,
+`ResourceKind.Buffer`, and `ResourceKind.Mapping`, these are the complete
+seven-kind inventory of this slice. All seven constructors are scoped
+`ResourceKind.C` paths; none is a bare reserved name. A `read_pipe`
+requires a `PipeRead`, and a `write_pipe` requires a `PipeWrite`;
+they expose bounded buffer/progress results, not raw file descriptors
+or pointers. A write to a closed pipe reports
+`IOError.BrokenPipe` rather than terminating the Ken edge by SIGPIPE.
+
+`wait_child` blocks until the child exits or is killed by a signal,
+returning exactly `Exited code` or `Signaled signal`,
+with the observed code or signal number as `UInt8`. Stopped and continued
+states are not wait results. At bracket settlement, taken and untaken
+pipe ends are released **before** the child; an unwaited child is reaped.
+On terminal-error finalization an unreaped child is killed and reaped,
+not left as a zombie. Revoking the originating grant does **not** signal
+the child; later plan, child and pipe operations report the existing
+`IOError.Revoked` identity. A failed spawn creates no child to wait for
+or release.
+
+#### 1.11.3 Process errors and the inherited signal boundary
+
+The existing `Capability.System.Error` surface extends its operation
+classification with `ProcessOp ProcessOperation` and its resource
+classification with `ProcessResource (Option Bytes)`. When known, the
+latter carries the program bytes; it does not expose a raw pid or fd.
+Spawn, pipe and wait failures keep their operation-specific error
+identity in the existing `SystemError` envelope. There is no parallel
+`SpawnError` family or a new `Revoked` identity. Causes use the already
+checked `IOError` identities:
+
+- `IOError.NotFound` for ENOENT;
+- `IOError.PermissionDenied` for EACCES or EPERM;
+- `IOError.InvalidInput` for a malformed plan: NUL in program,
+  argument or environment bytes; an empty or `=`-containing key;
+  duplicate/invalid descriptor entries; or empty argv at spawn;
+- `IOError.CapabilityDenied` when EXECUTE is absent;
+- `IOError.Revoked` when the originating grant was revoked;
+- `IOError.BrokenPipe` when writing to a closed pipe; and
+- `IOError.Other errno` for other failures, including ENOEXEC, E2BIG,
+  ETXTBSY and ECHILD.
+
+The child begins with SIGPIPE at `SIG_DFL`: the spawn path explicitly
+resets Ken's ignored SIGPIPE, rather than relying on a particular Rust
+runtime. Its signal mask is inherited unchanged from the **spawning
+thread**, not cleared. Other inherited dispositions that Ken did not
+establish remain inherited as in §1.10; caught actions reset on exec.
+No post-fork Ken callback or Ken code runs before exec. The public
+contract is the observed descriptor, signal, result and authority
+boundary, not a requirement to expose the host's spawn machinery.
+
+A launcher that ignores SIGCHLD may cause the OS to auto-reap the child.
+Then `wait_child` can return ECHILD as `IOError.Other 10` instead of a
+`ChildExit`; Ken does not reset SIGCHLD or promise a successful wait in
+that environment. This is a measured residual, not permission to change
+the inherited-disposition rule of §1.10. Outside that residual, the
+AC-1 observations include an argv/environment echo through a stdout
+pipe followed by `Exited 0`, and a self-SIGTERM child yielding
+`Signaled 15`, with interpreter/native parity. AC-2 observes the live
+child's three descriptors, default SIGPIPE and inherited mask while a
+non-CLOEXEC parent descriptor is present. Deny-by-default descriptors
+and SIGPIPE reset are independent obligations: removing either must
+change its corresponding live-child observation. These are acceptance
+criteria for the later assembled candidate, not results of this Spec
+Author turn.
+
+Cwd attachments, credentials, namespaces, cgroups, rlimits, PATH
+search, process groups, pidfd signalling and non-blocking wait are
+successor work, not implicit fields or behaviors of this first slice.
 
 ## 2. The FFI surface — the `foreign` declaration
 
