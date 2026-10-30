@@ -6038,6 +6038,7 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                     FsOpKind::GetInheritance => ken_host::FsCapabilityOperationV1::GetInheritance,
                     FsOpKind::SetInheritance => ken_host::FsCapabilityOperationV1::SetInheritance,
                     FsOpKind::Duplicate => ken_host::FsCapabilityOperationV1::Duplicate,
+                    FsOpKind::Spawn => ken_host::FsCapabilityOperationV1::Spawn,
                 },
                 held_rights,
             }
@@ -6075,6 +6076,7 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::GetInheritance => FsOpKind::GetInheritance,
                 ken_host::FsCapabilityOperationV1::SetInheritance => FsOpKind::SetInheritance,
                 ken_host::FsCapabilityOperationV1::Duplicate => FsOpKind::Duplicate,
+                ken_host::FsCapabilityOperationV1::Spawn => FsOpKind::Spawn,
             },
             held_rights: *held_rights,
         },
