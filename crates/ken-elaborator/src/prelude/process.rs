@@ -33,10 +33,10 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                 (Result ResourceError Unit)
                 (InL (FSOp a) AmbientOp (PrivateProcessPlanPush a plan 0 argument b"" 0))
-                (\result. Ret (Coproduct (FSOp a) AmbientOp)
+                (\response. Ret (Coproduct (FSOp a) AmbientOp)
                   (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                  (Result ResourceError Unit) result))
-              (\result. match result {
+                  (Result ResourceError Unit) response))
+              (\response. match response {
                 Err error |-> private_process_error a Unit error;
                 Ok _ |-> private_process_push_arguments a plan tail
               })
@@ -58,10 +58,10 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
                   (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                   (Result ResourceError Unit)
                   (InL (FSOp a) AmbientOp (PrivateProcessPlanPush a plan 1 key value 0))
-                  (\result. Ret (Coproduct (FSOp a) AmbientOp)
+                  (\response. Ret (Coproduct (FSOp a) AmbientOp)
                     (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                    (Result ResourceError Unit) result))
-                (\result. match result {
+                    (Result ResourceError Unit) response))
+                (\response. match response {
                   Err error |-> private_process_error a Unit error;
                   Ok _ |-> private_process_push_environment a plan tail
                 })
@@ -89,9 +89,9 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
             (Result ResourceError Unit)
             (InL (FSOp a) AmbientOp (PrivateProcessPlanPush a plan 2 b"" b""
               (process_stdio_scalar fd target)))
-            (\result. Ret (Coproduct (FSOp a) AmbientOp)
+            (\response. Ret (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-              (Result ResourceError Unit) result)
+              (Result ResourceError Unit) response)
     "#)?;
     checked(elab, "private_process_then", r#"
         proc private_process_then (a : Auth) (r : Type)
@@ -102,7 +102,7 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
           bind (Coproduct (FSOp a) AmbientOp)
             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
             (Result ResourceError Unit) (Result ResourceError r) action
-            (\result. match result {
+            (\response. match response {
               Err error |-> bind (Coproduct (FSOp a) AmbientOp)
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                 (Result ResourceError Unit) (Result ResourceError r)
@@ -161,7 +161,7 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
           match acquired {
             Err error |-> private_process_error a (ResourceBracketResult e r) error;
             Ok plan |-> match pure_plan {
-              PrivateSpawnPlan program arguments environment stdin stdout stderr |->
+              PrivateSpawnPlan executable arguments environment stdin stdout stderr |->
                 private_process_then a (ResourceBracketResult e r) plan
                   (private_process_push_arguments a plan arguments)
                   (\_. private_process_then a (ResourceBracketResult e r) plan
@@ -182,15 +182,15 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
           (body : Resource ResourceKind.ChildProcess -> HostIO a (ResourceBodyResult e r))
           : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Process] =
           match plan {
-            PrivateSpawnPlan program arguments environment stdin stdout stderr |->
+            PrivateSpawnPlan executable arguments environment stdin stdout stderr |->
               Vis (Coproduct (FSOp a) AmbientOp)
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                 (Result ResourceError (ResourceBracketResult e r))
-                (InL (FSOp a) AmbientOp (PrivateProcessPlanOpen a cap program))
+                (InL (FSOp a) AmbientOp (PrivateProcessPlanOpen a cap executable))
                 (\acquired. private_process_after_open a e r plan body acquired)
           }
     "#)?;
-    for (name, result, op) in [
+    for (name, response, op) in [
         ("take_stdin", "Resource ResourceKind.PipeWrite", "PrivateProcessTakePipeWrite a child"),
         ("take_stdout", "Resource ResourceKind.PipeRead", "PrivateProcessTakePipeRead a child 1"),
         ("take_stderr", "Resource ResourceKind.PipeRead", "PrivateProcessTakePipeRead a child 2"),
@@ -198,22 +198,22 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
     ] {
         let declaration = format!(r#"
             proc {name} (a : Auth) (child : Resource ResourceKind.ChildProcess)
-              : HostIO a (Result ResourceError ({result})) visits [Process] =
+              : HostIO a (Result ResourceError ({response})) visits [Process] =
               Vis (Coproduct (FSOp a) AmbientOp)
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                (Result ResourceError ({result})) (InL (FSOp a) AmbientOp ({op}))
-                (\result. Ret (Coproduct (FSOp a) AmbientOp)
+                (Result ResourceError ({response})) (InL (FSOp a) AmbientOp ({op}))
+                (\response. Ret (Coproduct (FSOp a) AmbientOp)
                   (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                  (Result ResourceError ({result})) result)
+                  (Result ResourceError ({response})) response)
         "#);
         checked(elab, name, &declaration)?;
     }
     checked(elab, "private_process_read_result", r#"
-        fn private_process_read_result (a : Auth) (result : Result ResourceError ReadProgress)
+        fn private_process_read_result (a : Auth) (response : Result ResourceError ReadProgress)
           : HostIO a (Result ResourceError ReadProgress) =
           Ret (Coproduct (FSOp a) AmbientOp)
             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-            (Result ResourceError ReadProgress) result
+            (Result ResourceError ReadProgress) response
     "#)?;
     checked(elab, "read_pipe", r#"
         proc read_pipe (a : Auth) (pipe : Resource ResourceKind.PipeRead)
@@ -234,7 +234,7 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
                       (Result ResourceError ReadProgress)
                       (InL (FSOp a) AmbientOp (PrivateResourceStreamRead a pipe
                         (buffer_handle_resource buffer) (buffer_window_start window) effective))
-                      (\result. private_process_read_result a result)
+                      (\response. private_process_read_result a response)
                   }
               }
             }
@@ -250,9 +250,9 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
             (InL (FSOp a) AmbientOp (PrivateResourceStreamWrite a pipe
               (buffer_handle_resource buffer) (buffer_span_start span)
               (buffer_span_length span) (buffer_span_origin span)))
-            (\result. Ret (Coproduct (FSOp a) AmbientOp)
+            (\response. Ret (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-              (Result ResourceError WriteProgress) result)
+              (Result ResourceError WriteProgress) response)
     "#)?;
     for (name, kind) in [
         ("close_pipe_write", "PipeWrite"),
@@ -265,9 +265,9 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                 (Result ResourceError Unit)
                 (InL (FSOp a) AmbientOp (PrivateResourceRelease a ResourceKind.{kind} pipe))
-                (\result. Ret (Coproduct (FSOp a) AmbientOp)
+                (\response. Ret (Coproduct (FSOp a) AmbientOp)
                   (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                  (Result ResourceError Unit) result)
+                  (Result ResourceError Unit) response)
         "#);
         checked(elab, name, &declaration)?;
     }

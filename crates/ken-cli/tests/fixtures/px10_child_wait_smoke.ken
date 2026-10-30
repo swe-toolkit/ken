@@ -1,0 +1,30 @@
+program capabilities FS AFull, Process
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [Process] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+        (withChild AFull Unit Unit cap
+          (spawn_plan (bytes_encode "/bin/true")
+            (Cons Bytes (bytes_encode "caller-zero") (Nil Bytes)))
+          (\child. bind (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (Result ResourceError ChildExit) (ResourceBodyResult Unit Unit)
+            (wait_child AFull child)
+            (\waited. match waited {
+              Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+                (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+              Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+                (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+            })))
+        (\outcome. match outcome {
+          Ok (ResourceBracketOk _) |-> host_exit AFull ExitCode.Success;
+          Ok _ |-> host_exit AFull (ExitCode.Failure 71);
+          Err _ |-> host_exit AFull (ExitCode.Failure 72)
+        })
+  }

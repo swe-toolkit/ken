@@ -4622,6 +4622,9 @@ pub struct EffectObservation {
     pub exit_status: i32,
 }
 
+#[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+mod px10_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;
