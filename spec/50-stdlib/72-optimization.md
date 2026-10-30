@@ -8,35 +8,32 @@
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
-> SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5).** Section 1 specifies the
-> non-empty least-cost selector and seven initial laws; its catalog
+> SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
+> SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT §3.6).** Section 1 specifies
+> the non-empty least-cost selector and seven initial laws; its catalog
 > module and seed are present on main. Section 1.4's Option selector,
-> four laws and seed are also present on main. Section 1.5 specifies
-> one additional checked law preserving the selected candidate under
-> cost transforms that preserve and reflect strict Nat order. Its
-> checked catalog export and package-owned seed test are now present
-> on main. Their candidate-local execution does not establish official
-> conformance-runner execution or a landed trust measurement. Section
-> 1.6 specifies two further public checked append-selection laws;
-> Architect's isolated D0 on `c99b3e998` checked their generic proofs
-> with no new `Axiom` and unchanged scratch trusted identities 114 → 114.
-> This assembled candidate includes the §1.6 checked catalog exports,
-> CV seed and package-owned test. Its candidate-local checks are not
-> official conformance-runner execution, CI, publication, landing or
-> landed trust. Section 2's catalog module and seed are present on main.
-> Section 3's greatest-cost selector and
-> seven laws are landed; §3.4 specifies the Option-returning extension
-> and its four laws from Architect-checked D0. The §3.4 catalog exports,
-> seed and package test are now present on main; the package test is not
-> official conformance-runner execution or a landed `trusted_base()`
-> measurement. Section 3.5 specifies a conditional argmax cost-order
-> invariance law; the Architect checked its generic proof in isolated
-> D0 on this base with unchanged scratch trusted identities 114 → 114.
-> The §3.5 checked catalog law, seed and package-owned test are now
-> present on main; earlier candidate-local execution is not official
-> conformance-runner execution, CI or landed trust. The §2.4 checked
-> law and package-owned seed test are on main; their local execution
-> is not official conformance or landed trust.
+> four laws and seed are also present on main. Section 1.5's checked
+> cost-order-invariance export and package-owned seed test are on main;
+> prior candidate-local execution is not official conformance or a
+> landed trust measurement. Section 1.6's two append-selection laws,
+> catalog exports, CV seed and package-owned test are on this base;
+> Architect's isolated D0 on `c99b3e998` checked the generic proofs
+> with no new `Axiom` and equal scratch trusted identities 114 → 114.
+> Earlier candidate-local checks are not official conformance or
+> landed trust. Section 2's catalog module and seed are present on
+> main. Section 3's greatest-cost selector and seven laws are landed;
+> §3.4's Option extension and four laws, and §3.5's conditional
+> cost-order-invariance law, have checked catalog exports, seeds and
+> package tests on this base. Their earlier checks are not official
+> conformance or landed trust. Section 3.6 specifies two public argmax
+> append laws: False keeps left, including ties, and True takes right.
+> Architect's isolated AC-0 on `1a3b2aa9f` checked both generic
+> proofs with no `Axiom` and equal scratch trusted identities
+> 114 → 114. This spec-only child adds no §3.6 catalog exports, test
+> or seed. AC-0 is scratch design evidence, not candidate execution,
+> official conformance, CI, publication, landing or landed trust.
+> The §2.4 law and package-owned seed test are on main; their local
+> execution is not official conformance or landed trust.
 
 ## 1. Least-cost candidate
 
@@ -397,13 +394,16 @@ the public `nonempty_append` list-view equality and
 `nonempty_to_list_shape`. The private list-fold combination uses
 strict-order transitivity and the false-comparison order facts to
 preserve the earliest tied result. `choose` remains private, as do
-`argmin_view`, `argmin_via_view`, `argmin_append_choice`,
-`argmin_from_append`, and `choose_earliest_assoc`; none is an extra
-public law, trust assumption, or permitted premise in these types.
-The proof does not require access to `NonEmptyCons`. Section 1.2's
-seven interfaces, §1.4's selector and four interfaces, §1.5's law,
-and §§2–3 retain their existing operation and law types. The argmax
-mirror is a **separate successor**, not part of §1.6.
+the shared append helpers `select`, `select_view`,
+`select_via_view`, `select_append_choice`, `select_from_append` and
+`choose_better_assoc`, their order-fact aliases
+`holds_at` and `transitive_at`, and the `lt_nat_true_trans` and
+`lt_nat_false_trans` facts that instantiate them for `argmin`; none is
+an extra public law, trust assumption, or permitted premise in these
+types. The proof does not require access to `NonEmptyCons`. Section
+1.2's seven interfaces, §1.4's selector and four interfaces, §1.5's
+law, and §§2–3 retain their existing operation and law types. The
+argmax mirror is §3.6, not part of §1.6.
 
 The assigned closed seed splits labels `0, 1 | 2, 3` with costs
 `5, 2 | 2, 7`. Both parts have cost `2` as their minimum, but the
@@ -618,14 +618,19 @@ measurement.
 
 > **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
-> SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5).** The §3.1–§3.2 operation
-> and seven laws, plus their seed, are present on main. Architect
-> checked §3.4 on an isolated D0 from `914cfbda0`; the §3.4 exports,
-> seed and package-owned test are now on main. Those package checks
-> are not official conformance-runner execution or a landed trust
-> measurement. Section 3.5's law is checked in Architect's isolated
-> D0 on `6e778c2d5` but has no catalog export or seed on this base;
-> D0 does not establish shipped §3.5 execution or official
+> SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
+> SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT §3.6).** The §3.1–§3.2
+> operation and seven laws, plus their seed, are present on main.
+> Architect checked §3.4 on an isolated D0 from `914cfbda0`; the
+> §3.4 exports, seed and package-owned test are now on main. Those
+> package checks are not official conformance or landed trust.
+> Section 3.5's catalog law, seed and package-owned test are on this
+> base; its earlier isolated D0 on `6e778c2d5` does not establish
+> official conformance or landed trust. Section 3.6 specifies two
+> public argmax append laws; Architect's isolated AC-0 on `1a3b2aa9f`
+> checked them with no new `Axiom` and equal scratch trusted identity
+> sets 114 → 114. This spec-only child adds no §3.6 catalog export,
+> package test or seed and claims no candidate execution, official
 > conformance, CI, publication, landing or landed trust.
 
 ### 3.1 Carrier, operation and tie rule
@@ -731,9 +736,10 @@ unchanged. Fold sharing is a package design choice, not another public
 selector, law, dependency, or required execution strategy.
 
 Option-returning maximization on a possibly empty input is specified
-in §3.4, not deferred. Arbitrary candidate orders or equality
-decisions, multiple sorted results, continuous optimization,
-approximation guarantees and performance bounds remain outside §3.
+in §3.4, and append-split selection in §3.6; neither is deferred.
+Arbitrary candidate orders or equality decisions, multiple sorted
+results, continuous optimization, approximation guarantees and
+performance bounds remain outside §3.
 In particular, §3 supplies no top-k selection.
 
 ### 3.4 Greatest-cost Option selector over a possibly empty list
@@ -885,3 +891,75 @@ refuses the isolated false claim. The generalized helpers remain
 private, and §1.5's public type is unchanged. Neither scratch D0 nor
 these candidate-local checks establish official conformance-runner
 execution, CI, publication, landing or a landed trust measurement.
+
+### 3.6 Selection over two appended non-empty parts
+
+> **Section 3.6 status: DRAFT v0
+> (SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT).** Architect's isolated
+> AC-0 on `1a3b2aa9f` checked both generic proofs with no new
+> `Axiom`, equal scratch trusted GlobalId identity sets 114 → 114,
+> and a tie/strict-right client. This spec-only child states their
+> public contracts, not their catalog exports, package test or seed.
+> The D0 is scratch design evidence, not candidate execution,
+> official conformance, CI, publication, landing or landed trust.
+
+`Algorithm.Optimization.Argmin` must export checked public Transparent
+proof bodies for two laws, in the following order, immediately after
+`argmax_cost_order_invariant` and before `argmax_option`. Both parts
+are `NonEmpty a`, with `nonempty_append a xs ys` the existing append.
+The public comparison asks whether the left part's selected cost is
+strictly lower than the right part's selected cost:
+
+```ken
+pub theorem argmax_append_keeps_left
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal Bool (lt_nat (cost (argmax a cost xs)) (cost (argmax a cost ys))) False
+      → Equal a (argmax a cost (nonempty_append a xs ys)) (argmax a cost xs)
+
+pub theorem argmax_append_takes_right
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (ys : NonEmpty a)
+    : Equal Bool (lt_nat (cost (argmax a cost xs)) (cost (argmax a cost ys))) True
+      → Equal a (argmax a cost (nonempty_append a xs ys)) (argmax a cost ys)
+```
+
+When the comparison is `False`, including a tied maximum across the
+split, the appended selection equals the left part's choice. When it
+is `True`, the right part is strictly costlier and its choice wins.
+Each part retains §3.1's earliest-tie rule internally, so even when
+the two parts select different equal-cost values, the combined choice
+is the earlier left one. These are structural `Equal a` results about
+selected input values, not merely equality of maximum costs. They
+hold for every candidate type and total natural cost function,
+without `DecEq a`, a candidate order, a non-strict cost premise, or a
+private name in either public type. No function equality or runtime
+complexity bound is asserted.
+
+The proofs share §1.6's private append helpers generalized over the
+strict comparator `better`, rather than duplicating the induction
+for `argmax`. The `argmin` proof passes `lt_nat`; the `argmax` proof
+passes the private `costlier`, which reduces to
+`lt_nat incumbent challenger`. This makes each private choice
+Boolean definitionally
+equal to its public `lt_nat` premise. The generic induction uses the
+True and False transitivity facts for the chosen comparator, but
+neither is an additional public premise. `choose`, `costlier`,
+`select`, `select_view`, `select_via_view`, `holds_at`,
+`transitive_at`, `select_append_choice`, `select_from_append`,
+`choose_better_assoc`, `lt_nat_true_trans`, `lt_nat_false_trans`,
+`costlier_true_trans` and `costlier_false_trans` all stay private.
+The two existing §1.6 public types and all other §1–§3.5 operation
+and law types remain unchanged; no new `Axiom`, public Nat law,
+primitive, kernel or surface feature is required.
+
+The assigned closed seed uses labels `0, 1 | 2, 3` with costs
+`2, 7 | 7, 1`: the maximum ties across parts, so the appended
+selector returns left label `1`, independently checked by `Proved`
+in addition to applying `argmax_append_keeps_left`. Raising label
+`2`'s cost to `8` makes the comparison `True` and selects right
+label `2` through `argmax_append_takes_right`, again checked
+independently. A claim that the tied original append selects the
+right part's label `2` must refuse after a fresh accepted prefix.
+Separate positive selections of both parts isolate the tie: a
+selector that takes right on ties would produce a different value.
+These closed cases discriminate the branch rule; the generic laws
+rest on checked proof bodies, not the closed instances.
