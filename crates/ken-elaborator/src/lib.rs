@@ -659,14 +659,23 @@ impl ElabEnv {
 
     /// Elaborate a roots-loaded unit with strict bare-name resolution.
     ///
-    /// This is opt-in until WP-4 migrates the real catalog dependency census;
-    /// [`Self::elaborate_module_from_roots`] retains its legacy behavior.
+    /// The catalog CLI selects this mode; the Legacy roots entry remains
+    /// available to isolated and transitional callers.
     pub fn elaborate_module_from_roots_strict(
         &mut self,
         roots: &[PathBuf],
         entry: &str,
     ) -> Result<Vec<GlobalId>, ElabError> {
         modules::elaborate_module_from_roots_strict(self, roots, entry)
+    }
+
+    /// Strict roots with V1 results for the entire loaded dependency closure.
+    pub fn elaborate_module_from_roots_strict_v1(
+        &mut self,
+        roots: &[PathBuf],
+        entry: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::elaborate_module_from_roots_strict_v1(self, roots, entry)
     }
 
     /// Execute checked-fence obligations for an already-loaded dotted entry.

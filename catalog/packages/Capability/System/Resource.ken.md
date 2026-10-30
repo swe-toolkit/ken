@@ -35,6 +35,15 @@ the bracket's private finalizer treats the resulting `Closed` as already
 settled rather than closing the OS resource twice.
 
 ```ken
+export ResourceBodyResult,
+  ResourceBodyOk,
+  ResourceBodyErr,
+  ResourceBracketResult,
+  ResourceBracketOk,
+  ResourceBracketBodyError,
+  ResourceBracketReleaseError,
+  ResourceBracketBodyAndReleaseError
+
 fn resource_body_success (e : Type) (a : Type) (value : a) : ResourceBodyResult e a =
   ResourceBodyOk e a value
 

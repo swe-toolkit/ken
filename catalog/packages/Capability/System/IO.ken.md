@@ -28,6 +28,15 @@ entry. Exactly-once settlement and liveness remain delegated runtime
 properties.
 
 ```ken
+import Capability.System.Buffer
+  (buffer_span_budget,
+    transfer_count_nat,
+    transfer_count_nat_succ,
+    transfer_count_predecessor,
+    transfer_count_remaining)
+
+export write_all_exact_prefix_prop
+
 import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Numeric.Nat.Arithmetic (add)

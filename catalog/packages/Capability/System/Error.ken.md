@@ -41,6 +41,24 @@ retry rule and both laws are the entry's first operations.
 ### Data families
 
 ```ken
+export FileOperation,
+  OpReadFile,
+  OpWriteFile,
+  OpAppendFile,
+  OpMetadata,
+  OpReadDirectory,
+  OpCreateDirectory,
+  OpRemoveFile,
+  OpRemoveDirectory,
+  OpRename,
+  OpChangeMode,
+  OpSeek,
+  OpSetLength,
+  OpSync,
+  OpGetInheritance,
+  OpSetInheritance,
+  OpDuplicate
+
 import Core.Logic.Conjunction (And, and_intro)
 
 export Transience, Transient, Permanent

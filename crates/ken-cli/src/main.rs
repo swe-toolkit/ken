@@ -474,7 +474,7 @@ fn elaborate_cli_file(
     let results_result = if let Some(catalog_module) = catalog_module {
         let roots = [catalog_module.root];
         elab_env
-            .elaborate_module_from_roots_v1(&roots, &catalog_module.entry)
+            .elaborate_module_from_roots_strict_v1(&roots, &catalog_module.entry)
             .and_then(|mut results| {
                 results.extend(
                     elab_env.execute_loaded_entry_checked_fences_v1(&catalog_module.entry)?,
