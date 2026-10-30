@@ -301,6 +301,68 @@ fn strict_admits_floor_kernel_locals_and_explicit_imports_without_new_trust() {
     assert!(matches!(copied, Term::Const { id, .. } if id == provider));
 }
 
+const J_FUNCTION_SOURCE: &str = "fn cast_function (a : Type) (b : Type) \
+    (e : Eq Type a b) : a -> b = J (λb' _. a -> b') (λy. y) e";
+
+/// Promise class: durable invariant. MEASURED: a Strict-roots source unit
+/// accepts a four-argument J with a function-valued motive, and the checked
+/// declaration is registered. CLAIMED: ordinary application past the three
+/// J sugar arguments does not re-resolve its head as an unbound source name.
+/// THE GAP: the exact-arity and under-applied controls below distinguish a
+/// general resolver exemption from this reachable kernel sugar shape.
+#[test]
+fn strict_overapplied_j_keeps_its_kernel_head() {
+    let root = FixtureRoot::new("j-overapplied");
+    root.write(
+        "Entry.ken",
+        &format!(
+            "{J_FUNCTION_SOURCE}\n\
+             fn cast_apply (a : Type) (b : Type) (e : Eq Type a b) \
+               (x : a) : b = J (λb' _. a -> b') (λy. y) e x\n"
+        ),
+    );
+    let mut env = ElabEnv::new().expect("base environment");
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect("Strict J with a function-valued motive accepts an extra argument");
+    assert!(env.globals.contains_key("Entry.cast_function"));
+    assert!(env.globals.contains_key("Entry.cast_apply"));
+    assert_eq!(env.env.trusted_base(), trusted_before);
+}
+
+/// Promise class: durable invariant. MEASURED: the same Strict-roots source
+/// unit's exactly-three-argument J result elaborates as an open function.
+/// CLAIMED: widening head recognition leaves the original exact-arity sugar
+/// route intact. THE GAP: the over-applied sibling exercises the added path.
+#[test]
+fn strict_exact_j_function_motive_still_elaborates() {
+    let root = FixtureRoot::new("j-exact");
+    root.write("Entry.ken", J_FUNCTION_SOURCE);
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect("the exact J sugar arity remains accepted");
+    assert!(env.globals.contains_key("Entry.cast_function"));
+}
+
+/// Promise class: durable invariant. MEASURED: a two-argument J with no local
+/// binder fails at Strict resolution with UnboundName for J. CLAIMED:
+/// widening kernel-head recognition does not exempt incomplete sugar spines.
+/// THE GAP: no-source-binder is intentional; the exact and over-applied rows
+/// show that the refusal is specific to the insufficient-arity boundary.
+#[test]
+fn strict_underapplied_j_without_binding_is_unbound() {
+    let root = FixtureRoot::new("j-underapplied");
+    root.write(
+        "Entry.ken",
+        "fn partial (m : Type) (b : Type) : Type = J m b",
+    );
+    let mut env = ElabEnv::new().expect("base environment");
+    let error = env
+        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .expect_err("two-argument J is not a completed kernel sugar spine");
+    assert_unbound(error, "J");
+}
+
 #[test]
 fn one_roots_run_cannot_mix_legacy_and_strict_cache_entries() {
     let root = FixtureRoot::new("mode-cache");

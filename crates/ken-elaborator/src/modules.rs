@@ -2795,11 +2795,11 @@ fn rexpr_kernel_head(expr: &RExpr) -> Option<&'static str> {
         return None;
     };
     match (name.as_str(), arity) {
-        (crate::resolve::SUGAR_ABSURD, 1) => Some(crate::resolve::SUGAR_ABSURD),
-        (crate::resolve::SUGAR_TRUNC_INTRO, 1) => Some(crate::resolve::SUGAR_TRUNC_INTRO),
-        (crate::resolve::SUGAR_J, 3) => Some(crate::resolve::SUGAR_J),
-        (crate::resolve::SUGAR_EQ, 3) => Some(crate::resolve::SUGAR_EQ),
-        (crate::resolve::SUGAR_ELIM_TRUNC, 3) => Some(crate::resolve::SUGAR_ELIM_TRUNC),
+        (crate::resolve::SUGAR_ABSURD, n) if n >= 1 => Some(crate::resolve::SUGAR_ABSURD),
+        (crate::resolve::SUGAR_TRUNC_INTRO, n) if n >= 1 => Some(crate::resolve::SUGAR_TRUNC_INTRO),
+        (crate::resolve::SUGAR_J, n) if n >= 3 => Some(crate::resolve::SUGAR_J),
+        (crate::resolve::SUGAR_EQ, n) if n >= 3 => Some(crate::resolve::SUGAR_EQ),
+        (crate::resolve::SUGAR_ELIM_TRUNC, n) if n >= 3 => Some(crate::resolve::SUGAR_ELIM_TRUNC),
         _ => None,
     }
 }
