@@ -1,7 +1,7 @@
 ---
 id: LANG-LITERAL-PLAN-CHECKED-IDS
 title: "A literal arm must be selected by its literal's value under the carrier's own view and comparator, but plan_literal_comparator still finds the String, Bytes and fixed-width views and the eq_int comparator by spelling in the flat globals map, so a source fn eq_int or fn string_to_list_char changes which arm a match selects and a checked theorem certifies the wrong result. Key every literal plan id on the checked identity registered for its carrier, and pin the takeover from source"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1

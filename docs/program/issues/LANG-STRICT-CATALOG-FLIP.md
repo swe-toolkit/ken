@@ -53,6 +53,13 @@ declarations, explicit imports, kernel names or the prelude floor.
   from SESSION-SCOPE and the floor slices. Two examples are the remaining
   `globals` writes (`evt_74ac7bpmpcd0c`) and Parsing's ambient
   `charToInt` (`evt_7001gdwsnh1q1`).
+- **Carried from LANG-LITERAL-PLAN-CHECKED-IDS** (merged `cfb3c7569`,
+  AC-3 sweep `evt_19t2etkgfmbsr`). No literal-key `globals.get` remains
+  in `elab.rs`. Two source-owned `main` lookups remain: the fence
+  snapshot and restore (`lib.rs:823`) and the entry-point choice
+  (`program_admission.rs:88`). The sweep was syntactic, so dynamic
+  `globals.get(name)` families are not censused; AC-0's trace covers
+  them on the routes it flips.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
