@@ -29,9 +29,14 @@
 > append laws: False keeps left, including ties, and True takes right.
 > Architect's isolated AC-0 on `1a3b2aa9f` checked both generic
 > proofs with no `Axiom` and equal scratch trusted identities
-> 114 → 114. This spec-only child adds no §3.6 catalog exports, test
-> or seed. AC-0 is scratch design evidence, not candidate execution,
-> official conformance, CI, publication, landing or landed trust.
+> 114 → 114. This assembled candidate has both §3.6 catalog exports,
+> a package-owned test and CV's authored seed. Foundation's two named
+> targets passed 2/2 each on implementation tip `886f3557`, with equal
+> trusted identity sets 114 → 114; two fixture controls reddened and
+> were restored, while the raised keep-left mutation has no verdict
+> after a build-lock timeout. The seed is unexecuted, and neither AC-0
+> scratch nor parent tests are current-tip execution. No official
+> conformance, CI, publication, landing or landed trust is claimed.
 > The §2.4 law and package-owned seed test are on main; their local
 > execution is not official conformance or landed trust.
 
@@ -629,9 +634,15 @@ measurement.
 > official conformance or landed trust. Section 3.6 specifies two
 > public argmax append laws; Architect's isolated AC-0 on `1a3b2aa9f`
 > checked them with no new `Axiom` and equal scratch trusted identity
-> sets 114 → 114. This spec-only child adds no §3.6 catalog export,
-> package test or seed and claims no candidate execution, official
-> conformance, CI, publication, landing or landed trust.
+> sets 114 → 114. This assembled candidate includes both checked
+> §3.6 catalog exports, the package-owned test and CV's authored seed.
+> Foundation's named argmax and argmin targets each passed 2/2 with
+> equal trusted identity sets 114 → 114 on implementation tip
+> `886f3557`; two fixture-only controls reddened and were restored.
+> The raised keep-left mutation has no verdict after a build-lock
+> timeout. The seed has not been Ken-checked or officially run, and
+> neither scratch AC-0 nor parent tests are current-tip execution.
+> No CI, publication, landing or landed trust is claimed.
 
 ### 3.1 Carrier, operation and tie rule
 
@@ -898,10 +909,16 @@ execution, CI, publication, landing or a landed trust measurement.
 > (SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT).** Architect's isolated
 > AC-0 on `1a3b2aa9f` checked both generic proofs with no new
 > `Axiom`, equal scratch trusted GlobalId identity sets 114 → 114,
-> and a tie/strict-right client. This spec-only child states their
-> public contracts, not their catalog exports, package test or seed.
-> The D0 is scratch design evidence, not candidate execution,
-> official conformance, CI, publication, landing or landed trust.
+> and a tie/strict-right client. This assembled candidate has both
+> checked public exports, a package-owned test and CV's closed seed.
+> On implementation tip `886f3557`, the named argmax and argmin
+> targets each passed 2/2 and compared trusted GlobalId identity sets
+> equal at 114 → 114. Two fixture-only refusal controls compiled, went
+> red and were restored; `reject_keep_left_on_raised` has no verdict
+> after a build-lock timeout. The seed is authored but has not been
+> Ken-checked or officially conformance-run. AC-0 is isolated scratch
+> evidence; the parent checks did not rerun on the current tip. No CI,
+> publication, landing or landed trust is claimed.
 
 `Algorithm.Optimization.Argmin` must export checked public Transparent
 proof bodies for two laws, in the following order, immediately after
