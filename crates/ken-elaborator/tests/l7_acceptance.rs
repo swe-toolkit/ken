@@ -72,6 +72,51 @@ fn foreign_decl_binds_typed_effect_rowed() {
     assert!(fb.runtime_checks.is_empty(), "no ensures → no runtime checks");
 }
 
+/// Promise class: durable invariant. A foreign parameter written with a
+/// source-defined `Bytes` alias of `Int` is not the registered Bytes carrier.
+/// MEASURED: the real foreign source route must give that parameter Scalar,
+/// while the same signature before takeover gives the real BytesPtr.
+/// CLAIMED: FFI marshalling is selected by the pre-source Bytes identity,
+/// not by the mutable source spelling. THE GAP: the alias and the pre-source
+/// Bytes occupy distinct checked IDs, both exercised by real foreign source.
+#[test]
+fn foreign_marshal_uses_registered_bytes_id_not_source_alias() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let real_bytes = env.bytes_env.bytes_id;
+    assert_eq!(env.globals["Bytes"], real_bytes);
+
+    let before = env
+        .elaborate_decl_v1(r#"foreign original : Bytes -> Int = "original" "lib" pure"#)
+        .expect("foreign declaration on checked Bytes");
+    assert_eq!(
+        before
+            .foreign_binding
+            .expect("registered foreign")
+            .marshal_sig
+            .expect("typed marshal")
+            .params,
+        vec![MarshalKind::BytesPtr],
+    );
+
+    env.elaborate_decl("def Bytes = Int")
+        .expect("source declaration takes over Bytes spelling");
+    let shadow = env.globals["Bytes"];
+    assert_ne!(shadow, real_bytes, "the source must rebind the spelling");
+    let after = env
+        .elaborate_decl_v1(r#"foreign after_bytes : Bytes -> Int = "alias" "lib" pure"#)
+        .expect("foreign declaration on source Bytes alias");
+    let params = after
+        .foreign_binding
+        .expect("registered foreign")
+        .marshal_sig
+        .expect("typed marshal")
+        .params;
+    assert!(
+        matches!(params.as_slice(), [MarshalKind::Scalar(_)]),
+        "source alias of Int must not acquire the Bytes pointer ABI: {params:?}"
+    );
+}
+
 // ─── B1/B2: AC2 — trusted_base_delta dependency pair ─────────────────────────
 
 /// B1: a definition whose body CALLS (contains) `os_write` has its postulate

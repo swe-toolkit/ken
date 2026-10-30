@@ -20335,10 +20335,13 @@ fn elaborate_foreign_decl(
         cx.metas.zonk_term(&ty_c)
     };
 
-    let bytes_id = globals
-        .get("Bytes")
-        .copied()
-        .ok_or_else(|| ElabError::Internal("Bytes not registered before foreign layer".into()))?;
+    // FFI marshalling is keyed by the same pre-source Bytes carrier that
+    // literal plans use. A source `def Bytes = Int` may rebind the flat map,
+    // but cannot turn the new Int alias into a Bytes pointer ABI.
+    let bytes_id = numeric_env
+        .literal_carriers()
+        .ok_or_else(|| ElabError::Internal("Bytes carrier not registered before foreign layer".into()))?
+        .1;
 
     // Foreign ensures → runtime check obligations (AC4).
     let ensures_strs: Vec<String> = rdecl.ensures.iter().map(|e| format!("{:?}", e)).collect();
