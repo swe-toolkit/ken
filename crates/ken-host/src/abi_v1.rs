@@ -809,6 +809,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
     authority_tag: u64,
     plan_hash: u64,
     allow_root_execution: u64,
+    process_declared: u64,
     root_denied_exit_status: i64,
     target_abi_hash: *const u8,
     host_effect_abi_hash: *const u8,
@@ -856,6 +857,8 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
     };
     if plan_hash == 0
         || allow_root_execution > 1
+        || process_declared > 1
+        || (process_declared != 0 && authority != crate::AUTH_FULL)
         || target_abi_hash.is_null()
         || host_effect_abi_hash.is_null()
     {
@@ -912,6 +915,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
         fs_root_spec,
         authority,
         plan_hash,
+        process_declared != 0,
         observation_path,
         posture,
         effective_uid.ok(),
@@ -949,6 +953,7 @@ fn initialize_process_context(
     fs_root_spec: FsRootSpec,
     authority: crate::Authority,
     plan_hash: u64,
+    process_declared: bool,
     observation_path: &[u8],
     posture: Result<ProcessPostureV1, PostureErrorV1>,
     effective_uid: Option<EffectiveUidSnapshotV1>,
@@ -958,6 +963,7 @@ fn initialize_process_context(
         fs_root_spec,
         authority,
         plan_hash,
+        process_declared,
         observation_path,
         posture,
         effective_uid,
@@ -970,6 +976,7 @@ fn initialize_process_context_with_lookup(
     fs_root_spec: FsRootSpec,
     authority: crate::Authority,
     plan_hash: u64,
+    process_declared: bool,
     observation_path: &[u8],
     posture: Result<ProcessPostureV1, PostureErrorV1>,
     effective_uid: Option<EffectiveUidSnapshotV1>,
@@ -979,11 +986,17 @@ fn initialize_process_context_with_lookup(
     let Ok(cwd_root) = crate::open_root(&execution_start_cwd) else {
         return Err(ProcessContextInitError::Ordinary);
     };
+    let rights = crate::rights_for_authority(authority);
+    let rights = if process_declared {
+        rights.union(crate::RightSet::EXECUTE)
+    } else {
+        rights
+    };
     let scope = crate::resolve_fs_root_spec_with_lookup_v1(
         &fs_root_spec,
         &cwd_root,
         effective_uid.ok_or(ProcessContextInitError::Ordinary)?,
-        crate::rights_for_authority(authority),
+        rights,
         SymlinkPolicy::NoFollow,
         home_lookup,
     )

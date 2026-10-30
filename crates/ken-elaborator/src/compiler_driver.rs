@@ -246,6 +246,7 @@ pub struct NativeEntrypointPlanV1 {
     pub(crate) prod_constructor: StableSymbol,
     pub(crate) authority_name: String,
     pub(crate) fs_root_spec: ken_host::FsRootSpec,
+    pub(crate) process_declared: bool,
     pub(crate) allow_root_execution: bool,
 }
 
@@ -2969,6 +2970,7 @@ fn complete_native_program_preparation(
                 _ => unreachable!("checked main authority is a known Auth constructor"),
             },
             fs_root_spec: plan.fs_root_spec.clone(),
+            process_declared: plan.process_declared,
             fs_root_binding: ken_runtime::fs_root_plan_binding_v1(
                 *plan_transport_hash,
                 &plan.fs_root_spec,
@@ -3984,6 +3986,7 @@ fn native_entrypoint_plan(
         prod_constructor: resolve(checked.prod_constructor)?,
         authority_name: checked.authority_name.clone(),
         fs_root_spec: checked.fs_root_spec.clone(),
+        process_declared: checked.process_declared,
         allow_root_execution: checked.allow_root_execution,
     })
 }
@@ -4459,6 +4462,7 @@ fn canonical_native_entrypoint_plan_bytes(plan: &NativeEntrypointPlanV1) -> Vec<
         out.extend_from_slice(field.as_bytes());
     }
     out.push(u8::from(plan.allow_root_execution));
+    out.push(u8::from(plan.process_declared));
     out.extend_from_slice(&plan.fs_root_spec.tag_v1().to_le_bytes());
     out.extend_from_slice(&(plan.fs_root_spec.bytes().len() as u64).to_le_bytes());
     out.extend_from_slice(plan.fs_root_spec.bytes());
@@ -8306,6 +8310,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             prod_constructor: symbol,
             authority_name: "AFull".to_string(),
             fs_root_spec: ken_host::FsRootSpec::default(),
+            process_declared: false,
             allow_root_execution: false,
         };
         let stale_hash = fingerprint(&canonical_native_entrypoint_plan_bytes(&plan));
