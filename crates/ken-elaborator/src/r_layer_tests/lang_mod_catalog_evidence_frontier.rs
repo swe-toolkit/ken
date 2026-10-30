@@ -886,7 +886,18 @@ fn minimisation_indirect_length_is_not_a_source_prerequisite() {
     env.elaborate_module_from_roots(&[root.clone()], module)
         .expect("legacy Minimisation loads");
     let length = env.globals["Data.Collections.List.length"];
-    match legacy_evidence(&root, module, &units[module], &units) {
+    let evidence = legacy_evidence(&root, module, &units[module], &units);
+    assert_eq!(
+        validate_evidence_frontier(&[UnitCensusRow {
+            canonical_module: module.to_string(),
+            parsed_direct_imports: units[module].direct_imports.clone(),
+            strict_observation: LoaderObservation::Succeeded,
+            legacy_observation: LoaderObservation::Succeeded,
+            legacy_identity_evidence: evidence.clone(),
+        }]),
+        Ok(())
+    );
+    match evidence {
         LegacyIdentityEvidence::ExactLedger {
             resolved_globals,
             identity_grounded_prerequisites,
