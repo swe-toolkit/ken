@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-D5B-COW-DISCHARGE
 title: "ABI-S6's last unmet criterion is seed case 1: a process-local write to a file-backed mapping must not reach the file. No fixture writes through a file-backed mapping, and on main no open mode can acquire a writable one, because file-mapping admission demands the destination's write right of the source handle. Admit the source on READ, run the case on both engines with a write-through control, lift the seed markers, and add the two missing typed-refusal witnesses"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1

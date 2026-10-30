@@ -1,7 +1,7 @@
 ---
 id: ABI-S6
 title: "ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
