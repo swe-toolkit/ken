@@ -30,7 +30,9 @@ The public carrier, operations and the first five generic laws lead the
 checked source, followed by their private recursive merge helper and proof
 lemmas. The window/merge distribution and composition laws, the three merge
 membership laws, merge associativity and the adjacent-window split each lead
-their private lemmas later in the source. Windowing includes the lower bound
+their private lemmas later in the source. The inverted-window law follows
+window append; its private decision lemma sits beside the split's bound lemmas.
+Windowing includes the lower bound
 but excludes the upper; a merge tie favors the left input without examining
 payloads. Membership uses Ω-valued `list_elem`, so neither a payload equality
 decision nor an ordering premise is needed.
@@ -287,6 +289,29 @@ pub theorem trace_window_append
         (trace_window p lo hi (list_append (Event p) xs ys))
         (list_append (Event p) (trace_window p lo hi xs) (trace_window p lo hi ys)) =
   (proof append for filter) (Event p) (event_in_window p lo hi) xs ys
+
+pub theorem trace_window_inverted_empty
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : Equal Bool (leq_nat hi lo) True
+      → Equal (List (Event p)) (trace_window p lo hi tr) (Nil (Event p)) =
+  match tr {
+    Nil ↦ λhi_lo. Proved;
+    Cons h t ↦
+      λhi_lo.
+        trans
+          (List (Event p))
+          (trace_window p lo hi (Cons (Event p) h t))
+          (trace_window p lo hi t)
+          (Nil (Event p))
+          (cong
+            Bool
+            (List (Event p))
+            (event_in_window p lo hi h)
+            False
+            (λd. window_keep (Event p) h (trace_window p lo hi t) d)
+            (event_in_window_inverted p lo hi h (leq_nat lo (event_time p h)) hi_lo Refl))
+          (trace_window_inverted_empty p lo hi t hi_lo)
+  }
 
 pub theorem trace_merge_nil_left
       (p : Type) (ys : List (Event p))
@@ -2852,6 +2877,33 @@ theorem event_in_window_past
           ((proof comm for bool_and) (leq_nat lo t) False)
   }
 
+theorem event_in_window_inverted
+      (p : Type) (lo : Nat) (hi : Nat) (e : Event p) (decision : Bool)
+    : Equal Bool (leq_nat hi lo) True
+      → Equal Bool (leq_nat lo (event_time p e)) decision
+      → Equal Bool (event_in_window p lo hi e) False =
+  match decision {
+    True ↦
+      λhi_lo.
+        λlo_e.
+          event_in_window_past
+            p
+            lo
+            hi
+            e
+            ((proof trans for leq_nat) hi lo (event_time p e) hi_lo lo_e);
+    False ↦
+      λhi_lo.
+        λlo_e.
+          cong
+            Bool
+            Bool
+            (leq_nat lo (event_time p e))
+            False
+            (λd. bool_and d (lt_nat (event_time p e) hi))
+            lo_e
+  }
+
 theorem event_in_window_raise
       (p : Type) (lo : Nat) (mid : Nat) (hi : Nat) (e : Event p)
     : Equal Bool (leq_nat lo mid) True
@@ -3020,15 +3072,23 @@ traces and inverted window bounds. The checked `trace_window_append` proof
 instantiates the collections provider's public `filter::append` law with the
 half-open event predicate; no additional helper or import is needed.
 
+Equal or inverted windows contain no events, even when the trace is unordered.
+The proof inducts on the trace. For each head, a private decision lemma
+examines the bound `lo ≤ time`: when true, transitivity of `hi ≤ lo ≤ time`
+makes the strict upper test false; when false, the lower test already rejects
+the event. Binding that decision and its equation before the case split lets
+the proof remove the head with `window_keep` and reuse the induction hypothesis
+for the tail. No trace-order premise or new import is needed.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
 of a separate trace wrapper. Unordered inputs remain legal; only the
 order-preservation laws ask for ordered inputs. The timestamp order is
-non-decreasing, admitting tied events. `trace_window` is half-open; equal or
-inverted bounds select no events. Membership in a window supplies two separate
-facts: its timestamp meets the inclusive lower and strict upper bound. The
-merge's tie rule is part of its
+non-decreasing, admitting tied events. `trace_window` is half-open; its checked
+empty-window law covers equal and inverted bounds on every finite trace.
+Membership in a window supplies two separate facts: its timestamp meets the
+inclusive lower and strict upper bound. The merge's tie rule is part of its
 computation, not a consequence of the count law. No clock, duration, signed
 time, infinite stream, or causality property is provided here. Membership
 claims occurrence without counting duplicates; the separate count law concerns
@@ -3041,7 +3101,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and fifteen checked law contracts.
+  — the carrier, half-open boundary, left-bias and sixteen checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -3050,7 +3110,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the fifteen laws form the package surface.
+   `trace_merge`, and the sixteen laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -3072,8 +3132,10 @@ merging, not window multiplicity.
    adjacent-window split reuses the checked `list_append` provider and nine
    new private proof helpers under ordered-trace and bound-order premises.
    Window append reuses the public `filter::append` proof from Derived with
-   the existing event predicate, without a new helper or import.
-4. **Trusted-base delta.** Zero: all fifteen exported laws have checked proof
+   the existing event predicate, without a new helper or import. The
+   inverted-window proof reuses `event_in_window_past`, `window_keep` and
+   checked natural-order transitivity. Its decision helper stays private.
+4. **Trusted-base delta.** Zero: all sixteen exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3092,4 +3154,8 @@ merging, not window multiplicity.
    accepts the complete seed and refuses its isolated swapped claim.
    The `cat_time_window_append` package test checks the §8 law and the
    complete accepted window-append seed with both isolated swapped refusals.
+   The `cat_time_inverted_window_empty` package test exercises the generic
+   empty-window law, closed equal and inverted bounds on ordered and unordered
+   traces, and a nonempty-window refusal with a same-form accepted control.
+   This package-owned fixture is not the separately owned conformance seed.
    These tests are not official conformance-runner execution or CI.
