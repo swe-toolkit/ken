@@ -53,8 +53,8 @@ theorem generic_take
 
 /// MEASURED: both law identities belong to the roots-loaded Argmin package,
 /// are Transparent, and elaborate a client restating their complete open
-/// Boolean-premise types. All six private proof/selector helpers refuse
-/// selective import. Exact trusted GlobalId sets agree before and after.
+/// Boolean-premise types. All fourteen live private proof/selector helpers
+/// refuse selective import. Exact trusted GlobalId sets agree before and after.
 /// CLAIMED: §1.6 exports two checked generic laws with no new trust or helper
 /// exposure. THE GAP: inherited provider assumptions remain; closed seed
 /// results below test branch behavior but do not prove universal laws.
@@ -98,13 +98,27 @@ fn append_laws_are_generic_checked_and_zero_trust() {
         .expect("generic client consumes full §1.6 laws for every type and cost");
     for private in [
         "choose",
-        "argmin_view",
-        "argmin_via_view",
-        "argmin_append_choice",
-        "argmin_from_append",
-        "choose_earliest_assoc",
+        "costlier",
+        "select",
+        "select_view",
+        "select_via_view",
+        "holds_at",
+        "transitive_at",
+        "select_append_choice",
+        "select_from_append",
+        "choose_better_assoc",
+        "lt_nat_true_trans",
+        "lt_nat_false_trans",
+        "costlier_true_trans",
+        "costlier_false_trans",
     ] {
-        match loaded_argmin().elaborate_file(&format!("import {ARGMIN} ({private})")) {
+        let id = env.globals[&format!("{ARGMIN}.{private}")];
+        assert!(owned.contains(&id), "{private} must exist in Argmin");
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{private} must have a checked body"
+        );
+        match env.elaborate_file(&format!("import {ARGMIN} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{ARGMIN}.{private}"));
             }
