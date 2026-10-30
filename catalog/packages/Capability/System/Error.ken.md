@@ -4,8 +4,8 @@
 from a transient error paired with an idempotent operation. The checked
 [converse theorem](#classification-laws) proves the "only from" direction,
 and the [revoked theorem](#classification-laws) proves that
-`error_transience Revoked = Permanent`. The envelope wraps filesystem and child-process errors without changing the
-canonical `IOError` identities.
+`error_transience Revoked = Permanent`. The envelope wraps filesystem and
+child-process errors without changing the canonical `IOError` identities.
 Import this surface as `Capability.System.Error`, beside `Capability.System.IO`.
 
 ## Contents
@@ -271,8 +271,9 @@ pub theorem retry_guidance_idempotence_flip
 
 `SystemError` preserves an operation, a resource reference, the canonical
 `IOError` identity, and a safe context. `ProcessResource` carries known program
-bytes rather than a pid or descriptor; `None` preserves an unknown resource. `file_error_to_system` wraps each
-`FileError` field without interpreting or replacing its cause. A safe context
+bytes rather than a pid or descriptor; `None` preserves an unknown resource.
+`file_error_to_system` wraps each `FileError` field without interpreting or
+replacing its cause. A safe context
 contains no authority-sensitive bytes; the current constructors carry no
 payload. Classification is pure checked Ken, not a host retry policy.
 
