@@ -258,6 +258,34 @@ pub theorem graph_reachable_graph_monotone
           graph_reachable_complete q fq h s t target (walk_lift q g h included s t walk) hit
       }
 
+pub fn graph_reverse (q : Type) (g : Graph q) : Graph q = MkGraph q (λs. λt. edge q g t s)
+
+pub theorem graph_reverse_edge
+      (q : Type) (g : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_reverse q g) s t) (edge q g t s) =
+  Refl
+
+pub fn walk_reverse
+      (q : Type) (g : Graph q) (s : q) (t : q) (walk : Walk q g s t)
+    : Walk q (graph_reverse q g) t s =
+  match walk {
+    WalkHere ↦ WalkHere q (graph_reverse q g) s;
+    WalkStep prev end e prefix ↦
+      walk_prepend q (graph_reverse q g) end prev s e (walk_reverse q g s prev prefix)
+  }
+
+pub theorem graph_reachable_reverse
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (target : q → Bool)
+      (walk : Walk q g s t)
+    : Equal Bool (target s) True
+      → Equal Bool (graph_reachable q fq (graph_reverse q g) t target) True =
+  graph_reachable_complete q fq (graph_reverse q g) t s target (walk_reverse q g s t walk)
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -525,6 +553,10 @@ reachability fixed point, not another graph-specific search. Graph
 monotonicity re-types the witness walk edge by edge: the private `walk_lift`
 replaces each step's checked edge proof with the inclusion premise's proof for
 the larger graph, and completeness then decides along the lifted walk.
+Reversal flips adjacency without a second graph representation. Induction on a
+walk prepends each reversed edge to the reversed prefix; the existing private
+`walk_prepend` retains the checked edge proof. Completeness turns that reversed
+walk and a hit at its original start into reachability from its original end.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -2321,7 +2353,7 @@ checked first edge gives a strict ordering claim.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–7](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–8](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2339,13 +2371,15 @@ chain. The
 [§7 seed](../../../../conformance/stdlib/graphs/seed-reachability-graph-monotone.md)
 adds one edge to the same chain and refuses the converse on the pair. The
 public API is the graph, path and certificate types, their
-constructors, the walk-append operation, the predicate-reachability decision
-and witness, the dependency-order operation, five list/order predicates,
-and sixteen kernel-checked laws. Every other helper is private to this package.
+constructors, walk composition and reversal, the graph reversal and
+predicate-reachability operations and witness, the dependency-order operation,
+five list/order predicates, and eighteen kernel-checked laws. Every other helper
+is private to this package.
 
 | Reader task | Section |
 |---|---|
 | Find a graph path or decision | [Definition](#2-definition), [Using it](#3-using-it) |
+| Reverse a graph and a walk | [Definition](#2-definition), [Laws & proofs](#4-laws--proofs) |
 | Review order or cycle evidence | [Definition](#2-definition), [Laws & proofs](#4-laws--proofs) |
 | Inspect search, proof and trust | [Laws & proofs](#4-laws--proofs), [Trust & derivation](#7-trust--derivation) |
 
@@ -2365,5 +2399,7 @@ refused clients. The §6 package test checks its complete accepted client,
 including the independent reachability controls, and refuses the isolated
 false converse. The §7 package test checks the accepted two-edge seed and
 all nine graph-edge pairs before refusing the isolated graph-converse claim.
-These are package tests, not official conformance-runner execution or CI.
-They do not establish execution of the §2 seed.
+The §8 package test checks the four generic exports, flipped edge and walk
+behavior, and reversed reachability on a three-vertex directed chain. That
+package test does not stand in for conformance-runner execution or CI. These
+package tests do not establish execution of the §2 seed.
