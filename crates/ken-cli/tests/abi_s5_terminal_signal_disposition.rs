@@ -191,6 +191,7 @@ fn ken_run_worker_signal_posture_is_exact() {
         "the program runs in the worker, not the CLI parent"
     );
     assert_live_posture(worker, true);
+    assert_live_posture(parent.id(), true);
     assert_reader_exits(parent);
 }
 
