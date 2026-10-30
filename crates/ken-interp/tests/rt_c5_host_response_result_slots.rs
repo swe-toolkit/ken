@@ -98,6 +98,16 @@ impl Fixture {
         self.value(&Term::constructor(self.id(name), vec![]))
     }
 
+    fn stdin(&mut self) -> EvalVal {
+        let id = self.elab.prelude_env.stdin_id;
+        self.value(&Term::constructor(id, vec![]))
+    }
+
+    fn stdout(&mut self) -> EvalVal {
+        let id = self.elab.prelude_env.stdout_id;
+        self.value(&Term::constructor(id, vec![]))
+    }
+
     fn call(&mut self, name: &str, args: impl IntoIterator<Item = EvalVal>) -> EvalVal {
         let mut f = self.named(name);
         for arg in args {
@@ -775,7 +785,7 @@ fn fs_resource_error_bytes() {
 #[test]
 fn ambient_io_error_read_result_plain_io() {
     let mut f = Fixture::new();
-    let stdin = f.ctor("Stdin");
+    let stdin = f.stdin();
     let action = f.call("read", [stdin, EvalVal::Int(20)]);
     let mut host = host();
     let response = f.verify_pair(action, "IOError", "ReadResult", &mut host);
@@ -788,7 +798,7 @@ fn ambient_io_error_read_result_plain_io() {
 #[test]
 fn ambient_io_error_read_result_host_console() {
     let mut f = Fixture::new();
-    let stdin = f.ctor("Stdin");
+    let stdin = f.stdin();
     let action = f.call("read", [stdin, EvalVal::Int(20)]);
     let full = f.full();
     let ty = f.eval_expr("Result IOError ReadResult");
@@ -819,7 +829,7 @@ fn ambient_io_error_read_result_host_console() {
 #[test]
 fn ambient_io_error_unit() {
     let mut f = Fixture::new();
-    let stdout = f.ctor("Stdout");
+    let stdout = f.stdout();
     let tree = f.call("write", [stdout, Fixture::bytes(b"written")]);
     let mut host = host();
     host.close(ConsoleStream::Stdout);

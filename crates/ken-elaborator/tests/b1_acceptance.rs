@@ -444,7 +444,7 @@ proc h (_value : Unit) : HostIO AFull Instant visits [Console, Clock] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result IOError Unit) Instant
-    (host_console AFull (Result IOError Unit) (flush Stdout))
+    (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
     (\outcome. after_flush outcome)
 "#;
     let denotation = compile_checked_target_denotation(

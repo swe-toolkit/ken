@@ -352,6 +352,8 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "Bottom",
             "BufferSpan",
             "Coproduct",
+            "ConsoleStream",
+            "eqChar",
             "CreatePolicy",
             "Equal",
             "ExitCode",

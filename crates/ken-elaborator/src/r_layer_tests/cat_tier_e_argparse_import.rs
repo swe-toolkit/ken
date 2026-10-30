@@ -350,6 +350,10 @@ fn argparse_selective_import_ledger_is_exact() {
             ]),
         ),
         (
+            "Core.Classes.LawfulClasses".to_owned(),
+            names(&["charToInt"]),
+        ),
+        (
             "Core.Logic.Transport".to_owned(),
             names(&["cong", "sym", "trans"]),
         ),

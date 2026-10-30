@@ -136,6 +136,9 @@ pub struct ModuleState {
     /// One roots-loader run cannot mix legacy and strict units: the loaded-unit
     /// cache records elaborated results rather than unresolved source.
     roots_resolution_mode: Option<ResolutionMode>,
+    /// Home module -> checked pre-source package identities bound in that
+    /// module's scope, never in unrelated clients or the strict ambient set.
+    package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>>,
 }
 
 type FileExportTables = HashMap<String, HashMap<String, HashMap<String, String>>>;
@@ -236,12 +239,13 @@ impl ModuleState {
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 30] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 32] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
+    "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
     "Equal",
@@ -267,6 +271,18 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 30] = [
     "TransferCount",
     "Unit",
     "Utf8Error",
+    "eqChar",
+];
+
+/// Each checked package identity has exactly one explicit-import home. The
+/// pre-source ID is bound only in that home's scope, then published by its
+/// ordinary `export`; it does not become an ambient floor binding.
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 5] = [
+    ("Capability.Console.Text", "IO"),
+    ("Capability.Console.Text", "write"),
+    ("Capability.Console.Text", "print_line"),
+    ("Core.Classes.LawfulClasses", "charToInt"),
+    ("Core.Classes.LawfulClasses", "leqChar"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
@@ -345,6 +361,46 @@ impl ModuleState {
             .into_iter()
             .map(str::to_string)
             .collect();
+    }
+
+    /// Rename only the surface binding of an already checked prelude type.
+    /// The pre-source names and artifact symbols were captured before this
+    /// move; the kernel family and all constructor IDs remain unchanged.
+    pub(crate) fn rename_prelude_source_type(
+        &mut self,
+        env: &ken_kernel::GlobalEnv,
+        globals: &mut HashMap<String, ken_kernel::GlobalId>,
+        from: &str,
+        to: &str,
+    ) -> Result<ken_kernel::GlobalId, ElabError> {
+        let id = globals.get(from).copied().ok_or_else(|| {
+            ElabError::Internal(format!("prelude source type `{from}` is missing"))
+        })?;
+        if env.inductive(id).is_none() || globals.contains_key(to) {
+            return Err(ElabError::Internal(format!(
+                "prelude source type `{from}` cannot move to `{to}`"
+            )));
+        }
+        let root = &mut self.root_scope;
+        if root.bindings.get(from).map(String::as_str) != Some(from)
+            || root.checked_local_ids.get(from) != Some(&id)
+            || root.bindings.contains_key(to)
+        {
+            return Err(ElabError::Internal(format!(
+                "prelude source type `{from}` has inconsistent root binding"
+            )));
+        }
+        root.bindings.remove(from);
+        root.locals.remove(from);
+        root.current_local_names.remove(from);
+        root.checked_local_ids.remove(from);
+        root.binding_ids.remove(from);
+        root.bindings.insert(to.to_string(), to.to_string());
+        root.locals.insert(to.to_string());
+        root.checked_local_ids.insert(to.to_string(), id);
+        globals.remove(from);
+        globals.insert(to.to_string(), id);
+        Ok(id)
     }
 
     /// Move one entire checked family's constructor bindings to `T.C`.
@@ -433,6 +489,23 @@ impl ModuleState {
                 .map(|(leaf, id)| (*id, leaf.clone()))
                 .collect()
         })
+    }
+
+    /// Checked pre-source package identities granted in `module`'s own
+    /// scope; empty for every other module.
+    pub(crate) fn package_home_ids(&self, module: &str) -> &[(String, ken_kernel::GlobalId)] {
+        self.package_home_ids.get(module).map_or(&[], Vec::as_slice)
+    }
+
+    /// Checked identities `package` publishes in this run, including selected
+    /// facade identities; empty for a package the run has not loaded.
+    pub(crate) fn package_export_ids(&self, package: &str) -> HashSet<ken_kernel::GlobalId> {
+        self.file_export_ids
+            .get(package)
+            .or_else(|| self.export_provenance.get(package).map(|p| &p.member_ids))
+            .into_iter()
+            .flat_map(|tables| tables.values().flat_map(|members| members.values().copied()))
+            .collect()
     }
 
     pub(crate) fn capture_strict_builtin_names(
@@ -546,6 +619,31 @@ impl ModuleState {
         }
         self.prelude_binding_names.insert("Proved".to_string());
         self.strict_builtin_names.insert("Proved".to_string());
+
+        let mut package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>> =
+            HashMap::new();
+        for (home, name) in PRELUDE_PACKAGE_HOMES {
+            let id = globals.get(name).copied().ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "package identity `{name}` for `{home}` has no pre-source identity"
+                ))
+            })?;
+            if !matches!(env.lookup(id), Some(ken_kernel::Decl::Transparent { .. })) {
+                return Err(ElabError::Internal(format!(
+                    "package identity `{name}` for `{home}` is not checked-transparent"
+                )));
+            }
+            if is_prelude_floor_name(name) || self.strict_builtin_names.contains(name) {
+                return Err(ElabError::Internal(format!(
+                    "package identity `{name}` for `{home}` is also strict ambient"
+                )));
+            }
+            package_home_ids
+                .entry(home.to_string())
+                .or_default()
+                .push((name.to_string(), id));
+        }
+        self.package_home_ids = package_home_ids;
         Ok(())
     }
 }
@@ -1977,11 +2075,7 @@ fn refresh_carried_instance_admission(elab: &mut ElabEnv) {
     };
     let public_ids: HashSet<ken_kernel::GlobalId> = admitted
         .iter()
-        .filter_map(|package| {
-            elab.module_state.file_export_ids.get(package)
-                .or_else(|| elab.module_state.export_provenance.get(package).map(|p| &p.member_ids))
-        })
-        .flat_map(|tables| tables.values().flat_map(|members| members.values().copied()))
+        .flat_map(|package| elab.module_state.package_export_ids(package))
         .collect();
     let carried: Vec<ken_kernel::GlobalId> = elab
         .class_env
@@ -2157,6 +2251,13 @@ fn load_unit(
 
         let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
         scope.private_ids.clone_from(&elab.module_state.private_ids);
+        // Only the approved file unit owns these pre-source IDs. An ordinary
+        // export publishes them through its provider table; other units must
+        // import that provider, never resolve the live process-global spelling.
+        for (name, id) in elab.module_state.package_home_ids(module) {
+            scope.bindings.insert(name.clone(), name.clone());
+            scope.binding_ids.insert(name.clone(), *id);
+        }
         let mut unit_definitions = HashSet::new();
         let mut ordered_inline_modules = HashSet::new();
         let (results, exports) = expand_scope(
@@ -2705,11 +2806,11 @@ fn rexpr_kernel_head(expr: &RExpr) -> Option<&'static str> {
         return None;
     };
     match (name.as_str(), arity) {
-        (crate::resolve::SUGAR_ABSURD, 1) => Some(crate::resolve::SUGAR_ABSURD),
-        (crate::resolve::SUGAR_TRUNC_INTRO, 1) => Some(crate::resolve::SUGAR_TRUNC_INTRO),
-        (crate::resolve::SUGAR_J, 3) => Some(crate::resolve::SUGAR_J),
-        (crate::resolve::SUGAR_EQ, 3) => Some(crate::resolve::SUGAR_EQ),
-        (crate::resolve::SUGAR_ELIM_TRUNC, 3) => Some(crate::resolve::SUGAR_ELIM_TRUNC),
+        (crate::resolve::SUGAR_ABSURD, n) if n >= 1 => Some(crate::resolve::SUGAR_ABSURD),
+        (crate::resolve::SUGAR_TRUNC_INTRO, n) if n >= 1 => Some(crate::resolve::SUGAR_TRUNC_INTRO),
+        (crate::resolve::SUGAR_J, n) if n >= 3 => Some(crate::resolve::SUGAR_J),
+        (crate::resolve::SUGAR_EQ, n) if n >= 3 => Some(crate::resolve::SUGAR_EQ),
+        (crate::resolve::SUGAR_ELIM_TRUNC, n) if n >= 3 => Some(crate::resolve::SUGAR_ELIM_TRUNC),
         _ => None,
     }
 }

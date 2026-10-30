@@ -43,6 +43,8 @@ import Capability.Diagnostics.Core
 
 import Core.Logic.Transport (cong, trans)
 
+import Core.Classes.LawfulClasses (charToInt)
+
 pub const numeric_empty_input_code : DiagnosticCode =
   MkDiagnosticCode "text.numeric.empty-input"
 

@@ -23989,7 +23989,11 @@ fn plan_literal_comparator(
                     LiteralComparatorValue::String(normalized),
                     LiteralComparatorPlan::String {
                         view: literal_builtin(cx, "string_to_list_char")?,
-                        eq_char: literal_builtin(cx, "eqChar")?,
+                        eq_char: cx
+                            .numeric_env
+                            .classify_eq(&Term::const_(cx.numeric_env.char_id, vec![]))
+                            .expect("Char has a registered value comparator")
+                            .op_id,
                         elements,
                     },
                 ));

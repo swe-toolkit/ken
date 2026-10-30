@@ -262,29 +262,51 @@ is a **surface error** (`24`) — it never reaches the kernel:
   lookup order, capitalization, nor an identical target ID breaks the tie.
   Qualified and aliased module imports otherwise preserve the imported
   declaration's identity. Selectively imported or renamed names do too.
-- **One strict mode, for every source unit.** Resolve a source name through its
-  lexical locals (including declarations already admitted to the same
-  incremental session), explicit imports, the kernel/built-in vocabulary, or
-  the closed prelude of `30-taxonomy §4`. The same rule applies to roots-loaded
-  and isolated-file compilation and to incremental elaboration. No other
-  lookup in an implementation-global table can make a spelling visible. A
-  loaded dependency is not implicitly imported and neither unit inherits the
-  other's imports. A registered convenience outside the prelude needs an
-  explicit public provider import; without one it is unbound.
+- **Strict roots resolution.** `elaborate_module_from_roots_strict`
+  resolves each unit's names through lexical locals, explicit imports,
+  kernel/built-in vocabulary, or the closed prelude of `30-taxonomy §4`.
+  This is the complete scope: no lookup in an implementation-global table
+  makes another spelling visible. A loaded dependency is not implicitly
+  imported and units do not inherit each other's imports. The five package
+  identities `IO`, `write`, `print_line`, `charToInt`, and `leqChar` need
+  explicit public imports from `Capability.Console.Text` and
+  `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
+  to the exact pre-source `GlobalId`; without it, an unimported bare use
+  raises `UnboundName` in Strict roots.
+- **Transitional Legacy resolution.** Until the L2-4 strict-entry flip,
+  `elaborate_module_from_roots` and `_v1` use Legacy roots. Explicit
+  provider imports there also resolve each of the five to its exact ID.
+  Bare unimported uses in Legacy roots are not required to be refused,
+  but neither their availability nor their identity is promised: a
+  loaded declaration may take over a spelling in the flat global table.
+  Catalog clients import their providers as a migration obligation, not
+  because Legacy roots enforce the Strict no-import rule. Standalone
+  `elaborate_file_v1`, `elaborate_ken_md_file_v1`, `elaborate_decl`, and
+  CLI entries outside `catalog/packages/` retain bare access to the five
+  exact pre-source IDs. Examples and inline sources using these entries
+  follow the same route. Other bare implementation globals may resolve
+  in Legacy mode but are neither guaranteed nor refused by this contract.
+  Legacy mode neither adds a floor/B name nor creates a second ID.
+  `ConsoleStream` and its scoped `ConsoleStream.Stdin`,
+  `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` paths apply in every
+  mode; the bare constructor spellings are not restored. This slice
+  changes no CLI route or standalone roots loader. L2-4 owns that route
+  and the strict-default flip.
 - **Closed built-in name set B.** For resolution and name protection, B is the
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
-  BufferSpan, Char, Coproduct, CreatePolicy, Equal, ExitCode, FileError,
-  HostIO, IOError, ITree, Instant, List, Nat, Option, Pair, ProcessInput,
-  Prod, ProgramCaps, Prop, Proved, ResourceError, ResourceKind, Result,
-  Top, TransferCount, Unit, Utf8Error}`. This floor subset contains thirty
-  exact identities: the prior fifteen, five entrypoint-ABI identities,
-  three effect/clock identities, `ITree`, and six FS/resource families
-  (`30-taxonomy §4`). These are not thirty types: `Top` and `Bottom` are
-  proposition constants, `Proved` is a proof binding, and `HostIO` is a
-  type-level function, not an inductive type or constructor family. For
-  an inductive floor type, its per-type
+  BufferSpan, Char, ConsoleStream, Coproduct, CreatePolicy, Equal,
+  ExitCode, FileError, HostIO, IOError, ITree, Instant, List, Nat,
+  Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
+  ResourceError, ResourceKind, Result, Top, TransferCount, Unit,
+  Utf8Error, eqChar}`. This floor subset contains thirty-two exact
+  identities: the prior thirty plus `ConsoleStream` and `eqChar`
+  (`30-taxonomy §4`). These are not thirty-two types: `Top` and
+  `Bottom` are proposition constants, `Proved` is a proof binding,
+  `HostIO` is a type-level function, and `eqChar` is a checked
+  comparator operation, not an inductive type or constructor family.
+  For an inductive floor type, its per-type
   **scoped constructors** property determines whether its whole exact
   constructor family also occupies bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
@@ -302,6 +324,12 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `ITree` is scoped: `ITree.Ret` and `ITree.Vis` resolve to the unchanged
   checked constructor IDs; bare `Ret` and `Vis` are not reserved and
   may be bound by other source declarations under ordinary non-B rules.
+  `ConsoleStream` is scoped: its complete exact checked family resolves
+  as `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
+  `ConsoleStream.Stderr`. Of this family, only `ConsoleStream` enters
+  the counted floor; bare `Stdin`, `Stdout`, `Stderr`, and the old
+  generic `Stream` spelling are not reserved by it. No constructor ID
+  is renamed.
   `FileError` is unscoped: `MkFileError` remains bare and reserved with
   its exact parent. `IOError` is scoped as a complete thirteen-cause
   family: only public `IOError.C` paths resolve, including

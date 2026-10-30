@@ -432,7 +432,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     Bool ExitCode
-    (host_console APartial Bool (is_terminal Stdout))
+    (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. match terminal {
       False |-> host_exit APartial (ExitCode.Failure 23) ;
       True |-> host_exit APartial (ExitCode.Failure 24)
@@ -480,7 +480,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
             (resp_coproduct (FSOp APartial) AmbientOp
               (fs_resp APartial) ambient_resp)
             (Result IOError Unit) ExitCode
-            (host_console APartial (Result IOError Unit) (write Stdout payload))
+            (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout payload))
             (\written. match written {
               Ok _ |-> host_exit APartial (ExitCode.Failure 62) ;
               Err error |-> match error {
@@ -583,7 +583,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                             (resp_coproduct (FSOp AFull) AmbientOp
                               (fs_resp AFull) ambient_resp)
                             (Result IOError Unit) ExitCode
-                            (host_console AFull (Result IOError Unit) (flush Stdout))
+                            (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
                             (\_. match bytes_at bytes 0 {
                               None |-> host_exit AFull (ExitCode.Failure 36) ;
                               Some byte |-> host_exit AFull (ExitCode.Failure byte)

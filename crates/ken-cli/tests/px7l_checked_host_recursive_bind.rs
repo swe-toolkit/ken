@@ -11,7 +11,7 @@ proc selected_body (terminal : Bool) (message : String)
     True |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit MkUnit)
@@ -26,7 +26,7 @@ proc delayed (body : Unit -> HostIO APartial Unit)
     (\_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_exit APartial ExitCode.Success))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
@@ -34,7 +34,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     Bool ExitCode
-    (host_console APartial Bool (is_terminal Stdout))
+    (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. delayed (selected_body terminal "captured"))
 "#;
 
@@ -49,8 +49,8 @@ proc selected_result (terminal : Bool) (message : String)
   : Unit -> HostIO APartial (Result IOError Unit) visits [Console] =
   \_. match terminal {
     False |-> host_console APartial (Result IOError Unit)
-      (write Stdout (bytes_encode message)) ;
-    True |-> host_console APartial (Result IOError Unit) (flush Stdout)
+      (write ConsoleStream.Stdout (bytes_encode message)) ;
+    True |-> host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout)
   }
 
 proc delayed_result (body : Unit -> HostIO APartial (Result IOError Unit))
@@ -69,7 +69,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     Bool ExitCode
-    (host_console APartial Bool (is_terminal Stdout))
+    (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. delayed_result (selected_result terminal "probe"))
 "#;
 

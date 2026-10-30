@@ -864,7 +864,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
          (fs_resp APartial) ambient_resp)
        (Result IOError Unit) ExitCode
        (host_console APartial (Result IOError Unit)
-         (write Stdout (bytes_encode "admitted")))
+         (write ConsoleStream.Stdout (bytes_encode "admitted")))
        (\_ . host_exit APartial ExitCode.Success)
 "#
         )

@@ -14,7 +14,7 @@ proc step (marker : Bytes) (tree : HostIO APartial (Result Int Bool))
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) (Result Int Bool)
-    (host_console APartial (Result IOError Unit) (write Stdout marker))
+    (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout marker))
     (retain_tree tree)
 
 fn zero_tree (_unit : Unit) : HostIO APartial (Result Int Bool) =
@@ -40,7 +40,7 @@ proc flush_then_exit (code : ExitCode) (_written : Result IOError Unit)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     (Result IOError Unit) ExitCode
-    (host_console APartial (Result IOError Unit) (flush Stdout))
+    (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
     (exit_with code)
 
 proc finish (outcome : Result Int Bool)
@@ -50,13 +50,13 @@ proc finish (outcome : Result Int Bool)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit)
-        (write Stdout (bytes_encode ":final-E")))
+        (write ConsoleStream.Stdout (bytes_encode ":final-E")))
       (flush_then_exit (ExitCode.Failure 7));
     Ok value |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit)
-        (write Stdout (bytes_encode ":final-O")))
+        (write ConsoleStream.Stdout (bytes_encode ":final-O")))
       (flush_then_exit ExitCode.Success)
   }
 

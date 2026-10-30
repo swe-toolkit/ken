@@ -1822,7 +1822,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                               (fs_resp AFull) ambient_resp)
                             (Result IOError Unit) ExitCode
                             (host_console AFull (Result IOError Unit)
-                              (write Stdout bytes))
+                              (write ConsoleStream.Stdout bytes))
                             (\written_console. match written_console {
                               Err _ |-> host_exit AFull (ExitCode.Failure 25) ;
                               Ok _ |->
@@ -1830,7 +1830,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                                   (resp_coproduct (FSOp AFull) AmbientOp
                                     (fs_resp AFull) ambient_resp)
                                   (Result IOError Unit) ExitCode
-                                  (host_console AFull (Result IOError Unit) (flush Stdout))
+                                  (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
                                   (\flushed. match flushed {
                                     Err _ |-> host_exit AFull (ExitCode.Failure 26) ;
                                     Ok _ |->
@@ -1838,7 +1838,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                                         (resp_coproduct (FSOp AFull) AmbientOp
                                           (fs_resp AFull) ambient_resp)
                                         Bool ExitCode
-                                        (host_console AFull Bool (is_terminal Stdout))
+                                        (host_console AFull Bool (is_terminal ConsoleStream.Stdout))
                                         (\terminal. match terminal {
                                           False |-> host_exit AFull ExitCode.Success ;
                                           True |-> host_exit AFull (ExitCode.Failure 27)
@@ -1892,7 +1892,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
        (resp_coproduct (FSOp AFull) AmbientOp
          (fs_resp AFull) ambient_resp)
        (Result IOError ReadResult) ExitCode
-    (host_console AFull (Result IOError ReadResult) (read Stdin (2 : Int)))
+    (host_console AFull (Result IOError ReadResult) (read ConsoleStream.Stdin (2 : Int)))
     (\first. match first {
       Err _ |-> host_exit AFull (ExitCode.Failure 41) ;
       Ok first_read |-> match first_read {
@@ -1906,7 +1906,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
                      (fs_resp AFull) ambient_resp)
                    (Result IOError ReadResult) ExitCode
                 (host_console AFull (Result IOError ReadResult)
-                  (read Stdin (4 : Int)))
+                  (read ConsoleStream.Stdin (4 : Int)))
                 (\second. match second {
               Err _ |-> host_exit AFull (ExitCode.Failure 43) ;
               Ok second_read |-> match second_read {
@@ -1920,7 +1920,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
                              (fs_resp AFull) ambient_resp)
                            (Result IOError ReadResult) ExitCode
                         (host_console AFull (Result IOError ReadResult)
-                          (read Stdin (4 : Int)))
+                          (read ConsoleStream.Stdin (4 : Int)))
                         (\third. match third {
                           Err _ |-> host_exit AFull (ExitCode.Failure 45) ;
                           Ok third_read |-> match third_read {

@@ -9,7 +9,7 @@ proc selected_body (terminal : Bool) (message : String)
     True |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
         (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
         Unit MkUnit)
@@ -24,7 +24,7 @@ proc delayed (body : Unit -> HostIO APartial Unit)
     (\_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) ExitCode
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_exit APartial ExitCode.Success))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
@@ -32,7 +32,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   bind (Coproduct (FSOp APartial) AmbientOp)
     (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
     Bool ExitCode
-    (host_console APartial Bool (is_terminal Stdout))
+    (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. delayed (selected_body terminal "captured"))
 "#;
 
@@ -127,7 +127,7 @@ fn owner_vis_join_consumption_refuses_before_dead_subtree_disposition() {
 /// was reached, not that it executed correctly.
 #[test]
 fn checked_double_bind_admits_and_runs_with_native_parity() {
-    const ORIGINAL: &str = "  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    (body MkUnit)\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush Stdout))\n      (\\_. host_exit APartial ExitCode.Success))";
+    const ORIGINAL: &str = "  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    (body MkUnit)\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))\n      (\\_. host_exit APartial ExitCode.Success))";
     const DOUBLE_BIND: &str = "  let p : HostIO APartial Unit = body MkUnit in\n  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    p\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      Unit ExitCode\n      p\n      (\\_. host_exit APartial ExitCode.Success))";
     assert_eq!(PX7L.matches(ORIGINAL).count(), 1);
     let source = PX7L.replacen(ORIGINAL, DOUBLE_BIND, 1);
@@ -191,7 +191,7 @@ const F1_BODY: &str = r#"  \_. match terminal {
     False |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_console APartial Unit (print_line "after-flush")) ;
     True |-> host_console APartial Unit (print_line message)
   }"#;
@@ -244,14 +244,14 @@ fn selected_pending_write_arm_controls_agree_across_executors() {
     const NO_MATCH: &str = r#"  \_. bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_console APartial Unit (print_line "after-flush"))"#;
     const UNSELECTED: &str = r#"  \_. match terminal {
     False |-> host_console APartial Unit (print_line message) ;
     True |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
       (Result IOError Unit) Unit
-      (host_console APartial (Result IOError Unit) (flush Stdout))
+      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_console APartial Unit (print_line "after-flush"))
   }"#;
     assert_native_interpreted_route(

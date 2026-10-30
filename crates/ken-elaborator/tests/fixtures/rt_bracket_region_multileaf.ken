@@ -77,7 +77,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         Bool ExitCode
-        (host_console AFull Bool (is_terminal Stdout))
+        (host_console AFull Bool (is_terminal ConsoleStream.Stdout))
         (\terminal.
           bind (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

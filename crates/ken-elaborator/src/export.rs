@@ -1611,11 +1611,11 @@ mod exact_inventory_tests {
                 r#"
 proc first (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
-  host_console AFull (Result IOError Unit) (flush Stdout)
+  host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 
 proc second (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
-  host_console AFull (Result IOError Unit) (flush Stdout)
+  host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#,
             ),
             target,

@@ -900,7 +900,7 @@ view.
 
 ### 1.10 Terminal and signal disposition at the executable edge (ABI-S5)
 
-The existing `proc is_terminal (stream : Stream) : IO Bool visits [Console]`
+The existing `proc is_terminal (stream : ConsoleStream) : IO Bool visits [Console]`
 returns `True` exactly when that stream's descriptor is a terminal, and `False`
 otherwise. It is total: its result is `Bool`, not `Result IOError Bool`. This
 states the already-shipped Console operation, not a new operation or a new

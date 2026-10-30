@@ -59,7 +59,7 @@ proc {target_name} (_value : Unit)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result IOError Unit) Instant
-    (host_console AFull (Result IOError Unit) (flush Stdout))
+    (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
     (\outcome. after_flush outcome)
 "#
     );
@@ -851,7 +851,7 @@ fn temporal_symbols_consume_the_one_checked_b1_alphabet() {
             r#"
 proc target (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
-  host_console AFull (Result IOError Unit) (flush Stdout)
+  host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#,
         ),
         "target",

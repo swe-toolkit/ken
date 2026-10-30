@@ -276,7 +276,7 @@ fn collections_prelude() -> String {
     // cannot also import the package's same-spelled declarations by module.
     for import in [
         "import Core.Function.Combinators (comp, idf)",
-        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)",
+        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat, leqChar)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)",
         "import Core.Logic.Or (Or, Inl, Inr)",
