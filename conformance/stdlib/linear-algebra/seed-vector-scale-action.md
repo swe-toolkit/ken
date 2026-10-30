@@ -4,22 +4,24 @@ Format: `../../README.md`.
 Spec: `spec/50-stdlib/65-linear-algebra.md §9`.
 Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION.md`.
 
-The accepted client applies all four generic §9 exports at length two and
-independently checks both sides of each law against closed vector values. These
-finite instances do not establish the generic proofs. The §9 contract is on
-this seed's base, but the four new catalog exports are not. Architect's AC-0
-reports that its source-shaped overlay accepted the AC-2 client and rejected
-the isolated false claim. This seed-only turn did not rerun that evidence or a
-package target. No official conformance-runner, CI, publication, or landing
-result is claimed. Each case promises a durable invariant.
+The accepted client applies all four §9 exports at abstract dimensions,
+factors and vectors, then instantiates them at length two and independently
+checks both sides against closed vector values. The open applications pin the
+public generic types; finite instances alone do not. This assembled candidate
+includes the checked exports and a package-owned test. Architect's AC-0
+reported scratch checks of the AC-2 client and isolated false claim; the
+prior-tip candidate-local package target and mutation are separate QA
+evidence, not a test run on this corrected seed or an official
+conformance-runner, CI, publication, or landing result. Each case
+promises a durable invariant.
 
 ## Accepted shared client
 
 Use `x=2`, `y=3`, `u=[1,2]`, and `v=[3,0]`. The independently computed
 values on both sides of the four laws are `[8,4]`, `[5,10]`, `[6,12]`, and
 `[1,2]`, respectively. The client invokes each generic theorem export directly;
-the separate `Refl` checks are closed value oracles, not replacements for those
-law applications.
+the separate `Refl` checks are closed value oracles, not replacements for
+open or closed law applications.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons)
@@ -27,6 +29,35 @@ import Data.Numeric.Nat.Arithmetic (add, mul)
 import Algorithm.LinearAlgebra.NatMatrix
   (vector_add, vector_scale, vector_scale_distrib,
    vector_scale_factor_distrib, vector_scale_compose, vector_scale_one)
+
+theorem vector_scale_distrib_open
+    (n : Nat) (x : Nat) (u : Vec Nat n) (v : Vec Nat n)
+  : Equal
+      (Vec Nat n)
+      (vector_scale n x (vector_add n u v))
+      (vector_add n (vector_scale n x u) (vector_scale n x v)) =
+  vector_scale_distrib n x u v
+
+theorem vector_scale_factor_distrib_open
+    (n : Nat) (x : Nat) (y : Nat) (u : Vec Nat n)
+  : Equal
+      (Vec Nat n)
+      (vector_scale n (add x y) u)
+      (vector_add n (vector_scale n x u) (vector_scale n y u)) =
+  vector_scale_factor_distrib n x y u
+
+theorem vector_scale_compose_open
+    (n : Nat) (x : Nat) (y : Nat) (u : Vec Nat n)
+  : Equal
+      (Vec Nat n)
+      (vector_scale n (mul x y) u)
+      (vector_scale n x (vector_scale n y u)) =
+  vector_scale_compose n x y u
+
+theorem vector_scale_one_open
+    (n : Nat) (u : Vec Nat n)
+  : Equal (Vec Nat n) (vector_scale n (Suc Zero) u) u =
+  vector_scale_one n u
 
 const zero : Nat = Zero
 const one : Nat = Suc zero
@@ -131,6 +162,23 @@ theorem dropped_scale_same_scope_true_control
   Refl
 ```
 
+### stdlib/linear-algebra/vector-scale-action-open
+
+- spec: §9.1.
+- promise class: durable invariant.
+- given: abstract `n`, factors `x` and `y`, and `u` and `v` of type
+  `Vec Nat n`.
+- expect: all four public exports apply directly at their ruled generic
+  types without specializing the dimension, factors or vectors.
+- measured: four abstract-variable theorem applications in the accepted
+  client; the first binds both vectors, the remaining three bind their
+  respective factors and vector.
+- claimed: the public interface admits all four §9.1 laws at arbitrary
+  input dimensions and operands, including `n=Zero` by quantification.
+- the gap: these client applications check the generic interface; the
+  checked proof bodies and their trust boundary are separately reviewed.
+- why: a dimension-two-only export cannot satisfy an abstract `n` client.
+
 ### stdlib/linear-algebra/vector-scale-action-closed
 
 - spec: §9.1 and §9.2.
@@ -143,8 +191,8 @@ theorem dropped_scale_same_scope_true_control
   equalities against separately constructed vectors.
 - claimed: the four generic exports have the specified types and agree with
   the closed operations on these inputs.
-- the gap: these closed applications do not establish the generic theorem
-  bodies for every `n`, `x`, `y`, `u`, and `v`.
+- the gap: closed values alone do not establish generic proof bodies;
+  the open client above checks the public generic types separately.
 - why: the applied theorem identities and separate value oracles distinguish
   unavailable or misordered exports from the closed vector calculations.
 
