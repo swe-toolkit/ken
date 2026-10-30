@@ -488,9 +488,14 @@ public soundness/completeness laws and Nat congruence; they do not add
 symmetry, transitivity, reflexivity or a new logical capability.
 Architect's isolated AC-0 on `b557bac0a` checked both generic bodies
 with no new `Axiom` and equal scratch trusted identity sets 114 → 114.
-This spec-only child adds no §10 catalog export or conformance seed and
-establishes no candidate execution, official conformance, CI,
-publication, landing or landed trust. A sorted-list normal form and
+This assembled candidate contains both checked §10 catalog laws, a
+package-owned test and CV's authored closed seed. Foundation's named
+package test passed 2/2 on implementation parent `b5cd7a0`, with equal
+candidate-local trusted GlobalId identity sets 114 → 114; its three
+mutation controls are package-test evidence. CV has not Ken-checked or
+officially conformance-run the seed. Architect's AC-0 remains separate
+scratch evidence; no assembled-tip test, CI, publication, landing or
+landed trust is claimed. A sorted-list normal form and
 signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in

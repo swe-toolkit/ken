@@ -19,13 +19,16 @@
 > checked exports, seed and package-owned test are present on this base.
 > Architect's §9 D0 on `757b2bd12` checked the generic compositions
 > with no new `Axiom` and equal scratch trusted identities 114 → 114.
-> Section 10 specifies two direct public congruence contracts for
-> `poly_eq` under `EAdd` and `EMul`. Architect's isolated AC-0 on
+> Section 10's two public congruence contracts under `EAdd` and `EMul`
+> now have checked catalog exports, a package-owned test and an authored
+> seed in this assembled candidate. Architect's isolated AC-0 on
 > `b557bac0a` checked both generic proofs with no new `Axiom` and
-> equal scratch trusted identity sets 114 → 114. This spec-only child
-> adds neither §10 catalog exports nor a §10 conformance seed; no
-> candidate execution, official conformance, CI, publication, landing
-> or landed trust is claimed.
+> equal scratch trusted identity sets 114 → 114. Foundation reported
+> the named package test 2/2 and equal candidate-local trusted GlobalId
+> identity sets 114 → 114 on parent `b5cd7a0`; its three mutation
+> controls are package-test evidence, not seed execution. CV authored
+> the seed but did not Ken-check or officially conformance-run it. No
+> assembled-tip test, CI, publication, landing or landed trust is claimed.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -928,10 +931,14 @@ this base.
 > (SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE).** Architect's isolated
 > AC-0 on `b557bac0a` checked both generic proof bodies with no new
 > `Axiom` and equal scratch trusted identity sets 114 → 114. This
-> spec-only child states the two public contracts; the catalog exports
-> and conformance seed are separate serial turns. The scratch result
-> does not establish candidate execution, official conformance, CI,
-> publication, landing or landed trust.
+> assembled candidate contains both checked §10 catalog theorems, the
+> package-owned test and CV's closed seed. Foundation's named package
+> test passed 2/2 at implementation parent `b5cd7a0`, with equal
+> candidate-local trusted GlobalId identity sets 114 → 114; its three
+> mutation controls are package-test evidence. The authored seed has
+> not been Ken-checked or run through official conformance. Neither
+> the isolated AC-0 nor the parent test establishes assembled-tip test
+> execution, CI, publication, landing or landed trust.
 
 `Algorithm.SymbolicAlgebra.NatPolynomial` must export two public
 Transparent checked theorems. Their arguments are the four expressions
