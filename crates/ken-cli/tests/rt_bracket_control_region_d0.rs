@@ -193,7 +193,8 @@ fn normalize_outcome(
                 | CanonicalReplyV1::WriteProgress(_)
                 | CanonicalReplyV1::MonotonicInstant(_)
                 | CanonicalReplyV1::FilePosition(_)
-                | CanonicalReplyV1::FdInheritancePolicy(_) => {
+                | CanonicalReplyV1::FdInheritancePolicy(_)
+                | CanonicalReplyV1::ChildExit(_) => {
                     NormalizedReply::Other(reply.clone())
                 }
             })
@@ -271,6 +272,12 @@ fn preregistered_tuple_normalizes_only_by_acquisition_ordinal() {
                 ResourceKindV1::FsHandle => HostOpV1::FsOpen,
                 ResourceKindV1::Buffer => HostOpV1::BufferAllocate,
                 ResourceKindV1::Mapping => HostOpV1::MappingAllocate,
+                ResourceKindV1::SpawnPlan
+                | ResourceKindV1::ChildProcess
+                | ResourceKindV1::PipeRead
+                | ResourceKindV1::PipeWrite => {
+                    panic!("this control only constructs FS/Buffer/Mapping acquisitions")
+                }
             },
             capability: None,
             resource_bindings: vec![(ResourceBindingRole::Target, identity)],
@@ -284,6 +291,12 @@ fn preregistered_tuple_normalizes_only_by_acquisition_ordinal() {
                     length: 1,
                     protection: MappingProtectionV1::ReadOnly,
                 },
+                ResourceKindV1::SpawnPlan
+                | ResourceKindV1::ChildProcess
+                | ResourceKindV1::PipeRead
+                | ResourceKindV1::PipeWrite => {
+                    panic!("this control only constructs FS/Buffer/Mapping acquisitions")
+                }
             },
             outcome: CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
                 schema_version: 1,
