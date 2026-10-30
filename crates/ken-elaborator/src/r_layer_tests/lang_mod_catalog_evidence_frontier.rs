@@ -325,6 +325,26 @@ fn collect_decl_globals(decl: &Decl, out: &mut BTreeSet<GlobalId>) {
     }
 }
 
+/// Checked declarations brought in by a direct import also bring their
+/// checked types and bodies. Those dependencies are not additional source
+/// prerequisites of the importing unit.
+fn imported_identity_closure(env: &ElabEnv, seed: BTreeSet<GlobalId>) -> BTreeSet<GlobalId> {
+    let mut reached = seed;
+    let mut pending = reached.iter().copied().collect::<Vec<_>>();
+    while let Some(identity) = pending.pop() {
+        if let Some(declaration) = env.env.lookup(identity) {
+            let mut dependencies = BTreeSet::new();
+            collect_decl_globals(declaration, &mut dependencies);
+            for dependency in dependencies {
+                if reached.insert(dependency) {
+                    pending.push(dependency);
+                }
+            }
+        }
+    }
+    reached
+}
+
 fn names_by_id(env: &ElabEnv) -> BTreeMap<GlobalId, Vec<String>> {
     let mut names = BTreeMap::<GlobalId, Vec<String>>::new();
     for (name, id) in &env.globals {
@@ -600,6 +620,22 @@ fn legacy_evidence(
     let interior_evidence = pinned_interior_evidence(module, unit, all_units, &env, &resolved);
     let mut modules_longest_first: Vec<_> = all_units.keys().cloned().collect();
     modules_longest_first.sort_by_key(|name| std::cmp::Reverse(name.len()));
+    let imported_seed = resolved
+        .iter()
+        .copied()
+        .filter(|identity| {
+            let identity_names = names.get(identity).map(Vec::as_slice).unwrap_or(&[]);
+            identity_names.iter().any(|name| {
+                unit.selective_import_bindings
+                    .get(name)
+                    .is_some_and(|provider| unit.direct_imports.contains(provider))
+            }) || identity_names.iter().any(|name| {
+                defining_module(name, &modules_longest_first)
+                    .is_some_and(|provider| unit.direct_imports.contains(&provider))
+            })
+        })
+        .collect();
+    let import_reached = imported_identity_closure(&env, imported_seed);
     let mut prerequisites = BTreeSet::new();
 
     for identity in resolved.iter().copied() {
@@ -614,6 +650,7 @@ fn legacy_evidence(
             || strict_available.contains(&identity)
             || base_support.contains(identity)
             || interior_evidence.contains(&identity)
+            || import_reached.contains(&identity)
             || matches!(
                 env.env.lookup(identity),
                 Some(Decl::Primitive {
@@ -791,7 +828,12 @@ fn validate_evidence_frontier(rows: &[UnitCensusRow]) -> Result<(), String> {
 /// observed in its checked core and in the imported provider's instance registry.
 /// CLAIMED: this is the current evidence frontier and nothing more. THE GAP:
 /// unavailable rows intentionally name no provider or migration and prevent every
-/// completeness claim.
+/// completeness claim. A prerequisite is an identity the unit's source reaches
+/// without an explaining direct import. Identities that enter the checked core
+/// only through the checked types or bodies of identities the unit's direct
+/// imports provide are transitive dependencies, not prerequisites. THE GAP:
+/// this census does not guard Strict resolution against fallback; the Strict
+/// resolver suites do.
 #[test]
 fn catalog_evidence_frontier_is_closed_and_honest() {
     let root = catalog_root();
@@ -822,6 +864,135 @@ fn catalog_evidence_frontier_is_closed_and_honest() {
         before, after,
         "the census must leave every source byte-stable"
     );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: the real Minimisation root succeeds under Strict, and its legacy
+/// checked core retains the exact List.length identity while its source-level
+/// prerequisite set is empty. CLAIMED: a dependency introduced through an
+/// imported checked declaration is not an unimported source name. THE GAP:
+/// the full catalog census separately checks every discovered root.
+#[test]
+fn minimisation_indirect_length_is_not_a_source_prerequisite() {
+    let root = catalog_root();
+    let units = discover_units(&root);
+    let module = "Algorithm.FormalLanguages.Minimisation";
+    assert_eq!(observe_strict(&root, module), LoaderObservation::Succeeded);
+    assert!(!units[module]
+        .direct_imports
+        .contains("Data.Collections.List"));
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[root.clone()], module)
+        .expect("legacy Minimisation loads");
+    let length = env.globals["Data.Collections.List.length"];
+    match legacy_evidence(&root, module, &units[module], &units) {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(
+                resolved_globals.contains(&length),
+                "retain the exact List.length ID"
+            );
+            assert!(
+                identity_grounded_prerequisites.is_empty(),
+                "indirect List.length must not require a direct source import: \
+                 {identity_grounded_prerequisites:?}"
+            );
+        }
+        other => panic!("Minimisation must have exact legacy evidence: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: a real legacy-loaded fixture retains a provider's checked
+/// identity while a known-answer missing-import-edge variant supplies only
+/// an unrelated bridge to the classifier. CLAIMED: the imported-identity
+/// closure cannot exempt an identity no retained direct import reaches. THE
+/// GAP: this variant intentionally removes a parsed import in the detector's
+/// input; it does not claim the actual source would compile without it.
+#[test]
+fn missing_direct_import_edge_keeps_provider_identity_a_prerequisite() {
+    let nonce = format!(
+        "ken-catalog-unimported-provider-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos()
+    );
+    let root = std::env::temp_dir()
+        .join(nonce)
+        .join("catalog")
+        .join("packages");
+    fs::create_dir_all(&root).expect("create fixture root");
+    fs::write(
+        root.join("Provider.ken"),
+        "fn provider_length (x : Nat) : Nat = x\nexport provider_length\n",
+    )
+    .expect("write provider fixture");
+    fs::write(
+        root.join("Bridge.ken"),
+        "import Provider (provider_length)\nconst marker : Nat = Zero\nexport marker\n",
+    )
+    .expect("write bridge fixture");
+    fs::write(
+        root.join("Consumer.ken"),
+        "import Bridge (marker)\nimport Provider (provider_length)\nfn use_provider_length (x : Nat) : Nat = provider_length x\nexport use_provider_length\n",
+    )
+    .expect("write consumer fixture");
+
+    let units = discover_units(&root);
+    assert_eq!(
+        units["Consumer"].direct_imports,
+        BTreeSet::from(["Bridge".to_string(), "Provider".to_string()])
+    );
+    assert_eq!(
+        observe_strict(&root, "Consumer"),
+        LoaderObservation::Succeeded
+    );
+    let mut env = ElabEnv::new().expect("base environment");
+    let legacy = env.elaborate_module_from_roots(&[root.clone()], "Consumer");
+    assert!(legacy.is_ok(), "legacy Consumer must load: {legacy:?}");
+    let provider_length = env.globals["Provider.provider_length"];
+    let mut missing_edge = units["Consumer"].clone();
+    assert!(missing_edge.direct_imports.remove("Provider"));
+    assert_eq!(
+        missing_edge
+            .selective_import_bindings
+            .remove("provider_length"),
+        Some("Provider".to_string())
+    );
+    assert_eq!(
+        missing_edge.direct_imports,
+        BTreeSet::from(["Bridge".to_string()])
+    );
+    match legacy_evidence(&root, "Consumer", &missing_edge, &units) {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(resolved_globals.contains(&provider_length));
+            assert_eq!(
+                identity_grounded_prerequisites,
+                BTreeSet::from([IdentityPrerequisite::ProviderInterfaceAndImport {
+                    identity: provider_length,
+                    defining_module: "Provider".to_string(),
+                    provider_interface_available: true,
+                }])
+            );
+        }
+        other => panic!("Consumer must have exact legacy evidence: {other:?}"),
+    }
+    let fixture_top = root
+        .parent()
+        .and_then(Path::parent)
+        .expect("fixture has temporary top");
+    fs::remove_dir_all(fixture_top).expect("remove fixture tree");
 }
 
 /// Promise class: durable invariant.

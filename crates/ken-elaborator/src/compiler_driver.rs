@@ -4871,10 +4871,10 @@ mod native_pre_source_stable_symbols {
 
     /// Promise class: durable invariant. MEASURED: intentionally duplicated
     /// checked snapshot names fail at the exact typed projection guard, for
-    /// declaration and constructor namespaces separately. CLAIMED: emission
-    /// cannot silently merge two distinct ids through a symbol-keyed section.
-    /// THE GAP: ordinary source cannot forge this snapshot; this test injects
-    /// conflicting checked identities to exercise the fail-closed arm.
+    /// declaration and unscoped constructor namespaces separately. CLAIMED:
+    /// emission cannot silently merge two distinct ids through a symbol-keyed
+    /// section. THE GAP: ordinary source cannot forge this snapshot; scoped
+    /// families take leaves from module_state rather than this name feed.
     #[test]
     fn duplicate_declaration_and_constructor_symbols_are_typed_refusals() {
         let mut env = ElabEnv::new().expect("pre-source environment");
@@ -4901,22 +4901,22 @@ mod native_pre_source_stable_symbols {
             other => panic!("expected declaration-identity collision: {other:?}"),
         }
         let mut env = ElabEnv::new().expect("pre-source environment");
-        let stdout = env.prelude_env.stdout_id;
-        let stdin = env.prelude_env.stdin_id;
+        let none = env.prelude_env.none_id;
+        let some = env.prelude_env.some_id;
         env.prelude_env
             .pre_source_names
-            .insert(stdin, Some("Stdout".into()));
+            .insert(some, Some("None".into()));
         match stable_symbols_for_env("native-program", &env, true) {
             Err(CompilerDriverError::DuplicateStableSymbol {
                 symbol,
                 first,
                 second,
             }) => {
-                let parent = StableSymbol::declaration("native-program", &[], "Stream");
-                assert_eq!(symbol, StableSymbol::constructor(&parent, "Stdout"));
+                let parent = StableSymbol::declaration("native-program", &[], "Option");
+                assert_eq!(symbol, StableSymbol::constructor(&parent, "None"));
                 assert_eq!(
                     BTreeSet::from([first, second]),
-                    BTreeSet::from([stdout, stdin])
+                    BTreeSet::from([none, some])
                 );
             }
             other => panic!("expected constructor-identity collision: {other:?}"),
