@@ -5477,10 +5477,24 @@ mod tests {
             HostOpV1::ProcessTakePipe,
             HostOpV1::ProcessWait,
         ];
+        // The explicit requests also exercise three pre-existing interpreter
+        // dispatcher operations that are represented but not native-tested:
+        // monotonic time, sleep, and entropy. Keep those named, rather than
+        // widening this test to every unavailable Process operation.
+        let interpreter_only = [
+            HostOpV1::ClockMonotonicNow,
+            HostOpV1::ClockSleepUntil,
+            HostOpV1::EntropyRandomBytes,
+        ];
+        assert!(interpreter_only.iter().all(|operation|
+            operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable));
         let pre_resource = HostOpV1::ALL
             .into_iter()
             .filter(|operation| {
-                !RESOURCE_BEARING.contains(operation) && !px10_process.contains(operation)
+                (operation.availability() == HostOpAvailabilityV1::NativeTested
+                    || interpreter_only.contains(operation))
+                    && !RESOURCE_BEARING.contains(operation)
+                    && !px10_process.contains(operation)
             })
             .collect::<Vec<_>>();
         assert_eq!(backend.0, requested, "every listed request uses the shared dispatch");
