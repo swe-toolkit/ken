@@ -10,7 +10,7 @@ witness is `crates/ken-cli/tests/abi_s5_terminal_signal_disposition.rs`.
 
 - promise class: durable invariant
 - given: a terminal and a nonterminal stream descriptor supplied to the
-  existing `is_terminal : Stream → IO Bool visits [Console]` operation.
+  existing `is_terminal : ConsoleStream → IO Bool visits [Console]` operation.
 - expect: `True` exactly for a terminal descriptor and `False` otherwise,
   without an `IOError` arm. This is the existing operation; this case does not
   ask for a new host operation, ABI field, or effect.

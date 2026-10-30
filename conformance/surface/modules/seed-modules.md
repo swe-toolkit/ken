@@ -17,10 +17,13 @@ content-addressed package manager remains out of scope.
 **Build state — N2 LANE B LANDED; contract completion mixed.** The cross-file
 accept and active-stack cycle arms in §D drive the landed roots loader. Its
 existing producer already supplies the valid anchor, one-root refusal, lazy
-poison control, and per-run cache used by §D1–§D4. Unsupported `pub` placement,
-the arbitrary-global fallback, and catalog-entry front-end routing remain
-**RED UNTIL the module/import repair campaign**. Each new case records its own
-reachable gate; a direct-loader success is not credited for a missing boundary.
+poison control, and per-run cache used by §D1–§D4. Unsupported `pub`
+placement, Strict-roots rejection of arbitrary-global fallback, and
+catalog-entry front-end routing remain
+**RED UNTIL the module/import repair campaign**. Legacy-roots behavior
+for other bare implementation globals is neither guaranteed nor refused.
+Each new case records its own reachable gate; a direct-loader success is not
+credited for a missing boundary.
 
 The original ES3 module resolver, the N2 file-discovery producer, and the kernel
 mechanisms they ride — the flat `Σ`, opaque constants, and `trusted_base()` —
@@ -572,15 +575,15 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the exact floor is closed
   in both directions
-- spec: `30-taxonomy §4` (closed thirty-name prelude floor), `33 §3.3`
-  (the exact floor, three Pair companions, and no convenience-global
-  fallback), `39 §2.0` step 4
+- spec: `30-taxonomy §4` (current 32-name floor; this fixture tests the
+  thirty pre-existing members), `33 §3.3` (the exact floor, three Pair
+  companions, and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
   the bare implementation-global spelling `Ambient`. Then invoke the strict
   roots loader. The controlled arms are:
 
-  1. entry `Floor` contains checked uses of all thirty prelude roster identities
+  1. entry `Floor` contains checked uses of the thirty pre-existing floor identities
      in contract-appropriate positions, every source-visible constructor through
      values and exhaustive matches, all three Pair companion bindings,
      `bytes_at`/`bytes_slice` uses whose results are matched as `Option`, a
@@ -633,12 +636,13 @@ sentinel beside the current contract.
 
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
-- promise class: **normative compatibility vector** — the exact thirty-name
-  roster and each constructor's scope are contract values; reuse of checked
-  identities, allocator accounting, and trust remain durable relations
+- promise class: **normative compatibility vector** — the original
+  thirty-name subset and each constructor's scope are contract values; reuse
+  of checked identities, allocator accounting, and trust remain durable
+  relations
 - spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
-  of all thirty names: `Auth`, `Bool`, `Bottom`, `BufferSpan`, `Char`,
+  of the thirty pre-existing names: `Auth`, `Bool`, `Bottom`, `BufferSpan`, `Char`,
   `Coproduct`, `CreatePolicy`, `Equal`, `ExitCode`, `FileError`, `HostIO`,
   `IOError`, `ITree`, `Instant`, `List`, `Nat`, `Option`, `Pair`,
   `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceError`,
@@ -653,7 +657,7 @@ sentinel beside the current contract.
   `PrivateBufferSpan` and `PrivateTransferCount` without resolving either from
   source.
 - expect: every emitted type/body contains the corresponding recorded id. The
-  exact thirty-name prelude roster is `Auth`, `Bool`, `Bottom`, `BufferSpan`,
+  original thirty-name prelude subset is `Auth`, `Bool`, `Bottom`, `BufferSpan`,
   `Char`, `Coproduct`, `CreatePolicy`, `Equal`, `ExitCode`, `FileError`,
   `HostIO`, `IOError`, `ITree`, `Instant`, `List`, `Nat`, `Option`, `Pair`,
   `ProcessInput`, `Prod`, `ProgramCaps`, `Prop`, `Proved`, `ResourceError`,
@@ -710,8 +714,9 @@ sentinel beside the current contract.
   and parameter types are nameable.
 - maintenance contract: adding unrelated non-trusted checked packages or
   definitions outside the floor, or ordinary checked source declarations
-  outside B, preserves the exact thirty-name roster, the listed constructor
-  scopes and per-run checked parent ids, no-allocation floor installation,
+  outside B, preserves these thirty pre-existing floor members and the listed
+  constructor scopes and per-run checked parent ids, no-allocation floor
+  installation,
   and unchanged `trusted_base()` identities.
   A new witnessed floor member, a removed member, or a changed constructor
   scope/visibility is a **contract change**, not routine test maintenance:
@@ -726,9 +731,10 @@ sentinel beside the current contract.
   `ResourceKind.FsHandle`, `.Buffer`, and `.Mapping` paths are the contract in
   `30-taxonomy §4` and `33 §3.3`, realized at
   `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **CURRENT CONTRACT:** this
-  row now specifies the thirty-name roster, including the six FS/resource
-  additions and their constructor dispositions. This is a conformance
-  expectation, not a measurement;
+  row specifies the thirty pre-existing floor members, including the six
+  FS/resource additions and their constructor dispositions. The later
+  Console/Char additions are covered by dedicated cases below. This is a
+  conformance expectation, not a measurement;
   no official conformance-runner result is claimed. **THE GAP:** every
   constructor must retain its recorded parent identity, and equal-shaped or
   same-spelling substitutions must not replace a floor identity.
@@ -903,7 +909,7 @@ sentinel beside the current contract.
 
 - promise class: **normative compatibility vector** — the exact scoped
   constructor inventories, private-constructor exclusions, and admitted
-  parent-name boundary belong to the thirty-name floor contract
+  parent-name boundary belong to the thirty pre-Console/Char floor members
 - spec: `30-taxonomy §4` (six newly admitted families), `33 §3.3`
   (scope and protected names), `34 §1.1` (qualified constructor identity)
 - given: in each fresh route (strict roots, legacy roots, legacy single-file),
@@ -923,8 +929,8 @@ sentinel beside the current contract.
   fn keep_count (x : TransferCount) : TransferCount = x
   ```
 
-  In a fresh unit of the same route, elaborate that same accepted prefix,
-  then append only this declaration:
+  In a fresh strict-roots unit, elaborate the same accepted prefix, then
+  append only this declaration:
 
   ```ken
   const bare_not_found : IOError = NotFound
@@ -957,19 +963,19 @@ sentinel beside the current contract.
   in the protected-name matrix above.
 - family closure: use the exact 13 `IOError.C`, 3 `CreatePolicy.C`, and 12
   `ResourceError.C` entries of the constructor table in
-  `prelude-floor-reuses-exact-types-and-constructors`. **For every one of
-  these 28 `T.C` entries independently, in every route**, run two distinct
-  source units after the accepted six-type prefix:
+  `prelude-floor-reuses-exact-types-and-constructors`. For every one of these
+  28 `T.C` entries independently, reuse its accepted expression or pattern arm
+  from `closed-floor-accepts-arbitrary-global-does-not` in all three routes,
+  and record the exact checked ID. After the accepted six-type prefix, use two
+  additional fresh strict-roots units:
 
-  1. Reuse its accepted typed expression or exhaustive-pattern arm from
-     `closed-floor-accepts-arbitrary-global-does-not`; in a fresh unit
-     remove only this occurrence's `T.` qualifier, preserving its arguments,
+  1. Remove only this occurrence's `T.` qualifier, preserving its arguments,
      type context, and other constructor paths. Bare `C` must refuse at
-     surface name resolution while the original qualified arm accepts and
-     resolves to its recorded checked ID. The value forms give
+     surface name resolution. The original qualified arm accepts and resolves
+     to its recorded checked ID. The value forms include
      `const bare_policy : CreatePolicy = CreateNew` and
-     `const bare_resource : ResourceError = Closed` as two instances.
-  2. In another fresh unit, append `data LocalCase = C`, then
+     `const bare_resource : ResourceError = Closed`.
+  2. Append `data LocalCase = C`, then
      `const local_case : LocalCase = C`. The name `C` is the **same bare
      leaf**, not a renamed stand-in; `LocalCase` is fresh for this unit.
      After this declaration, use the matching **qualified `T.C` again**
@@ -978,9 +984,10 @@ sentinel beside the current contract.
      parent IDs against the pre-source `T.C` record. The accepted local
      `C` has a distinct checked ID and the new `LocalCase` parent. Never
      combine different leaves into one unit; a collision in one leaf must
-     not hide another's observation.
+     not hide another's observation. No Legacy bare-leaf outcome is asserted.
 
-  The nullary policy and resource cases instantiate the second arm as:
+  The nullary policy and resource cases instantiate the strict-roots local
+  binding arm as:
 
   ```ken
   data LocalPolicyCase = CreateNew
@@ -1006,18 +1013,19 @@ sentinel beside the current contract.
   not prove the spelling is unreserved.
 - expect: every accepted prefix resolves the six types to their recorded
   pre-source IDs, and its three qualified values to constructors with their
-  respective checked parents. Bare `NotFound` rejects at surface name
-  resolution **after** the accepted prefix. Each admitted-parent collision
-  rejects at introduction while its paired renamed local family accepts
-  in each of the three routes. For all 28 scoped leaves, the isolated bare
-  floor use rejects, the same-leaf local constructor accepts with a distinct
-  checked parent and ID, and the qualified `T.C` still resolves to its
-  original checked ID **after** the local binding. No route changes
-  `trusted_base()` or allocates a replacement floor family.
-- controls: admitting `IOError` unscoped accepts the isolated bare
-  `NotFound` arm and **must redden this case** while the qualified positive
-  remains accepted. Reserving **any one** of the 28 bare `C` spellings in B
-  rejects that leaf's local `data LocalCase = C` arm at introduction; its
+  respective checked parents. In strict roots, bare `NotFound` rejects at
+  surface name resolution **after** the accepted prefix. Each admitted-parent
+  collision rejects at introduction while its paired renamed local family
+  accepts in each of the three routes. For all 28 scoped leaves, strict roots
+  refuse the isolated bare floor use; the same-leaf local constructor accepts
+  with a distinct checked parent and ID, and the qualified `T.C` still resolves
+  to its original checked ID **after** the local binding. All three routes
+  accept the qualified clients. No Legacy bare-leaf outcome is asserted. No
+  route changes `trusted_base()` or allocates a replacement floor family.
+- controls: in strict roots, admitting `IOError` unscoped accepts the isolated
+  bare `NotFound` arm and **must redden this case** while the qualified
+  positive remains accepted. Reserving **any one** of the 28 bare `C` spellings
+  in B rejects that leaf's local `data LocalCase = C` arm at introduction; its
   qualified `T.C` positive and bare floor-use refusal alone would still pass.
   Removing any admitted parent lets its same-name collision arm accept or
   fails the six-type prefix, while its renamed-local control remains valid.
@@ -1051,22 +1059,23 @@ sentinel beside the current contract.
   update; do not rebaseline only the failing negative fixture.
 - why: the first pair is AC-4's unscoped-`IOError` discriminator, which
   qualified-only positives cannot catch. The parent and local-lookalike
-  pairs separate protected types from unreserved scoped leaves. For each
-  scoped leaf, over-reservation fails its local same-leaf introduction even
-  while qualified acceptance and bare floor-use refusal remain green. The
+  pairs separate protected types from unreserved scoped leaves. For each scoped
+  leaf in strict roots, over-reservation fails its local same-leaf introduction
+  even while qualified acceptance and bare floor-use refusal remain green. The
   all-constructor variants keep the per-name rule honest; the private
   pattern rows reject both routes around visibility rather than relying
   on absence from a Rust name table. No official conformance-runner result
   is claimed by stating these cases.
 
 The Console/Char cases below implement the two-witness `30-taxonomy §4`
-pre-flip slice. Their three source routes are strict-roots, legacy-roots,
-and legacy single-file. Strict-roots and legacy-roots are both roots-loaded:
-all five package names require explicit provider imports in either route.
-Only the named standalone legacy entries retain bare access to those same
-pre-source IDs until L2-4. This exception grants neither roots fallback nor
-general implementation-global lookup. No row adds trust or duplicates a
-checked definition.
+pre-flip slice. Their source-resolution rows cover strict roots, legacy roots,
+and one standalone `elaborate_file_v1` entry. Both roots routes require explicit
+provider imports for the five package identities. Strict roots alone assert
+no-import refusals. The standalone row asserts bare access to those five exact
+pre-source IDs; it does not cover the other standalone Legacy entries. Other
+unimported Legacy bare globals, including `ConsoleOp`, are unspecified:
+neither promised nor refused. No row adds trust or duplicates a checked
+definition.
 
 ### surface/modules/console-stream-checked-family-and-char-comparator
 
@@ -1097,27 +1106,29 @@ checked definition.
 ### surface/modules/console-stream-floor-and-unreserved-case-pairs
 
 - promise class: **durable discriminator** — checked parents are reserved,
-  scoped case leaves are not; old `Stream` is internal
+  scoped case leaves and the generic `Stream` spelling are not reserved
 - spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`
-- given: in separate fresh units for all three routes, compare
-  `const ConsoleStream : Nat = Zero` and `const eqChar : Nat = Zero`
-  against their accepted one-name controls `const LocalStream : Nat = Zero`
-  and `const local_char_eq : Nat = Zero`. For each leaf `C` of `Stdin`,
-  `Stdout`, `Stderr`, compare `const value : ConsoleStream = C` with the
+- given: in separate fresh units in all three routes, compare the protected
+  names `ConsoleStream` and `eqChar` with their accepted one-name controls:
+  `const ConsoleStream : Nat = Zero` and `const eqChar : Nat = Zero` against
+  `const LocalStream : Nat = Zero` and `const local_char_eq : Nat = Zero`.
+  In separate strict-roots units only, for each leaf `C` of `Stdin`,
+  `Stdout`, and `Stderr`, compare `const value : ConsoleStream = C` with the
   accepting same-leaf local control `data LocalCase = C`, followed by
   `const local : LocalCase = C` and
   `const still_checked : ConsoleStream = ConsoleStream.C`.
-  Independently declare `data Stream = MkStream` as a non-floor local.
-- expect: both admitted-name declarations reject at introduction; their
-  unrelated local controls accept. Each bare floor use refuses at surface
-  resolution, each local leaf accepts with a different parent and ID, and
-  the qualified checked case still resolves after the local declaration.
-  The local `Stream` accepts without replacing the ConsoleStream family.
-  No row allocates a replacement floor identity or adds trust.
-- controls: erroneously reserving any bare case makes its same-leaf local
-  control reject while the qualified positive still passes. Adding `Stream`
-  to the floor makes its local-family acceptance reject; this is independent
-  of the `ConsoleStream` reservation control.
+  Independently declare `data Stream = MkStream` in strict roots.
+- expect: in all three routes, both admitted-name declarations reject at
+  introduction and their unrelated local controls accept. In strict roots,
+  each bare floor use refuses at surface resolution, each local leaf accepts
+  with a different parent and ID, and the qualified checked case still
+  resolves after the local declaration. The local `Stream` accepts there
+  without replacing the ConsoleStream family. No Legacy bare-leaf outcome is
+  asserted. No row allocates a replacement floor identity or adds trust.
+- controls: in strict roots, erroneously reserving any bare case makes its
+  same-leaf local control reject while the qualified positive still passes.
+  Adding `Stream` to the floor makes its strict-roots local-family acceptance
+  reject; this is independent of the `ConsoleStream` reservation control.
 
 ### surface/modules/console-char-package-homes-export-original-ids
 
@@ -1132,21 +1143,21 @@ checked definition.
   call `write ConsoleStream.Stdout payload` and `print_line message`, and
   apply `charToInt 65` and `leqChar 65 66`. Repeat the imported
   `legacy-roots` client after an unrelated checked declaration has taken
-  over flat `globals["write"]` with a fresh ID. In each roots route, use
-  five separate fresh no-import clients, each naming one of the five bare
-  package names. In both roots routes, independently test a non-home
-  file with `export IO`. Also exercise a no-roots standalone legacy
-  `elaborate_file_v1` input
-  using all five package names bare. This case does not measure the other
-  standalone legacy entries listed by `33 §3.3`.
+  over flat `globals["write"]` with a fresh ID. In strict roots only, use five
+  separate fresh no-import clients, each naming one of the five bare package
+  names, and test a non-home file with `export IO`. Assert no no-import
+  Legacy-roots outcome. Also exercise a no-roots standalone legacy
+  `elaborate_file_v1` input using all five package names bare. This case does
+  not measure the other standalone legacy entries listed by `33 §3.3`.
 - expect: both roots clients' imported uses select exactly the original
   pre-source checked IDs, with no added trust. The imported legacy-roots
   `write` still selects its original ID, not the replacement flat-global
-  ID. Every no-import roots client and the non-home publisher refuse at
-  surface resolution. The named standalone `elaborate_file_v1` input
-  accepts the five bare uses, each resolving to its original pre-source
-  ID; this does not grant bare access in either roots route or authorize
-  arbitrary implementation globals.
+  ID. Each strict-roots no-import client raises `UnboundName`; the strict-roots
+  non-home publisher fails surface resolution. No bare Legacy-roots outcome
+  is asserted. The named standalone `elaborate_file_v1` input accepts the five
+  bare uses, each resolving to its original pre-source ID. This does not
+  guarantee those bare names in either roots route or establish behavior for
+  other Legacy globals.
 - controls: deleting any one of the five compiler-owned home grants makes
   that home's ordinary `export` and its roots-client import reject. A
   same-name local declaration inside a home must refuse as ambiguous,
@@ -1157,12 +1168,11 @@ checked definition.
   uncovered by this seed row; this case does not certify them.
 
 The ITree cases below implement the source-resolution slice of
-`LANG-PRELUDE-FLOOR-ITREE` AC-1. Their routes are strict roots, legacy roots,
-and legacy single-file. Each of the six bare-name rows reuses the full accepted
-client below, including its local `Effect` record and signature value; it
-changes only the selected constructor qualifier. The rows assert a surface
-name-resolution refusal for each unqualified constructor and do not pin
-route-specific diagnostic variants or payloads.
+`LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructor and protected type-name
+cases cover strict roots, legacy roots, and legacy single-file. Only strict
+roots assert bare `Ret` and `Vis` refusals or same-name local bindings. Other
+Legacy bare globals are unspecified, so this seed asserts no Legacy bare
+constructor outcome.
 
 ### surface/modules/itree-qualified-constructors-resolve-to-checked-family
 
@@ -1261,81 +1271,27 @@ route-specific diagnostic variants or payloads.
 - why: the otherwise identical qualified fixture accepts in this mode. This
   row tests the bare `Vis` route independently of `Ret`.
 
-### surface/modules/itree-bare-ret-refuses-legacy-roots
-
-- promise class: **discriminating** — an unqualified constructor is not a
-  prelude reference in legacy roots mode
-- spec: `33 §3.3`; `36 §2.1`
-- given: start with the `ret_witness_for` fixture in
-  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from its `Ret` constructor path and run legacy roots.
-- expect: reject at surface name resolution because bare `Ret` is not in scope.
-  Do not pin a diagnostic variant or payload.
-- why: the otherwise identical qualified fixture accepts in this mode. This
-  row tests the bare `Ret` route independently of `Vis`.
-
-### surface/modules/itree-bare-vis-refuses-legacy-roots
-
-- promise class: **discriminating** — an unqualified constructor is not a
-  prelude reference in legacy roots mode
-- spec: `33 §3.3`; `36 §2.1`
-- given: start with the `vis_witness_for` fixture in
-  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from its outer `Vis` path and run legacy roots.
-- expect: reject at surface name resolution because bare `Vis` is not in scope.
-  Do not pin a diagnostic variant or payload.
-- why: the otherwise identical qualified fixture accepts in this mode. This
-  row tests the bare `Vis` route independently of `Ret`.
-
-### surface/modules/itree-bare-ret-refuses-legacy-file
-
-- promise class: **discriminating** — an unqualified constructor is not a
-  prelude reference in legacy single-file mode
-- spec: `33 §3.3`; `36 §2.1`
-- given: start with the `ret_witness_for` fixture in
-  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from its `Ret` constructor path and run legacy single-file.
-- expect: reject at surface name resolution because bare `Ret` is not in scope.
-  Do not pin a diagnostic variant or payload.
-- why: the otherwise identical qualified fixture accepts in this mode. This
-  row tests the bare `Ret` route independently of `Vis`.
-
-### surface/modules/itree-bare-vis-refuses-legacy-file
-
-- promise class: **discriminating** — an unqualified constructor is not a
-  prelude reference in legacy single-file mode
-- spec: `33 §3.3`; `36 §2.1`
-- given: start with the `vis_witness_for` fixture in
-  `itree-qualified-constructors-resolve-to-checked-family`; remove only the
-  `ITree.` qualifier from its outer `Vis` path and run legacy single-file.
-- expect: reject at surface name resolution because bare `Vis` is not in scope.
-  Do not pin a diagnostic variant or payload.
-- why: the otherwise identical qualified fixture accepts in this mode. This
-  row tests the bare `Vis` route independently of `Ret`.
-
-### surface/modules/bare-ret-is-bindable-source-constructor
+### surface/modules/bare-ret-is-bindable-source-constructor-in-strict-roots
 
 - promise class: **durable invariant** — freed `Ret` remains bindable by source
 - spec: `33 §3.3` (scoped ITree family); `36 §2.1`
-- given: in separate fresh strict-roots, legacy-roots, and legacy single-file
-  runs, elaborate `data LocalRet = Ret`.
-- expect: every route accepts and records `Ret` as a constructor of the new
+- given: in a fresh strict-roots run, elaborate `data LocalRet = Ret`.
+- expect: strict roots accepts and records `Ret` as a constructor of the new
   `LocalRet` family, distinct from checked `ITree.Ret`.
 - why: this same-spelling source declaration is the positive control for the
-  `Ret` refusal rows. It shows the bare spelling is free, not renamed or
-  globally banned.
+  strict-roots `Ret` refusal. Legacy bare `Ret` behavior is unspecified and
+  is not asserted here.
 
-### surface/modules/bare-vis-is-bindable-source-constructor
+### surface/modules/bare-vis-is-bindable-source-constructor-in-strict-roots
 
 - promise class: **durable invariant** — freed `Vis` remains bindable by source
 - spec: `33 §3.3` (scoped ITree family); `36 §2.1`
-- given: in separate fresh strict-roots, legacy-roots, and legacy single-file
-  runs, elaborate `data LocalVis = Vis`.
-- expect: every route accepts and records `Vis` as a constructor of the new
+- given: in a fresh strict-roots run, elaborate `data LocalVis = Vis`.
+- expect: strict roots accepts and records `Vis` as a constructor of the new
   `LocalVis` family, distinct from checked `ITree.Vis`.
 - why: this same-spelling source declaration is the positive control for the
-  `Vis` refusal rows. It shows the bare spelling is free, not renamed or
-  globally banned.
+  strict-roots `Vis` refusal. Legacy bare `Vis` behavior is unspecified and
+  is not asserted here.
 
 ### surface/modules/ord-nat-class-owner-and-reexport-use-one-dictionary
 
@@ -1494,7 +1450,7 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | all thirty roster identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | floor is closed and arbitrary/internal non-members do not resolve | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control |
+| floor/global | the thirty pre-existing floor identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | strict floor scope excludes arbitrary/internal non-members | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar are covered by dedicated Console/Char cases |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |
@@ -2029,10 +1985,11 @@ monotone-downward and revocation management actions remain runner/host-internal
   `prelude-head-does-not-transfer-orphan-ownership`.
 - **ITree source resolution** (`30 §4`, `33 §3.3`, `36 §2.1`):
   `itree-qualified-constructors-resolve-to-checked-family`,
-  `itree-source-name-is-protected-in-all-routes`, the six independent
-  strict/legacy `Ret`/`Vis` refusal rows, and the separate bindable-name rows.
-  These cases cover strict roots, legacy roots, and legacy single-file mode;
-  they do not claim the full B binding ban.
+  `itree-source-name-is-protected-in-all-routes`, two strict-roots-only
+  bare `Ret`/`Vis` refusal rows, and their matching strict-roots bindability
+  controls. The qualified-family and protected-type cases cover all three
+  routes. Legacy bare constructor behavior is unspecified and unasserted; the
+  cases do not claim the full B binding ban.
 - **N3** (module clash error + explicit resolution, lexical boundary, prelude
   floor, and grammar): `top-level-local-import-clash-rejected`,
   `import-de-selection-leaves-local-sole-binding`,
@@ -2112,8 +2069,11 @@ monotone-downward and revocation management actions remain runner/host-internal
   an arbitrary pre-registered Ken global. None can be implemented by clearing
   all imports or disabling the prelude.
 - **Floor availability, identity, and instance ownership are separate axes.**
-  Strict uses of all thirty prelude roster names, every source-visible
-  constructor, and all three Pair companions accept on the recorded ids.
+  Strict uses of the thirty pre-existing floor names, every source-visible
+  constructor in that subset, and all three Pair companions accept on the
+  recorded ids. Dedicated Console/Char cases cover the current floor's
+  `ConsoleStream` and `eqChar` additions, including all three scoped Console
+  constructors.
   `FileError` keeps bare `MkFileError`; `IOError`, `CreatePolicy`, and
   `ResourceError` constructors require their scoped paths. `BufferSpan` and
   `TransferCount` retain private constructors. `Coproduct`, `Instant`, and
@@ -2122,12 +2082,13 @@ monotone-downward and revocation management actions remain runner/host-internal
   with the admitted `BufferSpan` refusal and checks legacy identity against
   the cut base. The protected-name matrix specifies same-production refusals
   and renamed controls for its sixteen parent rows and ten unscoped constructor
-  families; `Char` and Pair have separate rows. The ITree cases additionally
-  test exact constructor paths, both bare-name refusals and bindings, and the
-  type-name guard across strict roots, legacy roots, and legacy single-file
-  routes. These bounded cases do not claim the full B binding ban. Ambient
-  availability still does not make an unrelated module a head owner. The actual
-  `Ord Nat` and Pair-instance cases then require class-owned provenance.
+  families; `Char` and Pair have separate rows. The ITree cases test exact
+  constructor paths and the protected type-name guard across all three routes.
+  Strict roots separately test bare `Ret` and `Vis` refusals against same-name
+  local binding controls. No Legacy bare `Ret`/`Vis` behavior is asserted.
+  These bounded cases do not claim the full B binding ban. Ambient availability
+  still does not make an unrelated module a head owner. The actual `Ord Nat`
+  and Pair-instance cases then require class-owned provenance.
   Widening globals, comparing only shapes, or treating re-export as ownership
   satisfies at most one axis.
 - **Root refusal does not decide multi-root precedence.** The root/path matrix
