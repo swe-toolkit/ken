@@ -4,9 +4,10 @@ Format: `../../README.md`.
 Spec: `spec/30-surface/38-ffi-io.md §1.11`.
 Frame: `docs/program/issues/PX10-SPAWN-PLAN-WAIT.md`.
 
-Section 1.11 is contract-pinned, not shipped. These are acceptance cases for
-its public behavior, not execution evidence. No Ken implementation, official
-conformance run, CI, publication, landing, or trust measurement is claimed.
+Section 1.11 specifies interpreter behavior and the native Process
+availability boundary. These are acceptance cases, not execution evidence.
+The seed has not been Ken-checked or run by the official conformance runner.
+No CI, publication, landing, or trust measurement is claimed.
 The cases describe surface clients using only the public forms in §1.11 and
 related existing buffer contract; they do not freeze host syscall mechanics.
 They use the exact §1.11.2 signatures, including the Auth/type parameters,
@@ -151,8 +152,8 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 - expect: the collected bytes equal the fixture record above; wait returns
   `Exited 0`. The caller-supplied first argument is `argv[0]`. The final
   environment contains the selected key and neither the replaced key nor the
-  parent's sentinel. Running the same checked program on the reference and
-  native paths yields identical bytes and `ChildExit`.
+  parent's sentinel. The checked interpreter yields the expected bytes and
+  `Exited 0`; native behavior is addressed separately below.
 - why: one accepted child pins argv, exact environment replacement, no parent
   environment overlay, a stdout `PipeRead`, bounded pipe reads, and normal
   exit. It does not pin read chunk sizes or environment iteration order.
@@ -449,14 +450,38 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 - why: this records the specified environment-dependent residual; it does
   not require SIGCHLD repair or hide the existing errno.
 
+## Native Process availability
+
+### surface/ffi-io/process-native-build-refuses-before-object-emission
+
+- promise class: transition sentinel.
+- spec: §1.11 status and §§1.11.2–1.11.3.
+- given: request a native build of the exact checked program in
+  `surface/ffi-io/process-spawn-passes-argv-and-environment`. Use the same
+  `px10-argv-env` fixture with no source changes and a fresh output
+  destination with no preexisting artifact. Its interpreter case is the
+  positive control. The program
+  declares `Process` and `FS AFull`; its pipe client uses `[FS, Process]`.
+- expect: the interpreter control accepts with the specified bytes and
+  `Exited 0`. Native build stops before object emission with a typed
+  availability refusal naming the operations that remain
+  `RepresentedUnavailable`; no native artifact is emitted. An unrelated
+  parse, type, or build failure does not satisfy this case.
+- why: the accepted interpreter run controls source validity. Native Process
+  remains unavailable in this slice; an emitted object would overclaim parity.
+  The transition ends when `PX10-NATIVE-SPAWN-PARITY` lands. That successor
+  must replace this refusal with native Process observations and update this
+  seed's opening status paragraph. This row is a contract case, not executed
+  by Ken or the official runner.
+
 ## Coverage boundary
 
 These cases pin the public plan, Process grant, pipe, wait, error, descriptor,
-and signal behavior in §1.11, including AC-1 and AC-2. The host-side invalid
-or duplicate descriptor-entry check has no public input because builders expose
-no descriptor map. The exact reverse order among internal release actions and
-the absence of a post-fork callback are not source-observable; this seed pins
-close-before-reap behavior without claiming to test those implementation
-properties. It does not cover successor attachments such as cwd, credentials,
-namespaces, cgroups, rlimits, process groups, pidfd signalling, or non-blocking
-wait.
+signal, and native-availability behavior in §1.11, including AC-1 and AC-2.
+The host-side invalid or duplicate descriptor-entry check has no public input
+because builders expose no descriptor map. The exact reverse order among
+internal release actions and the absence of a post-fork callback are not
+source-observable; this seed pins close-before-reap behavior without claiming
+to test those implementation properties. It does not cover successor
+attachments such as cwd, credentials, namespaces, cgroups, rlimits, process
+groups, pidfd signalling, or non-blocking wait.
