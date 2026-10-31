@@ -253,18 +253,16 @@ measurement is claimed.
 - promise class: **durable invariant** — a public attached proof is selected
   through its subject, never as a bare name
 - spec: `33 §4.1` and `33 §8.2`
-- given: in two fresh roots fixtures with the same module path
-  `PublicProofHome`, define the exported subject and attached proof below.
-  The provider and each consumer are separate roots-loaded units. The private
-  variant is identical except that it omits `pub` before
-  `proof identity_self`:
+- given: in two fresh roots fixtures, place the provider at path
+  `PublicProofHome.ken` (its implicit module path is `PublicProofHome`) and
+  each consumer in a separate roots-loaded unit. The provider contains these
+  direct declarations, with no inline module wrapper. The private variant
+  differs only by omitting `pub` before `proof identity_self`:
 
   ```ken
-  module PublicProofHome {
-    pub fn identity (x : Int) : Int = x;
-    pub proof identity_self for identity (x : Int)
-      : Equal Int (identity x) x = Refl
-  }
+  pub fn identity (x : Int) : Int = x;
+  pub proof identity_self for identity (x : Int)
+    : Equal Int (identity x) x = Refl
   ```
 
   In each fixture, run separate external clients that import only `identity`:
