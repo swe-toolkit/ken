@@ -2672,8 +2672,10 @@ Signed orientation remains outside this interface.
    a closed witness against independently proved corner memberships; three
    isolated refusals cover an inverted box and false witness premises. These
    candidate-local tests are not official conformance-runner execution, CI,
-   publication, landing or landed trust. The inside-antisymmetry seed remains
-   planned: its accepted small-box self-inclusion and refused reverse-inclusion
-   and inverted-box equality cases are expectations, not executed evidence.
-   Eleven authored seeds and the planned twelfth supplement rather than
-   replace the checked generic law bodies.
+   publication, landing or landed trust. The
+   [inside-antisymmetry seed](../../../../conformance/stdlib/geometry/seed-box-inside-antisymmetry.md)
+   is authored in this candidate but has not been Ken-checked or officially
+   conformance-run. Its accepted small-box self-inclusion and refused reverse
+   inclusion and inverted-box equality are expectations, not executed evidence.
+   All twelve authored seeds supplement rather than replace the checked
+   generic law bodies.
