@@ -2,8 +2,8 @@
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
 geometry operations. Six box-and-distance laws, six structural
-commutativity, associativity and absorption laws, two metric laws, seven corner-wise
-containment laws, three inclusion-order laws, and three area laws carry
+commutativity, associativity and absorption laws, three metric laws, seven
+corner-wise containment laws, three inclusion-order laws, and three area laws carry
 kernel-checked generic proofs.
 
 ## Contents
@@ -30,7 +30,7 @@ The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
 box-and-distance laws lead the definition; the six structural
 commutativity, associativity and absorption laws follow intersection and
-hull, ahead of the two metric laws. The corner-wise `inside` operation
+hull, ahead of the three metric laws. The corner-wise `inside` operation
 and its seven laws come next, then the three inclusion-order laws,
 followed by `area` and its three laws. Per-axis proof helpers and
 distance helpers stay private.
@@ -943,9 +943,12 @@ theorem axis_distance_self (a : Nat) : Equal Nat (axis_distance a a) Zero =
 
 The metric extension uses saturating natural subtraction on each axis.
 The triangle bound holds for every intermediate point, including a
-strictly longer detour. Zero distance gives equality of both coordinates;
-the two public theorems are supported by private per-axis proofs. No
-additional numerical carrier or trusted arithmetic operation is needed.
+strictly longer detour. Zero distance gives equality of both coordinates.
+Two points contained in `MkBox lo hi` are at most `manhattan lo hi` apart;
+an inverted box contains no point, so that bound needs no validity
+premise. The three public theorems are supported by private per-axis
+proofs. No additional numerical carrier or trusted arithmetic operation is
+needed.
 
 ```ken
 pub theorem manhattan_triangle
@@ -1007,6 +1010,57 @@ pub theorem manhattan_zero_equal
                 qy
                 (axis_distance_zero px qx (add_zero_left x_distance y_distance h))
                 (axis_distance_zero py qy (add_zero_right x_distance y_distance h))
+      }
+  }
+
+pub theorem manhattan_box_diameter
+      (lo : Point) (hi : Point) (p : Point) (q : Point)
+    : IsTrue (contains (MkBox lo hi) p)
+      → IsTrue (contains (MkBox lo hi) q)
+      → IsTrue (leq_nat (manhattan p q) (manhattan lo hi)) =
+  match lo {
+    MkPoint lx ly ↦
+      match hi {
+        MkPoint hx hy ↦
+          match p {
+            MkPoint px py ↦
+              match q {
+                MkPoint qx qy ↦
+                  λhp.
+                    λhq.
+                      leq_nat_add_mono
+                        (axis_distance px qx)
+                        (axis_distance lx hx)
+                        (axis_distance py qy)
+                        (axis_distance ly hy)
+                        (axis_distance_within
+                          lx
+                          hx
+                          px
+                          qx
+                          ((proof left for bool_and)
+                            (axis_contains lx hx px)
+                            (axis_contains ly hy py)
+                            hp)
+                          ((proof left for bool_and)
+                            (axis_contains lx hx qx)
+                            (axis_contains ly hy qy)
+                            hq))
+                        (axis_distance_within
+                          ly
+                          hy
+                          py
+                          qy
+                          ((proof right for bool_and)
+                            (axis_contains lx hx px)
+                            (axis_contains ly hy py)
+                            hp)
+                          ((proof right for bool_and)
+                            (axis_contains lx hx qx)
+                            (axis_contains ly hy qy)
+                            hq))
+              }
+          }
       }
   }
 
@@ -1223,6 +1277,87 @@ theorem box_equal
         (MkBox lo2 hi2)
         (cong Point Box lo1 lo2 (box_with_lo hi1) hl)
         (cong Point Box hi1 hi2 (box_with_hi lo2) hh)
+
+theorem axis_distance_within
+      (lo : Nat) (hi : Nat) (a : Nat) (b : Nat)
+    : IsTrue (axis_contains lo hi a)
+      → IsTrue (axis_contains lo hi b)
+      → IsTrue (leq_nat (axis_distance a b) (axis_distance lo hi)) =
+  λha.
+    λhb.
+      axis_distance_bounded
+        a
+        b
+        (axis_distance lo hi)
+        (axis_sub_within
+          lo
+          hi
+          a
+          b
+          ((proof right for bool_and) (leq_nat lo a) (leq_nat a hi) ha)
+          ((proof left for bool_and) (leq_nat lo b) (leq_nat b hi) hb))
+        (axis_sub_within
+          lo
+          hi
+          b
+          a
+          ((proof right for bool_and) (leq_nat lo b) (leq_nat b hi) hb)
+          ((proof left for bool_and) (leq_nat lo a) (leq_nat a hi) ha))
+
+theorem axis_sub_within
+      (lo : Nat) (hi : Nat) (a : Nat) (b : Nat)
+    : IsTrue (leq_nat a hi)
+      → IsTrue (leq_nat lo b)
+      → IsTrue (leq_nat (sub a b) (axis_distance lo hi)) =
+  λhigh.
+    λlow.
+      (proof trans for leq_nat)
+        (sub a b)
+        (sub hi b)
+        (axis_distance lo hi)
+        (sub_left_mono a hi b high)
+        ((proof trans for leq_nat)
+          (sub hi b)
+          (sub hi lo)
+          (axis_distance lo hi)
+          (sub_right_antitone hi lo b low)
+          (leq_nat_eq_right
+            (sub hi lo)
+            (add (sub hi lo) (sub lo hi))
+            (axis_distance lo hi)
+            (leq_nat_add_left_bound (sub hi lo) (sub lo hi))
+            ((proof comm for add) (sub hi lo) (sub lo hi))))
+
+theorem axis_distance_bounded
+      (a : Nat) (b : Nat) (w : Nat)
+    : IsTrue (leq_nat (sub a b) w)
+      → IsTrue (leq_nat (sub b a) w)
+      → IsTrue (leq_nat (axis_distance a b) w) =
+  match a {
+    Zero ↦
+      match b {
+        Zero ↦ λh1. λh2. h1;
+        Suc b2 ↦
+          λh1.
+            λh2.
+              (proof trans for leq_nat)
+                (add Zero (Suc b2))
+                (Suc b2)
+                w
+                (leq_nat_eq_right
+                  (add Zero (Suc b2))
+                  (add Zero (Suc b2))
+                  (Suc b2)
+                  ((proof refl for leq_nat) (add Zero (Suc b2)))
+                  ((proof zero_l for add) (Suc b2)))
+                h2
+      };
+    Suc a2 ↦
+      match b {
+        Zero ↦ λh1. λh2. h1;
+        Suc b2 ↦ λh1. λh2. axis_distance_bounded a2 b2 w h1 h2
+      }
+  }
 ```
 
 ```ken
@@ -2193,11 +2328,16 @@ triangle by induction, adds the two bounds monotonically, and reorders
 addition to match the distance definition. `manhattan_zero_equal` splits
 a zero sum into zero per-axis distances, derives equality of both
 coordinates by induction, and lifts them into point equality with `cong`.
+`manhattan_box_diameter` projects the four coordinate comparisons from both
+memberships, bounds each saturated difference by the box's own span on that
+axis with subtraction monotonicity and antitonicity, and adds the two axis
+bounds monotonically.
+
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
 `max::assoc` on the lower corners and `min::assoc` on the upper corners
 for intersection, reversing those selectors for hull. `point_equal` and
-`box_equal` assemble structural box equality; none of the twenty-four
+`box_equal` assemble structural box equality; none of the twenty-five
 pre-area public laws identifies boxes by their sets of members. Both
 mixed absorption proofs keep their shared box as the left operand.
 `intersect_hull_absorb` uses `max::absorb` to restore its lower coordinates
@@ -2271,8 +2411,8 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–9](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and twenty-nine public checked law types,
+1. **Contract.** [Exact geometry, §§1–10](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and thirty public checked law types,
    including the two structural distribution laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
@@ -2280,9 +2420,8 @@ Signed orientation remains outside this interface.
    `intersect_comm`, `hull_comm`, `intersect_assoc`, `hull_assoc`,
    `intersect_hull_absorb`, `hull_intersect_absorb`,
    `intersect_hull_distrib`, `hull_intersect_distrib`, `manhattan_symm`,
-   `manhattan_self`,
-   `manhattan_triangle`, `manhattan_zero_equal`, `inside`,
-   `inside_sound`, `inside_refl`, `intersect_inside_left`,
+   `manhattan_self`, `manhattan_triangle`, `manhattan_zero_equal`,
+   `manhattan_box_diameter`, `inside`, `inside_sound`, `inside_refl`, `intersect_inside_left`,
    `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
    `inside_complete`, `inside_trans`, `intersect_greatest`,
    `hull_least`, `area`, `area_inside`, `area_inverted_x`,
@@ -2334,7 +2473,11 @@ Signed orientation remains outside this interface.
    [distribution seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-distributivity.md)
    checks both box distribution laws and independently computed sides on a
    fixed triple, then refuses a false mixed regrouping; its package test
-   also checks both Nat selectors. These candidate-local tests are not
-   official conformance-runner execution, CI, publication, landing or landed
-   trust. All nine seeds supplement rather than replace the checked generic
-   law bodies.
+   also checks both Nat selectors. The
+   [box-diameter seed](../../../../conformance/stdlib/geometry/seed-manhattan-box-diameter.md)
+   is not yet authored; it will check a tight contained distance-five pair and
+   refuse an outside distance-six pair and a bound below five. Its
+   package-owned test checks those cases locally against the checked theorem.
+   These candidate-local tests are not official conformance-runner execution,
+   CI, publication, landing or landed trust. All ten seeds, once the new seed
+   is authored, supplement rather than replace the checked generic law bodies.
