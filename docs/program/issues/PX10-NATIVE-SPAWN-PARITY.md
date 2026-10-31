@@ -1,7 +1,7 @@
 ---
 id: PX10-NATIVE-SPAWN-PARITY
 title: "PX10's spawn and wait run only on the interpreter: the native bracket planner keys every region on an acquire in head position, so withChild, whose acquire follows the plan-open response match, has no return fold and no owned settlement. Give the native planner bracket regions whose acquire is not in head position, then promote the PX10 host operations to NativeTested with interpreter parity"
-status: draft
+status: ready
 owner: runtime
 size: L
 tier: T1
@@ -21,7 +21,7 @@ through `withChild` exactly as the interpreter does. The PX10 host
 operations are `NativeTested`, and the native bracket planner accepts
 a bracket whose acquire comes after stuck effects.
 
-## Settled inputs (measure on the cut base, which includes PX10 slice 1)
+## Settled inputs (measure on `58c2e1df6`, which includes PX10 slice 1)
 
 - **The wall.** `build_bracket_static_regions` takes the positional
   return fold as `folds.last()` under the acquire's continuation
@@ -40,6 +40,23 @@ a bracket whose acquire comes after stuck effects.
   containment under the acquire's own continuation. Every stage that
   reads that shape is in scope: the return fold, settlement ownership,
   body exits, and the parent forest.
+- **Slice 1 pins the native refusal.** Its AC-4 row asserts that a
+  native `withChild` build refuses through `RepresentedUnavailable`.
+  This WP inverts that row into the AC-1 parity row; it does not delete
+  it.
+- **Carried from slice 1, in scope where native:** an unused Process
+  grant refuses a native build, and `prepare_native_target_sources`
+  reaches lowering without the availability gate. AC-0 rules whether
+  each closes here or is named as a successor.
+- **The interpreter trace drops two settlements** (Adversary
+  evt_2ffcbyp8azkf0, on `58c2e1df6`). A pipe the `withChild` bracket
+  closes is acquired but never settled: `settle_child_pipes`
+  (`effect_v1.rs:1634`) discards each Ok observation, and the pipe close
+  at `:2209` cannot report `ReleaseFailed`. A `SpawnPlan` retired by
+  `ProcessSpawn` (`:3777`, `:1608`) is never settled. A body close and
+  terminal finalization (`~:2236`) both record a settlement, so the
+  outcome depends on the exit path. Parity measured against this
+  baseline would agree with a native path that drops the same records.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
@@ -50,7 +67,9 @@ base, stop and report the mismatch; do not build around it.
    support across the region builder and the settlement plane. Name
    each stage that reads the fused shape, give its repair, and give its
    negative.
-2. **One runtime branch.** It carries the ruled repairs, promotes
+2. **One runtime branch.** It first records exactly one settlement for
+   every acquired PX10 identity on every release path, on both engines.
+   It then carries the ruled repairs, promotes
    `ProcessPlanOpen` through `ProcessWait` and the two stream operations
    to `NativeTested` with their catalog columns, and adds native tests.
 
@@ -59,6 +78,11 @@ base, stop and report the mismatch; do not build around it.
 - **AC-1 (parity).** PX10 slice 1's AC-1 rows pass natively, and
   `rt_parity_native` reports the same (request, outcome) pairs as the
   interpreter.
+- **AC-1b (settlement).** For a `withChild` body that takes stdout and
+  waits, the trace settles the `PipeRead` and the `SpawnPlan` exactly
+  once each, before the child, in reverse acquisition order, on both
+  engines. A spawn that fails settles its plan. A mutant that drops the
+  bracket's pipe settlement reddens this row.
 - **AC-2 (no regression).** The return-fold equivalence pin holds on
   every existing bracket fixture. `rt_native_bracket_body_once`,
   `px7f_resource_native`, `rt_escape_second_resource_native` and
