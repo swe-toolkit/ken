@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER
 title: "Spec 67 gives boxes point membership and points a Manhattan metric, but no law connects them: a client cannot bound the distance between two points it knows lie in a box. Rule from a checked D0 at zero trust that two points contained in MkBox lo hi are at most manhattan lo hi apart, and state the law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
