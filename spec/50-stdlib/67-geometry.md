@@ -44,9 +44,9 @@
 > and a package-owned test. On implementation tip `c1d35d108`, the named
 > target passed 2/2 with equal trusted identity sets 114 → 114; this is
 > candidate-local package evidence, not official conformance. The
-> eleventh CV seed is planned but not yet authored. No official
-> conformance-runner execution, CI, publication, landing or landed
-> trust is established for §11.
+> eleventh CV seed is authored in this candidate but remains
+> unexecuted. No official conformance-runner execution, CI,
+> publication, landing or landed trust is established for §11.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -1073,9 +1073,9 @@ of the authored but unexecuted seed.
 > are present in this assembled candidate. On implementation tip
 > `c1d35d108`, the named target passed 2/2 with equal trusted identity
 > sets 114 → 114; this is candidate-local, not official conformance.
-> The eleventh CV seed is planned but not yet authored. No official
-> conformance-runner execution, CI, publication, landing or landed
-> trust is claimed for §11.
+> The eleventh CV seed is authored in this candidate but remains
+> unexecuted. No official conformance-runner execution, CI,
+> publication, landing or landed trust is claimed for §11.
 
 `Algorithm.Geometry.NatBox` must export both checked theorems immediately
 after `manhattan_box_diameter` and before the private
