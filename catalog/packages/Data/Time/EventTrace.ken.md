@@ -3195,8 +3195,11 @@ merging, not window multiplicity.
    [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md)
    and [window-append seed](../../../../conformance/stdlib/time-and-events/seed-window-append-distribution.md)
    supply independent closed values and refused claims; these clients
-   complement, not replace, the generic proofs. Package tests run the
-   merge-membership and composition seeds, including their pinned refusals.
+   complement, not replace, the generic proofs. The all-in-window
+   [seed](../../../../conformance/stdlib/time-and-events/seed-window-all-identity.md)
+   is authored but has not been Ken-checked or officially conformance-run.
+   Package tests run the merge-membership and composition seeds, including
+   their pinned refusals.
    The adjacent-split package test root-loads the checked generic law,
    accepts the complete seed and refuses its isolated swapped claim.
    The `cat_time_window_append` package test checks the §8 law and the
@@ -3208,6 +3211,6 @@ merging, not window multiplicity.
    The `cat_time_window_all_identity` package test applies the generic §10
    theorem to an open membership premise, then accepts a closed all-in-window
    trace and refuses the shorter window's false identity claim at its own
-   `Refl`. Its fixture is not an authored §10 conformance seed and does not
-   replace the generic checked proof. These tests are not official
+   `Refl`. Its fixture is separate from the authored §10 conformance seed and
+   does not replace the generic checked proof. These tests are not official
    conformance-runner execution or CI.
