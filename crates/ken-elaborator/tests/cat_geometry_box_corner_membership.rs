@@ -181,8 +181,10 @@ fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
 /// CLAIMED: a point in a box entails both stored corners are in that box;
 /// neither corner is automatically contained in an inverted box, and a false
 /// witness cannot justify either law.
-/// THE GAP: these finite controls complement, not replace, generic proofs;
-/// the separate CV seed and official conformance-runner execution are pending.
+/// THE GAP: these finite controls complement, not replace, generic proofs.
+/// The separate CV seed is authored but not Ken-checked or officially run;
+/// package-owned tests do not establish official conformance-runner execution,
+/// CI, publication, landing or landed trust.
 #[test]
 fn contained_witness_proves_both_corners_but_false_premises_refuse() {
     let mut positive = loaded_geometry();

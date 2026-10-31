@@ -2550,10 +2550,10 @@ Signed orientation remains outside this interface.
    pair, an outside distance-six pair, and a refused bound below five. Its
    package-owned test checks those cases locally against the checked theorem.
    The [corner-membership seed](../../../../conformance/stdlib/geometry/seed-box-corner-membership.md)
-   is not yet authored. The package-owned test checks both generic public laws
-   and a closed witness against independently proved corner memberships; three
+   is authored in this candidate but has not been Ken-checked or officially
+   conformance-run. The package-owned test checks both generic public laws and
+   a closed witness against independently proved corner memberships; three
    isolated refusals cover an inverted box and false witness premises. These
    candidate-local tests are not official conformance-runner execution, CI,
-   publication, landing or landed trust. Ten authored seeds and the planned
-   eleventh corner-membership seed supplement rather than replace the checked
-   generic law bodies.
+   publication, landing or landed trust. All eleven authored seeds supplement
+   rather than replace the checked generic law bodies.
