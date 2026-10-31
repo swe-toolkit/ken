@@ -301,11 +301,14 @@ is a **surface error** (`24`) — it never reaches the kernel:
     `OpCreateDirectory`, `OpRemoveFile`, `OpRemoveDirectory`,
     `OpRename`, `OpChangeMode`, `OpSeek`, `OpSetLength`, `OpSync`,
     `OpGetInheritance`, `OpSetInheritance`, and `OpDuplicate`.
-  - `Capability.System.IO` is the fifth affected catalog unit. It
-    must import its checked Buffer projections and transfer-count facts
-    from `Capability.System.Buffer`; their use in IO does not give a
-    second unit ownership of the same identities. Its locally defined
-    `write_all_*` laws remain that unit's own checked declarations.
+  - `Capability.System.IO` homes the checked
+    `write_all_exact_prefix_prop` definition and its attached proof
+    `write_all_exact_prefix_prop::exact_prefix`; the attached proof is
+    selected only through its subject, never as a bare name. IO imports
+    its checked Buffer projections and transfer-count facts from
+    `Capability.System.Buffer`; their use in IO does not give a second
+    unit ownership of the same identities. Its other `write_all_*` laws
+    remain that unit's own locally defined checked declarations.
   - `Capability.System.Resource` homes both `ResourceBodyResult`
     with `ResourceBodyOk` and `ResourceBodyErr`, and
     `ResourceBracketResult` with `ResourceBracketOk`,
@@ -323,6 +326,8 @@ is a **surface error** (`24`) — it never reaches the kernel:
   visibility. Non-inductive homes retain the checked-Transparent
   admission requirement; the inductive exception does not admit
   opaque, primitive or lookalike non-family declarations as homes.
+  An attached proof is homed only in the same unit as its subject,
+  and every identity has at most one home.
   Explicit imports of these names through their home preserve the
   exact checked identities in both roots modes. Legacy resolution
   continues to admit their existing bare uses; this home migration
