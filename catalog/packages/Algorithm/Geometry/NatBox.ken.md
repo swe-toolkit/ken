@@ -3,7 +3,7 @@
 Points and axis-aligned boxes over `Nat` have total, exact membership and
 geometry operations. Six box-and-distance laws, eight structural
 commutativity, associativity, absorption and distribution laws, three metric
-laws, two corner-membership laws, seven corner-wise containment laws, three
+laws, two corner-membership laws, seven corner-wise containment laws, four
 inclusion-order laws, and three area laws carry kernel-checked generic proofs.
 
 ## Contents
@@ -32,7 +32,7 @@ box-and-distance laws lead the definition; eight structural commutativity,
 associativity, absorption and distribution laws follow intersection and hull,
 ahead of the three metric laws. The two corner-membership laws
 follow the three metric laws. The corner-wise `inside` operation and its seven
-laws come next, then the three inclusion-order laws, followed by `area` and its
+laws come next, then the four inclusion-order laws, followed by `area` and its
 three laws. Per-axis proof helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
@@ -1820,6 +1820,97 @@ pub theorem inside_trans
       }
   }
 
+pub theorem inside_antisym
+      (a : Box) (b : Box)
+    : IsTrue (inside a b) → IsTrue (inside b a) → Equal Box a b =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match alo {
+            MkPoint alx aly ↦
+              match ahi {
+                MkPoint ahx ahy ↦
+                  match blo {
+                    MkPoint blx bly ↦
+                      match bhi {
+                        MkPoint bhx bhy ↦
+                          λab.
+                            λba.
+                              box_equal
+                                (MkPoint alx aly)
+                                (MkPoint blx bly)
+                                (MkPoint ahx ahy)
+                                (MkPoint bhx bhy)
+                                (point_equal
+                                  alx
+                                  blx
+                                  aly
+                                  bly
+                                  (axis_within_antisym_low
+                                    alx
+                                    ahx
+                                    blx
+                                    bhx
+                                    ((proof left for bool_and)
+                                      (axis_within alx ahx blx bhx)
+                                      (axis_within aly ahy bly bhy)
+                                      ab)
+                                    ((proof left for bool_and)
+                                      (axis_within blx bhx alx ahx)
+                                      (axis_within bly bhy aly ahy)
+                                      ba))
+                                  (axis_within_antisym_low
+                                    aly
+                                    ahy
+                                    bly
+                                    bhy
+                                    ((proof right for bool_and)
+                                      (axis_within alx ahx blx bhx)
+                                      (axis_within aly ahy bly bhy)
+                                      ab)
+                                    ((proof right for bool_and)
+                                      (axis_within blx bhx alx ahx)
+                                      (axis_within bly bhy aly ahy)
+                                      ba)))
+                                (point_equal
+                                  ahx
+                                  bhx
+                                  ahy
+                                  bhy
+                                  (axis_within_antisym_high
+                                    alx
+                                    ahx
+                                    blx
+                                    bhx
+                                    ((proof left for bool_and)
+                                      (axis_within alx ahx blx bhx)
+                                      (axis_within aly ahy bly bhy)
+                                      ab)
+                                    ((proof left for bool_and)
+                                      (axis_within blx bhx alx ahx)
+                                      (axis_within bly bhy aly ahy)
+                                      ba))
+                                  (axis_within_antisym_high
+                                    aly
+                                    ahy
+                                    bly
+                                    bhy
+                                    ((proof right for bool_and)
+                                      (axis_within alx ahx blx bhx)
+                                      (axis_within aly ahy bly bhy)
+                                      ab)
+                                    ((proof right for bool_and)
+                                      (axis_within blx bhx alx ahx)
+                                      (axis_within bly bhy aly ahy)
+                                      ba)))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
 pub theorem intersect_greatest
       (a : Box) (b : Box) (c : Box)
     : IsTrue (inside a b) → IsTrue (inside a c) → IsTrue (inside a (intersect b c)) =
@@ -2096,6 +2187,28 @@ theorem axis_within_trans
           h3
           ((proof right for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w12)
           ((proof right for bool_and) (leq_nat l3 l2) (leq_nat h2 h3) w23))
+
+theorem axis_within_antisym_low
+      (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat)
+    : IsTrue (axis_within l1 h1 l2 h2) → IsTrue (axis_within l2 h2 l1 h1) → Equal Nat l1 l2 =
+  λw12.
+    λw21.
+      (proof antisym for leq_nat)
+        l1
+        l2
+        ((proof left for bool_and) (leq_nat l1 l2) (leq_nat h2 h1) w21)
+        ((proof left for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w12)
+
+theorem axis_within_antisym_high
+      (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat)
+    : IsTrue (axis_within l1 h1 l2 h2) → IsTrue (axis_within l2 h2 l1 h1) → Equal Nat h1 h2 =
+  λw12.
+    λw21.
+      (proof antisym for leq_nat)
+        h1
+        h2
+        ((proof right for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w12)
+        ((proof right for bool_and) (leq_nat l1 l2) (leq_nat h2 h1) w21)
 
 theorem axis_within_meet
       (l : Nat) (h : Nat) (l2 : Nat) (h2 : Nat) (l3 : Nat) (h3 : Nat)
@@ -2407,7 +2520,7 @@ The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
 `max::assoc` on the lower corners and `min::assoc` on the upper corners
 for intersection, reversing those selectors for hull. `point_equal` and
-`box_equal` assemble structural box equality; none of the twenty-nine
+`box_equal` assemble structural box equality; none of the thirty
 pre-area public laws identifies boxes by their sets of members. Both
 mixed absorption proofs keep their shared box as the left operand.
 `intersect_hull_absorb` uses `max::absorb` to restore its lower coordinates
@@ -2425,8 +2538,11 @@ pointwise inclusion alone would be vacuous for an inverted inner box. The
 private `axis_within` and per-axis lemmas keep these distinctions explicit.
 
 `inside_trans` composes lower and upper comparisons along each axis, including
-for inverted boxes. `intersect_greatest` combines the lower bounds with the
-checked `max` least law and the upper bounds with the checked `min` greatest
+for inverted boxes. `inside_antisym` applies checked Nat antisymmetry to both
+comparisons on each axis and assembles structural box equality through the
+private `box_equal`. It needs no validity premise and identifies inverted
+boxes only when their stored corners agree. `intersect_greatest` combines the
+lower bounds with the checked `max` least law and the upper bounds with the checked `min` greatest
 law. `hull_least` combines them in the opposite direction. Private per-axis
 proofs and `bool_and` introduction assemble these generic corner-order laws
 without changing intersection or hull.
@@ -2460,7 +2576,7 @@ distance is exact and unsigned; its triangle inequality and zero-distance
 identity are proved. Corner-wise `inside` is directional and sufficient for
 point-set inclusion, but an empty inner box can be outside a second box by
 its corners despite having no points. Its converse law therefore requires
-a member of the inner box. The corner order is transitive; intersection is a
+a member of the inner box. The corner order is reflexive, transitive and antisymmetric; intersection is a
 greatest lower bound and hull a least upper bound for that order. The two
 mixed absorption laws return structural `Equal Box` to their shared left
 operand, without identifying boxes merely because they have the same points.
@@ -2481,9 +2597,10 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–11](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and thirty-two public checked law types,
-   including the two structural distribution and two corner-membership laws.
+1. **Contract.** [Exact geometry, §§1–12](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and thirty-three public checked law types,
+   including the two structural distribution, two corner-membership and
+   inside-antisymmetry laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
@@ -2494,8 +2611,8 @@ Signed orientation remains outside this interface.
    `manhattan_box_diameter`, `contains_lo_corner`, `contains_hi_corner`,
    `inside`, `inside_sound`, `inside_refl`, `intersect_inside_left`,
    `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
-   `inside_complete`, `inside_trans`, `intersect_greatest`,
-   `hull_least`, `area`, `area_inside`, `area_inverted_x`,
+   `inside_complete`, `inside_trans`, `inside_antisym`,
+   `intersect_greatest`, `hull_least`, `area`, `area_inside`, `area_inverted_x`,
    and `area_inverted_y`. `axis_within`, `axis_span`, `box_with_lo`,
    `box_with_hi`, `box_equal`, generic subtraction and
    multiplication bounds, per-axis lemmas and proof transport helpers
@@ -2555,5 +2672,8 @@ Signed orientation remains outside this interface.
    a closed witness against independently proved corner memberships; three
    isolated refusals cover an inverted box and false witness premises. These
    candidate-local tests are not official conformance-runner execution, CI,
-   publication, landing or landed trust. All eleven authored seeds supplement
-   rather than replace the checked generic law bodies.
+   publication, landing or landed trust. The inside-antisymmetry seed remains
+   planned: its accepted small-box self-inclusion and refused reverse-inclusion
+   and inverted-box equality cases are expectations, not executed evidence.
+   Eleven authored seeds and the planned twelfth supplement rather than
+   replace the checked generic law bodies.
