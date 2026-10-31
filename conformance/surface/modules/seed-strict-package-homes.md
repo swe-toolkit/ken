@@ -85,7 +85,8 @@ measurement is claimed.
   The System.IO source unit's five imports from System.Buffer are also
   observed: `buffer_span_budget`, `transfer_count_nat`,
   `transfer_count_nat_succ`, `transfer_count_predecessor`, and
-  `transfer_count_remaining`. Its attached proof is checked in the final case.
+  `transfer_count_remaining`. The IO owner's attached-proof identity is
+  checked through its subject in the IO-private case below.
 - measured: each home's public pre-source ordinary export identities, the
   consumer's resolved import `GlobalId`s, and constructor-parent identities.
   The snapshot is captured before loading any home; no numeric `GlobalId` is
@@ -99,7 +100,7 @@ measurement is claimed.
 - expect: the clients accept in both roots modes. Each home's pre-source
   ordinary export subset is exactly its listed ordinary names. The 40 named
   import bindings equal their pre-source `GlobalId`s; the attached proof is
-  checked through its subject in the final case, not as a bare export. Together
+  checked through its subject in the IO-private case, not as a bare export. Together
   the checks cover all 41 rows. No pre-source identity is attributed to more
   than one home. Constructor sets are exactly
   `BufferWindow` with `MkBufferWindow`, `FileOperation` with the sixteen
@@ -140,10 +141,9 @@ measurement is claimed.
   fn file_operation_type_probe
       (operation : FileOperation) : FileOperation = operation
 
-  theorem io_subject_probe
-        (span : BufferSpan) (count : TransferCount)
-    : write_all_exact_prefix_prop span count =
-      write_all_exact_prefix_prop::exact_prefix span count
+  fn io_subject_probe (span : BufferSpan) (count : TransferCount)
+      (evidence : write_all_exact_prefix_prop span count)
+    : write_all_exact_prefix_prop span count = evidence
 
   fn resource_result_type_probe (e : Type) (a : Type)
       (result : ResourceBodyResult e a) : ResourceBodyResult e a = result
@@ -152,8 +152,8 @@ measurement is claimed.
   For each probe, make a positive and a negative Strict-root client that
   differ only by its home import. Pair `FS` with Authority, `MkBufferWindow`
   with Buffer, `FileOperation` with Error, `write_all_exact_prefix_prop` with
-  IO, and `ResourceBodyResult` with Resource. The IO probe uses the
-  subject-qualified proof from the final case.
+  IO, and `ResourceBodyResult` with Resource. The IO probe uses the subject
+  in a proposition type; attached-proof visibility is tested separately.
 - measured: the exact resolution outcome of each fresh client, with all other
   provider roots and dependencies present.
 - claimed: each specified home edge is necessary in Strict roots; an
@@ -198,47 +198,114 @@ measurement is claimed.
   `L2-4` strict-entry flip. That successor owns the transition and must review
   or replace this sentinel for the named roots entrypoints.
 
-### surface/modules/system-io-attached-proof-is-selected-through-subject
+### surface/modules/system-io-attached-proof-remains-private-to-owner
 
-- promise class: **durable invariant** — an imported subject exposes its
-  attached proof only through the subject-qualified path
-- spec: `33 §3.3` and `33 §8.2`
-- given: in fresh catalog-root clients, import only
-  `write_all_exact_prefix_prop` from `Capability.System.IO` and run under
-  Strict and Legacy roots. With
-  `span : BufferSpan` and `count : TransferCount`, the accepted client proves
-  the imported proposition using both canonical and selector forms:
+- promise class: **durable invariant** — an exported subject does not expose
+  a private attached proof to external clients
+- spec: `33 §3.3`, `33 §4.1`, and `33 §8.2`
+- given: load the actual `Capability.System.IO` home under Strict and Legacy
+  roots. Its checked `write_all_preserves_exact_prefix` theorem selects
+  `exact_prefix` through `write_all_exact_prefix_prop`; record that internal
+  reference's resolved `GlobalId`. For an external client in each mode,
+  import only `write_all_exact_prefix_prop` and include the accepted
+  `io_subject_probe` from the preceding case. Append one claim per fresh
+  copy, leaving the subject import and probe unchanged:
 
   ```ken
-  import Capability.System.IO (write_all_exact_prefix_prop)
-
-  theorem exact_prefix_via_path
+  theorem external_via_path
       (span : BufferSpan) (count : TransferCount)
     : write_all_exact_prefix_prop span count =
       write_all_exact_prefix_prop::exact_prefix span count
+  ```
 
-  theorem exact_prefix_via_selector
+  ```ken
+  theorem external_via_selector
       (span : BufferSpan) (count : TransferCount)
     : write_all_exact_prefix_prop span count =
       proof exact_prefix for write_all_exact_prefix_prop span count
   ```
 
-  The Strict- and Legacy-root negative clients copy
-  `exact_prefix_via_path` and change only its right-hand reference to the bare
-  `exact_prefix span count`; the subject import and theorem type stay fixed.
-- measured: the subject and attached-proof `GlobalId`s selected by each
-  qualified reference, and the exact error for the bare reference.
-- claimed: `exact_prefix` is the checked attached proof of the imported
-  subject, is selected through that subject, and is not a bare binding.
-- the gap: the negative must reach attached-proof name resolution, not fail
-  because the subject or its import is missing. Its unchanged subject import
-  and theorem type provide that control.
-- expect: both qualified forms accept in both roots modes and resolve the
-  same pre-source `write_all_exact_prefix_prop::exact_prefix` identity under
-  the original subject ID. The IO subject and attached proof share the IO
-  home, and the proof has no second home. The bare form rejects with
-  `UnboundName(exact_prefix)` in both modes.
-- controls: the imported subject and both qualified references are positive
-  controls for the isolated bare-name refusal.
-- why: attached-proof identity is namespaced by its subject; importing the
-  subject does not put `exact_prefix` in the ordinary bare-name scope.
+  ```ken
+  theorem external_bare_name
+      (span : BufferSpan) (count : TransferCount)
+    : write_all_exact_prefix_prop span count = exact_prefix span count
+  ```
+- measured: the IO unit's internal attached-proof identity, its public
+  subject import, and each external reference's surface-resolution result.
+- claimed: the checked proof is homed with its subject and usable inside IO,
+  but subject import alone does not export the private proof.
+- the gap: each external refusal must reach proof visibility, not fail because
+  the subject or its import is missing. The accepted subject probe provides
+  that control.
+- expect: the IO unit resolves its internal selector to the pre-source proof
+  `GlobalId` under `write_all_exact_prefix_prop`. Its public interface
+  includes the subject but not the attached proof. The external subject import
+  and `io_subject_probe` accept; both qualified external forms reject as
+  surface visibility errors. The bare `exact_prefix` name is unresolved.
+- controls: the IO unit's internal proof use is the positive owner control.
+  The next case controls external selection when the proof is explicitly
+  public.
+- why: §8.2 makes attached proofs private by default; the home mapping does
+  not widen the IO module's ordinary public interface.
+
+### surface/modules/public-attached-proof-selector-requires-pub
+
+- promise class: **durable invariant** — a public attached proof is selected
+  through its subject, never as a bare name
+- spec: `33 §4.1` and `33 §8.2`
+- given: in two fresh roots fixtures with the same module path
+  `PublicProofHome`, define the exported subject and attached proof below.
+  The provider and each consumer are separate roots-loaded units. The private
+  variant is identical except that it omits `pub` before
+  `proof identity_self`:
+
+  ```ken
+  module PublicProofHome {
+    pub fn identity (x : Int) : Int = x;
+    pub proof identity_self for identity (x : Int)
+      : Equal Int (identity x) x = Refl
+  }
+  ```
+
+  In each fixture, run separate external clients that import only `identity`:
+
+  ```ken
+  import PublicProofHome (identity)
+
+  theorem public_via_path (x : Int)
+    : Equal Int (identity x) x = identity::identity_self x
+  ```
+
+  ```ken
+  import PublicProofHome (identity)
+
+  theorem public_via_selector (x : Int)
+    : Equal Int (identity x) x = proof identity_self for identity x
+  ```
+
+  The bare-name control imports the same subject and theorem type but uses
+  `identity_self x` as its proof reference:
+
+  ```ken
+  import PublicProofHome (identity)
+
+  theorem public_via_bare (x : Int)
+    : Equal Int (identity x) x = identity_self x
+  ```
+- measured: the attached-proof `GlobalId` resolved through the exported
+  subject, the surface result when only `pub` changes, and the bare-name
+  resolution outcome.
+- claimed: `pub proof` makes the attached proof available through its subject;
+  it does not add `identity_self` to the ordinary namespace.
+- the gap: the subject and claim remain identical between fixture variants;
+  the `pub` marker is the only visibility change. The proof claim mentions
+  `identity` applied and is well-formed.
+- expect: both qualified forms accept and resolve the same attached-proof
+  `GlobalId` in the public variant. Both external qualified forms refuse in
+  the private variant at surface visibility. The bare `identity_self`
+  reference refuses as unresolved even when `pub proof` is present.
+- controls: the public subject import and qualified proof are accepted
+  controls for the private-visibility refusal. The bare-name client differs
+  only at the proof reference.
+- why: §8.2 requires both an exported subject and `pub proof` for external
+  attached-proof visibility; subject selection alone cannot cross privacy.
