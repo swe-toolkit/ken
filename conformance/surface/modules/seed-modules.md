@@ -1250,20 +1250,74 @@ definition.
 - controls: the four source declarations are the accepted controls for their
   respective entry; each route is observed independently.
 
-### surface/modules/legacy-cli-exact-id-observation-gap
+### surface/modules/legacy-cli-exact-id-resolution-report
 
-- status: declared coverage gap; no executable CLI case is claimed
-- spec: `33 §3.3`; `39 §2.0`
-- normative promise: CLI entries outside `catalog/packages/` retain bare
-  access to the exact pre-source IDs `IO`, `write`, `print_line`,
-  `charToInt`, and `leqChar`.
-- gap: no specified observation for `ken check`, `ken run`, or
-  `ken native-build` reports the identities resolved by that route.
-  Process success, program output, or a native artifact cannot distinguish
-  a type-compatible wrong identity. The direct elaboration, literate, and
-  REPL cases above do not stand in for these CLI paths.
-- successor: `LANG-CLI-RESOLUTION-REPORT`. Add CLI exact-ID cases after
-  that route's observation contract is specified.
+- promise class: **normative compatibility vector** — each CLI route reports
+  exact checked pre-source identity, not merely a compatible spelling
+- spec: `33 §3.3`; `39 §2.0`; `70 §1.4`
+- given: place the accepted root below in a standalone `.ken` file. Place the
+  shadow root below in a second file; the shadow differs only by its leading
+  `proc write` declaration. Each root has the same `program` header and the
+  same four client declarations. Invoke each file separately with `ken check`,
+  `ken run` and `ken native-build`, using `--resolution-report=<new-path>`
+  immediately after the subcommand. Supply an explicit resource profile for
+  native-build. Read each route's own `ken.resolution/v1` report file.
+
+  Accepted root:
+
+  ```ken
+  program capabilities FS APartial
+
+  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+    write ConsoleStream.Stdout payload
+
+  const char_code_probe : Int = charToInt 65
+
+  const char_order_probe : Bool = leqChar 65 66
+
+  proc main
+        (_input : ProcessInput) (_caps : ProgramCaps APartial)
+      : HostIO APartial ExitCode
+      visits [Console] =
+    host_program APartial (print_line "probe")
+  ```
+
+  Shadow root:
+
+  ```ken
+  program capabilities FS APartial
+
+  proc write (stream : ConsoleStream) (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+    ITree.Ret ConsoleOp console_resp (Result IOError Unit) (Ok IOError Unit MkUnit)
+
+  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+    write ConsoleStream.Stdout payload
+
+  const char_code_probe : Int = charToInt 65
+
+  const char_order_probe : Bool = leqChar 65 66
+
+  proc main
+        (_input : ProcessInput) (_caps : ProgramCaps APartial)
+      : HostIO APartial ExitCode
+      visits [Console] =
+    host_program APartial (print_line "probe")
+  ```
+
+- expect: all six invocations accept. In every accepted document,
+  `write_probe` references pre-source `IO` and `write`, `main` references
+  pre-source `print_line`, `char_code_probe` references pre-source `charToInt`,
+  and `char_order_probe` references pre-source `leqChar`. In every shadow
+  document, `write_probe` references source-declared `write`, not pre-source
+  `write`; the other four identities remain pre-source. Documents for each
+  root are byte-identical across routes except for the `route` field. No
+  `GlobalId` number appears. Each invocation's stdout, stderr and status are
+  identical with and without the flag; without it no report is created.
+- controls: the shadow's body never mentions `write`, since a top-level source
+  binding captures every use of the name in that unit. Mutants reporting every
+  reference pre-source or classifying by written spelling each redden the
+  shadow `write_probe` row. An existing report path refuses creation without
+  overwriting it; an elaboration failure leaves no partial report file.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructor and protected type-name

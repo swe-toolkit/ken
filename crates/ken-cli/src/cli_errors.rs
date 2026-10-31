@@ -30,6 +30,8 @@ pub(crate) enum CliError {
     RunWorkingDirectoryRead(io::Error),
     ElaborationWorkerSpawn(io::Error),
     ElaborationWorkerStackOverflow,
+    ResolutionReportCreate(io::Error),
+    ResolutionReportWrite(io::Error),
 }
 
 ken_diagnostic::define_error_codes! {
@@ -58,6 +60,8 @@ ken_diagnostic::define_error_codes! {
     Self::RunWorkingDirectoryRead(..) => ("C0021", "cli.run_working_directory_read"),
     Self::ElaborationWorkerSpawn(..) => ("C0022", "cli.elaboration_worker_spawn"),
     Self::ElaborationWorkerStackOverflow [] => ("C0023", "cli.elaboration_worker_stack_overflow"),
+    Self::ResolutionReportCreate(..) => ("C0024", "cli.resolution_report_create"),
+    Self::ResolutionReportWrite(..) => ("C0025", "cli.resolution_report_write"),
     ;
 }
 
@@ -132,6 +136,12 @@ impl fmt::Display for CliError {
             }
             Self::ElaborationWorkerStackOverflow => {
                 write!(f, "ken: the elaboration worker exhausted its native stack")
+            }
+            Self::ResolutionReportCreate(error) => {
+                write!(f, "ken: cannot create resolution report: {error}")
+            }
+            Self::ResolutionReportWrite(error) => {
+                write!(f, "ken: cannot write resolution report: {error}")
             }
         }
     }

@@ -51,6 +51,7 @@ pub mod program_admission;
 pub mod protocol;
 pub mod prover;
 pub mod resolve;
+pub mod resolution_report;
 mod standard_operators;
 pub mod strings;
 pub mod temporal;
@@ -506,6 +507,22 @@ impl ElabEnv {
             console_stream_id,
             "ConsoleStream",
         )?;
+        // The source-visible canonical ConsoleStream family is scoped after
+        // the pre-source identity snapshot. Refresh only these captured
+        // *names*, keyed by their unchanged checked identities; never derive
+        // report membership from the mutable source globals.
+        for name in [
+            "ConsoleStream",
+            "ConsoleStream.Stdin",
+            "ConsoleStream.Stdout",
+            "ConsoleStream.Stderr",
+        ] {
+            if let Some(id) = elab.globals.get(name) {
+                elab.prelude_env
+                    .pre_source_names
+                    .insert(*id, Some(name.into()));
+            }
+        }
         elab.module_state.install_prelude_floor();
         elab.module_state.capture_strict_builtin_names(
             &elab.env,

@@ -1,0 +1,14 @@
+program capabilities FS APartial
+
+proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
+  write ConsoleStream.Stdout payload
+
+const char_code_probe : Int = charToInt 65
+
+const char_order_probe : Bool = leqChar 65 66
+
+proc main
+      (_input : ProcessInput) (_caps : ProgramCaps APartial)
+    : HostIO APartial ExitCode
+    visits [Console] =
+  host_program APartial (print_line "probe")

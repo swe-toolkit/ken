@@ -2,6 +2,7 @@
 
 mod cli_errors;
 mod repl;
+mod resolution_report;
 #[cfg(unix)]
 mod worker_process;
 
@@ -110,14 +111,27 @@ fn dispatch() -> i32 {
             }
         },
     };
+    let (report_path, positional) = if matches!(subcommand, "check" | "run" | "native-build") {
+        resolution_report::strip_first(&args[2..])
+    } else {
+        (None, &args[2..])
+    };
+    let report = match report_path.map(resolution_report::ReportFile::create) {
+        Some(Ok(report)) => Some(report),
+        Some(Err(error)) => {
+            emit_cli_error(error);
+            return 1;
+        }
+        None => None,
+    };
     match subcommand {
         "repl" => {
             repl::run();
             0
         }
-        "run" => match parse_run_invocation(&args[2..]) {
+        "run" => match parse_run_invocation(positional) {
             Ok(invocation) => {
-                run_file(invocation.path.as_os_str(), &invocation.arguments);
+                run_file(invocation.path.as_os_str(), &invocation.arguments, report);
                 0
             }
             Err(RunArgumentError::MissingPath) => {
@@ -131,14 +145,15 @@ fn dispatch() -> i32 {
             }
         },
         "check" => {
-            check_file(args.get(2).map(OsString::as_os_str));
+            check_file(positional.first().map(OsString::as_os_str), report);
             0
         }
         "native-build" => native_build_file(
-            args.get(2).map(OsString::as_os_str),
-            args.get(3).map(OsString::as_os_str),
-            args.get(4).map(OsString::as_os_str),
-            args.get(5).is_some(),
+            positional.first().map(OsString::as_os_str),
+            positional.get(1).map(OsString::as_os_str),
+            positional.get(2).map(OsString::as_os_str),
+            positional.get(3).is_some(),
+            report,
         ),
         "fmt" => {
             format_files(&args[2..]);
@@ -256,10 +271,12 @@ fn native_build_file(
     output_dir: Option<&OsStr>,
     profile_path: Option<&OsStr>,
     extra_argument: bool,
+    mut report: Option<resolution_report::ReportFile>,
 ) -> i32 {
     let Some(path) = path else {
         emit_cli_error(CliError::NativeBuildMissingFile);
         eprintln!("Usage: ken native-build <file.ken> <output-dir> <resource-profile.json>");
+        if let Some(report) = &mut report { report.abort(); }
         std::process::exit(1);
     };
     let Some(output_dir) = output_dir else {
@@ -291,6 +308,7 @@ fn native_build_file(
     };
     let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
         emit_cli_error(CliError::NativeBuildSourceRead(PathBuf::from(path), error));
+        if let Some(report) = &mut report { report.abort(); }
         std::process::exit(1);
     });
     let format = if path.to_string_lossy().ends_with(".ken.md") {
@@ -298,13 +316,28 @@ fn native_build_file(
     } else {
         ken_cli::SourceFormat::Ken
     };
-    match ken_cli::build_native_program(
-        &source,
-        format,
-        "native-program",
-        PathBuf::from(output_dir),
-        profile,
-    ) {
+    let output = if let Some(report) = &mut report {
+        let name = match format {
+            ken_cli::SourceFormat::Ken => "src/main.ken",
+            ken_cli::SourceFormat::LiterateKen => "src/main.ken.md",
+        };
+        let preparation =
+            ken_elaborator::compiler_driver::prepare_native_program_sources_with_resolution_report(
+                "native-program",
+                vec![ken_elaborator::compiler_driver::CompilerSource::new(name, &source)],
+            );
+        preparation.and_then(|preparation| {
+            report.write(preparation.resolution_report().expect("report requested"));
+            ken_elaborator::compiler_driver::complete_native_program_preparation(
+                preparation, PathBuf::from(output_dir), profile,
+            )
+        })
+    } else {
+        ken_cli::build_native_program(
+            &source, format, "native-program", PathBuf::from(output_dir), profile,
+        )
+    };
+    match output {
         Ok(output) => {
             for report in &output.open_obligation_reports {
                 eprintln!("{report}");
@@ -441,12 +474,14 @@ fn os_bytes(value: &OsStr) -> Vec<u8> {
 /// failure, or an elaboration error. Its sole caller is `ken check`.
 fn elaborate_cli_file(
     path: Option<&OsStr>,
+    mut report: Option<&mut resolution_report::ReportFile>,
 ) -> (PathBuf, ken_elaborator::ElabEnv, Vec<ken_elaborator::ElabResult>) {
     let path = match path {
         Some(p) => p,
         None => {
             emit_cli_error(CliError::CheckMissingFile);
             eprintln!("Usage: ken check <file.ken>");
+            if let Some(report) = report.as_deref_mut() { report.abort(); }
             std::process::exit(1);
         }
     };
@@ -455,6 +490,7 @@ fn elaborate_cli_file(
         Ok(s) => s,
         Err(e) => {
             emit_cli_error(CliError::CheckSourceRead(PathBuf::from(path), e));
+            if let Some(report) = report.as_deref_mut() { report.abort(); }
             std::process::exit(1);
         }
     };
@@ -466,6 +502,7 @@ fn elaborate_cli_file(
                 e.code(),
                 format_args!("ken check: elaborator init failed: {e:?}"),
             );
+            if let Some(report) = report.as_deref_mut() { report.abort(); }
             std::process::exit(1);
         }
     };
@@ -497,6 +534,7 @@ fn elaborate_cli_file(
                     path.to_string_lossy()
                 ),
             );
+            if let Some(report) = report.as_deref_mut() { report.abort(); }
             std::process::exit(1);
         }
     };
@@ -516,8 +554,30 @@ fn elaborate_cli_file(
 /// runnable program's `main` is simply never executed here (`ken run` is
 /// still how you run it) — `ken run` itself is unchanged, strict, and has no
 /// auto-detect fallthrough to this mode.
-fn check_file(path: Option<&OsStr>) {
-    let (_, _, results) = elaborate_cli_file(path);
+fn check_file(path: Option<&OsStr>, mut report: Option<resolution_report::ReportFile>) {
+    let (path, env, results) = elaborate_cli_file(path, report.as_mut());
+    if let Some(report) = &mut report {
+        let module = ken_elaborator::modules::catalog_module_from_path(&path);
+        let root_results = if let Some(module) = &module {
+            env.module_state.root_results_for_report(&module.entry).unwrap_or_else(|| {
+                let error = ken_elaborator::ElabError::Internal(
+                    format!("resolution report: missing checked root {}", module.entry));
+                emit_coded_error(error.code(), format_args!("ken check: {error:?}"));
+                report.abort();
+                std::process::exit(1);
+            })
+        } else {
+            &results
+        };
+        let document = ken_elaborator::resolution_report::resolution_report(
+            &env, root_results, "check", module.as_ref().map(|m| m.entry.as_str()),
+        ).unwrap_or_else(|error| {
+            emit_coded_error(error.code(), format_args!("ken check: {error:?}"));
+            report.abort();
+            std::process::exit(1);
+        });
+        report.write(&document);
+    }
     let reports = ken_elaborator::render_open_obligations(&results);
     if reports.is_empty() {
         return;
@@ -537,9 +597,10 @@ fn check_file(path: Option<&OsStr>) {
 /// name, supplies process input and capabilities, and drives its host tree.
 ///
 /// Console IDs are harvested from the elaboration environment (`ElabEnv::globals`).
-fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
+fn run_file(path: &OsStr, arguments: &[Vec<u8>], mut report: Option<resolution_report::ReportFile>) {
     let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
         emit_cli_error(CliError::RunSourceRead(PathBuf::from(path), error));
+        if let Some(report) = &mut report { report.abort(); }
         std::process::exit(1);
     });
     let format = if path.to_string_lossy().ends_with(".ken.md") {
@@ -552,10 +613,11 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
         .collect();
     let cwd = std::env::current_dir().unwrap_or_else(|error| {
         emit_cli_error(CliError::RunWorkingDirectoryRead(error));
+        if let Some(report) = &mut report { report.abort(); }
         std::process::exit(1);
     });
     let mut host = ken_interp::PosixHost::new();
-    match ken_cli::run_program_with_obligations(
+    match ken_cli::run_program_with_resolution_report(
         &source,
         format,
         arguments,
@@ -567,8 +629,22 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
                 eprintln!("{report}");
             }
         },
+        |env, results| {
+            if let Some(report) = &mut report {
+                let document = ken_elaborator::resolution_report::resolution_report(
+                    env, results, "run", None,
+                ).map_err(ken_cli::RunError::Elaboration)?;
+                report.write(&document);
+            }
+            Ok(())
+        },
     ) {
-        Ok(outcome) => std::process::exit(outcome.exit_status),
+        Ok(outcome) => {
+            if let Some(report) = &mut report {
+                report.abort();
+            }
+            std::process::exit(outcome.exit_status);
+        }
         Err(error) => {
             let code = error.code();
             let message = match &error {
@@ -616,6 +692,9 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
                 }
             };
             emit_coded_error(code, message);
+            if let Some(report) = &mut report {
+                report.abort();
+            }
             std::process::exit(1);
         }
     }
