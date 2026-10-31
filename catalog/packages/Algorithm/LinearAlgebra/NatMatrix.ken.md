@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and twenty-six algebraic laws have checked proofs.
+all arithmetic is exact, and thirty algebraic laws have checked proofs.
 
 ## Contents
 
@@ -23,11 +23,12 @@ zero-row and zero-column matrices use the same operations as nonempty ones.
 ## 2. Definition
 
 The canonical operations follow their contract: componentwise addition,
-scaling and dot product, followed by matrix-vector multiplication, transpose,
-matrix product and diagonal identity. Row-wise matrix addition and its six
-public laws follow those operations and laws, alongside two vector sum laws
-and four vector-scaling laws. The named private stages build columns and row
-products; no second matrix carrier or numeric primitive is needed.
+scaling, the zero vector and dot product, followed by matrix-vector
+multiplication, transpose, matrix product and diagonal identity. Row-wise
+matrix addition and its six public laws follow those operations and laws,
+alongside two vector sum laws, four vector-scaling laws and four zero-vector
+unit laws. The named private stages build columns and row products; no second
+matrix carrier or numeric primitive is needed.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
@@ -41,6 +42,8 @@ pub fn vector_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
 
 pub fn vector_scale (n : Nat) (factor : Nat) (xs : Vec Nat n) : Vec Nat n =
   map Nat Nat n (mul factor) xs
+
+pub fn vector_zero (n : Nat) : Vec Nat n = repeat Nat n Zero
 
 pub fn dot (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Nat =
   match xs {
@@ -853,6 +856,80 @@ pub theorem vector_scale_one
         (vector_scale_one k tail_u)
   }
 
+pub theorem vector_add_zero_left
+      (n : Nat) (u : Vec Nat n)
+    : Equal (Vec Nat n) (vector_add n (vector_zero n) u) u =
+  match u {
+    VNil ↦ Proved;
+    VCons k a tail_u ↦
+      vector_cons_eq
+        k
+        (add Zero a)
+        a
+        (vector_add k (vector_zero k) tail_u)
+        tail_u
+        ((proof zero_l for add) a)
+        (vector_add_zero_left k tail_u)
+  }
+
+pub theorem vector_add_zero_right
+      (n : Nat) (u : Vec Nat n)
+    : Equal (Vec Nat n) (vector_add n u (vector_zero n)) u =
+  match u {
+    VNil ↦ Proved;
+    VCons k a tail_u ↦
+      cong
+        (Vec Nat k)
+        (Vec Nat (Suc k))
+        (vector_add k tail_u (vector_zero k))
+        tail_u
+        (VCons Nat k a)
+        (vector_add_zero_right k tail_u)
+  }
+
+pub theorem vector_scale_zero
+      (n : Nat) (u : Vec Nat n)
+    : Equal (Vec Nat n) (vector_scale n Zero u) (vector_zero n) =
+  match u {
+    VNil ↦ Proved;
+    VCons k a tail_u ↦
+      vector_cons_eq
+        k
+        (mul Zero a)
+        Zero
+        (vector_scale k Zero tail_u)
+        (vector_zero k)
+        ((proof zero_l for mul) a)
+        (vector_scale_zero k tail_u)
+  }
+
+pub theorem dot_zero_left
+      (n : Nat) (xs : Vec Nat n)
+    : Equal Nat (dot n (vector_zero n) xs) Zero =
+  match xs {
+    VNil ↦ Proved;
+    VCons k x tail ↦
+      trans
+        Nat
+        (add (mul Zero x) (dot k (repeat Nat k Zero) tail))
+        (add Zero (dot k (repeat Nat k Zero) tail))
+        Zero
+        (cong
+          Nat
+          Nat
+          (mul Zero x)
+          Zero
+          (λv. add v (dot k (repeat Nat k Zero) tail))
+          ((proof zero_l for mul) x))
+        (trans
+          Nat
+          (add Zero (dot k (repeat Nat k Zero) tail))
+          (dot k (repeat Nat k Zero) tail)
+          Zero
+          ((proof zero_l for add) (dot k (repeat Nat k Zero) tail))
+          (dot_zero_left k tail))
+  }
+
 pub theorem matrix_vector_additive
       (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat n)
     : Equal
@@ -1515,33 +1592,6 @@ theorem transpose_zero_repeat
   match n {
     Zero ↦ Proved;
     Suc k ↦ Proved
-  }
-
-theorem dot_zero_left
-      (n : Nat) (xs : Vec Nat n)
-    : Equal Nat (dot n (repeat Nat n Zero) xs) Zero =
-  match xs {
-    VNil ↦ Proved;
-    VCons k x tail ↦
-      trans
-        Nat
-        (add (mul Zero x) (dot k (repeat Nat k Zero) tail))
-        (add Zero (dot k (repeat Nat k Zero) tail))
-        Zero
-        (cong
-          Nat
-          Nat
-          (mul Zero x)
-          Zero
-          (λv. add v (dot k (repeat Nat k Zero) tail))
-          ((proof zero_l for mul) x))
-        (trans
-          Nat
-          (add Zero (dot k (repeat Nat k Zero) tail))
-          (dot k (repeat Nat k Zero) tail)
-          Zero
-          ((proof zero_l for add) (dot k (repeat Nat k Zero) tail))
-          (dot_zero_left k tail))
   }
 
 theorem dot_one_head
@@ -2767,6 +2817,15 @@ the written Nat associativity proof to match nested scaling, while scaling
 by one uses left identity. A private cons-equality bridge combines equal
 heads and tails. All four statements also hold for empty vectors.
 
+`vector_zero` repeats the natural zero at each indexed position without
+exporting the generic repetition helper. Left addition with the zero vector
+uses the checked natural left-zero law at each head; right addition reduces
+its right-zero head and transports the tail proof. Scaling by zero uses the
+checked natural multiplication left-zero law. The dot-zero law uses the same
+checked recursive proof as the zero-row stages, with the new zero-vector name
+in its public statement. All four laws include empty vectors and introduce no
+premise.
+
 `matrix_vector_additive` uses the private right-argument dot-distribution
 lemma to transport each row's head, then transports the tail by induction.
 `matrix_vector_homogeneous` uses a private right-argument scaling lemma
@@ -2787,10 +2846,12 @@ vector sum laws supply commutativity and associativity for each row. Matrix-
 vector application also preserves a sum or scaling in its vector argument;
 this differs from adding matrices while keeping the vector fixed. Vector
 scaling acts on an indexed sum, distributes a sum of factors, composes
-factors and leaves a vector unchanged when its factor is one. The named
-`dot_with` helper passes the row's dot product to `map` without a
-lambda-headed application in a proof goal. A rational-valued
-or approximate matrix would require a different statement of equality and is
+factors and leaves a vector unchanged when its factor is one. The zero
+vector is the additive unit on either side, and scaling by zero or dotting
+with a zero vector gives zero. The named `dot_with` helper passes the row's
+dot product to `map` without a lambda-headed application in a proof goal.
+A rational-valued or approximate matrix would require a different statement
+of equality and is
 not implied by natural-number arithmetic.
 
 ## 6. References
@@ -2802,21 +2863,25 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–9 owns
-thirty-four public names across eight operations and twenty-six laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–10 owns
+thirty-nine public names across nine operations and thirty laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
 [matrix-vector linearity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-vector-linearity.md)
 [transpose adjoint seed](../../../../conformance/stdlib/linear-algebra/seed-transpose-adjoint.md),
 [identity symmetry seed](../../../../conformance/stdlib/linear-algebra/seed-identity-symmetric.md)
-and [vector-scaling seed](../../../../conformance/stdlib/linear-algebra/seed-vector-scale-action.md)
-provide finite behavioral clients. The module reuses the published
+and [vector-scaling seed](../../../../conformance/stdlib/linear-algebra/seed-vector-scale-action.md),
+along with the [zero-vector seed](../../../../conformance/stdlib/linear-algebra/seed-vector-zero-unit.md),
+provide finite behavioral clients. The zero-vector seed is authored but not
+Ken-checked or officially conformance-run. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
 prepending, row products and proof bridges remain private. The new
 `dot_zero_columns` and `transpose_cons_image` helpers, like
 `dot_scale_right` and `dot_distrib_right`, are not public. The scaling
-proof's `vector_cons_eq` also remains private. All twenty-six public theorems
+proof's `vector_cons_eq` also remains private. `vector_zero`,
+`vector_add_zero_left`, `vector_add_zero_right`, `vector_scale_zero` and
+`dot_zero_left` are public in source order. All thirty public theorems
 have checked bodies. This package adds no Axiom, postulate,
 primitive, `Float` or trusted-base entry; dependencies retain their own trust
 posture. Root-loaded acceptance tests check generic
@@ -2827,5 +2892,7 @@ checks its authored accepted client and isolated refusal. The transpose
 adjoint test checks its complete accepted seed, including both independently
 computed dot values, and refuses the swapped-input claim. The vector-scaling
 seed checks both sides of all four laws against independent values and isolates
-a dropped factor. These tests use root-loaded exports. They are not official
-conformance-runner runs or claims of CI, publication or landing.
+a dropped factor. The zero-vector package test checks open law types and
+length-two values, then refuses a false scale-zero equality after accepting
+a same-form scale-one control. These tests use root-loaded exports. They are
+not official conformance-runner runs or claims of CI, publication or landing.

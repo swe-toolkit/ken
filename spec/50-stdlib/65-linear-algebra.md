@@ -8,7 +8,8 @@
 > SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-LINEARITY §6;
 > SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT §7;
 > SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC §8;
-> SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION §9).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION §9;
+> SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT §10).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -20,12 +21,17 @@
 > public visibility and equal scratch trusted identities 109 → 109.
 > The §8 checked export, seed and package-owned test are on main. Neither
 > scratch D0 nor that test establishes official conformance-runner
-> execution or landed trust. Section 9 specifies four new checked vector
-> scaling laws. Architect's isolated D0 checked their generic proofs
-> with unchanged scratch trusted identity sets 114 → 114, but this
-> spec-only child does not add the §9 catalog exports or seed. No
-> official conformance, CI, publication, landing or landed trust is
-> established by this author turn.
+> execution or landed trust. Section 9's four checked scaling laws,
+> seed and package-owned test are now on main. Its isolated D0 had equal
+> scratch trusted identities 114 → 114; neither that scratch work nor
+> candidate-local tests establish official conformance-runner execution
+> or a measured landed trust result. Section 10 specifies one zero-vector
+> operation and four checked laws, taking the intended public roster to
+> nine operations and thirty laws (thirty-nine names). Architect AC-0
+> checked their generic proofs only in scratch with equal trusted
+> identity sets 109 → 109. This spec-only child adds no §10 catalog
+> operation, theorem, package test or CV seed; no §10 official
+> conformance, CI, publication, landing or landed trust is established.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -51,12 +57,13 @@ are not implied: the landed Rational carrier identifies values under
 would change the very equality in the laws below. No floating-point
 or signed calculation is silently represented by a natural.
 
-### 1.2 Seven exact operations
+### 1.2 Eight exact operations
 
-All seven functions belong to `Algorithm.LinearAlgebra.NatMatrix`.
+All eight functions belong to `Algorithm.LinearAlgebra.NatMatrix`.
 Their result indices are part of their checked types. `vector_add`
-adds aligned components, and `vector_scale` multiplies every
-component by the natural factor. Their empty inputs return an empty
+adds aligned components, `vector_scale` multiplies every component
+by the natural factor, and `vector_zero n` contains exactly `n`
+copies of natural `Zero`. At `n = Zero`, all three return an empty
 vector. No zip discards a component.
 
 ```ken
@@ -65,6 +72,8 @@ pub fn vector_add
 
 pub fn vector_scale
   (n : Nat) (factor : Nat) (xs : Vec Nat n) : Vec Nat n
+
+pub fn vector_zero (n : Nat) : Vec Nat n
 
 pub fn dot
   (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Nat
@@ -165,9 +174,10 @@ cases is a **proved Vec law**, not a fresh axiom.
 ### 1.4 Trust boundary and evidence limits
 
 The ordinary `Vec` eliminator, natural recursion, `Equal`, and the
-existing Nat laws account for §1's specified work. Its seven
-operations and five generic laws, together with §2's left identity
-and product associativity and §3's two compatibility laws and
+existing Nat laws account for §1's specified work. The seven §1
+operations landed before §10, and the five generic §1 laws, together
+with §2's left identity and product associativity and §3's two
+compatibility laws and
 `dot_scale`, are landed in `Algorithm.LinearAlgebra.NatMatrix`.
 The checked catalog module introduces no `Axiom`. The historical §3
 D0 measured `trusted_base()` as 109 before and after its scratch
@@ -504,17 +514,20 @@ because the underlying `zip_with_vcons` is not public in
 `Data.Vector.Vector`; the local theorem is not a second public
 vector API. Matrix proofs lift the vector equalities through the
 ordered rows, with no operation change to `vector_add` or
-`matrix_add` and no new Nat lemma. Neither a zero vector nor a
-commutative-monoid instance is introduced.
+`matrix_add` and no new Nat lemma. Section 10 subsequently adds a
+zero vector and its four laws; it introduces no commutative-monoid
+instance.
 
 The proof must not treat both nested additions as definitionally
-convertible to a `VCons` result. In Architect's D0, the left-nested
-successor form reduced, but right-nested `vector_add` did **not**:
-`zip_with` matches on its second operand and remains stuck on an
-inner `zip_with` result. Both vector and matrix associativity
-therefore pass through one-level cons equations, `cong` and `trans`;
-the head step uses the checked Nat law in the required direction.
-This records a proof route, not a new computation rule.
+convertible to a `VCons` result. `zip_with` matches its **first**
+operand, then its second within the successor arm. In Architect's
+§5 D0, the left-nested successor form reduced, but the right-nested
+`vector_add` stayed stuck on an inner `zip_with` result in that
+**second** position. Both vector and matrix associativity therefore
+pass through one-level cons equations, `cong` and `trans`; the head
+step uses the checked Nat law in the required direction. This
+records that proof route, not a general second-operand match rule or
+a new computation rule.
 
 Architect's isolated D0 inserted only `NatMatrix` proof bodies and
 added four names to the base's twenty-two-name allowed-inventory test.
@@ -771,9 +784,10 @@ closed symmetric example grants symmetry to an arbitrary matrix.
 > (SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION).** Architect's isolated
 > AC-0 on `524ea2cfd` checked four generic proofs with rc 0, no new
 > `Axiom` or premise, and equal scratch `trusted_base()` identity sets
-> 114 → 114. This spec-only child does not yet deliver the checked
-> catalog exports or closed seed. D0 is not official conformance,
-> CI, publication, landing or a landed trust measurement.
+> 114 → 114. The four §9 exports, closed seed and package-owned test
+> are now on main. Isolated D0 and earlier candidate-local tests do
+> not establish official conformance-runner execution or a measured
+> landed trust result.
 
 ### 9.1 Four public checked-law obligations
 
@@ -855,7 +869,102 @@ bodies and public clients, confirmed Transparent module ownership,
 no new `Axiom` or premise, equal scratch trusted identity sets
 114 → 114, and selective-import refusal for `vector_cons_eq`. The
 scratch accepted client and false-claim refusal are AC-0 evidence,
-not a shipped §9 conformance run. The catalog code, inventory update,
-closed seed and package test belong to later serial turns of this
-candidate; no author-run Ken test, official conformance, CI,
-publication, landing or landed trust is claimed here.
+not a shipped §9 conformance run. The §9 catalog code, inventory
+update, closed seed and package test are now on main. The historical
+§9 spec-only turn ran no Ken test;
+its isolated D0 and candidate-local checks did not establish official
+conformance-runner execution or a measured landed trust result.
+
+## 10. Zero vectors and four unit laws
+
+> **Section 10 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT).** Architect AC-0 on exact
+> base `42ba094f3` checked generic proofs with `ken check` and
+> `ken fmt --check` rc 0, no new `Axiom`, and equal scratch
+> `trusted_base()` identity sets 109 → 109. That is isolated design
+> evidence, not a candidate catalog check or a landed trust result.
+> This spec-only child adds no §10 catalog export, package test or CV
+> seed. No §10 official conformance-runner execution, CI, publication,
+> landing or measured landed trust is established.
+
+### 10.1 Public definition and premise-free checked laws
+
+The new public Transparent `vector_zero (n : Nat) : Vec Nat n`
+belongs to `Algorithm.LinearAlgebra.NatMatrix` immediately after
+`vector_scale`
+(§1.2). It returns `repeat Nat n Zero`, using the module's existing
+**private** generic `repeat`; it does not publish `repeat` or move it
+to `Data.Vector.Vector`. At zero length the result is `VNil Nat`.
+
+The module must export four public Transparent theorems in the order
+below, immediately after `vector_scale_one` and before
+`matrix_vector_additive`. The existing private `dot_zero_left` is
+**promoted**, not duplicated as an alias: its private block is removed
+and its public declaration occupies the fourth slot above. Its
+conclusion now names `vector_zero n`, which unfolds to its previous
+`repeat` form. Its proof body and private callers remain unchanged.
+
+```ken
+pub theorem vector_add_zero_left
+    (n : Nat) (u : Vec Nat n)
+  : Equal (Vec Nat n) (vector_add n (vector_zero n) u) u
+
+pub theorem vector_add_zero_right
+    (n : Nat) (u : Vec Nat n)
+  : Equal (Vec Nat n) (vector_add n u (vector_zero n)) u
+
+pub theorem vector_scale_zero
+    (n : Nat) (u : Vec Nat n)
+  : Equal (Vec Nat n) (vector_scale n Zero u) (vector_zero n)
+
+pub theorem dot_zero_left
+    (n : Nat) (xs : Vec Nat n)
+  : Equal Nat (dot n (vector_zero n) xs) Zero
+```
+
+Every statement is structural `Equal` for **all** natural `n`,
+including zero, and has no validity, nonempty-vector or other
+premise. The first two laws give `vector_zero n` as the left and
+right unit of `vector_add`; scaling any vector by `Zero` yields that
+zero vector; its dot product with any aligned vector is natural
+`Zero`. They assert no commutative-monoid instance and change no
+§1–§9 public operation or law type.
+
+### 10.2 Proof route, private boundary and closed discriminator
+
+Both unit proofs match on the written vector `u`, refining its
+index so the private `repeat Nat n Zero` unfolds in each successor
+case. On the left, the head is `add Zero a` and uses the existing
+checked `(proof zero_l for add) a`; on the right, `add a Zero`
+reduces definitionally, so `cong` transports the tail equality.
+The scaling proof uses `(proof zero_l for mul) a` at each head.
+The promoted dot-zero proof keeps its existing body: `vector_zero n`
+is definitionally the former `repeat Nat n Zero`, so the four private
+callers of `dot_zero_left` remain valid. `repeat`, `vector_cons_eq`,
+`vector_add_cons` and the other helper declarations stay private.
+These proof routes add no axiom, kernel or surface requirement.
+
+A later CV-authored seed can take `n = 2`, `u = [1,2]` and check both
+unit results as `[1,2]`, the scale-zero result and `vector_zero two`
+as `[0,0]`, and the dot-zero result as `Zero`. At that closed length,
+the Vec equalities accept `Refl`; the true `Equal Nat` dot-zero
+claim uses `Proved`, not `Refl` (the latter is refused for this goal
+shape). An empty-vector `Equal (Vec Nat Zero)` control also accepts
+`Proved`. A refused same-scope `Equal (Vec Nat two)` claim that
+`vector_scale two Zero u = u` must be paired with the accepted
+same-form `vector_scale two (Suc Zero) u = u` control. The former
+has `[0,0]` against `[1,2]`; the latter holds. An optional false
+natural dot-zero claim must use `Proved` so its refusal tests the
+value rather than an invalid `Refl` proof shape. Finite cases do not
+replace the generic checked laws, and no seed is authored or run by
+this spec-only turn.
+
+The §9 public inventory on this base is eight operations and
+twenty-six laws (thirty-four names). Adding `vector_zero` and
+exporting the four theorems above yields **nine operations and thirty
+laws, thirty-nine public names** when the catalog half is assembled.
+The new names are owned by `NatMatrix`, not by `Data.Vector.Vector`;
+`repeat` remains private. The exact-public-inventory package test
+must advance to thirty-nine names with the catalog child. Architect
+AC-0 measured this roster and equal scratch trust identities, not
+candidate-local package tests, official conformance, CI or landing.
