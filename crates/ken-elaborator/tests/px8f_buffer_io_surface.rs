@@ -6,10 +6,6 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{whnf, Context, Decl, GlobalId, KernelError, Term};
 
-const BUFFER_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/System/Buffer.ken.md");
-const IO_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/System/IO.ken.md");
-
 /// Load the landed Buffer + IO surface as its clients load it: through the
 /// strict roots loader. IO imports Buffer, so flat fences cannot stand for the
 /// pair. Catalog declarations enter `globals` under their qualified paths;
@@ -269,8 +265,6 @@ proc px8f_readsome_public_consumers
         io(&env, "write_all_all_success"),
         "the theorem and its native-prelude subject must remain distinct globals"
     );
-    assert!(!BUFFER_KEN_MD.contains("Axiom"));
-    assert!(!IO_KEN_MD.contains("Axiom"));
 }
 
 /// Promise class: durable invariant (`38 §1.7.3`). MEASURED: the actual

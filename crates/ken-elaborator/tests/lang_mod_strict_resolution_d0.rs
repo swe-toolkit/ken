@@ -1155,7 +1155,6 @@ fn catalog_ambient_passthrough_migration_census() {
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
-    let mut newly_clean = BTreeSet::new();
     let expected = prior
         .into_iter()
         .filter_map(|(entry, names)| {
@@ -1163,12 +1162,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 .into_iter()
                 .filter(|name| !removed.contains(name.as_str()))
                 .collect::<Vec<_>>();
-            if remaining.is_empty() {
-                newly_clean.insert(entry);
-                None
-            } else {
-                Some((entry, remaining))
-            }
+            (!remaining.is_empty()).then_some((entry, remaining))
         })
         .collect::<Vec<_>>();
     assert_eq!(
@@ -1178,11 +1172,6 @@ fn catalog_ambient_passthrough_migration_census() {
     assert!(
         residuals.is_empty(),
         "unexpected census residuals: {residuals:?}"
-    );
-    assert_eq!(
-        clean.iter().cloned().collect::<BTreeSet<_>>(),
-        discovered,
-        "all discovered units must be clean after the flip"
     );
     assert!(
         clean.iter().any(|entry| entry == "Capability.System.Error"),
@@ -1198,39 +1187,13 @@ fn catalog_ambient_passthrough_migration_census() {
         .iter()
         .map(|(entry, _)| entry.clone())
         .collect::<BTreeSet<_>>();
-    let expected_clean = [
-        "Algorithm.LinearAlgebra.NatMatrix",
-        "Capability.Filesystem.Errors",
-        "Capability.Process.Environment",
-        "Capability.Process.Exit",
-        "Capability.Process.WorkingDirectory",
-        "Capability.Time.WallClock",
-        "Core.Function.Combinators",
-        "Core.Logic.And",
-        "Core.Logic.Compare",
-        "Core.Logic.Conjunction",
-        "Core.Logic.Not",
-        "Data.Collections.List",
-        "Data.Numeric.Nat.Arithmetic",
-        "Data.Sums.Combinators",
-        "Data.Text.Codec",
-        "Data.Text.StringBijection",
-        "Data.Vector.Vector",
-        "Tooling.Verification.FoKripke",
-        "Core.Logic.Or",
-        "Core.Logic.OrdResult",
-        "Core.Logic.Transport",
-        "Tooling.Verification.ProofErasureBoundaryChecker",
-    ]
-    .into_iter()
-    .map(str::to_string)
-    .chain(newly_clean)
-    .collect::<BTreeSet<_>>();
-    let expected_residuals = BTreeSet::<String>::new();
-    assert_eq!(clean, expected_clean, "WP-4 strict-floor-clean sentinel");
     assert_eq!(
-        residual_names, expected_residuals,
-        "WP-4 strict-floor residual sentinel"
+        clean, discovered,
+        "every discovered catalog unit must be floor/home clean"
+    );
+    assert!(
+        residual_names.is_empty(),
+        "no discovered catalog unit may retain a census residual"
     );
     assert!(ambient.is_disjoint(&clean));
     assert!(ambient.is_disjoint(&residual_names));
