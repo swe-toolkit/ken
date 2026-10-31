@@ -154,7 +154,7 @@ fn matrix_env() -> ElabEnv {
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: exact owned, transparent law identities, selective imports of
-/// all thirty-four names and generic clients for ten specified propositions.
+/// all thirty-nine names and generic clients for fourteen specified propositions.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -182,6 +182,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     let expected = [
         "vector_add",
         "vector_scale",
+        "vector_zero",
         "dot",
         "matrix_vector",
         "transpose",
@@ -214,6 +215,10 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "vector_scale_factor_distrib",
         "vector_scale_compose",
         "vector_scale_one",
+        "vector_add_zero_left",
+        "vector_add_zero_right",
+        "vector_scale_zero",
+        "dot_zero_left",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -230,7 +235,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         .collect::<BTreeSet<_>>();
     assert!(
         expected.is_subset(&owned_names),
-        "all thirty-four public names are owned"
+        "all thirty-nine public names are owned"
     );
     for name in &expected {
         let id = env.globals[&format!("{MATRIX}.{name}")];
@@ -257,14 +262,16 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
 import Data.Numeric.Nat.Arithmetic (add, mul)
 import Algorithm.LinearAlgebra.NatMatrix
-  (vector_add, vector_scale, dot, matrix_vector, transpose, matrix_product,
-   identity, dot_comm, dot_distrib, transpose_invol, vector_identity,
-   matrix_identity_right, matrix_identity_left, matrix_product_assoc,
-   dot_scale, matrix_vector_product, transpose_product)
+  (vector_add, vector_scale, vector_zero, dot, matrix_vector, transpose,
+   matrix_product, identity, dot_comm, dot_distrib, transpose_invol,
+   vector_identity, matrix_identity_right, matrix_identity_left,
+   matrix_product_assoc, dot_scale, matrix_vector_product, transpose_product,
+   vector_add_zero_left, vector_add_zero_right, vector_scale_zero, dot_zero_left)
 fn client_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
   vector_add n xs ys
 fn client_scale (n : Nat) (f : Nat) (xs : Vec Nat n) : Vec Nat n =
   vector_scale n f xs
+fn client_zero (n : Nat) : Vec Nat n = vector_zero n
 fn client_matrix_vector (m : Nat) (n : Nat)
   (rows : Vec (Vec Nat n) m) (v : Vec Nat n) : Vec Nat m =
   matrix_vector m n rows v
@@ -315,9 +322,102 @@ theorem client_transpose_product (m : Nat) (n : Nat) (p : Nat)
     (transpose m p (matrix_product m n p a b))
     (matrix_product p n m (transpose n p b) (transpose m n a)) =
   transpose_product m n p a b
+theorem client_add_zero_left (n : Nat) (u : Vec Nat n) :
+  Equal (Vec Nat n) (vector_add n (vector_zero n) u) u =
+  vector_add_zero_left n u
+theorem client_add_zero_right (n : Nat) (u : Vec Nat n) :
+  Equal (Vec Nat n) (vector_add n u (vector_zero n)) u =
+  vector_add_zero_right n u
+theorem client_scale_zero (n : Nat) (u : Vec Nat n) :
+  Equal (Vec Nat n) (vector_scale n Zero u) (vector_zero n) =
+  vector_scale_zero n u
+theorem client_dot_zero (n : Nat) (u : Vec Nat n) :
+  Equal Nat (dot n (vector_zero n) u) Zero =
+  dot_zero_left n u
 "#,
     )
-    .expect("generic clients independently state ten law types");
+    .expect("generic clients independently state fourteen law types");
+}
+
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §10. PROMISE CLASS:
+/// durable invariant. MEASURED: five independent closed results at n=2 and
+/// a same-form scale-one control check, while the sole false scale-zero
+/// equality refuses at its own Refl. CLAIMED: the zero-vector operations
+/// and four checked laws have the intended small-vector behavior. THE GAP:
+/// closed cases cannot establish generic proofs; the open clients above do.
+#[test]
+fn zero_vector_closed_oracles_accept_and_false_scale_zero_refuses() {
+    const ACCEPTED: &str = r#"
+import Data.Vector.Vector (Vec, VNil, VCons)
+import Algorithm.LinearAlgebra.NatMatrix
+  (vector_add, vector_scale, vector_zero, dot,
+   vector_add_zero_left, vector_add_zero_right, vector_scale_zero, dot_zero_left)
+const one : Nat = Suc Zero
+const two : Nat = Suc one
+fn pair (x : Nat) (y : Nat) : Vec Nat two =
+  VCons Nat one x (VCons Nat Zero y (VNil Nat))
+const u : Vec Nat two = pair one two
+theorem left_unit : Equal (Vec Nat two)
+  (vector_add two (vector_zero two) u) u = vector_add_zero_left two u
+theorem right_unit : Equal (Vec Nat two)
+  (vector_add two u (vector_zero two)) u = vector_add_zero_right two u
+theorem zero_scale : Equal (Vec Nat two)
+  (vector_scale two Zero u) (vector_zero two) = vector_scale_zero two u
+theorem zero_dot : Equal Nat (dot two (vector_zero two) u) Zero =
+  dot_zero_left two u
+theorem left_unit_value : Equal (Vec Nat two)
+  (vector_add two (vector_zero two) u) (pair one two) = Refl
+theorem right_unit_value : Equal (Vec Nat two)
+  (vector_add two u (vector_zero two)) (pair one two) = Refl
+theorem zero_scale_value : Equal (Vec Nat two)
+  (vector_scale two Zero u) (pair Zero Zero) = Refl
+theorem zero_vector_value : Equal (Vec Nat two)
+  (vector_zero two) (pair Zero Zero) = Refl
+theorem zero_dot_value : Equal Nat (dot two (vector_zero two) u) Zero = Proved
+theorem scale_one_same_form : Equal (Vec Nat two)
+  (vector_scale two (Suc Zero) u) u = Refl
+"#;
+    const FALSE_SCALE_ZERO: &str = r#"theorem false_scale_zero :
+  Equal (Vec Nat two) (vector_scale two Zero u) u = Refl"#;
+    let mut accepted = matrix_env();
+    accepted
+        .elaborate_file(ACCEPTED)
+        .expect("generic applications and independent closed results check");
+    for name in [
+        "left_unit",
+        "right_unit",
+        "zero_scale",
+        "zero_dot",
+        "left_unit_value",
+        "right_unit_value",
+        "zero_scale_value",
+        "zero_vector_value",
+        "zero_dot_value",
+        "scale_one_same_form",
+    ] {
+        let id = accepted.globals[name];
+        assert!(matches!(
+            accepted.env.lookup(id),
+            Some(Decl::Transparent { .. })
+        ));
+    }
+    let parsed_false = parse_decls(FALSE_SCALE_ZERO).expect("isolated false theorem parses");
+    let [SourceDecl::TheoremDecl { span, .. }] = parsed_false.as_slice() else {
+        panic!("false scale-zero client must contain exactly one theorem");
+    };
+    let mut rejecting = matrix_env();
+    rejecting
+        .elaborate_file(ACCEPTED)
+        .expect("fresh same-form accepted control checks before refusal");
+    match rejecting.elaborate_file(FALSE_SCALE_ZERO) {
+        Err(ElabError::TypeMismatch {
+            span: failure,
+            reason,
+        }) if failure.start >= span.start
+            && failure.end <= span.end
+            && reason.contains("Refl expects an `Eq`-shaped goal") => {}
+        other => panic!("false scale-zero equality must refuse at Refl: {other:?}"),
+    }
 }
 
 // Sixteen positive, closed oracles from the sixteen-case conformance seed. The
