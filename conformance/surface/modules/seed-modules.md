@@ -640,7 +640,8 @@ sentinel beside the current contract.
   thirty-name subset and each constructor's scope are contract values; reuse
   of checked identities, allocator accounting, and trust remain durable
   relations
-- spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`
+- spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`,
+  `38 §1.11.1–§1.11.2`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
   of the thirty pre-existing names: `Auth`, `Bool`, `Bottom`, `BufferSpan`, `Char`,
   `Coproduct`, `CreatePolicy`, `Equal`, `ExitCode`, `FileError`, `HostIO`,
@@ -656,14 +657,14 @@ sentinel beside the current contract.
   For each of the seven `ResourceKind` constructors, pair an accepted
   qualified value in expected type `ResourceKind` with a rejection of the bare
   leaf in the same position, using separate fresh source units.
-  In the §1.11 source context, also use the pure
-  `SpawnPlan` type in an accepted identity function and resolve
-  `ResourceKind.SpawnPlan` as an accepted `ResourceKind` value. In a separate
-  source unit, try bare `SpawnPlan` as a `ResourceKind` value; record the
-  distinct accepted identities. Record the exact constructor ids and parent ids for
-  private
-  `PrivateBufferSpan` and `PrivateTransferCount` without resolving either from
-  source.
+  The Strict-root census does not resolve `SpawnPlan`. On the separate Legacy
+  standalone §1.11 source route, use the pure `SpawnPlan` type in an accepted
+  identity function and resolve `ResourceKind.SpawnPlan` as an accepted
+  `ResourceKind` value. In a separate source unit on that Legacy standalone
+  route, try bare `SpawnPlan` as a `ResourceKind` value; record the distinct
+  accepted identities. Also record
+  the exact constructor IDs and parent IDs of `PrivateBufferSpan` and
+  `PrivateTransferCount` without resolving them from source.
 - expect: every emitted type/body contains the corresponding recorded id. The
   original thirty-name prelude subset is `Auth`, `Bool`, `Bottom`, `BufferSpan`,
   `Char`, `Coproduct`, `CreatePolicy`, `Equal`, `ExitCode`, `FileError`,
@@ -674,8 +675,9 @@ sentinel beside the current contract.
   `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
   `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
   `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`; none is a bare
-  constructor path. In a type position, unqualified `SpawnPlan` names the
-  pure plan type; it is distinct from `ResourceKind.SpawnPlan`. The inductive
+  constructor path. On the Legacy standalone §1.11 source route, unqualified
+  `SpawnPlan` in type position names the pure plan type; it is distinct from
+  `ResourceKind.SpawnPlan`. The inductive
   members and their exact constructors are:
 
   | parent | constructors |
@@ -711,8 +713,9 @@ sentinel beside the current contract.
   constructor paths. `BufferSpan` and `TransferCount` retain private
   constructors, with no bare or qualified source constructor path. Each bare
   `ResourceKind` leaf in value position rejects against its accepted qualified
-  control. In type position, `SpawnPlan` is accepted as the pure plan type, not
-  the `ResourceKind.SpawnPlan` constructor. `Unit` is
+  control. On the Legacy standalone §1.11 route, `SpawnPlan` is accepted as
+  the pure plan type in type position; a bare `SpawnPlan` in a
+  `ResourceKind` value position rejects. `Unit` is
   unscoped and keeps bare `MkUnit`.
   `Char`, `HostIO`, and checked-transparent `Pair` have no constructors.
   Pair's three companions are bindings, not type members, and each resolves to
