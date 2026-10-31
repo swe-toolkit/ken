@@ -115,11 +115,12 @@ fn strict_frozen_corpus_gate_is_green() {
     );
 }
 
-/// Promise class: durable invariant. MEASURED: a Process-granted checked
-/// program is admitted with its declared FS authority and rejected when that
-/// authority is removed. CLAIMED: a Process grant does not replace the FS
-/// authority needed by its checked ProgramCaps AFull. THE GAP: this exercises
-/// one Process entrypoint and does not enumerate all runnable programs.
+/// Promise class: durable invariant; spec 38 §1.11.2 and conformance case
+/// process-spawn-requires-process-and-execute. MEASURED: the checked Process
+/// program runs with FS AFull; removing only FS still elaborates the same main
+/// but fails checked entrypoint admission. CLAIMED: a Process declaration
+/// cannot substitute for the required full FS grant. THE GAP: this tests one
+/// missing-FS entrypoint, not every insufficient FS authority.
 #[test]
 fn process_program_requires_its_declared_fs_authority() {
     let source = include_str!("fixtures/px10_child_wait_smoke.ken");
@@ -144,20 +145,12 @@ fn process_program_requires_its_declared_fs_authority() {
         no_fs, source,
         "control must remove the declared FS authority"
     );
-    let rejected = fixture("px10_process_without_fs.ken", &no_fs);
-    let output = Command::new(ken_bin())
-        .arg("run")
-        .arg(&rejected)
-        .output()
-        .unwrap();
+    let mut env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+    env.elaborate_file_v1(&no_fs)
+        .expect("the Process-only program still elaborates");
     assert!(
-        !output.status.success(),
-        "removing required FS authority was admitted"
-    );
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("MissingCapability { effect = FS }"),
-        "the admission failure must name the missing FS grant: {}",
-        String::from_utf8_lossy(&output.stderr)
+        ken_elaborator::program_admission::admit_checked_main(&env).is_err(),
+        "Process without FS AFull must be rejected by entrypoint admission"
     );
 }
 
