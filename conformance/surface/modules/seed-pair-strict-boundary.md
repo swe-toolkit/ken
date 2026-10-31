@@ -101,10 +101,11 @@ unchanged kernel behavior.
   `{mk_pair, pair_fst, pair_snd}`; companions are bindings, not floor
   identities.
 - controls: add the compiler-internal `Empty` identity, which has no independent
-  source-name requirement, to the configured type inventory; exact equality
-  fails with one extra type. Move a Pair companion into the type inventory;
-  the type-count and kind assertions fail. Delete either internal witness or
-  substitute a same-shaped fresh id; exact identity equality fails closed.
+  source-name requirement, to the configured floor-identity roster; exact
+  equality fails with one extra floor identity. Move a Pair companion into the
+  floor-identity roster; the identity-count and kind assertions fail. Delete
+  either internal witness or substitute a same-shaped fresh id; exact identity
+  equality fails closed.
 - why: a hard-coded roster does not prove derivation.
   Independent arm, origin, identity, kind, and companion assertions prevent
   both under-inclusion and compiler-global-map widening.
