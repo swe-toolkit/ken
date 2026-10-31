@@ -178,7 +178,8 @@ fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
 /// CLAIMED: the upper bound is attained by a contained pair but cannot
 /// certify an outside pair or a strictly smaller universal bound.
 /// THE GAP: these finite cases supplement the checked generic proof. CV's
-/// not-yet-authored seed and official conformance execution are separate.
+/// separate seed is authored but unexecuted; package-owned test success is
+/// not official conformance-runner execution.
 #[test]
 fn tight_pair_accepts_and_outside_or_smaller_bounds_refuse() {
     let mut positive = loaded_geometry();
