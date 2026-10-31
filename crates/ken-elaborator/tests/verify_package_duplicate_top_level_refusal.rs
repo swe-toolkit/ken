@@ -105,19 +105,15 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
     }
 }
 
-/// Promise class: normative compatibility vector for this package. MEASURED:
-/// an unrelated checked example is excluded from the emitted package and
-/// leaves its canonical semantic hash unchanged. The WIP vector
-/// 0xa906_9212_3b5f_b224 moves when scoped constructor artifact symbols
-/// take their checked family leaf rather than their `T.C` source spelling.
-/// Emptying only the late scoped-family loop with the same qualified source
-/// leaves 0x10e0_c33e_cb2a_7c2a unchanged. The FS/resource floor's six
-/// admitted families and scoped constructor names change the compiler-owned
-/// pre-source closure, so the fixed Bool package now hashes to
-/// 0xbe86_689a_0345_7405 without any source or trusted-base change.
-/// CLAIMED: unrelated example checking is still legal, without shifting
-/// admitted declaration identity. THE GAP: this fixes the package-name-
-/// dependent baseline vector for this one package, not every package name.
+/// Promise class: invariance. MEASURED: an unrelated checked example is
+/// excluded from the emitted package and leaves its canonical semantic hash
+/// and semantic artifact equal to the example-free baseline compiled in the
+/// same environment. CLAIMED: unrelated example checking is still legal,
+/// without shifting admitted declaration identity. THE GAP: the hash value
+/// itself is not pinned; it is a function of the compiler-owned pre-source
+/// closure and moves with every lawful prelude extension, so cross-version
+/// stability is the stored-artifact vectors' promise (checked_core.rs), not
+/// this row's.
 #[test]
 fn unrelated_example_keeps_the_baseline_semantics_and_hash() {
     let baseline = compile_literate(ADMITTED)
@@ -127,7 +123,6 @@ fn unrelated_example_keeps_the_baseline_semantics_and_hash() {
     let checked = compile_literate(&with_example)
         .expect("independent example remains valid")
         .package;
-    assert_eq!(baseline.core_semantic_hash, 0xbe86_689a_0345_7405);
     assert_eq!(checked.core_semantic_hash, baseline.core_semantic_hash);
     assert_eq!(checked.artifact.semantic, baseline.artifact.semantic);
 }
