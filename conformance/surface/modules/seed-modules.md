@@ -1443,8 +1443,8 @@ definition.
   `ken check --resolution-report=<first-path> --resolution-report=decoy.ken`.
   Use fresh report destinations.
 - expect: (a) accepts as an ordinary source-file check and creates no report.
-  In (b), `<misplaced-path>` is not created as a report;
-  do not pin the route's other positional outcome, status, or diagnostic text.
+  In (b), `ordinary.ken` is accepted as the source, and `<misplaced-path>` is
+  not created as a report. Do not pin diagnostic text.
   In (c), only the first token is removed as the report option. The literal
   `--resolution-report=decoy.ken` is the source path, a complete report is
   written to `<first-path>`, and no separate `decoy.ken` report is created.
@@ -1453,8 +1453,9 @@ definition.
   result for the valid bare-token path in (a).
 - why: the valid bare-token path distinguishes ordinary positional acceptance
   from a parser that consumes the token and errors before report creation. The
-  misplaced and repeated-token cases avoid freezing unrelated positional
-  behavior.
+  accepted ordinary source in (b) likewise rejects a parser that consumes the
+  misplaced token and errors before report creation; no diagnostic text is
+  frozen.
 
 ### surface/modules/catalog-resolution-report-source-constructor-reference
 
