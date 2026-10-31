@@ -1089,9 +1089,10 @@ standalone routes: `elaborate_file_v1`, `elaborate_ken_md_file_v1`,
 `elaborate_decl`, literate example fences, and inline REPL submissions.
 Roots require explicit imports; Strict roots alone assert missing-import
 refusals. Each accepted direct standalone API route asserts the five original
-IDs itself; one route's result does not stand in for another. The CLI promise
-is covered by `legacy-cli-exact-id-resolution-report` below, which exercises
-non-catalog `check`, `run`, and `native-build`. Other unimported Legacy bare
+IDs itself; one route's result does not stand in for another. The accepted
+CLI-root arm is covered by `legacy-cli-exact-id-resolution-report` below across
+non-catalog `check`, `run`, and `native-build`. Its source-shadow discriminator
+remains a coverage gap, described with that case. Other unimported Legacy bare
 implementation globals, including `ConsoleOp`, are unspecified: neither
 promised nor refused. The scoped ConsoleStream constructor rows below retain
 their every-route contract. No row adds trust or duplicates a checked
@@ -1255,25 +1256,17 @@ definition.
 - promise class: **normative compatibility vector** — each CLI route reports
   exact checked pre-source identity, not merely a compatible spelling
 - spec: `33 §3.3`; `39 §2.0`; `70 §1.4`
-- given: place the accepted root below in a standalone `.ken` file. Place the
-  shadow root below in a second file; the shadow differs only by its leading
-  `proc write` declaration. Each root has the same `program` header, explicit
-  `Capability.Console.Text` import of `write` as `catalog_write`, and the same
-  four client declarations. The shadow delegates its local `write` body through
-  that imported identity; `write_probe` still uses bare `write` to exercise
-  the five-name Legacy route contract. Invoke each file separately with
-  `ken check`, `ken run` and `ken native-build`, using
-  `--resolution-report=<new-path>` immediately after the subcommand. Supply an
-  explicit resource profile for native-build. Read each route's own
-  `ken.resolution/v1` report file.
+- given: place the accepted root below in a standalone `.ken` file with no
+  imports. Invoke it separately with `ken check`, `ken run` and
+  `ken native-build`, using `--resolution-report=<new-path>` immediately
+  after the subcommand. Supply an explicit resource profile for native-build.
+  Read each route's own `ken.resolution/v1` report file.
 
   Accepted root:
 
   ```ken
   program capabilities FS APartial
 
-  import Capability.Console.Text (write as catalog_write)
-
   proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
     write ConsoleStream.Stdout payload
 
@@ -1288,44 +1281,43 @@ definition.
     host_program APartial (print_line "probe")
   ```
 
-  Shadow root:
-
-  ```ken
-  program capabilities FS APartial
-
-  import Capability.Console.Text (write as catalog_write)
-
-  proc write (stream : ConsoleStream) (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
-    catalog_write stream payload
-
-  proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
-    write ConsoleStream.Stdout payload
-
-  const char_code_probe : Int = charToInt 65
-
-  const char_order_probe : Bool = leqChar 65 66
-
-  proc main
-        (_input : ProcessInput) (_caps : ProgramCaps APartial)
-      : HostIO APartial ExitCode
-      visits [Console] =
-    host_program APartial (print_line "probe")
-  ```
-
-- expect: all six invocations accept. In every accepted document,
+- expect: all three accepted-root invocations accept. In each report,
   `write_probe` references pre-source `IO` and `write`, `main` references
   pre-source `print_line`, `char_code_probe` references pre-source `charToInt`,
-  and `char_order_probe` references pre-source `leqChar`. In every shadow
-  document, `write_probe` references source-declared `write`, not pre-source
-  `write`; the other four identities remain pre-source. Documents for each
-  root are byte-identical across routes except for the `route` field. No
-  `GlobalId` number appears. Each invocation's stdout, stderr and status are
-  identical with and without the flag; without it no report is created.
-- controls: the shadow's body never mentions `write`, since a top-level source
-  binding captures every use of the name in that unit. Mutants reporting every
-  reference pre-source or classifying by written spelling each redden the
-  shadow `write_probe` row. An existing report path refuses creation without
-  overwriting it; an elaboration failure leaves no partial report file.
+  and `char_order_probe` references pre-source `leqChar`. Documents are
+  byte-identical across routes except for the `route` field. No `GlobalId`
+  number appears. Each invocation's stdout, stderr and status are identical
+  with and without the flag; without it no report is created.
+- controls: an existing report path refuses creation without overwriting it;
+  an elaboration failure leaves no partial report file.
+
+### Residual: standalone Legacy write-shadow report
+
+- spec: `33 §3.3`; `39 §2.0`; `70 §1.4`
+- normative expectation: each of `check`, `run` and `native-build` accepts a
+  type-compatible source declaration named `write`; its `write_probe` reference
+  is reported as `source-declared` rather than `pre-source`, while the other
+  four promised identities remain pre-source.
+- status: this shadow arm is a **coverage gap**, not a conformance result. The
+  six expected invocations remain normative, but this seed does not claim to
+  cover them.
+- gap: a standalone shadow must produce the `IO (Result IOError Unit)` value
+  consumed by the unchanged `write_probe` without referring to the shadowed
+  `write`. The explicit `Capability.Console.Text` import route used by the old
+  shadow is unavailable without a catalog root, and the five-name Legacy
+  promise does not make `ConsoleOp`, `console_resp`, or other implementation
+  globals available. `36 §2` specifies `ITree.Ret`, but its source constructor
+  application needs operation and response type arguments, which the five-name
+  promise does not provide. A local CLI probe of `print_line` found `IO Unit`,
+  not this result type. No contract-backed standalone shadow fixture was found;
+  do not replace these missing inputs with assumed globals or a failing
+  positive fixture.
+- evidence boundary: Language QA's exact-parent direct CLI probes found the
+  explicit-import roots fail before report creation. Local exploratory probes
+  found the accepted no-import root passes the three direct routes, while the
+  Axiom-based shadow fails report generation with an unattributed checked
+  identity. These probes are not official conformance-runner results. No
+  all-six coverage, CI, publication or landing is claimed.
 
 ### surface/modules/catalog-resolution-report-lists-entry-root-only
 
