@@ -65,7 +65,7 @@ and no-allocation witnesses. This is the surface analog of the kernel's closed
 | **`Char`** | signature: `String ↔ List Char` | checked transparent scalar type (`35 §2.4`); the constructor-free signature member. |
 | **`List`** | signature: `String ↔ List Char` and `Bytes ↔ List UInt8` | ordinary checked `data List`; signature-named at two independent primitive surfaces. |
 | **`Option`** | signature: `bytes_at` and `bytes_slice` results | ordinary checked `data Option a = None \| Some a`; strict source must name and eliminate the exact result family. |
-| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping`; the opaque primitive former needs this exact parameter identity. Source uses the scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`. |
+| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping \| SpawnPlan \| ChildProcess \| PipeRead \| PipeWrite`; the opaque primitive former needs this exact parameter identity. Source uses the seven scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`. |
 | **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
 | **`Utf8Error`** | signature: the error argument of `bytes_decode`'s result | ordinary checked `data Utf8Error = InvalidUtf8`; no replacement family can inhabit the primitive result. |
 | **`Nat`** | internal provision, kernel origin: source must reach the canonical natural/index family | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
@@ -100,8 +100,11 @@ FS/resource slice adds six identities to that historical 24-name floor,
 closing the current 30-name roster. For every inductive member, the floor
 admits constructors only by matching their kernel-recorded parent `GlobalId`.
 `ResourceKind` is scoped: its constructors are available as
-`ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`,
-not as bare names. `ExitCode` and `ProgramCaps` are also scoped; their
+`ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
+`ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
+and `ResourceKind.PipeWrite`, not as bare names. The unqualified `SpawnPlan`
+source type is the pure plan type, distinct from the `ResourceKind.SpawnPlan`
+constructor. `ExitCode` and `ProgramCaps` are also scoped; their
 constructor names are respectively `ExitCode.Success`, `ExitCode.Failure`,
 and `ProgramCaps.MkProgramCaps`. `ProcessInput`, `Prod`, and `Unit` bring
 their bare constructor names `MkProcessInput`, `MkProd`, and `MkUnit`.
@@ -134,7 +137,14 @@ possession.
   roster, keeping type-forming identities distinct from the `Top`/`Bottom`
   proposition constants and the `Proved : Top` proof binding. Also record each
   constructor id and parent, the three Pair companion ids and checked types,
-  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Do not select
+  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Through
+  source use, resolve each of the seven qualified `ResourceKind` constructors
+  as a value of expected type `ResourceKind`, paired with rejection of the bare
+  leaf in that position using a separate fresh source unit. In the §1.11 source
+  context, also resolve
+  `SpawnPlan` in type position and `ResourceKind.SpawnPlan` as a kind value;
+  separately try bare `SpawnPlan` as a `ResourceKind` value. Record the distinct
+  identities. Do not select
   declarations by helper name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
@@ -147,9 +157,19 @@ possession.
   `MkFileError` remains bare; all thirteen `IOError` causes, the three
   `CreatePolicy` cases, and all twelve `ResourceError` cases are scoped; the
   `BufferSpan` and `TransferCount` constructors retain private visibility.
-  Existing constructor dispositions remain unchanged, including bare `MkUnit`
-  and scoped `Coproduct`, `Instant`, and `ITree`; no same-spelling constructor
-  with another parent qualifies. The separate companion set is exactly
+  `ResourceKind` contributes exactly the seven qualified paths
+  `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
+  `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
+  `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`; none is a bare
+  constructor path. Each bare `ResourceKind` leaf in value position is refused
+  against its accepted qualified control. Unqualified `SpawnPlan` remains the
+  separate pure plan type, outside the thirty-name prelude roster and not a
+  bare constructor. It is accepted in type position, while its use as a
+  `ResourceKind` value is refused; the qualified
+  `ResourceKind.SpawnPlan` value is the accepted control. Existing constructor
+  dispositions remain unchanged, including bare
+  `MkUnit` and scoped `Coproduct`, `Instant`, and `ITree`; no same-spelling
+  constructor with another parent qualifies. The separate companion set is exactly
   `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
   Pair id. Installing the floor changes neither the declaration count nor
   allocator position. None of the thirty roster identities, constructor
