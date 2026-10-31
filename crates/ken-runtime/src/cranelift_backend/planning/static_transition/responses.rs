@@ -2000,11 +2000,74 @@ fn response_vis_dispatch_leaf(
                 continue;
             }
         }
+        if position == 0 {
+            if let Some(continued) = response_closure_continuation(plan, parents, parent)? {
+                cursor = continued;
+                continue;
+            }
+        }
         if response_tail_edge(plan.planned_occurrence_expr(parent)?, position).is_none() {
             return Ok(None);
         }
         cursor = parent;
     }
+}
+
+// A closure body is not a tail of its closure in general (response_tail_edge),
+// but two static shapes return its value to a known site.
+//
+// - A closure in field 1 of a Vis is that Vis's continuation. The
+//   ComputationalMatch that eliminates the Vis eliminates the continuation's
+//   result through the recursive position, so a Vis tail in the body reaches
+//   the same dispatch as the Vis itself.
+// - A curried closure chain applied in place, each closure the callee of the
+//   next Call out, returns its innermost body as the value of the outermost
+//   Call once the calls supply every parameter. A chain the calls do not
+//   saturate is a partial application and continues nowhere.
+//
+// Both are positions in the source tree; no emitting unit is consulted.
+fn response_closure_continuation(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    closure: StaticOriginId,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let params_of = |origin: StaticOriginId| -> Result<Option<usize>, CraneliftBackendError> {
+        Ok(match plan.planned_occurrence_expr(origin)? {
+            RuntimeExpr::LexicalClosure { params, .. } => Some(params.len()),
+            _ => None,
+        })
+    };
+    let Some(mut need) = params_of(closure)? else {
+        return Ok(None);
+    };
+    if let Some((vis, 1)) = parents.get(&closure).copied() {
+        if let RuntimeExpr::Construct { constructor, .. } = plan.planned_occurrence_expr(vis)? {
+            if constructor == &plan.process_symbols.itree_vis {
+                return Ok(Some(vis));
+            }
+        }
+    }
+    let mut outer = closure;
+    while let Some((up, 0)) = parents.get(&outer).copied() {
+        let Some(more) = params_of(up)? else { break };
+        need += more;
+        outer = up;
+    }
+    let mut call = outer;
+    while need > 0 {
+        let Some((up, 0)) = parents.get(&call).copied() else {
+            return Ok(None);
+        };
+        let RuntimeExpr::Call { args, .. } = plan.planned_occurrence_expr(up)? else {
+            return Ok(None);
+        };
+        if args.len() > need {
+            return Ok(None);
+        }
+        need -= args.len();
+        call = up;
+    }
+    Ok((call != outer).then_some(call))
 }
 
 fn selected_host_response_route(

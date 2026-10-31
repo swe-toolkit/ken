@@ -28,6 +28,8 @@ use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, Progra
 use crate::{ElabEnv, ElabError, ElabResult};
 
 mod bracket_regions;
+#[cfg(test)]
+mod px10_plan_census_tests;
 use bracket_regions::collect_normalized_bracket_regions;
 pub use bracket_regions::NormalizedBracketRegion;
 
@@ -3010,6 +3012,18 @@ pub fn complete_native_program_preparation(
             ),
         )));
     }
+    emit_native_program_preparation(preparation, output_dir, profile)
+}
+
+/// Object emission for a preparation the Process gate has admitted. Kept
+/// separate so the PX10 plan census can plan a gated program without a
+/// production route around the gate.
+#[inline(always)]
+fn emit_native_program_preparation(
+    preparation: NativeProgramPreparationV1,
+    output_dir: impl AsRef<Path>,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
     let plan = preparation.plan.as_ref();
     let host_spine = preparation.host_spine.as_ref();
     let NativeProgramPreparationV1 {

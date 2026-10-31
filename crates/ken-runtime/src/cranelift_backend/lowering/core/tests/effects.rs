@@ -2111,11 +2111,24 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
     assert_ne!(actual, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
 }
 
+/// The host operations planning represents: every operation the reference
+/// executor admits, read from `ken_host`. That is the native-tested set plus the
+/// PX10 Process and pipe-stream operations, which are `RepresentedUnavailable`.
+/// Planning them does not make them native: the compiler driver's Process gate
+/// refuses their programs before object emission, and the native ABI refuses
+/// them at dispatch, until native parity moves them to `NativeTested`.
+fn executor_admitted_host_operations() -> BTreeSet<ken_host::HostOpV1> {
+    ken_host::HostOpV1::ALL
+        .into_iter()
+        .filter(|operation| operation.executor_admits())
+        .collect()
+}
+
 #[test]
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(
-        CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
-        ken_host::NATIVE_TESTED_TARGETS_V1
+        CRANELIFT_HOST_EFFECT_CONSUMERS_V1.into_iter().collect::<BTreeSet<_>>(),
+        executor_admitted_host_operations()
     );
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
         let layout = ken_host::host_effect_wire_layout_v1(operation).unwrap();
@@ -3422,7 +3435,8 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// MEASURED: for each admitted operation the ordinals carrying a contract are
 /// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
 /// admitted operation has `n >= 1`, the capability slot carries one for exactly
-/// the eleven FS-path operations, and no unadmitted lane carries one at any slot.
+/// the eleven FS-path operations and `ProcessPlanOpen`, and no unadmitted lane
+/// carries one at any slot.
 ///
 /// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
 /// admitted while some seat of it silently has no contract.
@@ -3434,8 +3448,8 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_key() {
     // The admitted set itself comes from `ken_host`, not from this backend.
     assert_eq!(
-        CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
-        ken_host::NATIVE_TESTED_TARGETS_V1
+        CRANELIFT_HOST_EFFECT_CONSUMERS_V1.into_iter().collect::<BTreeSet<_>>(),
+        executor_admitted_host_operations()
     );
     let capability_bearing = [
         ken_host::HostOpV1::FsReadFile,
@@ -3449,6 +3463,7 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         ken_host::HostOpV1::FsRename,
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
+        ken_host::HostOpV1::ProcessPlanOpen,
     ];
     assert_eq!(
         host_effect_seat_contract_of(
@@ -5429,10 +5444,14 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// carried span. Each synthesized `FileError` separately declares
 /// `SiteOperand(0)`; that carried source-path use is projected through the
 /// emitted helper without widening its direct-consumer availability.
+///
+/// Seats of a planned operation the native ABI still refuses form a third,
+/// gated partition. Their table disposition is not an evidence claim.
 #[test]
 fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     let mut either_phase = Vec::new();
     let mut specialized_only = Vec::new();
+    let mut gated = Vec::new();
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
         // Past any real arity, so a seat stranded beyond a hole is found
         // rather than assumed absent — the same sweep width the gapless
@@ -5445,6 +5464,14 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
                 continue;
             };
             if need != EffectSeatNeed::BytesPointerLength {
+                continue;
+            }
+            // A planned operation the native ABI still refuses has no native
+            // evidence to disposition its seats by. They are held apart, so
+            // promoting the operation to `NativeTested` moves them into the
+            // evidence partitions below and reddens until someone decides them.
+            if operation.availability() != ken_host::HostOpAvailabilityV1::NativeTested {
+                gated.push((operation, slot));
                 continue;
             }
             if avail.admits(EffectSeatPhase::CarriedWord) {
@@ -5486,9 +5513,18 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
         "a SPECIALIZED_ONLY byte-span seat lacks its evidence disposition"
     );
     assert_eq!(
+        gated,
+        vec![
+            (ken_host::HostOpV1::ProcessPlanOpen, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::ProcessPlanPush, EffectSeatSlot::Argument(2)),
+            (ken_host::HostOpV1::ProcessPlanPush, EffectSeatSlot::Argument(3)),
+        ],
+        "a byte-span seat of a natively refused operation is not the planned set"
+    );
+    assert_eq!(
         either_phase.len() + specialized_only.len(),
         16,
-        "the byte-span seat population is sixteen; a change needs its own disposition"
+        "the native byte-span seat population is sixteen; a change needs its own disposition"
     );
 }
 

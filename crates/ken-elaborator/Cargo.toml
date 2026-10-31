@@ -32,5 +32,6 @@ ken-interp = { path = "../ken-interp" }
 ken-runtime = { path = "../ken-runtime", features = [
     "dasm-c2-observation",
     "checked-ih-realization-observation",
+    "px8-ds-test-support",
 ] }
 tempfile = "3"

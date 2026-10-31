@@ -580,9 +580,14 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
                 _ => break,
             }
         }
-        let Some(&f) = folds.last() else {
-            return Err(planner_error("acquire dispatch has no positional return fold"));
-        };
+        let f = return_fold(plan, &parents, roles, k)?;
+        // Where the downward descent from the acquire continuation reaches a
+        // fold, the tail up-walk must name the same one.
+        if folds.last().is_some_and(|down| *down != f) {
+            return Err(planner_error(
+                "the positional return fold disagrees with the acquire continuation's fold chain",
+            ));
+        }
         let RuntimeExpr::Match { scrutinee, .. } = expr(plan, k)? else {
             return Err(planner_error("acquire response is not dispatched at its own continuation"));
         };
@@ -623,6 +628,37 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
     }
     assign_parent_forest(&mut regions)?;
     Ok(regions)
+}
+
+// The positional return fold is the innermost ComputationalMatch whose
+// scrutinee tail-contains the acquire's Result dispatch. The walk climbs only
+// through tail positions: Match branches, frame and join bodies, closure
+// bodies, Let bodies, Vis continuations, and the Ret case of an enclosing fold.
+fn return_fold(plan: &StaticTransitionPlan<'_>, parents: &ParentMap, roles: &BracketRoles,
+    dispatch: StaticOriginId) -> Result<StaticOriginId, CraneliftBackendError>
+{
+    let refuse = || planner_error("acquire dispatch has no positional return fold");
+    let mut cur = dispatch;
+    while let Some(&(p, pos)) = parents.get(&cur) {
+        let tail = match expr(plan, p)? {
+            RuntimeExpr::ComputationalMatch { .. } if pos == 0 => return Ok(p),
+            RuntimeExpr::ComputationalMatch { .. } => {
+                let (ret, _) = select_cases(plan, p, &roles.ret, &roles.vis)?;
+                pos == 1 + ret
+            }
+            RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::LexicalClosure { .. } => pos == 0,
+            RuntimeExpr::Match { .. } => pos >= 1,
+            RuntimeExpr::Let { .. } => pos == 1,
+            _ => pos == 1 && is_construct(plan, p, &roles.vis, 2)?,
+        };
+        if !tail {
+            return Err(refuse());
+        }
+        cur = p;
+    }
+    Err(refuse())
 }
 
 fn require_body_exits(
