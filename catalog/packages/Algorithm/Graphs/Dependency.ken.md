@@ -286,6 +286,99 @@ pub theorem graph_reachable_reverse
       → Equal Bool (graph_reachable q fq (graph_reverse q g) t target) True =
   graph_reachable_complete q fq (graph_reverse q g) t s target (walk_reverse q g s t walk)
 
+pub theorem walk_reverse_append
+      (q : Type)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (u : q)
+      (first : Walk q g s t)
+      (second : Walk q g t u)
+    : Equal
+        (Walk q (graph_reverse q g) u s)
+        (walk_reverse q g s u (walk_append q g s t u first second))
+        (walk_append
+          q
+          (graph_reverse q g)
+          u
+          t
+          s
+          (walk_reverse q g t u second)
+          (walk_reverse q g s t first)) =
+  match second {
+    WalkHere ↦
+      sym
+        (Walk q (graph_reverse q g) t s)
+        (walk_append
+          q
+          (graph_reverse q g)
+          t
+          t
+          s
+          (WalkHere q (graph_reverse q g) t)
+          (walk_reverse q g s t first))
+        (walk_reverse q g s t first)
+        (walk_append_here_left q (graph_reverse q g) t s (walk_reverse q g s t first));
+    WalkStep prev end e prefix ↦
+      trans
+        (Walk q (graph_reverse q g) end s)
+        (walk_prepend
+          q
+          (graph_reverse q g)
+          end
+          prev
+          s
+          e
+          (walk_reverse q g s prev (walk_append q g s t prev first prefix)))
+        (walk_prepend
+          q
+          (graph_reverse q g)
+          end
+          prev
+          s
+          e
+          (walk_append
+            q
+            (graph_reverse q g)
+            prev
+            t
+            s
+            (walk_reverse q g t prev prefix)
+            (walk_reverse q g s t first)))
+        (walk_append
+          q
+          (graph_reverse q g)
+          end
+          t
+          s
+          (walk_prepend q (graph_reverse q g) end prev t e (walk_reverse q g t prev prefix))
+          (walk_reverse q g s t first))
+        (cong
+          (Walk q (graph_reverse q g) prev s)
+          (Walk q (graph_reverse q g) end s)
+          (walk_reverse q g s prev (walk_append q g s t prev first prefix))
+          (walk_append
+            q
+            (graph_reverse q g)
+            prev
+            t
+            s
+            (walk_reverse q g t prev prefix)
+            (walk_reverse q g s t first))
+          (λw. walk_prepend q (graph_reverse q g) end prev s e w)
+          (walk_reverse_append q g s t prev first prefix))
+        (walk_prepend_append
+          q
+          (graph_reverse q g)
+          end
+          prev
+          t
+          s
+          e
+          (walk_reverse q g t prev prefix)
+          (walk_reverse q g s t first))
+  }
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -557,6 +650,14 @@ Reversal flips adjacency without a second graph representation. Induction on a
 walk prepends each reversed edge to the reversed prefix; the existing private
 `walk_prepend` retains the checked edge proof. Completeness turns that reversed
 walk and a hit at its original start into reachability from its original end.
+Reversal of an appended walk reverses the order of its parts. The checked
+`walk_reverse_append` law inducts on the written second walk: the base case
+uses symmetry of left `WalkHere` identity in the reversed graph, while the
+step case lifts the induction hypothesis under private `walk_prepend` and
+commutes that prepend across the appended walks with the private
+`walk_prepend_append` lemma. The edge proof converts to the reversed edge by
+the graph's definitional flip; neither a new edge premise nor finite evidence
+is needed.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -717,6 +818,32 @@ fn walk_prepend
     WalkHere ↦ WalkStep q g s s t first (WalkHere q g s);
     WalkStep prev end e prefix ↦
       WalkStep q g s prev end e (walk_prepend q g s t prev first prefix)
+  }
+
+theorem walk_prepend_append
+      (q : Type)
+      (g : Graph q)
+      (a : q)
+      (b : q)
+      (t : q)
+      (c : q)
+      (e : Equal Bool (edge q g a b) True)
+      (front : Walk q g b t)
+      (back : Walk q g t c)
+    : Equal
+        (Walk q g a c)
+        (walk_prepend q g a b c e (walk_append q g b t c front back))
+        (walk_append q g a t c (walk_prepend q g a b t e front) back) =
+  match back {
+    WalkHere ↦ Refl;
+    WalkStep prev end step prefix ↦
+      cong
+        (Walk q g a prev)
+        (Walk q g a end)
+        (walk_prepend q g a b prev e (walk_append q g b t prev front prefix))
+        (walk_append q g a t prev (walk_prepend q g a b t e front) prefix)
+        (λw. WalkStep q g a prev end step w)
+        (walk_prepend_append q g a b t prev e front prefix)
   }
 
 fn walk_step_selected
@@ -2340,7 +2467,9 @@ an order or cycle carries computationally relevant evidence, unlike an
 walk or simple cycle is prescribed. The finite pair scan considers potential
 cycle edges; it does not duplicate reachability's fixed point. Walk
 composition does not require finite evidence, and only a walk with a
-checked first edge gives a strict ordering claim.
+checked first edge gives a strict ordering claim. Reversal preserves the
+whole composed walk, not just its endpoints: a reversed two-part route cannot
+be identified with a different shortcut route having the same endpoints.
 
 ## 6. References
 
@@ -2353,7 +2482,7 @@ checked first edge gives a strict ordering claim.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–8](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–9](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2370,10 +2499,12 @@ checks a strict target widening and refuses the false converse on the same
 chain. The
 [§7 seed](../../../../conformance/stdlib/graphs/seed-reachability-graph-monotone.md)
 adds one edge to the same chain and refuses the converse on the pair. The
+[§8 seed](../../../../conformance/stdlib/graphs/seed-reachability-reverse.md)
+checks graph and walk reversal on a directed chain. The
 public API is the graph, path and certificate types, their
 constructors, walk composition and reversal, the graph reversal and
 predicate-reachability operations and witness, the dependency-order operation,
-five list/order predicates, and eighteen kernel-checked laws. Every other helper
+five list/order predicates, and nineteen kernel-checked laws. Every other helper
 is private to this package.
 
 | Reader task | Section |
@@ -2400,6 +2531,8 @@ including the independent reachability controls, and refuses the isolated
 false converse. The §7 package test checks the accepted two-edge seed and
 all nine graph-edge pairs before refusing the isolated graph-converse claim.
 The §8 package test checks the four generic exports, flipped edge and walk
-behavior, and reversed reachability on a three-vertex directed chain. That
-package test does not stand in for conformance-runner execution or CI. These
-package tests do not establish execution of the §2 seed.
+behavior, and reversed reachability on a three-vertex directed chain. The
+§9 package test checks the premise-free generic law on arbitrary walks and
+two different reversed routes with the same endpoints on a shortcut graph.
+These package tests do not stand in for conformance-runner execution or CI,
+and do not establish execution of the §2 seed.
