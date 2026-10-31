@@ -2542,10 +2542,10 @@ for inverted boxes. `inside_antisym` applies checked Nat antisymmetry to both
 comparisons on each axis and assembles structural box equality through the
 private `box_equal`. It needs no validity premise and identifies inverted
 boxes only when their stored corners agree. `intersect_greatest` combines the
-lower bounds with the checked `max` least law and the upper bounds with the checked `min` greatest
-law. `hull_least` combines them in the opposite direction. Private per-axis
-proofs and `bool_and` introduction assemble these generic corner-order laws
-without changing intersection or hull.
+lower bounds with the checked `max` least law and the upper bounds with
+the checked `min` greatest law. `hull_least` combines them in the opposite
+direction. Private per-axis proofs and `bool_and` introduction assemble
+these generic corner-order laws without changing intersection or hull.
 
 `area_inside` bounds each inner inclusive span by its outer span using
 monotonicity and antitonicity of saturating subtraction, then combines the
@@ -2576,8 +2576,9 @@ distance is exact and unsigned; its triangle inequality and zero-distance
 identity are proved. Corner-wise `inside` is directional and sufficient for
 point-set inclusion, but an empty inner box can be outside a second box by
 its corners despite having no points. Its converse law therefore requires
-a member of the inner box. The corner order is reflexive, transitive and antisymmetric; intersection is a
-greatest lower bound and hull a least upper bound for that order. The two
+a member of the inner box. The corner order is reflexive, transitive
+and antisymmetric; intersection is a greatest lower bound and hull a least
+upper bound for that order. The two
 mixed absorption laws return structural `Equal Box` to their shared left
 operand, without identifying boxes merely because they have the same points.
 The separate distribution laws prove both mixed operations distribute over
