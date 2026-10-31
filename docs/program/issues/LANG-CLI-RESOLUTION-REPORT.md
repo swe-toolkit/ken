@@ -61,7 +61,11 @@ base, stop and report the mismatch; do not build around it.
   `pre-source` with the canonical name (30 §4) for each of the five.
 - **AC-2 (shadow).** The same root with a type-compatible `fn write`
   reports `source-declared` for `write` on each route. A mutant that
-  reports every name as `pre-source` reddens a named row.
+  reports every name as `pre-source` reddens a named row. Split by
+  Steward evt_p4t8w7v6211d: the implementation test meets it here, and
+  the black-box conformance case moves to LANG-STRICT-ISOLATED-ROUTES
+  AC-5. No contract-backed standalone shadow exists without an
+  isolated-file import loader.
 - **AC-3 (identity vocabulary).** Records name identities as the
   pre-source canonical name or as `(module, declaration)`, never as a
   raw GlobalId number. Without the opt-in flag, each route's output is

@@ -76,6 +76,13 @@ base, stop and report the mismatch; do not build around it.
   the isolated file's entry point.
 - **AC-4 (mutation, QA).** Pointing `main.rs:485` back at
   `elaborate_file_v1` makes AC-2's `ken check` refusal row accept.
+- **AC-5 (carried from LANG-CLI-RESOLUTION-REPORT AC-2).** The six
+  standalone shadow invocations in the modules seed
+  (`conformance/surface/modules/seed-modules.md`), now recorded there as
+  a coverage gap, become
+  covered: the shadow `fn write` imports its provider on an isolated
+  file, and `--resolution-report` records `write` as `source-declared`
+  on `check`, `run` and `native-build`.
 
 ## Stop conditions
 
