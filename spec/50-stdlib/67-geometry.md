@@ -1111,10 +1111,11 @@ by `manhattan lo hi` itself. Thus the box's own corners attain the
 §10 bound whenever it contains any point. This is a consequence of
 the two public laws, **not** a third public attainment theorem.
 
-A subsequent CV seed can use `(1,1)–(4,3)` with witness `(2,2)`,
-apply both laws and check each corner's membership independently.
-Its isolated negative must refuse the lower-corner claim for the
-inverted `(3,3)–(1,1)` box, paired with an accepted witness case so
-the missing premise, rather than proof-form mismatch, is tested.
-These seed obligations do not constitute an authored or executed
-seed in this spec-only turn.
+The CV-authored seed in this candidate uses `(1,1)–(4,3)` with
+witness `(2,2)`, applies both laws and checks each corner's membership
+independently. Its isolated negative expects the lower-corner claim
+for the inverted `(3,3)–(1,1)` box to be refused and pairs it with a
+`False` value control expected to pass. This pins the missing witness,
+not a proof-form mismatch. The seed is authored but has not been
+Ken-checked or run through the official conformance runner. Its presence does not
+establish CI, publication, landing or a landed-trust result.
