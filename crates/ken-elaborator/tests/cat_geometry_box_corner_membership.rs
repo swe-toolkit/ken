@@ -123,9 +123,6 @@ theorem lo_is_contained_by_law : IsTrue (contains (MkBox lo hi) lo) =
 theorem hi_is_contained_by_law : IsTrue (contains (MkBox lo hi) hi) =
   contains_hi_corner lo hi witness witness_is_contained
 
-theorem preserve_valid_lo (h : IsTrue (contains (MkBox lo hi) lo)) :
-  IsTrue (contains (MkBox lo hi) lo) = h
-
 theorem inverted_lo_is_excluded :
   Equal Bool (contains (MkBox inverted_lo inverted_hi) inverted_lo) False = Proved
 theorem inverted_witness_is_excluded :
@@ -141,8 +138,8 @@ theorem reject_inverted_lo :
 
 const FALSE_INVERTED_PREMISE: &str = r#"
 theorem reject_inverted_witness :
-  IsTrue (contains (MkBox lo hi) lo) =
-  preserve_valid_lo (contains_lo_corner inverted_lo inverted_hi inverted_witness Proved)
+  IsTrue (contains (MkBox inverted_lo inverted_hi) inverted_lo) =
+  contains_lo_corner inverted_lo inverted_hi inverted_witness Proved
 "#;
 
 const FALSE_OUTSIDE_PREMISE: &str = r#"
@@ -176,8 +173,8 @@ fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
 /// The prefix computes false both inverted-box memberships and the outside
 /// point's membership. Three separate fresh prefixes each reject at their own
 /// theorem with kernel TypeMismatch: inverted own-lo `Proved`, application of
-/// the low-corner law to an inverted box with a false witness under an accepted
-/// corner result, and valid-box law application with an outside witness.
+/// the low-corner law at its own conclusion with a false inverted-box witness,
+/// and valid-box law application with an outside witness.
 /// CLAIMED: a point in a box entails both stored corners are in that box;
 /// neither corner is automatically contained in an inverted box, and a false
 /// witness cannot justify either law.
