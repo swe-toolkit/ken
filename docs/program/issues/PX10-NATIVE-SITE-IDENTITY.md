@@ -1,6 +1,6 @@
 ---
 id: PX10-NATIVE-SITE-IDENTITY
-title: "The native planner reads a site's identity (bracket settlement owner, response leaf, transport stage class, region-exit owner, call target) from the unit that emits the site's code, not from the site's static owner. The two diverge wherever a predeclared higher-order prelude function such as withChild has its callbacks emitted inside another unit, so PX10's three fixtures stop at four walls. Key every plane on the static owner, projecting to the emitting unit through one site-identity map"
+title: "The native planner reads a site's identity (bracket settlement owner, response leaf, region-exit owner, call target) from the unit that emits the site's code, not from the site's static owner. The two diverge wherever a predeclared higher-order prelude function such as withChild has its callbacks emitted inside another unit, so PX10's three fixtures stop at four walls. Key every plane on the static owner, projecting to the emitting unit through one site-identity map"
 status: ready
 owner: runtime
 size: L
@@ -32,10 +32,13 @@ static site has one identity wherever its code is emitted.
     root owner, not the Vis that returned it. R3 closes it.
   - W2, `responses.rs:2030`: a `CheckedBracketFinalizer` Vis emitted
     inside a closure cannot reach its selecting match by an up-walk.
-  - W3, `responses.rs:3825`: the transport stage of producer call 158
-    is classed "mixed" from its emitting workers. Re-keying that one
-    plane makes `brackets.rs:165` mint two owners for one static exit,
-    in all three fixtures.
+  - W3, `responses.rs:3825`, a relay source in a mixed-owner transport
+    stage, is not this node's. Keying the stage on (producer call
+    origin, producer owner) over-admits the shape
+    `rt_performing_mixed_owner` pins as refused: its two owners differ
+    because the second Vis's operation comes from another function,
+    not because the sites are separate instances (Architect
+    evt_2vjqrxcmee6ra). W3 moves to `PX10-NATIVE-BRANCH-ALTERNATIVES`.
   - W4, `lowering/calls.rs:1861`: a curried push chain's innermost body
     is called from unit 20 while its static caller is unit 18.
 - **The one existing projection.** `emittable_call_edges` already
@@ -60,8 +63,6 @@ base, stop and report the mismatch; do not build around it.
 2. **One runtime branch** carrying the ruled map and the plane re-keys:
    - the two response-leaf tail edges (a closure stored as an
      `itree_vis` continuation, and a curried chain called in place);
-   - the transport stage keyed on `(producer_call_origin,
-     producer_owner)`;
    - one invoke helper that honours a closure's boundary environment.
 
    The process-op promotion, the availability-gate deletion and native
@@ -70,17 +71,22 @@ base, stop and report the mismatch; do not build around it.
 ## Acceptance
 
 - **AC-1 (walls advance).** With the Process operations admitted in the
-  test configuration, smoke, argv_env_pipe and live_child each pass W2,
-  W3 and W4 and stop at the P2 wall. A named row records each fixture's
-  wall verbatim. A bypass that suppresses a cardinality guard is out of
-  scope: probe 21 built smoke that way, and the build then trapped.
+  test configuration, the fixtures pass W2 and W4. Smoke stops at the
+  P2 wall ("the detached-result seat projected 2 undischarged causal
+  calls onto one unit result"). argv_env_pipe and live_child stop at the
+  typed mixed-owner relay refusal (relay sources 1724 and 1228). A named
+  row records each fixture's wall verbatim. A bypass that suppresses a
+  cardinality guard is out of scope: probe 21 built smoke that way, and
+  the build then trapped.
 - **AC-2 (one owner).** Each static region exit has exactly one owner in
-  every plane this node keys. A pin on argv_env_pipe and live_child
-  names the exit and its owner.
+  the two planes this node keys: the return fold and the returned-Vis
+  settlement. A pin on argv_env_pipe and live_child names the exit and
+  its owner.
 - **AC-3 (no regression).** The return-fold equivalence holds on every
   existing region build. `rt_native_bracket_body_once`,
-  `px7f_resource_native`, `rt_escape_second_resource_native` and
-  `rt_bracket_control_region_d0` stay green.
+  `px7f_resource_native`, `rt_escape_second_resource_native`,
+  `rt_bracket_control_region_d0` and `rt_performing_mixed_owner` stay
+  green.
 - **AC-4 (negative, QA).** A settlement or response whose static owner
   lies outside the region still refuses. A mutant that keys one plane on
   the emitting unit reddens a named row.
@@ -92,7 +98,7 @@ base, stop and report the mismatch; do not build around it.
 
 Checks: 6 fired: the wall population is the Architect's probe
 enumeration across all three fixtures, bypassing each wall to reach the
-next. 7 fired: the naive W3 re-key was re-run on all three fixtures and
-fails at `brackets.rs:165`, which is why the scope is the map rather
-than per-wall fixes. 8 fired: AC-2 counts owners per static exit, which
+next. 7 fired: the W3 key was run against the next consumer of its
+kind, `rt_performing_mixed_owner`, which went red (0 refusals against
+1), so W3 leaves this node. 8 fired: AC-2 counts owners per static exit, which
 the probe-7 failure (two owners) does not satisfy.

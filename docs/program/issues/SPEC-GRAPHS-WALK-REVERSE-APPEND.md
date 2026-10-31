@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-WALK-REVERSE-APPEND
 title: "Spec 62 composes walks (§3, §4) and reverses them (§8), but states no law relating the two, so a client cannot reverse a composed walk without unfolding both definitions. Rule from a checked D0 at zero trust that walk_reverse of walk_append is the walk_append of the reversed walks in the opposite order, and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
