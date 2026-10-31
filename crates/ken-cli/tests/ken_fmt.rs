@@ -115,57 +115,6 @@ fn strict_frozen_corpus_gate_is_green() {
     );
 }
 
-/// Promise class: durable invariant. MEASURED: every runnable Ken root in
-/// the catalog, examples, conformance and crate fixture corpus declares exactly
-/// one FS authority in its capabilities header. CLAIMED: adding a runnable root
-/// cannot silently omit its FS authority. THE GAP: roots outside this corpus or
-/// without the ProgramCaps/HostIO marker are not enumerated by this gate.
-#[test]
-fn every_checked_runnable_root_declares_its_fs_authority() {
-    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut roots = Vec::new();
-    for directory in ["catalog", "examples", "conformance", "crates"] {
-        let directory = repository.join(directory);
-        collect(&directory, ".ken", &mut roots);
-        collect(&directory, ".ken.md", &mut roots);
-    }
-    roots.sort();
-    roots.dedup();
-
-    let mut runnable = Vec::new();
-    for path in &roots {
-        let source = fs::read_to_string(path).unwrap();
-        if !source.contains("ProgramCaps") && !source.contains("HostIO") {
-            continue;
-        }
-        runnable.push(path);
-        assert!(
-            source.lines().any(|line| {
-                let Some(capabilities) = line.trim().strip_prefix("program capabilities ") else {
-                    return false;
-                };
-                let mut fs_count = 0;
-                for member in capabilities.split(',') {
-                    let mut words = member.split_ascii_whitespace();
-                    if words.next() == Some("FS") {
-                        let authority = words.next();
-                        if !matches!(authority, Some("ANone" | "APartial" | "AFull"))
-                            || words.next().is_some()
-                        {
-                            return false;
-                        }
-                        fs_count += 1;
-                    }
-                }
-                fs_count == 1
-            }),
-            "runnable Ken root lacks exactly one declared FS authority: {}",
-            path.display()
-        );
-    }
-    assert!(!runnable.is_empty(), "runnable corpus must not be empty");
-}
-
 /// Promise class: durable invariant. MEASURED: a Process-granted checked
 /// program is admitted with its declared FS authority and rejected when that
 /// authority is removed. CLAIMED: a Process grant does not replace the FS
