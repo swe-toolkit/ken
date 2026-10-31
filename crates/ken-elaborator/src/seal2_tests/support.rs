@@ -509,6 +509,30 @@ pub fn classify_section(section: &str) -> &'static str {
         })
 }
 
+/// The landed Buffer + IO surface, loaded as its clients load it: through the
+/// strict roots loader. IO imports Buffer, so the flat-fence route can no
+/// longer stand for the pair. Every declaration either unit checks, private
+/// ones included, enters `globals` under its qualified path; that is the
+/// namespace the oracles walk, and the assertion below keeps it so.
+pub fn landed_surface() -> ElabEnv {
+    let mut env = ElabEnv::empty().expect("SEAL-2 prelude");
+    let root = catalog_packages_dir();
+    let mut checked = Vec::new();
+    for module in ["Capability.System.IO", "Capability.System.Buffer"] {
+        let owned = env
+            .elaborate_module_from_roots_strict(&[root.clone()], module)
+            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
+        assert!(!owned.is_empty(), "{module} checks no declaration");
+        checked.extend(owned);
+    }
+    let reachable = env.globals.values().copied().collect::<BTreeSet<_>>();
+    assert!(
+        checked.iter().all(|id| reachable.contains(id)),
+        "every checked Buffer and IO declaration must be visible to the oracle"
+    );
+    env
+}
+
 /// The `catalog/packages` directory, relative to this crate.
 pub fn catalog_packages_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

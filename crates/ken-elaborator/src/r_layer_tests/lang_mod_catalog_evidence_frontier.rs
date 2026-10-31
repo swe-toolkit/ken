@@ -11,9 +11,9 @@ use std::sync::OnceLock;
 
 use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::modules::{
-    PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
+    catalog_module_from_path, PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES,
 };
-use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span, literate, parser};
+use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span};
 use ken_kernel::{
     ConstructorDecl, Decl, GlobalId, InductiveDecl, KernelError, Level, ParameterPolarity,
     PrimReduction, Term,
@@ -98,7 +98,9 @@ fn parse_source(path: &Path) -> Vec<SurfaceDecl> {
 fn written_segments(path: &Path) -> BTreeSet<String> {
     let source = fs::read_to_string(path).expect("catalog source must be readable UTF-8");
     let code = if path.to_string_lossy().ends_with(".ken.md") {
-        literate::extract_ken_md(&source).expect("literate extraction").source
+        literate::extract_ken_md(&source)
+            .expect("literate extraction")
+            .source
     } else {
         source
     };
@@ -907,6 +909,11 @@ fn catalog_evidence_frontier_is_closed_and_honest() {
 
     validate_evidence_frontier(&rows)
         .expect("every ExactLedger strict observation must be identity-explained");
+    assert!(
+        rows.iter()
+            .all(|row| row.strict_observation == LoaderObservation::Succeeded),
+        "all discovered catalog units must load through Strict roots"
+    );
 
     let after: BTreeMap<_, _> = discover_units(&root)
         .into_iter()
@@ -1076,19 +1083,26 @@ fn facade_exported_length_is_directly_import_explained() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: System.Error refuses in Strict roots; its Legacy core retains
-/// the checked FileOperation ID as an unmet CanonicalHome prerequisite.
+/// MEASURED: a non-home consumer refuses in Strict roots; its Legacy core
+/// retains the checked FileOperation ID as an unmet CanonicalHome prerequisite.
 /// CLAIMED: a directly written unimported name is not explained merely by
-/// its presence in the checked type of an unrelated floor identity. THE GAP:
-/// facade re-exports need the independent checked-export identity pin above.
+/// its presence in an unrelated floor type. THE GAP: the homed System.Error
+/// unit is tested separately as a successful Strict owner.
 #[test]
 fn system_error_written_file_operation_stays_a_prerequisite() {
-    let root = catalog_root();
+    let root = std::env::temp_dir()
+        .join(format!("ken-file-operation-nonhome-{}", std::process::id()))
+        .join("catalog")
+        .join("packages");
+    fs::create_dir_all(&root).expect("fixture root");
+    fs::write(
+        root.join("Consumer.ken"),
+        "fn use_file_operation (operation : FileOperation) : FileOperation = operation\n",
+    )
+    .expect("fixture source");
     let units = discover_units(&root);
-    let module = "Capability.System.Error";
-    assert!(!units[module]
-        .direct_imports
-        .contains("Capability.Filesystem.Errors"));
+    let module = "Consumer";
+    assert!(units[module].direct_imports.is_empty());
     assert_eq!(
         observe_strict(&root, module),
         LoaderObservation::Refused {
@@ -1110,7 +1124,7 @@ fn system_error_written_file_operation_stays_a_prerequisite() {
     assert_eq!(
         validate_evidence_frontier(&[row]),
         Ok(()),
-        "System.Error written prerequisite: {evidence:?}"
+        "non-home written prerequisite: {evidence:?}"
     );
     match evidence {
         LegacyIdentityEvidence::ExactLedger {
@@ -1119,12 +1133,51 @@ fn system_error_written_file_operation_stays_a_prerequisite() {
             ..
         } => {
             assert!(resolved_globals.contains(&file_operation));
-            assert!(identity_grounded_prerequisites.contains(&IdentityPrerequisite::CanonicalHome {
-                identity: file_operation,
-                current_names: vec!["FileOperation".to_string()],
-            }));
+            assert!(identity_grounded_prerequisites.contains(
+                &IdentityPrerequisite::CanonicalHome {
+                    identity: file_operation,
+                    current_names: vec!["FileOperation".to_string()],
+                }
+            ));
         }
-        other => panic!("System.Error must have exact legacy evidence: {other:?}"),
+        other => panic!("Consumer must have exact legacy evidence: {other:?}"),
+    }
+    fs::remove_dir_all(root.parent().and_then(Path::parent).expect("fixture top"))
+        .expect("remove fixture");
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: System.Error succeeds under Strict and the pre-source
+/// FileOperation identity is explained by its own checked home grant.
+/// CLAIMED: home ownership accounts for this direct source use without
+/// broadening the floor. THE GAP: a non-home consumer is tested above.
+#[test]
+fn system_error_file_operation_home_is_explained() {
+    let root = catalog_root();
+    let units = discover_units(&root);
+    let module = "Capability.System.Error";
+    assert_eq!(observe_strict(&root, module), LoaderObservation::Succeeded);
+    let env = ElabEnv::new().expect("pre-source environment");
+    let file_operation = env.globals["FileOperation"];
+    assert!(env
+        .module_state
+        .package_home_ids(module)
+        .iter()
+        .any(|(_, id)| *id == file_operation));
+    match legacy_evidence(&root, module, &units[module], &units) {
+        LegacyIdentityEvidence::ExactLedger {
+            resolved_globals,
+            identity_grounded_prerequisites,
+            ..
+        } => {
+            assert!(resolved_globals.contains(&file_operation));
+            assert!(
+                identity_grounded_prerequisites.is_empty(),
+                "home grant explains source identity"
+            );
+        }
+        other => panic!("System.Error must have exact evidence: {other:?}"),
     }
 }
 
@@ -1188,7 +1241,10 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
         .module_state
         .package_export_ids("Test.Provider")
         .contains(&write_id));
-    assert!(env.module_state.package_home_ids("Test.Consumer").is_empty());
+    assert!(env
+        .module_state
+        .package_home_ids("Test.Consumer")
+        .is_empty());
     assert!(!strict_available_ids(&env).contains(&write_id));
 
     match legacy_evidence(&root, "Test.Consumer", &units["Test.Consumer"], &units) {
@@ -1198,10 +1254,12 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
             ..
         } => {
             assert!(resolved_globals.contains(&write_id));
-            assert!(identity_grounded_prerequisites.contains(&IdentityPrerequisite::CanonicalHome {
-                identity: write_id,
-                current_names: vec!["write".to_string()],
-            }));
+            assert!(identity_grounded_prerequisites.contains(
+                &IdentityPrerequisite::CanonicalHome {
+                    identity: write_id,
+                    current_names: vec!["write".to_string()],
+                }
+            ));
         }
         other => panic!("direct lowercase client must retain exact evidence: {other:?}"),
     }
@@ -1330,7 +1388,10 @@ fn bare_legacy_write_outside_its_home_stays_a_prerequisite() {
     .expect("write non-home fixture");
     let units = discover_units(&root);
     assert!(units["Consumer"].direct_imports.is_empty());
-    assert_eq!(observe_legacy(&root, "Consumer"), LoaderObservation::Succeeded);
+    assert_eq!(
+        observe_legacy(&root, "Consumer"),
+        LoaderObservation::Succeeded
+    );
     assert_eq!(
         observe_strict(&root, "Consumer"),
         LoaderObservation::Refused {
@@ -1346,10 +1407,12 @@ fn bare_legacy_write_outside_its_home_stays_a_prerequisite() {
             ..
         } => {
             assert!(resolved_globals.contains(&write_id));
-            assert!(identity_grounded_prerequisites.contains(&IdentityPrerequisite::CanonicalHome {
-                identity: write_id,
-                current_names: vec!["write".to_string()],
-            }));
+            assert!(identity_grounded_prerequisites.contains(
+                &IdentityPrerequisite::CanonicalHome {
+                    identity: write_id,
+                    current_names: vec!["write".to_string()],
+                }
+            ));
         }
         other => panic!("non-home Consumer must have exact legacy evidence: {other:?}"),
     }

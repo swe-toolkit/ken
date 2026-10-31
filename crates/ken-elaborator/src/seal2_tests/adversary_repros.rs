@@ -19,42 +19,6 @@ use ken_elaborator::ElabEnv;
 
 use seal2_support::{closed_producers, conservative_deep_producers, head_only_producers};
 
-const BUFFER_KEN_MD: &str =
-    include_str!("../../../../catalog/packages/Capability/System/Buffer.ken.md");
-const IO_KEN_MD: &str = include_str!("../../../../catalog/packages/Capability/System/IO.ken.md");
-
-fn landed_surface() -> ElabEnv {
-    let mut env = ElabEnv::empty().expect("prelude");
-    let root = seal2_support::catalog_packages_dir();
-    for module in ["Core.Logic.Transport", "Data.Numeric.Nat.Arithmetic"] {
-        env.elaborate_module_from_roots(&[root.clone()], module)
-            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
-    }
-    // These flat fences have no module-qualified proof namespace. Withhold
-    // prelude copies and selectors before checking their catalog declarations.
-    for name in [
-        "buffer_nat_add",
-        "buffer_suc_cong",
-        "transfer_count_request_budget",
-        "transfer_count_request_budget::bounded",
-        "write_all_call_bound",
-        "write_all_call_bound::termination",
-        "write_all_complete",
-        "write_all_complete::success_complete",
-        "write_all_first_error",
-        "write_all_first_error::first_error",
-        "write_all_all_success",
-        "write_all_all_success::all_success",
-    ] {
-        env.globals.remove(name);
-    }
-    env.elaborate_ken_md_file(BUFFER_KEN_MD)
-        .expect("System.Buffer checked fences");
-    env.elaborate_ken_md_file(IO_KEN_MD)
-        .expect("System.IO checked fences");
-    env
-}
-
 // ---------------------------------------------------------------------------
 // PROPERTY tests — must keep holding.
 // ---------------------------------------------------------------------------
@@ -64,7 +28,7 @@ fn landed_surface() -> ElabEnv {
 /// strongest of the three and must also derive `{}`.
 #[test]
 fn carrier_closure_holds_deeply_on_the_landed_surface() {
-    let env = landed_surface();
+    let env = seal2_support::landed_surface();
     assert_eq!(
         head_only_producers(&env, "BufferSpan"),
         BTreeSet::new(),
@@ -86,7 +50,7 @@ fn carrier_closure_holds_deeply_on_the_landed_surface() {
 /// BufferFreeze source-unreachability argument rests on this closure.
 #[test]
 fn transfer_count_has_no_public_producer() {
-    let env = landed_surface();
+    let env = seal2_support::landed_surface();
     assert_eq!(head_only_producers(&env, "TransferCount"), BTreeSet::new());
     assert_eq!(
         conservative_deep_producers(&env, "TransferCount"),

@@ -277,12 +277,53 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 32] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 5] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 46] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "print_line"),
     ("Core.Classes.LawfulClasses", "charToInt"),
     ("Core.Classes.LawfulClasses", "leqChar"),
+    ("Capability.Filesystem.Authority", "FS"),
+    ("Capability.Filesystem.Authority", "read_bytes"),
+    ("Capability.Filesystem.Authority", "write_file"),
+    ("Capability.System.Buffer", "BufferWindow"),
+    ("Capability.System.Buffer", "MkBufferWindow"),
+    ("Capability.System.Buffer", "buffer_span_length"),
+    ("Capability.System.Buffer", "buffer_span_budget"),
+    ("Capability.System.Buffer", "transfer_count_int"),
+    ("Capability.System.Buffer", "transfer_count_nat"),
+    ("Capability.System.Buffer", "transfer_count_remaining"),
+    ("Capability.System.Buffer", "transfer_count_positive"),
+    ("Capability.System.Buffer", "transfer_count_positive_prop"),
+    ("Capability.System.Buffer", "transfer_count_predecessor"),
+    ("Capability.System.Buffer", "transfer_count_nat_succ"),
+    ("Capability.System.Error", "FileOperation"),
+    ("Capability.System.Error", "OpReadFile"),
+    ("Capability.System.Error", "OpWriteFile"),
+    ("Capability.System.Error", "OpAppendFile"),
+    ("Capability.System.Error", "OpMetadata"),
+    ("Capability.System.Error", "OpReadDirectory"),
+    ("Capability.System.Error", "OpCreateDirectory"),
+    ("Capability.System.Error", "OpRemoveFile"),
+    ("Capability.System.Error", "OpRemoveDirectory"),
+    ("Capability.System.Error", "OpRename"),
+    ("Capability.System.Error", "OpChangeMode"),
+    ("Capability.System.Error", "OpSeek"),
+    ("Capability.System.Error", "OpSetLength"),
+    ("Capability.System.Error", "OpSync"),
+    ("Capability.System.Error", "OpGetInheritance"),
+    ("Capability.System.Error", "OpSetInheritance"),
+    ("Capability.System.Error", "OpDuplicate"),
+    ("Capability.System.IO", "write_all_exact_prefix_prop"),
+    ("Capability.System.IO", "write_all_exact_prefix_prop::exact_prefix"),
+    ("Capability.System.Resource", "ResourceBodyResult"),
+    ("Capability.System.Resource", "ResourceBodyOk"),
+    ("Capability.System.Resource", "ResourceBodyErr"),
+    ("Capability.System.Resource", "ResourceBracketResult"),
+    ("Capability.System.Resource", "ResourceBracketOk"),
+    ("Capability.System.Resource", "ResourceBracketBodyError"),
+    ("Capability.System.Resource", "ResourceBracketReleaseError"),
+    ("Capability.System.Resource", "ResourceBracketBodyAndReleaseError"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
@@ -620,32 +661,85 @@ impl ModuleState {
         self.prelude_binding_names.insert("Proved".to_string());
         self.strict_builtin_names.insert("Proved".to_string());
 
-        let mut package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>> =
-            HashMap::new();
-        for (home, name) in PRELUDE_PACKAGE_HOMES {
-            let id = globals.get(name).copied().ok_or_else(|| {
-                ElabError::Internal(format!(
-                    "package identity `{name}` for `{home}` has no pre-source identity"
-                ))
-            })?;
-            if !matches!(env.lookup(id), Some(ken_kernel::Decl::Transparent { .. })) {
-                return Err(ElabError::Internal(format!(
-                    "package identity `{name}` for `{home}` is not checked-transparent"
-                )));
-            }
-            if is_prelude_floor_name(name) || self.strict_builtin_names.contains(name) {
-                return Err(ElabError::Internal(format!(
-                    "package identity `{name}` for `{home}` is also strict ambient"
-                )));
-            }
-            package_home_ids
-                .entry(home.to_string())
-                .or_default()
-                .push((name.to_string(), id));
-        }
+        let package_home_ids =
+            package_home_table(env, globals, &self.strict_builtin_names, &PRELUDE_PACKAGE_HOMES)?;
         self.package_home_ids = package_home_ids;
         Ok(())
     }
+}
+
+/// Validate the explicit-import homes and key each row on its pre-source ID.
+/// A row is a checked-transparent definition, an attached proof of a subject
+/// homed in the same unit, or a checked inductive family homed together with
+/// exactly its complete constructor set (the same identity test the floor
+/// families pass). Every identity has at most one home.
+fn package_home_table(
+    env: &ken_kernel::GlobalEnv,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+    strict_builtin_names: &HashSet<String>,
+    homes: &[(&str, &str)],
+) -> Result<HashMap<String, Vec<(String, ken_kernel::GlobalId)>>, ElabError> {
+    let mut table: HashMap<String, Vec<(String, ken_kernel::GlobalId)>> = HashMap::new();
+    let mut owner: HashMap<ken_kernel::GlobalId, &str> = HashMap::new();
+    for (home, name) in homes {
+        let id = globals.get(*name).copied().ok_or_else(|| {
+            ElabError::Internal(format!(
+                "package identity `{name}` for `{home}` has no pre-source identity"
+            ))
+        })?;
+        let transparent = matches!(env.lookup(id), Some(ken_kernel::Decl::Transparent { .. }));
+        if !transparent && env.inductive(id).is_none() && env.constructor(id).is_none() {
+            return Err(ElabError::Internal(format!(
+                "package identity `{name}` for `{home}` is not checked-transparent or inductive"
+            )));
+        }
+        if is_prelude_floor_name(name) || strict_builtin_names.contains(*name) {
+            return Err(ElabError::Internal(format!(
+                "package identity `{name}` for `{home}` is also strict ambient"
+            )));
+        }
+        if let Some(previous) = owner.insert(id, home) {
+            return Err(ElabError::Internal(format!(
+                "package identity `{name}` has two homes, `{previous}` and `{home}`"
+            )));
+        }
+        table
+            .entry(home.to_string())
+            .or_default()
+            .push((name.to_string(), id));
+    }
+    for (home, members) in &table {
+        let homed: HashSet<ken_kernel::GlobalId> = members.iter().map(|(_, id)| *id).collect();
+        for (name, id) in members {
+            if let Some(family) = env.inductive(*id) {
+                let actual: HashSet<_> = family.constructors.iter().map(|c| c.id).collect();
+                let selected: HashSet<_> = homed
+                    .iter()
+                    .copied()
+                    .filter(|m| env.constructor(*m).is_some_and(|(parent, _)| parent.id == *id))
+                    .collect();
+                if actual != selected {
+                    return Err(ElabError::Internal(format!(
+                        "package family `{name}` for `{home}` has incomplete checked constructor set"
+                    )));
+                }
+            } else if let Some((parent, _)) = env.constructor(*id) {
+                if !homed.contains(&parent.id) {
+                    return Err(ElabError::Internal(format!(
+                        "package constructor `{name}` for `{home}` is homed without its family"
+                    )));
+                }
+            } else if let Some((subject, _)) = name.split_once("::") {
+                let subject_homed = members.iter().any(|(other, _)| other == subject);
+                if !subject_homed {
+                    return Err(ElabError::Internal(format!(
+                        "package attached proof `{name}` for `{home}` is homed without its subject"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(table)
 }
 
 fn require_pre_source_floor_identities(
@@ -2255,8 +2349,13 @@ fn load_unit(
         // export publishes them through its provider table; other units must
         // import that provider, never resolve the live process-global spelling.
         for (name, id) in elab.module_state.package_home_ids(module) {
-            scope.bindings.insert(name.clone(), name.clone());
-            scope.binding_ids.insert(name.clone(), *id);
+            if name.contains("::") {
+                // An attached proof is selected under its subject, never bare.
+                scope.qualified_ids.insert(name.clone(), *id);
+            } else {
+                scope.bindings.insert(name.clone(), name.clone());
+                scope.binding_ids.insert(name.clone(), *id);
+            }
         }
         let mut unit_definitions = HashSet::new();
         let mut ordered_inline_modules = HashSet::new();
@@ -2431,8 +2530,17 @@ pub fn elaborate_module_from_roots_v1(
         .map(|(_, results)| results)
 }
 
-/// Opt-in strict roots entry. WP-4 will move the real catalog caller to this
-/// entry only after its dependency census has been migrated.
+/// Strict roots entry returning the checked V1 results of the whole closure.
+pub fn elaborate_module_from_roots_strict_v1(
+    elab: &mut ElabEnv,
+    roots: &[PathBuf],
+    entry: &str,
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
+        .map(|(_, results)| results)
+}
+
+/// Strict roots entry returning only the direct entry-unit identities.
 pub fn elaborate_module_from_roots_strict(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
@@ -9775,3 +9883,132 @@ mod namespace_effect_tests {
 #[cfg(test)]
 #[path = "modules_reused_env_tests.rs"]
 mod reused_env_identity_scrub_tests;
+#[cfg(test)]
+mod strict_catalog_home_tests {
+    use super::*;
+
+    /// Promise class: durable invariant. MEASURED: each malformed candidate
+    /// reaches its own identity, family, owner, or subject gate. CLAIMED: a
+    /// malformed home cannot confer an unrelated checked identity. THE GAP:
+    /// the pre-source environment has no non-transparent non-family witness;
+    /// that error arm has no live bootstrap example on this base.
+    #[test]
+    fn incomplete_and_cross_home_families_refuse_at_the_checked_gate() {
+        let elab = ElabEnv::new().expect("pre-source environment");
+        let table = |rows: &[(&str, &str)]| {
+            package_home_table(
+                &elab.env,
+                &elab.globals,
+                &elab.module_state.strict_builtin_names,
+                rows,
+            )
+            .expect_err("invalid home must refuse")
+            .to_string()
+        };
+        for (rows, expected) in [
+            (
+                vec![("A", "BufferWindow")],
+                "incomplete checked constructor set",
+            ),
+            (vec![("A", "MkBufferWindow")], "homed without its family"),
+            (
+                vec![("A", "BufferWindow"), ("A", "OpReadFile")],
+                "incomplete checked constructor set",
+            ),
+            (
+                vec![
+                    ("A", "BufferWindow"),
+                    ("A", "MkBufferWindow"),
+                    ("B", "BufferWindow"),
+                ],
+                "two homes",
+            ),
+            (
+                vec![("A", "write_all_exact_prefix_prop::exact_prefix")],
+                "homed without its subject",
+            ),
+            (vec![("A", "Nat")], "also strict ambient"),
+            (vec![("A", "NoSuchHomeIdentity")], "no pre-source identity"),
+        ] {
+            let refusal = table(&rows);
+            assert!(refusal.contains(expected), "{rows:?}: {refusal}");
+        }
+        let split = table(&[("A", "BufferWindow"), ("B", "MkBufferWindow")]);
+        assert!(
+            split.contains("incomplete checked constructor set")
+                || split.contains("homed without its family"),
+            "split family must refuse on either checked parent/child arm: {split}"
+        );
+        package_home_table(
+            &elab.env,
+            &elab.globals,
+            &elab.module_state.strict_builtin_names,
+            &[("A", "BufferWindow"), ("A", "MkBufferWindow")],
+        )
+        .expect("complete family is a legal home");
+    }
+
+    /// Promise class: durable invariant. MEASURED: the Legacy resolver keeps
+    /// every bare home spelling, and its global target remains the pre-source
+    /// checked ID. CLAIMED: adding the Strict homes does not change bare
+    /// Legacy meanings. THE GAP: a separate client elaborates a family and a
+    /// transparent definition to pin their checked terms, not every arity.
+    #[test]
+    fn legacy_bare_home_names_retain_the_pre_source_ids() {
+        let env = ElabEnv::new().expect("pre-source environment");
+        let scope = Scope::with_mode(
+            ResolutionMode::Legacy,
+            env.module_state.strict_builtin_names.clone(),
+        );
+        for &(home, name) in &PRELUDE_PACKAGE_HOMES {
+            let id = env
+                .module_state
+                .package_home_ids(home)
+                .iter()
+                .find(|(spelling, _)| spelling == name)
+                .map(|(_, id)| *id)
+                .expect("captured home ID");
+            assert_eq!(env.globals.get(name), Some(&id), "{home}.{name}");
+            if !name.contains("::") {
+                let resolved = resolve_ref(&scope, &HashMap::new(), name, &Span::zero())
+                    .expect("Legacy bare name");
+                assert_eq!(resolved, name, "{home}.{name}");
+                assert_eq!(env.globals.get(&resolved), Some(&id));
+            }
+        }
+    }
+
+    /// Promise class: durable invariant. MEASURED: capture's exact checked
+    /// identities agree with each home's public export IDs after strict load.
+    /// CLAIMED: a home grants only its pre-source IDs, not copied definitions.
+    /// THE GAP: a separate client test exercises import visibility and refusal.
+    #[test]
+    fn real_homes_publish_their_pre_source_identities() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        for home in [
+            "Capability.Filesystem.Authority",
+            "Capability.System.Buffer",
+            "Capability.System.Error",
+            "Capability.System.IO",
+            "Capability.System.Resource",
+        ] {
+            let mut env = ElabEnv::new().expect("pre-source environment");
+            let expected = env.module_state.package_home_ids(home).to_vec();
+            assert!(!expected.is_empty(), "{home} must own checked identities");
+            for (name, id) in &expected {
+                assert_eq!(env.globals.get(name), Some(id));
+            }
+            env.elaborate_module_from_roots_strict(&[root.clone()], home)
+                .unwrap_or_else(|error| panic!("{home} strict load: {error:?}"));
+            let published = env.module_state.package_export_ids(home);
+            for (name, id) in &expected {
+                if !name.contains("::") {
+                    assert!(
+                        published.contains(id),
+                        "{home} did not publish {name} as {id:?}"
+                    );
+                }
+            }
+        }
+    }
+}

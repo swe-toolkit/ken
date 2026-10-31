@@ -14,6 +14,18 @@ stated as kernel proofs. The checked structural budget and count witnesses used
 by `writeAll`, however, are ordinary Ken data and their laws are kernel-checked.
 
 ```ken
+export BufferWindow,
+  MkBufferWindow,
+  buffer_span_length,
+  buffer_span_budget,
+  transfer_count_int,
+  transfer_count_nat,
+  transfer_count_remaining,
+  transfer_count_positive,
+  transfer_count_positive_prop,
+  transfer_count_predecessor,
+  transfer_count_nat_succ
+
 import Data.Numeric.Nat.Arithmetic (add)
 
 fn buffer_window (start : Int) (length : Int) : BufferWindow = MkBufferWindow start length

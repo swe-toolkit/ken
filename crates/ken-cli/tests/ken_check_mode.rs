@@ -136,6 +136,45 @@ fn check_catalog_entry_resolves_import_through_roots_loader() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: the CLI's catalog roots route
+/// rejects a bare non-floor checked family and accepts its explicit home import.
+/// CLAIMED: `ken check` does not resolve catalog entries through the Legacy
+/// ambient fallback. THE GAP: isolated paths retain their separate route.
+#[test]
+fn catalog_check_requires_import_for_checked_buffer_window_home() {
+    let root = "strict_home_buffer_window/catalog/packages";
+    write_fixture(
+        &format!("{root}/Capability/System/Buffer.ken"),
+        "export BufferWindow, MkBufferWindow\n",
+    );
+    for (suffix, import, should_pass) in [
+        ("Bare", "", false),
+        (
+            "Imported",
+            "import Capability.System.Buffer (BufferWindow, MkBufferWindow)\n",
+            true,
+        ),
+    ] {
+        let path = write_fixture(
+            &format!("{root}/{suffix}/Entry.ken"),
+            &format!("{import}fn make_window (start : Int) (length : Int) : BufferWindow = MkBufferWindow start length\n"),
+        );
+        let output = Command::new(ken_bin())
+            .arg("check")
+            .arg(&path)
+            .output()
+            .expect("spawn ken check");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.success(), should_pass, "{suffix}: {stderr}");
+        if !should_pass {
+            assert!(
+                stderr.contains("UnboundName") && stderr.contains("BufferWindow"),
+                "strict catalog refusal must identify the unimported checked family: {stderr}"
+            );
+        }
+    }
+}
+
 /// Durable invariant: roots loading does not erase the entry document's
 /// negative-example obligation.
 #[test]
