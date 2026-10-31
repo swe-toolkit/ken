@@ -1090,9 +1090,9 @@ standalone routes: `elaborate_file_v1`, `elaborate_ken_md_file_v1`,
 Roots require explicit imports; Strict roots alone assert missing-import
 refusals. Each accepted direct standalone API route asserts the five original
 IDs itself; one route's result does not stand in for another. The CLI promise
-remains normative, but this seed declares an observation gap for non-catalog
-`check`, `run`, and `native-build`; see the gap below. Other unimported Legacy
-bare implementation globals, including `ConsoleOp`, are unspecified: neither
+is covered by `legacy-cli-exact-id-resolution-report` below, which exercises
+non-catalog `check`, `run`, and `native-build`. Other unimported Legacy bare
+implementation globals, including `ConsoleOp`, are unspecified: neither
 promised nor refused. The scoped ConsoleStream constructor rows below retain
 their every-route contract. No row adds trust or duplicates a checked
 definition.
@@ -1257,16 +1257,22 @@ definition.
 - spec: `33 §3.3`; `39 §2.0`; `70 §1.4`
 - given: place the accepted root below in a standalone `.ken` file. Place the
   shadow root below in a second file; the shadow differs only by its leading
-  `proc write` declaration. Each root has the same `program` header and the
-  same four client declarations. Invoke each file separately with `ken check`,
-  `ken run` and `ken native-build`, using `--resolution-report=<new-path>`
-  immediately after the subcommand. Supply an explicit resource profile for
-  native-build. Read each route's own `ken.resolution/v1` report file.
+  `proc write` declaration. Each root has the same `program` header, explicit
+  `Capability.Console.Text` import of `write` as `catalog_write`, and the same
+  four client declarations. The shadow delegates its local `write` body through
+  that imported identity; `write_probe` still uses bare `write` to exercise
+  the five-name Legacy route contract. Invoke each file separately with
+  `ken check`, `ken run` and `ken native-build`, using
+  `--resolution-report=<new-path>` immediately after the subcommand. Supply an
+  explicit resource profile for native-build. Read each route's own
+  `ken.resolution/v1` report file.
 
   Accepted root:
 
   ```ken
   program capabilities FS APartial
+
+  import Capability.Console.Text (write as catalog_write)
 
   proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
     write ConsoleStream.Stdout payload
@@ -1287,8 +1293,10 @@ definition.
   ```ken
   program capabilities FS APartial
 
+  import Capability.Console.Text (write as catalog_write)
+
   proc write (stream : ConsoleStream) (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
-    ITree.Ret ConsoleOp console_resp (Result IOError Unit) (Ok IOError Unit MkUnit)
+    catalog_write stream payload
 
   proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
     write ConsoleStream.Stdout payload
