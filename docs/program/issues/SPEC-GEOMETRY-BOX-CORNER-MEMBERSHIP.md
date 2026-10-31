@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-CORNER-MEMBERSHIP
 title: "Spec 67 §10 bounds the distance between two points in MkBox lo hi by manhattan lo hi, but no public law says the bound is reached: a client cannot conclude that a box containing some point contains its own corners. Rule from a checked D0 at zero trust that a box containing a point contains lo and hi, and state the two laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
