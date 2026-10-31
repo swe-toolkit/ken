@@ -9,7 +9,8 @@
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY §7;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION §8;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY §9;
-> SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER §10).** Sections 1–4,
+> SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER §10;
+> SPEC-GEOMETRY-BOX-CORNER-MEMBERSHIP §11).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -35,11 +36,13 @@
 > scratch and candidate-local checks are not official conformance-runner
 > execution or a measured landed trust result. Section 10 states a
 > checked upper bound on Manhattan distance between points contained in
-> one box. Architect's AC-0 proof check is isolated scratch evidence,
-> not a candidate test. This assembled candidate contains the §10
-> catalog theorem, package-owned test and CV-authored seed; the seed is
-> authored but unexecuted. Official conformance-runner execution, CI,
-> publication, landing and landed trust are not established here.
+> one box. Its catalog theorem, package-owned test and seed are now on
+> main; Architect's AC-0 was isolated scratch evidence, not a landed
+> trust measurement. Section 11 states witnessed membership of both
+> stored corners. Architect AC-0 checked both generic proofs only in
+> scratch. This spec-only child adds no §11 catalog theorems, package
+> test or CV seed. No §11 official conformance-runner execution, CI,
+> publication, landing or landed trust is established.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -1040,9 +1043,8 @@ bounds each per-axis distance by the corresponding corner distance.
 `axis_distance_bounded` are new **private** proof helpers;
 `axis_distance` remains private. None becomes a client import or a
 new public premise, and no §1–§9 operation or law type changes. The
-law neither supplies an attainment witness nor publishes an extra
-corner-membership theorem; that separate containment claim belongs
-to a possible successor.
+law alone neither supplies an attainment witness nor publishes an extra
+corner-membership theorem; §11 states that separate containment claim.
 
 The CV-authored seed is present in this candidate. Its closed box
 `(1,1)–(4,3)` contains `(1,3)` and `(4,1)`; their Manhattan distance
@@ -1055,3 +1057,56 @@ an unrelated type error. A smaller-than-`5` bound on the contained
 pair is also false. These closed calculations delimit the generic
 contract but do not replace its checked proof or count as execution
 of the authored but unexecuted seed.
+
+## 11. A box containing a point contains its stored corners
+
+> **Section 11 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-CORNER-MEMBERSHIP).** Architect's AC-0 on exact base
+> `be60eb319` checked both generic proofs in scratch with `ken check`
+> and `ken fmt --check` rc 0, no new `Axiom`, and equal scratch trusted
+> identity sets 114 → 114. These are design measurements, not candidate
+> checks. This spec-only child adds no §11 catalog theorems, package
+> test or conformance seed; no official conformance-runner execution,
+> CI, publication, landing or landed trust is claimed for §11.
+
+`Algorithm.Geometry.NatBox` must export both checked theorems immediately
+after `manhattan_box_diameter` and before the private
+`axis_distance_triangle`:
+
+```ken
+pub theorem contains_lo_corner
+      (lo : Point) (hi : Point) (p : Point)
+    : IsTrue (contains (MkBox lo hi) p) → IsTrue (contains (MkBox lo hi) lo)
+
+pub theorem contains_hi_corner
+      (lo : Point) (hi : Point) (p : Point)
+    : IsTrue (contains (MkBox lo hi) p) → IsTrue (contains (MkBox lo hi) hi)
+```
+
+Each theorem has exactly one **curried witness premise**: some `p` lies
+in `MkBox lo hi`. The conclusion names the corresponding stored
+corner's membership in that same box. No validity premise is needed,
+and neither theorem promises that every box contains its own corners:
+`(3,3)–(1,1)` contains no point and does not contain its own lower
+corner. Omitting the witness would make the lower-corner claim false
+for that inverted box.
+
+The checked proof reuses `axis_corner_low` and `axis_corner_high`,
+which stay **private** and unchanged. The public contract is at the
+`Box` level; no per-axis raw-Nat helper becomes an export or a public
+premise. No §1–§10 operation or law type changes.
+
+For any box containing a point `p`, the two theorems establish
+membership of `lo` and `hi`. Applying §10's
+`manhattan_box_diameter` to those two members bounds their distance
+by `manhattan lo hi` itself. Thus the box's own corners attain the
+§10 bound whenever it contains any point. This is a consequence of
+the two public laws, **not** a third public attainment theorem.
+
+A subsequent CV seed can use `(1,1)–(4,3)` with witness `(2,2)`,
+apply both laws and check each corner's membership independently.
+Its isolated negative must refuse the lower-corner claim for the
+inverted `(3,3)–(1,1)` box, paired with an accepted witness case so
+the missing premise, rather than proof-form mismatch, is tested.
+These seed obligations do not constitute an authored or executed
+seed in this spec-only turn.
