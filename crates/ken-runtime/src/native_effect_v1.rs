@@ -109,14 +109,12 @@ impl<B: HostEffectBackendV1> KenNativeInvocationV1<B> {
             call.resources,
             &call.request,
         )?;
-        self.observation
-            .effect_trace
-            .push(ken_host::effect_event_from_dispatch(
-                self.observation.effect_trace.len() as u64,
-                call.operation,
-                call.request,
-                &reply,
-            ));
+        ken_host::append_dispatch_events(
+            &mut self.observation.effect_trace,
+            call.operation,
+            call.request,
+            &reply,
+        );
         Ok(self.response_arena.append(reply))
     }
 }

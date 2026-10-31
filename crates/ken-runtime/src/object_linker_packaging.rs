@@ -4679,12 +4679,13 @@ mod tests {
         )
         .unwrap();
         let token = open.resource_token.expect("semantic lane mints a token");
-        let mut semantic_events = vec![ken_host::effect_event_from_dispatch(
-            0,
+        let mut semantic_events = Vec::new();
+        ken_host::append_dispatch_events(
+            &mut semantic_events,
             ken_host::HostOpV1::FsOpen,
             open_request,
             &open,
-        )];
+        );
         for (operation, request) in [
             (
                 ken_host::HostOpV1::FsHandleMetadata,
@@ -4710,12 +4711,7 @@ mod tests {
                 &request,
             )
             .unwrap();
-            semantic_events.push(ken_host::effect_event_from_dispatch(
-                semantic_events.len() as u64,
-                operation,
-                request,
-                &reply,
-            ));
+            ken_host::append_dispatch_events(&mut semantic_events, operation, request, &reply);
         }
         assert_eq!(
             trace.effect_trace, semantic_events,

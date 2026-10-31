@@ -37,13 +37,14 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
             ken_host::HostOpV1::ProcessPlanPush,
             ken_host::HostOpV1::ProcessPlanPush,
             ken_host::HostOpV1::ProcessPlanPush,
+            ken_host::HostOpV1::ResourceRelease,
             ken_host::HostOpV1::ProcessSpawn,
             ken_host::HostOpV1::ProcessWait,
             ken_host::HostOpV1::ResourceRelease,
         ],
     );
     assert!(matches!(
-        observed.effect_trace[6].outcome,
+        observed.effect_trace[7].outcome,
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ChildExit(
             ken_host::ChildExitV1::Exited(0)
         ))
@@ -232,6 +233,192 @@ fn ac1_checked_interpreter_stdout_pipe_preserves_argv_and_environment() {
         ),
         "normal child exit: {waits:?}"
     );
+}
+
+/// Promise class: durable invariant (spec 38 §1.11.2; spec 71 settlement
+/// template). MEASURED: checked withChild takes and reads its stdout pipe,
+/// waits, and records one target-bound release per acquired plan, pipe and
+/// child identity, with the pipe before the child. A failed spawn still
+/// records its plan release before the error. CLAIMED: dispatch-time
+/// retirement and bracket cleanup cannot silently lose or duplicate these
+/// settlements. THE GAP: only one taken pipe is exercised; pipe close is a
+/// drop today, so a pipe ReleaseFailed is not reachable in this fixture.
+#[test]
+fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
+    use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
+    use ken_host::{HostOpV1 as Op, ResourceBindingRole as Role};
+    use ken_host::{ResourceKindV1 as Kind, ResourceSettlementOutcomeV1 as Settlement};
+
+    let source = ARGV_ENV_PIPE.replace(
+        "PX10_CHILD_PROBE_PATH",
+        env!("CARGO_BIN_EXE_px10-child-probe"),
+    );
+    let root = tempfile::tempdir().expect("isolated interpreter root");
+    // Same 3292 KiB resident fixture stack measured by AC-1; 16 MiB leaves
+    // more than 12 MiB headroom, independently of the harness default.
+    let observed = std::thread::Builder::new()
+        .name("px10-ac1b-settlement".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &[],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .map_err(|error| format!("{error:?}"))
+        })
+        .expect("stated interpreter fixture stack")
+        .join()
+        .expect("interpreter fixture thread completes")
+        .expect("checked stdout-pipe program executes");
+    assert_eq!(observed.exit_status, 0, "{:?}", observed.effect_trace);
+    let trace = &observed.effect_trace;
+    let acquired = |op, kind| {
+        let events = trace
+            .iter()
+            .filter(|event| event.operation == op)
+            .filter_map(|event| match &event.outcome {
+                Outcome::Success(Reply::ResourceAcquired {
+                    resource_kind,
+                    identity,
+                    ..
+                }) if *resource_kind == kind => Some(*identity),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(events.len(), 1, "exactly one {op:?}/{kind:?}: {trace:?}");
+        events[0]
+    };
+    let plan = acquired(Op::ProcessPlanOpen, Kind::SpawnPlan);
+    let child = acquired(Op::ProcessSpawn, Kind::ChildProcess);
+    let pipe = acquired(Op::ProcessTakePipe, Kind::PipeRead);
+    assert_ne!(plan, child);
+    assert_ne!(child, pipe);
+    assert_ne!(plan, pipe);
+    let settled = |kind, identity| {
+        let events = trace
+            .iter()
+            .filter(|event| event.operation == Op::ResourceRelease)
+            .filter(|event| event.resource_bindings.contains(&(Role::Target, identity)))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            events.len(),
+            1,
+            "one {kind:?} settlement for {identity:?}: {trace:?}"
+        );
+        let event = events[0];
+        assert_eq!(
+            event.resource_bindings,
+            [(Role::Target, identity)],
+            "settlement must bind its acquired identity"
+        );
+        assert!(matches!(
+            &event.outcome,
+            Outcome::Success(Reply::ResourceSettlement(observation))
+                if observation.resource_kind == kind
+                    && observation.identity == identity
+                    && observation.outcome == Settlement::Released
+        ));
+        event.sequence
+    };
+    let plan_at = settled(Kind::SpawnPlan, plan);
+    let pipe_at = settled(Kind::PipeRead, pipe);
+    let child_at = settled(Kind::ChildProcess, child);
+    let spawn_at = trace
+        .iter()
+        .find(|event| event.operation == Op::ProcessSpawn)
+        .unwrap()
+        .sequence;
+    assert!(plan_at < spawn_at && spawn_at < pipe_at && pipe_at < child_at);
+    assert!(
+        trace.iter().any(|event| matches!(
+            (&event.operation, &event.outcome),
+            (Op::ResourceStreamRead, Outcome::Success(Reply::ReadProgress(
+                ken_host::ReadProgressV1::ReadSome { transferred, .. }
+            ))) if transferred.get() > 0
+        )),
+        "the checked body must actually read its acquired pipe"
+    );
+    assert!(
+        trace.iter().any(|event| matches!(
+            (&event.operation, &event.outcome),
+            (
+                Op::ProcessWait,
+                Outcome::Success(Reply::ChildExit(ken_host::ChildExitV1::Exited(0)))
+            )
+        )),
+        "the checked body must wait for its child"
+    );
+
+    let missing = tempfile::tempdir().expect("isolated absent child path");
+    let absent = missing.path().join("no-such-child");
+    let failed_source = SMOKE.replace("/bin/true", absent.to_str().expect("UTF-8 child path"));
+    let failed_root = tempfile::tempdir().expect("isolated failed-spawn root");
+    let mut host = ken_interp::PosixHost::new_at(failed_root.path());
+    let failed = ken_cli::run_program_effect_observation(
+        &failed_source,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        failed_root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("failed spawn remains a checked interpreter observation");
+    let failed_trace = &failed.effect_trace;
+    let failed_plan = failed_trace
+        .iter()
+        .find_map(|event| match (&event.operation, &event.outcome) {
+            (
+                Op::ProcessPlanOpen,
+                Outcome::Success(Reply::ResourceAcquired {
+                    resource_kind: Kind::SpawnPlan,
+                    identity,
+                    ..
+                }),
+            ) => Some(*identity),
+            _ => None,
+        })
+        .expect("one plan acquired before failed spawn");
+    let errors = failed_trace
+        .iter()
+        .filter(|event| {
+            matches!(
+                (&event.operation, &event.outcome),
+                (Op::ProcessSpawn, Outcome::Error(_))
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(errors.len(), 1, "spawn must fail: {failed_trace:?}");
+    let failed_settlements = failed_trace
+        .iter()
+        .filter(|event| {
+            event.operation == Op::ResourceRelease
+                && event
+                    .resource_bindings
+                    .contains(&(Role::Target, failed_plan))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        failed_settlements.len(),
+        1,
+        "retired plan is settled once: {failed_trace:?}"
+    );
+    assert_eq!(
+        failed_settlements[0].resource_bindings,
+        [(Role::Target, failed_plan)]
+    );
+    assert!(matches!(
+        &failed_settlements[0].outcome,
+        Outcome::Success(Reply::ResourceSettlement(observation))
+            if observation.resource_kind == Kind::SpawnPlan
+                && observation.identity == failed_plan
+                && observation.outcome == Settlement::Released
+    ));
+    assert!(failed_settlements[0].sequence < errors[0].sequence);
 }
 
 struct NonCloexecFd9 {
