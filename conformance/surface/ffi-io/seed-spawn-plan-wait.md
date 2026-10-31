@@ -15,9 +15,11 @@ They use the exact §1.11.2 signatures, including the Auth/type parameters,
 specified typed resource arguments. No second Process capability argument or
 raw descriptor form is introduced.
 
-At this base `ChildInherit` takes the existing `Stream` family. The later
-Console/Char migration is one spelling change to `ConsoleStream`, not a second
-family. These cases use the pre-landing `Stream` form.
+Source clients use `ChildInherit ConsoleStream` and the qualified
+`ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and `ConsoleStream.Stderr`
+values. They select the existing checked stream family. The prelude retains
+its internal `ChildInherit Stream` declaration; no second family or
+source-visible `Stream` alias is introduced.
 
 ## Test fixtures
 
@@ -192,17 +194,18 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 - promise class: normative compatibility vector.
 - spec: §1.11.1.
 - given: a client exhaustively matches `ChildStdio` using `ChildPipe`,
-  `ChildNull`, and `ChildInherit Stream`, with no catch-all. A separate
+  `ChildNull`, and `ChildInherit ConsoleStream`, with no catch-all. A separate
   negative client supplies an integer descriptor to `ChildInherit`; its
-  positive control supplies a parent `Stream` value. The routing run selects
-  the parent's stdin, stdout, and stderr `Stream` values with distinct input
-  and captured output on each parent stream.
+  positive control supplies a parent `ConsoleStream` value. The routing run
+  selects `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
+  `ConsoleStream.Stderr` with distinct input and captured output on each
+  parent stream.
 - expect: the exhaustive client is complete for the three specified choices;
-  the integer target is rejected by the `Stream` type and the positive control
-  is accepted. Inherited child stdin reads the parent's input; inherited child
-  stdout and stderr reach their corresponding parent streams. `ChildNull`
-  connects only the selected child stream to the null device. No arbitrary
-  descriptor value is accepted as a `ChildInherit` target.
+  the integer target is rejected by the `ConsoleStream` type and the positive
+  control is accepted. Inherited child stdin reads the parent's input;
+  inherited child stdout and stderr reach their corresponding parent streams.
+  `ChildNull` connects only the selected child stream to the null device. No
+  arbitrary descriptor value is accepted as a `ChildInherit` target.
 - why: the three routing choices are tested against distinct parent streams;
   a swapped or raw-descriptor route differs observably. The case is about the
   public type and behavior, not a source-text inventory.
