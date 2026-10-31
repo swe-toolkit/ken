@@ -1281,13 +1281,15 @@ definition.
     host_program APartial (print_line "probe")
   ```
 
-- expect: all three accepted-root invocations accept. In each report,
-  `write_probe` references pre-source `IO` and `write`, `main` references
-  pre-source `print_line`, `char_code_probe` references pre-source `charToInt`,
-  and `char_order_probe` references pre-source `leqChar`. Documents are
-  byte-identical across routes except for the `route` field. No `GlobalId`
-  number appears. Each invocation's stdout, stderr and status are identical
-  with and without the flag; without it no report is created.
+- expect: all three accepted-root invocations accept. The reports have
+  `route` values `check`, `run`, and `native-build`, respectively; each has
+  `module` set to JSON `null`. In each report, `write_probe` references
+  pre-source `IO` and `write`, `main` references pre-source `print_line`,
+  `char_code_probe` references pre-source `charToInt`, and `char_order_probe`
+  references pre-source `leqChar`. Documents are byte-identical across routes
+  except for the `route` field. No `GlobalId` number appears. Each invocation's
+  stdout, stderr and status are identical with and without the flag; without it
+  no report is created.
 - controls: an existing report path refuses creation without overwriting it;
   an elaboration failure leaves no partial report file.
 
@@ -1431,26 +1433,57 @@ definition.
 - promise class: **durable invariant** — only one leading equals-form token is
   consumed as the report option
 - spec: `70 §1.4`
-- given: use a valid standalone source containing `const answer : Bool = True`.
-  With fresh destinations, invoke (a) `ken check` with bare
-  `--resolution-report`, `<bare-path>`, and `<source>` arguments in that order;
-  (b) `ken check` with `<source>` followed by
-  `--resolution-report=<misplaced-path>`; and (c) create a valid source file
-  whose literal path is `--resolution-report=decoy.ken`, ensure `decoy.ken` does
-  not exist, then invoke
+- given: in an isolated directory, create a valid standalone source containing
+  `const answer : Bool = True` at the literal path `--resolution-report`; also
+  create an identical source at `ordinary.ken`. Invoke (a)
+  `ken check --resolution-report`; (b)
+  `ken check ordinary.ken --resolution-report=<misplaced-path>`; and (c) create
+  a valid source at literal path `--resolution-report=decoy.ken`; ensure
+  `decoy.ken` does not exist, then invoke
   `ken check --resolution-report=<first-path> --resolution-report=decoy.ken`.
-- expect: in (a) and (b), the destination is not created as a report; the
-  token is not this option. Do not pin the route's other positional outcome,
-  status, or diagnostic text. In (c), only the first token is removed as the
-  report option. The literal `--resolution-report=decoy.ken` is the source
-  path, a complete report is written to `<first-path>`, and `decoy.ken` is not
-  created as a report. The report is written to the named file, not stdout or
-  stderr.
-- controls: the canonical one-token invocation with the same source and a
-  fresh destination produces a complete report at that destination.
-- why: the positive option position is tested separately from the bare,
-  misplaced, and repeated-token boundaries, without freezing unrelated
-  positional-parser behavior.
+  Use fresh report destinations.
+- expect: (a) accepts as an ordinary source-file check and creates no report.
+  In (b), `<misplaced-path>` is not created as a report;
+  do not pin the route's other positional outcome, status, or diagnostic text.
+  In (c), only the first token is removed as the report option. The literal
+  `--resolution-report=decoy.ken` is the source path, a complete report is
+  written to `<first-path>`, and no separate `decoy.ken` report is created.
+  The report is written to the named file, not stdout or stderr.
+- controls: `ken check ordinary.ken` accepts, establishing the ordinary-check
+  result for the valid bare-token path in (a).
+- why: the valid bare-token path distinguishes ordinary positional acceptance
+  from a parser that consumes the token and errors before report creation. The
+  misplaced and repeated-token cases avoid freezing unrelated positional
+  behavior.
+
+### surface/modules/catalog-resolution-report-source-constructor-reference
+
+- promise class: **durable invariant** — a root-owned constructor reference
+  carries the constructor field required by the report schema
+- spec: `34 §1`; `34 §1.1`; `70 §1.4`
+- given: in a fresh fixture catalog, write `catalog/packages/Entry.ken.md`:
+
+  ````markdown
+  # Entry
+
+  ```ken
+  data LocalChoice = Chosen
+  const selected : LocalChoice = LocalChoice.Chosen
+  ```
+  ````
+
+  From the fixture root, run `ken check` with
+  `--resolution-report=<new-path>` immediately after the subcommand.
+- expect: the entry accepts with a complete report. In the `selected` row's
+  `references` array, the family reference is source-declared with
+  `declaration` equal to `LocalChoice`. A distinct source-declared constructor
+  reference also has `declaration` equal to `LocalChoice` and includes the
+  required `constructor` field. Do not pin member-key order or the constructor
+  field's value.
+- controls: the same entry accepts under `ken check` without the report option.
+- why: `Chosen` is a constructor of a family declared in the entry root, so this
+  exercises the schema's constructor-specific field without relying on an
+  imported or pre-source constructor.
 
 ### surface/modules/resolution-report-failure-labels
 
