@@ -37,10 +37,13 @@
 > measurement. CV statically checked the seed but did not run it as Ken
 > or through the official runner. The separate `cat_graphs_dependency`
 > run timed out without a verdict. Section 9 states one premise-free
-> walk-reversal law. Its Architect AC-0 is scratch-only (trusted identities
-> 114 → 114); this spec-only child adds no §9 catalog export, package
-> test or CV seed. No §9 official conformance, CI, publication, landing
-> or measured landed trust is established.
+> walk-reversal law. Architect AC-0's 114 → 114 identity check was
+> scratch-only. The historical spec-only child added no §9 catalog
+> export, package test or CV seed; this assembled candidate contains
+> the checked catalog law, package-owned test and CV-authored seed.
+> The seed is authored but not Ken-checked or run through the official
+> conformance runner. Candidate-local tests establish no official
+> conformance, CI, publication, landing or measured landed trust.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -837,9 +840,13 @@ candidate QA or a conformance-execution result.
 > `ken check` and `ken fmt --check` rc 0, no added `Axiom`, and equal
 > scratch `trusted_base()` identity sets 114 → 114. This is isolated
 > design evidence, not a candidate catalog check or landed trust
-> result. This spec-only child adds no §9 catalog export, package test
-> or CV-authored seed. No §9 official conformance-runner execution,
-> CI, publication, landing or measured landed trust is established.
+> result. The historical spec-only child added no §9 catalog law,
+> package test or CV seed. This assembled candidate contains the
+> checked catalog law, package-owned test and CV-authored seed. The
+> seed remains authored but not Ken-checked or run through the official
+> conformance runner. Neither scratch AC-0 nor candidate-local tests
+> establish an official conformance run, CI, publication, landing or a measured
+> landed-trust result.
 
 `Algorithm.Graphs.Dependency` must export one public Transparent law
 immediately after `graph_reachable_reverse` and before `contains`.
@@ -887,17 +894,18 @@ flip; no new edge lemma, premise, kernel form, surface rule or source
 of trust is required. All §1–§8 public operation and law types stay
 unchanged.
 
-The later CV seed must use a three-vertex chain **with a V0 → V2
-shortcut**, not the chain alone: the reversed graph then has two
-distinct walks from V2 to V0, one through V1 and one direct. On the
-composed V0 → V1 → V2 walk, the accepted law and a closed equality of
-its reversed result with the route through V1 form the positive
-control. An isolated equality with the direct shortcut walk must be
+The CV-authored seed in this assembled candidate uses a three-vertex
+chain **with a V0 → V2 shortcut**, not the chain alone: the reversed
+graph then has two distinct walks from V2 to V0, one through V1 and
+one direct. On the composed V0 → V1 → V2 walk, the accepted law and
+a closed equality of its reversed result with the route through V1
+form the positive control. An isolated equality with the direct shortcut walk must be
 refused at its own `Refl`, paired with an accepted same-form `Refl`
 claim for the route through V1. `Proved` is refused even for a true
 closed `Walk` equality, so it cannot discriminate this false walk
 claim; edge proofs inside `WalkStep` instead use `Proved` for their
 `Equal Bool` claims. A well-typed direct walk does not become equal to a different
 same-endpoint walk by this law. These closed observations delimit the
-contract but do not replace its generic checked proof; no §9 seed is
-authored or executed by this spec-only turn.
+contract but do not replace its generic checked proof. The historical
+spec-only child authored no seed; the assembled candidate contains the
+CV-authored seed, which remains unexecuted.
