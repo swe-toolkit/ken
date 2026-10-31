@@ -244,6 +244,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
         runtime_roles: Box::new(CanonicalRuntimeRoles::zeroed()),
         native_trusted_base: std::collections::BTreeSet::new(),
         pre_source_names: std::collections::BTreeMap::new(),
+        pre_source_display_names: std::collections::BTreeMap::new(),
         nat_id: z,
         zero_id: z,
         suc_id: z,
@@ -366,6 +367,10 @@ pub struct PreludeEnv {
     /// before package source can rebind `globals`. A present `None` is an
     /// admitted unnamed declaration, not a request to consult the live map.
     pub(crate) pre_source_names: std::collections::BTreeMap<GlobalId, Option<String>>,
+    /// Source-visible names for pre-source identities whose surface binding
+    /// moved after capture. Display only: membership and stable symbols stay
+    /// keyed on `pre_source_names`.
+    pub(crate) pre_source_display_names: std::collections::BTreeMap<GlobalId, String>,
     // `Nat` (Peano) — the `unfoldUpTo` fuel.
     pub nat_id: GlobalId,
     pub zero_id: GlobalId,
@@ -3457,6 +3462,7 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         runtime_roles,
         native_trusted_base: std::collections::BTreeSet::new(),
         pre_source_names: std::collections::BTreeMap::new(),
+        pre_source_display_names: std::collections::BTreeMap::new(),
         nat_id: core.nat_id,
         zero_id: core.zero_id,
         suc_id: core.suc_id,

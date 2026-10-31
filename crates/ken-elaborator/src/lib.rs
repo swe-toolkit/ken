@@ -508,9 +508,9 @@ impl ElabEnv {
             "ConsoleStream",
         )?;
         // The source-visible canonical ConsoleStream family is scoped after
-        // the pre-source identity snapshot. Refresh only these captured
-        // *names*, keyed by their unchanged checked identities; never derive
-        // report membership from the mutable source globals.
+        // the immutable pre-source identity and stable-symbol snapshot. Capture
+        // only report display names here, keyed by those same checked IDs;
+        // never alter the native stable-symbol names or report membership.
         for name in [
             "ConsoleStream",
             "ConsoleStream.Stdin",
@@ -519,8 +519,8 @@ impl ElabEnv {
         ] {
             if let Some(id) = elab.globals.get(name) {
                 elab.prelude_env
-                    .pre_source_names
-                    .insert(*id, Some(name.into()));
+                    .pre_source_display_names
+                    .insert(*id, name.into());
             }
         }
         elab.module_state.install_prelude_floor();
@@ -1039,6 +1039,9 @@ impl ElabEnv {
             .retain(|id| !removed_ids.contains(id));
         prelude_env
             .pre_source_names
+            .retain(|id, _| !removed_ids.contains(id));
+        prelude_env
+            .pre_source_display_names
             .retain(|id, _| !removed_ids.contains(id));
         class_env.scrub_global_ids(&removed_ids);
         module_state.scrub_global_ids(&removed_ids);

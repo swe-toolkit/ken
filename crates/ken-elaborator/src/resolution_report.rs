@@ -185,7 +185,13 @@ pub fn resolution_report(
         let mut refs = BTreeSet::new();
         for id in ids {
             let reference = if let Some(name) = env.prelude_env.pre_source_names.get(&id) {
-                Reference::PreSource(name.clone())
+                Reference::PreSource(
+                    env.prelude_env
+                        .pre_source_display_names
+                        .get(&id)
+                        .cloned()
+                        .or_else(|| name.clone()),
+                )
             } else if let Some((name, constructor)) = source.get(&id) {
                 Reference::Source(root_name(name, module).to_owned(), constructor.clone())
             } else if let Some((unit, name)) = imported.get(&id) {
