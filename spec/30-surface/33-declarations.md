@@ -355,6 +355,30 @@ is a **surface error** (`24`) — it never reaches the kernel:
   mode; the bare constructor spellings are not restored. This slice
   changes no CLI route or standalone roots loader. L2-4 owns that route
   and the strict-default flip.
+- **CLI observation of checked resolution.** The opt-in
+  `--resolution-report=<path>` file (§70 §1.4) makes the five-ID promise
+  on standalone and non-catalog `ken check`, `ken run` and
+  `ken native-build` observable at each route's own successful
+  elaboration. A closed root referencing `IO`, `write`, `print_line`,
+  `charToInt` and `leqChar` yields `pre-source` entries with their
+  canonical names in the checked declarations' reference sets. This
+  observes the exact checked identities, not merely successful
+  type-checking or matching program output; it does not replace the
+  normative guarantee above.
+
+  A type-compatible top-level source declaration named `write` is a
+  discriminating control: the three routes accept a well-typed shadow
+  root, but its `write_probe` references `source-declared` `write`, not
+  the pre-source `write`; the other four identities remain pre-source.
+  In a Strict root the accepted client imports all five from their
+  homes, while the shadow must **omit** the `write` import to avoid an
+  ambiguous declaration. The shadow's own body must not mention
+  `write`: a top-level binding captures earlier uses too, making a
+  wrapper that calls `write` recursive. The report distinguishes
+  identities fixed in checked terms, not which source spellings
+  produced them: inserted references are included and literal
+  identities omitted. It neither emits raw `GlobalId` numbers nor
+  changes the availability or resolution of any name.
 - **Closed built-in name set B.** For resolution and name protection, B is the
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
