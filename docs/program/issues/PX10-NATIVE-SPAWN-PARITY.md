@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX10-SPAWN-PLAN-WAIT]
+depends_on: [PX10-SPAWN-PLAN-WAIT, PX10-NATIVE-SITE-IDENTITY, PX10-NATIVE-BRANCH-ALTERNATIVES]
 blocks: [PX10]
 github: null
 origin: "PX10-SPAWN-PLAN-WAIT recut interpreter-first (Steward evt_15ra8z0j0typg) on the Architect's measured native wall (evt_4asjwp948dzqh). L1 objective: the Linux ABI program. This is PX10's native-parity slice; pidfd signalling is the next. Steward-filed per COORDINATION section 2."
@@ -90,6 +90,35 @@ base, stop and report the mismatch; do not build around it.
 - **AC-3 (negative, QA).** A dispatch reached through a fold's `Vis`
   case, or through a `Let` value, still refuses. A mutant that accepts
   either reddens a named row.
+
+## Increments and §1b inventory
+
+Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
+
+- **Increment A** is the settlement repair (R1) and AC-1b on the
+  interpreter. It lands on its own.
+- **Increment B** is R2, R3, the recipe rows, the promotion, the gate
+  deletion and native parity. It waits for `PX10-NATIVE-SITE-IDENTITY`
+  and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
+
+The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
+evt_1jd8yzwewmtf6) has five entries:
+
+1. W1, the returned-Vis settlement is checked against the protocol's
+   root owner. Keyed on the emitting protocol; R3 closes it.
+2. W1', `aggregates.rs:10581`: `host_effect_recipe_tree` gives the
+   seven PX10 operations no recipe. Keyed on a second operation list;
+   the recipe rows close it. This entry is independent of the others.
+3. W2, `responses.rs:2030`: a finalizer emitted inside a closure cannot
+   reach its selecting match. Keyed on the emitter's position.
+4. W3, `responses.rs:3825`: a mixed-owner transport stage. Keyed on the
+   emission unit.
+5. W4, `lowering/calls.rs:1861`: a curried chain body is called from
+   its emitting unit, not its static caller. Keyed on the emitting
+   function.
+
+Entries 1, 3, 4 and 5 share one predicate: identity read from the
+emitting unit, not the static owner.
 
 ## Stop conditions
 
