@@ -8,7 +8,8 @@
 > SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
-> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9).** The §1–2
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9;
+> SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10).** The §1–2
 > operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
@@ -41,25 +42,23 @@
 > test are present on this base; the test checks the complete accepted seed
 > and isolated false hull claim. These package checks are not official
 > conformance-runner execution, CI, publication, landing or landed trust.
-> Section 8 specifies two new premise-free absorption laws by endpoint-value
-> inclusion. Architect's isolated D0 on `fd2f57557` checked their generic
-> bodies with no new `Axiom` and equal scratch trusted GlobalId sets
-> (114 → 114). This assembled candidate adds the two §8 checked catalog
-> laws, the corrected CV seed and a package-owned test. D0 remains scratch;
-> reported candidate-local tests and mutations do not establish official
-> conformance-runner execution, CI, publication, landing or landed trust.
-> Section 9 specifies four premise-free hull/intersection regrouping laws
-> by mutual endpoint-value inclusion. Architect's isolated AC-0 on
-> `903b06068` checked the four generic proofs without an `Axiom` and with
-> unchanged scratch trusted GlobalId identities (114 → 114). The
-> assembled candidate has four checked §9 catalog exports, the authored
-> seed and a package-owned test. The named
-> `cat_numeric_interval_hull_intersect_associativity` target passed 2/2
-> with reported candidate-local trusted identity sets 114 → 114. CV
-> statically checked the seed but did not run it as Ken or through the
-> official conformance runner. Neither D0 nor candidate-local checks
-> establish official conformance, CI, publication, landing or landed
-> trust.
+> Section 8's two checked absorption laws, corrected CV seed and
+> package-owned test are now on main. Architect's isolated D0 had equal
+> scratch trusted identities 114 → 114; earlier candidate-local checks
+> do not establish official conformance or measured landed trust.
+> Section 9's four checked regrouping laws, authored seed and
+> package-owned test are now on main. Architect AC-0 checked the generic
+> proofs in scratch without a new `Axiom` and with equal trusted
+> identities 114 → 114. The named package target previously passed 2/2
+> with candidate-local trusted identities 114 → 114; CV statically
+> checked the seed but did not run it as Ken or through the official
+> conformance runner. Neither result establishes an official runner
+> execution or measured landed trust. Section 10 specifies four public
+> point-unit inclusions. Architect AC-0 checked them only in scratch
+> with equal trusted identities 114 → 114. This spec-only child adds no
+> §10 catalog export, package test or CV seed; no §10 official
+> conformance, CI, publication, landing or measured landed trust is
+> established.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -1007,3 +1006,87 @@ operand position. Those D0 observations remain isolated scratch
 results. CV statically checked the authored seed but did not run it as
 Ken or through the official conformance runner; the package-owned
 test is candidate-local evidence, not execution of that seed.
+
+## 10. Point zero and point one as interval units
+
+> **Section 10 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-POINT-UNITS).** Architect AC-0 on exact
+> base `86b7cac5e` checked four generic laws with `ken check` and
+> `ken fmt --check` rc 0, no added `Axiom`, and equal scratch
+> `trusted_base()` identity sets 114 → 114. This is isolated design
+> evidence, not candidate catalog or seed execution. This spec-only
+> child adds no §10 catalog export, package test or CV-authored seed.
+> No §10 official conformance-runner execution, CI, publication,
+> landing or measured landed trust is established.
+
+`Algorithm.Numeric.RationalInterval` must export four public
+Transparent theorems in the order below, immediately after
+`interval_intersect_assoc_rev_inside` and before the existing private
+`equiv_leq`. Each takes **one** interval and has **no premise**:
+
+```ken
+pub theorem interval_add_zero_l_inside
+    (i : Interval)
+  : IsTrue
+      (interval_inside (interval_add (interval_point rational_zero) i) i)
+
+pub theorem interval_add_zero_l_rev_inside
+    (i : Interval)
+  : IsTrue
+      (interval_inside i (interval_add (interval_point rational_zero) i))
+
+pub theorem interval_mul_one_l_inside
+    (i : Interval)
+  : IsTrue
+      (interval_inside (interval_mul (interval_point rational_one) i) i)
+
+pub theorem interval_mul_one_l_rev_inside
+    (i : Interval)
+  : IsTrue
+      (interval_inside i (interval_mul (interval_point rational_one) i))
+```
+
+The first and second laws give both directions of endpoint-value
+inclusion between `i` and its sum with the **left** point zero; the
+third and fourth do likewise for its product with the **left** point
+one. `interval_point` uses equal endpoints, while `interval_add` and
+`interval_mul` act componentwise. Section 3's `interval_inside`
+compares stored rational endpoint values, even for an interval with
+inverted endpoints. These laws therefore hold for **every** `i`,
+without an ordered-endpoints, membership or nonemptiness premise.
+Neither mutual inclusion nor a closed fixture's reduction asserts
+structural `Equal Interval` or canonical rational spelling.
+
+A checked proof can match the written `i : Interval` as
+`MkInterval a b`, introduce the two Boolean endpoint bounds with
+the existing conjunction law, and transport §64's
+`zero_l for rational_add` or `one_l for rational_mul` through the
+existing private `equiv_leq`; the opposite bound uses symmetry of the
+same rational equivalence. `equiv_leq` and `rational_distrib_r` remain
+private.
+There is no new helper, axiom, kernel or surface rule, and all §1–§9
+operations, law types and proof-route contracts remain unchanged.
+
+**Composition note, not another public law.** Right-point-unit forms
+need no separate exports. For addition, the public
+`interval_add_comm_inside i (interval_point rational_zero)` followed
+by `interval_add_zero_l_inside i` feeds `interval_inside_trans` to
+put `interval_add i (interval_point rational_zero)` inside `i`.
+The converse uses `interval_add_zero_l_rev_inside i` followed by
+`interval_add_comm_inside (interval_point rational_zero) i`. Replace
+`add`/`zero` with `mul`/`one` and use the corresponding §5
+commutativity law for multiplication. These are compositions of the
+existing public results, not new declarations or uses of Rational's
+right-unit proofs.
+
+A later CV seed can apply all four laws to `i=[1/2,1]` and exercise
+an inverted interval such as `[1,1/2]`. Its wrong-unit refusal
+compares `interval_mul (interval_point rational_zero) i = [0,0]`
+with `i`, whose lower bound is `1/2`; the accepted same-form control
+uses `rational_one` instead. Both `IsTrue (interval_inside …)` claims
+use `Proved`: `Refl` is refused even for the true control on this
+goal shape, so it cannot discriminate the wrong unit. A closed
+`Equal Interval` claim can happen to accept `Refl` on the ordinary
+fixture but does not supply a structural unit law. These cases
+illustrate the generic obligation; no §10 seed is authored or run
+by this spec-only child.
