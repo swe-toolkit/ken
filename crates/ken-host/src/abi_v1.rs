@@ -1241,32 +1241,8 @@ impl ProcessContext {
         &mut self,
         settlements: Vec<crate::ResourceSettlementObservationV1>,
     ) {
-        for settlement in settlements {
-            let outcome = match &settlement.outcome {
-                crate::ResourceSettlementOutcomeV1::Released => CanonicalOutcomeV1::Success(
-                    CanonicalReplyV1::ResourceSettlement(settlement.clone()),
-                ),
-                crate::ResourceSettlementOutcomeV1::ReleaseFailed(io) => CanonicalOutcomeV1::Error(
-                    crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::ReleaseFailed {
-                        schema_version: settlement.schema_version,
-                        resource_kind: settlement.resource_kind,
-                        identity: settlement.identity,
-                        io: *io,
-                    }),
-                ),
-            };
-            let reply = crate::HostDispatchReplyV1 {
-                capability_identity: None,
-                resource_token: None,
-                resource_bindings: vec![(crate::ResourceBindingRole::Target, settlement.identity)],
-                outcome,
-            };
-            self.effect_trace.push(crate::effect_event_from_dispatch(
-                self.effect_trace.len() as u64,
-                HostOpV1::ResourceRelease,
-                CanonicalRequestV1::ResourceRelease,
-                &reply,
-            ));
+        for settlement in &settlements {
+            crate::append_settlement_event(&mut self.effect_trace, settlement);
         }
     }
 }
@@ -2187,12 +2163,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
     let Ok(result) = result else {
         return -3;
     };
-    context.effect_trace.push(crate::effect_event_from_dispatch(
-        context.effect_trace.len() as u64,
-        op,
-        request,
-        &result,
-    ));
+    crate::append_dispatch_events(&mut context.effect_trace, op, request, &result);
     // SAFETY: generated code supplies an aligned writable HostReplyV1 slot.
     let token = result.resource_token;
     set_reply(
@@ -4984,12 +4955,7 @@ mod tests {
             if operation == HostOpV1::MappingAllocate && model_resource.is_none() {
                 model_resource = model_reply.resource_token;
             }
-            model_trace.push(crate::effect_event_from_dispatch(
-                model_trace.len() as u64,
-                operation,
-                request,
-                &model_reply,
-            ));
+            crate::append_dispatch_events(&mut model_trace, operation, request, &model_reply);
         }
         assert_eq!(native_trace, model_trace);
 

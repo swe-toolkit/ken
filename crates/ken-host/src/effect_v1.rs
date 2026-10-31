@@ -1633,24 +1633,29 @@ impl ResourceTableV1 {
 
     fn settle_child_pipes(
         &mut self, child_token: ResourceTokenV1, backend: &mut impl HostEffectBackendV1,
-    ) -> Result<(), ResourceErrorV1> {
+    ) -> Result<Vec<ResourceSettlementObservationV1>, ResourceErrorV1> {
         let (owner, _, _) = self.typed_owner(child_token, ResourceKindV1::ChildProcess)?;
         let ResourceOwnerV1::Child(child) = owner else { unreachable!("validated child kind") };
         let mut tokens = child.taken_pipes.clone();
         tokens.reverse();
+        let mut settled = Vec::new();
         let mut first_error = None;
         for token in tokens {
             match self.begin_release(token) {
-                Ok(pending) => {
-                    if let Err(error) = Self::finish_release_with(pending, backend) {
-                        first_error.get_or_insert(error);
-                    }
-                }
+                Ok(pending) => settled.push(match Self::finish_release_with(pending, backend) {
+                    Ok(observation) => observation,
+                    Err(ResourceErrorV1::ReleaseFailed { schema_version, resource_kind, identity, io }) =>
+                        ResourceSettlementObservationV1 {
+                            schema_version, resource_kind, identity,
+                            outcome: ResourceSettlementOutcomeV1::ReleaseFailed(io),
+                        },
+                    Err(error) => { first_error.get_or_insert(error); continue; }
+                }),
                 Err(ResourceErrorV1::Closed) => {} // Closed early by the body.
                 Err(error) => { first_error.get_or_insert(error); }
             }
         }
-        first_error.map_or(Ok(()), Err)
+        first_error.map_or(Ok(settled), Err)
     }
 
     pub fn resolve_fs_handle(
@@ -2690,6 +2695,10 @@ pub struct HostDispatchReplyV1 {
     pub resource_token: Option<ResourceTokenV1>,
     pub resource_bindings: Vec<(ResourceBindingRole, ResourceTraceIdentityV1)>,
     pub outcome: CanonicalOutcomeV1,
+    /// Settlements performed by this dispatch for identities other than its
+    /// own result, in the order they happened. The trace appender emits these
+    /// ahead of the dispatch event.
+    pub prior_settlements: Vec<ResourceSettlementObservationV1>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3200,6 +3209,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
     };
     let mut minted_resource = None;
     let mut resource_bindings = Vec::new();
+    let mut prior_settlements = Vec::new();
     let outcome = match (operation, request) {
         (HostOpV1::ConsoleRead, CanonicalRequestV1::ConsoleRead { stream, limit }) => backend
             .console_read(*stream, *limit)
@@ -3772,9 +3782,17 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 let (_, identity, provenance) = resources.typed_owner(token, ResourceKindV1::SpawnPlan)
                     .map_err(SemanticErrorV1::Resource)?;
                 let provenance = provenance.ok_or(ResourceErrorV1::MalformedResource).map_err(SemanticErrorV1::Resource)?;
-                let _lease = revocation.admit(provenance).ok_or(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
+                // A spawn attempt retires the live plan even when admission or
+                // the backend refuses to create the child.
                 let (plan, _, provenance) = resources.take_plan(token).map_err(SemanticErrorV1::Resource)?;
+                prior_settlements.push(ResourceSettlementObservationV1 {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: ResourceKindV1::SpawnPlan,
+                    identity,
+                    outcome: ResourceSettlementOutcomeV1::Released,
+                });
+                let _lease = revocation.admit(provenance).ok_or(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))?;
                 let child = backend.process_spawn(plan).map_err(SemanticErrorV1::Io)?;
                 let (child_token, child_identity) = resources.insert_child(child, provenance);
                 minted_resource = Some(child_token);
@@ -3850,7 +3868,10 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 unreachable!("resource shape validated")
             };
             let pipe_error = if resources.typed_owner(token, ResourceKindV1::ChildProcess).is_ok() {
-                resources.settle_child_pipes(token, backend).err()
+                match resources.settle_child_pipes(token, backend) {
+                    Ok(settled) => { prior_settlements.extend(settled); None }
+                    Err(error) => Some(error),
+                }
             } else {
                 None
             };
@@ -3883,6 +3904,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             Ok(reply) => CanonicalOutcomeV1::Success(reply),
             Err(error) => CanonicalOutcomeV1::Error(error),
         },
+        prior_settlements,
     })
 }
 
@@ -3985,6 +4007,7 @@ fn path_denied(
         resource_token: None,
         resource_bindings: Vec::new(),
         outcome: CanonicalOutcomeV1::Error(file_error(operation, &request_path(request), cause)),
+        prior_settlements: Vec::new(),
     }
 }
 
@@ -4010,6 +4033,7 @@ fn error_denied(error: SemanticErrorV1) -> HostDispatchReplyV1 {
         resource_token: None,
         resource_bindings: Vec::new(),
         outcome: CanonicalOutcomeV1::Error(error),
+        prior_settlements: Vec::new(),
     }
 }
 
@@ -4432,22 +4456,52 @@ pub struct EffectEvent {
     pub outcome: CanonicalOutcomeV1,
 }
 
-/// Construct the canonical runtime event after semantic dispatch has
-/// produced its reply and before an executor reifies that reply.
-pub fn effect_event_from_dispatch(
-    sequence: u64,
+/// Append each settlement performed by a dispatch before the dispatch event.
+/// This is the sole dispatch-to-trace conversion for both executors.
+pub fn append_dispatch_events(
+    trace: &mut Vec<EffectEvent>,
     operation: HostOpV1,
     request: CanonicalRequestV1,
     reply: &HostDispatchReplyV1,
-) -> EffectEvent {
-    EffectEvent {
-        sequence,
+) {
+    for settlement in &reply.prior_settlements {
+        append_settlement_event(trace, settlement);
+    }
+    trace.push(EffectEvent {
+        sequence: trace.len() as u64,
         operation,
         capability: reply.capability_identity.clone(),
         resource_bindings: reply.resource_bindings.clone(),
         request,
         outcome: reply.outcome.clone(),
-    }
+    });
+}
+
+/// Append a target-bound ResourceRelease event for an observed settlement.
+/// Dispatch-time and terminal-finalization settlements use this same form.
+pub fn append_settlement_event(
+    trace: &mut Vec<EffectEvent>,
+    settlement: &ResourceSettlementObservationV1,
+) {
+    let outcome = match &settlement.outcome {
+        ResourceSettlementOutcomeV1::Released =>
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(settlement.clone())),
+        ResourceSettlementOutcomeV1::ReleaseFailed(io) =>
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::ReleaseFailed {
+                schema_version: settlement.schema_version,
+                resource_kind: settlement.resource_kind,
+                identity: settlement.identity,
+                io: *io,
+            })),
+    };
+    trace.push(EffectEvent {
+        sequence: trace.len() as u64,
+        operation: HostOpV1::ResourceRelease,
+        capability: None,
+        resource_bindings: vec![(ResourceBindingRole::Target, settlement.identity)],
+        request: CanonicalRequestV1::ResourceRelease,
+        outcome,
+    });
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -7903,12 +7957,7 @@ mod tests {
         )
         .unwrap();
         let token = open.resource_token.unwrap();
-        events.push(effect_event_from_dispatch(
-            0,
-            HostOpV1::FsOpen,
-            open_request,
-            &open,
-        ));
+        append_dispatch_events(&mut events, HostOpV1::FsOpen, open_request, &open);
         for (sequence, operation, request) in [
             (
                 1,
@@ -7932,9 +7981,8 @@ mod tests {
                 &request,
             )
             .unwrap();
-            events.push(effect_event_from_dispatch(
-                sequence, operation, request, &reply,
-            ));
+            assert_eq!(events.len() as u64, sequence);
+            append_dispatch_events(&mut events, operation, request, &reply);
         }
         events
     }
@@ -9388,9 +9436,11 @@ mod tests {
                 (ResourceBindingRole::Buffer, buffer_identity),
             ]
         );
-        let event = effect_event_from_dispatch(7, HostOpV1::FsReadAt, read_request, &read);
-        assert_eq!(event.sequence, 7);
-        assert_eq!(event.resource_bindings, read.resource_bindings);
+        let mut events = Vec::new();
+        append_dispatch_events(&mut events, HostOpV1::FsReadAt, read_request, &read);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].sequence, 0);
+        assert_eq!(events[0].resource_bindings, read.resource_bindings);
 
         let freeze = dispatch_host_op_v1(
             &mut backend,

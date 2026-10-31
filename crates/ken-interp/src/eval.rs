@@ -7413,12 +7413,7 @@ impl EffectTraceRecorder {
         request: ken_host::CanonicalRequestV1,
         reply: &ken_host::HostDispatchReplyV1,
     ) {
-        self.events.push(ken_host::effect_event_from_dispatch(
-            self.events.len() as u64,
-            operation,
-            request,
-            reply,
-        ));
+        ken_host::append_dispatch_events(&mut self.events, operation, request, reply);
     }
 }
 
@@ -7769,37 +7764,8 @@ fn run_io_with_effect_recorder<H: HostHandler>(
     let mut backend = InterpreterHostBackend { handler };
     let settlements = resources.finalize_all_with_mode(&mut backend, result.is_err());
     if let Some(recorder) = recorder.as_deref_mut() {
-        for settlement in settlements {
-            let outcome = match settlement.outcome {
-                ken_host::ResourceSettlementOutcomeV1::Released => {
-                    ken_host::CanonicalOutcomeV1::Success(
-                        ken_host::CanonicalReplyV1::ResourceSettlement(settlement.clone()),
-                    )
-                }
-                ken_host::ResourceSettlementOutcomeV1::ReleaseFailed(io) => {
-                    ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Resource(
-                        ken_host::ResourceErrorV1::ReleaseFailed {
-                            schema_version: settlement.schema_version,
-                            resource_kind: settlement.resource_kind,
-                            identity: settlement.identity,
-                            io,
-                        },
-                    ))
-                }
-            };
-            recorder.record(
-                ken_host::HostOpV1::ResourceRelease,
-                ken_host::CanonicalRequestV1::ResourceRelease,
-                &ken_host::HostDispatchReplyV1 {
-                    capability_identity: None,
-                    resource_token: None,
-                    resource_bindings: vec![(
-                        ken_host::ResourceBindingRole::Target,
-                        settlement.identity,
-                    )],
-                    outcome,
-                },
-            );
+        for settlement in &settlements {
+            ken_host::append_settlement_event(&mut recorder.events, settlement);
         }
     }
     result
