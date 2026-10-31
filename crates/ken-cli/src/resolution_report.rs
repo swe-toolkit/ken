@@ -65,15 +65,37 @@ impl Drop for ReportFile {
 
 /// Only the one leading `--resolution-report=<path>` token is recognized.
 /// A repeated token remains an ordinary positional argument.
-pub(crate) fn strip_first(args: &[OsString]) -> (Option<&OsStr>, &[OsString]) {
+pub(crate) fn strip_first(args: &[OsString]) -> (Option<OsString>, &[OsString]) {
     let Some(first) = args.first() else {
         return (None, args);
     };
-    let Some(bytes) = first
-        .to_str()
-        .and_then(|s| s.strip_prefix("--resolution-report="))
-    else {
-        return (None, args);
-    };
-    (Some(OsStr::new(bytes)), &args[1..])
+    match report_suffix(first) {
+        Some(path) => (Some(path), &args[1..]),
+        None => (None, args),
+    }
+}
+
+#[cfg(unix)]
+fn report_suffix(token: &OsStr) -> Option<OsString> {
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    token
+        .as_bytes()
+        .strip_prefix(b"--resolution-report=")
+        .map(|suffix| OsString::from_vec(suffix.to_vec()))
+}
+
+#[cfg(windows)]
+fn report_suffix(token: &OsStr) -> Option<OsString> {
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    let units: Vec<u16> = token.encode_wide().collect();
+    let prefix: Vec<u16> = "--resolution-report=".encode_utf16().collect();
+    units.strip_prefix(&prefix).map(OsString::from_wide)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn report_suffix(token: &OsStr) -> Option<OsString> {
+    token
+        .to_str()?
+        .strip_prefix("--resolution-report=")
+        .map(OsString::from)
 }

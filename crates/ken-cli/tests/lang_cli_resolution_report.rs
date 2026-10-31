@@ -1,5 +1,6 @@
 //! Black-box identity observation at each actual CLI route.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -18,7 +19,9 @@ fn invoke(route: &str, root: &Path, dir: &Path, report: Option<&Path>) -> Output
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_ken"));
     cmd.arg(route);
     if let Some(path) = report {
-        cmd.arg(format!("--resolution-report={}", path.display()));
+        let mut option = OsString::from("--resolution-report=");
+        option.push(path.as_os_str());
+        cmd.arg(option);
     }
     cmd.arg(root);
     if route == "native-build" {
@@ -234,6 +237,35 @@ fn source_constructor_is_attributed_to_its_checked_family() {
         .any(|r| r["class"] == "source-declared"
             && r["declaration"] == "LocalChoice"
             && r["constructor"] == "LocalYes"));
+}
+
+#[cfg(unix)]
+#[test]
+fn non_utf8_report_path_is_preserved_by_all_three_route_parsers() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let root = base("resolution-report-non-utf8-path");
+    for route in ["check", "run", "native-build"] {
+        let dir = root.join(route);
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("root.ken");
+        std::fs::write(&source, ACCEPTED).unwrap();
+        std::fs::write(dir.join("profile.json"), PROFILE).unwrap();
+        let report = dir.join(OsString::from_vec(b"resolution-\xff.json".to_vec()));
+        assert!(!report.exists());
+        let output = invoke(route, &source, &dir, Some(&report));
+        assert!(
+            output.status.success(),
+            "{route}: non-UTF-8 report path must be accepted: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let json: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(&report).expect("report created at the exact non-UTF-8 path"),
+        )
+        .unwrap();
+        assert_eq!(json["schema"], "ken.resolution/v1");
+        assert_eq!(json["route"], route);
+    }
 }
 
 #[test]

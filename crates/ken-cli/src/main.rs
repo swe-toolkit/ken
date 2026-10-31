@@ -116,7 +116,7 @@ fn dispatch() -> i32 {
     } else {
         (None, &args[2..])
     };
-    let report = match report_path.map(resolution_report::ReportFile::create) {
+    let report = match report_path.as_deref().map(resolution_report::ReportFile::create) {
         Some(Ok(report)) => Some(report),
         Some(Err(error)) => {
             emit_cli_error(error);
