@@ -1319,6 +1319,54 @@ definition.
   shadow `write_probe` row. An existing report path refuses creation without
   overwriting it; an elaboration failure leaves no partial report file.
 
+### surface/modules/catalog-resolution-report-lists-entry-root-only
+
+- promise class: **durable invariant** — catalog reports identify the entry
+  root, classify imported references, and omit checked-fence declarations
+- spec: `70 §1.4`
+- given: in a fresh fixture catalog, write `catalog/packages/Dependency.ken.md`
+  with a `ken` fence containing `pub const value : Bool = True`. Write
+  `catalog/packages/Entry.ken.md` as:
+
+  ````markdown
+  # Entry
+
+  ```ken
+  import Dependency
+  const answer : Bool = Dependency.value
+  ```
+
+  ```ken example
+  const example : Bool = answer
+  ```
+  ````
+
+  From the fixture root, run:
+
+  ```text
+  ken check --resolution-report=<new-path> catalog/packages/Entry.ken.md
+  ```
+
+  Read the complete report. In a separate fresh copy of the same catalog,
+  change only the example-fence body to
+  `const example : Bool = missing_value`; run the same command with a different
+  new report path.
+- expect: the valid entry accepts with a complete report whose `module` is
+  `Entry`. The `declarations` array contains exactly the entry-root declaration
+  `answer`; it contains neither imported `Dependency.value` nor checked-fence
+  `example`. The `answer` row classifies `Dependency.value` as imported with
+  module `Dependency` and declaration `value`. The invalid-fence control rejects
+  during source checking because `missing_value` is unresolved; the controlled
+  failure leaves no report file.
+- controls: the valid example fence is the accepted control for the invalid
+  fence; the imported value is its accepted control for report attribution.
+  Changing only the example body ensures a rejected control reaches fence
+  checking rather than failing earlier in the entry or dependency.
+- why: the report is built from the catalog entry's own root results, although
+  the check route also elaborates its checked fences and loads imports. This
+  case distinguishes those populations and pins the imported identity class
+  without asserting implementation text or global IDs.
+
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructor and protected type-name
 cases cover strict roots, legacy roots, and legacy single-file. Only strict
