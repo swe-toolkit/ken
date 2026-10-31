@@ -1,7 +1,7 @@
 ---
 id: PX10-NATIVE-SPAWN-PARITY
 title: "PX10's spawn and wait run only on the interpreter: the native bracket planner keys every region on an acquire in head position, so withChild, whose acquire follows the plan-open response match, has no return fold and no owned settlement. Give the native planner bracket regions whose acquire is not in head position, then promote the PX10 host operations to NativeTested with interpreter parity"
-status: draft
+status: ready
 owner: runtime
 size: L
 tier: T1
@@ -21,7 +21,7 @@ through `withChild` exactly as the interpreter does. The PX10 host
 operations are `NativeTested`, and the native bracket planner accepts
 a bracket whose acquire comes after stuck effects.
 
-## Settled inputs (measure on the cut base, which includes PX10 slice 1)
+## Settled inputs (measure on `58c2e1df6`, which includes PX10 slice 1)
 
 - **The wall.** `build_bracket_static_regions` takes the positional
   return fold as `folds.last()` under the acquire's continuation
@@ -40,6 +40,14 @@ a bracket whose acquire comes after stuck effects.
   containment under the acquire's own continuation. Every stage that
   reads that shape is in scope: the return fold, settlement ownership,
   body exits, and the parent forest.
+- **Slice 1 pins the native refusal.** Its AC-4 row asserts that a
+  native `withChild` build refuses through `RepresentedUnavailable`.
+  This WP inverts that row into the AC-1 parity row; it does not delete
+  it.
+- **Carried from slice 1, in scope where native:** an unused Process
+  grant refuses a native build, and `prepare_native_target_sources`
+  reaches lowering without the availability gate. AC-0 rules whether
+  each closes here or is named as a successor.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.

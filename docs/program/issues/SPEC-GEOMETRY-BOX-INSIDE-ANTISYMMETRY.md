@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INSIDE-ANTISYMMETRY
 title: "Spec 67 makes corner-wise inside reflexive (§3) and transitive (§5), but no public law makes it antisymmetric, so a client holding inside a b and inside b a cannot conclude Equal Box a b, and inside is not yet a partial order. Rule from a checked D0 at zero trust that mutual inside gives structural box equality, for every Box including inverted ones, and state the law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

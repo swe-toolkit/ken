@@ -1,7 +1,7 @@
 ---
 id: PX10-SPAWN-PLAN-WAIT
 title: "A Ken program cannot start another program: there is no spawn host operation, and Capability.Process covers only the current process's argv, environment, working directory and exit. Give PX10 its first slice: a declarative spawn plan with explicit argv and environment bytes and a closed descriptor map, deny-by-default inheritance, the edge's SIGPIPE reset from spec 38 §1.10, and a wait that returns a typed exit or signal"
-status: ready
+status: merged
 owner: runtime
 size: L
 tier: T1
