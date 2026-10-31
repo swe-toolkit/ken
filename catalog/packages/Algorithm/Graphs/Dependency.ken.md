@@ -2501,6 +2501,8 @@ chain. The
 adds one edge to the same chain and refuses the converse on the pair. The
 [§8 seed](../../../../conformance/stdlib/graphs/seed-reachability-reverse.md)
 checks graph and walk reversal on a directed chain. The
+[§9 seed](../../../../conformance/stdlib/graphs/seed-walk-reverse-append.md)
+is authored but has not been Ken-checked or officially conformance-run. The
 public API is the graph, path and certificate types, their
 constructors, walk composition and reversal, the graph reversal and
 predicate-reachability operations and witness, the dependency-order operation,
