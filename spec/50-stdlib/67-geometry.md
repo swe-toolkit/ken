@@ -8,7 +8,8 @@
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-COMMUTATIVITY §6;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-ASSOCIATIVITY §7;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-ABSORPTION §8;
-> SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY §9).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY §9;
+> SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER §10).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -29,12 +30,16 @@
 > and with equal scratch trusted identities 114 → 114. The exports
 > and a package-owned seed test are present on main. Neither the D0
 > nor the package test establishes official conformance-runner execution
-> or a landed trust measurement. Section 9 specifies two further Nat
-> selectors and structural box laws; Architect checked their generic
-> proofs in scratch. This assembled candidate includes the §9 Nat Order
-> and NatBox checked exports, AC-2 seed and package-owned test. Neither
-> scratch D0 nor candidate-local checks establish official
-> conformance-runner execution, CI, publication, landing or landed trust.
+> or a landed trust measurement. Section 9's two further Nat selectors,
+> structural box laws and closed seed are now present on main; earlier
+> scratch and candidate-local checks are not official conformance-runner
+> execution or a measured landed trust result. Section 10 states a
+> checked upper bound on Manhattan distance between points contained in
+> one box. Architect's AC-0 proof check is isolated scratch evidence,
+> not a candidate test. This assembled candidate contains the §10
+> catalog theorem, package-owned test and CV-authored seed; the seed is
+> authored but unexecuted. Official conformance-runner execution, CI,
+> publication, landing and landed trust are not established here.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -990,6 +995,63 @@ private helpers was refused. The wrong Nat selector was refused with
 `KernelRejected TypeMismatch`, while the same-form true box claim
 was accepted and the false mixed claim refused. These results are
 Architect-reported scratch evidence, not tests run in this author
-turn. The catalog additions and closed seed belong to later serial
-turns of this candidate. No official conformance-runner execution,
-CI, publication, landing or landed trust is claimed.
+turn. The §9 catalog additions and closed seed are now present on
+main. The isolated D0 and earlier candidate-local checks do not
+establish official conformance-runner execution or a measured landed
+trust delta. This author turn does not rerun their tests.
+
+## 10. Manhattan distance bounded by a containing box
+
+> **Section 10 status: DRAFT v0
+> (SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER).** Architect AC-0 checked the
+> generic proof in a scratch NatBox on exact base `5dc5e5eac`, with
+> `ken check` rc 0, no new `Axiom`, and equal scratch trusted identity
+> sets 114 → 114. These are isolated design results, not candidate
+> execution. This assembled candidate contains the catalog theorem,
+> package-owned test and CV-authored seed; the seed is authored but
+> unexecuted. No official conformance-runner execution, CI,
+> publication, landing or landed trust is claimed for §10.
+
+`Algorithm.Geometry.NatBox` must export the following checked theorem
+immediately after `manhattan_zero_equal` and before the private
+`axis_distance_triangle`. Its public type uses only the existing
+`Point`, `MkBox`, `contains`, `manhattan`, `leq_nat` and `IsTrue` names:
+
+```ken
+pub theorem manhattan_box_diameter
+      (lo : Point) (hi : Point) (p : Point) (q : Point)
+    : IsTrue (contains (MkBox lo hi) p)
+      → IsTrue (contains (MkBox lo hi) q)
+      → IsTrue (leq_nat (manhattan p q) (manhattan lo hi))
+```
+
+Both containment hypotheses are **separate, curried premises**: the
+first applies to `p`, the second to `q`, and the conclusion bounds
+their distance by the distance between the stated corners. The law
+holds for any four natural-coordinate points; there is no box-validity
+premise. In an inverted box no point satisfies its `contains` premise,
+so the implication makes no claim about a distance between points in
+that empty box. The bound refers to the stored `lo` and `hi` corners,
+not to a canonicalized box or an area.
+
+The proof projects both axis comparisons from each membership and
+bounds each per-axis distance by the corresponding corner distance.
+`axis_distance_within`, `axis_sub_within` and
+`axis_distance_bounded` are new **private** proof helpers;
+`axis_distance` remains private. None becomes a client import or a
+new public premise, and no §1–§9 operation or law type changes. The
+law neither supplies an attainment witness nor publishes an extra
+corner-membership theorem; that separate containment claim belongs
+to a possible successor.
+
+The CV-authored seed is present in this candidate. Its closed box
+`(1,1)–(4,3)` contains `(1,3)` and `(4,1)`; their Manhattan distance
+and the corners' distance are both `5`, so it exhibits a tight
+instance without a second public theorem. Moving the first point to
+`(0,3)` makes it outside the box and gives distance `6` to `(4,1)`.
+The isolated refusal must follow an accepted prefix and retain the
+same bound shape, exposing the missing membership premise rather than
+an unrelated type error. A smaller-than-`5` bound on the contained
+pair is also false. These closed calculations delimit the generic
+contract but do not replace its checked proof or count as execution
+of the authored but unexecuted seed.
