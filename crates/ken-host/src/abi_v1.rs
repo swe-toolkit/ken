@@ -3094,11 +3094,13 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: every
-    /// assigned resource-kind tag round-trips through ReleaseFailed; the
-    /// first unassigned tag and u64::MAX refuse. CLAIMED: the resource-kind
-    /// reply decoder remains canonical and fail-closed as kinds grow. THE GAP:
-    /// the two negative probes do not enumerate all unassigned tags.
+    /// Promise class: normative compatibility vector. MEASURED: each kind
+    /// and the CapabilityDenied cause use their catalog-assigned numeric tags
+    /// in the encoder and decoder; the first unassigned tag and u64::MAX
+    /// refuse. CLAIMED: the resource-error reply is canonically encoded and
+    /// fail-closed as kinds grow. THE GAP: the two negative probes do not
+    /// enumerate every unassigned tag; the linked reply projection is pinned
+    /// separately below.
     #[test]
     fn resource_error_reply_decoder_is_canonical_and_fail_closed() {
         assert_eq!(
@@ -3159,18 +3161,31 @@ mod tests {
                 io: crate::IoErrorIdentityV1::Other(-5),
             })
         );
-        // The exhaustive match makes a new kind a compile error until it is
-        // added to this round-trip and the derived invalid-tag boundary.
+        // These normative bytes are independent of the two codec tables.
+        // The exhaustive match makes a new kind a compile error until its
+        // catalog binding and wire vector are added here.
         let kinds = [
-            crate::ResourceKindV1::FsHandle,
-            crate::ResourceKindV1::Buffer,
-            crate::ResourceKindV1::Mapping,
-            crate::ResourceKindV1::SpawnPlan,
-            crate::ResourceKindV1::ChildProcess,
-            crate::ResourceKindV1::PipeRead,
-            crate::ResourceKindV1::PipeWrite,
+            (crate::ResourceKindV1::FsHandle, "resource_kind.FsHandle", 0),
+            (crate::ResourceKindV1::Buffer, "resource_kind.Buffer", 1),
+            (crate::ResourceKindV1::Mapping, "resource_kind.Mapping", 2),
+            (
+                crate::ResourceKindV1::SpawnPlan,
+                "resource_kind.SpawnPlan",
+                3,
+            ),
+            (
+                crate::ResourceKindV1::ChildProcess,
+                "resource_kind.ChildProcess",
+                4,
+            ),
+            (crate::ResourceKindV1::PipeRead, "resource_kind.PipeRead", 5),
+            (
+                crate::ResourceKindV1::PipeWrite,
+                "resource_kind.PipeWrite",
+                6,
+            ),
         ];
-        for kind in kinds {
+        for (kind, binding, tag) in kinds {
             match kind {
                 crate::ResourceKindV1::FsHandle
                 | crate::ResourceKindV1::Buffer
@@ -3180,11 +3195,13 @@ mod tests {
                 | crate::ResourceKindV1::PipeRead
                 | crate::ResourceKindV1::PipeWrite => {}
             }
+            assert_eq!(effect_binding("tag", binding), tag, "catalog {binding}");
+            assert_eq!(resource_kind_tag(kind), tag, "encoder {kind:?}");
             assert_eq!(
                 decode_resource_error_reply(
                     3,
                     ResourceErrorReplyV1 {
-                        resource_kind: resource_kind_tag(kind),
+                        resource_kind: tag,
                         ..release
                     }
                 ),
@@ -3194,26 +3211,32 @@ mod tests {
                     identity: crate::ResourceTraceIdentityV1(u64::MAX),
                     io: crate::IoErrorIdentityV1::Other(-5),
                 }),
-                "{kind:?} must round-trip through ReleaseFailed"
+                "decoder {kind:?} at catalog tag {tag}"
             );
         }
+        assert_eq!(effect_binding("error", "capability.CapabilityDenied"), 2);
+        assert_eq!(io_error_tag(crate::IoErrorIdentityV1::CapabilityDenied), 2);
         assert_eq!(
-            decode_resource_error_reply(
-                3,
-                ResourceErrorReplyV1 {
-                    io: io_error_tag(crate::IoErrorIdentityV1::CapabilityDenied),
-                    ..release
-                }
-            ),
+            io_error_from_tag(2),
+            Some(crate::IoErrorIdentityV1::CapabilityDenied)
+        );
+        assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
+        assert_eq!(io_error_tag(crate::IoErrorIdentityV1::BrokenPipe), 3);
+        assert_eq!(
+            io_error_from_tag(3),
+            Some(crate::IoErrorIdentityV1::BrokenPipe)
+        );
+        assert_eq!(
+            decode_resource_error_reply(3, ResourceErrorReplyV1 { io: 2, ..release }),
             Some(crate::ResourceErrorV1::ReleaseFailed {
                 schema_version: crate::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
                 resource_kind: crate::ResourceKindV1::FsHandle,
                 identity: crate::ResourceTraceIdentityV1(u64::MAX),
                 io: crate::IoErrorIdentityV1::CapabilityDenied,
             }),
-            "newly assigned CapabilityDenied tag must remain a valid release cause"
+            "catalog tag 2 is a valid CapabilityDenied release cause"
         );
-        let mut tags = kinds.map(resource_kind_tag).to_vec();
+        let mut tags = kinds.map(|(_, _, tag)| tag).to_vec();
         tags.sort_unstable();
         tags.dedup();
         assert_eq!(tags.len(), kinds.len(), "kind tags are distinct");
@@ -3312,7 +3335,7 @@ mod tests {
             (
                 3,
                 ResourceErrorReplyV1 {
-                    io: io_error_tag(crate::IoErrorIdentityV1::Other(0)) + 1,
+                    io: effect_binding("error", "io.Other") + 1,
                     ..release
                 },
             ),
@@ -3453,6 +3476,35 @@ mod tests {
                 },
             )
         );
+        // The real C-ABI reply projection must emit the independently pinned
+        // catalog tags, not merely agree with the test-only decoder.
+        for (kind, tag) in [
+            (crate::ResourceKindV1::SpawnPlan, 3),
+            (crate::ResourceKindV1::ChildProcess, 4),
+            (crate::ResourceKindV1::PipeRead, 5),
+            (crate::ResourceKindV1::PipeWrite, 6),
+        ] {
+            assert_eq!(
+                project(crate::ResourceErrorV1::ReleaseFailed {
+                    schema_version: 1,
+                    resource_kind: kind,
+                    identity: crate::ResourceTraceIdentityV1(17),
+                    io: crate::IoErrorIdentityV1::CapabilityDenied,
+                }),
+                (
+                    REPLY_RESOURCE_ERROR,
+                    3,
+                    ResourceErrorReplyV1 {
+                        schema_version: 1,
+                        resource_kind: tag,
+                        identity: 17,
+                        io: 2,
+                        ..ResourceErrorReplyV1::default()
+                    },
+                ),
+                "reply projection must preserve {kind:?} at catalog tag {tag}"
+            );
+        }
         assert_eq!(
             project(crate::ResourceErrorV1::ResourceKindMismatch {
                 expected: crate::ResourceKindV1::Mapping,

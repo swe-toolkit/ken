@@ -1921,12 +1921,12 @@ mod tests {
         }
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: Mapping is the
-    /// third resource-kind tag in both settlement failure and kind-mismatch
-    /// wire payloads, and the next tag fails closed. CLAIMED: ABI-S6 D1 extends
-    /// the resource-kind wire identity append-only without conflating Mapping
-    /// with Buffer. THE GAP: this is codec evidence; resource release behavior
-    /// is pinned independently in `effect_v1`.
+    /// Promise class: normative compatibility vector. MEASURED: Mapping's
+    /// failure and mismatch payloads remain exact; all seven resource-kind
+    /// byte tags agree with their generated ABI bindings, and unassigned tags
+    /// refuse. CLAIMED: ABI-S6 D1 and PX10 extend the resource-kind wire
+    /// append-only without conflating identities. THE GAP: this is codec
+    /// evidence; resource release behavior is pinned in `effect_v1`.
     #[test]
     fn abi_s6_d1_mapping_resource_kind_wire_is_distinct_and_fail_closed() {
         let failure = SemanticErrorV1::Resource(ResourceErrorV1::ReleaseFailed {
@@ -1959,11 +1959,60 @@ mod tests {
         assert_eq!(get_error(&mut cursor).unwrap(), mismatch);
         assert_eq!(cursor.position, encoded.len());
 
-        let mut cursor = Cursor {
-            bytes: &[3],
-            position: 0,
-        };
-        assert_eq!(get_resource_kind(&mut cursor), Err(EffectTraceWireError));
+        // Independent byte vectors and build-generated catalog bindings pin
+        // the tag, so swapping encoder and decoder together cannot pass.
+        let kinds = [
+            (ResourceKindV1::FsHandle, "resource_kind.FsHandle", 0),
+            (ResourceKindV1::Buffer, "resource_kind.Buffer", 1),
+            (ResourceKindV1::Mapping, "resource_kind.Mapping", 2),
+            (ResourceKindV1::SpawnPlan, "resource_kind.SpawnPlan", 3),
+            (
+                ResourceKindV1::ChildProcess,
+                "resource_kind.ChildProcess",
+                4,
+            ),
+            (ResourceKindV1::PipeRead, "resource_kind.PipeRead", 5),
+            (ResourceKindV1::PipeWrite, "resource_kind.PipeWrite", 6),
+        ];
+        for (kind, name, tag) in kinds {
+            match kind {
+                ResourceKindV1::FsHandle
+                | ResourceKindV1::Buffer
+                | ResourceKindV1::Mapping
+                | ResourceKindV1::SpawnPlan
+                | ResourceKindV1::ChildProcess
+                | ResourceKindV1::PipeRead
+                | ResourceKindV1::PipeWrite => {}
+            }
+            let catalog_tag = crate::HOST_EFFECT_ABI_V1_BINDINGS
+                .iter()
+                .find_map(|(binding_kind, binding_name, value)| {
+                    (*binding_kind == "tag" && *binding_name == name).then_some(*value)
+                })
+                .unwrap_or_else(|| panic!("missing generated ABI binding {name}"));
+            assert_eq!(catalog_tag, u64::from(tag), "catalog {name}");
+            let mut encoded = Vec::new();
+            put_resource_kind(&mut encoded, kind);
+            assert_eq!(encoded, [tag], "encoder {kind:?}");
+            let mut cursor = Cursor {
+                bytes: &[tag],
+                position: 0,
+            };
+            assert_eq!(get_resource_kind(&mut cursor), Ok(kind), "decoder {kind:?}");
+            assert_eq!(cursor.position, 1);
+        }
+        let mut assigned_tags = kinds.map(|(_, _, tag)| tag).to_vec();
+        assigned_tags.sort_unstable();
+        assigned_tags.dedup();
+        assert_eq!(assigned_tags.len(), kinds.len(), "distinct wire tags");
+        let first_unassigned = assigned_tags[assigned_tags.len() - 1] + 1;
+        for invalid in [first_unassigned, u8::MAX] {
+            let mut cursor = Cursor {
+                bytes: &[invalid],
+                position: 0,
+            };
+            assert_eq!(get_resource_kind(&mut cursor), Err(EffectTraceWireError));
+        }
     }
 
     /// Promise class: normative compatibility vector. MEASURED: both frozen
