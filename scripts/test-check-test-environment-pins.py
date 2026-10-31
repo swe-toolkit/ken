@@ -74,6 +74,18 @@ pub(crate) mod tests {
             "crates/ken-kernel/tests/fixture.rs", "fn fixture() { let id = GlobalId(503); }"
         ), [])
 
+    def test_global_reads_are_distinct_from_fixture_constructors(self) -> None:
+        text = '''fn fixture() {
+    let a = env.globals[503];
+    let b = env.globals.get(504);
+    let fixture = GlobalId(505);
+}'''
+        hits = lint.scan_text("crates/ken-kernel/tests/fixture.rs", text)
+        self.assertEqual(hits, [
+            lint.Hit("crates/ken-kernel/tests/fixture.rs", 2, "503", "global-read"),
+            lint.Hit("crates/ken-kernel/tests/fixture.rs", 3, "504", "global-read"),
+        ])
+
     def test_split_count_is_statement_scoped(self) -> None:
         text = '''assert_eq!(
     x
@@ -96,6 +108,11 @@ pub(crate) mod tests {
     def test_one_digit_count_is_not_a_pin(self) -> None:
         self.assertEqual(lint.scan_text(
             "crates/ken-kernel/tests/fixture.rs", "assert_eq!(xs.len(), 9);"
+        ), [])
+
+    def test_hash_requires_twelve_digits_not_padding_underscores(self) -> None:
+        self.assertEqual(lint.scan_text(
+            "crates/ken-kernel/tests/fixture.rs", "assert_eq!(digest, 0x1234_5678_abc);"
         ), [])
 
     def test_rust_macro_delimiters_and_inline_attributes_do_not_evoke_blindness(self) -> None:

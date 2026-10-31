@@ -66,7 +66,7 @@ ALLOWED: tuple[tuple[str, str, str, str], ...] = (
 
 ID = re.compile(r"(?<![\w.])(\d{3,})(?:_?u(?:8|16|32|64|size)|_?i(?:32|64))?(?![\w.])")
 HEX = re.compile(r"0[xX][0-9a-fA-F_]+(?:_?[iu](?:8|16|32|64|size))?")
-HASH = re.compile(r"0x[0-9a-fA-F_]{12,}")
+HASH = re.compile(r"0x_*(?:[0-9a-fA-F]_*){12,}(?![0-9a-fA-F_])")
 HASH_CONTEXT = re.compile(r"assert|==|!=|expected|contains\(")
 ASSERT = re.compile(r"\b(?:debug_)?assert(?:_eq|_ne)?\s*!\s*[({\[]")
 COUNT_MACRO = {"assert_eq!", "assert_ne!", "debug_assert_eq!"}
@@ -88,6 +88,7 @@ STACK_LINE = re.compile(
     r"stack_size|1024|KiB|KIB|MiB|Duration|from_millis|from_secs|"
     r"sleep|timeout|with_capacity"
 )
+CFG_TEST = re.compile(r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]")
 INLINE_TEST_MODULE = re.compile(
     r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"
     r"(?:#\s*\[[^\]]*\]\s*)*"
@@ -144,8 +145,8 @@ def lex(text: str) -> tuple[str, str]:
             code.append(_blank(segment))
             visible.append(_blank(segment))
         else:
-            raw = RAW_STRING.match(text, pos)
-            char = CHAR_LITERAL.match(text, pos)
+            raw = RAW_STRING.match(text, pos) if text[pos] in "rb" else None
+            char = CHAR_LITERAL.match(text, pos) if text[pos] in "b'" else None
             if raw:
                 end_marker = '"' + raw.group(1)
                 end = text.find(end_marker, raw.end())
@@ -182,8 +183,14 @@ def test_source(path: str, text: str) -> str:
     parts = Path(path).parts
     if len(parts) < 4 or parts[0] != "crates" or parts[2] not in ("src", "tests"):
         return ""
+    full_test_file = (
+        parts[2] == "tests" or "tests" in parts[3:]
+        or "r_layer_tests" in parts[3:] or parts[-1] == "tests.rs"
+    )
+    if not full_test_file and not CFG_TEST.search(text):
+        return ""
     code, visible = lex(text)
-    if parts[2] == "tests" or "tests" in parts[3:] or "r_layer_tests" in parts[3:] or parts[-1] == "tests.rs":
+    if full_test_file:
         return visible
     if parts[-1].endswith(".rs"):
         pairs: dict[int, int] = {}
