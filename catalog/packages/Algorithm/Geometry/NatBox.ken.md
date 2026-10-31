@@ -2475,9 +2475,9 @@ Signed orientation remains outside this interface.
    fixed triple, then refuses a false mixed regrouping; its package test
    also checks both Nat selectors. The
    [box-diameter seed](../../../../conformance/stdlib/geometry/seed-manhattan-box-diameter.md)
-   is not yet authored; it will check a tight contained distance-five pair and
-   refuse an outside distance-six pair and a bound below five. Its
+   is authored but unexecuted. It specifies a tight contained distance-five
+   pair, an outside distance-six pair, and a refused bound below five. Its
    package-owned test checks those cases locally against the checked theorem.
    These candidate-local tests are not official conformance-runner execution,
-   CI, publication, landing or landed trust. All ten seeds, once the new seed
-   is authored, supplement rather than replace the checked generic law bodies.
+   CI, publication, landing or landed trust. All ten seeds supplement rather
+   than replace the checked generic law bodies.
