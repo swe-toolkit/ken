@@ -74,12 +74,15 @@ One candidate:
   It also confirms that no §1 to §9 operation or law type changes.
 - **AC-1.** §10 states the operation and each ruled law by its public
   type. The Spec Leader and CV review it, with a Decision.
-- **AC-2.** The seed's accepted client uses `n = 2` and `u = [1,2]`.
-  - It applies each law and checks each side by `Refl` against its
-    computed value: `[1,2]`, `[1,2]`, `[0,0]` and `0`.
-  - Its refused block pins `vector_scale 2 Zero u = u`, the scale-one
-    law at the wrong factor. Its left side computes to `[0,0]`, against
-    `[1,2]`.
+- **AC-2** (amended on AC-0, Steward evt_1rwqahwk0gxxs). The seed's
+  accepted client uses `n = 2` and `u = [1,2]`.
+  - The three `Equal (Vec Nat two)` rows check each side by `Refl`
+    against `[1,2]`, `[1,2]` and `[0,0]`.
+  - The Nat row `dot two (vector_zero two) u = Zero` uses `Proved`;
+    `Refl` is refused there for goal shape.
+  - Its refused block pins `vector_scale two Zero u = u` by `Refl`. In
+    the same scope, `vector_scale two (Suc Zero) u = u` by `Refl` is
+    accepted.
 
 ## Stop conditions
 
