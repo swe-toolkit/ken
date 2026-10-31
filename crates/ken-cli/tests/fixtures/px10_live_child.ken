@@ -91,7 +91,7 @@ proc buffer_body
                   (bytes_encode "-c")
                   (Cons
                     Bytes
-                    (bytes_encode "printf %s $$ > $PX10_READY_PATH; printf ready; read line")
+                    (bytes_encode "printf ready; printf %s $$ > $PX10_READY_PATH; read line")
                     (Nil Bytes)))))
             (Cons
               (Prod Bytes Bytes)

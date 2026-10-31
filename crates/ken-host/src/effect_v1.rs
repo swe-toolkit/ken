@@ -5024,7 +5024,8 @@ mod tests {
     /// dispatcher classifier's capability-gated set equals the locked path-op
     /// set and every member occurs in ABI-R3's generated catalog. CLAIMED: a
     /// capability-guarded operation cannot silently skip admission. THE GAP:
-    /// Resource-token operations have their own exhaustive D2 classifier.
+    /// Resource-token operations have their own exhaustive D2 classifier;
+    /// ProcessSpawn admits its typed plan and provenance in its own arm.
     #[test]
     fn capability_admission_inventory_is_exact_and_abi_r3_closed() {
         let expected = vec![
@@ -5039,6 +5040,7 @@ mod tests {
             HostOpV1::FsRename,
             HostOpV1::FsChangeMode,
             HostOpV1::FsOpen,
+            HostOpV1::ProcessPlanOpen,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -5051,7 +5053,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 16] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 21] = [
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
@@ -5068,6 +5070,11 @@ mod tests {
             HostOpV1::MappingReadView,
             HostOpV1::MappingWriteView,
             HostOpV1::MappingAcquireFile,
+            HostOpV1::ResourceStreamRead,
+            HostOpV1::ResourceStreamWrite,
+            HostOpV1::ProcessPlanPush,
+            HostOpV1::ProcessTakePipe,
+            HostOpV1::ProcessWait,
         ];
         for operation in HostOpV1::ALL {
             let capability_admitted = expected.contains(&operation);
@@ -5082,7 +5089,10 @@ mod tests {
             assert!(
                 capability_admitted
                     || operation.is_ambient()
-                    || RESOURCE_SIDE_D2.contains(&operation),
+                    || RESOURCE_SIDE_D2.contains(&operation)
+                    // Spawn consumes a typed plan and admits its provenance
+                    // in its own arm before handing the plan to the backend.
+                    || operation == HostOpV1::ProcessSpawn,
                 "operation {operation:?} has no admission owner"
             );
         }
@@ -5101,7 +5111,8 @@ mod tests {
     /// existing resources; settlement and ambient allocation are explicitly
     /// outside that set. CLAIMED: every resource borrow crosses provenance
     /// admission before backend access. THE GAP: the behavioral lineage and
-    /// no-backend-effect implications are exercised by the resource oracle.
+    /// no-backend-effect implications are exercised by the resource oracle;
+    /// ProcessSpawn's consuming plan has its own typed-owner and lease check.
     #[test]
     fn resource_admission_inventory_is_exact_and_abi_r3_closed() {
         let expected = vec![
@@ -5118,6 +5129,11 @@ mod tests {
             HostOpV1::MappingReadView,
             HostOpV1::MappingWriteView,
             HostOpV1::MappingAcquireFile,
+            HostOpV1::ResourceStreamRead,
+            HostOpV1::ResourceStreamWrite,
+            HostOpV1::ProcessPlanPush,
+            HostOpV1::ProcessTakePipe,
+            HostOpV1::ProcessWait,
         ];
         let classified = HostOpV1::ALL
             .into_iter()

@@ -74,8 +74,12 @@ const FLOOR_CASES: [FloorCase; 10] = [
             "ResourceKind.FsHandle",
             "ResourceKind.Buffer",
             "ResourceKind.Mapping",
+            "ResourceKind.SpawnPlan",
+            "ResourceKind.ChildProcess",
+            "ResourceKind.PipeRead",
+            "ResourceKind.PipeWrite",
         ],
-        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.FsHandle }",
+        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.SpawnPlan ; ResourceKind.SpawnPlan |-> ResourceKind.ChildProcess ; ResourceKind.ChildProcess |-> ResourceKind.PipeRead ; ResourceKind.PipeRead |-> ResourceKind.PipeWrite ; ResourceKind.PipeWrite |-> ResourceKind.FsHandle }",
     },
     FloorCase {
         name: "Result",
@@ -168,7 +172,7 @@ const COLLISION_CASES: [CollisionCase; 8] = [
         parent: "ResourceKind",
         parent_collision_source: "data ResourceKind = LocalFsHandle | LocalBuffer",
         // ResourceKind is scoped: only its parent belongs to bare B. The
-        // three generic constructor spellings are available to user code.
+        // scoped constructor spellings remain available to user code.
         constructor_collisions: &[],
         renamed_source: "data LocalResourceKind = LocalFsHandle | LocalBuffer",
         renamed_parent: "LocalResourceKind",

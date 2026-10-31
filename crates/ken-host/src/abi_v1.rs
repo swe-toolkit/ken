@@ -3094,6 +3094,11 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// Promise class: normative compatibility vector. MEASURED: every
+    /// assigned resource-kind tag round-trips through ReleaseFailed; the
+    /// first unassigned tag and u64::MAX refuse. CLAIMED: the resource-kind
+    /// reply decoder remains canonical and fail-closed as kinds grow. THE GAP:
+    /// the two negative probes do not enumerate all unassigned tags.
     #[test]
     fn resource_error_reply_decoder_is_canonical_and_fail_closed() {
         assert_eq!(
@@ -3154,6 +3159,66 @@ mod tests {
                 io: crate::IoErrorIdentityV1::Other(-5),
             })
         );
+        // The exhaustive match makes a new kind a compile error until it is
+        // added to this round-trip and the derived invalid-tag boundary.
+        let kinds = [
+            crate::ResourceKindV1::FsHandle,
+            crate::ResourceKindV1::Buffer,
+            crate::ResourceKindV1::Mapping,
+            crate::ResourceKindV1::SpawnPlan,
+            crate::ResourceKindV1::ChildProcess,
+            crate::ResourceKindV1::PipeRead,
+            crate::ResourceKindV1::PipeWrite,
+        ];
+        for kind in kinds {
+            match kind {
+                crate::ResourceKindV1::FsHandle
+                | crate::ResourceKindV1::Buffer
+                | crate::ResourceKindV1::Mapping
+                | crate::ResourceKindV1::SpawnPlan
+                | crate::ResourceKindV1::ChildProcess
+                | crate::ResourceKindV1::PipeRead
+                | crate::ResourceKindV1::PipeWrite => {}
+            }
+            assert_eq!(
+                decode_resource_error_reply(
+                    3,
+                    ResourceErrorReplyV1 {
+                        resource_kind: resource_kind_tag(kind),
+                        ..release
+                    }
+                ),
+                Some(crate::ResourceErrorV1::ReleaseFailed {
+                    schema_version: crate::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: kind,
+                    identity: crate::ResourceTraceIdentityV1(u64::MAX),
+                    io: crate::IoErrorIdentityV1::Other(-5),
+                }),
+                "{kind:?} must round-trip through ReleaseFailed"
+            );
+        }
+        assert_eq!(
+            decode_resource_error_reply(
+                3,
+                ResourceErrorReplyV1 {
+                    io: io_error_tag(crate::IoErrorIdentityV1::CapabilityDenied),
+                    ..release
+                }
+            ),
+            Some(crate::ResourceErrorV1::ReleaseFailed {
+                schema_version: crate::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                resource_kind: crate::ResourceKindV1::FsHandle,
+                identity: crate::ResourceTraceIdentityV1(u64::MAX),
+                io: crate::IoErrorIdentityV1::CapabilityDenied,
+            }),
+            "newly assigned CapabilityDenied tag must remain a valid release cause"
+        );
+        let mut tags = kinds.map(resource_kind_tag).to_vec();
+        tags.sort_unstable();
+        tags.dedup();
+        assert_eq!(tags.len(), kinds.len(), "kind tags are distinct");
+        let unassigned = tags[tags.len() - 1] + 1;
+
         let mismatch = ResourceErrorReplyV1 {
             expected_kind: 0,
             actual_kind: 1,
@@ -3233,11 +3298,24 @@ mod tests {
             (
                 3,
                 ResourceErrorReplyV1 {
-                    resource_kind: 3,
+                    resource_kind: unassigned,
                     ..release
                 },
             ),
-            (3, ResourceErrorReplyV1 { io: 2, ..release }),
+            (
+                3,
+                ResourceErrorReplyV1 {
+                    resource_kind: u64::MAX,
+                    ..release
+                },
+            ),
+            (
+                3,
+                ResourceErrorReplyV1 {
+                    io: io_error_tag(crate::IoErrorIdentityV1::Other(0)) + 1,
+                    ..release
+                },
+            ),
             (
                 3,
                 ResourceErrorReplyV1 {

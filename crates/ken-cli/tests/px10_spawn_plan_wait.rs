@@ -422,6 +422,8 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
         .recv_timeout(Duration::from_secs(10))
         .expect("spawn worker establishes signals before Ken executes");
     let deadline = Instant::now() + Duration::from_secs(30);
+    // The shell writes to stdout before publishing its PID file: seeing the
+    // file proves the pipe has data before this test terminates the child.
     let pid = loop {
         if let Ok(text) = std::fs::read_to_string(&ready) {
             break text.parse::<libc::pid_t>().expect("child pid record");
