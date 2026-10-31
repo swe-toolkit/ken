@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX10-SPAWN-PLAN-WAIT, PX10-NATIVE-SITE-IDENTITY]
+depends_on: [PX10-SPAWN-PLAN-WAIT, PX10-NATIVE-SITE-IDENTITY, PX10-NATIVE-BRANCH-ALTERNATIVES]
 blocks: [PX10]
 github: null
 origin: "PX10-SPAWN-PLAN-WAIT recut interpreter-first (Steward evt_15ra8z0j0typg) on the Architect's measured native wall (evt_4asjwp948dzqh). L1 objective: the Linux ABI program. This is PX10's native-parity slice; pidfd signalling is the next. Steward-filed per COORDINATION section 2."
@@ -98,7 +98,8 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
 - **Increment A** is the settlement repair (R1) and AC-1b on the
   interpreter. It lands on its own.
 - **Increment B** is R2, R3, the recipe rows, the promotion, the gate
-  deletion and native parity. It waits for `PX10-NATIVE-SITE-IDENTITY`.
+  deletion and native parity. It waits for `PX10-NATIVE-SITE-IDENTITY`
+  and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
 
 The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6) has five entries:

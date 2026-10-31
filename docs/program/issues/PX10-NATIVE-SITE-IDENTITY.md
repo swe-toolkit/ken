@@ -7,7 +7,7 @@ size: L
 tier: T1
 gate: architect
 depends_on: [PX10-SPAWN-PLAN-WAIT]
-blocks: [PX10-NATIVE-SPAWN-PARITY]
+blocks: [PX10-NATIVE-BRANCH-ALTERNATIVES, PX10-NATIVE-SPAWN-PARITY]
 github: null
 origin: "Architect AC-0 round 2 on PX10-NATIVE-SPAWN-PARITY Increment B (evt_1jd8yzwewmtf6): five walls, four sharing one §1b predicate. Steward recut evt_6kmhp6k18ypq5 under the operator's 2026-09-21 restructuring direction. L1 objective: the Linux ABI program. Steward-filed per COORDINATION section 2."
 ---
@@ -52,19 +52,31 @@ base, stop and report the mismatch; do not build around it.
 ## Deliverable
 
 1. **AC-0 (Architect, D0 on the cut base).** A scratch prototype of the
-   site-identity map that brings the three slice-1 fixtures to a native
-   build, then a verbatim ruling of the map and of each plane's key.
-2. **One runtime branch** carrying the ruled map and the plane re-keys.
+   site-identity map, then a verbatim ruling of the map and of each
+   plane's key. The D0 (evt_5dkq1wcbfvdxm) measured that the map closes
+   W2, W3 and W4 but not the branch-join wall, P2: a continuation result
+   whose producer has several runtime-selected alternatives. P2 belongs
+   to `PX10-NATIVE-BRANCH-ALTERNATIVES` (Steward ruling evt_2teptrm99sf03).
+2. **One runtime branch** carrying the ruled map and the plane re-keys:
+   - the two response-leaf tail edges (a closure stored as an
+     `itree_vis` continuation, and a curried chain called in place);
+   - the transport stage keyed on `(producer_call_origin,
+     producer_owner)`;
+   - one invoke helper that honours a closure's boundary environment.
+
    The process-op promotion, the availability-gate deletion and native
    parity stay in PX10-NATIVE-SPAWN-PARITY Increment B.
 
 ## Acceptance
 
-- **AC-1.** Smoke, argv_env_pipe and live_child build natively, with the
-  Process operations admitted in the test configuration.
+- **AC-1 (walls advance).** With the Process operations admitted in the
+  test configuration, smoke, argv_env_pipe and live_child each pass W2,
+  W3 and W4 and stop at the P2 wall. A named row records each fixture's
+  wall verbatim. A bypass that suppresses a cardinality guard is out of
+  scope: probe 21 built smoke that way, and the build then trapped.
 - **AC-2 (one owner).** Each static region exit has exactly one owner in
-  every plane. A pin on argv_env_pipe and live_child names the exit and
-  its owner.
+  every plane this node keys. A pin on argv_env_pipe and live_child
+  names the exit and its owner.
 - **AC-3 (no regression).** The return-fold equivalence holds on every
   existing region build. `rt_native_bracket_body_once`,
   `px7f_resource_native`, `rt_escape_second_resource_native` and
