@@ -8,7 +8,8 @@
 > SPEC-TIME-MERGE-ASSOCIATIVITY §6;
 > SPEC-TIME-WINDOW-ADJACENT-SPLIT §7;
 > SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8;
-> SPEC-TIME-INVERTED-WINDOW-EMPTY §9).** The §1–2 EventTrace
+> SPEC-TIME-INVERTED-WINDOW-EMPTY §9;
+> SPEC-TIME-WINDOW-ALL-IDENTITY §10).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -33,28 +34,24 @@
 > publication, landing or a landed trust measurement.
 > Section 6's unconditional structural merge-associativity law and its
 > private proof helpers are on main; earlier candidate-local checks
-> alone were not official conformance or landed trust. Section 7
-> specifies a premise-bearing split of an ordered trace across adjacent
-> half-open windows. Architect's isolated D0 on `d94af9ee5` checked
-> its generic proof with no new `Axiom` and equal scratch trusted
-> GlobalIds (114 → 114). The §7 catalog export was absent on the
-> spec author's base. This assembled candidate adds the checked law
-> and a package-owned test of the complete accepted seed and isolated
-> swapped refusal; that test is not official conformance-runner
-> execution, CI, publication, landing or landed trust. Section 8
-> specifies a premise-free structural append/window law over arbitrary
-> traces and bounds. Architect's D0 on `70982b77e` checked the generic
-> Derived prerequisite and time proof as scratch design evidence only;
-> the separately owned catalog, seed and test need exact-tip review in
-> the assembled candidate. No official conformance-runner execution,
-> CI, publication, landing or landed trust follows from this spec turn.
-> Section 9 states a public empty-window law for arbitrary traces whenever
-> `hi ≤ lo`, including equal bounds. Architect's isolated AC-0 on
-> `f97544426` checked the generic proof with rc 0, no `Axiom`, and
-> identical scratch trusted GlobalId sets 114 → 114. The assembled
-> candidate carries the §9 catalog export, its package test and the
-> conformance seed; none of these establishes official conformance-runner
-> execution, CI, publication, landing or landed trust.
+> alone were not official conformance or landed trust. Section 7's
+> checked adjacent-window split, seed and package-owned test are now on
+> main. Its isolated D0 had equal scratch trusted identities 114 → 114;
+> earlier package checks are not official conformance-runner execution
+> or a measured landed trust result. Section 8's premise-free
+> append/window law, Derived prerequisite, seed and package-owned test
+> are now on main. Its D0 was scratch evidence, not an official runner
+> result or landed trust measurement. Section 9's checked empty-window
+> law for `hi ≤ lo`, seed and package-owned test are now on main.
+> Architect AC-0 checked its generic proof with equal scratch trusted
+> identities 114 → 114; its candidate-local checks do not establish
+> official conformance-runner execution or measured landed trust.
+> Section 10 specifies identity of a window covering every member of
+> a trace. Architect AC-0 checked its generic proof only in scratch
+> with equal trusted identities 114 → 114. This spec-only child adds no
+> §10 catalog theorem, package test or CV seed. No §10 official
+> conformance, CI, publication, landing or measured landed trust is
+> established.
 
 ## 1. Finite event traces over natural times
 
@@ -915,3 +912,66 @@ false-window boundary. A separate refused law application at `[4,5)`
 needs the absent `leq_nat 5 4 = True` premise. Architect observed these
 accept/refuse pairs in scratch D0; this Spec Author turn does not run
 or deliver the §9 seed or catalog theorem.
+
+## 10. A window covering every event leaves the trace unchanged
+
+> **Section 10 status: DRAFT v0
+> (SPEC-TIME-WINDOW-ALL-IDENTITY).** Architect AC-0 on exact base
+> `289a4bb90` checked the generic proof with `ken check` and
+> `ken fmt --check` rc 0, no new `Axiom`, and equal scratch
+> `trusted_base()` identity sets 114 → 114. This is isolated design
+> evidence, not a candidate catalog check or landed trust result.
+> This spec-only child adds no §10 catalog theorem, package test or
+> CV seed. No §10 official conformance-runner execution, CI,
+> publication, landing or measured landed trust is established.
+
+`Data.Time.EventTrace` must export one public Transparent theorem
+immediately after `trace_window_inverted_empty` and before
+`trace_merge_nil_left`. The argument order follows `trace_window`.
+Its only premise says that **each member of the original list**
+satisfies the actual window predicate:
+
+```ken
+pub theorem trace_window_all_identity
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : ((e : Event p) → list_elem (Event p) e tr → Equal Bool (event_in_window p lo hi e) True)
+      → Equal (List (Event p)) (trace_window p lo hi tr) tr
+```
+
+The result is structural equality of the **lists**, including event
+order and duplicate occurrences, not merely mutual membership or
+equality of the selected event set. For arbitrary `p`, bounds and
+trace, the premise covers every event represented in `tr`, and
+`trace_window` retains each event unchanged and in its original
+position. The empty trace satisfies the law as well. No
+`time_ordered p tr`, `lo ≤ hi`, `hi ≤ lo`, uniqueness, payload
+comparison or other condition is required. Section 9's separate
+claim remains: equal or inverted bounds discard every event from any
+trace.
+
+The checked proof inducts on the **written** `tr`. In a `Cons` case,
+the public `list_elem_head` from `Data.Collections.Derived` supplies
+membership for the head, so the function premise gives
+`Equal Bool (event_in_window p lo hi h) True`. Congruence through the
+existing private `window_keep` rewrites the head decision to keep
+that event. For the tail, `list_elem_later` lifts a tail membership
+to a membership of the original trace; this restricts the same
+premise to the recursive call, and congruence under `Cons` assembles
+the full list equality. Neither the two Derived lemmas nor private
+`window_keep` is re-exported from `EventTrace`; no new helper,
+`Axiom`, kernel rule, surface form or §1–§9 operation or law type is
+needed. The later Foundation catalog child adds the necessary
+`list_elem_head` import and the corresponding §2 package-lede
+sentence; this spec-only child does neither.
+
+The later CV seed can use `tr=[(4,T),(6,F),(5,T)]`. At `[4,8)`, a
+closed discharge of every member's `event_in_window` predicate
+allows the generic law and the true equality
+`trace_window Bool 4 8 tr = tr`, checked by `Refl`. At `[4,6)`,
+`trace_window` instead keeps `[(4,T),(5,T)]`, also a true `Refl`
+control; the isolated false claim `trace_window Bool 4 6 tr = tr`
+must refuse at its own `Refl`. The true `[4,8)` equality is an
+accepted **same-form** control, so the refusal pins the time-6
+boundary rather than an invalid equality proof form. These closed
+cases do not replace the generic proof. No seed is authored or run
+in this spec-only turn.
