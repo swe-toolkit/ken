@@ -35,9 +35,11 @@
 > scratch and candidate-local checks are not official conformance-runner
 > execution or a measured landed trust result. Section 10 states a
 > checked upper bound on Manhattan distance between points contained in
-> one box. Its only checked development so far is Architect's isolated
-> AC-0 scratch; the catalog law, package test and CV seed are subsequent
-> serial turns, not deliverables of this spec-only child.
+> one box. Architect's AC-0 proof check is isolated scratch evidence,
+> not a candidate test. This assembled candidate contains the §10
+> catalog theorem, package-owned test and CV-authored seed; the seed is
+> authored but unexecuted. Official conformance-runner execution, CI,
+> publication, landing and landed trust are not established here.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -1005,8 +1007,9 @@ trust delta. This author turn does not rerun their tests.
 > generic proof in a scratch NatBox on exact base `5dc5e5eac`, with
 > `ken check` rc 0, no new `Axiom`, and equal scratch trusted identity
 > sets 114 → 114. These are isolated design results, not candidate
-> execution. This spec-only turn adds no catalog theorem, package test
-> or conformance seed; no official conformance-runner execution, CI,
+> execution. This assembled candidate contains the catalog theorem,
+> package-owned test and CV-authored seed; the seed is authored but
+> unexecuted. No official conformance-runner execution, CI,
 > publication, landing or landed trust is claimed for §10.
 
 `Algorithm.Geometry.NatBox` must export the following checked theorem
@@ -1041,7 +1044,7 @@ law neither supplies an attainment witness nor publishes an extra
 corner-membership theorem; that separate containment claim belongs
 to a possible successor.
 
-The CV seed is a subsequent serial deliverable. Its closed box
+The CV-authored seed is present in this candidate. Its closed box
 `(1,1)–(4,3)` contains `(1,3)` and `(4,1)`; their Manhattan distance
 and the corners' distance are both `5`, so it exhibits a tight
 instance without a second public theorem. Moving the first point to
@@ -1051,4 +1054,4 @@ same bound shape, exposing the missing membership premise rather than
 an unrelated type error. A smaller-than-`5` bound on the contained
 pair is also false. These closed calculations delimit the generic
 contract but do not replace its checked proof or count as execution
-of the not-yet-authored seed.
+of the authored but unexecuted seed.
