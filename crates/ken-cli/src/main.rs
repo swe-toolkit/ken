@@ -111,10 +111,12 @@ fn dispatch() -> i32 {
             }
         },
     };
+    // No subcommand is help, so there may be no positional slice at index 2.
+    let command_args = args.get(2..).unwrap_or(&[]);
     let (report_path, positional) = if matches!(subcommand, "check" | "run" | "native-build") {
-        resolution_report::strip_first(&args[2..])
+        resolution_report::strip_first(command_args)
     } else {
-        (None, &args[2..])
+        (None, command_args)
     };
     let report = match report_path.as_deref().map(resolution_report::ReportFile::create) {
         Some(Ok(report)) => Some(report),
