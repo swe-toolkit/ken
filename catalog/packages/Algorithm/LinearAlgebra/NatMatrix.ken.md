@@ -2871,8 +2871,10 @@ thirty-nine public names across nine operations and thirty laws. The
 [matrix-vector linearity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-vector-linearity.md)
 [transpose adjoint seed](../../../../conformance/stdlib/linear-algebra/seed-transpose-adjoint.md),
 [identity symmetry seed](../../../../conformance/stdlib/linear-algebra/seed-identity-symmetric.md)
-and [vector-scaling seed](../../../../conformance/stdlib/linear-algebra/seed-vector-scale-action.md)
-provide finite behavioral clients. The module reuses the published
+and [vector-scaling seed](../../../../conformance/stdlib/linear-algebra/seed-vector-scale-action.md),
+along with the [zero-vector seed](../../../../conformance/stdlib/linear-algebra/seed-vector-zero-unit.md),
+provide finite behavioral clients. The zero-vector seed is authored but not
+Ken-checked or officially conformance-run. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
 prepending, row products and proof bridges remain private. The new
 `dot_zero_columns` and `transpose_cons_image` helpers, like
