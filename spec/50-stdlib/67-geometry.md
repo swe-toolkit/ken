@@ -40,9 +40,13 @@
 > main; Architect's AC-0 was isolated scratch evidence, not a landed
 > trust measurement. Section 11 states witnessed membership of both
 > stored corners. Architect AC-0 checked both generic proofs only in
-> scratch. This spec-only child adds no §11 catalog theorems, package
-> test or CV seed. No §11 official conformance-runner execution, CI,
-> publication, landing or landed trust is established.
+> scratch. This assembled candidate contains both §11 catalog theorems
+> and a package-owned test. On implementation tip `c1d35d108`, the named
+> target passed 2/2 with equal trusted identity sets 114 → 114; this is
+> candidate-local package evidence, not official conformance. The
+> eleventh CV seed is planned but not yet authored. No official
+> conformance-runner execution, CI, publication, landing or landed
+> trust is established for §11.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -1064,10 +1068,14 @@ of the authored but unexecuted seed.
 > (SPEC-GEOMETRY-BOX-CORNER-MEMBERSHIP).** Architect's AC-0 on exact base
 > `be60eb319` checked both generic proofs in scratch with `ken check`
 > and `ken fmt --check` rc 0, no new `Axiom`, and equal scratch trusted
-> identity sets 114 → 114. These are design measurements, not candidate
-> checks. This spec-only child adds no §11 catalog theorems, package
-> test or conformance seed; no official conformance-runner execution,
-> CI, publication, landing or landed trust is claimed for §11.
+> identity sets 114 → 114. These are scratch design measurements, not
+> candidate checks. Both §11 catalog theorems and a package-owned test
+> are present in this assembled candidate. On implementation tip
+> `c1d35d108`, the named target passed 2/2 with equal trusted identity
+> sets 114 → 114; this is candidate-local, not official conformance.
+> The eleventh CV seed is planned but not yet authored. No official
+> conformance-runner execution, CI, publication, landing or landed
+> trust is claimed for §11.
 
 `Algorithm.Geometry.NatBox` must export both checked theorems immediately
 after `manhattan_box_diameter` and before the private
