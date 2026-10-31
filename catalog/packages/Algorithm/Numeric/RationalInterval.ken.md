@@ -1477,7 +1477,9 @@ API.
    and [absorption seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersect-absorption.md)
    supply separately constructed positive values and false controls;
    those finite cases do not replace the generic checked proof bodies. The
-   distributivity seed's accepting client and dropped-product refusal, and the
+   [§10 point-unit seed](../../../../conformance/stdlib/numerical/seed-interval-point-units.md)
+   is authored but has not been Ken-checked or officially conformance-run.
+   The distributivity seed's accepting client and dropped-product refusal, and the
    inclusion-order seed's accepted client and two chain refusals, run in package
    tests. The associativity seed's whole accepted client, including its two
    closed `Refl` controls, and isolated false prefix-inclusion claim are checked
