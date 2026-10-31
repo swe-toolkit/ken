@@ -45,10 +45,13 @@
 > with equal trusted identity sets 114 → 114. Neither establishes an
 > official conformance-runner run or measured landed trust delta.
 > Section 12 states structural antisymmetry of corner-wise inclusion.
-> Architect AC-0 checked its generic proof only in scratch; this
-> spec-only child adds no §12 catalog theorem, package test or CV seed.
-> No §12 official conformance-runner run, CI, publication, landing or
-> landed-trust result is established.
+> Architect AC-0 checked its generic proof only in scratch; the
+> historical spec-only child added no §12 catalog theorem, package test
+> or CV seed. This assembled candidate contains the catalog theorem,
+> package-owned test and CV-authored seed. The seed is authored but
+> unexecuted. Neither it nor candidate-local checks establish official
+> conformance-runner execution, CI, publication, landing or a measured
+> landed-trust result for §12.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -1126,10 +1129,13 @@ establish CI, publication, landing or a landed-trust result.
 > (SPEC-GEOMETRY-BOX-INSIDE-ANTISYMMETRY).** Architect AC-0 on exact
 > base `0fdc10a5d` checked the generic proof in scratch with `ken check`
 > and `ken fmt --check` rc 0, no new `Axiom`, and equal scratch trusted
-> identity sets 114 → 114. These are design measurements, not a
-> candidate proof or landed trust result. This spec-only turn adds no
-> catalog theorem, package test or conformance seed; no official
-> conformance-runner execution, CI, publication or landing is claimed
+> identity sets 114 → 114. Those scratch measurements alone establish
+> neither candidate checks nor a landed trust result. The historical spec-only
+> child added no catalog theorem, package test or conformance seed.
+> This assembled candidate contains the catalog theorem, package-owned
+> test and CV-authored seed; the seed is authored but has not been
+> Ken-checked or run through the official conformance runner. No CI,
+> publication, landing or measured landed-trust result is established
 > for §12.
 
 `Algorithm.Geometry.NatBox` must export the following checked theorem
@@ -1163,10 +1169,12 @@ A one-direction comparison such as `(1,1)–(2,2)` inside
 `(0,0)–(3,3)` does not suffice: the reverse `inside` is `False`, and
 the boxes are distinct.
 
-A subsequent CV seed can use that small/large pair to test the second
-premise and can pair the false `Equal Box` claim for the two inverted
-boxes with a same-form reflexive equality control. These closed cases
-delimit the public law but do not replace its checked generic proof.
+The CV-authored seed in this assembled candidate uses that small/large
+pair to test the second premise and pairs the false `Equal Box` claim
+for the two inverted boxes with a same-form reflexive equality control.
+These closed cases delimit the public law but do not replace its checked
+generic proof.
 A negative `Equal Box` row must use `Refl`, not `Proved`, so refusal
 reflects the false structural equality rather than a malformed
-proof form. No seed is authored or executed by this spec-only turn.
+proof form. The historical spec-only child authored no seed; the
+assembled candidate contains the CV-authored but unexecuted seed.
