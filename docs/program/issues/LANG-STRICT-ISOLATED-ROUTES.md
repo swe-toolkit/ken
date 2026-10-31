@@ -82,7 +82,10 @@ base, stop and report the mismatch; do not build around it.
   a coverage gap, become
   covered: the shadow `fn write` imports its provider on an isolated
   file, and `--resolution-report` records `write` as `source-declared`
-  on `check`, `run` and `native-build`.
+  on `check`, `run` and `native-build`. The CLI-REPORT ring's local
+  probes found that the accepted no-import root passes the three direct
+  routes, but an `Axiom`-based shadow fails report generation with an
+  unattributed checked identity. Measure that first; it is in scope.
 
 ## Stop conditions
 

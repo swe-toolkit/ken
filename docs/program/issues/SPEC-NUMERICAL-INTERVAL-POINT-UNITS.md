@@ -76,10 +76,14 @@ candidate.
   reused `i`.
   - Its refused block pins the wrong-unit inclusion
     `interval_inside (interval_mul (interval_point rational_zero) i) i`
-    by `Refl`: the left side is `[0,0]`, and `1/2 ≤ 0` is false.
+    by `Proved`. The left side is `[0,0]` and `1/2 ≤ 0` is false, so the
+    kernel refuses it as `TypeMismatch` with the span inside the claim.
   - Its accepted same-form control is
     `interval_inside (interval_mul (interval_point rational_one) i) i`
-    by `Refl`, so the refusal is the unit, not the shape.
+    by `Proved`, so the refusal is the unit, not the shape. `Refl` does
+    not discriminate here: an `IsTrue` goal is not Eq-shaped, so it
+    refuses both rows alike (Architect D0 evt_5y7dt3m2x9twr; Steward
+    ruling evt_2v2rzk4vq7713).
 
 ## Stop conditions
 
