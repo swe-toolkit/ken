@@ -7,7 +7,8 @@
 > SPEC-GRAPHS-REACHABILITY-ALONG-WALK §5;
 > SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE §6;
 > SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE §7;
-> SPEC-GRAPHS-REVERSE-REACHABILITY §8).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REVERSE-REACHABILITY §8;
+> SPEC-GRAPHS-WALK-REVERSE-APPEND §9).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -24,21 +25,22 @@
 > exports the checked law and its package-owned test runs the complete
 > accepted seed and isolated refusal; that is not official conformance-
 > runner execution, CI, publication, landing or landed trust. Section 7
-> specifies one public graph-monotonicity law; its checked proof and seed
-> were first measured in Architect's isolated D0. This assembled candidate
-> adds the §7 catalog export, its authored seed and a package-owned test;
-> these candidate-local checks are not official conformance-runner execution,
-> CI, publication, landing or landed trust. No kernel, trust, or surface-syntax
-> change or revision to §61 §2 is required. Section 8 specifies four
-> public reverse-graph and reachability forms. This assembled candidate
-> has all four checked catalog exports, a package-owned test and the
-> authored §8 seed. The named `cat_graphs_reverse_reachability` test
-> passed 2/2 with reported candidate-local trusted identities 114 → 114.
-> Architect's AC-0 remains isolated scratch evidence; CV statically checked the
-> new seed but did not run it as Ken or through the official conformance
-> runner. The separate `cat_graphs_dependency` run timed out without a
-> verdict. No official conformance, CI, publication, landing or landed
-> trust is claimed.
+> specifies one public graph-monotonicity law; its checked catalog
+> proof, seed and package-owned test are now on main. Architect's D0 was
+> isolated scratch evidence, and earlier candidate-local checks were
+> not official conformance-runner execution or landed trust. No kernel,
+> trust or surface-syntax change or revision to §61 §2 is required.
+> Section 8's four checked reverse-graph and reachability forms, authored
+> seed and package-owned test are now on main. The named test previously
+> passed 2/2 with reported candidate-local trusted identities 114 → 114;
+> that result is not an official conformance run or a landed trust
+> measurement. CV statically checked the seed but did not run it as Ken
+> or through the official runner. The separate `cat_graphs_dependency`
+> run timed out without a verdict. Section 9 states one premise-free
+> walk-reversal law. Its Architect AC-0 is scratch-only (trusted identities
+> 114 → 114); this spec-only child adds no §9 catalog export, package
+> test or CV seed. No §9 official conformance, CI, publication, landing
+> or measured landed trust is established.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -753,15 +755,15 @@ delivery, official conformance, CI, publication, landing, or landed trust.
 > (SPEC-GRAPHS-REVERSE-REACHABILITY).** Architect's isolated AC-0 on
 > `77d13c94b22f7b9f7886edf610d8a7c3b6db31b9` checked the four
 > generic forms and seed controls with rc 0, no `Axiom`, and unchanged
-> scratch `trusted_base()` identities (114 → 114). This assembled
-> candidate has the four checked catalog forms, a package-owned test,
-> and the authored `conformance/stdlib/graphs/seed-reachability-reverse.md`.
-> The named `cat_graphs_reverse_reachability` test passed 2/2, with
-> reported candidate-local trusted identities 114 → 114. CV's seed
-> checks were static only: no Ken or official conformance run of that
-> seed. `cat_graphs_dependency` timed out without a verdict. Neither
-> the isolated D0 nor candidate-local results establish official
-> conformance, CI, publication, landing or landed trust.
+> scratch `trusted_base()` identities (114 → 114). All four checked
+> catalog forms, the package-owned test and the authored
+> `conformance/stdlib/graphs/seed-reachability-reverse.md` are now on
+> main. The named test previously passed 2/2 with reported
+> candidate-local trusted identities 114 → 114; CV statically checked
+> the seed but did not run it as Ken or through the official runner.
+> `cat_graphs_dependency` timed out without a verdict. Neither D0 nor
+> those earlier candidate-local results establish official conformance
+> execution or a measured landed trust result.
 
 `Algorithm.Graphs.Dependency` must export the following four public
 Transparent forms, in this order, immediately after
@@ -826,3 +828,76 @@ same reachability claim on the forward chain, where no edge leaves V2.
 CV statically checked the seed but did not run it as Ken or through the
 official conformance runner. Seed authorship and static checks are not
 candidate QA or a conformance-execution result.
+
+## 9. Reversal of a composed walk
+
+> **Section 9 status: DRAFT v0
+> (SPEC-GRAPHS-WALK-REVERSE-APPEND).** Architect AC-0 on exact base
+> `29511b74f` checked the generic theorem and private helper with
+> `ken check` and `ken fmt --check` rc 0, no added `Axiom`, and equal
+> scratch `trusted_base()` identity sets 114 → 114. This is isolated
+> design evidence, not a candidate catalog check or landed trust
+> result. This spec-only child adds no §9 catalog export, package test
+> or CV-authored seed. No §9 official conformance-runner execution,
+> CI, publication, landing or measured landed trust is established.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent law
+immediately after `graph_reachable_reverse` and before `contains`.
+Its arguments follow §3's `walk_append`: a graph, start `s`, joining
+vertex `t`, end `u`, and the two walks in forward order. Its checked
+public type has no additional premise:
+
+```ken
+pub theorem walk_reverse_append
+      (q : Type)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (u : q)
+      (first : Walk q g s t)
+      (second : Walk q g t u)
+    : Equal
+        (Walk q (graph_reverse q g) u s)
+        (walk_reverse q g s u (walk_append q g s t u first second))
+        (walk_append q (graph_reverse q g) u t s
+          (walk_reverse q g t u second)
+          (walk_reverse q g s t first))
+```
+
+Both sides are **walk data** in the reversed graph from `u` to `s`:
+reversal of a joined forward walk equals the join of its reversed
+parts in the **opposite** order. Equality here is between the walks,
+not merely their endpoints or their reachability results. The law
+holds for arbitrary `q`, `g` and walks, including a zero-edge part;
+it needs neither `Finite q`, `DecEq q` nor an edge proposition beyond
+the checked edges already carried by `first` and `second`.
+
+The generic proof inducts on the written `second` walk, as §3's
+`walk_append` does. In the `WalkHere` case, the symmetric direction
+of §4's public `walk_append_here_left` in the **reversed** graph
+closes the goal. In a `WalkStep` case, §8's `walk_reverse` prepends
+the reversed final edge. `cong` lifts the induction hypothesis under
+the existing private `walk_prepend`; `trans` then uses a new private
+`walk_prepend_append` lemma to commute that prepend across the
+reversed append. The helper itself inducts on its written back walk;
+it belongs immediately after `walk_prepend` and before
+`walk_step_selected`. Neither helper is exported. The original edge
+proof converts to the reversed-edge requirement by §8's definitional
+flip; no new edge lemma, premise, kernel form, surface rule or source
+of trust is required. All §1–§8 public operation and law types stay
+unchanged.
+
+The later CV seed must use a three-vertex chain **with a V0 → V2
+shortcut**, not the chain alone: the reversed graph then has two
+distinct walks from V2 to V0, one through V1 and one direct. On the
+composed V0 → V1 → V2 walk, the accepted law and a closed equality of
+its reversed result with the route through V1 form the positive
+control. An isolated equality with the direct shortcut walk must be
+refused at its own `Refl`, paired with an accepted same-form `Refl`
+claim for the route through V1. `Proved` is refused even for a true
+closed `Walk` equality, so it cannot discriminate this false walk
+claim; edge proofs inside `WalkStep` instead use `Proved` for their
+`Equal Bool` claims. A well-typed direct walk does not become equal to a different
+same-endpoint walk by this law. These closed observations delimit the
+contract but do not replace its generic checked proof; no §9 seed is
+authored or executed by this spec-only turn.
