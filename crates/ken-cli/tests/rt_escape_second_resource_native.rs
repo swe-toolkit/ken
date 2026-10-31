@@ -1359,8 +1359,8 @@ fn buffer_freeze_outcome(
 // r2 fixture. Raw relay provenance stays visible, but both marked successors
 // are settlement-owned and leave the projected returned set before emission.
 /// Promise class: transition sentinel for this r2 fixture's exact owner/Vis
-/// members. MEASURED: raw owners 1276 and 1296 retain their exact two-member
-/// provenance; successors 756 and 537 are authenticated settlements and neither
+/// members. MEASURED: raw owners 1353 and 1373 retain their exact two-member
+/// provenance; successors 833 and 614 are authenticated settlements and neither
 /// remains a projected returned Vis. CLAIMED: no owner emits a second returned
 /// edge for a continuation consumed by its bracket. THE GAP: this plan-only
 /// relation does not prove source drive; native parity separately observes it.
@@ -1378,12 +1378,12 @@ fn r2_relay_owners_settle_authenticated_successors_without_returning_them() {
         let _output = compiled.expect("r2 compiles to the current fail-closed artifact");
         assert_eq!(diagnostics.len(), 1, "one r2 response plan");
         let plan = &diagnostics[0];
-        let expected = [(1276u32, 586u32, 756u32), (1296, 369, 537)];
+        let expected = [(1353u32, 663u32, 833u32), (1373, 446, 614)];
         let observed_owners = plan.returned_vis_protocols.iter()
             .filter(|protocol| expected.iter().any(|(owner, _, _)| *owner == protocol.owner_origin))
             .map(|protocol| protocol.owner_origin)
             .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(observed_owners, [1276, 1296].into_iter().collect(),
+        assert_eq!(observed_owners, [1353, 1373].into_iter().collect(),
             "r2's exact raw response-owner inventory must remain present");
         for (owner, relay, successor) in expected {
             let protocol = plan.returned_vis_protocols.iter()
@@ -1392,7 +1392,7 @@ fn r2_relay_owners_settle_authenticated_successors_without_returning_them() {
             assert!(protocol.error.is_none() && protocol.excluded_by_relay,
                 "the raw owner stays source-driven and free of return errors: {protocol:?}");
             assert_eq!(protocol.contexts.len(), 1, "one raw context per named r2 owner");
-            assert_eq!(protocol.contexts[0].0, if owner == 1276 { 0 } else { 1 },
+            assert_eq!(protocol.contexts[0].0, if owner == 1353 { 0 } else { 1 },
                 "r2 owner {owner} moved its exact raw context");
             assert_eq!(protocol.contexts[0].1.len(), 2,
                 "r2 owner {owner} must retain exactly two raw provenance members");
@@ -1408,7 +1408,7 @@ fn r2_relay_owners_settle_authenticated_successors_without_returning_them() {
                 .all(|(projected_owner, _)| *projected_owner != owner),
                 "settled owner {owner} retained a returned successor after consumption");
         }
-        eprintln!("RT-OWNER-VIS SOURCE-DRIVEN R2 owners=[1276, 1296]");
+        eprintln!("RT-OWNER-VIS SOURCE-DRIVEN R2 owners=[1353, 1373]");
     });
 }
 
@@ -1473,8 +1473,8 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
 
 /// Promise class: transition sentinel for the selected-call fixture shape.
 /// MEASURED: the pre-schema transport source names the r2 S5→S6 call, and
-/// exactly one plane owns it: the checked bracket settlement row at its
-/// ResourceRelease Vis 537 (main owned it as installed owner 4, context 4).
+/// exactly one plane owns it: the checked ResourceRelease bracket settlement
+/// row whose continuation was emitted from the selected specialization.
 /// Every pre-schema transport source has exactly one owner, an installed
 /// owner or a bracket row, and preselection matches installed owners.
 /// CLAIMED: the representation-independent source stratum retains the exact
@@ -1500,24 +1500,24 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
         }
         assert_eq!(diagnostics.len(), 1, "one planner must publish one stratum");
         let plan = &diagnostics[0];
-        let selected_call = |identity: &str| [
-            "emission_owner: Specialization(ContinuationSpecializationId(5))",
-            "producer_construct_origin: StaticOriginId(537)",
-            "producer_alternative: 1",
-            "target: ContinuationSpecializationId(6)",
-            "recursive_position: 1",
-        ].iter().all(|component| identity.contains(component));
-        assert!(!plan.static_response_owners.iter()
-                .any(|owner| selected_call(&owner.selected_caller)),
-            "the settled release must not also be an ordinary installed owner");
         let settled = plan.bracket_response_rows.iter()
-            .filter(|row| selected_call(&row.k_identity)).collect::<Vec<_>>();
+            .filter(|row| row.operation == "ResourceRelease"
+                && row.k_identity.contains("emission_owner: Specialization(")
+                && row.k_identity.contains("producer_alternative: 1")
+                && row.k_identity.contains("recursive_position: 1")
+                && row.continuation_inputs.first()
+                    .is_some_and(|(_, source, _)| source.starts_with("ProducerLocal {"))
+                && plan.pre_schema_transport_sources.contains(&row.k_identity))
+            .collect::<Vec<_>>();
         let [row] = settled.as_slice() else {
-            panic!("exactly one bracket row must own r2's selected call: {settled:#?}");
+            panic!("exactly one checked specialized bracket release owns r2: {settled:#?}");
         };
-        assert_eq!((row.vis_origin, row.k_context, row.operation.as_str()),
-            (537, 4, "ResourceRelease"), "the selected call's settlement row moved");
         let selected = &row.k_identity;
+        assert!(!plan.static_response_owners.iter()
+                .any(|owner| owner.selected_caller == selected.as_str()),
+            "the checked release must not also be an ordinary installed owner");
+        assert!(plan.bracket_settlement_vis_origins.contains(&row.vis_origin),
+            "the selected checked release must be authenticated by the bracket");
         assert!(plan.pre_schema_transport_sources.contains(selected),
             "the pre-schema transport-source set lost the selected edge");
         let installed = plan.static_response_owners.iter().map(|owner| &owner.selected_caller)

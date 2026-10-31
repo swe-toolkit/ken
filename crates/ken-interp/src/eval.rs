@@ -5587,6 +5587,9 @@ pub struct FSIds {
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
+    pub px10_op_ids: [GlobalId; 8],
+    pub px10_kind_ids: [GlobalId; 4],
+    pub px10_exit_ids: [GlobalId; 2],
     pub private_resource_release_id: GlobalId,
     pub private_bracket_release_id: GlobalId,
     pub resource_read_id: GlobalId,
@@ -5672,6 +5675,9 @@ impl FSIds {
             private_mapping_read_view_id: prelude.private_mapping_read_view_id,
             private_mapping_write_view_id: prelude.private_mapping_write_view_id,
             private_mapping_acquire_file_id: prelude.private_mapping_acquire_file_id,
+            px10_op_ids: prelude.px10_op_ids,
+            px10_kind_ids: prelude.px10_kind_ids,
+            px10_exit_ids: prelude.px10_exit_ids,
             private_resource_release_id: prelude.private_resource_release_id,
             private_bracket_release_id: prelude.private_bracket_release_id,
             resource_read_id: roles.resource_open_read,
@@ -5808,6 +5814,7 @@ fn io_error_identity_value(
     let ctor = match identity {
         ken_host::IoErrorIdentityV1::NotFound => ids.notfound_id,
         ken_host::IoErrorIdentityV1::PermissionDenied => ids.permissiondenied_id,
+        ken_host::IoErrorIdentityV1::CapabilityDenied => ids.capabilitydenied_id,
         ken_host::IoErrorIdentityV1::BrokenPipe => ids.brokenpipe_id,
         ken_host::IoErrorIdentityV1::Interrupted => ids.interrupted_id,
         ken_host::IoErrorIdentityV1::AlreadyExists => ids.alreadyexists_id,
@@ -6038,6 +6045,7 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                     FsOpKind::GetInheritance => ken_host::FsCapabilityOperationV1::GetInheritance,
                     FsOpKind::SetInheritance => ken_host::FsCapabilityOperationV1::SetInheritance,
                     FsOpKind::Duplicate => ken_host::FsCapabilityOperationV1::Duplicate,
+                    FsOpKind::Spawn => ken_host::FsCapabilityOperationV1::Spawn,
                 },
                 held_rights,
             }
@@ -6075,6 +6083,7 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::GetInheritance => FsOpKind::GetInheritance,
                 ken_host::FsCapabilityOperationV1::SetInheritance => FsOpKind::SetInheritance,
                 ken_host::FsCapabilityOperationV1::Duplicate => FsOpKind::Duplicate,
+                ken_host::FsCapabilityOperationV1::Spawn => FsOpKind::Spawn,
             },
             held_rights: *held_rights,
         },
@@ -6467,6 +6476,10 @@ fn resource_error_value_v1(
                 ken_host::ResourceKindV1::FsHandle => make_ctor(fs.fs_handle_id, vec![], store),
                 ken_host::ResourceKindV1::Buffer => make_ctor(fs.buffer_id, vec![], store),
                 ken_host::ResourceKindV1::Mapping => make_ctor(fs.mapping_id, vec![], store),
+                ken_host::ResourceKindV1::SpawnPlan => make_ctor(fs.px10_kind_ids[0], vec![], store),
+                ken_host::ResourceKindV1::ChildProcess => make_ctor(fs.px10_kind_ids[1], vec![], store),
+                ken_host::ResourceKindV1::PipeRead => make_ctor(fs.px10_kind_ids[2], vec![], store),
+                ken_host::ResourceKindV1::PipeWrite => make_ctor(fs.px10_kind_ids[3], vec![], store),
             };
             let trace = make_ctor(
                 fs.private_resource_trace_identity_id,
@@ -6484,6 +6497,10 @@ fn resource_error_value_v1(
                 ken_host::ResourceKindV1::FsHandle => make_ctor(fs.fs_handle_id, vec![], store),
                 ken_host::ResourceKindV1::Buffer => make_ctor(fs.buffer_id, vec![], store),
                 ken_host::ResourceKindV1::Mapping => make_ctor(fs.mapping_id, vec![], store),
+                ken_host::ResourceKindV1::SpawnPlan => make_ctor(fs.px10_kind_ids[0], vec![], store),
+                ken_host::ResourceKindV1::ChildProcess => make_ctor(fs.px10_kind_ids[1], vec![], store),
+                ken_host::ResourceKindV1::PipeRead => make_ctor(fs.px10_kind_ids[2], vec![], store),
+                ken_host::ResourceKindV1::PipeWrite => make_ctor(fs.px10_kind_ids[3], vec![], store),
             };
             let expected = kind(expected, store);
             let actual = kind(actual, store);
@@ -6841,6 +6858,44 @@ fn fs_dispatch<H: HostHandler>(
             ken_host::CanonicalRequestV1::BufferFreeze { start, length },
             fs.op_metadata_id,
         )
+    } else if op_id == fs.px10_op_ids[0] {
+        (
+            ken_host::HostOpV1::ProcessPlanOpen,
+            ken_host::CanonicalRequestV1::ProcessPlanOpen { program: bytes_at(2)? },
+            fs.op_metadata_id,
+        )
+    } else if op_id == fs.px10_op_ids[1] {
+        let field = narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        let scalar = narrow_host_u64(args.get(5)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        (
+            ken_host::HostOpV1::ProcessPlanPush,
+            ken_host::CanonicalRequestV1::ProcessPlanPush {
+                field, first: bytes_at(3)?, second: bytes_at(4)?, scalar,
+            },
+            fs.op_metadata_id,
+        )
+    } else if op_id == fs.px10_op_ids[2] {
+        (ken_host::HostOpV1::ProcessSpawn, ken_host::CanonicalRequestV1::ProcessSpawn, fs.op_metadata_id)
+    } else if op_id == fs.px10_op_ids[3] || op_id == fs.px10_op_ids[4] {
+        let fd = if op_id == fs.px10_op_ids[3] { 0 } else {
+            narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?
+        };
+        (ken_host::HostOpV1::ProcessTakePipe,
+         ken_host::CanonicalRequestV1::ProcessTakePipe { fd }, fs.op_metadata_id)
+    } else if op_id == fs.px10_op_ids[5] {
+        (ken_host::HostOpV1::ProcessWait, ken_host::CanonicalRequestV1::ProcessWait, fs.op_metadata_id)
+    } else if op_id == fs.px10_op_ids[6] || op_id == fs.px10_op_ids[7] {
+        let buffer_start = narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        let length = narrow_host_u64(args.get(4)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        if op_id == fs.px10_op_ids[6] {
+            (ken_host::HostOpV1::ResourceStreamRead,
+             ken_host::CanonicalRequestV1::ResourceStreamRead { buffer_start, length },
+             fs.op_metadata_id)
+        } else {
+            (ken_host::HostOpV1::ResourceStreamWrite,
+             ken_host::CanonicalRequestV1::ResourceStreamWrite { buffer_start, length },
+             fs.op_metadata_id)
+        }
     } else if op_id == fs.private_resource_release_id || op_id == fs.private_bracket_release_id {
         (
             ken_host::HostOpV1::ResourceRelease,
@@ -6863,6 +6918,12 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::MappingReadView
             | ken_host::HostOpV1::MappingWriteView
             | ken_host::HostOpV1::MappingAcquireFile
+            | ken_host::HostOpV1::ResourceStreamRead
+            | ken_host::HostOpV1::ResourceStreamWrite
+            | ken_host::HostOpV1::ProcessPlanPush
+            | ken_host::HostOpV1::ProcessSpawn
+            | ken_host::HostOpV1::ProcessTakePipe
+            | ken_host::HostOpV1::ProcessWait
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -6881,6 +6942,8 @@ fn fs_dispatch<H: HostHandler>(
     let resource = if matches!(
         operation,
         ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::MappingAcquireFile
+            | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
+            | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
     ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
@@ -6895,6 +6958,18 @@ fn fs_dispatch<H: HostHandler>(
         None
     };
     let resource_inputs = match operation {
+        ken_host::HostOpV1::ResourceStreamRead => match (args.get(1), args.get(2)) {
+            (Some(EvalVal::ResourceToken(stream)), Some(EvalVal::ResourceToken(buffer))) =>
+                ken_host::ResourceInputsV1::FileBuffer { file: *stream, buffer: *buffer },
+            _ => return Some(Err(())),
+        },
+        ken_host::HostOpV1::ResourceStreamWrite => match (args.get(1), args.get(2), args.get(5)) {
+            (Some(EvalVal::ResourceToken(stream)), Some(EvalVal::ResourceToken(buffer)),
+             Some(EvalVal::ResourceToken(origin))) => ken_host::ResourceInputsV1::FileBufferSpan {
+                file: *stream, target_buffer: *buffer, span_origin: *origin,
+            },
+            _ => return Some(Err(())),
+        },
         ken_host::HostOpV1::FsReadAt => match (args.get(1), args.get(3)) {
             (Some(EvalVal::ResourceToken(file)), Some(EvalVal::ResourceToken(buffer))) => {
                 ken_host::ResourceInputsV1::FileBuffer {
@@ -7015,6 +7090,7 @@ fn validate_transfer_request_bound(
         None => Ok(()),
         Some(ken_host::TransferRequestBoundV1::ReadAt(transferred)) => match request {
             ken_host::CanonicalRequestV1::FsReadAt { length, .. }
+            | ken_host::CanonicalRequestV1::ResourceStreamRead { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -7023,6 +7099,7 @@ fn validate_transfer_request_bound(
         },
         Some(ken_host::TransferRequestBoundV1::WriteAt(transferred)) => match request {
             ken_host::CanonicalRequestV1::FsWriteAt { length, .. }
+            | ken_host::CanonicalRequestV1::ResourceStreamWrite { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -7098,6 +7175,13 @@ fn reify_host_reply_v1(
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceAcquired {
             ..
         }) => EvalVal::ResourceToken(resource_token.ok_or(())?),
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ChildExit(exit)) => {
+            let (ctor, value) = match exit {
+                ken_host::ChildExitV1::Exited(code) => (fs.px10_exit_ids[0], code),
+                ken_host::ChildExitV1::Signaled(signal) => (fs.px10_exit_ids[1], signal),
+            };
+            make_ctor(ctor, vec![EvalVal::Int(i64::from(value))], store)
+        }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceSettlement(
             _,
         )) => make_ctor(ids.unit_id, vec![], store),
@@ -7683,7 +7767,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
         }
     })();
     let mut backend = InterpreterHostBackend { handler };
-    let settlements = resources.finalize_all_with(&mut backend);
+    let settlements = resources.finalize_all_with_mode(&mut backend, result.is_err());
     if let Some(recorder) = recorder.as_deref_mut() {
         for settlement in settlements {
             let outcome = match settlement.outcome {
@@ -8253,6 +8337,9 @@ mod px5b_effect_observation_tests {
             private_mapping_read_view_id: id(),
             private_mapping_write_view_id: id(),
             private_mapping_acquire_file_id: id(),
+            px10_op_ids: [id(); 8],
+            px10_kind_ids: [id(); 4],
+            px10_exit_ids: [id(); 2],
             private_resource_release_id: id(),
             private_bracket_release_id: id(),
             resource_read_id: id(),

@@ -3628,6 +3628,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             N::nullary(R::ResourceKindFsHandle),
             N::nullary(R::ResourceKindBuffer),
             N::nullary(R::ResourceKindMapping),
+            N::nullary(R::ResourceKindSpawnPlan),
+            N::nullary(R::ResourceKindChildProcess),
+            N::nullary(R::ResourceKindPipeRead),
+            N::nullary(R::ResourceKindPipeWrite),
         ]));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
@@ -12138,7 +12142,7 @@ mod tests {
         .map(|(index, role)| (path(ERR, &[alt(index as u32)]), Fixed(role)))
         .chain(
             // `ResourceKind` at its THREE distinct parent paths, each with its
-            // own three alternatives. These are the repeated-role sites.
+            // own seven alternatives. These are the repeated-role sites.
             [
                 (4_u32, 0_u32),
                 (5, 0),
@@ -12150,6 +12154,10 @@ mod tests {
                     R::ResourceKindFsHandle,
                     R::ResourceKindBuffer,
                     R::ResourceKindMapping,
+                    R::ResourceKindSpawnPlan,
+                    R::ResourceKindChildProcess,
+                    R::ResourceKindPipeRead,
+                    R::ResourceKindPipeWrite,
                 ]
                     .into_iter()
                     .enumerate()
@@ -12771,6 +12779,10 @@ mod tests {
                 Fixed(R::ResourceKindFsHandle),
                 Fixed(R::ResourceKindBuffer),
                 Fixed(R::ResourceKindMapping),
+                Fixed(R::ResourceKindSpawnPlan),
+                Fixed(R::ResourceKindChildProcess),
+                Fixed(R::ResourceKindPipeRead),
+                Fixed(R::ResourceKindPipeWrite),
             ],
         );
 

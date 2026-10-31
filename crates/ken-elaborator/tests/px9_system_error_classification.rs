@@ -238,18 +238,33 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
     );
     assert_eq!(
         system_constructor_names(&env, &owned, "Operation"),
-        ["FilesystemOp"]
+        ["FilesystemOp", "ProcessOp"]
     );
     assert_eq!(
         system_inductive(&env, &owned, "Operation").constructors[0].args,
         [former(env.globals["FileOperation"])]
     );
     assert_eq!(
+        system_inductive(&env, &owned, "Operation").constructors[1].args,
+        [former(system_id(&env, &owned, "ProcessOperation"))]
+    );
+    assert_eq!(
+        system_constructor_names(&env, &owned, "ProcessOperation"),
+        ["SpawnChild", "TakePipe", "ReadPipe", "WritePipe", "ClosePipe", "WaitChild"]
+    );
+    assert_eq!(
         system_constructor_names(&env, &owned, "ResourceRef"),
-        ["FilesystemResource"]
+        ["FilesystemResource", "ProcessResource"]
     );
     assert_eq!(
         system_inductive(&env, &owned, "ResourceRef").constructors[0].args,
+        [Term::app(
+            former(env.globals["Option"]),
+            Term::const_(env.globals["Bytes"], vec![]),
+        )]
+    );
+    assert_eq!(
+        system_inductive(&env, &owned, "ResourceRef").constructors[1].args,
         [Term::app(
             former(env.globals["Option"]),
             Term::const_(env.globals["Bytes"], vec![]),

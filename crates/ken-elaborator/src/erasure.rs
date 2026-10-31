@@ -620,6 +620,9 @@ pub(crate) struct CheckedHostSpineV1 {
     pub resource_mapping_limit: StableSymbol,
     /// ABI-S6 D5a appends the now-native Mapping kind role.
     pub resource_kind_mapping: StableSymbol,
+    /// PX10 checked resource kinds and typed wait constructors.
+    pub px10_kind_symbols: [StableSymbol; 4],
+    pub px10_exit_symbols: [StableSymbol; 2],
     /// The checked constructor identity, independent of its host-op mapping.
     pub bracket_finalizer_constructor: Option<StableSymbol>,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
@@ -4373,7 +4376,7 @@ fn decode_checked_host_operation<'a>(
     let expected_family = match crate::export::host_operation_family_v1(operation) {
         crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
         crate::export::HostOpFamilyV1::Console => &spine.console_family,
-        crate::export::HostOpFamilyV1::Fs => &spine.fs_family,
+        crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => &spine.fs_family,
         crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
     };
     if &constructor.family_symbol != expected_family {
@@ -4415,6 +4418,12 @@ const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1
                 | ken_host::HostOpV1::MappingReadView
                 | ken_host::HostOpV1::MappingWriteView
                 | ken_host::HostOpV1::MappingAcquireFile
+                | ken_host::HostOpV1::ResourceStreamRead
+                | ken_host::HostOpV1::ResourceStreamWrite
+                | ken_host::HostOpV1::ProcessPlanPush
+                | ken_host::HostOpV1::ProcessSpawn
+                | ken_host::HostOpV1::ProcessTakePipe
+                | ken_host::HostOpV1::ProcessWait
                 | ken_host::HostOpV1::ResourceRelease
         )
 }
@@ -4434,6 +4443,12 @@ const fn runtime_selected_host_operation_requires_capability(
                 | ken_host::HostOpV1::MappingReadView
                 | ken_host::HostOpV1::MappingWriteView
                 | ken_host::HostOpV1::MappingAcquireFile
+                | ken_host::HostOpV1::ResourceStreamRead
+                | ken_host::HostOpV1::ResourceStreamWrite
+                | ken_host::HostOpV1::ProcessPlanPush
+                | ken_host::HostOpV1::ProcessSpawn
+                | ken_host::HostOpV1::ProcessTakePipe
+                | ken_host::HostOpV1::ProcessWait
                 | ken_host::HostOpV1::ResourceRelease
         )
 }
@@ -4479,7 +4494,7 @@ fn lower_runtime_selected_host_operation(
             let expected_family = match crate::export::host_operation_family_v1(host_operation) {
                 crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
                 crate::export::HostOpFamilyV1::Console => &spine.console_family,
-                crate::export::HostOpFamilyV1::Fs => &spine.fs_family,
+                crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => &spine.fs_family,
                 crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
             };
             if family != expected_family {
@@ -9069,6 +9084,10 @@ mod px7l_tests {
                 "MappingLimit",
             ),
             resource_kind_mapping: StableSymbol::constructor(&family("ResourceKind"), "Mapping"),
+            px10_kind_symbols: ["SpawnPlan", "ChildProcess", "PipeRead", "PipeWrite"]
+                .map(|name| StableSymbol::constructor(&family("ResourceKind"), name)),
+            px10_exit_symbols: ["Exited", "Signaled"]
+                .map(|name| StableSymbol::constructor(&family("ChildExit"), name)),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -9414,6 +9433,12 @@ mod px7l_tests {
                         | ken_host::HostOpV1::MappingReadView
                         | ken_host::HostOpV1::MappingWriteView
                         | ken_host::HostOpV1::MappingAcquireFile
+                        | ken_host::HostOpV1::ResourceStreamRead
+                        | ken_host::HostOpV1::ResourceStreamWrite
+                        | ken_host::HostOpV1::ProcessPlanPush
+                        | ken_host::HostOpV1::ProcessSpawn
+                        | ken_host::HostOpV1::ProcessTakePipe
+                        | ken_host::HostOpV1::ProcessWait
                         | ken_host::HostOpV1::ResourceRelease
                 );
             assert_eq!(
@@ -9525,6 +9550,8 @@ mod d1b_role_b_decoder_alignment {
             file_operation_duplicate: sentinel("file_operation_duplicate"),
             resource_mapping_limit: sentinel("resource_mapping_limit"),
             resource_kind_mapping: sentinel("resource_kind_mapping"),
+            px10_kind_symbols: [0, 1, 2, 3].map(|i| sentinel(&format!("px10_kind_{i}"))),
+            px10_exit_symbols: [0, 1].map(|i| sentinel(&format!("px10_exit_{i}"))),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),

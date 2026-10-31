@@ -33,6 +33,8 @@ pub mod capability;
 mod effect_v1;
 mod effect_wire;
 mod mapping_v1;
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod process_v1;
 #[cfg(target_os = "linux")]
 mod resource_close_v1;
 mod revocation_v1;
@@ -44,6 +46,8 @@ pub use abi_v1::{
 };
 pub use capability::*;
 pub use effect_v1::*;
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+pub use process_v1::{ChildExitV1, ChildProcessV1, ChildStdioV1, SpawnPlanV1};
 pub use effect_wire::*;
 pub use revocation_v1::RevocationDomain;
 
@@ -948,6 +952,32 @@ pub fn resource_write_at_v1(
         let _ = (handle, offset, bytes);
         unsupported()
     }
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+pub fn process_spawn_v1(plan: SpawnPlanV1) -> std::io::Result<ChildProcessV1> {
+    plan.spawn()
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+pub fn process_wait_v1(child: &mut ChildProcessV1) -> std::io::Result<ChildExitV1> {
+    child.wait()
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+pub fn process_stream_read_v1(
+    fd: &std::os::fd::OwnedFd,
+    bytes: &mut [u8],
+) -> std::io::Result<usize> {
+    process_v1::stream_read_v1(fd, bytes)
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+pub fn process_stream_write_v1(
+    fd: &std::os::fd::OwnedFd,
+    bytes: &[u8],
+) -> std::io::Result<usize> {
+    process_v1::stream_write_v1(fd, bytes)
 }
 
 pub fn resource_seek_v1(handle: &ResourceHandleV1, from: FsSeekFromV1) -> HostResult<u64> {

@@ -587,6 +587,7 @@ pub(crate) enum HostOpFamilyV1 {
     Clock,
     Fs,
     Entropy,
+    Process,
 }
 
 pub(crate) const fn host_operation_family_v1(
@@ -628,6 +629,13 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::MappingReadView
         | ken_host::HostOpV1::MappingWriteView
         | ken_host::HostOpV1::MappingAcquireFile => HostOpFamilyV1::Fs,
+        ken_host::HostOpV1::ResourceStreamRead
+        | ken_host::HostOpV1::ResourceStreamWrite
+        | ken_host::HostOpV1::ProcessPlanOpen
+        | ken_host::HostOpV1::ProcessPlanPush
+        | ken_host::HostOpV1::ProcessSpawn
+        | ken_host::HostOpV1::ProcessTakePipe
+        | ken_host::HostOpV1::ProcessWait => HostOpFamilyV1::Process,
     }
 }
 
@@ -637,6 +645,7 @@ fn host_operation_family(operation: ken_host::HostOpV1) -> (&'static str, &'stat
         HostOpFamilyV1::Clock => ("ClockOp", "Clock"),
         HostOpFamilyV1::Fs => ("FSOp", "FS"),
         HostOpFamilyV1::Entropy => ("EntropyOp", "Entropy"),
+        HostOpFamilyV1::Process => ("FSOp", "Process"),
     }
 }
 
@@ -711,6 +720,13 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::MappingReadView => "MappingReadView",
         ken_host::HostOpV1::MappingWriteView => "MappingWriteView",
         ken_host::HostOpV1::MappingAcquireFile => "MappingAcquireFile",
+        ken_host::HostOpV1::ResourceStreamRead => "ResourceStreamRead",
+        ken_host::HostOpV1::ResourceStreamWrite => "ResourceStreamWrite",
+        ken_host::HostOpV1::ProcessPlanOpen => "ProcessPlanOpen",
+        ken_host::HostOpV1::ProcessPlanPush => "ProcessPlanPush",
+        ken_host::HostOpV1::ProcessSpawn => "ProcessSpawn",
+        ken_host::HostOpV1::ProcessTakePipe => "ProcessTakePipe",
+        ken_host::HostOpV1::ProcessWait => "ProcessWait",
     }
 }
 
@@ -981,6 +997,25 @@ const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
     },
 ];
 
+const PROCESS_PLAN_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessPlanPush, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessSpawn, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+const PROCESS_CHILD_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessTakePipe, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessWait, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+const PIPE_READ_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 2] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceStreamRead, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+const PIPE_WRITE_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 2] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceStreamWrite, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+
 const MAPPING_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
     ResourceLifetimeBindingPoint {
         operation: ken_host::HostOpV1::MappingReadView,
@@ -1058,6 +1093,37 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
         }
     }
 
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessPlanOpen) {
+        if let Some(operation) = first_reachable_operation(alphabet, &[
+            ken_host::HostOpV1::ProcessPlanPush, ken_host::HostOpV1::ProcessSpawn,
+        ]) {
+            return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SpawnPlan, operation,
+            });
+        }
+    }
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessSpawn) {
+        if let Some(operation) = first_reachable_operation(alphabet, &[
+            ken_host::HostOpV1::ProcessTakePipe, ken_host::HostOpV1::ProcessWait,
+        ]) {
+            return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::ChildProcess, operation,
+            });
+        }
+    }
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessTakePipe) {
+        if let Some(operation) = first_reachable_operation(alphabet, &[
+            ken_host::HostOpV1::ResourceStreamRead, ken_host::HostOpV1::ResourceStreamWrite,
+        ]) {
+            return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: if operation == ken_host::HostOpV1::ResourceStreamRead {
+                    ken_host::ResourceKindV1::PipeRead
+                } else {
+                    ken_host::ResourceKindV1::PipeWrite
+                }, operation,
+            });
+        }
+    }
     Ok(())
 }
 
@@ -1069,6 +1135,9 @@ fn project_resource_lifetime_obligation(
     if alphabet_contains_host_op(alphabet, ken_host::HostOpV1::FsOpen)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::BufferAllocate)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::MappingAllocate)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessPlanOpen)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessSpawn)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessTakePipe)
     {
         Ok(Some(project_resource_lifetime_obligation_body(alphabet)))
     } else {
@@ -1119,6 +1188,21 @@ fn project_resource_lifetime_obligation_body(
         });
     }
 
+    for (kind, operation, role, sites) in [
+        (ken_host::ResourceKindV1::SpawnPlan, ken_host::HostOpV1::ProcessPlanOpen, ken_host::ResourceBindingRole::Target, PROCESS_PLAN_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::ChildProcess, ken_host::HostOpV1::ProcessSpawn, ken_host::ResourceBindingRole::File, PROCESS_CHILD_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::PipeRead, ken_host::HostOpV1::ProcessTakePipe, ken_host::ResourceBindingRole::Buffer, PIPE_READ_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::PipeWrite, ken_host::HostOpV1::ProcessTakePipe, ken_host::ResourceBindingRole::Buffer, PIPE_WRITE_REQUIRE_SAME_AT.as_slice()),
+    ] {
+        if alphabet_contains_host_op(alphabet, operation) {
+            plans.push(ResourceLifetimePlan {
+                resource_kind: kind,
+                bind_at: ResourceLifetimeBindingPoint { operation, role },
+                require_same_at: reachable(sites),
+            });
+        }
+    }
+
     ResourceLifetimeObligation {
         obligation_id: "resource-lifetime",
         status: "delegated",
@@ -1151,9 +1235,12 @@ fn validate_resource_lifetime_selection(
     let has_buffer = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::BufferAllocate);
     let has_file = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::FsOpen);
     let has_mapping = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::MappingAllocate);
+    let has_process = [ken_host::HostOpV1::ProcessPlanOpen, ken_host::HostOpV1::ProcessSpawn,
+        ken_host::HostOpV1::ProcessTakePipe].into_iter()
+        .any(|operation| alphabet_contains_host_op(alphabet, operation));
 
     match value {
-        Some(value) if has_buffer || has_file || has_mapping => {
+        Some(value) if has_buffer || has_file || has_mapping || has_process => {
             validate_resource_lifetime_obligation(value, alphabet)
         }
         None if has_buffer => Err(ExportError::MissingResourceLifetimePlan {
@@ -1164,6 +1251,9 @@ fn validate_resource_lifetime_selection(
         }),
         None if has_mapping => Err(ExportError::MissingResourceLifetimePlan {
             resource_kind: ken_host::ResourceKindV1::Mapping,
+        }),
+        None if has_process => Err(ExportError::MissingResourceLifetimePlan {
+            resource_kind: ken_host::ResourceKindV1::SpawnPlan,
         }),
         Some(_) => Err(ExportError::InvalidResourceLifetimeObligation),
         None => Ok(()),
@@ -1181,11 +1271,18 @@ fn validate_resource_lifetime_obligation(
         ken_host::ResourceKindV1::FsHandle,
         ken_host::ResourceKindV1::Buffer,
         ken_host::ResourceKindV1::Mapping,
+        ken_host::ResourceKindV1::SpawnPlan,
+        ken_host::ResourceKindV1::ChildProcess,
+        ken_host::ResourceKindV1::PipeRead,
+        ken_host::ResourceKindV1::PipeWrite,
     ] {
         let acquisition = match resource_kind {
             ken_host::ResourceKindV1::FsHandle => ken_host::HostOpV1::FsOpen,
             ken_host::ResourceKindV1::Buffer => ken_host::HostOpV1::BufferAllocate,
             ken_host::ResourceKindV1::Mapping => ken_host::HostOpV1::MappingAllocate,
+            ken_host::ResourceKindV1::SpawnPlan => ken_host::HostOpV1::ProcessPlanOpen,
+            ken_host::ResourceKindV1::ChildProcess => ken_host::HostOpV1::ProcessSpawn,
+            ken_host::ResourceKindV1::PipeRead | ken_host::ResourceKindV1::PipeWrite => ken_host::HostOpV1::ProcessTakePipe,
         };
         if alphabet_contains_host_op(alphabet, acquisition)
             && !value
@@ -1219,6 +1316,10 @@ const fn canonical_resource_kind_v1(value: ken_host::ResourceKindV1) -> &'static
         ken_host::ResourceKindV1::FsHandle => "FsHandle",
         ken_host::ResourceKindV1::Buffer => "Buffer",
         ken_host::ResourceKindV1::Mapping => "Mapping",
+        ken_host::ResourceKindV1::SpawnPlan => "SpawnPlan",
+        ken_host::ResourceKindV1::ChildProcess => "ChildProcess",
+        ken_host::ResourceKindV1::PipeRead => "PipeRead",
+        ken_host::ResourceKindV1::PipeWrite => "PipeWrite",
     }
 }
 

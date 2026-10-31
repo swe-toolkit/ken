@@ -31,6 +31,8 @@ use ken_kernel::{
 use crate::error::ElabError;
 use crate::ElabEnv;
 
+mod process;
+
 /// Declares [`CanonicalRuntimeRoles`] and its registration-time capture from a
 /// single list, so the field set and the captured set cannot drift apart.
 ///
@@ -314,6 +316,9 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_mapping_read_view_id: z,
         private_mapping_write_view_id: z,
         private_mapping_acquire_file_id: z,
+        px10_op_ids: [z; 8],
+        px10_kind_ids: [z; 4],
+        px10_exit_ids: [z; 2],
         private_buffer_handle_id: z,
         buffer_handle_resource_id: z,
         buffer_handle_capacity_id: z,
@@ -479,6 +484,9 @@ pub struct PreludeEnv {
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
+    pub px10_op_ids: [GlobalId; 8],
+    pub px10_kind_ids: [GlobalId; 4],
+    pub px10_exit_ids: [GlobalId; 2],
     pub private_buffer_handle_id: GlobalId,
     pub buffer_handle_resource_id: GlobalId,
     pub buffer_handle_capacity_id: GlobalId,
@@ -832,6 +840,8 @@ struct PreludeResourceSeed {
     resource_kind_id: GlobalId,
     fs_handle_id: GlobalId,
     resource_id: GlobalId,
+    px10_kind_ids: [GlobalId; 4],
+    px10_exit_ids: [GlobalId; 2],
     private_resource_trace_identity_id: GlobalId,
     resource_host_io_id: GlobalId,
     closed_id: GlobalId,
@@ -861,6 +871,7 @@ struct PreludeOperationIds {
     private_mapping_read_view_id: GlobalId,
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
+    px10_op_ids: [GlobalId; 8],
 }
 
 struct PreludeResourceIds {
@@ -876,6 +887,9 @@ struct PreludeResourceIds {
     private_mapping_read_view_id: GlobalId,
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
+    px10_op_ids: [GlobalId; 8],
+    px10_kind_ids: [GlobalId; 4],
+    px10_exit_ids: [GlobalId; 2],
     private_buffer_handle_id: GlobalId,
     buffer_handle_resource_id: GlobalId,
     buffer_handle_capacity_id: GlobalId,
@@ -2026,7 +2040,7 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
     // generation-checked resource table is its sole interpreter. The trace
     // identity has one private two-u32-limb constructor so the native reply
     // can preserve all 64 bits without narrowing through signed Ken `Int`.
-    elab.elaborate_decl("data ResourceKind = FsHandle | Buffer | Mapping")
+    elab.elaborate_decl("data ResourceKind = FsHandle | Buffer | Mapping | SpawnPlan | ChildProcess | PipeRead | PipeWrite")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceKind failed: {e}")))?;
     let resource_kind_id = *elab
         .globals
@@ -2043,8 +2057,67 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         .get("ResourceKind.FsHandle")
         .copied()
         .ok_or_else(|| ElabError::Internal("prelude: ResourceKind.FsHandle missing".into()))?;
+    // The public plan is a pure immutable value. The positional constructor
+    // is unavailable to source after the checked builders are installed.
+    elab.elaborate_decl("data ChildStdio = ChildPipe | ChildNull | ChildInherit Stream")
+        .map_err(|e| ElabError::Internal(format!("prelude ChildStdio failed: {e}")))?;
+    elab.elaborate_decl("data ChildExit = Exited UInt8 | Signaled UInt8")
+        .map_err(|e| ElabError::Internal(format!("prelude ChildExit failed: {e}")))?;
+    // `ResourceKind.SpawnPlan` and the type `SpawnPlan` legitimately share
+    // their terminal spelling. Surface `data` preflight rejects that overlap
+    // before constructor scoping; install the same ordinary checked inductive
+    // through the kernel API, as FSOp/ProgramCaps already do.
+    let list = Term::indformer(elab.globals["List"], vec![]);
+    let prod = Term::indformer(elab.globals["Prod"], vec![]);
+    let bytes = Term::const_(elab.globals["Bytes"], vec![]);
+    let child_stdio = Term::indformer(elab.globals["ChildStdio"], vec![]);
+    let arguments = Term::app(list.clone(), bytes.clone());
+    let entry = Term::app(Term::app(prod, bytes.clone()), bytes.clone());
+    let environment = Term::app(list, entry);
+    let spawn_plan_id = declare_inductive(&mut elab.env, |_| InductiveSpec {
+        level_params: vec![], params: vec![], indices: vec![], level: Level::Zero,
+        constructors: vec![CtorSpec {
+            args: vec![bytes, arguments, environment,
+                       child_stdio.clone(), child_stdio.clone(), child_stdio],
+            target_indices: vec![],
+        }],
+    }).map_err(|e| ElabError::Internal(format!("prelude SpawnPlan failed: {e}")))?;
+    elab.globals.insert("SpawnPlan".into(), spawn_plan_id);
+    let private_spawn_plan_id = elab.env.inductive(spawn_plan_id)
+        .and_then(|ind| ind.constructors.first()).map(|ctor| ctor.id)
+        .ok_or_else(|| ElabError::Internal("prelude PrivateSpawnPlan missing".into()))?;
+    elab.globals.insert("PrivateSpawnPlan".into(), private_spawn_plan_id);
+    elab.elaborate_decl(
+        "fn spawn_plan (executable : Bytes) (arguments : List Bytes) : SpawnPlan = \
+         PrivateSpawnPlan executable arguments (Nil (Prod Bytes Bytes)) ChildNull ChildNull ChildNull",
+    ).map_err(|e| ElabError::Internal(format!("prelude spawn_plan failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn with_environment (plan : SpawnPlan) (env : List (Prod Bytes Bytes)) : SpawnPlan = \
+         match plan { PrivateSpawnPlan executable arguments old_env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env stdin stdout stderr }",
+    ).map_err(|e| ElabError::Internal(format!("prelude with_environment failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn with_stdin (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan = \
+         match plan { PrivateSpawnPlan executable arguments env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env target stdout stderr }",
+    ).map_err(|e| ElabError::Internal(format!("prelude with_stdin failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn with_stdout (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan = \
+         match plan { PrivateSpawnPlan executable arguments env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env stdin target stderr }",
+    ).map_err(|e| ElabError::Internal(format!("prelude with_stdout failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn with_stderr (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan = \
+         match plan { PrivateSpawnPlan executable arguments env stdin stdout stderr |-> \
+           PrivateSpawnPlan executable arguments env stdin stdout target }",
+    ).map_err(|e| ElabError::Internal(format!("prelude with_stderr failed: {e}")))?;
     elab.elaborate_decl("data ResourceTraceIdentity = PrivateResourceTraceIdentity Int Int")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceTraceIdentity failed: {e}")))?;
+    let px10_kind_ids = [
+        "ResourceKind.SpawnPlan", "ResourceKind.ChildProcess",
+        "ResourceKind.PipeRead", "ResourceKind.PipeWrite",
+    ].map(|name| elab.globals[name]);
+    let px10_exit_ids = [elab.globals["Exited"], elab.globals["Signaled"]];
     let private_resource_trace_identity_id = elab
         .globals
         .get("PrivateResourceTraceIdentity")
@@ -2098,7 +2171,7 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         .get("ReleaseFailed")
         .copied()
         .ok_or_else(|| ElabError::Internal("prelude: ReleaseFailed missing".into()))?;
-    Ok(PreludeResourceSeed { auth_t, bytes_t, create_policy_t, bool_t, int_t, cap_id, resource_kind_id, fs_handle_id, resource_id, private_resource_trace_identity_id, resource_host_io_id, closed_id, malformed_resource_id, right_not_held_id, release_failed_id })
+    Ok(PreludeResourceSeed { auth_t, bytes_t, create_policy_t, bool_t, int_t, cap_id, resource_kind_id, fs_handle_id, resource_id, px10_kind_ids, px10_exit_ids, private_resource_trace_identity_id, resource_host_io_id, closed_id, malformed_resource_id, right_not_held_id, release_failed_id })
 }
 
 #[inline(never)]
@@ -2291,6 +2364,15 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         Term::const_(resource_id, vec![]),
         Term::constructor(mapping_id, vec![]),
     );
+    let resource_of_kind = |name: &str| -> Result<Term, ElabError> {
+        let id = elab.globals.get(name).copied().ok_or_else(||
+            ElabError::Internal(format!("prelude: {name} missing")))?;
+        Ok(Term::app(Term::const_(resource_id, vec![]), Term::constructor(id, vec![])))
+    };
+    let resource_plan_t = resource_of_kind("ResourceKind.SpawnPlan")?;
+    let resource_child_t = resource_of_kind("ResourceKind.ChildProcess")?;
+    let resource_pipe_read_t = resource_of_kind("ResourceKind.PipeRead")?;
+    let resource_pipe_write_t = resource_of_kind("ResourceKind.PipeWrite")?;
     let mapping_prot_t = elab
         .globals
         .get("MappingProt")
@@ -2358,7 +2440,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                     int_t.clone(),
                     int_t.clone(),
                     // PX8-SPAN-PROV: trailing `span_origin` acquisition token.
-                    resource_buffer_t,
+                    resource_buffer_t.clone(),
                 ]),
                 named(vec![int_t.clone(), mapping_prot_t.clone()]),
                 named(vec![
@@ -2373,7 +2455,15 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                     bytes_t.clone(),
                     resource_mapping_t,
                 ]),
-                named(vec![resource_fs_handle_t, int_t, mapping_prot_t]),
+                named(vec![resource_fs_handle_t, int_t.clone(), mapping_prot_t]),
+                named(vec![cap_a(), bytes_t.clone()]),
+                named(vec![resource_plan_t.clone(), int_t.clone(), bytes_t.clone(), bytes_t.clone(), int_t.clone()]),
+                named(vec![resource_plan_t]),
+                named(vec![resource_child_t.clone()]),
+                named(vec![resource_child_t.clone(), int_t.clone()]),
+                named(vec![resource_child_t]),
+                named(vec![resource_pipe_read_t, resource_buffer_t.clone(), int_t.clone(), int_t.clone()]),
+                named(vec![resource_pipe_write_t, resource_buffer_t.clone(), int_t.clone(), int_t, resource_buffer_t]),
             ]
         },
     })
@@ -2410,6 +2500,14 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateMappingReadView",
         "PrivateMappingWriteView",
         "PrivateMappingAcquireFile",
+        "PrivateProcessPlanOpen",
+        "PrivateProcessPlanPush",
+        "PrivateProcessSpawn",
+        "PrivateProcessTakePipeWrite",
+        "PrivateProcessTakePipeRead",
+        "PrivateProcessWait",
+        "PrivateResourceStreamRead",
+        "PrivateResourceStreamWrite",
     ]
     .into_iter()
     .zip(fs_ctor_ids)
@@ -2428,6 +2526,11 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let private_mapping_read_view_id = elab.globals["PrivateMappingReadView"];
     let private_mapping_write_view_id = elab.globals["PrivateMappingWriteView"];
     let private_mapping_acquire_file_id = elab.globals["PrivateMappingAcquireFile"];
+    let px10_op_ids = [
+        "PrivateProcessPlanOpen", "PrivateProcessPlanPush", "PrivateProcessSpawn",
+        "PrivateProcessTakePipeWrite", "PrivateProcessTakePipeRead",
+        "PrivateProcessWait", "PrivateResourceStreamRead", "PrivateResourceStreamWrite",
+    ].map(|name| elab.globals[name]);
     Ok(PreludeOperationIds {
         private_fs_open_id,
         private_fs_handle_metadata_id,
@@ -2441,6 +2544,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         private_mapping_read_view_id,
         private_mapping_write_view_id,
         private_mapping_acquire_file_id,
+        px10_op_ids,
     })
 }
 
@@ -2465,6 +2569,9 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
         private_mapping_read_view_id: op.private_mapping_read_view_id,
         private_mapping_write_view_id: op.private_mapping_write_view_id,
         private_mapping_acquire_file_id: op.private_mapping_acquire_file_id,
+        px10_op_ids: op.px10_op_ids,
+        px10_kind_ids: seed.px10_kind_ids,
+        px10_exit_ids: seed.px10_exit_ids,
         private_buffer_handle_id: buffer.private_buffer_handle_id,
         buffer_handle_resource_id: buffer.buffer_handle_resource_id,
         buffer_handle_capacity_id: buffer.buffer_handle_capacity_id,
@@ -2511,7 +2618,15 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateMappingAllocate length protection |-> Result ResourceError (Resource ResourceKind.Mapping); \
            PrivateMappingReadView mapping start length span_origin |-> Result ResourceError Bytes; \
            PrivateMappingWriteView mapping start bytes span_origin |-> Result ResourceError Unit; \
-           PrivateMappingAcquireFile file length protection |-> Result ResourceError (Resource ResourceKind.Mapping) \
+           PrivateMappingAcquireFile file length protection |-> Result ResourceError (Resource ResourceKind.Mapping); \
+           PrivateProcessPlanOpen cap executable |-> Result ResourceError (Resource ResourceKind.SpawnPlan); \
+           PrivateProcessPlanPush plan field first second scalar |-> Result ResourceError Unit; \
+           PrivateProcessSpawn plan |-> Result ResourceError (Resource ResourceKind.ChildProcess); \
+           PrivateProcessTakePipeWrite child |-> Result ResourceError (Resource ResourceKind.PipeWrite); \
+           PrivateProcessTakePipeRead child fd |-> Result ResourceError (Resource ResourceKind.PipeRead); \
+           PrivateProcessWait child |-> Result ResourceError ChildExit; \
+           PrivateResourceStreamRead stream buffer start length |-> Result ResourceError ReadProgress; \
+           PrivateResourceStreamWrite stream buffer start length origin |-> Result ResourceError WriteProgress \
          }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
@@ -2948,6 +3063,7 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     .map_err(|e| ElabError::Internal(format!("prelude withMapping failed: {e}")))?;
     register_resource_bracket_laws(elab)?;
     register_post_bracket_io(elab)?;
+    process::register_prelude_process(elab)?;
 
     // Scope both private families only after the checked buffer helpers have
     // used their original bare bindings, but before their IDs are hidden.
@@ -2963,6 +3079,11 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         )?;
     }
 
+    let plan_id = elab.globals["SpawnPlan"];
+    elab.module_state.scope_constructor_family(
+        &elab.env, &mut elab.globals, plan_id, "SpawnPlan",
+    )?;
+
     // No raw acquire or representation constructor is a public Ken identity.
     // Their GlobalIds remain reachable only through the checked definitions
     // above and the immutable `PreludeEnv` driver record.
@@ -2977,6 +3098,25 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "PrivateMappingReadView",
         "PrivateMappingWriteView",
         "PrivateMappingAcquireFile",
+        "PrivateProcessPlanOpen",
+        "PrivateProcessPlanPush",
+        "PrivateProcessSpawn",
+        "PrivateProcessTakePipeWrite",
+        "PrivateProcessTakePipeRead",
+        "PrivateProcessWait",
+        "PrivateResourceStreamRead",
+        "PrivateResourceStreamWrite",
+        "SpawnPlan.PrivateSpawnPlan",
+        "private_process_error",
+        "private_process_read_result",
+        "process_stdio_scalar",
+        "private_process_then",
+        "private_process_push_arguments",
+        "private_process_push_environment",
+        "private_process_push_stdio",
+        "private_process_after_push",
+        "private_process_after_open",
+        "private_process_release_child",
         "PrivateMappingHandle",
         "mapping_handle_resource",
         "mapping_handle_length",
@@ -3388,6 +3528,9 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         private_mapping_read_view_id: fs_ids.private_mapping_read_view_id,
         private_mapping_write_view_id: fs_ids.private_mapping_write_view_id,
         private_mapping_acquire_file_id: fs_ids.private_mapping_acquire_file_id,
+        px10_op_ids: fs_ids.px10_op_ids,
+        px10_kind_ids: fs_ids.px10_kind_ids,
+        px10_exit_ids: fs_ids.px10_exit_ids,
         private_buffer_handle_id: fs_ids.private_buffer_handle_id,
         buffer_handle_resource_id: fs_ids.buffer_handle_resource_id,
         buffer_handle_capacity_id: fs_ids.buffer_handle_capacity_id,

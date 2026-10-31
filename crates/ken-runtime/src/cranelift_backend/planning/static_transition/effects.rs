@@ -413,7 +413,8 @@ fn host_effect_seat_contract(
                 | Op::FsRemoveDirectory
                 | Op::FsRename
                 | Op::FsChangeMode
-                | Op::FsOpen => Some((
+                | Op::FsOpen
+                | Op::ProcessPlanOpen => Some((
                     Semantic::ObserveCapabilityToken,
                     Need::CapabilityTokenScalar,
                     // Both phases: the emitter reads a specialized
@@ -440,6 +441,12 @@ fn host_effect_seat_contract(
                 | Op::MappingReadView
                 | Op::MappingWriteView
                 | Op::MappingAcquireFile
+                | Op::ResourceStreamRead
+                | Op::ResourceStreamWrite
+                | Op::ProcessPlanPush
+                | Op::ProcessSpawn
+                | Op::ProcessTakePipe
+                | Op::ProcessWait
                 | Op::ConsoleRead
                 | Op::ClockWallNow
                 | Op::ClockMonotonicNow
@@ -539,6 +546,24 @@ fn host_effect_seat_contract(
         // Int decoder and bounds lane handle the widened seat.
         (Op::MappingAcquireFile, 1) => Some(carried_exact_int),
         (Op::MappingAcquireFile, 2) => Some(tag),
+        (Op::ProcessPlanOpen, 0) => Some(carried_bytes),
+        (Op::ProcessPlanPush, 0)
+        | (Op::ProcessSpawn, 0)
+        | (Op::ProcessTakePipe, 0)
+        | (Op::ProcessWait, 0)
+        | (Op::ResourceStreamRead, 0)
+        | (Op::ResourceStreamRead, 1)
+        | (Op::ResourceStreamWrite, 0)
+        | (Op::ResourceStreamWrite, 1)
+        | (Op::ResourceStreamWrite, 4) => Some(phase_bearing_resource),
+        (Op::ProcessPlanPush, 1)
+        | (Op::ProcessPlanPush, 4)
+        | (Op::ProcessTakePipe, 1)
+        | (Op::ResourceStreamRead, 2)
+        | (Op::ResourceStreamRead, 3)
+        | (Op::ResourceStreamWrite, 2)
+        | (Op::ResourceStreamWrite, 3) => Some(carried_exact_int),
+        (Op::ProcessPlanPush, 2) | (Op::ProcessPlanPush, 3) => Some(carried_bytes),
         (Op::BufferAllocate, 0) | (Op::MappingAllocate, 0) => Some(carried_exact_int),
         (Op::MappingAllocate, 1) => Some(tag),
         (Op::BufferFreeze, 0)
@@ -624,7 +649,14 @@ fn host_effect_seat_contract(
             | Op::MappingAllocate
             | Op::MappingReadView
             | Op::MappingWriteView
-            | Op::MappingAcquireFile,
+            | Op::MappingAcquireFile
+            | Op::ResourceStreamRead
+            | Op::ResourceStreamWrite
+            | Op::ProcessPlanOpen
+            | Op::ProcessPlanPush
+            | Op::ProcessSpawn
+            | Op::ProcessTakePipe
+            | Op::ProcessWait,
             _,
         ) => None,
         // ⛔ The represented-UNAVAILABLE lanes, named rather than wildcarded.

@@ -102,6 +102,8 @@ impl RightSet {
     pub const ENUMERATE: Self = Self(1 << 4);
     pub const METADATA: Self = Self(1 << 5);
     pub const CHANGE_MODE: Self = Self(1 << 6);
+    /// Process execution is never implied by filesystem AFull.
+    pub const EXECUTE: Self = Self(1 << 7);
     pub const ALL: Self = Self((1 << 7) - 1);
 
     pub const fn union(self, other: Self) -> Self {
@@ -120,7 +122,7 @@ impl RightSet {
         self.0
     }
     pub const fn from_bits(bits: u8) -> Self {
-        Self(bits & Self::ALL.0)
+        Self(bits & Self::ALL.union(Self::EXECUTE).0)
     }
 }
 
@@ -245,6 +247,14 @@ impl Cap {
             scope,
         }
     }
+    /// Called only after checked Program admission proved `Process` plus FS
+    /// `AFull`; existing AFull grants do not carry EXECUTE implicitly.
+    pub fn with_declared_process_grant(mut self) -> Self {
+        if self.authority == AUTH_FULL {
+            self.scope.rights = self.scope.rights.union(RightSet::EXECUTE);
+        }
+        self
+    }
     pub fn authority(&self) -> Authority {
         self.authority
     }
@@ -275,6 +285,7 @@ pub enum FsCapabilityOperation {
     GetInheritance,
     SetInheritance,
     Duplicate,
+    Spawn,
 }
 
 impl FsCapabilityOperation {
@@ -292,6 +303,7 @@ impl FsCapabilityOperation {
             Self::SetLength | Self::Sync => RightSet::WRITE,
             Self::GetInheritance => RightSet::READ,
             Self::SetInheritance | Self::Duplicate => RightSet::CHANGE_MODE,
+            Self::Spawn => RightSet::EXECUTE,
         }
     }
     pub const fn resolves_parent(self) -> bool {

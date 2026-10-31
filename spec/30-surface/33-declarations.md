@@ -375,8 +375,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
   by that family. When disabled, its entire constructor family stays bare and
   reserved. There is no per-constructor subset choice. `ResourceKind` is scoped:
-  `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and
-  `ResourceKind.Mapping` replace its former three bare reserved names.
+  `ResourceKind.FsHandle`, `ResourceKind.Buffer`,
+  `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
+  `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and
+  `ResourceKind.PipeWrite` are its seven public paths. None is a bare
+  reserved name.
   `ExitCode` is scoped: `ExitCode.Success` and `ExitCode.Failure` resolve,
   but bare `Success` and `Failure` do not enter B. `ProgramCaps` is scoped:
   `MkProgramCaps` is not bare-reserved; qualification does not widen its

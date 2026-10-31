@@ -25,6 +25,7 @@ pub struct CheckedMainDescriptor {
     pub authority_name: String,
     pub authority: capabilities::Authority,
     pub fs_root_spec: ken_host::FsRootSpec,
+    pub process_declared: bool,
     pub allow_root_execution: bool,
 }
 
@@ -35,6 +36,7 @@ pub enum ProgramAdmissionError {
     MissingCapability { effect: &'static str },
     DuplicateCapability { effect: &'static str },
     UnsupportedEffectRow,
+    ProcessRequiresFullFs,
     InvalidMainAbi { authority: String },
 }
 
@@ -47,6 +49,7 @@ fn checked_prelude_entry_abi(
     authority_name: &str,
     authority: capabilities::Authority,
     fs_root_spec: ken_host::FsRootSpec,
+    process_declared: bool,
     allow_root_execution: bool,
 ) -> CheckedMainDescriptor {
     let roles = &prelude.runtime_roles;
@@ -76,6 +79,7 @@ fn checked_prelude_entry_abi(
         authority_name: authority_name.to_string(),
         authority,
         fs_root_spec,
+        process_declared,
         allow_root_execution,
     }
 }
@@ -112,6 +116,12 @@ pub fn admit_checked_main(env: &ElabEnv) -> Result<CheckedMainDescriptor, Progra
         "AFull" => ("AFull", capabilities::AUTH_FULL),
         other => unreachable!("parser admitted invalid FS authority {other}"),
     };
+    let process_declared = capabilities
+        .iter()
+        .any(|capability| capability.family == "Process");
+    if process_declared && authority != capabilities::AUTH_FULL {
+        return Err(ProgramAdmissionError::ProcessRequiresFullFs);
+    }
     let fs_root_spec = declaration
         .root
         .as_deref()
@@ -119,12 +129,15 @@ pub fn admit_checked_main(env: &ElabEnv) -> Result<CheckedMainDescriptor, Progra
         .unwrap_or_default();
 
     if let Some(row) = env.effect_rows.get("main") {
-        let granted = EffectRow::from_effects([
+        let mut granted = EffectRow::from_effects([
             "Console".to_string(),
             "Clock".to_string(),
             "Entropy".to_string(),
             "FS".to_string(),
         ]);
+        if process_declared {
+            granted.insert("Process");
+        }
         if !row.row_vars().is_empty() || !row.concrete_effects().is_subset_of(&granted) {
             return Err(ProgramAdmissionError::UnsupportedEffectRow);
         }
@@ -136,6 +149,7 @@ pub fn admit_checked_main(env: &ElabEnv) -> Result<CheckedMainDescriptor, Progra
         authority_name,
         authority,
         fs_root_spec,
+        process_declared,
         header.allow_root_execution,
     );
 

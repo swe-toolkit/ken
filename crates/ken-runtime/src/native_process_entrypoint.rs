@@ -89,6 +89,8 @@ pub struct NativeProcessSymbols {
     pub file_operation_duplicate: RuntimeSymbol,
     pub resource_mapping_limit: RuntimeSymbol,
     pub resource_kind_mapping: RuntimeSymbol,
+    pub px10_kind_symbols: [RuntimeSymbol; 4],
+    pub px10_exit_symbols: [RuntimeSymbol; 2],
 }
 
 impl NativeProcessSymbols {
@@ -193,6 +195,10 @@ impl NativeProcessSymbols {
             file_operation_duplicate: "ctor:prelude::FileOperation::OpDuplicate".to_string(),
             resource_mapping_limit: "ctor:prelude::ResourceError::MappingLimit".to_string(),
             resource_kind_mapping: "ctor:prelude::ResourceKind::Mapping".to_string(),
+            px10_kind_symbols: ["SpawnPlan", "ChildProcess", "PipeRead", "PipeWrite"]
+                .map(|name| format!("ctor:prelude::ResourceKind::{name}")),
+            px10_exit_symbols: ["Exited", "Signaled"]
+                .map(|name| format!("ctor:prelude::ChildExit::{name}")),
         }
     }
 }

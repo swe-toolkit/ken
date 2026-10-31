@@ -349,6 +349,45 @@ struct MappingAcquireFileRequestV1 {
 }
 
 #[repr(C)]
+struct ResourceStreamReadRequestV1 {
+    stream: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+}
+
+#[repr(C)]
+struct ResourceStreamWriteRequestV1 {
+    stream: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+    span_origin: u64,
+}
+
+#[repr(C)]
+struct ProcessPlanOpenRequestV1 {
+    capability: u64,
+    program: SliceV1,
+}
+
+#[repr(C)]
+struct ProcessPlanPushRequestV1 {
+    plan: u64,
+    field: u64,
+    first: SliceV1,
+    second: SliceV1,
+    scalar: u64,
+}
+
+#[repr(C)]
+struct ProcessSpawnRequestV1 { plan: u64 }
+#[repr(C)]
+struct ProcessTakePipeRequestV1 { child: u64, fd: u64 }
+#[repr(C)]
+struct ProcessWaitRequestV1 { child: u64 }
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {
     schema_version: u64,
@@ -382,6 +421,7 @@ const REPLY_METADATA: u64 = 5;
 const REPLY_RESOURCE_ERROR: u64 = 6;
 const REPLY_READ_PROGRESS: u64 = 7;
 const REPLY_WRITE_PROGRESS: u64 = 8;
+const REPLY_CHILD_EXIT: u64 = 9;
 
 struct ProcessContext {
     _posture: ProcessPostureV1,
@@ -809,6 +849,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
     authority_tag: u64,
     plan_hash: u64,
     allow_root_execution: u64,
+    process_declared: u64,
     root_denied_exit_status: i64,
     target_abi_hash: *const u8,
     host_effect_abi_hash: *const u8,
@@ -856,6 +897,8 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
     };
     if plan_hash == 0
         || allow_root_execution > 1
+        || process_declared > 1
+        || (process_declared != 0 && authority != crate::AUTH_FULL)
         || target_abi_hash.is_null()
         || host_effect_abi_hash.is_null()
     {
@@ -912,6 +955,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
         fs_root_spec,
         authority,
         plan_hash,
+        process_declared != 0,
         observation_path,
         posture,
         effective_uid.ok(),
@@ -949,6 +993,7 @@ fn initialize_process_context(
     fs_root_spec: FsRootSpec,
     authority: crate::Authority,
     plan_hash: u64,
+    process_declared: bool,
     observation_path: &[u8],
     posture: Result<ProcessPostureV1, PostureErrorV1>,
     effective_uid: Option<EffectiveUidSnapshotV1>,
@@ -958,6 +1003,7 @@ fn initialize_process_context(
         fs_root_spec,
         authority,
         plan_hash,
+        process_declared,
         observation_path,
         posture,
         effective_uid,
@@ -970,6 +1016,7 @@ fn initialize_process_context_with_lookup(
     fs_root_spec: FsRootSpec,
     authority: crate::Authority,
     plan_hash: u64,
+    process_declared: bool,
     observation_path: &[u8],
     posture: Result<ProcessPostureV1, PostureErrorV1>,
     effective_uid: Option<EffectiveUidSnapshotV1>,
@@ -979,11 +1026,17 @@ fn initialize_process_context_with_lookup(
     let Ok(cwd_root) = crate::open_root(&execution_start_cwd) else {
         return Err(ProcessContextInitError::Ordinary);
     };
+    let rights = crate::rights_for_authority(authority);
+    let rights = if process_declared {
+        rights.union(crate::RightSet::EXECUTE)
+    } else {
+        rights
+    };
     let scope = crate::resolve_fs_root_spec_with_lookup_v1(
         &fs_root_spec,
         &cwd_root,
         effective_uid.ok_or(ProcessContextInitError::Ordinary)?,
-        crate::rights_for_authority(authority),
+        rights,
         SymlinkPolicy::NoFollow,
         home_lookup,
     )
@@ -1098,7 +1151,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_finish(
     // SAFETY: the starter supplies the unique init result exactly once after
     // Ken entry returns; no borrowed response is used after this call.
     let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
-    context.finalize_resources();
+    context.finalize_resources(terminal_value < 0);
     if let Some(mut sink) = context.observation.take() {
         if write_observation(&mut sink, &context, terminal_value).is_err() {
             return -1;
@@ -1126,7 +1179,7 @@ pub unsafe fn ken_host_invocation_v1_finish_with_capacity(
         return -1;
     }
     let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
-    context.finalize_resources();
+    context.finalize_resources(true);
     if let Some(mut sink) = context.observation.take() {
         if write_observation_with_terminal(
             &mut sink,
@@ -1155,7 +1208,7 @@ pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
         return -1;
     }
     let mut context = unsafe { Box::from_raw(context.cast::<ProcessContext>()) };
-    context.finalize_resources();
+    context.finalize_resources(true);
     if let Some(mut sink) = context.observation.take() {
         if write_observation_with_terminal(
             &mut sink,
@@ -1170,10 +1223,10 @@ pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
 }
 
 impl ProcessContext {
-    fn finalize_resources(&mut self) {
+    fn finalize_resources(&mut self, terminal_error: bool) {
         let settlements = {
             let host = &mut self.host;
-            self.resources.finalize_all_with(host)
+            self.resources.finalize_all_with_mode(host, terminal_error)
         };
         self.record_resource_settlements(settlements);
     }
@@ -1360,6 +1413,14 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 reply.detail = 0;
             }
         },
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::ChildExit(exit)) => {
+            reply.tag = REPLY_CHILD_EXIT;
+            // Low byte is the constructor tag; next byte is its UInt8 value.
+            reply.detail = match exit {
+                crate::ChildExitV1::Exited(code) => u64::from(code) << 8,
+                crate::ChildExitV1::Signaled(signal) => (u64::from(signal) << 8) | 1,
+            };
+        }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::WriteProgress(progress)) => {
             let crate::WriteProgressV1::Wrote(transferred) = progress;
             reply.tag = REPLY_WRITE_PROGRESS;
@@ -1409,26 +1470,14 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 } => {
                     reply.detail = 3;
                     reply.resource_error.schema_version = u64::from(schema_version);
-                    reply.resource_error.resource_kind = match resource_kind {
-                        crate::ResourceKindV1::FsHandle => 0,
-                        crate::ResourceKindV1::Buffer => 1,
-                        crate::ResourceKindV1::Mapping => 2,
-                    };
+                    reply.resource_error.resource_kind = resource_kind_tag(resource_kind);
                     reply.resource_error.identity = identity.0;
                     reply.resource_error.io = io_error_tag(io);
                 }
                 crate::ResourceErrorV1::ResourceKindMismatch { expected, actual } => {
                     reply.detail = 4;
-                    reply.resource_error.expected_kind = match expected {
-                        crate::ResourceKindV1::FsHandle => 0,
-                        crate::ResourceKindV1::Buffer => 1,
-                        crate::ResourceKindV1::Mapping => 2,
-                    };
-                    reply.resource_error.actual_kind = match actual {
-                        crate::ResourceKindV1::FsHandle => 0,
-                        crate::ResourceKindV1::Buffer => 1,
-                        crate::ResourceKindV1::Mapping => 2,
-                    };
+                    reply.resource_error.expected_kind = resource_kind_tag(expected);
+                    reply.resource_error.actual_kind = resource_kind_tag(actual);
                 }
                 crate::ResourceErrorV1::BufferLimit => reply.detail = 5,
                 crate::ResourceErrorV1::InvalidOffset => reply.detail = 6,
@@ -1456,10 +1505,23 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
     }
 }
 
+fn resource_kind_tag(kind: crate::ResourceKindV1) -> u64 {
+    match kind {
+        crate::ResourceKindV1::FsHandle => 0,
+        crate::ResourceKindV1::Buffer => 1,
+        crate::ResourceKindV1::Mapping => 2,
+        crate::ResourceKindV1::SpawnPlan => 3,
+        crate::ResourceKindV1::ChildProcess => 4,
+        crate::ResourceKindV1::PipeRead => 5,
+        crate::ResourceKindV1::PipeWrite => 6,
+    }
+}
+
 fn io_error_tag(error: IoErrorIdentityV1) -> u64 {
     match error {
         IoErrorIdentityV1::NotFound => 0,
         IoErrorIdentityV1::PermissionDenied => 1,
+        IoErrorIdentityV1::CapabilityDenied => 2,
         IoErrorIdentityV1::BrokenPipe => 3,
         IoErrorIdentityV1::Interrupted => 4,
         IoErrorIdentityV1::AlreadyExists => 5,
@@ -1488,6 +1550,7 @@ fn io_error_from_tag(encoded: u64) -> Option<IoErrorIdentityV1> {
     Some(match discriminator {
         0 => IoErrorIdentityV1::NotFound,
         1 => IoErrorIdentityV1::PermissionDenied,
+        2 => IoErrorIdentityV1::CapabilityDenied,
         3 => IoErrorIdentityV1::BrokenPipe,
         4 => IoErrorIdentityV1::Interrupted,
         5 => IoErrorIdentityV1::AlreadyExists,
@@ -1512,6 +1575,10 @@ fn decode_resource_error_reply(
         0 => Some(crate::ResourceKindV1::FsHandle),
         1 => Some(crate::ResourceKindV1::Buffer),
         2 => Some(crate::ResourceKindV1::Mapping),
+        3 => Some(crate::ResourceKindV1::SpawnPlan),
+        4 => Some(crate::ResourceKindV1::ChildProcess),
+        5 => Some(crate::ResourceKindV1::PipeRead),
+        6 => Some(crate::ResourceKindV1::PipeWrite),
         _ => None,
     };
     let all_zero = payload == ResourceErrorReplyV1::default();
@@ -2052,6 +2119,58 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                     bytes: bytes.to_vec(),
                 },
             )
+        }
+        HostOpV1::ProcessPlanOpen if request_size == std::mem::size_of::<ProcessPlanOpenRequestV1>() => {
+            if !request.cast::<ProcessPlanOpenRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessPlanOpenRequestV1>() };
+            let Some(program) = (unsafe { borrowed_slice(&wire.program) }) else { return -1 };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ProcessPlanOpen { program: program.to_vec() },
+            )
+        }
+        HostOpV1::ProcessPlanPush if request_size == std::mem::size_of::<ProcessPlanPushRequestV1>() => {
+            if !request.cast::<ProcessPlanPushRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessPlanPushRequestV1>() };
+            let (Some(first), Some(second)) = (unsafe { borrowed_slice(&wire.first) }, unsafe { borrowed_slice(&wire.second) }) else { return -1 };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.plan)),
+                CanonicalRequestV1::ProcessPlanPush { field: wire.field, first: first.to_vec(), second: second.to_vec(), scalar: wire.scalar },
+            )
+        }
+        HostOpV1::ProcessSpawn if request_size == std::mem::size_of::<ProcessSpawnRequestV1>() => {
+            if !request.cast::<ProcessSpawnRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessSpawnRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.plan)), CanonicalRequestV1::ProcessSpawn)
+        }
+        HostOpV1::ProcessTakePipe if request_size == std::mem::size_of::<ProcessTakePipeRequestV1>() => {
+            if !request.cast::<ProcessTakePipeRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessTakePipeRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessTakePipe { fd: wire.fd })
+        }
+        HostOpV1::ProcessWait if request_size == std::mem::size_of::<ProcessWaitRequestV1>() => {
+            if !request.cast::<ProcessWaitRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessWaitRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessWait)
+        }
+        HostOpV1::ResourceStreamRead if request_size == std::mem::size_of::<ResourceStreamReadRequestV1>() => {
+            if !request.cast::<ResourceStreamReadRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ResourceStreamReadRequestV1>() };
+            (None, crate::ResourceInputsV1::FileBuffer {
+                file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+            }, CanonicalRequestV1::ResourceStreamRead { buffer_start: wire.buffer_start, length: wire.length })
+        }
+        HostOpV1::ResourceStreamWrite if request_size == std::mem::size_of::<ResourceStreamWriteRequestV1>() => {
+            if !request.cast::<ResourceStreamWriteRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ResourceStreamWriteRequestV1>() };
+            (None, crate::ResourceInputsV1::FileBufferSpan {
+                file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+            }, CanonicalRequestV1::ResourceStreamWrite { buffer_start: wire.buffer_start, length: wire.length })
         }
         _ => return -3,
     };
@@ -2975,6 +3094,13 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// Promise class: normative compatibility vector. MEASURED: each kind
+    /// and the CapabilityDenied cause use their catalog-assigned numeric tags
+    /// in the encoder and decoder; the first unassigned tag and u64::MAX
+    /// refuse. CLAIMED: the resource-error reply is canonically encoded and
+    /// fail-closed as kinds grow. THE GAP: the two negative probes do not
+    /// enumerate every unassigned tag; the linked reply projection is pinned
+    /// separately below.
     #[test]
     fn resource_error_reply_decoder_is_canonical_and_fail_closed() {
         assert_eq!(
@@ -3035,6 +3161,87 @@ mod tests {
                 io: crate::IoErrorIdentityV1::Other(-5),
             })
         );
+        // These normative bytes are independent of the two codec tables.
+        // The exhaustive match makes a new kind a compile error until its
+        // catalog binding and wire vector are added here.
+        let kinds = [
+            (crate::ResourceKindV1::FsHandle, "resource_kind.FsHandle", 0),
+            (crate::ResourceKindV1::Buffer, "resource_kind.Buffer", 1),
+            (crate::ResourceKindV1::Mapping, "resource_kind.Mapping", 2),
+            (
+                crate::ResourceKindV1::SpawnPlan,
+                "resource_kind.SpawnPlan",
+                3,
+            ),
+            (
+                crate::ResourceKindV1::ChildProcess,
+                "resource_kind.ChildProcess",
+                4,
+            ),
+            (crate::ResourceKindV1::PipeRead, "resource_kind.PipeRead", 5),
+            (
+                crate::ResourceKindV1::PipeWrite,
+                "resource_kind.PipeWrite",
+                6,
+            ),
+        ];
+        for (kind, binding, tag) in kinds {
+            match kind {
+                crate::ResourceKindV1::FsHandle
+                | crate::ResourceKindV1::Buffer
+                | crate::ResourceKindV1::Mapping
+                | crate::ResourceKindV1::SpawnPlan
+                | crate::ResourceKindV1::ChildProcess
+                | crate::ResourceKindV1::PipeRead
+                | crate::ResourceKindV1::PipeWrite => {}
+            }
+            assert_eq!(effect_binding("tag", binding), tag, "catalog {binding}");
+            assert_eq!(resource_kind_tag(kind), tag, "encoder {kind:?}");
+            assert_eq!(
+                decode_resource_error_reply(
+                    3,
+                    ResourceErrorReplyV1 {
+                        resource_kind: tag,
+                        ..release
+                    }
+                ),
+                Some(crate::ResourceErrorV1::ReleaseFailed {
+                    schema_version: crate::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: kind,
+                    identity: crate::ResourceTraceIdentityV1(u64::MAX),
+                    io: crate::IoErrorIdentityV1::Other(-5),
+                }),
+                "decoder {kind:?} at catalog tag {tag}"
+            );
+        }
+        assert_eq!(effect_binding("error", "capability.CapabilityDenied"), 2);
+        assert_eq!(io_error_tag(crate::IoErrorIdentityV1::CapabilityDenied), 2);
+        assert_eq!(
+            io_error_from_tag(2),
+            Some(crate::IoErrorIdentityV1::CapabilityDenied)
+        );
+        assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
+        assert_eq!(io_error_tag(crate::IoErrorIdentityV1::BrokenPipe), 3);
+        assert_eq!(
+            io_error_from_tag(3),
+            Some(crate::IoErrorIdentityV1::BrokenPipe)
+        );
+        assert_eq!(
+            decode_resource_error_reply(3, ResourceErrorReplyV1 { io: 2, ..release }),
+            Some(crate::ResourceErrorV1::ReleaseFailed {
+                schema_version: crate::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                resource_kind: crate::ResourceKindV1::FsHandle,
+                identity: crate::ResourceTraceIdentityV1(u64::MAX),
+                io: crate::IoErrorIdentityV1::CapabilityDenied,
+            }),
+            "catalog tag 2 is a valid CapabilityDenied release cause"
+        );
+        let mut tags = kinds.map(|(_, _, tag)| tag).to_vec();
+        tags.sort_unstable();
+        tags.dedup();
+        assert_eq!(tags.len(), kinds.len(), "kind tags are distinct");
+        let unassigned = tags[tags.len() - 1] + 1;
+
         let mismatch = ResourceErrorReplyV1 {
             expected_kind: 0,
             actual_kind: 1,
@@ -3114,11 +3321,24 @@ mod tests {
             (
                 3,
                 ResourceErrorReplyV1 {
-                    resource_kind: 3,
+                    resource_kind: unassigned,
                     ..release
                 },
             ),
-            (3, ResourceErrorReplyV1 { io: 2, ..release }),
+            (
+                3,
+                ResourceErrorReplyV1 {
+                    resource_kind: u64::MAX,
+                    ..release
+                },
+            ),
+            (
+                3,
+                ResourceErrorReplyV1 {
+                    io: effect_binding("error", "io.Other") + 1,
+                    ..release
+                },
+            ),
             (
                 3,
                 ResourceErrorReplyV1 {
@@ -3256,6 +3476,35 @@ mod tests {
                 },
             )
         );
+        // The real C-ABI reply projection must emit the independently pinned
+        // catalog tags, not merely agree with the test-only decoder.
+        for (kind, tag) in [
+            (crate::ResourceKindV1::SpawnPlan, 3),
+            (crate::ResourceKindV1::ChildProcess, 4),
+            (crate::ResourceKindV1::PipeRead, 5),
+            (crate::ResourceKindV1::PipeWrite, 6),
+        ] {
+            assert_eq!(
+                project(crate::ResourceErrorV1::ReleaseFailed {
+                    schema_version: 1,
+                    resource_kind: kind,
+                    identity: crate::ResourceTraceIdentityV1(17),
+                    io: crate::IoErrorIdentityV1::CapabilityDenied,
+                }),
+                (
+                    REPLY_RESOURCE_ERROR,
+                    3,
+                    ResourceErrorReplyV1 {
+                        schema_version: 1,
+                        resource_kind: tag,
+                        identity: 17,
+                        io: 2,
+                        ..ResourceErrorReplyV1::default()
+                    },
+                ),
+                "reply projection must preserve {kind:?} at catalog tag {tag}"
+            );
+        }
         assert_eq!(
             project(crate::ResourceErrorV1::ResourceKindMismatch {
                 expected: crate::ResourceKindV1::Mapping,
@@ -3775,6 +4024,7 @@ mod tests {
                 2,
                 1,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -3808,6 +4058,7 @@ mod tests {
                 2,
                 1,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 wrong.as_ptr(),
@@ -3838,6 +4089,7 @@ mod tests {
                 2,
                 0,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -3861,6 +4113,7 @@ mod tests {
             FsRootSpec::default(),
             AUTH_FULL,
             1,
+            false,
             &[],
             Err(PostureErrorV1::HostPostureUnavailable),
             Some(EffectiveUidSnapshotV1::scripted(1000)),
@@ -3945,6 +4198,7 @@ mod tests {
                 FsRootSpec::EffectiveUserHome(b"data".to_vec()),
                 AUTH_FULL,
                 31,
+                false,
                 &[],
                 establish_process_posture_v1(Ok(EffectiveUidSnapshotV1::scripted(1000)), false),
                 Some(EffectiveUidSnapshotV1::scripted(1000)),
@@ -4017,6 +4271,7 @@ mod tests {
             FsRootSpec::EffectiveUserHome(b"data".to_vec()),
             AUTH_FULL,
             41,
+            false,
             &[],
             establish_process_posture_v1(Ok(uid), false),
             Some(uid),
@@ -4069,6 +4324,7 @@ mod tests {
                 2,
                 19,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -4105,6 +4361,7 @@ mod tests {
                 2,
                 19,
                 1,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),

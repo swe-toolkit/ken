@@ -1,0 +1,147 @@
+program capabilities FS AFull, Process
+
+proc child_body
+      (buffer : BufferHandle) (child : Resource ResourceKind.ChildProcess)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Process] =
+  bind
+    (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (Resource ResourceKind.PipeRead))
+    (ResourceBodyResult Unit Unit)
+    (take_stdout AFull child)
+    (λtaken.
+      match taken {
+        Err _ ↦
+          ITree.Ret
+            (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (ResourceBodyResult Unit Unit)
+            (ResourceBodyErr Unit Unit MkUnit);
+        Ok pipe ↦
+          bind
+            (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (Result ResourceError ReadProgress)
+            (ResourceBodyResult Unit Unit)
+            (read_pipe AFull pipe buffer (MkBufferWindow (0 : Int) (256 : Int)))
+            (λread_status.
+              match read_status {
+                Err _ ↦
+                  ITree.Ret
+                    (Coproduct (FSOp AFull) AmbientOp)
+                    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                    (ResourceBodyResult Unit Unit)
+                    (ResourceBodyErr Unit Unit MkUnit);
+                Ok ReadEof ↦
+                  ITree.Ret
+                    (Coproduct (FSOp AFull) AmbientOp)
+                    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                    (ResourceBodyResult Unit Unit)
+                    (ResourceBodyErr Unit Unit MkUnit);
+                Ok (ReadSome _ _) ↦
+                  bind
+                    (Coproduct (FSOp AFull) AmbientOp)
+                    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                    (Result ResourceError ChildExit)
+                    (ResourceBodyResult Unit Unit)
+                    (wait_child AFull child)
+                    (λwaited.
+                      match waited {
+                        Err _ ↦
+                          ITree.Ret
+                            (Coproduct (FSOp AFull) AmbientOp)
+                            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                            (ResourceBodyResult Unit Unit)
+                            (ResourceBodyErr Unit Unit MkUnit);
+                        Ok _ ↦
+                          ITree.Ret
+                            (Coproduct (FSOp AFull) AmbientOp)
+                            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+                            (ResourceBodyResult Unit Unit)
+                            (ResourceBodyOk Unit Unit MkUnit)
+                      })
+              })
+      })
+
+proc buffer_body
+      (cap : Cap AFull) (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Process] =
+  bind
+    (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withChild
+      AFull
+      Unit
+      Unit
+      cap
+      (with_stdin
+        (with_stdout
+          (with_environment
+            (spawn_plan
+              (bytes_encode "/bin/sh")
+              (Cons
+                Bytes
+                (bytes_encode "caller-zero")
+                (Cons
+                  Bytes
+                  (bytes_encode "-c")
+                  (Cons
+                    Bytes
+                    (bytes_encode "printf ready; printf %s $$ > $PX10_READY_PATH; read line")
+                    (Nil Bytes)))))
+            (Cons
+              (Prod Bytes Bytes)
+              (MkProd
+                Bytes
+                Bytes
+                (bytes_encode "PX10_READY_PATH")
+                (bytes_encode "PX10_READY_FILE"))
+              (Nil (Prod Bytes Bytes))))
+          ChildPipe)
+        ChildPipe)
+      (child_body buffer))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦
+          ITree.Ret
+            (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (ResourceBodyResult Unit Unit)
+            (ResourceBodyOk Unit Unit MkUnit);
+        Ok _ ↦
+          ITree.Ret
+            (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (ResourceBodyResult Unit Unit)
+            (ResourceBodyErr Unit Unit MkUnit);
+        Err _ ↦
+          ITree.Ret
+            (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (ResourceBodyResult Unit Unit)
+            (ResourceBodyErr Unit Unit MkUnit)
+      })
+
+proc main
+      (_input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Process] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap ↦
+      bind
+        (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError (ResourceBracketResult Unit Unit))
+        ExitCode
+        (withBuffer AFull Unit Unit (256 : Int) (buffer_body cap))
+        (λoutcome.
+          match outcome {
+            Ok (ResourceBracketOk _) ↦ host_exit AFull ExitCode.Success;
+            Ok _ ↦ host_exit AFull (ExitCode.Failure 73);
+            Err _ ↦ host_exit AFull (ExitCode.Failure 74)
+          })
+  }

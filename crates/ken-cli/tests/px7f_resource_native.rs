@@ -562,9 +562,9 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     use std::collections::{BTreeMap, BTreeSet};
 
     let fixtures: &[(&str, &str, u32, &[(u32, &[u32])], u32)] = &[
-        ("right-denial-protocol", RIGHT_NOT_HELD, 587, &[(0, &[564])], 564),
-        ("double-release-protocol", DOUBLE_RELEASE, 618,
-            &[(1, &[607]), (0, &[526])], 526),
+        ("right-denial-protocol", RIGHT_NOT_HELD, 664, &[(0, &[641])], 641),
+        ("double-release-protocol", DOUBLE_RELEASE, 695,
+            &[(1, &[684]), (0, &[603])], 603),
     ];
     for &(label, source, owner, expected, bracket_origin) in fixtures {
         let dir = output_dir(label);
@@ -730,7 +730,9 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
     let ordinary = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
         .collect::<Vec<_>>();
     assert_eq!(ordinary.len(), 1, "this fixture has exactly one ordinary response owner");
-    assert_eq!(ordinary[0].vis_origin, 618, "E4 observes the non-bracket owner");
+    assert_eq!(ordinary[0].operation, "ResourceRelease",
+        "E4 observes the checked ordinary release owner");
+    let owner_vis = ordinary[0].vis_origin;
     // Promise class: durable invariant. MEASURED: the actual generated K
     // context query returns None for the ordinary owner with no completed
     // detached-return boundary. CLAIMED: the declared Result contract must
@@ -738,7 +740,7 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
     // has a response row and owner but no completed boundary; the companion
     // fixed-product pin proves a completed boundary retains Some(Ret).
     for plan in &plans {
-        for row in plan.all_static_response_rows.iter().filter(|row| row.vis_origin == 618) {
+        for row in plan.all_static_response_rows.iter().filter(|row| row.vis_origin == owner_vis) {
             let contracts = plan.generated_context_result_contracts.iter()
                 .filter(|(context, _)| *context == row.k_context)
                 .collect::<Vec<_>>();
@@ -747,10 +749,15 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
                 "E4 has no completed return boundary and must not demand Ret: {contracts:?}");
         }
     }
-    assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
-        .any(|row| row.vis_origin == 526), "the distinct bracket S remains plane-owned");
-    assert!(plans.iter().flat_map(|plan| &plan.bracket_response_rows)
-        .all(|row| row.vis_origin != 618), "the E4 owner cannot be bracket-owned");
+    let bracket = plans.iter().flat_map(|plan| &plan.bracket_response_rows)
+        .filter(|row| row.operation == "ResourceRelease")
+        .collect::<Vec<_>>();
+    assert_eq!(bracket.len(), 1, "the distinct checked release remains bracket-owned");
+    assert_ne!(bracket[0].vis_origin, owner_vis,
+        "the E4 ordinary release owner cannot also be bracket-owned");
+    assert!(plans.iter().any(|plan|
+        plan.bracket_settlement_vis_origins.contains(&bracket[0].vis_origin)),
+        "the bracket release must be independently authenticated");
     assert_eq!(pairs.len(), 2, "both source parameter captures must reach the response emitter");
     let source_positions = pairs.iter().map(|(source, _, _)| *source)
         .collect::<std::collections::BTreeSet<_>>();
@@ -795,7 +802,7 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     // is the last one emitted; its planned record tail places it on the
     // pending-Vis verifier.
     let refused = frames.last().expect("the refused owner was emitted");
-    assert_eq!(refused.owner_origin, 618, "the refused owner is the ordinary K protocol owner");
+    assert_eq!(refused.owner_origin, 695, "the refused owner is the ordinary K protocol owner");
     assert!(refused.widths.is_some(), "the refused owner took the pending-Vis arm: {frames:?}");
 }
 

@@ -391,7 +391,7 @@ fn abstract_export_keeps_qualified_constructor_private() {
 }
 
 /// Promise class: durable invariant. MEASURED: ResourceKind qualified
-/// expressions and all three pattern arms check with canonical prelude IDs,
+/// expressions and all seven pattern arms check with canonical prelude IDs,
 /// even after the qualified flat spelling is forged to a Bool constructor.
 /// CLAIMED: scoped constructor selection is per parent type, preserving
 /// match exhaustiveness and trust. THE GAP: the bare and rebind tests inspect
@@ -411,7 +411,11 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
          fn classify (k : ResourceKind) : Nat = match k {\
            ResourceKind.FsHandle |-> Zero;\
            ResourceKind.Buffer |-> Suc Zero;\
-           ResourceKind.Mapping |-> Suc (Suc Zero) }",
+           ResourceKind.Mapping |-> Zero;\
+           ResourceKind.SpawnPlan |-> Zero;\
+           ResourceKind.ChildProcess |-> Zero;\
+           ResourceKind.PipeRead |-> Zero;\
+           ResourceKind.PipeWrite |-> Zero }",
     )
     .expect("every checked ResourceKind member qualifies");
     assert_eq!(env.env.constructor(buffer).unwrap().0.id, kind_id);
@@ -421,7 +425,7 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
             "fn incomplete (k : ResourceKind) : Nat = match k {\
                ResourceKind.Buffer |-> Zero }",
         )
-        .expect_err("the other two constructors must remain required");
+        .expect_err("the other six constructors must remain required");
     assert!(
         matches!(error, ElabError::ExhaustivenessError { .. }),
         "wrong missing-identity refusal: {error:?}"
@@ -429,21 +433,32 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
     assert_eq!(env.env.trusted_base(), trust);
 }
 
-/// Promise class: durable invariant. MEASURED: all three ResourceKind
-/// constructor spellings are absent from the bare global map; a bare Buffer
-/// expression and pattern each reject with the exact unresolved spelling;
+/// Promise class: durable invariant. MEASURED: six ResourceKind constructor
+/// spellings are absent from the bare global map; bare SpawnPlan names the
+/// distinct pure plan type. A bare Buffer expression and pattern each reject;
 /// the qualified positive survives a forged flat display spelling.
 /// CLAIMED: scoped C never becomes a pattern variable by fallback.
 /// THE GAP: another source may legitimately bind C, tested separately.
 #[test]
 fn scoped_resource_kind_bare_member_neither_resolves_nor_binds() {
     let mut env = env();
-    for bare in ["FsHandle", "Buffer", "Mapping"] {
+    for bare in [
+        "FsHandle",
+        "Buffer",
+        "Mapping",
+        "ChildProcess",
+        "PipeRead",
+        "PipeWrite",
+    ] {
         assert!(
             !env.globals.contains_key(bare),
             "{bare} must not occupy bare B"
         );
     }
+    assert_ne!(
+        env.globals["SpawnPlan"], env.globals["ResourceKind.SpawnPlan"],
+        "the pure plan type must not alias its scoped resource-kind constructor"
+    );
     let actual = env.prelude_env.runtime_roles.resource_kind_buffer;
     let forged = env.globals["True"];
     assert_ne!(actual, forged);

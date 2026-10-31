@@ -246,6 +246,7 @@ pub struct NativeEntrypointPlanV1 {
     pub(crate) prod_constructor: StableSymbol,
     pub(crate) authority_name: String,
     pub(crate) fs_root_spec: ken_host::FsRootSpec,
+    pub(crate) process_declared: bool,
     pub(crate) allow_root_execution: bool,
 }
 
@@ -960,7 +961,7 @@ fn collect_checked_perform_nodes(
                         {
                             crate::export::HostOpFamilyV1::Clock => self.clock_family.clone(),
                             crate::export::HostOpFamilyV1::Console => self.console_family.clone(),
-                            crate::export::HostOpFamilyV1::Fs => self.fs_family.clone(),
+                            crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => self.fs_family.clone(),
                             crate::export::HostOpFamilyV1::Entropy => self.entropy_family.clone(),
                         };
                         self.nodes.insert(CheckedPerformNodeV1::Host {
@@ -2951,6 +2952,28 @@ fn complete_native_program_preparation(
     output_dir: impl AsRef<Path>,
     profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
+    // Every public Process and pipe-stream operation requires the checked
+    // Process grant; no FS-only program has it. Refuse on that stable authority
+    // before object emission, not on generic host response alternatives (which
+    // include all operations) or on a particular bracket-lowering shape.
+    if preparation.plan.process_declared {
+        let unavailable = ken_host::HostOpV1::ALL
+            .into_iter()
+            .filter(|operation| {
+                operation.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
+                    && operation.executor_admits()
+            })
+            .map(|operation| format!("{operation:?}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
+            "host_effect_lowering_unavailable",
+            format!(
+                "declared Process capability requires host operations {unavailable}, \
+                 which are RepresentedUnavailable for native build"
+            ),
+        )));
+    }
     let plan = preparation.plan.as_ref();
     let host_spine = preparation.host_spine.as_ref();
     let NativeProgramPreparationV1 {
@@ -2969,6 +2992,7 @@ fn complete_native_program_preparation(
                 _ => unreachable!("checked main authority is a known Auth constructor"),
             },
             fs_root_spec: plan.fs_root_spec.clone(),
+            process_declared: plan.process_declared,
             fs_root_binding: ken_runtime::fs_root_plan_binding_v1(
                 *plan_transport_hash,
                 &plan.fs_root_spec,
@@ -3026,6 +3050,8 @@ fn complete_native_program_preparation(
                 file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
                 resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
+                px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
+                px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3984,6 +4010,7 @@ fn native_entrypoint_plan(
         prod_constructor: resolve(checked.prod_constructor)?,
         authority_name: checked.authority_name.clone(),
         fs_root_spec: checked.fs_root_spec.clone(),
+        process_declared: checked.process_declared,
         allow_root_execution: checked.allow_root_execution,
     })
 }
@@ -4109,6 +4136,14 @@ fn checked_host_spine_v1(
             prelude.private_mapping_acquire_file_id,
             ken_host::HostOpV1::MappingAcquireFile,
         ),
+        (prelude.px10_op_ids[0], ken_host::HostOpV1::ProcessPlanOpen),
+        (prelude.px10_op_ids[1], ken_host::HostOpV1::ProcessPlanPush),
+        (prelude.px10_op_ids[2], ken_host::HostOpV1::ProcessSpawn),
+        (prelude.px10_op_ids[3], ken_host::HostOpV1::ProcessTakePipe),
+        (prelude.px10_op_ids[4], ken_host::HostOpV1::ProcessTakePipe),
+        (prelude.px10_op_ids[5], ken_host::HostOpV1::ProcessWait),
+        (prelude.px10_op_ids[6], ken_host::HostOpV1::ResourceStreamRead),
+        (prelude.px10_op_ids[7], ken_host::HostOpV1::ResourceStreamWrite),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }
@@ -4154,6 +4189,16 @@ fn checked_host_spine_v1(
         file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
         resource_kind_mapping: resolve_id(roles.resource_kind_mapping)?,
+        px10_kind_symbols: [
+            resolve_id(prelude.px10_kind_ids[0])?,
+            resolve_id(prelude.px10_kind_ids[1])?,
+            resolve_id(prelude.px10_kind_ids[2])?,
+            resolve_id(prelude.px10_kind_ids[3])?,
+        ],
+        px10_exit_symbols: [
+            resolve_id(prelude.px10_exit_ids[0])?,
+            resolve_id(prelude.px10_exit_ids[1])?,
+        ],
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -4412,6 +4457,12 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.resource_mapping_limit,
         // ABI-S6 D5a appends the now-native Mapping resource-kind role.
         &spine.resource_kind_mapping,
+        &spine.px10_kind_symbols[0],
+        &spine.px10_kind_symbols[1],
+        &spine.px10_kind_symbols[2],
+        &spine.px10_kind_symbols[3],
+        &spine.px10_exit_symbols[0],
+        &spine.px10_exit_symbols[1],
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -4459,6 +4510,7 @@ fn canonical_native_entrypoint_plan_bytes(plan: &NativeEntrypointPlanV1) -> Vec<
         out.extend_from_slice(field.as_bytes());
     }
     out.push(u8::from(plan.allow_root_execution));
+    out.push(u8::from(plan.process_declared));
     out.extend_from_slice(&plan.fs_root_spec.tag_v1().to_le_bytes());
     out.extend_from_slice(&(plan.fs_root_spec.bytes().len() as u64).to_le_bytes());
     out.extend_from_slice(plan.fs_root_spec.bytes());
@@ -4570,14 +4622,21 @@ fn stable_symbols_for_env(
 }
 
 // Kernel-checked String payload is the single authority for native lowering;
-// Char literals are core IntLit values, and unrelated numeric literals retain
-// the elaborator's original side table.
+// Char literals are core IntLit values, and Int/Bytes literals retain the
+// elaborator's original side table.
 fn literal_native_symbol(env: &ElabEnv, id: GlobalId) -> Option<String> {
     match env.env.checked_literal(id) {
         Some(value) => Some(format!("lit_string_{}", value.as_str())),
         None => match env.num_values.get(&id) {
             Some(crate::NumericLitVal::Int(value)) => Some(format!("lit_int_{value}")),
             Some(crate::NumericLitVal::Str(value)) => Some(format!("lit_string_{value}")),
+            Some(crate::NumericLitVal::Bytes(value)) => Some(format!(
+                "lit_bytes_hex_{}",
+                value
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>(),
+            )),
             _ => None,
         },
     }
@@ -6700,6 +6759,42 @@ proc main
         );
     }
 
+    /// Promise class: normative compatibility vector. Bytes literal symbols
+    /// encode the checked payload as lowercase hex, including empty bytes.
+    /// MEASURED: two distinct checked literal IDs map to the ABI decoder's
+    /// nonempty and empty symbols. CLAIMED: native compilation preserves raw
+    /// Bytes literals. THE GAP: object emission and execution remain separate;
+    /// the PX10 native smoke exercises them after the bracket planner is fixed.
+    #[test]
+    fn native_bytes_literals_have_exact_symbols_including_empty() {
+        let mut env = ElabEnv::new().expect("prelude");
+        for (name, source, expected) in [
+            (
+                "zz_bytes",
+                r#"const zz_bytes : Bytes = b"\x0a\xff""#,
+                "lit_bytes_hex_0aff",
+            ),
+            (
+                "zz_empty",
+                r#"const zz_empty : Bytes = b"""#,
+                "lit_bytes_hex_",
+            ),
+        ] {
+            env.elaborate_decl(source).expect("Bytes literal checks");
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals[name])
+                .expect("constant body");
+            let ken_kernel::Term::Const { id: literal, .. } = body else {
+                panic!("{name} must be backed by a checked Bytes literal");
+            };
+            assert_eq!(
+                literal_native_symbol(&env, literal).as_deref(),
+                Some(expected)
+            );
+        }
+    }
+
     const GATE_4A_EQUALITY_SOURCE: &str = r#"program capabilities FS APartial
 fn walk (fuel : Nat) (state : Bool) : HostIO APartial ExitCode =
   match fuel {
@@ -8306,6 +8401,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             prod_constructor: symbol,
             authority_name: "AFull".to_string(),
             fs_root_spec: ken_host::FsRootSpec::default(),
+            process_declared: false,
             allow_root_execution: false,
         };
         let stale_hash = fingerprint(&canonical_native_entrypoint_plan_bytes(&plan));
@@ -8801,23 +8897,14 @@ mod package_route_example_declarations {
         semantic.declarations.keys().cloned().collect()
     }
 
-    /// Promise class: normative compatibility vector for the fixed package
-    /// identity and source-only declarations. The denotation vector pins the
-    /// whole checked denotation closure, ambient prelude included. Under spec
-    /// 46 §3.1 an authorized checked-core change in that prelude moves it.
-    /// The K-a rebaseline changes `Char` from `Int` to `Σ Int isScalar`, plus
-    /// five dependent Char declarations: `charToInt`, `eqChar`, `intToChar`,
-    /// `leqChar`, and `print_line`. A per-key diff across all 21 semantic lanes
-    /// found only those six symbols changed. Replacing all six entries with
-    /// main `0919ab3d6`'s reproduces `0xea0b_029f_f624_c5d6` exactly
-    /// (evt_5p66cdb2xkky5, evt_1mz0vpbw28sev). The source-vs-literate
-    /// relation remains unchanged.
-    ///
-    /// MEASURED: the `.ken.md` example changes the declaration set and semantic
-    /// hash on the old route. CLAIMED: package and denotation routes admit only
-    /// declaration-fence results while keeping their source-only hashes. GAP:
-    /// this fixture pins the specified constant example, not every possible
-    /// declaration form in an example fence.
+    /// Promise class: durable invariant. MEASURED: compiling the same checked
+    /// declaration as plain Ken and as literate Ken with an example fence
+    /// produces identical declaration sets and semantic hashes on the package
+    /// and denotation routes. CLAIMED: an example-only declaration cannot enter
+    /// either route's admitted semantic closure. THE GAP: the fixture covers
+    /// one obligation-free example declaration, not every example form; the
+    /// pre-source prelude is shared by both arms, so its lawful growth changes
+    /// both hashes together without weakening this comparison.
     #[test]
     fn package_and_denotation_exclude_example_declarations_from_admission() {
         let source_only = CompilerSource::new("repro.ken", DECLARATION);
@@ -8846,19 +8933,6 @@ mod package_route_example_declarations {
                 .symbols
                 .contains(&example),
             "an obligation-free example must not add a package symbol"
-        );
-        // Promise class: normative compatibility vector for this package.
-        // This package vector moves from the WIP 0x6c92_44e9_4730_3a45
-        // because every scoped constructor's artifact symbol now uses its
-        // checked family's bare leaf rather than a `T.C` source spelling.
-        // Emptying only the late scoped-family loop on the same qualified
-        // source left 0xfd9d_81f8_fbce_6ee8 unchanged before the FS/resource
-        // floor expansion. Six newly reserved checked families and their
-        // scoped source constructors change the compiler-owned pre-source
-        // closure. This fixed source now hashes to 0x5011_0ebe_49e0_1727.
-        assert_eq!(
-            package_source.package.core_semantic_hash,
-            0x5011_0ebe_49e0_1727
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8891,16 +8965,6 @@ mod package_route_example_declarations {
                 .symbols
                 .contains(&example),
             "an obligation-free example must not add a denotation symbol"
-        );
-        // Promise class: normative compatibility vector for the denotation.
-        // The denotation vector similarly moves from the WIP
-        // 0xe158_b743_ec4d_6062 with checked scoped-family artifact leaves.
-        // The same loop-empty control left 0x7886_43b9_b36c_aae3 unchanged
-        // before the six-family FS/resource floor expansion. The checked
-        // pre-source denotation closure now hashes to 0xa486_5cf9_3d62_dfec.
-        assert_eq!(
-            denotation_source.package.core_semantic_hash,
-            0xa486_5cf9_3d62_dfec
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

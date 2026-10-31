@@ -43,29 +43,30 @@ here would be bloat. None found (all four are genuine).
 | **The effect / FFI boundary** — `foreign` + the base `IO`/effect primitive (`[Console]`/`[FS]`; `print_line` foreign) | I/O is not pure Ken — the effect boundary is where the world enters. |
 | **Base elaborator syntax** — λ/app/`let`/`match`/annotation/`data`/`const`/`fn`/`proc`/`instance`, refinement types, the **operator-infix + fixity** affordance, `if`-sugar, minimal `module`/`import` | the language forms themselves; the parser/elaborator realizes them. (Note: `if` *desugars* to `match`, and operator *semantics* is package — but the **syntactic affordance** to write them is base. Syntax built-in; semantics derivable.) |
 
-## B. The prelude set (closed signature + internal-provision inventories — AC2)
+## B. The prelude floor (signature and internal-provision inventories — AC2)
 
-**Membership rule (normative, checkable):** the prelude is the closed union of
-(1) Ken-defined types named by built-in primitive signatures and (2) internally
-provided identities that the surface contract independently requires source to
-name and that source cannot recreate with the same `GlobalId` (`30-taxonomy
-§4`). An internal-provision witness names its origin as kernel boundary or
-compiler bootstrap and records the exact pre-source identity. Mere compiler
-map presence is not a witness. The signature arm is derived from the executable
-population: traverse the type of every `Decl::Primitive`, then retain references
-whose declaration is an ordinary checked inductive or transparent definition.
-The internal-provision arm requires exact identity, any constructor parentage,
-and no-allocation witnesses. This is the surface analog of the kernel's closed
-`is_prelude = {Top, Bottom, tt}` (`64 §1`), not a catch-all.
+**Membership rule (normative, checkable):** the floor identity roster is the
+closed union of (1) Ken-defined types named by built-in primitive signatures
+and (2) internally provisioned identities, of any checked declaration kind,
+that the surface contract independently requires source to name and source
+cannot recreate with the same `GlobalId` (`30-taxonomy §4`). The
+internal-provision arm records the origin and exact pre-source identity; mere
+compiler map presence is not a witness. The signature arm is derived by
+traversing every `Decl::Primitive` type and retaining references to ordinary
+checked inductives or transparent definitions. Internal provision may include
+an operation: `eqChar` has an exact comparator source-use witness (`37 §2.5`).
+Neither arm is a catch-all (`64 §1`).
 
-| Prelude type | Membership witness | Derivation / identity witness |
+| Floor identity | Membership witness | Derivation / identity witness |
 |---|---|---|
 | **`Auth`** | signature: `Cap : Auth → Type` | ordinary checked `data Auth = ANone \| APartial \| AFull`; the opaque primitive former needs this exact parameter identity. |
 | **`Bool`** | signature: comparison result `A → A → Bool` | ordinary checked `data Bool = True \| False` — derivable, but signature-named ⇒ prelude (F1). |
 | **`Char`** | signature: `String ↔ List Char` | checked transparent scalar type (`35 §2.4`); the constructor-free signature member. |
+| **`ConsoleStream`** | internal provision: the public `ChildInherit ConsoleStream` form (`38 §1.11.1`) | checked type whose exact complete family is scoped as `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and `ConsoleStream.Stderr`. |
+| **`eqChar`** | internal provision: comparator required by `Char ==` and character-literal matching (`30-taxonomy §4`, `37 §2.5`) | checked `Char → Char → Bool` operation with an exact registered ID; not a type or constructor family. |
 | **`List`** | signature: `String ↔ List Char` and `Bytes ↔ List UInt8` | ordinary checked `data List`; signature-named at two independent primitive surfaces. |
 | **`Option`** | signature: `bytes_at` and `bytes_slice` results | ordinary checked `data Option a = None \| Some a`; strict source must name and eliminate the exact result family. |
-| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping`; the opaque primitive former needs this exact parameter identity. Source uses the scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`. |
+| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping \| SpawnPlan \| ChildProcess \| PipeRead \| PipeWrite`; the opaque primitive former needs this exact parameter identity. Source uses the seven scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`. |
 | **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
 | **`Utf8Error`** | signature: the error argument of `bytes_decode`'s result | ordinary checked `data Utf8Error = InvalidUtf8`; no replacement family can inhabit the primitive result. |
 | **`Nat`** | internal provision, kernel origin: source must reach the canonical natural/index family | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
@@ -85,7 +86,7 @@ and no-allocation witnesses. This is the surface analog of the kernel's closed
 | **`BufferSpan`** | internal provision: public bounded-transfer argument (`38 §1.7.1–2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
 | **`TransferCount`** | internal provision: public read/write progress carrier (`38 §1.7.2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
 | **`ResourceError`** | internal provision: public resource-operation result carrier (`38 §1.7.1–2`) | native code produces all twelve exact constructor IDs; source uses scoped `ResourceError.C` paths. |
-| **`Ω` (Omega)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
+| **`Ω` (kernel-only)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
 The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
 ResourceKind, Result, Utf8Error}`**. The internal-provision arm adds
@@ -93,15 +94,25 @@ ResourceKind, Result, Utf8Error}`**. The internal-provision arm adds
 `{Equal, Prop, Proved, Top, Bottom}`, the five entrypoint-ABI identities
 `{ExitCode, HostIO, ProcessInput, Prod, ProgramCaps}`, the three
 effect/clock identities `{Coproduct, Instant, Unit}`, and the source-required
-`ITree` identity (`30-taxonomy §4`). The prior roster had 23 names; this
-candidate adds `ITree` as the twenty-fourth. The original
-fifteen were realized at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. This
-FS/resource slice adds six identities to that historical 24-name floor,
-closing the current 30-name roster. For every inductive member, the floor
+`ITree`, `ConsoleStream`, and `eqChar` identities (`30-taxonomy §4`). The
+prior roster had 23 names; this ITree slice added `ITree` as the twenty-fourth.
+The original fifteen were realized at
+`0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The FS/resource slice added six
+identities, closing the then-current 30-name roster. The current 32-name
+floor-identity roster is the eight signature identities and twenty-four
+internal-provision identities, including the `eqChar` comparator operation.
+For every inductive member, the floor
 admits constructors only by matching their kernel-recorded parent `GlobalId`.
 `ResourceKind` is scoped: its constructors are available as
-`ResourceKind.FsHandle`, `ResourceKind.Buffer`, and `ResourceKind.Mapping`,
-not as bare names. `ExitCode` and `ProgramCaps` are also scoped; their
+`ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
+`ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
+and `ResourceKind.PipeWrite`, not as bare names. `ConsoleStream` is scoped:
+its complete family is `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
+`ConsoleStream.Stderr`; bare leaf names are not reserved. The unqualified
+`SpawnPlan` source type is the pure plan type, distinct from the
+`ResourceKind.SpawnPlan` constructor. `eqChar` is the exact checked comparator
+operation in the floor roster, not a type or constructor family. `ExitCode` and
+`ProgramCaps` are also scoped; their
 constructor names are respectively `ExitCode.Success`, `ExitCode.Failure`,
 and `ProgramCaps.MkProgramCaps`. `ProcessInput`, `Prod`, and `Unit` bring
 their bare constructor names `MkProcessInput`, `MkProd`, and `MkUnit`.
@@ -115,45 +126,77 @@ unscoped, retaining bare `MkFileError`. `IOError`, `CreatePolicy`, and
 `IOError.C`, `CreatePolicy.C`, and `ResourceError.C`, with no bare cases
 reserved. `BufferSpan` and `TransferCount` are scoped types whose constructors
 remain private and unavailable by either bare or qualified source spelling.
-`Char`, `HostIO`, and transparent `Pair` have no constructor arm. Pair's
-companion inventory is exactly `{mk_pair, pair_fst, pair_snd}`; each checked
-type is keyed to the exact Pair id. Every listed family, definition,
-constructor, and companion is outside `trusted_base()`. Compiler-installed
+`Char`, `HostIO`, and transparent `Pair` have no constructor arm. `eqChar` is
+an operation, not a constructor family. Pair's companion inventory is exactly
+`{mk_pair, pair_fst, pair_snd}`; each checked
+type is keyed to the exact Pair id. Every listed floor identity, constructor,
+and companion is outside `trusted_base()`. Compiler-installed
 checked declarations outside these closed inventories are not admitted by mere
 possession.
 
 ### surface/taxonomy/prelude-signature-inventory-is-executable-and-closed
 
 - promise class: **normative compatibility vector** — these exact identities are
-  the public primitive-signature and internal-provision contract
-- spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`
+  the public primitive-signature and internal-provision contract, including the
+  `eqChar` comparator operation
+- spec: `30-taxonomy §4`; `33 §3.3`; `39 §2.0`; `38 §1.11.1–§1.11.2`;
+  `37 §2.5`
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently record the
-  `GlobalId` and actual declaration kind for each name in the thirty-name
-  roster, keeping type-forming identities distinct from the `Top`/`Bottom`
-  proposition constants and the `Proved : Top` proof binding. Also record each
-  constructor id and parent, the three Pair companion ids and checked types,
-  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Do not select
+  `GlobalId` and actual declaration kind for each name in the 32-name
+  floor-identity roster, keeping type-forming identities distinct from the
+  `Top`/`Bottom` proposition constants, the `Proved : Top` proof binding, and
+  the `eqChar` comparator operation. Record `eqChar`'s exact ID and checked
+  type. Also record each constructor id and parent, including the complete
+  `ConsoleStream` family, the three Pair companion ids and checked types,
+  `declarations().len()`, `next_global_id()`, and `trusted_base()`. Through
+  source use, resolve each of the seven qualified `ResourceKind` constructors
+  as a value of expected type `ResourceKind`, paired with rejection of the bare
+  leaf in that position using a separate fresh source unit. Resolve
+  `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` as
+  `ConsoleStream` values, paired with bare-leaf refusals in separate fresh
+  units. Resolve `eqChar` at
+  type `Char → Char → Bool`. On the separate Legacy standalone §1.11 source
+  route, resolve `SpawnPlan` in type position and `ResourceKind.SpawnPlan` as a
+  kind value; in another source unit on that route, try bare `SpawnPlan` as a
+  `ResourceKind` value. Record the distinct identities. Do not select
   declarations by helper name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
   internal-provision set `{Nat, Pair, Equal, ExitCode, HostIO, ProcessInput,
   Prod, ProgramCaps, Prop, Proved, Top, Bottom, Coproduct, Instant, Unit,
   ITree, BufferSpan, CreatePolicy, FileError, IOError, ResourceError,
-  TransferCount}` closes the thirty-name roster. `Proved` has type `Top` and
-  is a proof binding, not a type former. The constructor set is the exact
-  parent-derived closure, including all constructors of the six added families:
-  `MkFileError` remains bare; all thirteen `IOError` causes, the three
-  `CreatePolicy` cases, and all twelve `ResourceError` cases are scoped; the
-  `BufferSpan` and `TransferCount` constructors retain private visibility.
-  Existing constructor dispositions remain unchanged, including bare `MkUnit`
-  and scoped `Coproduct`, `Instant`, and `ITree`; no same-spelling constructor
-  with another parent qualifies. The separate companion set is exactly
+  TransferCount, ConsoleStream, eqChar}` closes the exact 32-name floor
+  roster. `ConsoleStream` is an inductive type and `eqChar` is an operation;
+  neither is another primitive-signature type. `Proved` has type `Top` and is a
+  proof binding, not a type former.
+  The constructor set is the exact parent-derived closure, including all
+  constructors of the six added families: `MkFileError` remains bare; all
+  thirteen `IOError` causes, the three `CreatePolicy` cases, and all twelve
+  `ResourceError` cases are scoped; the `BufferSpan` and `TransferCount`
+  constructors retain private visibility. `ResourceKind` contributes exactly
+  the seven qualified paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`,
+  `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
+  `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`; none is a bare
+  constructor path. Each bare `ResourceKind` leaf in value position is refused
+  against its accepted qualified control. `ConsoleStream` contributes the
+  complete scoped family `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
+  `ConsoleStream.Stderr`; each bare leaf is refused against its qualified
+  control, and only the `ConsoleStream` type name enters the roster.
+  Unqualified `SpawnPlan` remains the separate pure plan type, outside the
+  32-name floor roster and not a bare constructor. On the Legacy standalone
+  §1.11 route it is accepted in type position, while its use as a
+  `ResourceKind` value is refused; the qualified `ResourceKind.SpawnPlan`
+  value is the accepted control. `eqChar` is the exact `Char → Char → Bool`
+  operation identity, not a type or constructor family. Existing constructor
+  dispositions remain unchanged, including bare `MkUnit` and scoped
+  `Coproduct`, `Instant`, and `ITree`; no same-spelling constructor with another
+  parent qualifies. The separate companion set is exactly
   `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
   Pair id. Installing the floor changes neither the declaration count nor
-  allocator position. None of the thirty roster identities, constructor
-  identities, or Pair-companion identities enters `trusted_base()`.
+  allocator position. None of the 32 roster identities, constructor identities,
+  or Pair-companion identities enters `trusted_base()`.
 - controls: prove both equality directions with compile-preserving mutations.
   For under-inclusion, install a checked `Extra` type and a real test-only
   primitive whose signature names `Extra`, leaving the configured floor
@@ -163,9 +206,11 @@ possession.
   red.
   Independently count a companion as a type or substitute a fresh same-shaped
   Pair id; the kind or identity assertion must red.
-- why: producer traversal closes the population by construction. A selected
-  `reg_*` grep omits primitives registered through another helper; a spelling
-  list cannot distinguish a constructor attached to a lookalike family.
+- why: producer traversal closes the signature dependency set. Each
+  internal-provision identity, including the `eqChar` operation, needs its own
+  source-need witness; a selected `reg_*` grep omits primitive signatures
+  registered by another helper, and spelling cannot establish constructor
+  parentage.
 - **MEASURED (carried from old bases):** at `06c62313af62`, the producer
   traversal returned the exact eight-id signature set; admitting its union with
   `Nat` preserved ids, accounting, and trust. At
@@ -295,8 +340,9 @@ ordinary data representation.
   origin, and no-allocation witnesses add the internal set `{Nat, Pair}` (and
   the five kernel-machinery-keyed `30-taxonomy §4` members), the five
   entrypoint-ABI and three effect/clock identities, the scoped `ITree` family,
-  and the six FS/resource types. The inventory yields the thirty-name roster,
-  three Pair companions, and constructor closure. The `OrdResult` bloat
+  and the six FS/resource types. The inventory yields the current 32-name
+  floor roster, including `ConsoleStream` and `eqChar`, three Pair companions,
+  and constructor closure. The `OrdResult` bloat
   finding proves the opposite direction (ruled remove; `Ordering`→package,
   §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/

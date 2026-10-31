@@ -3,10 +3,10 @@
 //! A natural user-source Underived owner has not been constructed.
 #![cfg(target_os = "linux")]
 
-/// Promise class: transition sentinel. The forced origin numbers are operands
-/// of this fixed AC-MAIN fixture, not a general inventory of owner origins.
-/// Retire or rederive them if a natural user-source Underived owner is found
-/// or this fixture's owner enumeration changes.
+/// Promise class: transition sentinel. The forced owners are this AC-MAIN
+/// fixture's FsReadAt and BufferAllocate response owners, looked up by
+/// operation in the same build environment rather than pinned as origin
+/// numbers. Retire them if a natural user-source Underived owner is found.
 /// MEASURED: the unforced source installs both owners without Underived; the
 /// same source forced at each owner's protocol producer either refuses before
 /// artifact emission or executes with interpreter-equivalent effects and
@@ -69,9 +69,43 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
                 "the independent interpreter must perform the forwarded read"
             );
 
+            // Owners are looked up by the operation each one performs, in the
+            // same build environment, never pinned as origin numbers: an origin
+            // is a function of everything elaborated before this fixture.
+            let owner_of = {
+                let (_, diagnostics) =
+                    ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                        ken_cli::build_native_program(
+                            source,
+                            ken_cli::SourceFormat::Ken,
+                            "rt_performing_underived",
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    });
+                assert_eq!(diagnostics.len(), 1, "the unforced build publishes one plan");
+                let rows = diagnostics[0]
+                    .all_static_response_rows
+                    .iter()
+                    .map(|row| (row.vis_origin, row.operation.clone()))
+                    .collect::<Vec<_>>();
+                move |operation: &str| {
+                    let owners = rows
+                        .iter()
+                        .filter(|(_, performed)| performed == operation)
+                        .map(|(owner, _)| *owner)
+                        .collect::<std::collections::BTreeSet<_>>();
+                    assert_eq!(owners.len(), 1, "exactly one {operation} owner: {rows:?}");
+                    owners.into_iter().next().unwrap()
+                }
+            };
+            let read_owner = owner_of("FsReadAt");
+            let allocate_owner = owner_of("BufferAllocate");
+            assert_ne!(read_owner, allocate_owner, "the two operands are distinct owners");
+
             // The unforced row is the owner-installation control. Each forced
             // row changes only the protocol classification of that same source.
-            for forced_owner in [None, Some(901_u32), Some(778_u32)] {
+            for forced_owner in [None, Some(allocate_owner), Some(read_owner)] {
                 let build = || {
                     ken_cli::build_native_program(
                         source,
@@ -100,8 +134,8 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
                             .map(|row| (row.vis_origin, row.operation.as_str()))
                             .collect::<Vec<_>>();
                         assert!(
-                            rows.contains(&(778, "FsReadAt"))
-                                && rows.contains(&(901, "BufferAllocate")),
+                            rows.contains(&(read_owner, "FsReadAt"))
+                                && rows.contains(&(allocate_owner, "BufferAllocate")),
                             "the unforced fixture must install both forced operands: {rows:?}"
                         );
                         assert_eq!(

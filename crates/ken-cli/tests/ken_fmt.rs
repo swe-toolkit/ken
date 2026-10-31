@@ -115,38 +115,43 @@ fn strict_frozen_corpus_gate_is_green() {
     );
 }
 
+/// Promise class: durable invariant; spec 38 §1.11.2 and conformance case
+/// process-spawn-requires-process-and-execute. MEASURED: the checked Process
+/// program runs with FS AFull; removing only FS still elaborates the same main
+/// but fails checked entrypoint admission. CLAIMED: a Process declaration
+/// cannot substitute for the required full FS grant. THE GAP: this tests one
+/// missing-FS entrypoint, not every insufficient FS authority.
 #[test]
-fn every_checked_runnable_root_declares_its_fs_authority() {
-    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut roots = Vec::new();
-    for directory in ["catalog", "examples", "conformance", "crates"] {
-        let directory = repository.join(directory);
-        collect(&directory, ".ken", &mut roots);
-        collect(&directory, ".ken.md", &mut roots);
-    }
-    roots.sort();
-    roots.dedup();
+fn process_program_requires_its_declared_fs_authority() {
+    let source = include_str!("fixtures/px10_child_wait_smoke.ken");
+    let admitted = fixture("px10_process_with_fs.ken", source);
+    let output = Command::new(ken_bin())
+        .arg("run")
+        .arg(&admitted)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
-    let mut runnable = Vec::new();
-    for path in &roots {
-        let source = fs::read_to_string(path).unwrap();
-        let uses_program_abi = source.contains("ProgramCaps") || source.contains("HostIO");
-        if !uses_program_abi {
-            continue;
-        }
-        runnable.push(path);
-        assert!(
-            source
-                .lines()
-                .any(|line| line.trim() == "program capabilities FS APartial"
-                    || line.trim() == "program capabilities FS AFull"
-                    || line.trim() == "program capabilities FS ANone"),
-            "runnable Ken root lacks a declared FS authority: {}",
-            path.display(),
-        );
-    }
-
-    assert!(!runnable.is_empty(), "runnable corpus must not be empty");
+    let no_fs = source.replacen(
+        "program capabilities FS AFull, Process",
+        "program capabilities Process",
+        1,
+    );
+    assert_ne!(
+        no_fs, source,
+        "control must remove the declared FS authority"
+    );
+    let mut env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+    env.elaborate_file_v1(&no_fs)
+        .expect("the Process-only program still elaborates");
+    assert!(
+        ken_elaborator::program_admission::admit_checked_main(&env).is_err(),
+        "Process without FS AFull must be rejected by entrypoint admission"
+    );
 }
 
 fn collect(directory: &Path, suffix: &str, out: &mut Vec<PathBuf>) {

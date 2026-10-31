@@ -347,8 +347,7 @@ impl StartExclusion {
             }
             Self::AsAlias => parser.is_contextual_ident("as"),
             Self::MatchEquationBinder => {
-                parser.is_contextual_ident("eqn")
-                    && matches!(parser.lookahead(1), Token::Colon)
+                parser.is_contextual_ident("eqn") && matches!(parser.lookahead(1), Token::Colon)
             }
             Self::ProofSelector => matches!(parser.peek(), Token::KwProof),
             Self::IfExpression => matches!(parser.peek(), Token::KwIf),
@@ -1814,26 +1813,89 @@ mod atom_start_premise {
             | Token::Or
             | Token::Member => true,
 
-            Token::KwConst | Token::KwFn | Token::KwProc | Token::KwLet | Token::KwIn
-            | Token::KwIf | Token::KwThen | Token::KwElse | Token::KwType | Token::KwInfixl
-            | Token::KwInfixr | Token::KwInfix | Token::KwRequires | Token::KwEnsures
-            | Token::KwProve | Token::KwLaw | Token::KwOld | Token::KwSpace | Token::KwMut
-            | Token::KwBecomes | Token::KwData | Token::KwMatch | Token::KwDef
-            | Token::KwTypeReserved | Token::KwForeign | Token::KwRecord | Token::KwClass
-            | Token::KwInstance | Token::KwDerive | Token::KwWhere | Token::KwTemporal
-            | Token::KwModule | Token::KwImport | Token::KwExport | Token::KwUseReserved
-            | Token::KwPub | Token::KwProgram | Token::KwPackage | Token::KwAdmits
-            | Token::KwCapabilities | Token::KwProp | Token::KwTheorem | Token::KwAxiom
-            | Token::KwProof | Token::LParen | Token::RParen | Token::Colon
-            | Token::DoubleColon | Token::Eq | Token::Dot | Token::Arrow | Token::Lambda
-            | Token::Semicolon | Token::LBrace | Token::RBrace | Token::Pipe
-            | Token::LBracket | Token::RBracket | Token::Comma | Token::Str(_)
-            | Token::CharLit(_) | Token::ByteStr(_) | Token::Plus | Token::PlusPercent
-            | Token::Minus | Token::Star | Token::Slash | Token::Percent
-            | Token::EqEq | Token::PropEq | Token::FlowsTo
-            | Token::Join | Token::Meet | Token::Times | Token::MapsTo | Token::TruncBar
-            | Token::IntLit(_) | Token::FloatLit(_) | Token::DecimalLit(_, _)
-            | Token::Float32Lit(_) | Token::Ident(_) | Token::ConId(_) | Token::Nat(_)
+            Token::KwConst
+            | Token::KwFn
+            | Token::KwProc
+            | Token::KwLet
+            | Token::KwIn
+            | Token::KwIf
+            | Token::KwThen
+            | Token::KwElse
+            | Token::KwType
+            | Token::KwInfixl
+            | Token::KwInfixr
+            | Token::KwInfix
+            | Token::KwRequires
+            | Token::KwEnsures
+            | Token::KwProve
+            | Token::KwLaw
+            | Token::KwOld
+            | Token::KwSpace
+            | Token::KwMut
+            | Token::KwBecomes
+            | Token::KwData
+            | Token::KwMatch
+            | Token::KwDef
+            | Token::KwTypeReserved
+            | Token::KwForeign
+            | Token::KwRecord
+            | Token::KwClass
+            | Token::KwInstance
+            | Token::KwDerive
+            | Token::KwWhere
+            | Token::KwTemporal
+            | Token::KwModule
+            | Token::KwImport
+            | Token::KwExport
+            | Token::KwUseReserved
+            | Token::KwPub
+            | Token::KwProgram
+            | Token::KwPackage
+            | Token::KwAdmits
+            | Token::KwCapabilities
+            | Token::KwProp
+            | Token::KwTheorem
+            | Token::KwAxiom
+            | Token::KwProof
+            | Token::LParen
+            | Token::RParen
+            | Token::Colon
+            | Token::DoubleColon
+            | Token::Eq
+            | Token::Dot
+            | Token::Arrow
+            | Token::Lambda
+            | Token::Semicolon
+            | Token::LBrace
+            | Token::RBrace
+            | Token::Pipe
+            | Token::LBracket
+            | Token::RBracket
+            | Token::Comma
+            | Token::Str(_)
+            | Token::CharLit(_)
+            | Token::ByteStr(_)
+            | Token::Plus
+            | Token::PlusPercent
+            | Token::Minus
+            | Token::Star
+            | Token::Slash
+            | Token::Percent
+            | Token::EqEq
+            | Token::PropEq
+            | Token::FlowsTo
+            | Token::Join
+            | Token::Meet
+            | Token::Times
+            | Token::MapsTo
+            | Token::TruncBar
+            | Token::IntLit(_)
+            | Token::FloatLit(_)
+            | Token::DecimalLit(_, _)
+            | Token::Float32Lit(_)
+            | Token::Ident(_)
+            | Token::ConId(_)
+            | Token::Nat(_)
             | Token::Eof => false,
         }
     }
@@ -2499,7 +2561,7 @@ impl Parser {
             let mut declarations = Vec::new();
             loop {
                 let (family, family_span) = self.expect_con()?;
-                if family != "FS" {
+                if family != "FS" && family != "Process" {
                     return Err(ElabError::UnknownCapabilityFamily {
                         family,
                         span: family_span,
@@ -2514,29 +2576,37 @@ impl Parser {
                         span: family_span,
                     });
                 }
-                let (authority, authority_span) = self.expect_con()?;
-                if !matches!(authority.as_str(), "ANone" | "APartial" | "AFull") {
-                    return Err(ElabError::InvalidCapabilityAuthority {
-                        family,
-                        authority,
-                        span: authority_span,
-                    });
-                }
-                end = authority_span.end;
-                let root = if let Token::Str(root) = self.peek().clone() {
-                    let root_span = self.peek_span().clone();
-                    self.advance();
-                    let bytes = root.into_bytes();
-                    if ken_host::FsRootSpec::parse_declared(&bytes).is_none() {
-                        return Err(ElabError::ParseError {
-                            msg: "FS root must be absolute or begin with './' or '~/'".to_string(),
-                            span: root_span,
+                let (authority, root) = if family == "FS" {
+                    let (authority, authority_span) = self.expect_con()?;
+                    if !matches!(authority.as_str(), "ANone" | "APartial" | "AFull") {
+                        return Err(ElabError::InvalidCapabilityAuthority {
+                            family,
+                            authority,
+                            span: authority_span,
                         });
                     }
-                    end = root_span.end;
-                    Some(bytes)
+                    end = authority_span.end;
+                    let root = if let Token::Str(root) = self.peek().clone() {
+                        let root_span = self.peek_span().clone();
+                        self.advance();
+                        let bytes = root.into_bytes();
+                        if ken_host::FsRootSpec::parse_declared(&bytes).is_none() {
+                            return Err(ElabError::ParseError {
+                                msg: "FS root must be absolute or begin with './' or '~/'"
+                                    .to_string(),
+                                span: root_span,
+                            });
+                        }
+                        end = root_span.end;
+                        Some(bytes)
+                    } else {
+                        None
+                    };
+                    (authority, root)
                 } else {
-                    None
+                    // Process is an explicit grant, not a second authority family.
+                    end = family_span.end;
+                    (String::new(), None)
                 };
                 declarations.push(CapabilityDecl {
                     family,
@@ -4449,9 +4519,7 @@ impl Parser {
                     // DECLARATION PARSER as the producer, which is exactly the
                     // defect `lang_application_atom_if_rejection.rs` exists to
                     // catch.
-                    if let Some(exclusion) =
-                        self.atom_start_exclusion(AtomPosition::Expression)
-                    {
+                    if let Some(exclusion) = self.atom_start_exclusion(AtomPosition::Expression) {
                         if let Some(diagnostic) = exclusion.argument_diagnostic() {
                             return Err(ElabError::ParseError {
                                 msg: diagnostic,
@@ -5286,10 +5354,10 @@ impl Parser {
             // `old e` — pre-state reference (`21 §6.4`)
             ExprAtomForm::Old => {
                 self.advance(); // consume 'old'
-                // Unlike the ordinary application loop, `old` has consumed
-                // its prefix and still owes an operand. Every expression
-                // exclusion must therefore reject locally rather than inherit
-                // `ProofSelector`'s declaration-boundary yield.
+                                // Unlike the ordinary application loop, `old` has consumed
+                                // its prefix and still owes an operand. Every expression
+                                // exclusion must therefore reject locally rather than inherit
+                                // `ProofSelector`'s declaration-boundary yield.
                 if self
                     .atom_start_exclusion(AtomPosition::Expression)
                     .is_some()
@@ -5524,10 +5592,7 @@ fn reduce_default_surface(values: &mut Vec<Expr>, operator: InfixOperator) {
     values.push(combined);
 }
 
-fn associate_surface_spine(
-    operands: Vec<Expr>,
-    operators: Vec<InfixOperator>,
-) -> Expr {
+fn associate_surface_spine(operands: Vec<Expr>, operators: Vec<InfixOperator>) -> Expr {
     let mut operands = operands.into_iter();
     let mut values = vec![operands.next().expect("a spine has one more operand")];
     let mut pending: Vec<InfixOperator> = Vec::new();
@@ -5536,10 +5601,7 @@ fn associate_surface_spine(
             .last()
             .is_some_and(|top| default_precedence(top) >= default_precedence(&operator))
         {
-            reduce_default_surface(
-                &mut values,
-                pending.pop().expect("pending operator exists"),
-            );
+            reduce_default_surface(&mut values, pending.pop().expect("pending operator exists"));
         }
         pending.push(operator);
         values.push(rhs);
@@ -5597,10 +5659,7 @@ fn reassociate_default_expr(expr: Expr) -> Expr {
             operators,
             ..
         } => associate_surface_spine(
-            operands
-                .into_iter()
-                .map(reassociate_default_expr)
-                .collect(),
+            operands.into_iter().map(reassociate_default_expr).collect(),
             operators,
         ),
         Expr::EMatch {
@@ -5729,9 +5788,7 @@ fn reassociate_default_type(ty: Type) -> Type {
         // `RTrunc` arm, which IS reaching (it runs at DECLARED fixity and rejects
         // an ambiguous-fixity truncated predicate; see that arm and its test).
         // The traversal must still not silently leaf a `‖…‖`.
-        Type::TTrunc(inner, span) => {
-            Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
-        }
+        Type::TTrunc(inner, span) => Type::TTrunc(Box::new(reassociate_default_type(*inner)), span),
         // A projection's base is an expression, and this is the DEFAULT-fixity
         // pass: `reassociate_default_expr` is the expression half, so recurse
         // into the base through it rather than leaving the subtree unvisited.
