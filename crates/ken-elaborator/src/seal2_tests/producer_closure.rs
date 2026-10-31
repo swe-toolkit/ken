@@ -23,42 +23,6 @@ use seal2_support::{
     head_only_producers, reaching_roots, result_type_produces, synthetic_facts, ALLOWED_SECTIONS,
 };
 
-const BUFFER_KEN_MD: &str =
-    include_str!("../../../../catalog/packages/Capability/System/Buffer.ken.md");
-const IO_KEN_MD: &str = include_str!("../../../../catalog/packages/Capability/System/IO.ken.md");
-
-fn landed_surface() -> ElabEnv {
-    let mut env = ElabEnv::empty().expect("SEAL-2 prelude");
-    let root = catalog_packages_dir();
-    for module in ["Core.Logic.Transport", "Data.Numeric.Nat.Arithmetic"] {
-        env.elaborate_module_from_roots(&[root.clone()], module)
-            .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
-    }
-    // These flat fences have no module-qualified proof namespace. Withhold
-    // prelude copies and selectors before checking their catalog declarations.
-    for name in [
-        "buffer_nat_add",
-        "buffer_suc_cong",
-        "transfer_count_request_budget",
-        "transfer_count_request_budget::bounded",
-        "write_all_call_bound",
-        "write_all_call_bound::termination",
-        "write_all_complete",
-        "write_all_complete::success_complete",
-        "write_all_first_error",
-        "write_all_first_error::first_error",
-        "write_all_all_success",
-        "write_all_all_success::all_success",
-    ] {
-        env.globals.remove(name);
-    }
-    env.elaborate_ken_md_file(BUFFER_KEN_MD)
-        .expect("System.Buffer checked fences");
-    env.elaborate_ken_md_file(IO_KEN_MD)
-        .expect("System.IO checked fences");
-    env
-}
-
 fn carrier_former(env: &ElabEnv, carrier_name: &str) -> Term {
     Term::IndFormer {
         id: env.globals[carrier_name],
@@ -75,7 +39,7 @@ fn carrier_former(env: &ElabEnv, carrier_name: &str) -> Term {
 /// call at this same shape.
 #[test]
 fn one_derivation_covers_both_sealed_carriers() {
-    let env = landed_surface();
+    let env = seal2_support::landed_surface();
     for carrier in ["BufferSpan", "TransferCount"] {
         assert_eq!(
             closed_producers(&env, carrier),
@@ -151,7 +115,7 @@ fn closed_oracle_unfolds_a_transparent_alias_in_a_nonhead_position() {
 /// carrier is never at the head). (AC-3.)
 #[test]
 fn position_closure_holds_under_every_structural_former() {
-    let env = landed_surface();
+    let env = seal2_support::landed_surface();
     let bs = carrier_former(&env, "BufferSpan");
     let filler = Term::Var(0); // a non-carrier leaf used to occupy sibling slots
     let b = |t: Term| Box::new(t);
@@ -376,8 +340,11 @@ const ENUMERATED_CARRIER_ENVIRONMENTS: &[EnumeratedCarrierEnvironment] = &[
             "Capability/System/Buffer.ken.md",
             "Capability/System/IO.ken.md",
         ],
-        load: landed_surface,
-        loaded_witnesses: &["span_length", "write_all_preserves_exact_prefix"],
+        load: seal2_support::landed_surface,
+        loaded_witnesses: &[
+            "Capability.System.Buffer.span_length",
+            "Capability.System.IO.write_all_preserves_exact_prefix",
+        ],
     },
     EnumeratedCarrierEnvironment {
         roots: &["Core/Classes/LawfulFunctors.ken.md"],

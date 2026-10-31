@@ -1,7 +1,7 @@
 //! LANG-MOD-STRICT-RESOLUTION D0 buildability and migration census.
 //!
-//! D0 is measurement only: every root-loaded ambient fallback exercised here
-//! still succeeds. No strict-mode carrier or enforcement exists in this file.
+//! D0 measures Legacy fallback and the catalog's independent Strict-era
+//! floor/home migration census. Resolution enforcement lives in the loader.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::{
     catalog_module_from_path, is_prelude_floor_name, PRELUDE_COMPANION_BINDING_NAMES,
-    PRELUDE_FLOOR_NAMES,
+    PRELUDE_FLOOR_NAMES, PRELUDE_PACKAGE_HOMES,
 };
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Level, Term};
@@ -359,6 +359,15 @@ fn strict_floor_env(extra_names: &BTreeSet<String>) -> ElabEnv {
         }
     }
     admitted.extend(PRELUDE_COMPANION_BINDING_NAMES.map(|name| env.globals[name]));
+    // Checked home identities are in scope in their owning unit (33 §3.3).
+    // The strict frontier separately refuses the same bare names outside home.
+    for (home, name) in PRELUDE_PACKAGE_HOMES {
+        let id = *env
+            .globals
+            .get(name)
+            .unwrap_or_else(|| panic!("{home} home row `{name}` has no checked global"));
+        admitted.insert(id);
+    }
     env.globals
         .retain(|name, id| admitted.contains(id) || extra_names.contains(name));
     env
@@ -458,10 +467,11 @@ fn console_char_homes_and_all_direct_catalog_consumers_need_no_ambient_names() {
     }
 }
 
-/// Transition sentinel for catalog migration: this is a behavioral census,
-/// not a source-text census. The Console/Char floor and the two explicit
-/// package homes remove their old ambient dependencies; every remaining name
-/// still requires a separate provider migration.
+/// Promise class: durable invariant.
+/// MEASURED: every discovered catalog unit loads against the floor plus home
+/// identities without requiring an ambient convenience. CLAIMED: no catalog
+/// unit depends on a bare ambient prelude name. THE GAP: home identities are
+/// admitted globally here; the strict frontier owns their non-home refusal.
 #[test]
 fn catalog_ambient_passthrough_migration_census() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -488,10 +498,10 @@ fn catalog_ambient_passthrough_migration_census() {
         }
     }
 
-    // Preserve the last-cut exact baseline as the independent behavioral
-    // census oracle. The Console/Char slice predicts only these explicit
-    // deletions: the checked home edges and the scoped/floor spellings remove
-    // their former ambient dependencies, without adding another convenience.
+    // Preserve the last-cut exact baseline as an independent behavioral
+    // census oracle. This catalog flip closes the five remaining Strict
+    // refusals by checked package homes; its exact post-flip ambient set is
+    // empty. The pre-flip ledger below still pins the migration's members.
     let prior: Vec<(String, Vec<String>)> = vec![
         (
             // SUBSET-SIGMA K-a Char projection: inherited from
@@ -1101,6 +1111,47 @@ fn catalog_ambient_passthrough_migration_census() {
         "charToInt",
         "eqChar",
         "leqChar",
+        "FS",
+        "read_bytes",
+        "write_file",
+        "BufferWindow",
+        "MkBufferWindow",
+        "buffer_span_budget",
+        "buffer_span_length",
+        "transfer_count_int",
+        "transfer_count_nat",
+        "transfer_count_positive",
+        "transfer_count_positive_prop",
+        "transfer_count_remaining",
+        "transfer_count_nat_succ",
+        "transfer_count_predecessor",
+        "FileOperation",
+        "OpReadFile",
+        "OpWriteFile",
+        "OpAppendFile",
+        "OpMetadata",
+        "OpReadDirectory",
+        "OpCreateDirectory",
+        "OpRemoveFile",
+        "OpRemoveDirectory",
+        "OpRename",
+        "OpChangeMode",
+        "OpSeek",
+        "OpSetLength",
+        "OpSync",
+        "OpGetInheritance",
+        "OpSetInheritance",
+        "OpDuplicate",
+        "write_all_exact_prefix_prop",
+        "write_all_exact_prefix_prop::exact_prefix",
+        "ResourceBodyResult",
+        "ResourceBodyOk",
+        "ResourceBodyErr",
+        "ResourceBracketResult",
+        "ResourceBracketOk",
+        "ResourceBracketBodyError",
+        "ResourceBracketReleaseError",
+        "ResourceBracketBodyAndReleaseError",
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
@@ -1122,7 +1173,20 @@ fn catalog_ambient_passthrough_migration_census() {
         .collect::<Vec<_>>();
     assert_eq!(
         census, expected,
-        "Console/Char migration: only the predicted exact ambient pairs disappear"
+        "checked-home catalog flip: exact ambient pairs must all disappear"
+    );
+    assert!(
+        residuals.is_empty(),
+        "unexpected census residuals: {residuals:?}"
+    );
+    assert_eq!(
+        clean.iter().cloned().collect::<BTreeSet<_>>(),
+        discovered,
+        "all discovered units must be clean after the flip"
+    );
+    assert!(
+        clean.iter().any(|entry| entry == "Capability.System.Error"),
+        "the checked FileOperation home must clear Error's census row"
     );
 
     let ambient = census

@@ -10,33 +10,23 @@ const BUFFER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/System/Buffer.ken.md");
 const IO_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/System/IO.ken.md");
 
-fn load_checked_dependencies(env: &mut ElabEnv) {
+/// Load the landed Buffer + IO surface as its clients load it: through the
+/// strict roots loader. IO imports Buffer, so flat fences cannot stand for the
+/// pair. Catalog declarations enter `globals` under their qualified paths;
+/// checked prelude names stay bare, so look catalog laws up with `io`.
+fn load_landed_surface(env: &mut ElabEnv) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join("catalog/packages");
-    for module in ["Core.Logic.Transport", "Data.Numeric.Nat.Arithmetic"] {
-        env.elaborate_module_from_roots(&[root.clone()], module)
+    for module in ["Capability.System.IO", "Capability.System.Buffer"] {
+        env.elaborate_module_from_roots_strict(&[root.clone()], module)
             .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
     }
-    // This older flat-fence fixture has no module-qualified proof namespace.
-    // Withhold the old prelude names, including their flat proof selectors,
-    // before checking the catalog's now-local declarations.
-    for name in [
-        "buffer_nat_add",
-        "buffer_suc_cong",
-        "transfer_count_request_budget",
-        "transfer_count_request_budget::bounded",
-        "write_all_call_bound",
-        "write_all_call_bound::termination",
-        "write_all_complete",
-        "write_all_complete::success_complete",
-        "write_all_first_error",
-        "write_all_first_error::first_error",
-        "write_all_all_success",
-        "write_all_all_success::all_success",
-    ] {
-        env.globals.remove(name);
-    }
+}
+
+/// The checked identity a `Capability.System.IO` declaration owns.
+fn io(env: &ElabEnv, name: &str) -> GlobalId {
+    env.globals[&format!("Capability.System.IO.{name}")]
 }
 
 fn result_head(env: &ken_kernel::GlobalEnv, ty: &Term) -> Term {
@@ -85,11 +75,7 @@ fn public_buffer_span_producers(env: &ElabEnv) -> BTreeSet<String> {
 fn checked_surface_is_public_but_proof_carrying_constructors_stay_private() {
     let mut env = ElabEnv::empty().expect("PX8-F prelude");
     let base_trusted = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
-    load_checked_dependencies(&mut env);
-    env.elaborate_ken_md_file(BUFFER_KEN_MD)
-        .expect("System.Buffer checked fences");
-    env.elaborate_ken_md_file(IO_KEN_MD)
-        .expect("System.IO checked fences and five law terms");
+    load_landed_surface(&mut env);
     assert_eq!(
         env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
         base_trusted,
@@ -120,10 +106,6 @@ proc px8f_exact_write_all
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Unit) visits [FS] =
   writeAll a file offset buffer span
-
-theorem px8f_write_all_all_success_theorem_uses_subject
-  : Equal Bool (write_all_all_success Zero) True =
-  write_all_all_success_holds Zero
 
 proc px8f_readsome_public_consumers
   (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
@@ -171,6 +153,37 @@ proc px8f_readsome_public_consumers
 "#,
     )
     .expect("exact PX8-F public signatures elaborate");
+    // The IO theorem concludes about IO's own checked subject. Both are
+    // package-private, so the check reads their checked identities; a bare
+    // client spelling would now name the distinct prelude copy.
+    let subject = io(&env, "write_all_all_success");
+    assert_ne!(
+        subject, env.globals["write_all_all_success"],
+        "the catalog subject is not the bare prelude copy"
+    );
+    let Some(Decl::Transparent { ty, .. }) =
+        env.env.lookup(io(&env, "write_all_all_success_holds"))
+    else {
+        panic!("write_all_all_success_holds must have a checked body");
+    };
+    let mut conclusion = ty;
+    while let Term::Pi(_, body) = conclusion {
+        conclusion = body;
+    }
+    let Term::App(equal_and_left, _) = conclusion else {
+        panic!("write_all_all_success_holds must state an Equal application");
+    };
+    let Term::App(_, left) = equal_and_left.as_ref() else {
+        panic!("write_all_all_success_holds must carry a left endpoint");
+    };
+    let mut head = left.as_ref();
+    while let Term::App(function, _) = head {
+        head = function;
+    }
+    assert!(
+        matches!(head, Term::Const { id, .. } if *id == subject),
+        "write_all_all_success_holds must conclude about IO's checked subject"
+    );
 
     for public in [
         "BufferHandle",
@@ -221,11 +234,6 @@ proc px8f_readsome_public_consumers
     for law in [
         "write_all_exact_prefix_prop",
         "write_all_exact_prefix_prop::exact_prefix",
-        "write_all_terminates",
-        "write_all_preserves_exact_prefix",
-        "write_all_success_is_complete",
-        "write_all_preserves_first_error",
-        "write_all_all_success_holds",
         "transfer_count_nat_succ",
         "write_all_entry",
         "write_all_stop",
@@ -234,18 +242,31 @@ proc px8f_readsome_public_consumers
         "write_all_done",
         "write_all_continue",
         "write_all_advance_start",
-        "write_all_strict_decrease",
-        "write_all_fuel_sufficient",
-        "write_all_complete_after_wrote",
-        "write_all_zero_budget",
     ] {
         assert!(
             env.env.transparent_body(env.globals[law]).is_some(),
             "law `{law}` must be a real checked body"
         );
     }
+    for law in [
+        "write_all_terminates",
+        "write_all_preserves_exact_prefix",
+        "write_all_success_is_complete",
+        "write_all_preserves_first_error",
+        "write_all_all_success_holds",
+        "write_all_strict_decrease",
+        "write_all_fuel_sufficient",
+        "write_all_complete_after_wrote",
+        "write_all_zero_budget",
+    ] {
+        assert!(
+            env.env.transparent_body(io(&env, law)).is_some(),
+            "IO law `{law}` must be a real checked body"
+        );
+    }
     assert_ne!(
-        env.globals["write_all_all_success_holds"], env.globals["write_all_all_success"],
+        io(&env, "write_all_all_success_holds"),
+        io(&env, "write_all_all_success"),
         "the theorem and its native-prelude subject must remain distinct globals"
     );
     assert!(!BUFFER_KEN_MD.contains("Axiom"));
@@ -440,11 +461,7 @@ fn checked_source_cannot_forge_or_project_mapping_handles() {
 #[test]
 fn buffer_span_producer_closure_is_derived_from_public_globals() {
     let mut env = ElabEnv::empty().expect("SPAN-SEAL prelude");
-    load_checked_dependencies(&mut env);
-    env.elaborate_ken_md_file(BUFFER_KEN_MD)
-        .expect("System.Buffer checked fences");
-    env.elaborate_ken_md_file(IO_KEN_MD)
-        .expect("System.IO checked fences");
+    load_landed_surface(&mut env);
     assert_eq!(public_buffer_span_producers(&env), BTreeSet::new());
 }
 
