@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-CATALOG-FLIP
 title: "Spec 33 §3.3 says every source unit resolves in one strict mode, but ken check reaches the catalog through the Legacy roots entry, and five catalog units refuse under Strict because the prelude-source names they use have no import home, which the Transparent-only package-home gate cannot give an inductive family. Extend package homes to checked inductive families, home those names in the five units that wrap them, and move ken check's catalog route to Strict"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1

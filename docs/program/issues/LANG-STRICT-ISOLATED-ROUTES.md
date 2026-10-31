@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-ISOLATED-ROUTES
 title: "After the catalog route is strict, ken check on an isolated .ken or .ken.md file and ken run still elaborate in Legacy, and 45 of the 57 isolated files that check today refuse under Strict: isolated files have no import loader, and the program vocabulary (host_program, host_exit, bind, FSOp, the State family and others) has no import home. Add strict file entries and an isolated-file import loader, home the program vocabulary under the 2026-09-25 rule, migrate the refusing files, and move the isolated routes and ken run to Strict"
-status: draft
+status: ready
 owner: language
 size: L
 tier: T1
@@ -20,7 +20,7 @@ origin: "Operator 2026-09-25: one resolution mode; an ever-present intrinsic's n
 `ResolutionMode::Strict`. An isolated file can import catalog modules,
 and every file that checks today still checks.
 
-## Settled inputs (main `614203948`, Architect AC-0 evt_6069bcfays9wq)
+## Settled inputs (AC-0 evt_6069bcfays9wq, rechecked on `0fdc10a5d`)
 
 - **The routes.** `ken check`'s isolated arm (`ken-cli/src/main.rs:485`,
   `:487`) and `ken run` (`run_program_inner`, `ken-cli/src/lib.rs:161`,
@@ -50,6 +50,7 @@ base, stop and report the mismatch; do not build around it.
 ## Deliverable
 
 1. **AC-0 first (Architect, on the cut base).**
+   - Re-measure the 86-file population, which predates the flip.
    - Measure the inline Ken sources.
    - Classify each of the 67 names under the home rule.
    - Rule the isolated loader's catalog-root discovery (spec 33 §3.2).
