@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT
 title: "Spec 65 makes vector_add commutative and associative but has no zero vector, so the sums have no unit and scaling by zero has no stated result (§5.2: neither a zero vector nor a commutative-monoid instance is introduced). Rule from a checked D0 at zero trust a public zero vector, show it is the two-sided unit of vector_add, the result of scaling by Zero and a zero of dot, and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
