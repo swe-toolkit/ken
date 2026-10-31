@@ -1337,7 +1337,7 @@ definition.
   ```
 
   ```ken example
-  const example : Bool = answer
+  const example : Bool = True
   ```
   ````
 
