@@ -104,6 +104,18 @@ base, stop and report the mismatch; do not build around it.
   `exec`.
 - Any trust growth, or a kernel change. These are operator stops.
 
+## Symptom inventory
+
+Architect-owned (architect playbook §1b-i); classified at evt_3k5ptt2gp9s15.
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. rt_parity_native origin pins (Vis 745 x15, +others) — keyed on prelude allocation order
+2. effect_v1 pre-resource dispatch set derived from HostOpV1::ALL; :6595 next_in_inventory — keyed on the closed operation population/order
+3. compiler_driver absolute prelude hashes — keyed on whole prelude content
+4. abi_v1 fail-closed row `resource_kind: 3` — keyed on the count of resource kinds (M5 red 2, evt_y3trheqq400p)
+```
+
 Checks: 4 fired: `HostOpV1` and `Capability.Process` were read on
 `1da65f2cd`, and neither has a spawn or wait; ABI-S5's landing
 (`bef52ee7c`) changed no `crates/*/src` path, and §1.10's child rule was
