@@ -104,6 +104,33 @@ where
         effective_uid,
         report_obligations,
         |line| eprintln!("{line}"),
+        |_, _| Ok(()),
+    )
+    .map(|(outcome, _)| outcome)
+}
+
+/// The ordinary runner, with one optional observation at the same checked
+/// admission seam, before the program's host tree is driven.
+pub fn run_program_with_resolution_report<H, F, R>(
+    source: &str,
+    format: SourceFormat,
+    arguments: &[Vec<u8>],
+    environment: &[(Vec<u8>, Vec<u8>)],
+    cwd: &[u8],
+    host: &mut H,
+    report_obligations: F,
+    report_resolution: R,
+) -> Result<ProgramOutcome, RunError>
+where
+    H: ken_interp::HostHandler,
+    F: FnMut(&[String]),
+    R: FnMut(&ken_elaborator::ElabEnv, &[ken_elaborator::ElabResult]) -> Result<(), RunError>,
+{
+    let effective_uid = ken_runtime::observe_effective_uid_v1()
+        .map_err(|_| RunError::RootExecutionObservationUnavailable)?;
+    run_program_inner(
+        source, format, arguments, environment, cwd, host, false,
+        effective_uid, report_obligations, |line| eprintln!("{line}"), report_resolution,
     )
     .map(|(outcome, _)| outcome)
 }
@@ -135,11 +162,12 @@ pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
         effective_uid,
         |_| {},
         |_| {},
+        |_, _| Ok(()),
     )
     .map(|(_, observation)| observation.expect("observation requested"))
 }
 
-fn run_program_inner<H, F, G>(
+fn run_program_inner<H, F, G, R>(
     source: &str,
     format: SourceFormat,
     arguments: &[Vec<u8>],
@@ -150,11 +178,13 @@ fn run_program_inner<H, F, G>(
     effective_uid: ken_runtime::EffectiveUidSnapshotV1,
     mut report_obligations: F,
     mut report_terminal_error: G,
+    mut report_resolution: R,
 ) -> Result<(ProgramOutcome, Option<ken_runtime::EffectObservation>), RunError>
 where
     H: ken_interp::HostHandler,
     F: FnMut(&[String]),
     G: FnMut(&str),
+    R: FnMut(&ken_elaborator::ElabEnv, &[ken_elaborator::ElabResult]) -> Result<(), RunError>,
 {
     let mut elab_env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
     let results = match format {
@@ -202,6 +232,7 @@ where
             }),
         ));
     }
+    report_resolution(&elab_env, &results)?;
     let main_id = admitted.main;
     let declared_fs = DeclaredFsAuthority {
         name: match admitted.authority_name.as_str() {
@@ -893,6 +924,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
             ken_runtime::EffectiveUidSnapshotV1::scripted(effective_uid),
             |_| {},
             |_| {},
+            |_, _| Ok(()),
         )
         .expect("checked program reaches the real interpreter runner");
         (observation.expect("observation requested"), host)
@@ -937,6 +969,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
             ken_runtime::EffectiveUidSnapshotV1::scripted(0),
             |_| {},
             |line| lines.push(line.to_owned()),
+            |_, _| Ok(()),
         )
         .expect("root denial is a controlled host failure");
         assert_eq!(outcome.exit_status, 1);
@@ -967,6 +1000,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
             ken_runtime::EffectiveUidSnapshotV1::scripted(u32::MAX),
             |_| {},
             |line| lines.push(line.to_owned()),
+            |_, _| Ok(()),
         )
         .expect("missing home account is a controlled host failure");
         assert_eq!(outcome.exit_status, 1);

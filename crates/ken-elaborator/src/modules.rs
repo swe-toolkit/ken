@@ -41,6 +41,9 @@ pub struct ModuleState {
     /// order-independent diagnostic when another declaration takes the same
     /// canonical globals key. Unlike a spelling lookup this survives rebinds.
     declaration_descriptions: HashMap<ken_kernel::GlobalId, String>,
+    /// Original source key captured when its checked identity is committed.
+    /// Unlike `globals`, this cannot be rebound by a later source declaration.
+    source_names_by_id: HashMap<ken_kernel::GlobalId, String>,
     /// Provenance of each elaborator-minted symbol, keyed by the checked
     /// declaration rather than the replaceable entry in `globals`.
     minted_spellings: HashMap<ken_kernel::GlobalId, MintedSpelling>,
@@ -198,8 +201,25 @@ impl ModuleState {
         }
     }
 
+    pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
+        self.source_names_by_id.get(&id).map(String::as_str)
+    }
+
+    pub(crate) fn loaded_results_for_report(
+        &self,
+    ) -> &HashMap<String, Vec<crate::elab::ElabResult>> {
+        &self.loaded_unit_results
+    }
+
+    /// Exact owning results, excluding imports and checked document fences.
+    pub fn root_results_for_report(&self, module: &str) -> Option<&[crate::elab::ElabResult]> {
+        self.loaded_unit_results.get(module).map(Vec::as_slice)
+    }
+
     pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
         self.declaration_descriptions
+            .retain(|id, _| !removed.contains(id));
+        self.source_names_by_id
             .retain(|id, _| !removed.contains(id));
         self.minted_spellings.retain(|id, _| !removed.contains(id));
         self.root_scope.scrub_global_ids(removed);
@@ -4278,6 +4298,9 @@ fn check_declared_identities(
         elab.module_state
             .declaration_descriptions
             .insert(id, identity.description.clone());
+        elab.module_state
+            .source_names_by_id
+            .insert(id, identity.key.clone());
         if let IdentityProvenance::Minted(spelling) = &identity.provenance {
             elab.module_state.minted_spellings.insert(id, spelling.clone());
         }

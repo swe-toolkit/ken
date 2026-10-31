@@ -2392,6 +2392,24 @@ pub fn prepare_native_program_sources(
     package_name: &str,
     sources: Vec<CompilerSource>,
 ) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    prepare_native_program_sources_inner(package_name, sources, false)
+}
+
+/// The same production preparation, with an opt-in observation of its own
+/// checked environment before the preparation consumes it for emission.
+pub fn prepare_native_program_sources_with_resolution_report(
+    package_name: &str,
+    sources: Vec<CompilerSource>,
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    prepare_native_program_sources_inner(package_name, sources, true)
+}
+
+#[inline(always)]
+fn prepare_native_program_sources_inner(
+    package_name: &str,
+    sources: Vec<CompilerSource>,
+    report: bool,
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
     let manifest = CompilerManifest::new(package_name, Vec::new());
     if package_name.is_empty() {
         return Err(NativeProgramBuildError::Driver(
@@ -2409,6 +2427,7 @@ pub fn prepare_native_program_sources(
     let mut admitted_ids = Vec::new();
     let mut example_ids = BTreeSet::new();
     let mut results = Vec::new();
+    let mut root_results = Vec::new();
     let mut headed_source = None;
     for source in &sources {
         let (declarations, examples, source_example_ids) =
@@ -2419,12 +2438,22 @@ pub fn prepare_native_program_sources(
             admitted_ids.push(result.def_id);
         }
         example_ids.extend(source_example_ids);
+        if report {
+            root_results.extend(declarations.iter().cloned());
+        }
         results.extend(declarations);
         results.extend(examples);
     }
     let obligations = owned_v2_obligations(&results);
     let open_obligation_reports = crate::render_open_obligations(&results);
     let checked = admit_checked_main(&env).map_err(NativeProgramBuildError::Admission)?;
+    let resolution_report = if report {
+        Some(crate::resolution_report::resolution_report(&env, &root_results, "native-build", None)
+            .map_err(CompilerDriverError::Elaboration)
+            .map_err(NativeProgramBuildError::Driver)?)
+    } else {
+        None
+    };
     // Checked-main admission has already proved the exact HostIO ABI. An
     // empty effect row is still a HostIO computation (`Ret`), so it must use
     // the same finite checked-host producer boundary as effectful programs.
@@ -2849,6 +2878,7 @@ pub fn prepare_native_program_sources(
         selected,
         open_obligation_reports,
         bracket_regions,
+        resolution_report,
     })
 }
 
@@ -2878,9 +2908,15 @@ pub struct NativeProgramPreparationV1 {
     selected: Vec<SelectedTargetReport>,
     open_obligation_reports: Vec<String>,
     bracket_regions: Vec<NormalizedBracketRegion>,
+    resolution_report: Option<String>,
 }
 
 impl NativeProgramPreparationV1 {
+    /// The route-local checked-identity observation, when requested at entry.
+    pub fn resolution_report(&self) -> Option<&str> {
+        self.resolution_report.as_deref()
+    }
+
     /// Checked normalized-term regions retained for the next compiler phase.
     /// No host operation or Runtime expression participates in their selection.
     pub fn bracket_regions(&self) -> &[NormalizedBracketRegion] {
@@ -2947,7 +2983,7 @@ pub fn compile_native_program_sources(
 /// Keeping this operation private prevents callers from supplying a plan while
 /// preserving object identity for the closure-bearing Runtime program.
 #[inline(always)]
-fn complete_native_program_preparation(
+pub fn complete_native_program_preparation(
     preparation: NativeProgramPreparationV1,
     output_dir: impl AsRef<Path>,
     profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
@@ -3105,6 +3141,7 @@ fn complete_native_program_preparation(
         selected,
         open_obligation_reports,
         bracket_regions: _,
+        resolution_report: _,
     } = preparation;
     let package = *package;
     let plan = *plan;

@@ -141,15 +141,135 @@ that line is **not authenticated**: a running program may print
 stderr as a trustworthy tool diagnosis solely by matching the
 prefix.
 
-### 1.4 Machine channel and deferred behavior
+### 1.4 Machine channels and the resolution report
 
-For these batch CLI failures, the **human stderr line is the sole
-specified code carrier in this tranche**. This section fixes no JSON
-representation, new `--format` flag, or secondary identifier. A future
-machine format must carry the **same code string**, not invent another code
-space, and must reconcile with the distinct `ken.verify/v1` verdict
-documents (`../20-verification/25 §2–§3`). Deferring CLI JSON does
-not waive that chapter's existing verifier-protocol obligations.
+For controlled batch CLI **failures**, the human stderr line remains the
+sole specified code carrier in this tranche. There is no JSON failure
+format, `--format` flag or secondary code identifier. A future machine
+failure format must carry the **same code string**, never a second code
+space, and reconcile with the distinct `ken.verify/v1` verdict documents
+(`../20-verification/25 §2–§3`). The opt-in elaboration-identity report
+below is **neither** that failure format nor a verdict document. It
+contains no diagnostic code or verification verdict, and does not change
+the stderr code requirement on any controlled failure.
+
+The three routes `ken check`, `ken run` and `ken native-build` accept one
+leading token `--resolution-report=<path>` immediately after the
+subcommand. The CLI removes only that first token; each existing
+positional parser receives exactly the arguments it otherwise would.
+A bare `--resolution-report` without `=` or a token in another position
+is not this option and retains the route's existing positional behavior.
+Only one leading token is recognized; a repeated token remains a
+positional argument. The accepted positions are:
+
+```text
+ken check --resolution-report=<path> <file>
+ken run --resolution-report=<path> <file> [-- <args>...]
+ken native-build --resolution-report=<path> <file> <output-dir> <resource-profile.json>
+```
+
+Without the option, each route's stdout, stderr,
+exit status and file effects remain unchanged. With a successfully
+written report, stdout, stderr and exit status remain byte-identical to
+the same invocation without the option; report-file creation or write
+failures are the explicit exceptions. The report is written **only** to
+the named file, never to stdout or stderr: `ken run` gives those streams
+to the program, `ken check` uses stderr for obligations, and
+`native-build` uses stdout for its artifact path.
+
+The CLI exclusively creates the file before reading the source. An
+empty, existing or unwritable path refuses creation without changing
+any pre-existing file; the controlled CLI failure uses ledger label
+`cli.resolution_report_create` in the `C` domain (§1.2). A failed
+report write or flush uses `cli.resolution_report_write`, also a `C`
+cause. An elaboration or classifier failure retains its own carrier's
+code, not one of these creation/write labels. On every exit the CLI
+process controls, it unlinks a file it created unless the **entire**
+report was written and flushed. Thus on a controlled exit a newly
+created report path exists iff a complete report was written; a
+complete report persists even if execution or native completion later
+fails. An abnormal worker termination, including a signal or native
+stack exhaustion during elaboration, can instead leave an empty or
+partial file. Every complete report is nonempty and newline-terminated;
+readers must not treat mere file existence as completeness. The parent
+process does not unlink the path: it cannot tell a worker-created file
+from a pre-existing one. Under `ken run`, a program with filesystem
+authority can rewrite a completed report; its later contents are not
+authenticated as tool output (§1.3).
+
+Each report comes from the **same elaboration environment** that its
+route subsequently checks, executes or lowers, never from a second
+resolution pass. `check` writes after successful root elaboration and
+before displaying open obligations. For a catalog entry, its checked
+document fences have also been elaborated, but `declarations` lists
+only the entry unit's own root declarations, not those fences or its
+import closure. `run` writes after the checked-main admission and
+root-execution admission succeed, immediately before driving the host
+tree. `native-build` computes the report from its preparation's
+elaboration environment, then writes it after successful source
+preparation and before native completion or object emission. These
+are route-local **successful-elaboration** boundaries, not promises of
+subsequent execution or native-build success; a later failure does not
+retract a complete report.
+
+The file is one compact UTF-8 JSON document on one line, followed by
+one newline. Its ordered top-level keys are `schema`, `route`, `module`
+and `declarations`. `schema` is `ken.resolution/v1`; `route` is
+`check`, `run` or `native-build`; `module` is the catalog entry's
+dotted module path for a catalog `check`, otherwise `null`.
+`declarations` is an array in the root route's declaration-result
+order. Each item has ordered keys `declaration` (the root's source
+name without an internal native-driver package prefix) and
+`references`. The latter is a deduplicated array sorted first by
+class rank `pre-source`, `imported`, `source-declared`, then bytewise
+by the name fields. Serialization is deterministic and byte-stable
+for the same checked root and route; for a standalone root admitted
+by all three routes, its documents differ only in `route`.
+
+For each root result, the reported references are the checked
+identities found recursively in the kernel-checked types and bodies
+of that declaration and its auxiliaries. The collector is a pure read:
+it does not elaborate, re-resolve names, mutate globals or change a
+checked identity. Constant, inductive-former, constructor and
+elimination-family references all count. A reference
+inserted by elaboration counts just like one originating in source;
+this is a report of **referenced identities**, not a record of written
+free-name spellings or their provenance. Source-minted literal
+identities are omitted. Classification uses the checked identity,
+not a mutable lookup by spelling, in this order:
+
+- A pre-source identity records `{"class":"pre-source","name":…}`,
+  with its canonical source-visible name, or `null` if the identity
+  has no captured name. A report-only display name for a renamed
+  pre-source family (such as `ConsoleStream.Stdin`) does not alter
+  its checked identity or native stable symbol.
+- A root-owned checked declaration records
+  `{"class":"source-declared","declaration":…}`. A constructor
+  of a root-owned family also has a `constructor` field; its
+  `declaration` is the family name.
+- An identity owned by another loaded unit records
+  `{"class":"imported","module":…,"declaration":…}`. That
+  declaration field names the imported declaration in its module;
+  this does not list the imported unit among root declarations.
+
+If a referenced identity fits none of those classes and is not a
+source-minted literal, generation fails closed with an elaboration
+`Internal` error and its existing `E`-domain code. The incomplete
+file is removed on controlled failure; no class is guessed, and no
+raw `GlobalId` number occurs in a complete report. The record's versioned,
+deterministic and total-on-success shape follows the machine-document
+conventions of `25 §2`, but it is not `ken.verify/v1`; a breaking
+schema change requires a new version, while readers ignore unknown
+additive optional fields.
+
+Architect AC-0 measured the accepted and source-shadowed roots on all
+three CLI routes but did not walk the native driver's report environment
+or the literate `.ken.md` arm. Those are distinct obligations, not
+facts established by AC-0. The implementation child reports a
+candidate-local named target passing 6/6, including native-report
+parity and literate coverage, with two classifier mutations red and
+restored; those reports do not establish independent QA, official
+conformance execution or CI.
 
 General elaborator error recovery and the ordering and cap on
 multiple elaboration diagnostics are deferred. Warning severity and

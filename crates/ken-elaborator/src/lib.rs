@@ -51,6 +51,7 @@ pub mod program_admission;
 pub mod protocol;
 pub mod prover;
 pub mod resolve;
+pub mod resolution_report;
 mod standard_operators;
 pub mod strings;
 pub mod temporal;
@@ -506,6 +507,22 @@ impl ElabEnv {
             console_stream_id,
             "ConsoleStream",
         )?;
+        // The source-visible canonical ConsoleStream family is scoped after
+        // the immutable pre-source identity and stable-symbol snapshot. Capture
+        // only report display names here, keyed by those same checked IDs;
+        // never alter the native stable-symbol names or report membership.
+        for name in [
+            "ConsoleStream",
+            "ConsoleStream.Stdin",
+            "ConsoleStream.Stdout",
+            "ConsoleStream.Stderr",
+        ] {
+            if let Some(id) = elab.globals.get(name) {
+                elab.prelude_env
+                    .pre_source_display_names
+                    .insert(*id, name.into());
+            }
+        }
         elab.module_state.install_prelude_floor();
         elab.module_state.capture_strict_builtin_names(
             &elab.env,
@@ -1022,6 +1039,9 @@ impl ElabEnv {
             .retain(|id| !removed_ids.contains(id));
         prelude_env
             .pre_source_names
+            .retain(|id, _| !removed_ids.contains(id));
+        prelude_env
+            .pre_source_display_names
             .retain(|id, _| !removed_ids.contains(id));
         class_env.scrub_global_ids(&removed_ids);
         module_state.scrub_global_ids(&removed_ids);
