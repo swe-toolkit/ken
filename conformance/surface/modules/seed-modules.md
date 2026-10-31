@@ -1255,7 +1255,7 @@ definition.
 
 - promise class: **normative compatibility vector** — each CLI route reports
   exact checked pre-source identity, not merely a compatible spelling
-- spec: `33 §3.3`; `39 §2.0`; `70 §1.4`
+- spec: `33 §3.3`; `70 §1.4`
 - given: place the accepted root below in a standalone `.ken` file with no
   imports. Invoke it separately with `ken check`, `ken run` and
   `ken native-build`, using `--resolution-report=<new-path>` immediately
@@ -1293,7 +1293,7 @@ definition.
 
 ### Residual: standalone Legacy write-shadow report
 
-- spec: `33 §3.3`; `39 §2.0`; `70 §1.4`
+- spec: `33 §3.3`; `70 §1.4`
 - normative expectation: each of `check`, `run` and `native-build` accepts a
   type-compatible source declaration named `write`; its `write_probe` reference
   is reported as `source-declared` rather than `pre-source`, while the other
@@ -1366,6 +1366,118 @@ definition.
   the check route also elaborates its checked fences and loads imports. This
   case distinguishes those populations and pins the imported identity class
   without asserting implementation text or global IDs.
+
+### surface/modules/catalog-resolution-report-complete-schema-and-order
+
+- promise class: **durable invariant** — the complete report has the specified
+  schema, reference classes, and deterministic ordering
+- spec: `33 §3.1`; `33 §3.3`; `70 §1.4`
+- given: in a fresh fixture catalog, write `catalog/packages/Dependency.ken.md`:
+
+  ````markdown
+  # Dependency
+
+  ```ken
+  pub const imported_a : Bool = True
+  pub const imported_z : Bool = False
+  pub const choose :
+    Bool -> Bool -> Bool -> Bool -> Bool -> Bool -> Bool -> Bool -> Bool =
+    λa. λb. λc. λd. λe. λf. λg. λh. a
+  ```
+  ````
+
+  Write `catalog/packages/Entry.ken.md`:
+
+  ````markdown
+  # Entry
+
+  ```ken
+  import Dependency
+  const local_a : Bool = True
+  const local_z : Bool = local_a
+  const answer : Bool =
+    Dependency.choose local_a local_z local_a
+      Dependency.imported_a Dependency.imported_z
+      Dependency.imported_a True False
+  ```
+  ````
+
+  From the fixture root, run `ken check` with
+  `--resolution-report=<new-path>` immediately after the subcommand. Repeat
+  from a byte-identical fresh fixture with a different new report path.
+- expect: each report is one compact UTF-8 JSON document on one line followed
+  by a newline. Its required top-level keys are `schema`, `route`, `module`,
+  and `declarations`, in that order, with values `ken.resolution/v1`,
+  `check`, `Entry`, and the root route's declaration results. Each declaration
+  item has the required keys `declaration` and `references`, in that order.
+  The root entries are `local_a`, `local_z`, and `answer` in declaration-result
+  order; no imported declaration is a root entry. Do not reject unknown
+  additive optional fields. `local_a` has the pre-source references `Bool` and
+  `True`; `local_z` has pre-source `Bool` followed by source-declared `local_a`.
+  `answer` has pre-source `Bool`, `False`, and `True` in bytewise name order,
+  then imported `Dependency.choose`, `Dependency.imported_a`, and
+  `Dependency.imported_z` in bytewise module/declaration order, followed by
+  source-declared `local_a` and `local_z` in bytewise declaration order. Each
+  reference has the fields and values for its class specified by §1.4. Do not
+  pin member-key order within a reference object. Repeated uses of `local_a`
+  and `imported_a` occur once in their respective reference arrays. No raw
+  `GlobalId` number appears. The two reports are byte-identical.
+- why: the fixture reaches all three identity classes in one declaration and
+  distinguishes array sorting and deduplication from the report's complete
+  ordered outer shape.
+
+### surface/modules/resolution-report-option-token-boundaries
+
+- promise class: **durable invariant** — only one leading equals-form token is
+  consumed as the report option
+- spec: `70 §1.4`
+- given: use a valid standalone source containing `const answer : Bool = True`.
+  With fresh destinations, invoke (a) `ken check` with bare
+  `--resolution-report`, `<bare-path>`, and `<source>` arguments in that order;
+  (b) `ken check` with `<source>` followed by
+  `--resolution-report=<misplaced-path>`; and (c) create a valid source file
+  whose literal path is `--resolution-report=decoy.ken`, ensure `decoy.ken` does
+  not exist, then invoke
+  `ken check --resolution-report=<first-path> --resolution-report=decoy.ken`.
+- expect: in (a) and (b), the destination is not created as a report; the
+  token is not this option. Do not pin the route's other positional outcome,
+  status, or diagnostic text. In (c), only the first token is removed as the
+  report option. The literal `--resolution-report=decoy.ken` is the source
+  path, a complete report is written to `<first-path>`, and `decoy.ken` is not
+  created as a report. The report is written to the named file, not stdout or
+  stderr.
+- controls: the canonical one-token invocation with the same source and a
+  fresh destination produces a complete report at that destination.
+- why: the positive option position is tested separately from the bare,
+  misplaced, and repeated-token boundaries, without freezing unrelated
+  positional-parser behavior.
+
+### surface/modules/resolution-report-failure-labels
+
+- promise class: **durable invariant** — report-file failures retain their
+  assigned CLI cause identities
+- spec: `70 §1.1`; `70 §1.2`; `70 §1.4`
+- given: (a) invoke `ken check --resolution-report= <valid-source>`; (b)
+  invoke `ken check --resolution-report=<existing-path> <missing-source>`,
+  where `<existing-path>` contains sentinel bytes; (c) invoke
+  `ken check --resolution-report=<new-path> <valid-source>` with a controlled
+  filesystem fixture that refuses creation; (d) repeat the command in (c) with
+  a fixture that permits creation but returns an error on report write; (e)
+  repeat (d) with a fixture that returns an error on report flush.
+- expect: (a)–(c) return status 1 with the code assigned to ledger label
+  `cli.resolution_report_create` in domain C. In (b), creation fails before
+  the missing source is read and the existing bytes are unchanged. In (d) and
+  (e), the controlled failure returns status 1 with the code assigned to
+  `cli.resolution_report_write` in domain C. No empty or partial report file
+  remains after (c)–(e). Do not pin message text or numeric code
+  independently of the active ledger assignment.
+- controls: a fresh destination with the missing source reaches the source
+  failure rather than `cli.resolution_report_create` and leaves no partial
+  report. The same valid source with a healthy filesystem produces a complete
+  report.
+- why: these controls distinguish failure before source reading from failure
+  after report-file creation, and pin the two cause labels rather than generic
+  refusal or non-overwrite alone.
 
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructor and protected type-name
