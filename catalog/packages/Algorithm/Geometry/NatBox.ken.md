@@ -1,10 +1,10 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. Six box-and-distance laws, six structural
-commutativity, associativity and absorption laws, three metric laws, seven
-corner-wise containment laws, three inclusion-order laws, and three area laws carry
-kernel-checked generic proofs.
+geometry operations. Six box-and-distance laws, eight structural
+commutativity, associativity, absorption and distribution laws, three metric
+laws, two corner-membership laws, seven corner-wise containment laws, three
+inclusion-order laws, and three area laws carry kernel-checked generic proofs.
 
 ## Contents
 
@@ -28,12 +28,12 @@ point set is empty.
 
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
-box-and-distance laws lead the definition; the six structural
-commutativity, associativity and absorption laws follow intersection and
-hull, ahead of the three metric laws. The corner-wise `inside` operation
-and its seven laws come next, then the three inclusion-order laws,
-followed by `area` and its three laws. Per-axis proof helpers and
-distance helpers stay private.
+box-and-distance laws lead the definition; eight structural commutativity,
+associativity, absorption and distribution laws follow intersection and hull,
+ahead of the three metric laws. The two corner-membership laws
+follow the three metric laws. The corner-wise `inside` operation and its seven
+laws come next, then the three inclusion-order laws, followed by `area` and its
+three laws. Per-axis proof helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -1060,6 +1060,72 @@ pub theorem manhattan_box_diameter
                             (axis_contains ly hy qy)
                             hq))
               }
+          }
+      }
+  }
+
+pub theorem contains_lo_corner
+      (lo : Point) (hi : Point) (p : Point)
+    : IsTrue (contains (MkBox lo hi) p) → IsTrue (contains (MkBox lo hi) lo) =
+  match lo {
+    MkPoint lx ly ↦
+      match hi {
+        MkPoint hx hy ↦
+          match p {
+            MkPoint px py ↦
+              λhp.
+                (proof intro for bool_and)
+                  (axis_contains lx hx lx)
+                  (axis_contains ly hy ly)
+                  (axis_corner_low
+                    lx
+                    hx
+                    px
+                    ((proof left for bool_and)
+                      (axis_contains lx hx px)
+                      (axis_contains ly hy py)
+                      hp))
+                  (axis_corner_low
+                    ly
+                    hy
+                    py
+                    ((proof right for bool_and)
+                      (axis_contains lx hx px)
+                      (axis_contains ly hy py)
+                      hp))
+          }
+      }
+  }
+
+pub theorem contains_hi_corner
+      (lo : Point) (hi : Point) (p : Point)
+    : IsTrue (contains (MkBox lo hi) p) → IsTrue (contains (MkBox lo hi) hi) =
+  match lo {
+    MkPoint lx ly ↦
+      match hi {
+        MkPoint hx hy ↦
+          match p {
+            MkPoint px py ↦
+              λhp.
+                (proof intro for bool_and)
+                  (axis_contains lx hx hx)
+                  (axis_contains ly hy hy)
+                  (axis_corner_high
+                    lx
+                    hx
+                    px
+                    ((proof left for bool_and)
+                      (axis_contains lx hx px)
+                      (axis_contains ly hy py)
+                      hp))
+                  (axis_corner_high
+                    ly
+                    hy
+                    py
+                    ((proof right for bool_and)
+                      (axis_contains lx hx px)
+                      (axis_contains ly hy py)
+                      hp))
           }
       }
   }
@@ -2331,13 +2397,17 @@ coordinates by induction, and lifts them into point equality with `cong`.
 `manhattan_box_diameter` projects the four coordinate comparisons from both
 memberships, bounds each saturated difference by the box's own span on that
 axis with subtraction monotonicity and antitonicity, and adds the two axis
-bounds monotonically.
+bounds monotonically. `contains_lo_corner` and `contains_hi_corner` project
+both axis memberships from the point witness, apply the corresponding private
+per-axis corner lemmas, then reassemble the corner memberships with `bool_and`.
+Together with `manhattan_box_diameter`, they show the distance bound is attained
+by the two stored corners whenever the box contains a point.
 
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
 `max::assoc` on the lower corners and `min::assoc` on the upper corners
 for intersection, reversing those selectors for hull. `point_equal` and
-`box_equal` assemble structural box equality; none of the twenty-five
+`box_equal` assemble structural box equality; none of the twenty-nine
 pre-area public laws identifies boxes by their sets of members. Both
 mixed absorption proofs keep their shared box as the left operand.
 `intersect_hull_absorb` uses `max::absorb` to restore its lower coordinates
@@ -2411,9 +2481,9 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–10](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and thirty public checked law types,
-   including the two structural distribution laws.
+1. **Contract.** [Exact geometry, §§1–11](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and thirty-two public checked law types,
+   including the two structural distribution and two corner-membership laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
@@ -2421,7 +2491,8 @@ Signed orientation remains outside this interface.
    `intersect_hull_absorb`, `hull_intersect_absorb`,
    `intersect_hull_distrib`, `hull_intersect_distrib`, `manhattan_symm`,
    `manhattan_self`, `manhattan_triangle`, `manhattan_zero_equal`,
-   `manhattan_box_diameter`, `inside`, `inside_sound`, `inside_refl`, `intersect_inside_left`,
+   `manhattan_box_diameter`, `contains_lo_corner`, `contains_hi_corner`,
+   `inside`, `inside_sound`, `inside_refl`, `intersect_inside_left`,
    `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
    `inside_complete`, `inside_trans`, `intersect_greatest`,
    `hull_least`, `area`, `area_inside`, `area_inverted_x`,
@@ -2478,6 +2549,11 @@ Signed orientation remains outside this interface.
    is authored but unexecuted. It specifies a tight contained distance-five
    pair, an outside distance-six pair, and a refused bound below five. Its
    package-owned test checks those cases locally against the checked theorem.
-   These candidate-local tests are not official conformance-runner execution,
-   CI, publication, landing or landed trust. All ten seeds supplement rather
-   than replace the checked generic law bodies.
+   The [corner-membership seed](../../../../conformance/stdlib/geometry/seed-box-corner-membership.md)
+   is authored in this candidate but has not been Ken-checked or officially
+   conformance-run. The package-owned test checks both generic public laws and
+   a closed witness against independently proved corner memberships; three
+   isolated refusals cover an inverted box and false witness premises. These
+   candidate-local tests are not official conformance-runner execution, CI,
+   publication, landing or landed trust. All eleven authored seeds supplement
+   rather than replace the checked generic law bodies.
