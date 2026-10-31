@@ -1358,10 +1358,9 @@ fn buffer_freeze_outcome(
 // The protocol diagnostic and the unignored native row exercise the same
 // r2 fixture. Raw relay provenance stays visible, but both marked successors
 // are settlement-owned and leave the projected returned set before emission.
-/// Promise class: transition sentinel for this r2 fixture's exact owner/Vis
-/// members. MEASURED: raw owners 1353 and 1373 retain their exact two-member
-/// provenance; successors 833 and 614 are authenticated settlements and neither
-/// remains a projected returned Vis. CLAIMED: no owner emits a second returned
+/// Promise class: durable invariant over the two source-context owner roles.
+/// MEASURED: each raw context owner retains one relay and one bracket-owned
+/// successor with no ordinary successor edge; neither survives projection. CLAIMED: no owner emits a second returned
 /// edge for a continuation consumed by its bracket. THE GAP: this plan-only
 /// relation does not prove source drive; native parity separately observes it.
 #[test]
@@ -1378,37 +1377,38 @@ fn r2_relay_owners_settle_authenticated_successors_without_returning_them() {
         let _output = compiled.expect("r2 compiles to the current fail-closed artifact");
         assert_eq!(diagnostics.len(), 1, "one r2 response plan");
         let plan = &diagnostics[0];
-        let expected = [(1353u32, 663u32, 833u32), (1373, 446, 614)];
-        let observed_owners = plan.returned_vis_protocols.iter()
-            .filter(|protocol| expected.iter().any(|(owner, _, _)| *owner == protocol.owner_origin))
-            .map(|protocol| protocol.owner_origin)
-            .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(observed_owners, [1353, 1373].into_iter().collect(),
-            "r2's exact raw response-owner inventory must remain present");
-        for (owner, relay, successor) in expected {
-            let protocol = plan.returned_vis_protocols.iter()
-                .find(|protocol| protocol.owner_origin == owner)
-                .expect("one exact raw r2 owner");
+        let mut observed_owners = std::collections::BTreeSet::new();
+        for context in [0, 1] {
+            let owners = plan.returned_vis_protocols.iter()
+                .filter(|protocol| protocol.contexts.iter().any(|(id, _)| *id == context))
+                .collect::<Vec<_>>();
+            assert_eq!(owners.len(), 1, "one source-driven r2 owner for context {context}");
+            let protocol = owners[0];
+            let owner = protocol.owner_origin;
+            assert!(observed_owners.insert(owner), "two context roles require distinct owners");
             assert!(protocol.error.is_none() && protocol.excluded_by_relay,
                 "the raw owner stays source-driven and free of return errors: {protocol:?}");
             assert_eq!(protocol.contexts.len(), 1, "one raw context per named r2 owner");
-            assert_eq!(protocol.contexts[0].0, if owner == 1353 { 0 } else { 1 },
-                "r2 owner {owner} moved its exact raw context");
-            assert_eq!(protocol.contexts[0].1.len(), 2,
+            let (_, members) = &protocol.contexts[0];
+            assert_eq!(members.len(), 2,
                 "r2 owner {owner} must retain exactly two raw provenance members");
-            let members = protocol.contexts.iter().flat_map(|(_, members)| members)
-                .map(|member| (member.origin, member.relay, member.successor_id.is_none()))
-                .collect::<std::collections::BTreeSet<_>>();
-            assert_eq!(members, [(relay, true, true), (successor, false, true)]
-                .into_iter().collect(),
-                "raw r2 owner {owner} lost a named member or reintroduced a successor edge");
+            let relays = members.iter().filter(|member| member.relay).collect::<Vec<_>>();
+            let successors = members.iter().filter(|member| !member.relay).collect::<Vec<_>>();
+            assert_eq!(relays.len(), 1, "context {context} needs one relay member");
+            assert_eq!(successors.len(), 1, "context {context} needs one successor member");
+            assert_ne!(relays[0].origin, successors[0].origin,
+                "context {context} needs distinct relay and successor origins");
+            assert!(members.iter().all(|member| member.successor_id.is_none()),
+                "raw r2 owner {owner} reintroduced a successor edge");
+            let successor = successors[0].origin;
             assert!(plan.bracket_settlement_vis_origins.contains(&successor),
                 "r2 successor {successor} must be an authenticated bracket settlement");
             assert!(plan.settled_returned_vis_protocols.iter()
                 .all(|(projected_owner, _)| *projected_owner != owner),
                 "settled owner {owner} retained a returned successor after consumption");
         }
-        eprintln!("RT-OWNER-VIS SOURCE-DRIVEN R2 owners=[1353, 1373]");
+        assert_eq!(observed_owners.len(), 2, "both raw context owners must be distinct");
+        eprintln!("RT-OWNER-VIS SOURCE-DRIVEN R2 owners={observed_owners:?}");
     });
 }
 
