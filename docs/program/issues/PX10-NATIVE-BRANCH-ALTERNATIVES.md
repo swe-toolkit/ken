@@ -52,43 +52,87 @@ one producer still holds for a static result.
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
 
+## Ruled design (Architect AC-0 evt_5efd2tp6dqsj3)
+
+P2 and W3 are two mechanisms. Both framed P2 options are rejected on
+measurement: native lowering has no generic indirect path, and an arm has
+nothing to eliminate, since each alternative is lowered Carried at its own
+origin and the selection is read in another function.
+
+- **W3, an instance key.** The stage map (`transport_producer_owners`)
+  and the exclusively-predeclared test in
+  `derive_pre_schema_relay_promotions` key on `(producer_call_origin,
+  k_identity.producer_owner())`. One provenance owner whose sources at
+  one call mix predeclared and specialization emission owners still
+  refuses.
+- **P2, a labelled alternative transport** (ADR 0023's closed flow set,
+  applied to continuation results):
+  - R1, the planner record `ProducerAlternativeSet` keyed on (emission
+    owner, result), with members sorted by target and the label as the
+    index. The admission predicate and record are verbatim in the ruling.
+  - R2, the set's transport word is the private tag-1 Record `[Child,
+    Label]`. Each member's source writes its own label inside its arm.
+  - R3, one resolver returns `Single` or `Alternatives`. A reader handed
+    `Alternatives` emits the closed label switch, and a reader with no
+    such arm refuses with a typed PlannerInvariant.
+  - R4, the seat returns the labelled word for exactly one issued set.
+    Every other multi-edge residual still refuses.
+
 ## Deliverable
 
-1. **AC-0 first (Architect, on the cut base after SITE-IDENTITY).** It
-   measures whether one mechanism closes both P2 and W3, the case of
-   continuation sources that are not uniform at one result or one call.
-   If not, it names the split. For P2 it rules between:
-   - a result with two or more alternative producer transports as a
-     dynamic boundary, driving its Carried word on the generic path;
-   - or per-branch seat duplication.
+Two increments of this WP, each its own candidate, both after
+SITE-IDENTITY lands.
 
-   It names each of the six guards' disposition, and whether
-   `rt_performing_mixed_owner`'s shape stays refused.
-2. **One runtime branch** carrying the ruled mechanism and its tests.
+1. **Increment 1, the W3 key**, plus the re-anchored
+   `rt_performing_mixed_owner` pin (Steward evt_49kzxbpbm16tb). The pin
+   keeps its promise: the fixture refuses before native execution with a
+   typed planner refusal, now the computational-occurrence
+   PlannerInvariant (`aggregates.rs:465`), and the interpreter still
+   reaches both FsReadFile operations.
+2. **Increment 2, R1 to R4**, with the per-guard disposition report.
 
 ## Acceptance
 
-- **AC-1.** Smoke, argv_env_pipe and live_child build natively with the
-  Process operations admitted in the test configuration. Each native run
-  reports the same (request, outcome) pairs as the interpreter.
-- **AC-2 (guards intact).** A static result with two producer edges
-  still refuses at each of the six guards. A named row pins one.
-  `rt_performing_mixed_owner` stays green, unless AC-0 rules its shape
-  lawful and replaces the pin with a parity row.
-- **AC-3 (negative, QA).** A two-alternative result consumed with the
-  wrong layout refuses or runs correctly, and never traps. A mutant that
-  drops the per-alternative discharge reddens a named row.
-- **AC-4 (no regression).** The four bracket suites and the return-fold
-  equivalence stay green.
+Increment 1:
+
+- **AC-1a.** argv_env_pipe advances to W7 and live_child to the P2 seat
+  at result 1104, each a verbatim census row.
+- **AC-1b.** The re-anchored pin holds, and a row pins "one provenance
+  owner at one call under two emission owners refuses", or records it
+  unexercised with the reason.
+- **AC-1c.** The four bracket suites and the return-fold equivalence
+  stay green.
+
+Increment 2:
+
+- **AC-2a (parity).** Smoke, argv_env_pipe and live_child build natively
+  with the Process operations admitted in the test configuration. Each
+  native run reports the same (request, outcome) pairs as the
+  interpreter, under a bounded wait, so a regression fails rather than
+  hanging on live_child's `read line`.
+- **AC-2b (guards intact).** `DuplicateResidualEdge` is refused by the
+  predicate, plus one named row at the seat. A guard no fixture reaches
+  with an issued set keeps its single-producer refusal, and the build
+  reports each guard's disposition and the row that reached it.
+- **AC-2c (negative, QA).**
+  - A reader whose expected member set differs from the issued set
+    refuses at planning, with a named row.
+  - A mutant that swaps two members' labels at the writer reddens
+    smoke's parity row.
+  - A mutant that writes the bare payload without its label is caught by
+    the reader assertion before any field projection.
+- **AC-2d (no regression).** As AC-1c.
 
 ## Stop conditions
 
 - A kernel or trust change, or a post-fork callback.
 - A third advancing stop on the native-lowering chain (§1a count 2).
 
-Checks: 7 fired: W3's static-owner key reddened
-`rt_performing_mixed_owner`, so AC-2 keeps that pin unless AC-0 rules
-otherwise. 2 fired: the six cardinality guards are the Architect's
-enumeration of the result-to-producer path. 8 fired: native build is a
-proxy, since probe 21 built smoke and then trapped. AC-1 compares
-traces with the interpreter, and AC-3 requires refusal or a correct run.
+Checks: 7 fired: under the W3 key, `rt_performing_mixed_owner` no longer
+reaches the mixed-owner guard and fails closed at a separate wall, so the
+pin is re-anchored on its promise rather than its count. 2 fired: the
+guard fan-in is eight (six framed, `responses.rs:511` reached behind a
+bypass, `:6885` by sweep), so the rule is one resolver, not a list. 8
+fired: native build is a proxy, since bypass builds trapped or hung;
+AC-2a compares traces with the interpreter, and AC-2c's label swap must
+redden parity.
