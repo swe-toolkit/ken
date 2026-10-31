@@ -960,7 +960,7 @@ public constructor. The first builder
 and setters have these checked shapes:
 
 ```ken
-pub data ChildStdio = ChildPipe | ChildNull | ChildInherit Stream
+pub data ChildStdio = ChildPipe | ChildNull | ChildInherit ConsoleStream
 export ChildPipe, ChildNull, ChildInherit
 pub data ChildExit = Exited UInt8 | Signaled UInt8
 export Exited, Signaled
@@ -985,7 +985,8 @@ Program, argument, key and value bytes containing NUL are invalid; an
 environment key is also invalid when empty or containing `=`.
 
 `ChildStdio` has only the three displayed choices. `ChildInherit` names one
-of the parent's three `Stream` values, not an arbitrary host descriptor.
+of the parent's `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, or
+`ConsoleStream.Stderr` values, not an arbitrary host descriptor.
 `ChildNull` connects the corresponding child stream to the null device.
 `ChildPipe` creates a fresh pipe for that stream: child stdin gives the
 parent a **write** end, while child stdout or stderr gives the parent a
@@ -996,14 +997,12 @@ outside stdin/stdout/stderr or a duplicate descriptor entry in the
 host-side plan is invalid. The immutable Ken builders do not expose an
 arbitrary descriptor map or a raw descriptor constructor.
 
-This base still calls the pre-source stream family `Stream`; the separate
-Console/Char admission renames that **same checked family** to
-`ConsoleStream`, with public paths `ConsoleStream.Stdin`,
-`ConsoleStream.Stdout` and `ConsoleStream.Stderr`. Once that WP lands,
-`ChildInherit Stream` migrates to `ChildInherit ConsoleStream` as one
-spelling change. It does not create a second family or preserve the old
-`Stream` spelling as an alias. Do not apply that migration to this
-pre-landing base by guessing the publisher outcome.
+The checked prelude retains its internal `ChildInherit Stream`
+declaration. Source-name registration presents that same checked stream
+family as `ConsoleStream`, with public paths `ConsoleStream.Stdin`,
+`ConsoleStream.Stdout` and `ConsoleStream.Stderr`; the source-visible
+`ChildInherit ConsoleStream` spelling adds neither a second family nor a
+`Stream` source alias. The plan's descriptor behavior is unchanged.
 
 #### 1.11.2 Explicit Process grant and resource lifetime
 
