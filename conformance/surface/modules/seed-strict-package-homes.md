@@ -169,6 +169,140 @@ measurement is claimed.
 - why: Strict roots resolve only through explicit imports and the closed
   prelude; a name held only by a catalog home is not ambient.
 
+### surface/modules/inc2b-mapping-child-homes-preserve-identities
+
+- promise class: **normative compatibility vector** — the listed checked
+  pre-source names, home edges, and complete public constructor families are
+  fixed by the spec; a changed home or identity requires a contract change
+- spec: `30-taxonomy §4`; `38 §1.9, §1.11`; `33 §3.3`
+- given: in a fresh pre-source environment, snapshot the `GlobalId` for each
+  of the 20 names below before loading catalog sources. Load both home units
+  and a separate client through `elaborate_module_from_roots_strict` with
+  these explicit imports:
+
+  ```ken
+  import Capability.System.Mapping
+    (MappingHandle, MappingWindow, MkMappingWindow, MappingSource,
+      Anonymous, FileBacked, mapBytes, mapWrite)
+  import Capability.Process.Child
+    (ChildStdio, ChildPipe, ChildNull, ChildInherit, spawn_plan,
+      with_environment, with_stdin, with_stdout, withChild,
+      wait_child, take_stdout, read_pipe)
+
+  fn mapping_handle_control (mapping : MappingHandle) : MappingHandle =
+    mapping
+
+  const mapping_window_control : MappingWindow = MkMappingWindow 1 2
+
+  fn mapping_window_cases (window : MappingWindow) : Int =
+    match window {
+      MkMappingWindow offset length ↦ offset
+    }
+
+  fn mapping_source_cases (source : MappingSource) : Bool =
+    match source {
+      Anonymous length ↦ True;
+      FileBacked handle length ↦ False
+    }
+
+  fn child_stdio_cases (target : ChildStdio) : Bool =
+    match target {
+      ChildPipe ↦ True;
+      ChildNull ↦ False;
+      ChildInherit stream ↦ True
+    }
+  ```
+
+  In a separate Strict-root client, import `MappingHandle` and try this
+  private-constructor pattern:
+
+  ```ken
+  import Capability.System.Mapping (MappingHandle)
+  fn private_mapping_handle_probe (mapping : MappingHandle) : Bool =
+    match mapping {
+      PrivateMappingHandle resource extent ↦ True
+    }
+  ```
+
+  Keep the accepted `mapping_handle_control` as the positive control; do not
+  pin a diagnostic for the private-constructor refusal. This case makes no
+  claim about the deferred `SpawnPlan`, `with_stderr`, `take_stdin`, or
+  `take_stderr` homes.
+
+  The Mapping inventory is `MappingHandle`, `MappingWindow`,
+  `MkMappingWindow`, `MappingSource`, `Anonymous`, `FileBacked`,
+  `mapBytes`, and `mapWrite`. The Child inventory is `ChildStdio`,
+  `ChildPipe`, `ChildNull`, `ChildInherit`, `spawn_plan`,
+  `with_environment`, `with_stdin`, `with_stdout`, `withChild`,
+  `wait_child`, `take_stdout`, and `read_pipe`.
+- measured: each home's public pre-source ordinary export identities, the
+  consumer's resolved import `GlobalId`s, and each constructor's parent
+  identity. The snapshot precedes loading both homes; no numeric `GlobalId`
+  is hardcoded.
+- claimed: every listed name imports from its specified home with its
+  original checked identity, and each public data family is complete.
+- the gap: matching spellings can hide a copied or rebound identity; a type
+  import alone can also hide an omitted public constructor.
+- expect: the client accepts. Each home's public pre-source ordinary export
+  subset is exactly its inventory above; all 20 resolved imports equal their
+  independent pre-source snapshots, and no identity is homed twice. The
+  constructor sets are exactly `MappingWindow` with `MkMappingWindow`,
+  `MappingSource` with `Anonymous` and `FileBacked`, and `ChildStdio` with
+  `ChildPipe`, `ChildNull`, and `ChildInherit`; each constructor's parent
+  equals its snapshotted family identity. `MappingHandle` is available as an
+  abstract type, but its private constructor and fields are not publicly
+  nameable.
+- controls: the `MappingWindow`, `MappingSource`, and `ChildStdio` matches
+  omit catch-all arms, so an incomplete public family refuses. The
+  `MappingHandle` identity-function control uses its public type; the separate
+  private-constructor probe must refuse at surface visibility.
+- why: the exact imported `GlobalId` and parent relations distinguish these
+  existing checked homes from a same-spelling replacement or incomplete
+  family.
+
+### surface/modules/inc2b-strict-home-imports-are-required
+
+- promise class: **durable provider-edge invariant** — each new home name
+  requires its explicit Strict-root import rather than a flat-global fallback
+- spec: `30-taxonomy §4`; `38 §1.9, §1.11`; `33 §3.3`
+- given: for each owner, load the same dependency-closed roots and make two
+  fresh Strict-root clients differing only in the selected constructor's
+  import. The Mapping pair is:
+
+  ```ken
+  import Capability.System.Mapping (MappingWindow, MkMappingWindow)
+  const window_probe : MappingWindow = MkMappingWindow 1 2
+  ```
+
+  The negative Mapping client retains the `MappingWindow` import but omits
+  `MkMappingWindow`; its source body is unchanged. The Child pair is:
+
+  ```ken
+  import Capability.Process.Child (ChildStdio, ChildPipe)
+  const child_stdio_probe : ChildStdio = ChildPipe
+  ```
+
+  The negative Child client retains the `ChildStdio` import but omits
+  `ChildPipe`; its source body is unchanged. The owner module and all other
+  dependencies remain loaded in each pair.
+- measured: the exact Strict-root resolution outcome for each client and the
+  name reported by a refusal.
+- claimed: each new module home is necessary for its imported public names;
+  another loaded unit or the implementation-global table cannot supply an
+  omitted name.
+- the gap: a negative that differs in another import or in its source body
+  could refuse for the wrong reason. Here each positive differs from its
+  negative by only one constructor import.
+- expect: both imported clients accept. The Mapping negative refuses with
+  `UnboundName` naming `MkMappingWindow`; the Child negative refuses with
+  `UnboundName` naming `ChildPipe`. No other missing dependency or type error
+  satisfies either negative.
+- controls: each accepted client is the control for its paired omitted-import
+  refusal. The preceding identity case imports and checks the complete 8-name
+  and 12-name inventories under Strict roots.
+- why: Strict roots resolve through explicit imports, built-in vocabulary,
+  and the closed prelude, not a flat implementation-global fallback.
+
 ### surface/modules/legacy-package-home-bare-uses-remain-until-l2-4
 
 - promise class: **transition sentinel** — the current Legacy bare-use

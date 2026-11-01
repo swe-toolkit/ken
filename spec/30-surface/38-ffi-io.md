@@ -852,7 +852,7 @@ used after the bracket
 settles, or after revocation at the `../60-security/62 §4.2` admission boundary,
 yields the single `Revoked` identity, `Permanent` (`§1.8`). Because the check
 lives at the access op, there is no separate view token to invalidate and no
-mint-then-consume gap. The public prelude API has these shapes:
+mint-then-consume gap. The public checked API has these shapes:
 
 ```ken
 proc withMapping (a : Auth) (e : Type) (r : Type)
@@ -874,6 +874,20 @@ where the read window `MappingWindow = MkMappingWindow Int Int` (offset, length)
 source selects only `MappingProt.ReadOnly` or `MappingProt.ReadWrite`,
 not bare `ReadOnly` or `ReadWrite`. A `MappingProt.ReadOnly` mapping
 refuses `mapWrite` with a fail-visible `ResourceError`.
+
+**Mapping package home (Increment 2b).** `Capability.System.Mapping`
+is the explicit-import home for exactly eight checked pre-source names:
+`MappingHandle`, `MappingWindow`, `MkMappingWindow`, `MappingSource`,
+`Anonymous`, `FileBacked`, `mapBytes` and `mapWrite`. The
+`MappingWindow` and `MappingSource` exports include their complete
+public constructor families; importing the abstract `MappingHandle`
+type does **not** reveal `PrivateMappingHandle` or its fields. The
+separate bracket operation `withMapping` remains homed at
+`Capability.System.Resource`, and `MappingProt` remains a scoped
+floor family (§30 §4). These homes reuse the checked identities
+rather than making new types or widening the floor. Strict isolated
+source imports the home to name its exports; the package does not
+switch any CLI resolution route.
 
 **The surface is 1:1 with the frozen wire — no validate-and-discard parameter.**
 Every checked parameter of the mapping surface passes through to a frozen-wire
@@ -1004,6 +1018,23 @@ pub fn with_stderr (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
 `ChildExit.Exited` and `ChildExit.Signaled` with their `UInt8`
 payloads, not bare `Exited` or `Signaled`. This does not make the
 separate `ChildStdio` family a floor admission.
+
+**Child-process package home (Increment 2b).**
+`Capability.Process.Child` is the explicit-import home for exactly
+twelve checked pre-source names: `ChildStdio`, `ChildPipe`,
+`ChildNull`, `ChildInherit`, `spawn_plan`, `with_environment`,
+`with_stdin`, `with_stdout`, `withChild`, `wait_child`,
+`take_stdout` and `read_pipe`. The `ChildStdio` export carries its
+complete three-constructor public family; the private plan
+constructor remains hidden. `ChildExit` and its qualified cases
+remain in the scoped floor (§30 §4), not in this package. This home
+does not add `SpawnPlan`, `with_stderr`, `take_stdin` or `take_stderr`:
+those four home promises require the separate Increment 3 AC-0.
+Other child and pipe operations described below retain their existing
+contract; this roster does not give them an unruled home. The twelve
+exports reuse checked identities and require an explicit import in
+Strict isolated source; they do not alter authority, trust or CLI
+resolution routes.
 
 `spawn_plan` sets the environment to empty and all three child streams to
 `ChildNull`. `with_environment` replaces, rather than adds to, the plan's
