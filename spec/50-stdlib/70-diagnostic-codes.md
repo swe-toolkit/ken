@@ -246,7 +246,17 @@ not a mutable lookup by spelling, in this order:
 - A root-owned checked declaration records
   `{"class":"source-declared","declaration":…}`. A constructor
   of a root-owned family also has a `constructor` field; its
-  `declaration` is the family name.
+  `declaration` is the family name. A checked **opaque postulate**
+  admitted while elaborating a root result belongs to that result by
+  checked identity, even when it is neither the result's own identity
+  nor one of its auxiliaries. References to such identities record
+  `source-declared` with that root's `declaration` name. This covers
+  an `= Axiom` body, an `axiom` declaration and an open `ensures`
+  obligation hole without guessing from an owner-label spelling. A
+  side-effect postulate adds no extra root row; an explicit `axiom`
+  declaration that is itself a root result retains its own row. This
+  adds no general opaque fallback: non-literal identities without a
+  captured pre-source, root or imported owner still fail closed.
 - An identity owned by another loaded unit records
   `{"class":"imported","module":…,"declaration":…}`. That
   declaration field names the imported declaration in its module;

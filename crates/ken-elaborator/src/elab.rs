@@ -107,6 +107,9 @@ pub struct ElabResult {
     /// Private admitted Transparent declarations owned by this result, in
     /// admission order. Never named in `globals`; empty on the ordinary path.
     pub auxiliary_ids: Vec<GlobalId>,
+    /// Other opaque identities minted while elaborating this root result:
+    /// Axiom sugar, foreign postulates, and open obligation holes.
+    pub postulate_ids: Vec<GlobalId>,
     /// Open obligation holes emitted during elaboration.
     pub obligations: Vec<Obligation>,
     /// For `foreign` declarations: the full binding record (AC1/AC5 tests).
@@ -18852,11 +18855,12 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
+    let first = env.next_global_id();
     let self_reference_waits_for_preadmission = !globals.contains_key(&rdecl.name)
         && rexpr_mentions_name(&rdecl.body, &rdecl.name)
         && matches!(rdecl.kind, RDeclKind::View { .. } | RDeclKind::Let);
-    if self_reference_waits_for_preadmission || !rdecl.contains_infix_spine {
-        return elaborate_associated_rdecl(
+    let mut outcome = if self_reference_waits_for_preadmission || !rdecl.contains_infix_spine {
+        elaborate_associated_rdecl(
             env,
             globals,
             preconditions,
@@ -18872,27 +18876,44 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
             refinement_facts,
             declared_fixity,
             rdecl,
-        );
+        )
+    } else {
+        let associated = reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators))?
+            .expect("a declaration marked with an infix spine must be reassociated");
+        elaborate_associated_rdecl(
+            env,
+            globals,
+            preconditions,
+            num_values,
+            numeric_env,
+            class_env,
+            provenance,
+            standard_operators,
+            effect_rows,
+            fixities,
+            fixity_spans,
+            ctor_decl_spans,
+            refinement_facts,
+            declared_fixity,
+            &associated,
+        )
+    };
+    if let Ok(result) = outcome.as_mut() {
+        attach_postulate_ids(env, first, result);
     }
-    let associated = reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators))?
-        .expect("a declaration marked with an infix spine must be reassociated");
-    elaborate_associated_rdecl(
-        env,
-        globals,
-        preconditions,
-        num_values,
-        numeric_env,
-        class_env,
-        provenance,
-        standard_operators,
-        effect_rows,
-        fixities,
-        fixity_spans,
-        ctor_decl_spans,
-        refinement_facts,
-        declared_fixity,
-        &associated,
-    )
+    outcome
+}
+
+/// Record the opaque identities this root result minted. Kept out of line so
+/// its iterator temporaries are not part of the elaboration recursion's frame.
+#[inline(never)]
+fn attach_postulate_ids(env: &GlobalEnv, first: GlobalId, result: &mut ElabResult) {
+    result.postulate_ids = env
+        .decls()
+        .filter(|decl| matches!(decl, ken_kernel::Decl::Opaque { .. }))
+        .map(ken_kernel::Decl::id)
+        .filter(|id| *id >= first && *id != result.def_id && !result.auxiliary_ids.contains(id))
+        .collect();
 }
 
 #[inline(never)]
@@ -19063,6 +19084,7 @@ fn elaborate_associated_rdecl(
                 .global_modules
                 .insert(d_id, class_env.current_module);
             Ok(ElabResult {
+                postulate_ids: Vec::new(),
                 name: rdecl.name.clone(),
                 def_id: d_id,
                 obligations: vec![],
@@ -19087,6 +19109,7 @@ fn elaborate_associated_rdecl(
                 .global_modules
                 .insert(d_id, class_env.current_module);
             Ok(ElabResult {
+                postulate_ids: Vec::new(),
                 name: rdecl.name.clone(),
                 def_id: d_id,
                 obligations: vec![],
@@ -19112,6 +19135,7 @@ fn elaborate_associated_rdecl(
             })?;
             globals.insert(rdecl.name.clone(), id);
             Ok(ElabResult {
+                postulate_ids: Vec::new(),
                 name: rdecl.name.clone(),
                 def_id: id,
                 obligations: vec![],
@@ -19368,6 +19392,7 @@ fn elab_record_decl_checked(
         field_types,
     );
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: id,
         obligations: vec![],
@@ -19583,6 +19608,7 @@ fn elab_class_decl(
     );
 
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: id,
         obligations: vec![],
@@ -20209,6 +20235,7 @@ fn elab_instance_decl(
     let mut obligations = Vec::new();
     absorb_obligations(&mut obligations, field_obligations);
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: instance_id,
         obligations,
@@ -20299,6 +20326,7 @@ fn elab_derive(
     }
 
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: instance_id,
         obligations: vec![],
@@ -20376,6 +20404,7 @@ fn elaborate_foreign_decl(
         .collect();
 
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id,
         obligations,
@@ -20857,6 +20886,7 @@ pub(crate) fn elaborate_space_decl(
     })?;
     elab.globals.insert(space.name.clone(), state_id);
     let mut results = vec![ElabResult {
+        postulate_ids: Vec::new(),
         name: space.name.clone(),
         def_id: state_id,
         obligations: vec![],
@@ -21160,6 +21190,7 @@ pub(crate) fn elaborate_space_decl(
         elab.effect_rows
             .insert(qualified_name.clone(), declared_row.clone());
         results.push(ElabResult {
+            postulate_ids: Vec::new(),
             name: qualified_name,
             def_id: operation_id,
             obligations: contract_obligations,
@@ -21264,6 +21295,7 @@ fn elaborate_v0(
         })?;
     globals.insert(rdecl.name.clone(), id);
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: id,
         obligations: body_obligations,
@@ -21426,6 +21458,7 @@ fn elaborate_recursive_view(
             let mut obligations = type_obligations;
             absorb_obligations(&mut obligations, body_obligations);
             Ok(ElabResult {
+                postulate_ids: Vec::new(),
                 name: rdecl.name.clone(),
                 def_id: id,
                 auxiliary_ids: auxiliary_ids.into_iter().flatten().collect(),
@@ -21642,6 +21675,7 @@ pub(crate) fn elaborate_mutual_group(
             .zip(all_obligations)
             .zip(auxiliary_ids)
             .map(|(((rdecl, id), obligations), auxiliary)| ElabResult {
+                postulate_ids: Vec::new(),
                 name: rdecl.name.clone(),
                 def_id: id,
                 auxiliary_ids: auxiliary.into_iter().collect(),
@@ -22164,6 +22198,7 @@ fn elaborate_view_with_spec(
             id
         };
         Ok(ElabResult {
+            postulate_ids: Vec::new(),
             name: rdecl.name.clone(),
             def_id: id,
             auxiliary_ids: admitted_auxiliary_ids,
@@ -22225,6 +22260,7 @@ fn elaborate_prove(
         kind: ObligationKind::Prove,
     });
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: hole_id,
         obligations,
@@ -22278,6 +22314,7 @@ fn elaborate_prop_decl(
     globals.insert(rdecl.name.clone(), id);
 
     let mut produced = ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: id,
         obligations: vec![],
@@ -22378,6 +22415,7 @@ fn elaborate_checked_theorem(
         })?;
     globals.insert(rdecl.name.clone(), id);
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: id,
         obligations: body_obligations,
@@ -22636,6 +22674,7 @@ fn elaborate_temporal(
     globals.insert(rdecl.name.clone(), placeholder);
 
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: placeholder,
         obligations: vec![],
@@ -22724,6 +22763,7 @@ fn elaborate_law(
 
     // Return: def_id = law_id (the law postulate), obligations = per-field holes
     Ok(ElabResult {
+        postulate_ids: Vec::new(),
         name: rdecl.name.clone(),
         def_id: law_id,
         obligations,

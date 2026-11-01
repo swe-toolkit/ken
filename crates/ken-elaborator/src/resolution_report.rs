@@ -76,6 +76,9 @@ fn ownership(results: &[ElabResult]) -> BTreeMap<GlobalId, (String, Option<Strin
         for id in &result.auxiliary_ids {
             owned.insert(*id, (result.name.clone(), None));
         }
+        for id in &result.postulate_ids {
+            owned.insert(*id, (result.name.clone(), None));
+        }
     }
     owned
 }
