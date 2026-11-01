@@ -161,8 +161,8 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     );
     assert_eq!(
         floor.len(),
-        37,
-        "30 §4 floor count with five scoped families"
+        40,
+        "30 §4 floor count with five scoped families and three State operations"
     );
     assert!(floor.contains("ConsoleStream") && floor.contains("eqChar"));
     assert!(!floor.contains("Stream"));

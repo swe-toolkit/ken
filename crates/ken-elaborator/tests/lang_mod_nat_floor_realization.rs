@@ -380,6 +380,9 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "TransferCount",
             "Unit",
             "WriteProgress",
+            "run_state",
+            "state_get",
+            "state_put",
         ]
         .map(|name| env.globals[name]),
     );

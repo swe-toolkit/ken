@@ -11,7 +11,7 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 37] = [
+const TYPE_FLOOR: [&str; 40] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -49,6 +49,9 @@ const TYPE_FLOOR: [&str; 37] = [
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "run_state",
+    "state_get",
+    "state_put",
 ];
 
 const COMPANIONS: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
@@ -214,8 +217,8 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 /// five source-required entrypoint-ABI identities, three effect/clock identities,
 /// ITree, and six FS/resource families (BufferSpan, CreatePolicy, FileError,
 /// IOError, ResourceError, TransferCount), ConsoleStream, and the separate
-/// checked Char comparator eqChar and five scoped resource families close the
-/// floor to thirty-seven entries.
+/// checked Char comparator eqChar, five scoped resource families and three
+/// checked State operations close the floor to forty identities.
 /// The separately configured companion inventory has three checked-transparent
 /// constants keyed to the exact Pair identity. CLAIMED: type and binding
 /// membership are independent closed
@@ -264,6 +267,9 @@ fn prelude_signature_inventory_is_executable_and_closed() {
                     | "TransferCount"
                     | "Top"
                     | "WriteProgress"
+                    | "run_state"
+                    | "state_get"
+                    | "state_put"
             )
         })
         .map(|name| env.globals[name])
@@ -300,6 +306,9 @@ fn prelude_signature_inventory_is_executable_and_closed() {
         "TransferCount",
         "Top",
         "WriteProgress",
+        "run_state",
+        "state_get",
+        "state_put",
     ]
     .map(|name| env.globals[name])
     .into_iter()

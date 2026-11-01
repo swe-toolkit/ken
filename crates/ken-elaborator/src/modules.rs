@@ -261,13 +261,13 @@ impl ModuleState {
     }
 }
 
-/// The complete Ken-defined always-present type floor (`30-taxonomy §4`).
+/// The complete Ken-defined always-present identity floor (`30-taxonomy §4`).
 ///
-/// Strict resolution consults [`is_prelude_floor_name`] so the configured type
-/// inventory has one source of truth. Its signature arm is independently
+/// Strict resolution consults [`is_prelude_floor_name`] so the configured
+/// identity inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 37] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 40] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -305,6 +305,9 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 37] = [
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "run_state",
+    "state_get",
+    "state_put",
 ];
 
 /// Each checked package identity has exactly one explicit-import home. The
