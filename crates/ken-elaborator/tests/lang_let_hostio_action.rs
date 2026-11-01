@@ -28,7 +28,7 @@ fn spine(mut term: &Term) -> (&Term, Vec<&Term>) {
 fn assert_bind<'a>(env: &ElabEnv, term: &'a Term) -> Vec<&'a Term> {
     let (head, args) = spine(term);
     assert!(
-        matches!(head, Term::Const { id, .. } if *id == env.globals["bind"]),
+        matches!(head, Term::Const { id, .. } if *id == env.prelude_env.bind_id),
         "expected the registered bind identity, got {head:?}"
     );
     assert_eq!(args.len(), 6, "bind has (e, resp, a, b, t, f)");
@@ -64,7 +64,7 @@ fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_bo
         .expect("infer the result as an ITree with a pure-body Ret");
     let (inferred_ty, inferred_body) = checked_def(&env, inferred);
     let (tree_head, tree_args) = spine(inferred_ty);
-    assert!(matches!(tree_head, Term::IndFormer { id, .. } if *id == env.globals["ITree"]));
+    assert!(matches!(tree_head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id));
     assert_eq!(tree_args.len(), 3);
     let inferred_args = assert_bind(&env, inferred_body);
     let Term::Lam(_, inferred_continuation) = inferred_args[5] else {
@@ -82,16 +82,19 @@ fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_bo
 #[test]
 fn annotated_non_tree_proc_result_remains_an_ordinary_let() {
     let mut env = ElabEnv::new().expect("checked prelude");
-    env.elaborate_decl("proc direct_value : Int visits [Console] = 1")
+    let direct = env
+        .elaborate_decl("proc direct_value : Int visits [Console] = 1")
         .expect("a proc may declare a row while returning a non-tree value");
     let id = env
         .elaborate_decl("proc read : Int visits [Console] = let n : Int = direct_value in n")
-        .expect("non-tree performed RHS stays on the ordinary annotated path");
+        .expect("row-declared non-tree RHS stays on the ordinary annotated path");
     let (_, core) = checked_def(&env, id);
-    assert!(
-        matches!(core, Term::Let { .. }),
-        "a non-tree proc result retains the kernel's ordinary Let"
-    );
+    let Term::Let { ty, val, body } = core else {
+        panic!("a non-tree proc result retains the kernel's ordinary Let")
+    };
+    assert_eq!(ty.as_ref(), &Term::const_(env.globals["Int"], vec![]));
+    assert_eq!(val.as_ref(), &Term::const_(direct, vec![]));
+    assert_eq!(body.as_ref(), &Term::var(0));
 }
 
 #[test]
