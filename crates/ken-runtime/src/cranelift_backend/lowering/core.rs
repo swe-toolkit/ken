@@ -9376,10 +9376,47 @@ impl<'a> Lowering<'a> {
                 super::units::CandidateDisposition::InlineNoCall,
             )?;
         }
+        // Every arm of an issued set writes the same planner-owned Record.
+        // Only its label is selected by this arm's member identity.
+        let answer = match self.static_transition_plan.producer_alternative_set_of(&identity)? {
+            None => returned,
+            Some(set) => {
+                let label = i64::from(set.label(&identity)?);
+                let result = set.result;
+                let record = self.static_transition_plan.producer_alternative_record(set)?;
+                let child = match &returned {
+                    LoweringOperand::Carried(word) => *word,
+                    LoweringOperand::Specialized(value) => {
+                        if value.contains_boundary_closure_environment()? {
+                            self.transfer_represented_boundary_value(builder, result, value)?
+                        } else {
+                            self.transfer_into_carrier(builder, result, value)?
+                        }
+                    }
+                    LoweringOperand::Residual(_) => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "ProducerAlternativeSet",
+                            "an alternative member returned a recursive residual, which [Child, Label] does not carry",
+                        ));
+                    }
+                };
+                let label_value = builder.ins().iconst(types::I64, label);
+                let label_word = self.transfer_into_carrier(builder, result,
+                    &Lowered::Int { value: label_value, known: Some(label) })?;
+                let wrapped = self.emit_checked_aggregate_alloc(
+                    builder, GovernedAllocationSite::CarriedConstructor,
+                    record, PlannedAggregateShape::Record, BoundaryClass::Record, 2,
+                )?;
+                self.emit_carrier_store_tag_id(builder, wrapped, 1)?;
+                self.emit_carrier_store_field(builder, wrapped, 0, child)?;
+                self.emit_carrier_store_field(builder, wrapped, 1, label_word)?;
+                LoweringOperand::Carried(wrapped)
+            }
+        };
         Ok(ClaimedContinuationResult {
             identity,
             recursive_position: transport.recursive_position(),
-            answer: RoutedAnswer::checked(returned),
+            answer: RoutedAnswer::checked(answer),
         })
     }
 

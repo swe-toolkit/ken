@@ -6,6 +6,7 @@ use super::{
     planner_error, ContinuationEmissionOwner, CraneliftBackendError, StaticTransitionPlan,
 };
 use crate::RuntimeExpr;
+use std::collections::BTreeMap;
 
 /// The closed set of producer transports that can reach one result. Members
 /// are sorted by target specialization and a member's label is its index. A
@@ -50,9 +51,7 @@ impl StaticTransitionPlan<'_> {
         if members.iter().any(|member| {
             member.producer_result_origin() != result
                 || member.emission_owner() != emission_owner
-                || self
-                    .checked_ih_environment_transport_source(member)
-                    .is_none()
+                || !self.pre_schema_transport_sources.contains(*member)
         }) {
             return Ok(None);
         }
@@ -89,6 +88,47 @@ impl StaticTransitionPlan<'_> {
             result,
             members,
         }))
+    }
+
+    /// Every set issued from the pre-schema transport sources, grouped on
+    /// its emission owner and result rather than on the writing member.
+    pub(in crate::cranelift_backend::planning::static_transition) fn build_producer_alternative_sets(
+        &self,
+    ) -> Result<Vec<ProducerAlternativeSet>, CraneliftBackendError> {
+        let mut groups: BTreeMap<
+            (ContinuationEmissionOwner, StaticOriginId),
+            Vec<&ContinuationCallIdentity>,
+        > = BTreeMap::new();
+        for member in &self.pre_schema_transport_sources {
+            groups
+                .entry((member.emission_owner(), member.producer_result_origin()))
+                .or_default()
+                .push(member);
+        }
+        let mut sets = Vec::new();
+        for members in groups.values() {
+            if let Some(set) = self.producer_alternative_set(members)? {
+                sets.push(set);
+            }
+        }
+        Ok(sets)
+    }
+
+    pub(in crate::cranelift_backend) fn producer_alternative_set_of(
+        &self,
+        member: &ContinuationCallIdentity,
+    ) -> Result<Option<&ProducerAlternativeSet>, CraneliftBackendError> {
+        let mut matching = self
+            .producer_alternative_sets
+            .iter()
+            .filter(|set| set.members.contains(member));
+        let set = matching.next();
+        if matching.next().is_some() {
+            return Err(planner_error(
+                "a producer is a member of two alternative sets",
+            ));
+        }
+        Ok(set)
     }
 
     /// The occurrence/child-position steps from `root` to `needle`.
