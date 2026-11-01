@@ -148,8 +148,9 @@ Increment 2:
 ## Stop conditions
 
 - A kernel or trust change, or a post-fork callback.
-- The sixth advancing stop on the native-lowering chain (§1a count 5;
-  the third was discharged by the R2 ruling).
+- An advancing stop the Architect does not rule within Increment 2.
+  The Architect holds the §1a count (6 at the carried-Nat ruling
+  `evt_7v00f7vzkhdpr`), and Research re-triggers at the ninth.
 - A stop named in the R2 ruling: `occurrence_authority` refuses for a
   set's result, a set member does not reach
   `call_checked_ih_environment_transport`, or a set's meet differs
