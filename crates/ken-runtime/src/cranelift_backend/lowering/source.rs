@@ -761,7 +761,462 @@ impl<'a> Lowering<'a> {
 
 }
 
+/// Where one selected checked-IH transport leaves the source machine: the
+/// singleton seat and every issued-alternative arm share this exit.
+pub(super) enum SelectedCheckedIhTransportExit {
+    /// Source control continues with this answer.
+    Value(RoutedAnswer),
+    /// This arm ended in its own terminator (the forward-Ret closeout).
+    Complete(LoweringOperand),
+}
+
 impl<'a> Lowering<'a> {
+    /// The singleton and every issued-alternative member use the same
+    /// post-transport route. An arm either yields a routed answer or closes
+    /// its own forward-Ret edge before any common value join.
+    fn lower_selected_checked_ih_transport(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        current_checked_ih_projection: Option<&(
+            CheckedIhGeneratedEntryProjection, PendingCheckedIhCall, StaticOriginId,
+        )>,
+        #[cfg(feature = "px8-ds-test-support")]
+        current_forward_ret_role_witness: Option<(
+            StaticOriginId, StaticOriginId, StaticOriginId, &'static str,
+        )>,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<SelectedCheckedIhTransportExit, CraneliftBackendError> {
+        let mut current_checked_ih_projection = current_checked_ih_projection.cloned();
+        // D2 forms one move-only compiler proof only after the
+        // exact transport has been selected and before its call is
+        // emitted. The proof is deliberately not consumed by the
+        // returned value or any control edge in this increment.
+        let forward_ret_outcome = match self
+            .function_local
+            .checked_ih_generated_entry_access
+            .as_ref()
+        {
+            Some(access) => {
+                self.composed_return_forward_ret_authority(access, &transport)?
+            }
+            None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+        };
+        // inc2 (b) pin (Architect evt_1qf2wn2sfbq7x / runtime-qa
+        // evt_6vhnvcxpp1fx1): record the (A) collapsibility
+        // discriminator's determination for every formed Tail
+        // authority, computed DIRECTLY -- independent of the
+        // `tail_worker_body_is_ret_kmatch` short-circuit that hides the
+        // effect tail behaviorally -- so the preventive guard's
+        // classification is pinned even where it flips no arm on today's
+        // programs. Test-support observation only; no emitted-byte change.
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            let frame = match &forward_ret_outcome {
+                ComposedReturnForwardRetAuthorityOutcome::Formed(authority) =>
+                    Some(authority._plan.active_frame_origin()),
+                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) =>
+                    Some(proof.active_frame_origin()),
+                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, _) =>
+                    Some(proof.active_frame_origin()),
+                ComposedReturnForwardRetAuthorityOutcome::NonApplicable
+                | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
+                | ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
+                | ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => None,
+            };
+            if let Some(frame) = frame {
+                let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
+                let candidate_body_purities =
+                    self.tail_route_forward_edge_body_purities(&transport)?;
+                record_composed_return_forward_edge_collapsibility(
+                    frame, collapsible, candidate_body_purities,
+                );
+            }
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        if let Some((
+            current_invocation_origin,
+            current_call_origin,
+            current_callee_origin,
+            current_admission,
+        )) = current_forward_ret_role_witness
+        {
+            let (outcome, proof) = match &forward_ret_outcome {
+                ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                    ("NonApplicable", None)
+                }
+                ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                    ("Formed", Some(&authority._plan))
+                }
+                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) => {
+                    ("FormedBasePath", Some(proof))
+                }
+                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, _) => {
+                    ("ConsumedBySettlement", Some(proof))
+                }
+                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                    ("MissingRequired", None)
+                }
+                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                    ("SuppressedForInertness", None)
+                }
+                ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                    ("Duplicated", None)
+                }
+            };
+            record_composed_return_forward_ret_role_witness(
+                current_invocation_origin,
+                current_call_origin,
+                current_callee_origin,
+                current_admission,
+                transport.source_call_identity(),
+                outcome,
+                proof,
+            );
+        }
+        // A non-governed current call may still select a transport whose
+        // derived generated-entry row is a TailProducerToRet route: the
+        // forward-Ret plan proof keys on the transport's route, not on
+        // the current call's projection, so `Formed` reaches HERE (this
+        // is the seam the fs-at-offset composed returns take). D3-RECUT
+        // consumes it with the forward-SSA-edge closeout; NonApplicable
+        // retains the existing environment-capture producer path.
+        if current_checked_ih_projection.is_none() {
+            match forward_ret_outcome {
+                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
+                    self.pending_computational_ih_call.take();
+                    let result = self
+                        .call_tail_checked_ih_transport_from_case_environment(
+                            builder, &transport, &env,
+                        )?;
+                    #[cfg(feature = "px8-ds-test-support")]
+                    record_settlement_consumed_tail(settlement, proof.source_call_identity());
+                    return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                }
+                ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                    // RT-COMPOSED-RETURN-FORWARD-RET-EDGE D3-RECUT (b2
+                    // inc1, ruling A evt_h0vgd11g5xfb): the R3 shape gate
+                    // is at CONSUMPTION. Formation is unnarrowed, so this
+                    // formed Tail authority may be pure-remap or
+                    // effect-performing. An EFFECT (non-Ret{Match}) Tail
+                    // flows through the existing machinery = the base path
+                    // (call_tail -> Continue, form-but-ignore the forward
+                    // edge), as base did for every Tail; its downstream
+                    // governed arrival records E's reach as on base.
+                    // Deferred to inc2's (a) effect closeout.
+                    //
+                    // (A) preventive collapsibility guard (inc2,
+                    // Architect evt_1z9x00y6ydjtf): even a Ret{Match}
+                    // worker body only collapses when its producer
+                    // result reaches the strict-Ret sink through pure
+                    // value-narrowing (no intervening effect / recursor
+                    // / join). A non-collapsible tail falls to base.
+                    // Fail-safe: any ambiguity is base. Scopes the edge
+                    // to value-returning tails without narrowing
+                    // formation (planned == formed == base).
+                    if !self.tail_worker_body_is_ret_kmatch(&transport)?
+                        || !self.tail_route_is_forward_edge_collapsible(&transport)? {
+                        self.pending_computational_ih_call.take();
+                        let result = self
+                            .call_tail_checked_ih_transport_from_case_environment(
+                                builder, &transport, &env,
+                            )?;
+                        return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                    }
+                    // Pure Ret{Match} -- the funded READ half. At a
+                    // NON-governed current call, the
+                    // transport route may still select a Tail
+                    // producer-to-Ret whose certificate E is GOVERNED
+                    // (the plan proof forms only for a governed E:
+                    // aggregates.rs `access.admissions.get(key)` must be
+                    // `Governed`). The forward-SSA-edge closeout below
+                    // REPLACES the base lowering's form-but-ignore ->
+                    // Continue path. `Complete(RecursiveBackedge)`
+                    // short-circuits the source machine, turning a
+                    // non-empty, observation-bearing continuation into a
+                    // tail; base recorded E's current-call-seam
+                    // observations by CONTINUING past it. HS3 structural
+                    // closure (Architect evt_18x2n8yta31xz /
+                    // evt_16b5brxhg4stm): the forward edge assumes E's
+                    // COMPLETE sealed seam-observation obligation, keyed on
+                    // E's governed coordinate (the proof's `entry_*` = the
+                    // selected projection's arrival), each member exactly
+                    // once (the edge is the sole recorder -- 4162/4265/...
+                    // never fire for E under the short-circuit). Completeness
+                    // is STRUCTURAL: a total match with no catch-all in
+                    // `discharge_forward_edge_sealed_observations`, so a
+                    // future displaced counter is a compile error, not a
+                    // hard-stop. Test-support OBSERVATION only
+                    // (`px8-ds-test-support`): no emitted-byte change. E is
+                    // already installed at generated-context emission
+                    // (units.rs), so install is NOT re-recorded.
+                    #[cfg(feature = "px8-ds-test-support")]
+                    {
+                        let proof = &authority._plan;
+                        // Re-fetch the current function's generated-entry
+                        // access (the same one `forward_ret_outcome` was
+                        // formed from above); a Formed authority
+                        // guarantees it is present.
+                        let access = self
+                            .function_local
+                            .checked_ih_generated_entry_access
+                            .as_ref()
+                            .ok_or_else(|| {
+                                unsupported(LoweringCause::PlannerInvariant,
+                                    "ComposedReturnForwardRetCloseoutReach",
+                                    "a formed non-governed forward-Ret authority has no generated-entry access",
+                                )
+                            })?;
+                        let projection = access
+                            .governed_projection_for(
+                                proof.entry_invocation_origin(),
+                                proof.entry_call_origin(),
+                                proof.entry_callee_origin(),
+                            )
+                            .ok_or_else(|| {
+                                unsupported(LoweringCause::PlannerInvariant,
+                                    "ComposedReturnForwardRetCloseoutReach",
+                                    "the non-governed forward-Ret closeout certificate E has no governed generated-entry admission",
+                                )
+                            })?;
+                        discharge_forward_edge_sealed_observations(
+                            access,
+                            proof.entry_binding(),
+                            proof.entry_invocation_origin(),
+                            proof.entry_call_origin(),
+                            proof.entry_callee_origin(),
+                            projection,
+                        );
+                    }
+                    return Ok(SelectedCheckedIhTransportExit::Complete(
+            self.emit_composed_return_ret_kmatch_closeout(
+                            builder, authority, &transport, &env,
+                        )?,
+        ));
+                }
+                // MUTANT NOTE: replacing call_tail by a captured
+                // environment is invariant-equivalent on admitted
+                // checked-control values: they arrive as residuals,
+                // and call_tail inlines them. The buffer mutant
+                // reached this seat twice and preserved full parity;
+                // M-admission-off pins the upstream admission.
+                // The measured escape/parity/PX8 corpus has zero
+                // PendingTopology non-residual seat reaches; the
+                // unobserved population remains unknown.
+                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                        let status = self.static_transition_plan
+                            .strict_ret_sink_assessment(_proof.active_frame_origin())?
+                            .map(|assessment| assessment.status);
+                        eprintln!(
+                            "RT_BASE_SEAT thread={:?} seat=non_governed frame={} status={status:?} kind={}",
+                            std::thread::current().name(),
+                            _proof.active_frame_origin().ticket_body_ordinal(),
+                            self.formed_base_path_selected_value_kind(&transport, &env),
+                        );
+                    }
+                    self.pending_computational_ih_call.take();
+                    let result = self
+                        .call_tail_checked_ih_transport_from_case_environment(
+                            builder, &transport, &env,
+                        )?;
+                    return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                }
+                ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                    self.pending_computational_ih_call.take();
+                    let environment = self
+                        .checked_ih_captured_environment_from_case_environment(
+                            builder,
+                            &transport,
+                            &env,
+                        )?;
+                    return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(environment.into_operand())));
+                }
+                // AC-EXACT-ONCE (zero-closeout control): with the
+                // authority suppressed, no forward edge is taken and the
+                // result reverts to the source-machine answer collapse,
+                // reddening on the base ResourceBodyResult trap.
+                #[cfg(feature = "px8-ds-test-support")]
+                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                    self.pending_computational_ih_call.take();
+                    let result = self
+                        .call_tail_checked_ih_transport_from_case_environment(
+                            builder, &transport, &env,
+                        )?;
+                    return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                }
+                #[cfg(feature = "px8-ds-test-support")]
+                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComposedReturnForwardRetAuthority",
+                        "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                    ));
+                }
+                #[cfg(feature = "px8-ds-test-support")]
+                ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComposedReturnForwardRetAuthority",
+                        "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                    ));
+                }
+            }
+        }
+        let (projection, pending, callee_origin) = current_checked_ih_projection
+            .take()
+            .expect("the governed route projection was checked above");
+        let routed_answer = match projection.route() {
+            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
+                match forward_ret_outcome {
+                    ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {}
+                    ComposedReturnForwardRetAuthorityOutcome::Formed(_)
+                    | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
+                    | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "CheckedIhApplicationResult",
+                            "a Direct route unexpectedly formed Tail forward-Ret authority",
+                        ));
+                    }
+                    #[cfg(feature = "px8-ds-test-support")]
+                    ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
+                    | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
+                    | ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "CheckedIhApplicationResult",
+                            "a Direct route reached a test-only Tail authority outcome",
+                        ));
+                    }
+                }
+                self.pending_computational_ih_call.take();
+                self.call_direct_checked_ih_transport_from_case_environment(
+                    builder,
+                    &transport,
+                    &projection,
+                    pending,
+                    callee_origin,
+                    &env,
+                )?
+                .into_routed_answer()
+            }
+            CheckedIhGeneratedEntryRoute::TailProducerToRet => {
+                // The governed generated-entry arrival's Tail route: the
+                // Trap-checked runtime Result takes ONE certified forward
+                // SSA edge to the shared Ret block, bypassing the
+                // source-machine answer collapse, the constructor
+                // transfer, the active carried backedge, and the checked
+                // fallback. Same closeout as the non-governed seam above.
+                match forward_ret_outcome {
+                    ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
+                        self.pending_computational_ih_call.take();
+                        let result = self
+                            .call_tail_checked_ih_transport_from_case_environment(
+                                builder, &transport, &env,
+                            )?;
+                        #[cfg(feature = "px8-ds-test-support")]
+                        record_settlement_consumed_tail(settlement, proof.source_call_identity());
+                        return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                    }
+                    ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
+                        // (A) shape gate at consumption (evt_h0vgd11g5xfb),
+                        // mirrored at the governed seam. An EFFECT
+                        // (non-Ret{Match}) Tail takes the governed base
+                        // path (call_tail -> Continue), as base did -- NOT
+                        // the pure-remap closeout (that is inc2's (a)
+                        // machinery). The NonApplicable arm below stays a
+                        // hard error: under unnarrowed formation a governed
+                        // Tail always forms its authority.
+                        //
+                        // (A) preventive collapsibility guard (inc2,
+                        // evt_1z9x00y6ydjtf), mirrored here: a Ret{Match}
+                        // body only collapses when the producer result
+                        // reaches the strict-Ret sink through pure
+                        // value-narrowing; a non-collapsible tail falls to
+                        // base. Fail-safe: any ambiguity is base.
+                        if !self.tail_worker_body_is_ret_kmatch(&transport)?
+                            || !self.tail_route_is_forward_edge_collapsible(&transport)? {
+                            self.pending_computational_ih_call.take();
+                            let result = self
+                                .call_tail_checked_ih_transport_from_case_environment(
+                                    builder, &transport, &env,
+                                )?;
+                            return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                        }
+                        // Pure Ret{Match}: the governed generated-entry
+                        // arrival already recorded E's capsule reach (the
+                        // governed validation branch above), so the closeout
+                        // does NOT re-record it (that would double-count).
+                        // Take the forward SSA edge.
+                        return Ok(SelectedCheckedIhTransportExit::Complete(
+            self.emit_composed_return_ret_kmatch_closeout(
+                                builder, authority, &transport, &env,
+                            )?,
+        ));
+                    }
+                    ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
+                        #[cfg(feature = "px8-ds-test-support")]
+                        if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                            let status = self.static_transition_plan
+                                .strict_ret_sink_assessment(_proof.active_frame_origin())?
+                                .map(|assessment| assessment.status);
+                            eprintln!(
+                                "RT_BASE_SEAT thread={:?} seat=governed frame={} status={status:?} kind={}",
+                                std::thread::current().name(),
+                                _proof.active_frame_origin().ticket_body_ordinal(),
+                                self.formed_base_path_selected_value_kind(&transport, &env),
+                            );
+                        }
+                        self.pending_computational_ih_call.take();
+                        let result = self
+                            .call_tail_checked_ih_transport_from_case_environment(
+                                builder, &transport, &env,
+                            )?;
+                        return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                    }
+                    ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "ComposedReturnForwardRetAuthority",
+                            "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                        ));
+                    }
+                    // AC-EXACT-ONCE (zero-closeout control): suppress the
+                    // authority and the Result reverts to the answer
+                    // collapse, reddening on the base ResourceBodyResult
+                    // trap.
+                    #[cfg(feature = "px8-ds-test-support")]
+                    ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
+                        self.pending_computational_ih_call.take();
+                        let result = self
+                            .call_tail_checked_ih_transport_from_case_environment(
+                                builder, &transport, &env,
+                            )?;
+                        return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
+                    }
+                    #[cfg(feature = "px8-ds-test-support")]
+                    ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "ComposedReturnForwardRetAuthority",
+                            "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                        ));
+                    }
+                    // AC-EXACT-ONCE (twice-closeout control): two
+                    // authorities is the "fires twice for one arrival"
+                    // state; it refuses at formation.
+                    #[cfg(feature = "px8-ds-test-support")]
+                    ComposedReturnForwardRetAuthorityOutcome::Duplicated(
+                        _first,
+                        _duplicate,
+                    ) => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "ComposedReturnForwardRetAuthority",
+                            "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                        ));
+                    }
+                }
+            }
+        };
+        Ok(SelectedCheckedIhTransportExit::Value(routed_answer))
+    }
+
     /// One labelled checked-IH transport arm, shared by the PX8 labelled unit
     /// switch and the PX10 issued-alternative switch. A labelled arm returns a
     /// value; no forward-Ret collapse inside the switch.
@@ -4912,481 +5367,43 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     (_, _) => unreachable!("this arm matched a computational recursor"),
                 };
                 if let Some(transport) = transport {
-                    // D2 forms one move-only compiler proof only after the
-                    // exact transport has been selected and before its call is
-                    // emitted. The proof is deliberately not consumed by the
-                    // returned value or any control edge in this increment.
-                    let forward_ret_outcome = match self
-                        .function_local
-                        .checked_ih_generated_entry_access
-                        .as_ref()
-                    {
-                        Some(access) => {
-                            self.composed_return_forward_ret_authority(access, &transport)?
-                        }
-                        None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+                    return Ok(match self.lower_selected_checked_ih_transport(
+                        builder, &transport, current_checked_ih_projection.as_ref(),
+                        #[cfg(feature = "px8-ds-test-support")] current_forward_ret_role_witness,
+                        &env,
+                    )? {
+                        SelectedCheckedIhTransportExit::Value(value) =>
+                            SourceCallOutcome::Continue(SourceMachineState::Value { value, control }),
+                        SelectedCheckedIhTransportExit::Complete(operand) =>
+                            SourceCallOutcome::Complete(operand),
+                    });
+                }
+                if let Some((set, members)) = transport_alternatives {
+                    Self::reject_carried_residual_arguments(args.len())?;
+                    let Lowered::ComputationalRecursorClosure { residual, .. } = &recursor else {
+                        unreachable!("this arm matched a computational recursor")
                     };
-                    // inc2 (b) pin (Architect evt_1qf2wn2sfbq7x / runtime-qa
-                    // evt_6vhnvcxpp1fx1): record the (A) collapsibility
-                    // discriminator's determination for every formed Tail
-                    // authority, computed DIRECTLY -- independent of the
-                    // `tail_worker_body_is_ret_kmatch` short-circuit that hides the
-                    // effect tail behaviorally -- so the preventive guard's
-                    // classification is pinned even where it flips no arm on today's
-                    // programs. Test-support observation only; no emitted-byte change.
-                    #[cfg(feature = "px8-ds-test-support")]
-                    {
-                        let frame = match &forward_ret_outcome {
-                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) =>
-                                Some(authority._plan.active_frame_origin()),
-                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) =>
-                                Some(proof.active_frame_origin()),
-                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, _) =>
-                                Some(proof.active_frame_origin()),
-                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable
-                            | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
-                            | ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
-                            | ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => None,
-                        };
-                        if let Some(frame) = frame {
-                            let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
-                            let candidate_body_purities =
-                                self.tail_route_forward_edge_body_purities(&transport)?;
-                            record_composed_return_forward_edge_collapsibility(
-                                frame, collapsible, candidate_body_purities,
-                            );
-                        }
-                    }
-                    #[cfg(feature = "px8-ds-test-support")]
-                    if let Some((
-                        current_invocation_origin,
-                        current_call_origin,
-                        current_callee_origin,
-                        current_admission,
-                    )) = current_forward_ret_role_witness
-                    {
-                        let (outcome, proof) = match &forward_ret_outcome {
-                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
-                                ("NonApplicable", None)
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                                ("Formed", Some(&authority._plan))
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) => {
-                                ("FormedBasePath", Some(proof))
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, _) => {
-                                ("ConsumedBySettlement", Some(proof))
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
-                                ("MissingRequired", None)
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
-                                ("SuppressedForInertness", None)
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
-                                ("Duplicated", None)
-                            }
-                        };
-                        record_composed_return_forward_ret_role_witness(
-                            current_invocation_origin,
-                            current_call_origin,
-                            current_callee_origin,
-                            current_admission,
-                            transport.source_call_identity(),
-                            outcome,
-                            proof,
-                        );
-                    }
-                    // A non-governed current call may still select a transport whose
-                    // derived generated-entry row is a TailProducerToRet route: the
-                    // forward-Ret plan proof keys on the transport's route, not on
-                    // the current call's projection, so `Formed` reaches HERE (this
-                    // is the seam the fs-at-offset composed returns take). D3-RECUT
-                    // consumes it with the forward-SSA-edge closeout; NonApplicable
-                    // retains the existing environment-capture producer path.
-                    if current_checked_ih_projection.is_none() {
-                        match forward_ret_outcome {
-                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
-                                self.pending_computational_ih_call.take();
-                                let result = self
-                                    .call_tail_checked_ih_transport_from_case_environment(
-                                        builder, &transport, &env,
-                                    )?;
-                                #[cfg(feature = "px8-ds-test-support")]
-                                record_settlement_consumed_tail(settlement, proof.source_call_identity());
-                                return Ok(SourceCallOutcome::Continue(
-                                    SourceMachineState::Value {
-                                        value: RoutedAnswer::checked(result),
-                                        control,
-                                    },
-                                ));
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                                // RT-COMPOSED-RETURN-FORWARD-RET-EDGE D3-RECUT (b2
-                                // inc1, ruling A evt_h0vgd11g5xfb): the R3 shape gate
-                                // is at CONSUMPTION. Formation is unnarrowed, so this
-                                // formed Tail authority may be pure-remap or
-                                // effect-performing. An EFFECT (non-Ret{Match}) Tail
-                                // flows through the existing machinery = the base path
-                                // (call_tail -> Continue, form-but-ignore the forward
-                                // edge), as base did for every Tail; its downstream
-                                // governed arrival records E's reach as on base.
-                                // Deferred to inc2's (a) effect closeout.
-                                //
-                                // (A) preventive collapsibility guard (inc2,
-                                // Architect evt_1z9x00y6ydjtf): even a Ret{Match}
-                                // worker body only collapses when its producer
-                                // result reaches the strict-Ret sink through pure
-                                // value-narrowing (no intervening effect / recursor
-                                // / join). A non-collapsible tail falls to base.
-                                // Fail-safe: any ambiguity is base. Scopes the edge
-                                // to value-returning tails without narrowing
-                                // formation (planned == formed == base).
-                                if !self.tail_worker_body_is_ret_kmatch(&transport)?
-                                    || !self.tail_route_is_forward_edge_collapsible(&transport)? {
-                                    self.pending_computational_ih_call.take();
-                                    let result = self
-                                        .call_tail_checked_ih_transport_from_case_environment(
-                                            builder, &transport, &env,
-                                        )?;
-                                    return Ok(SourceCallOutcome::Continue(
-                                        SourceMachineState::Value {
-                                            value: RoutedAnswer::checked(result),
-                                            control,
-                                        },
-                                    ));
-                                }
-                                // Pure Ret{Match} -- the funded READ half. At a
-                                // NON-governed current call, the
-                                // transport route may still select a Tail
-                                // producer-to-Ret whose certificate E is GOVERNED
-                                // (the plan proof forms only for a governed E:
-                                // aggregates.rs `access.admissions.get(key)` must be
-                                // `Governed`). The forward-SSA-edge closeout below
-                                // REPLACES the base lowering's form-but-ignore ->
-                                // Continue path. `Complete(RecursiveBackedge)`
-                                // short-circuits the source machine, turning a
-                                // non-empty, observation-bearing continuation into a
-                                // tail; base recorded E's current-call-seam
-                                // observations by CONTINUING past it. HS3 structural
-                                // closure (Architect evt_18x2n8yta31xz /
-                                // evt_16b5brxhg4stm): the forward edge assumes E's
-                                // COMPLETE sealed seam-observation obligation, keyed on
-                                // E's governed coordinate (the proof's `entry_*` = the
-                                // selected projection's arrival), each member exactly
-                                // once (the edge is the sole recorder -- 4162/4265/...
-                                // never fire for E under the short-circuit). Completeness
-                                // is STRUCTURAL: a total match with no catch-all in
-                                // `discharge_forward_edge_sealed_observations`, so a
-                                // future displaced counter is a compile error, not a
-                                // hard-stop. Test-support OBSERVATION only
-                                // (`px8-ds-test-support`): no emitted-byte change. E is
-                                // already installed at generated-context emission
-                                // (units.rs), so install is NOT re-recorded.
-                                #[cfg(feature = "px8-ds-test-support")]
-                                {
-                                    let proof = &authority._plan;
-                                    // Re-fetch the current function's generated-entry
-                                    // access (the same one `forward_ret_outcome` was
-                                    // formed from above); a Formed authority
-                                    // guarantees it is present.
-                                    let access = self
-                                        .function_local
-                                        .checked_ih_generated_entry_access
-                                        .as_ref()
-                                        .ok_or_else(|| {
-                                            unsupported(LoweringCause::PlannerInvariant,
-                                                "ComposedReturnForwardRetCloseoutReach",
-                                                "a formed non-governed forward-Ret authority has no generated-entry access",
-                                            )
-                                        })?;
-                                    let projection = access
-                                        .governed_projection_for(
-                                            proof.entry_invocation_origin(),
-                                            proof.entry_call_origin(),
-                                            proof.entry_callee_origin(),
-                                        )
-                                        .ok_or_else(|| {
-                                            unsupported(LoweringCause::PlannerInvariant,
-                                                "ComposedReturnForwardRetCloseoutReach",
-                                                "the non-governed forward-Ret closeout certificate E has no governed generated-entry admission",
-                                            )
-                                        })?;
-                                    discharge_forward_edge_sealed_observations(
-                                        access,
-                                        proof.entry_binding(),
-                                        proof.entry_invocation_origin(),
-                                        proof.entry_call_origin(),
-                                        proof.entry_callee_origin(),
-                                        projection,
-                                    );
-                                }
-                                return Ok(SourceCallOutcome::Complete(
-                                    self.emit_composed_return_ret_kmatch_closeout(
-                                        builder, authority, &transport, &env,
-                                    )?,
-                                ));
-                            }
-                            // MUTANT NOTE: replacing call_tail by a captured
-                            // environment is invariant-equivalent on admitted
-                            // checked-control values: they arrive as residuals,
-                            // and call_tail inlines them. The buffer mutant
-                            // reached this seat twice and preserved full parity;
-                            // M-admission-off pins the upstream admission.
-                            // The measured escape/parity/PX8 corpus has zero
-                            // PendingTopology non-residual seat reaches; the
-                            // unobserved population remains unknown.
-                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
-                                #[cfg(feature = "px8-ds-test-support")]
-                                if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
-                                    let status = self.static_transition_plan
-                                        .strict_ret_sink_assessment(_proof.active_frame_origin())?
-                                        .map(|assessment| assessment.status);
-                                    eprintln!(
-                                        "RT_BASE_SEAT thread={:?} seat=non_governed frame={} status={status:?} kind={}",
-                                        std::thread::current().name(),
-                                        _proof.active_frame_origin().ticket_body_ordinal(),
-                                        self.formed_base_path_selected_value_kind(&transport, &env),
-                                    );
-                                }
-                                self.pending_computational_ih_call.take();
-                                let result = self
-                                    .call_tail_checked_ih_transport_from_case_environment(
-                                        builder, &transport, &env,
-                                    )?;
-                                return Ok(SourceCallOutcome::Continue(
-                                    SourceMachineState::Value {
-                                        value: RoutedAnswer::checked(result),
-                                        control,
-                                    },
-                                ));
-                            }
-                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
-                                self.pending_computational_ih_call.take();
-                                let environment = self
-                                    .checked_ih_captured_environment_from_case_environment(
-                                        builder,
-                                        &transport,
-                                        &env,
-                                    )?;
-                                return Ok(SourceCallOutcome::Continue(
-                                    SourceMachineState::Value {
-                                        value: RoutedAnswer::checked(environment.into_operand()),
-                                        control,
-                                    },
-                                ));
-                            }
-                            // AC-EXACT-ONCE (zero-closeout control): with the
-                            // authority suppressed, no forward edge is taken and the
-                            // result reverts to the source-machine answer collapse,
-                            // reddening on the base ResourceBodyResult trap.
-                            #[cfg(feature = "px8-ds-test-support")]
-                            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
-                                self.pending_computational_ih_call.take();
-                                let result = self
-                                    .call_tail_checked_ih_transport_from_case_environment(
-                                        builder, &transport, &env,
-                                    )?;
-                                return Ok(SourceCallOutcome::Continue(
-                                    SourceMachineState::Value {
-                                        value: RoutedAnswer::checked(result),
-                                        control,
-                                    },
-                                ));
-                            }
-                            #[cfg(feature = "px8-ds-test-support")]
-                            ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
-                                return Err(unsupported(LoweringCause::PlannerInvariant,
-                                    "ComposedReturnForwardRetAuthority",
-                                    "a validated Tail producer-to-Ret route has no exact post-selection authority",
-                                ));
-                            }
-                            #[cfg(feature = "px8-ds-test-support")]
-                            ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
-                                return Err(unsupported(LoweringCause::PlannerInvariant,
-                                    "ComposedReturnForwardRetAuthority",
-                                    "a validated Tail producer-to-Ret route formed more than one post-selection authority",
-                                ));
-                            }
-                        }
-                    }
-                    let (projection, pending, callee_origin) = current_checked_ih_projection
-                        .take()
-                        .expect("the governed route projection was checked above");
-                    let routed_answer = match projection.route() {
-                        CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
-                            match forward_ret_outcome {
-                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {}
-                                ComposedReturnForwardRetAuthorityOutcome::Formed(_)
-                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
-                                | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {
-                                    return Err(unsupported(LoweringCause::PlannerInvariant,
-                                        "CheckedIhApplicationResult",
-                                        "a Direct route unexpectedly formed Tail forward-Ret authority",
-                                    ));
-                                }
-                                #[cfg(feature = "px8-ds-test-support")]
-                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
-                                | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
-                                | ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
-                                    return Err(unsupported(LoweringCause::PlannerInvariant,
-                                        "CheckedIhApplicationResult",
-                                        "a Direct route reached a test-only Tail authority outcome",
-                                    ));
-                                }
-                            }
-                            self.pending_computational_ih_call.take();
-                            self.call_direct_checked_ih_transport_from_case_environment(
-                                builder,
-                                &transport,
-                                &projection,
-                                pending,
-                                callee_origin,
-                                &env,
-                            )?
-                            .into_routed_answer()
-                        }
-                        CheckedIhGeneratedEntryRoute::TailProducerToRet => {
-                            // The governed generated-entry arrival's Tail route: the
-                            // Trap-checked runtime Result takes ONE certified forward
-                            // SSA edge to the shared Ret block, bypassing the
-                            // source-machine answer collapse, the constructor
-                            // transfer, the active carried backedge, and the checked
-                            // fallback. Same closeout as the non-governed seam above.
-                            match forward_ret_outcome {
-                                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
-                                    self.pending_computational_ih_call.take();
-                                    let result = self
-                                        .call_tail_checked_ih_transport_from_case_environment(
-                                            builder, &transport, &env,
-                                        )?;
-                                    #[cfg(feature = "px8-ds-test-support")]
-                                    record_settlement_consumed_tail(settlement, proof.source_call_identity());
-                                    return Ok(SourceCallOutcome::Continue(
-                                        SourceMachineState::Value {
-                                            value: RoutedAnswer::checked(result),
-                                            control,
-                                        },
-                                    ));
-                                }
-                                ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
-                                    // (A) shape gate at consumption (evt_h0vgd11g5xfb),
-                                    // mirrored at the governed seam. An EFFECT
-                                    // (non-Ret{Match}) Tail takes the governed base
-                                    // path (call_tail -> Continue), as base did -- NOT
-                                    // the pure-remap closeout (that is inc2's (a)
-                                    // machinery). The NonApplicable arm below stays a
-                                    // hard error: under unnarrowed formation a governed
-                                    // Tail always forms its authority.
-                                    //
-                                    // (A) preventive collapsibility guard (inc2,
-                                    // evt_1z9x00y6ydjtf), mirrored here: a Ret{Match}
-                                    // body only collapses when the producer result
-                                    // reaches the strict-Ret sink through pure
-                                    // value-narrowing; a non-collapsible tail falls to
-                                    // base. Fail-safe: any ambiguity is base.
-                                    if !self.tail_worker_body_is_ret_kmatch(&transport)?
-                                        || !self.tail_route_is_forward_edge_collapsible(&transport)? {
-                                        self.pending_computational_ih_call.take();
-                                        let result = self
-                                            .call_tail_checked_ih_transport_from_case_environment(
-                                                builder, &transport, &env,
-                                            )?;
-                                        return Ok(SourceCallOutcome::Continue(
-                                            SourceMachineState::Value {
-                                                value: RoutedAnswer::checked(result),
-                                                control,
-                                            },
-                                        ));
-                                    }
-                                    // Pure Ret{Match}: the governed generated-entry
-                                    // arrival already recorded E's capsule reach (the
-                                    // governed validation branch above), so the closeout
-                                    // does NOT re-record it (that would double-count).
-                                    // Take the forward SSA edge.
-                                    return Ok(SourceCallOutcome::Complete(
-                                        self.emit_composed_return_ret_kmatch_closeout(
-                                            builder, authority, &transport, &env,
-                                        )?,
-                                    ));
-                                }
-                                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
-                                    #[cfg(feature = "px8-ds-test-support")]
-                                    if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
-                                        let status = self.static_transition_plan
-                                            .strict_ret_sink_assessment(_proof.active_frame_origin())?
-                                            .map(|assessment| assessment.status);
-                                        eprintln!(
-                                            "RT_BASE_SEAT thread={:?} seat=governed frame={} status={status:?} kind={}",
-                                            std::thread::current().name(),
-                                            _proof.active_frame_origin().ticket_body_ordinal(),
-                                            self.formed_base_path_selected_value_kind(&transport, &env),
-                                        );
-                                    }
-                                    self.pending_computational_ih_call.take();
-                                    let result = self
-                                        .call_tail_checked_ih_transport_from_case_environment(
-                                            builder, &transport, &env,
-                                        )?;
-                                    return Ok(SourceCallOutcome::Continue(
-                                        SourceMachineState::Value {
-                                            value: RoutedAnswer::checked(result),
-                                            control,
-                                        },
-                                    ));
-                                }
-                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
-                                    return Err(unsupported(LoweringCause::PlannerInvariant,
-                                        "ComposedReturnForwardRetAuthority",
-                                        "a validated Tail producer-to-Ret route has no exact post-selection authority",
-                                    ));
-                                }
-                                // AC-EXACT-ONCE (zero-closeout control): suppress the
-                                // authority and the Result reverts to the answer
-                                // collapse, reddening on the base ResourceBodyResult
-                                // trap.
-                                #[cfg(feature = "px8-ds-test-support")]
-                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {
-                                    self.pending_computational_ih_call.take();
-                                    let result = self
-                                        .call_tail_checked_ih_transport_from_case_environment(
-                                            builder, &transport, &env,
-                                        )?;
-                                    return Ok(SourceCallOutcome::Continue(
-                                        SourceMachineState::Value {
-                                            value: RoutedAnswer::checked(result),
-                                            control,
-                                        },
-                                    ));
-                                }
-                                #[cfg(feature = "px8-ds-test-support")]
-                                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
-                                    return Err(unsupported(LoweringCause::PlannerInvariant,
-                                        "ComposedReturnForwardRetAuthority",
-                                        "a validated Tail producer-to-Ret route has no exact post-selection authority",
-                                    ));
-                                }
-                                // AC-EXACT-ONCE (twice-closeout control): two
-                                // authorities is the "fires twice for one arrival"
-                                // state; it refuses at formation.
-                                #[cfg(feature = "px8-ds-test-support")]
-                                ComposedReturnForwardRetAuthorityOutcome::Duplicated(
-                                    _first,
-                                    _duplicate,
-                                ) => {
-                                    return Err(unsupported(LoweringCause::PlannerInvariant,
-                                        "ComposedReturnForwardRetAuthority",
-                                        "a validated Tail producer-to-Ret route formed more than one post-selection authority",
-                                    ));
-                                }
-                            }
+                    let word = match residual.as_ref() {
+                        LoweringOperand::Residual(word) => *word,
+                        LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ProducerAlternativeSet",
+                                "an alternative checked-IH transport force has no issued slot residual"));
                         }
                     };
-                    return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                        value: routed_answer,
-                        control,
-                    }));
+                    return Ok(match self.select_checked_ih_transport_alternative(
+                        builder, &set, &members, word,
+                        |this, builder, transport| this.lower_selected_checked_ih_transport(
+                            builder, transport, current_checked_ih_projection.as_ref(),
+                            #[cfg(feature = "px8-ds-test-support")] current_forward_ret_role_witness,
+                            &env,
+                        ),
+                    )? {
+                        SelectedCheckedIhTransportExit::Value(value) =>
+                            SourceCallOutcome::Continue(SourceMachineState::Value { value, control }),
+                        SelectedCheckedIhTransportExit::Complete(operand) =>
+                            SourceCallOutcome::Complete(operand),
+                    });
                 }
                 let checked_ih_invocation =
                     self.mint_checked_computational_ih_instance(&mut recursor)?;
@@ -5502,26 +5519,6 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         recursive_unit_body,
                         rt_continuation_kinds(&suspended.continuation),
                     ));
-                    if let Some((set, members)) = transport_alternatives {
-                        Self::reject_carried_residual_arguments(args.len())?;
-                        let LoweringOperand::Residual(residual) = runtime_value else {
-                            return Err(unsupported(LoweringCause::PlannerInvariant,
-                                "ProducerAlternativeSet",
-                                "an alternative checked-IH transport force has no issued slot residual",
-                            ));
-                        };
-                        let value = self.select_checked_ih_transport_alternative(
-                            builder, &set, &members, residual,
-                            |this, builder, transport| {
-                                this.lower_labelled_checked_ih_transport_arm(
-                                    builder, transport, current_checked_ih_projection.as_ref(), &env,
-                                )
-                            },
-                        )?;
-                        return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                            value: RoutedAnswer::direct(value), control: suspended,
-                        }));
-                    }
                     if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
                         let value = self.call_selected_recursive_position_unit(

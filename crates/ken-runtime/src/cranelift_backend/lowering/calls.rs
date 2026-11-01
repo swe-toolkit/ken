@@ -32,6 +32,7 @@
 
 use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
+use super::source::SelectedCheckedIhTransportExit;
 
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
@@ -987,10 +988,10 @@ impl<'a> Lowering<'a> {
             members: &[CheckedIhEnvironmentTransport],
             residual: CarriedResidualWord,
             mut arm: F,
-        ) -> Result<LoweringOperand, CraneliftBackendError>
+        ) -> Result<SelectedCheckedIhTransportExit, CraneliftBackendError>
         where
             F: FnMut(&mut Self, &mut FunctionBuilder<'_>, &CheckedIhEnvironmentTransport)
-                -> Result<LoweringOperand, CraneliftBackendError>,
+                -> Result<SelectedCheckedIhTransportExit, CraneliftBackendError>,
         {
             if members.len() != set.members.len() || members.iter().zip(&set.members).any(
                 |(transport, member)| transport.source_call_identity() != member
@@ -1015,10 +1016,9 @@ impl<'a> Lowering<'a> {
             }
             let ordinal = self.residual_label_ordinal(builder, residual, &slot)?;
             let mut labels = BTreeSet::new();
-            let join = builder.create_block();
-            let CarriedBlockParam::Value(joined) = append_carried_block_param(
-                builder, join, Representation::Value,
-            ) else { unreachable!("an alternative transport joins in the value plane") };
+            let mut joined_routing: Option<(SourceComputationalAnswerRoute, EliminatorRole)> = None;
+            let mut join: Option<(Block, CarriedBoundaryWord)> = None;
+            let mut completed = None;
             for transport in members {
                 let source = transport.source_specialization();
                 if self.static_transition_plan.recursive_carrier_for_specialization(source)?
@@ -1055,23 +1055,62 @@ impl<'a> Lowering<'a> {
                 let _ = self.checked_ih_transport_child(
                     builder, LoweringOperand::Residual(residual), transport,
                 )?;
-                let result = arm(self, builder, transport)?;
-                let answer = match result {
-                    LoweringOperand::Carried(word) => word,
-                    LoweringOperand::Residual(residual) =>
-                        self.decode_residual_child(builder, residual)?,
-                    LoweringOperand::Specialized(_) => return Err(unsupported(
-                        LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
-                        "a checked-IH alternative returned a specialized value across its ABI",
-                    )),
-                };
-                builder.ins().jump(join, &[answer.word.into()]);
+                match arm(self, builder, transport)? {
+                    SelectedCheckedIhTransportExit::Value(answer) => {
+                        // A value join is a meet: all arriving arms agree on route and role.
+                        let routing = (answer.route, answer.role);
+                        if *joined_routing.get_or_insert(routing) != routing {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ProducerAlternativeSet",
+                                "checked-IH alternative value arms arrive on different answer routes"));
+                        }
+                        let word = match answer.value {
+                            LoweringOperand::Carried(word) => word,
+                            LoweringOperand::Residual(residual) =>
+                                self.decode_residual_child(builder, residual)?,
+                            LoweringOperand::Specialized(_) => return Err(unsupported(
+                                LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                                "a checked-IH alternative returned a specialized value across its ABI")),
+                        };
+                        let (join, _) = *join.get_or_insert_with(|| {
+                            let block = builder.create_block();
+                            let CarriedBlockParam::Value(joined) = append_carried_block_param(
+                                builder, block, Representation::Value,
+                            ) else { unreachable!("an alternative transport joins in the value plane") };
+                            (block, joined)
+                        });
+                        builder.ins().jump(join, &[word.word.into()]);
+                    }
+                    SelectedCheckedIhTransportExit::Complete(operand) => {
+                        let block = builder.current_block().ok_or_else(|| unsupported(
+                            LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                            "a completing alternative arm left no current block"))?;
+                        let terminated = builder.func.layout.last_inst(block)
+                            .is_some_and(|inst| builder.func.dfg.insts[inst].opcode().is_terminator());
+                        if !terminated
+                            || !matches!(operand, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ProducerAlternativeSet",
+                                "a completing checked-IH alternative arm did not end in its own closeout"));
+                        }
+                        completed = Some(operand);
+                    }
+                }
                 builder.switch_to_block(next);
             }
             let refused = builder.ins().iconst(types::I64, -1);
             builder.ins().return_(&[refused]);
-            builder.switch_to_block(join);
-            Ok(LoweringOperand::Carried(joined))
+            match (join, joined_routing, completed) {
+                (Some((join, joined)), Some((route, role)), _) => {
+                    builder.switch_to_block(join);
+                    Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::forward(
+                        LoweringOperand::Carried(joined), route, role,
+                    )))
+                }
+                (None, None, Some(operand)) => Ok(SelectedCheckedIhTransportExit::Complete(operand)),
+                _ => Err(unsupported(LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                    "a checked-IH alternative switch produced no arm")),
+            }
         }
 
         pub(super) fn call_declared_recursive_position_unit(
