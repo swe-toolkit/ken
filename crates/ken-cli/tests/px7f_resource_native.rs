@@ -131,7 +131,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
         (withResource AFull Unit (Resource ResourceKind.FsHandle)
-          cap (bytes_encode "held.bin") ResourceMetadata
+          cap (bytes_encode "held.bin") ResourceOpenMode.ResourceMetadata
           (\resource. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
@@ -208,7 +208,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult ResourceError Unit)) ExitCode
         (withResource AFull ResourceError Unit
-          cap (bytes_encode "held.bin") ResourceRead metadata_body)
+          cap (bytes_encode "held.bin") ResourceOpenMode.ResourceRead metadata_body)
         (\outcome. after_right_outer outcome)
   }
 "#;
@@ -296,7 +296,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult ResourceError Unit)) ExitCode
         (withResource AFull ResourceError Unit cap (bytes_encode "held.bin")
-          ResourceMetadata double_release_body)
+          ResourceOpenMode.ResourceMetadata double_release_body)
         (\outcome. double_release_done outcome)
   }
 "#;

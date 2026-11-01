@@ -528,6 +528,11 @@ impl ElabEnv {
             &elab.env,
             &elab.globals,
             &elab.prelude_env.native_trusted_base,
+            [
+                (elab.prelude_env.get_fn_id, "state_get"),
+                (elab.prelude_env.put_fn_id, "state_put"),
+                (elab.prelude_env.run_state_id, "run_state"),
+            ],
         )?;
         // The prelude itself uses the ordinary declaration elaborator. Only
         // declarations admitted after this pre-source boundary belong to a

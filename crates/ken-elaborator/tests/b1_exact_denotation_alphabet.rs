@@ -29,7 +29,7 @@ proc body (resource : Resource ResourceKind.FsHandle)
 proc target (cap : Cap AFull) (path : Bytes)
   : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit))
     visits [FS, FsOpen, FsHandleMetadata, ResourceRelease] =
-  withResource AFull Unit Unit cap path ResourceMetadata body
+  withResource AFull Unit Unit cap path ResourceOpenMode.ResourceMetadata body
 "#;
 
 const DECLARED_HEADROOM_WITHOUT_METADATA: &str = r#"
@@ -42,7 +42,7 @@ fn body (resource : Resource ResourceKind.FsHandle)
 proc target (cap : Cap AFull) (path : Bytes)
   : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit))
     visits [FS, FsOpen, FsHandleMetadata, ResourceRelease] =
-  withResource AFull Unit Unit cap path ResourceMetadata body
+  withResource AFull Unit Unit cap path ResourceOpenMode.ResourceMetadata body
 "#;
 
 fn export(source: &str) -> Result<ken_elaborator::BehavioralExport, ExportError> {

@@ -18,5 +18,5 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly body)
     (\outcome. after_mapping outcome)

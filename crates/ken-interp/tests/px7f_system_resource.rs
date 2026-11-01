@@ -103,7 +103,7 @@ fn env() -> ken_elaborator::ElabEnv {
             (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
             (Result ResourceError FileMetadata)
             (withResource AFull Unit (Resource ResourceKind.FsHandle)
-              cap path ResourceMetadata px7f_escape_body)
+              cap path ResourceOpenMode.ResourceMetadata px7f_escape_body)
             (\outcome. px7f_after_escaped_outer outcome)
         "#,
     )
@@ -284,7 +284,7 @@ fn public_bracket_success_and_early_release_settle_once() {
     let env = env();
     for body in ["px7f_escape_body", "px7f_early_release_body"] {
         let mut store = EvalStore::new();
-        let tree = with_resource(&env, &mut store, "ResourceMetadata", body);
+        let tree = with_resource(&env, &mut store, "ResourceOpenMode.ResourceMetadata", body);
         let value = drive(&env, &mut store, tree);
         let bracket = result_payload(&env, &value);
         assert!(matches!(
@@ -298,7 +298,12 @@ fn public_bracket_success_and_early_release_settle_once() {
 fn read_only_handle_metadata_surfaces_exact_right_not_held_masks() {
     let env = env();
     let mut store = EvalStore::new();
-    let tree = with_resource(&env, &mut store, "ResourceRead", "px7f_metadata_body");
+    let tree = with_resource(
+        &env,
+        &mut store,
+        "ResourceOpenMode.ResourceRead",
+        "px7f_metadata_body",
+    );
     let value = drive(&env, &mut store, tree);
     let bracket = result_payload(&env, &value);
     let EvalVal::Ctor { id, args, .. } = bracket else {

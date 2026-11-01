@@ -123,13 +123,13 @@ proc px8f_readsome_public_consumers
             (Err ResourceError Unit error);
         Ok progress ↦
           match progress {
-            ReadEof ↦
+            ReadProgress.ReadEof ↦
               ITree.Ret
                 (Coproduct (FSOp a) AmbientOp)
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
                 (Result ResourceError Unit)
                 (Ok ResourceError Unit MkUnit);
-            ReadSome span count ↦
+            ReadProgress.ReadSome span count ↦
               bind
                 (Coproduct (FSOp a) AmbientOp)
                 (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
@@ -390,8 +390,8 @@ proc mapping_surface_read
         "Anonymous",
         "FileBacked",
         "MappingProt",
-        "ReadOnly",
-        "ReadWrite",
+        "MappingProt.ReadOnly",
+        "MappingProt.ReadWrite",
         "MappingExtent",
         "MappingWindow",
         "MkMappingWindow",

@@ -30,7 +30,7 @@ proc file_body (file : Resource ResourceKind.FsHandle)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
-    (withMapping AFull Unit Unit (FileBacked file (8 : Int)) ReadOnly mapping_body)
+    (withMapping AFull Unit Unit (FileBacked file (8 : Int)) MappingProt.ReadOnly mapping_body)
     (\outcome. after_mapping_body outcome)
 
 fn after_file (outcome : Result FileError (ResourceBracketResult Unit Unit))
@@ -49,6 +49,6 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "transport.bin")
-          ResourceMetadata file_body)
+          ResourceOpenMode.ResourceMetadata file_body)
         (\outcome. after_file outcome)
   }

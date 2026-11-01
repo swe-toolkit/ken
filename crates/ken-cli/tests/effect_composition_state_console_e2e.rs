@@ -25,7 +25,7 @@ fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// `get` (State) sequenced with `inject_r (print_line ...)` (Console) under
+/// `state_get` (State) sequenced with `inject_r (print_line ...)` (Console) under
 /// `Coproduct (StateOp Nat) ConsoleOp`, run through `run_state` then `run_io`.
 /// `Pair Unit Nat` is a surface-nameable alias for `run_state`'s real return
 /// type `Sigma Unit Nat` (`prelude.rs`'s `Pair := \a b. Sigma a b`).
@@ -33,7 +33,7 @@ const PROG: &str = r#"program capabilities FS APartial
 const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =
   run_state Nat ConsoleOp console_resp Unit Zero
     (bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
-      (get Nat ConsoleOp console_resp MkUnit)
+      (state_get Nat ConsoleOp console_resp MkUnit)
       (\n . inject_r (StateOp Nat) ConsoleOp (resp_state Nat) console_resp Unit (print_line "state-console-pairing")))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)

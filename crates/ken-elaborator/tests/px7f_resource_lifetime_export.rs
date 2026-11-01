@@ -31,7 +31,7 @@ proc px7f_export_body (resource : Resource ResourceKind.FsHandle)
 proc px7f_export_resource (cap : Cap AFull) (path : Bytes)
   : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit))
     visits [FS, FsOpen, FsHandleMetadata, ResourceRelease] =
-  withResource AFull Unit Unit cap path ResourceMetadata px7f_export_body
+  withResource AFull Unit Unit cap path ResourceOpenMode.ResourceMetadata px7f_export_body
 "#;
 
 const ORDINARY_PRODUCER: &str = r#"

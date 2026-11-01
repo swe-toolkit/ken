@@ -184,7 +184,7 @@ proc rt_read_offset_stage (cap : Cap AFull)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
 (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
 (withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_read_offset_file)
+  ResourceOpenMode.ResourceRead rt_read_offset_file)
 (\outcome. rt_bracket_done outcome)
 
 proc rt_read_window_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
@@ -211,7 +211,7 @@ proc rt_read_window_stage (cap : Cap AFull)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
 (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
 (withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_read_window_file)
+  ResourceOpenMode.ResourceRead rt_read_window_file)
 (\outcome. rt_bracket_done outcome)
 
 proc rt_read_norights_stage (cap : Cap AFull)
@@ -220,7 +220,7 @@ proc rt_read_norights_stage (cap : Cap AFull)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
 (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
 (withResource AFull Unit Unit cap (bytes_encode "sink")
-  (ResourceWriteCreate CreatePolicy.CreateOrTruncate) rt_read_offset_file)
+  (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) rt_read_offset_file)
 (\outcome. rt_bracket_done outcome)
 
 proc rt_write_after_read
@@ -228,12 +228,12 @@ proc rt_write_after_read
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
+Ok (ReadProgress.ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
   (writeAt AFull file (sub_int 0 1) buffer span)
   (\written. rt_expect_write_invalid_offset written);
-Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
 Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
@@ -264,7 +264,7 @@ proc rt_write_readonly_stage (cap : Cap AFull)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
 (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
 (withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead rt_write_file)
+  ResourceOpenMode.ResourceRead rt_write_file)
 (\outcome. rt_bracket_done outcome)
 
 fn rt_file_bracket_result
@@ -287,12 +287,12 @@ proc rt_write_pair_after
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-Ok (ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
+Ok (ReadProgress.ReadSome span count) |-> bind (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
   (writeAt AFull sink (sub_int 0 1) buffer span)
   (\written. rt_expect_write_invalid_offset written);
-Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+Ok ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
   (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
   (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
 Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
@@ -327,7 +327,7 @@ proc rt_write_pair_source (cap : Cap AFull) (source : Resource ResourceKind.FsHa
 (Result FileError (ResourceBracketResult Unit Unit))
 (ResourceBodyResult Unit Unit)
 (withResource AFull Unit Unit cap (bytes_encode "sink")
-  (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (rt_write_pair_sink source))
+  (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (rt_write_pair_sink source))
 (\outcome. rt_file_bracket_result outcome)
 
 proc rt_write_writable_stage (cap : Cap AFull)
@@ -336,13 +336,13 @@ proc rt_write_writable_stage (cap : Cap AFull)
 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
 (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
 (withResource AFull Unit Unit cap (bytes_encode "source")
-  ResourceRead (rt_write_pair_source cap))
+  ResourceOpenMode.ResourceRead (rt_write_pair_source cap))
 (\outcome. rt_bracket_done outcome)
 
 fn rt_cap41_expect_eof (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-  Ok ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+  Ok ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
   Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
@@ -436,7 +436,7 @@ proc rt_cap41_endpoint_stage (cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_endpoint_file)
+      ResourceOpenMode.ResourceRead rt_cap41_endpoint_file)
     (\outcome. rt_bracket_done outcome)
 
 proc rt_cap41_out_of_range_stage (cap : Cap AFull)
@@ -445,7 +445,7 @@ proc rt_cap41_out_of_range_stage (cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_out_of_range_file)
+      ResourceOpenMode.ResourceRead rt_cap41_out_of_range_file)
     (\outcome. rt_bracket_done outcome)
 
 proc rt_cap41_offset_endpoint_stage (cap : Cap AFull)
@@ -454,7 +454,7 @@ proc rt_cap41_offset_endpoint_stage (cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_offset_endpoint_file)
+      ResourceOpenMode.ResourceRead rt_cap41_offset_endpoint_file)
     (\outcome. rt_bracket_done outcome)
 
 proc rt_cap41_offset_out_of_range_stage (cap : Cap AFull)
@@ -463,7 +463,7 @@ proc rt_cap41_offset_out_of_range_stage (cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_cap41_offset_out_of_range_file)
+      ResourceOpenMode.ResourceRead rt_cap41_offset_out_of_range_file)
     (\outcome. rt_bracket_done outcome)
 
 fn rt_uint64_checked_bounds_stage (_cap : Cap AFull)

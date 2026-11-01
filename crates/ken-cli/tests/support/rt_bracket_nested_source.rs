@@ -10,7 +10,7 @@ pub(super) fn nested_bracket_source(depth: usize) -> String {
             (Result FileError (ResourceBracketResult Unit Unit))
             (ResourceBodyResult Unit Unit)
             (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-              ResourceMetadata leaf_body)
+              ResourceOpenMode.ResourceMetadata leaf_body)
             (\outcome. body_result outcome))"#
         }
         3 => {
@@ -20,14 +20,14 @@ pub(super) fn nested_bracket_source(depth: usize) -> String {
             (Result FileError (ResourceBracketResult Unit Unit))
             (ResourceBodyResult Unit Unit)
             (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-              ResourceMetadata (\inner_resource.
+              ResourceOpenMode.ResourceMetadata (\inner_resource.
                 bind (Coproduct (FSOp AFull) AmbientOp)
                   (resp_coproduct (FSOp AFull) AmbientOp
                     (fs_resp AFull) ambient_resp)
                   (Result FileError (ResourceBracketResult Unit Unit))
                   (ResourceBodyResult Unit Unit)
                   (withResource AFull Unit Unit cap (bytes_encode "held-2.bin")
-                    ResourceMetadata leaf_body)
+                    ResourceOpenMode.ResourceMetadata leaf_body)
                   (\inner_outcome. body_result inner_outcome)))
             (\outcome. body_result outcome))"#
         }

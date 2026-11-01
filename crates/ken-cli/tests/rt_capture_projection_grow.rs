@@ -73,7 +73,7 @@ proc rt_branched_stage (cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
-      ResourceRead rt_branched_file)
+      ResourceOpenMode.ResourceRead rt_branched_file)
     (\outcome. rt_branched_done outcome)
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)

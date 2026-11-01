@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative thirty-two-identity prelude and its exact
+> normative forty-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -41,8 +41,10 @@ there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
 Apart from internal-only `Empty` and the admitted entrypoint-ABI,
-effect/clock, ITree, six FS/resource families, the `ConsoleStream`
-family and `eqChar` below, the other names in this table are
+effect/clock, ITree, six earlier FS/resource families, the five
+scoped progress/acquisition/mapping/child-result families,
+`ConsoleStream`, `eqChar` and the three State operations below, the
+other names in this table are
 **observed spellings**, not names approved for permanent reservation.
 Before a later slice admits a newly witnessed name, Spec checks that
 its spelling closely encloses its meaning (`30 §4`). For the admitted
@@ -81,6 +83,11 @@ constructor still has the same checked parent and `GlobalId`.
 | `IOError` (floor) | Yes | All thirteen causes use `IOError.C`; `NotFound`, `Other`, `Unsupported` and `Revoked` are not bare reservations. |
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
 | `ResourceError` (floor) | Yes | All twelve error causes use `ResourceError.C`; no bare error name is reserved. |
+| `ReadProgress` (floor) | Yes | `ReadProgress.ReadSome` and `ReadProgress.ReadEof` are the complete checked read-result family; neither leaf is bare-reserved. |
+| `WriteProgress` (floor) | Yes | `WriteProgress.Wrote` is the checked write-result case; `Wrote` is not bare-reserved. |
+| `ResourceOpenMode` (floor) | Yes | `ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata` and `ResourceOpenMode.ResourceWriteCreate` select FS acquisition modes; their leaves are not bare-reserved. |
+| `MappingProt` (floor) | Yes | `MappingProt.ReadOnly` and `MappingProt.ReadWrite` select mapping protection; neither leaf is bare-reserved. |
+| `ChildExit` (floor) | Yes | `ChildExit.Exited` and `ChildExit.Signaled` are the complete checked wait-result family; neither leaf is bare-reserved. |
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
 | `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
@@ -123,7 +130,8 @@ producer/reader and parent-ID probe on `fd2f57557` (Architect AC-0),
 paired with their independent `38` source need (Spec Leader AC-0).
 Other inventory citations retain their stated census base. Only
 marked witnessed entrypoint-ABI, effect/clock, ITree, FS/resource,
-`ConsoleStream` and `eqChar` rows below join the floor; no other row
+progress/acquisition/mapping/child-result, `ConsoleStream`, `eqChar`
+and State-operation rows below join the floor; no other row
 alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
@@ -142,7 +150,16 @@ alone reserves a name.
 | `Prod` (floor, unscoped) | `ProcessInput`'s environment field names `List (Prod Bytes Bytes)`; its exact constructor-backed runtime identity is source-required. Floor `Pair` cannot replace its representation in this slice. |
 | `MkProd` (bare floor constructor) | Native environment-pair consumers select its exact ID; the whole unscoped `Prod` family is reserved. |
 | `host_exit` (internal-only) | Native entrypoint machinery keys this exact ID, but `33 §3.2.1` does not require programs to name it. An example use does not confer source need; the example migrates in the same build. |
+| `host_program` (package) | `Capability.Process.Exit` exports its checked HostIO builder by exact ID; no new floor name. |
+| `host_program_then` (package) | The same Exit package exports this checked sequencing helper, not a floor operation. |
+| `host_console` (package) | The same Exit package exports the checked Console lift by exact ID. |
+| `host_fs` (package) | The same Exit package exports the checked FS lift required at `33 §3.2.1`. |
+| `host_pure` (package) | Checked prelude HostIO return definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
+| `host_bind` (package) | Checked prelude HostIO sequencing definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
 | `eqChar` (floor operation) | `decimal_char.rs::set_eq_entry` captures its checked ID; the Char `==` plan and character literal patterns read that registration. The string-literal-pattern reader is rekeyed to the same exact ID instead of a mutable spelling lookup. §34 literal equality and §37 Char/string operations require the canonical comparator in source. It is a checked operation, not a type or constructor family. |
+| `run_state` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires the State runner as a source operation. Not a type or Pair companion. |
+| `state_get` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires source access to the State read operation. Bare `get` remains unreserved. |
+| `state_put` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires source access to the State write operation. Bare `put` remains unreserved. |
 | `leqChar` (package) | No native exact-ID reader; §37 Char ordering still requires this checked comparison. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import, with no copied definition. |
 | `charToInt` (package) | No native exact-ID reader; §18a §5.9.1 and §38 ASCII/parsing use its checked `Char → Int` projection. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import. |
 | `IO` (package) | Checked Console-ITree alias. The effect reifier selects `ITree` and `ConsoleOp` checked IDs, not the `IO` alias ID. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
@@ -158,6 +175,15 @@ alone reserves a name.
 | `Stdout` (qualified floor constructor) | Interpreter selects its exact checked ID; output source names `ConsoleStream.Stdout`, never bare `Stdout`. |
 | `Stderr` (qualified floor constructor) | Interpreter selects its exact checked ID; output source names `ConsoleStream.Stderr`, never bare `Stderr`. |
 | `read_bytes` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`ReadFile` identities, not this wrapper's ID. |
+| `readFile` (package) | `Capability.Filesystem.Authority` exports the checked public read wrapper (`38 §1.3.1`); no floor identity is added. |
+| `writeFile` (package) | The same Authority package exports the checked full-authority write wrapper with its `CreatePolicy` argument. |
+| `withResource` (package) | `Capability.System.Resource` exports the checked FS acquisition bracket, which names floor `ResourceOpenMode` (`38 §1.3.1`). |
+| `withBuffer` (package) | The same Resource package exports the checked buffer-acquisition bracket (`38 §1.7.1`). |
+| `withMapping` (package) | The same Resource package exports the checked mapping bracket using floor `MappingProt` (`38 §1.9`). |
+| `release` (package) | The same Resource package exports the checked explicit settlement operation, not a floor member. |
+| `BufferHandle` (package, abstract) | `Capability.System.Buffer` homes this checked type alone; its `PrivateBufferHandle` constructor is not public or a floor identity. |
+| `readAt` (package) | `Capability.System.IO` exports the checked bounded read wrapper; it returns floor `ReadProgress`. |
+| `spanBytes` (package) | The same IO package exports the checked bounded span-to-bytes wrapper. |
 | `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `print_line` (package) | Checked Console helper promised by §38 and existing programs, with no native exact-ID reader. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `write_file` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`WriteFile` identities, not this wrapper's ID. |
@@ -202,6 +228,21 @@ alone reserves a name.
 | `InvalidBounds` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_invalid_bounds`; parent `ResourceError`; source `ResourceError.InvalidBounds`, not bare. |
 | `NoProgress` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_no_progress`; parent `ResourceError`; source `ResourceError.NoProgress`, not bare. |
 | `MappingLimit` (qualified floor constructor) | `CanonicalRuntimeRoles::resource_mapping_limit`; parent `ResourceError`; source `ResourceError.MappingLimit`, not bare. |
+| `ReadProgress` (floor, scoped) | Native read results carry this exact checked family (`38 §1.7.2`, §1.11); source must name its cases to handle data and EOF. |
+| `ReadSome` (qualified floor constructor) | Checked span-and-count result, source `ReadProgress.ReadSome`, not bare. |
+| `ReadEof` (qualified floor constructor) | Checked zero-progress result, source `ReadProgress.ReadEof`, not bare. |
+| `WriteProgress` (floor, scoped) | Native write results carry this exact checked family (`38 §1.7.2`, §1.11); source must name its positive-count case. |
+| `Wrote` (qualified floor constructor) | Checked count result, source `WriteProgress.Wrote`, not bare. |
+| `ResourceOpenMode` (floor, scoped) | The exact checked FS acquisition mode is selected by native open operations (`38 §1.3.1`); source names it for `withResource`. |
+| `ResourceRead` (qualified floor constructor) | Checked read mode, source `ResourceOpenMode.ResourceRead`, not bare. |
+| `ResourceMetadata` (qualified floor constructor) | Checked metadata mode, source `ResourceOpenMode.ResourceMetadata`, not bare. |
+| `ResourceWriteCreate` (qualified floor constructor) | Checked write mode carrying `CreatePolicy`, source `ResourceOpenMode.ResourceWriteCreate`, not bare. |
+| `MappingProt` (floor, scoped) | Native mapping acquisition uses this exact checked protection family (`38 §1.9`); source names it for `withMapping`. |
+| `ReadOnly` (qualified floor constructor) | Checked mapping protection, source `MappingProt.ReadOnly`, not bare. |
+| `ReadWrite` (qualified floor constructor) | Checked mapping protection, source `MappingProt.ReadWrite`, not bare. |
+| `ChildExit` (floor, scoped) | Native child wait returns this exact checked family (`38 §1.11`); source matches its code or signal. |
+| `Exited` (qualified floor constructor) | Checked exit-code result, source `ChildExit.Exited`, not bare. |
+| `Signaled` (qualified floor constructor) | Checked signal result, source `ChildExit.Signaled`, not bare. |
 | `ResourceBodyResult` (package, not floor) | Source-promised bracket body-result carrier (`38 §1.7.1`); no native reader or producer of its exact ID. |
 | `ResourceBodyOk` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
 | `ResourceBodyErr` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
@@ -211,11 +252,18 @@ alone reserves a name.
 | `ResourceBracketReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 | `ResourceBracketBodyAndReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 
-The five entrypoint-ABI, three effect/clock, `ITree`, six FS/resource,
-`ConsoleStream`, and `eqChar` identities marked floor above join B
-alongside the original fifteen: thirty-two counted identities. The
-three Console constructors retain their exact IDs and scoped paths but
-are not separate `PRELUDE_FLOOR_NAMES` entries. Unscoped constructor
+The five entrypoint-ABI, three effect/clock, `ITree`, six earlier
+FS/resource, five new scoped progress/acquisition/mapping/child-result,
+`ConsoleStream`, `eqChar` and the three checked State operations marked
+floor above join B alongside the original fifteen: forty counted
+identities. Their operation spellings are protected; bare `get` and
+`put` are not reserved by the State trio.
+The package-home roster now has sixty-one rows: the prior forty-six,
+twelve further checked homes, and the three Exit HostIO lifts/return/
+sequence names. The package rows above are not additional floor
+members or bare Strict names. The three Console constructors retain
+their exact IDs and scoped paths but are not separate
+`PRELUDE_FLOOR_NAMES` entries. Unscoped constructor
 families reserve bare names; scoped families retain exact IDs reachable
 only through `T.C` when public, without bare B entries.
 Private constructors stay hidden even when their parent type is scoped.

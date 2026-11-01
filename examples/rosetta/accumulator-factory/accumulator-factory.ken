@@ -8,8 +8,9 @@ program capabilities FS APartial
 -- total each time it is called.
 --
 -- Genuine hidden state, not a threaded parameter: built on the landed
--- `[State]` effect surface (VAL2 #10) -- `get`/`put`/`bind`/`run_state` over
--- an `ITree`. Each "call" (`addTo n`) is one `get`-then-`put`-then-`Ret`
+-- `[State]` effect surface (VAL2 #10) -- `state_get`/`state_put`/`bind`/
+-- `run_state` over an `ITree`. Each "call" (`addTo n`) is one
+-- `state_get`-then-`state_put`-then-`Ret`
 -- step; the accumulator's running total is never a caller-visible
 -- parameter anywhere in this program -- `run_state` threads it internally,
 -- exactly the point of using an algebraic effect instead of explicit
@@ -50,14 +51,14 @@ fn addTo (n : Nat) : ITree Op Resp Nat =
     Resp
     Nat
     Nat
-    (get Nat Eff RespEff MkUnit)
+    (state_get Nat Eff RespEff MkUnit)
     (λprev.
       bind
         Op
         Resp
         Unit
         Nat
-        (put Nat Eff RespEff (addNat prev n))
+        (state_put Nat Eff RespEff (addNat prev n))
         (λ_. ITree.Ret Op Resp Nat (addNat prev n)))
 
 fn eq_nat (a : Nat) (b : Nat) : Bool =

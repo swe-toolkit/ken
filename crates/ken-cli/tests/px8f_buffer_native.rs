@@ -33,8 +33,8 @@ proc after_read
   match outcome {
     Err error |-> read_error_body error;
     Ok progress |-> match progress {
-      ReadEof |-> read_eof_body MkUnit;
-      ReadSome span count |->
+      ReadProgress.ReadEof |-> read_eof_body MkUnit;
+      ReadProgress.ReadSome span count |->
         bind (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
@@ -112,7 +112,7 @@ proc input_body (cap : Cap AFull) (input : Resource ResourceKind.FsHandle)
     (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "output.bin")
-      (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (output_body input))
+      (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (output_body input))
     (\outcome. after_output outcome)
 
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
@@ -136,7 +136,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "input.bin")
-          ResourceRead (input_body cap))
+          ResourceOpenMode.ResourceRead (input_body cap))
         (\outcome. finish outcome)
   }
 "#;

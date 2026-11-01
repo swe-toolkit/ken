@@ -53,7 +53,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match caps {
     ProgramCaps.MkProgramCaps cap |-> bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-        (withResource AFull Unit Unit cap (bytes_encode "held-0.bin") ResourceMetadata
+        (withResource AFull Unit Unit cap (bytes_encode "held-0.bin") ResourceOpenMode.ResourceMetadata
           (\resource. bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyResult Unit Unit) (lk_bracket "o1" "c1" lk_leaf) (\br. lk_ret br)))
         (\outcome. after_root outcome)
   }

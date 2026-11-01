@@ -8531,21 +8531,29 @@ mod d1b_role_c1_roster_identity {
             ),
             (
                 "resource_open_read",
-                "ResourceRead",
+                "ResourceOpenMode.ResourceRead",
                 roles.resource_open_read,
             ),
             (
                 "resource_open_metadata",
-                "ResourceMetadata",
+                "ResourceOpenMode.ResourceMetadata",
                 roles.resource_open_metadata,
             ),
             (
                 "resource_open_write_create",
-                "ResourceWriteCreate",
+                "ResourceOpenMode.ResourceWriteCreate",
                 roles.resource_open_write_create,
             ),
-            ("mapping_read_only", "ReadOnly", roles.mapping_read_only),
-            ("mapping_read_write", "ReadWrite", roles.mapping_read_write),
+            (
+                "mapping_read_only",
+                "MappingProt.ReadOnly",
+                roles.mapping_read_only,
+            ),
+            (
+                "mapping_read_write",
+                "MappingProt.ReadWrite",
+                roles.mapping_read_write,
+            ),
             ("create_new", "CreatePolicy.CreateNew", roles.create_new),
             (
                 "create_or_truncate",

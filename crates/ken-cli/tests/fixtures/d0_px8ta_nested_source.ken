@@ -35,7 +35,7 @@ proc level_one_body
     (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-      ResourceMetadata leaf_body)
+      ResourceOpenMode.ResourceMetadata leaf_body)
     (\outcome. body_result outcome)
 
 proc level_two_body
@@ -46,7 +46,7 @@ proc level_two_body
     (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-      ResourceMetadata (\resource. level_one_body cap resource))
+      ResourceOpenMode.ResourceMetadata (\resource. level_one_body cap resource))
     (\outcome. body_result outcome)
 
 fn after_root
@@ -69,6 +69,6 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "held-0.bin")
-          ResourceMetadata __ROOT_BODY__)
+          ResourceOpenMode.ResourceMetadata __ROOT_BODY__)
         (\outcome. after_root outcome)
   }
