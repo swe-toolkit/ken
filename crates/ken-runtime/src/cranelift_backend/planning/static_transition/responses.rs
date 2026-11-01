@@ -5541,10 +5541,27 @@ impl StaticTransitionPlan<'_> {
                 .any(|returned| {
                     returned.context == owner.k_context() && !returned.members.is_empty()
                 }),
-            Some(
-                super::returned_vis::ResponseOwnerSettlement::RetOnly
-                | super::returned_vis::ResponseOwnerSettlement::Excluded { .. },
-            ) => false,
+            // An Excluded owner has no protocol record, but its K context may
+            // still return an ordinary successor Vis: that member, like a
+            // Protocol member, is not a Ret publication of K. Relay and
+            // bracket-settlement members keep their baseline treatment.
+            Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
+                reason: super::returned_vis::ExcludedSettlement::Relay,
+            }) => self
+                .returned_vis_protocol(row.vis_origin())?
+                .contexts
+                .iter()
+                .filter(|returned| returned.context == owner.k_context())
+                .flat_map(|returned| &returned.members)
+                .any(|member| !member.relay && member.bracket.is_none()),
+            Some(super::returned_vis::ResponseOwnerSettlement::RetOnly) => false,
+            Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
+                reason: super::returned_vis::ExcludedSettlement::Underived(_),
+            }) => {
+                return Err(planner_error(
+                    "a static-response return boundary names an Underived response owner",
+                ))
+            }
             None => {
                 return Err(planner_error(
                     "a static-response return boundary names a response row with no owner settlement",
