@@ -170,8 +170,7 @@ fn px10_argv_and_live_advance_to_w7_and_p2() {
                 (ReturnedVisSettlement, 870, 1043),
             ][..],
             Some(ken_runtime::DetachedResultSeatRefusalObservation {
-                result: 1104,
-                constructs: vec![1073, 1101],
+                edges: vec![(1104, 1073), (1104, 1101)],
             }),
         ),
     ] {

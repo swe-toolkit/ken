@@ -71,8 +71,8 @@ pub fn with_exit_code_case_of_case_route_count<T>(operation: impl FnOnce() -> T)
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetachedResultSeatRefusalObservation {
-    pub result: u32,
-    pub constructs: Vec<u32>,
+    /// Each causal edge's own result and construct, observed as a pair.
+    pub edges: Vec<(u32, u32)>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -12785,9 +12785,10 @@ impl<'a> Lowering<'a> {
                 DETACHED_RESULT_SEAT_REFUSALS.with(|slot| {
                     if let Some(rows) = slot.borrow_mut().as_mut() {
                         rows.push(DetachedResultSeatRefusalObservation {
-                            result: residual[0].producer_result_origin.observation_ordinal(),
-                            constructs: residual.iter().map(|edge|
-                                edge.producer_construct_origin.observation_ordinal()).collect(),
+                            edges: residual.iter().map(|edge| (
+                                edge.producer_result_origin.observation_ordinal(),
+                                edge.producer_construct_origin.observation_ordinal(),
+                            )).collect(),
                         });
                     }
                 });
