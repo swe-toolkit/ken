@@ -379,6 +379,76 @@ pub theorem walk_reverse_append
           (walk_reverse q g s t first))
   }
 
+pub theorem graph_reverse_involutive
+      (q : Type) (g : Graph q)
+    : Equal (Graph q) (graph_reverse q (graph_reverse q g)) g =
+  match g {
+    MkGraph step ↦ graph_reverse_involutive_at q step
+  }
+
+pub theorem walk_reverse_involutive
+      (q : Type) (step : q → q → Bool) (s : q) (t : q) (walk : Walk q (MkGraph q step) s t)
+    : Equal
+        (Walk q (MkGraph q step) s t)
+        (walk_reverse
+          q
+          (graph_reverse q (MkGraph q step))
+          t
+          s
+          (walk_reverse q (MkGraph q step) s t walk))
+        walk =
+  match walk {
+    WalkHere ↦ walk_reverse_involutive_here q step s;
+    WalkStep prev end e prefix ↦
+      trans
+        (Walk q (MkGraph q step) s end)
+        (walk_reverse
+          q
+          (graph_reverse q (MkGraph q step))
+          end
+          s
+          (walk_reverse
+            q
+            (MkGraph q step)
+            s
+            end
+            (WalkStep q (MkGraph q step) s prev end e prefix)))
+        (WalkStep
+          q
+          (MkGraph q step)
+          s
+          prev
+          end
+          e
+          (walk_reverse
+            q
+            (graph_reverse q (MkGraph q step))
+            prev
+            s
+            (walk_reverse q (MkGraph q step) s prev prefix)))
+        (WalkStep q (MkGraph q step) s prev end e prefix)
+        (walk_reverse_prepend
+          q
+          (graph_reverse q (MkGraph q step))
+          end
+          prev
+          s
+          e
+          (walk_reverse q (MkGraph q step) s prev prefix))
+        (cong
+          (Walk q (MkGraph q step) s prev)
+          (Walk q (MkGraph q step) s end)
+          (walk_reverse
+            q
+            (graph_reverse q (MkGraph q step))
+            prev
+            s
+            (walk_reverse q (MkGraph q step) s prev prefix))
+          prefix
+          (λw. WalkStep q (MkGraph q step) s prev end e w)
+          (walk_reverse_involutive q step s prev prefix))
+  }
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -657,7 +727,13 @@ step case lifts the induction hypothesis under private `walk_prepend` and
 commutes that prepend across the appended walks with the private
 `walk_prepend_append` lemma. The edge proof converts to the reversed edge by
 the graph's definitional flip; neither a new edge premise nor finite evidence
-is needed.
+is needed. Reversing a graph twice returns its original edge function. The
+public graph law matches its representation before applying the private
+`graph_reverse_involutive_at` lemma, since an open graph does not reduce to its
+constructor. The walk law fixes a `MkGraph` representation and inducts on the
+walk: `WalkHere` closes through `walk_reverse_involutive_here`, and each step
+uses `walk_reverse_prepend` to expose the original last edge before lifting
+the prefix induction hypothesis under `WalkStep`.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -844,6 +920,48 @@ theorem walk_prepend_append
         (walk_append q g a t prev (walk_prepend q g a b t e front) prefix)
         (λw. WalkStep q g a prev end step w)
         (walk_prepend_append q g a b t prev e front prefix)
+  }
+
+theorem graph_reverse_involutive_at
+      (q : Type) (step : q → q → Bool)
+    : Equal (Graph q) (graph_reverse q (graph_reverse q (MkGraph q step))) (MkGraph q step) =
+  Refl
+
+theorem walk_reverse_involutive_here
+      (q : Type) (step : q → q → Bool) (s : q)
+    : Equal
+        (Walk q (MkGraph q step) s s)
+        (walk_reverse
+          q
+          (graph_reverse q (MkGraph q step))
+          s
+          s
+          (walk_reverse q (MkGraph q step) s s (WalkHere q (MkGraph q step) s)))
+        (WalkHere q (MkGraph q step) s) =
+  Proved
+
+theorem walk_reverse_prepend
+      (q : Type)
+      (g : Graph q)
+      (a : q)
+      (b : q)
+      (c : q)
+      (first : Equal Bool (edge q g a b) True)
+      (suffix : Walk q g b c)
+    : Equal
+        (Walk q (graph_reverse q g) c a)
+        (walk_reverse q g a c (walk_prepend q g a b c first suffix))
+        (WalkStep q (graph_reverse q g) c b a first (walk_reverse q g b c suffix)) =
+  match suffix {
+    WalkHere ↦ Refl;
+    WalkStep prev end e prefix ↦
+      cong
+        (Walk q (graph_reverse q g) prev a)
+        (Walk q (graph_reverse q g) end a)
+        (walk_reverse q g a prev (walk_prepend q g a b prev first prefix))
+        (WalkStep q (graph_reverse q g) prev b a first (walk_reverse q g b prev prefix))
+        (λw. walk_prepend q (graph_reverse q g) end prev a e w)
+        (walk_reverse_prepend q g a b prev first prefix)
   }
 
 fn walk_step_selected
@@ -2469,7 +2587,10 @@ cycle edges; it does not duplicate reachability's fixed point. Walk
 composition does not require finite evidence, and only a walk with a
 checked first edge gives a strict ordering claim. Reversal preserves the
 whole composed walk, not just its endpoints: a reversed two-part route cannot
-be identified with a different shortcut route having the same endpoints.
+be identified with a different shortcut route having the same endpoints. The
+walk involution law states its equality at a matched graph representation;
+clients with an open graph can transport along the graph law using a named
+family rather than assuming data eta.
 
 ## 6. References
 
@@ -2482,7 +2603,7 @@ be identified with a different shortcut route having the same endpoints.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–9](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–10](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2506,8 +2627,8 @@ is authored but has not been Ken-checked or officially conformance-run. The
 public API is the graph, path and certificate types, their
 constructors, walk composition and reversal, the graph reversal and
 predicate-reachability operations and witness, the dependency-order operation,
-five list/order predicates, and nineteen kernel-checked laws. Every other helper
-is private to this package.
+five list/order predicates, and twenty-one kernel-checked laws. Every other
+helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -2536,5 +2657,8 @@ The §8 package test checks the four generic exports, flipped edge and walk
 behavior, and reversed reachability on a three-vertex directed chain. The
 §9 package test checks the premise-free generic law on arbitrary walks and
 two different reversed routes with the same endpoints on a shortcut graph.
-These package tests do not stand in for conformance-runner execution or CI,
-and do not establish execution of the §2 seed.
+The §10 package test checks the graph and walk involution laws on generic
+inputs and a closed directed chain, with their private proof helpers hidden
+from imports. These package tests do not stand in for official
+conformance-runner execution or CI, and do not establish execution of the §2
+seed.
