@@ -9,7 +9,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE §7;
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION §8;
 > SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT §9;
-> SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10).** The §1–9 catalog
+> SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10;
+> SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11).** The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
 > conformance or landed trust. Section 8's conditional
@@ -986,4 +987,51 @@ premises remain true. The refused block must start from a fresh
 accepted prefix so the outer-constructor mismatch, not an earlier
 fixture or a false premise, causes rejection. Symmetry, transitivity
 and reflexivity of `poly_eq` are relational laws, not the constructor
-preservation laws specified here; §10 exports none of them.
+preservation laws specified here; §10 exports none of them, and §11
+states all three.
+
+## 11. Canonical polynomial equality is an equivalence
+
+> **Section 11 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE).** This spec-only child
+> states the three public law types. Architect's AC-0 on this base
+> checked the proposed bodies in scratch with no new `Axiom` and
+> identical trusted identity sets (114 → 114). This child adds no
+> catalog export, package test or CV seed; scratch proof checks are
+> not an official conformance run, CI, publication, landing or a
+> measurement of landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export three public
+Transparent theorems with checked bodies, in this order, immediately
+after `poly_eq_false_refutes` and before `poly_eq_add`. Their public
+types have expressions before facts; reflexivity needs no premise,
+symmetry takes one `poly_eq` fact, and transitivity takes two:
+
+```ken
+pub theorem poly_eq_refl (e : Expr) : IsTrue (poly_eq e e)
+
+pub theorem poly_eq_sym
+    (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+  : IsTrue (poly_eq e2 e1)
+
+pub theorem poly_eq_trans
+    (e1 : Expr) (e2 : Expr) (e3 : Expr)
+    (h12 : IsTrue (poly_eq e1 e2))
+    (h23 : IsTrue (poly_eq e2 e3))
+  : IsTrue (poly_eq e1 e3)
+```
+
+Reflexivity uses the existing private `poly_same_refl` on the
+canonical form of `e`: `poly_eq e e` unfolds to the comparison of
+`canonicalize e` with itself. For symmetry, §2's `poly_eq_sound`
+gives `Equal Nat` of the two evaluations at every total environment;
+`Core.Logic.Transport`'s `sym` reverses that equality at `Nat`, and
+`poly_eq_complete` returns the reversed `IsTrue` decision. For
+transitivity, `poly_eq_sound` supplies both evaluation equalities at
+every environment; `trans` at `Nat` chains them before
+`poly_eq_complete` returns the endpoint decision. The private
+reflexivity helper stays private. These are relational laws of the
+Boolean canonical decision, not structural `Equal Expr` laws or
+function equalities. No further premise, new helper, postulate,
+primitive, kernel or surface change, or alteration to any §1–§10
+operation or law type is required.
