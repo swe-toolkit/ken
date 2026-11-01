@@ -9,7 +9,8 @@
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9;
-> SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10).** The §1–2
+> SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10;
+> SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION §11).** The §1–2
 > operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
@@ -53,12 +54,22 @@
 > with candidate-local trusted identities 114 → 114; CV statically
 > checked the seed but did not run it as Ken or through the official
 > conformance runner. Neither result establishes an official runner
-> execution or measured landed trust. Section 10 specifies four public
-> point-unit inclusions. Architect AC-0 checked them only in scratch
-> with equal trusted identities 114 → 114. This spec-only child adds no
-> §10 catalog export, package test or CV seed; no §10 official
-> conformance, CI, publication, landing or measured landed trust is
-> established.
+> execution or measured landed trust. Section 10's four public
+> point-unit inclusions, authored CV seed and package-owned test are
+> present on this base. Architect AC-0 checked them earlier in scratch
+> with equal trusted identities 114 → 114; neither that result nor the
+> package test establishes official conformance-runner execution or
+> measured landed trust. Section 11 states two further left-point-zero
+> multiplication laws. Architect AC-0 checked their proposed bodies
+> on `70dc30f97` in scratch without `Axiom` and with equal trusted
+> identities 114 → 114. The historical Spec-only child `bdc3e5b47`
+> stated the types without catalog exports, a package test or a CV seed.
+> Foundation reports that its assembled working tree contains the two
+> checked laws, package-owned test and corrected CV seed; the named
+> package test passed 3/3 using the actual seed fence with trusted
+> GlobalId identities 114 → 114. That working-tree report is not an
+> exact committed-tip gate and does not establish official conformance-
+> runner execution, CI, publication, landing or measured landed trust.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -1013,11 +1024,12 @@ test is candidate-local evidence, not execution of that seed.
 > (SPEC-NUMERICAL-INTERVAL-POINT-UNITS).** Architect AC-0 on exact
 > base `86b7cac5e` checked four generic laws with `ken check` and
 > `ken fmt --check` rc 0, no added `Axiom`, and equal scratch
-> `trusted_base()` identity sets 114 → 114. This is isolated design
-> evidence, not candidate catalog or seed execution. This spec-only
-> child adds no §10 catalog export, package test or CV-authored seed.
-> No §10 official conformance-runner execution, CI, publication,
-> landing or measured landed trust is established.
+> `trusted_base()` identity sets 114 → 114. The four checked catalog
+> exports, CV-authored seed and package-owned test are now on this
+> base. The package test checks its own generic and closed clients,
+> not execution of the separate seed through the official conformance
+> runner. Neither scratch evidence nor package checks establish an
+> official conformance-runner result or measured landed trust.
 
 `Algorithm.Numeric.RationalInterval` must export four public
 Transparent theorems in the order below, immediately after
@@ -1090,3 +1102,82 @@ goal shape, so it cannot discriminate the wrong unit. A closed
 fixture but does not supply a structural unit law. These cases
 illustrate the generic obligation; no §10 seed is authored or run
 by this spec-only child.
+
+## 11. Point zero absorbs interval multiplication by inclusion
+
+> **Section 11 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION).** Architect AC-0
+> on exact landed base `70dc30f97` checked both generic proposals in
+> scratch with rc 0, no `Axiom`, and equal `trusted_base()` identity
+> sets 114 → 114. The historical Spec-only child `bdc3e5b47`
+> stated the law types but did not add the catalog exports, package
+> test or CV seed. Foundation reports its assembled working tree now
+> includes both checked exports, a package-owned test and the corrected
+> CV-authored seed. The named package test passed 3/3 on that working
+> tree, exercising the actual seed's accepted block and isolated own-
+> span refusal, with trusted GlobalId identities 114 → 114. This is
+> Foundation's working-tree package-test evidence, not an exact
+> committed-tip gate or official conformance-runner execution; neither
+> scratch nor that report establishes CI, publication, landing or
+> measured landed trust.
+
+`Algorithm.Numeric.RationalInterval` must export two public Transparent
+laws in the following order, immediately after
+`interval_mul_one_l_rev_inside` and before the private `equiv_leq`:
+
+```ken
+pub theorem interval_mul_zero_l_inside
+      (i : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_mul (interval_point rational_zero) i)
+          (interval_point rational_zero))
+
+pub theorem interval_mul_zero_l_rev_inside
+      (i : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_point rational_zero)
+          (interval_mul (interval_point rational_zero) i))
+```
+
+Both laws quantify over **every** `i : Interval`, including inverted
+endpoints, with no side condition. They assert mutual **endpoint-value
+inclusion** between the product of the left point zero and point zero
+itself. As in §§3 and 10, `IsTrue (interval_inside …)` observes the
+stored lower and upper rational values; it does not assert structural
+`Equal Interval` or collapse every empty interval to a canonical value.
+Multiplication is componentwise: for `i = MkInterval a b`, the two
+product endpoints are `rational_mul rational_zero a` and
+`rational_mul rational_zero b`. Rational's public
+`(proof zero_l for rational_mul)` gives equivalence of each with
+`rational_zero`; the existing private `equiv_leq` transports each
+required direction to `rational_leq`, and the existing conjunction
+introduction combines the endpoint comparisons. Both checked proofs
+match the **written** `i`. `equiv_leq` and `rational_distrib_r` stay
+private; no new import, premise, axiom, kernel or surface rule is needed.
+No §1–§10 operation or law type changes.
+
+**Right-point-zero is a composition, not another export.** For the
+inclusion of `interval_mul i (interval_point rational_zero)` inside
+point zero, compose §5's
+`interval_mul_comm_inside i (interval_point rational_zero)` with
+`interval_mul_zero_l_inside i` using `interval_inside_trans`. In the
+opposite direction, compose `interval_mul_zero_l_rev_inside i` with
+`interval_mul_comm_inside (interval_point rational_zero) i`. These
+produce the right-zero inclusions from public laws only, without
+`zero_r for rational_mul` or a new named theorem.
+
+The CV-owned seed may apply both left-zero laws to the ordinary
+`i = [1/2,1]` and inverted `[1,1/2]` intervals. Its same-form
+closed discriminator keeps the product fixed: the true claim places
+`interval_mul (interval_point rational_zero) i` inside
+`interval_point rational_zero`, while the false claim substitutes
+`interval_point rational_one` as its target. Both use `Proved`:
+Architect AC-0 observed acceptance for the point-zero control and
+`KernelRejected TypeMismatch` at the false claim's own span. `Refl`
+refuses **both** claims and cannot separate them. A closed case is a
+behavioral discriminator, not a replacement for the two generic
+checked proofs. Seed authorship and official conformance execution
+belong to separate evidence stages; neither is claimed by this
+Spec-only child.
