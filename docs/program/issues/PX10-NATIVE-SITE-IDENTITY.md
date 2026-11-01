@@ -1,7 +1,7 @@
 ---
 id: PX10-NATIVE-SITE-IDENTITY
 title: "The native planner reads a site's identity (bracket settlement owner, response leaf, region-exit owner, call target) from the unit that emits the site's code, not from the site's static owner. The two diverge wherever a predeclared higher-order prelude function such as withChild has its callbacks emitted inside another unit, so PX10's three fixtures stop at four walls. Key every plane on the static owner, projecting to the emitting unit through one site-identity map"
-status: ready
+status: merged
 owner: runtime
 size: L
 tier: T1

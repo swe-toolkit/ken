@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE
 title: "Spec 72 §2 states that find_below returns None only when no m below the bound satisfies p, but not the converse: a client that has refuted every m below the bound cannot conclude that the search returns None without casing on the result itself. Rule from a checked D0 at zero trust and state the converse as a public law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
