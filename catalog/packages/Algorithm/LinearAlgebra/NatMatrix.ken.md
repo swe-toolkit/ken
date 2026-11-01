@@ -2946,11 +2946,12 @@ proof's `vector_cons_eq` also remains private. `vector_zero`,
 follow in that order. All thirty-three laws have checked bodies. This
 package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
-tests check generic imports, closed values and indexed relations, isolated refused claims, and
-the exact trusted-identity set. The indexed-sum package test checks the authored
-positive client and four isolated refusals; the matrix-vector linearity test
-checks its authored accepted client and isolated refusal. The transpose
-adjoint test checks its complete accepted seed, including both independently
+tests check generic imports, closed values and indexed relations,
+isolated refused claims, and the exact trusted-identity set. The
+indexed-sum package test checks the authored positive client and four
+isolated refusals; the matrix-vector linearity test checks its authored
+accepted client and isolated refusal. The transpose adjoint test checks
+its complete accepted seed, including both independently
 computed dot values, and refuses the swapped-input claim. The vector-scaling
 seed checks both sides of all four laws against independent values and isolates
 a dropped factor. The zero-vector package test checks open law types and
