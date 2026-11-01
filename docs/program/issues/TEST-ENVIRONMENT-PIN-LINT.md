@@ -1,7 +1,7 @@
 ---
 id: TEST-ENVIRONMENT-PIN-LINT
 title: "Tests pin values that are functions of the whole compiler prelude (absolute GlobalId and vis_origin numbers, absolute semantic-hash literals, whole-environment member counts), so every lawful prelude extension breaks pins outside the extending WP and they surface one CI round at a time: PX10 hit three such stops. Re-key the latent pins by role or relative equality, and add a test-source lint over the three value shapes with an allowed inventory and a seeded-positive control"
-status: ready
+status: merged
 owner: verify
 size: M
 tier: T1
