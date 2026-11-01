@@ -53,7 +53,7 @@ base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-Three increments, each its own candidate, in order.
+Four increments, each its own candidate, in order.
 
 1. **Increment 1, entries and loader** (Language, M). The AC-0's R1
    root discovery, R2 strict isolated entries with the loader, and R4
@@ -73,10 +73,18 @@ Three increments, each its own candidate, in order.
 
    Spec co-turn: 33 §3.2.1 (the trio), 36 §4.5 (the State spellings),
    38 (the families) and the 30 §4 roster and ledger rows. The mapping
-   and child-process remainders (D0 §3) are an operator fork and stay
-   held. Console `read`, `wall_now` and `host_clock` are unpromised, and
-   their users stay held.
-3. **Increment 3, route switches.** check, run (with roots threaded
+   and child-process remainders (D0 §3) are Increment 2b's. Console
+   `read`, `wall_now` and `host_clock` are unpromised, and their users
+   stay held.
+3. **Increment 2b, mapping and child-process homes** (Language, S).
+   Operator 2026-11-01 ("concur with rec"): the D0 §3 remainders get two
+   new ordinary catalog modules, `Capability.Process.Child` and
+   `Capability.System.Mapping`. This is the ruled exception to the home
+   rule above. They are catalog units, not intrinsic or host modules, and
+   they add no trust. It lands before Increment 3, because AC-3a needs
+   their users to check under Strict. Spec co-turn: 38 and the 30 §4
+   roster rows.
+4. **Increment 3, route switches.** check, run (with roots threaded
    through the API) and native-build through a strict preparation entry.
    It also migrates the files and inline sources. It opens with its own
    AC-0 on the full inline population, ken-verify included.
@@ -103,6 +111,18 @@ Increment 1:
   report on `check` with exit 0. The fail-closed arm stays.
 - **AC-1e (mutation, QA).** Dropping the postulate ownership loop
   reddens the Axiom row while the Proved row stays green.
+
+Increment 2b:
+
+- **AC-2b-a.** Each D0 §3 remainder name is exported from its ruled
+  module and has a PRELUDE_PACKAGE_HOMES row. Through the strict entry,
+  an isolated file that imports it is accepted, and the same file without
+  the import refuses with UnboundName.
+- **AC-2b-b.** `trusted_base()` is unchanged as an identity set, and no
+  intrinsic, host module or floor name is added.
+- **AC-2b-c.** The Legacy-clean isolated files that use these names are
+  counted on the cut base and on the candidate, and a test asserts how
+  many check through the strict entry with their imports.
 
 Increment 3:
 
