@@ -2955,9 +2955,13 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
 [independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md),
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
+[equivalence seed](
+ ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md), and
 [congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md)
-specify the public surface and closed observations. The public API comprises
+specify the public surface and closed observations. The equivalence seed is
+authored but has not been Ken-checked or executed by the official conformance
+runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
 and twenty-seven checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
