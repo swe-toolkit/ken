@@ -59,13 +59,23 @@ Three increments, each its own candidate, in order.
    root discovery, R2 strict isolated entries with the loader, and R4
    postulate ownership. Spec co-turn: 33 §3.2 (the isolated root) and
    70 §1.4 (postulate ownership). No route switch and no migration.
-2. **Increment 2, homes.** It needs Spec promise rulings first, for the
-   AC-0's groups C to G. The group G fork is ruled (i): the
-   program-entry surface is promised and homed in an existing owner,
-   with Capability.Process.Exit as the recommended owner. Then come the
-   Architect's keying D0 per family, the catalog exports, and the 36, 38
-   and ledger rows. A group D family with no owner and no §4 witnesses
-   returns to the operator.
+2. **Increment 2, homes** (Language, M), on the Architect's D0
+   evt_4t0zk96zkg1jg and the Spec rulings evt_yr384gavx2p6 and
+   evt_340dbj9fvwf4d:
+   - the D0's twelve PRELUDE_PACKAGE_HOMES rows and catalog exports,
+     plus the promised HostIO trio `host_fs`, `host_pure` and
+     `host_bind` in Capability.Process.Exit;
+   - the abstract-family arm in `package_home_table`, keyed on private
+     identity;
+   - the floor admissions: ReadProgress, WriteProgress,
+     ResourceOpenMode, MappingProt and ChildExit as scoped families,
+     and State's `state_get`, `state_put` and `run_state`.
+
+   Spec co-turn: 33 §3.2.1 (the trio), 36 §4.5 (the State spellings),
+   38 (the families) and the 30 §4 roster and ledger rows. The mapping
+   and child-process remainders (D0 §3) are an operator fork and stay
+   held. Console `read`, `wall_now` and `host_clock` are unpromised, and
+   their users stay held.
 3. **Increment 3, route switches.** check, run (with roots threaded
    through the API) and native-build through a strict preparation entry.
    It also migrates the files and inline sources. It opens with its own
@@ -110,7 +120,32 @@ Increment 3:
   `--resolution-report` records `write` as `source-declared` on all
   three routes.
 
-Increment 2's acceptance is framed once the Spec promise rulings land.
+Increment 2:
+
+- **AC-2a (homes).** Each homed name resolves on a strict isolated file
+  with its import and refuses with UnboundName without it, one row per
+  owning unit.
+- **AC-2b (abstract family).** `BufferHandle` homes as its type alone.
+  `BufferWindow` alone still refuses, because `MkBufferWindow` is
+  public, and so does a family with a constructor outside the private
+  set.
+- **AC-2c (composition).** `host_pure` and `host_bind` are checked
+  definitions with no `Axiom` and `trusted_base()` unchanged. The
+  Architect's exact-tip review rules whether they are defined in
+  `Exit.ken.md` or homed by row. A strict isolated program sequences
+  two `print_line` calls with `host_bind` and ends with `host_pure`.
+  Under `ken run`, the output is the two lines in order, so an action
+  the composition drops reddens the row.
+- **AC-2d (floor).** The roster and count pins grow by the admitted
+  families and State names, and the 30 §4, 33 and 39 roster text
+  agrees. A user binding named `get` or `put` still accepts.
+- **AC-2e (rename).** The rename from `get` and `put` to `state_get`
+  and `state_put` migrates every user in the same candidate. Every
+  source root is grepped, and every file that checked before still
+  checks.
+- **AC-2f (mutation, QA).** Removing the `host_bind` home row makes
+  AC-2c's program refuse with UnboundName. Removing the abstract arm
+  makes the `BufferHandle` row refuse.
 
 ## Stop conditions
 
@@ -122,4 +157,7 @@ Checks: 4 fired: fork (ii) cannot be written as a printing `main`, since
 no catalog unit yields HostIO. 6 fired: the population is the AC-0's 91
 files at the strict seam, with the inline count named as a lower bound
 for Increment 3's AC-0. 8 fired: AC-1e's mutant removes the ownership
-the Axiom row reads, while the Proved row reads only def_id.
+the Axiom row reads, while the Proved row reads only def_id. AC-2c
+compares run output, because a `let` of a HostIO value type-checks and
+drops its action (D0 §7), so a check-only row cannot tell the
+composition from a no-op.
