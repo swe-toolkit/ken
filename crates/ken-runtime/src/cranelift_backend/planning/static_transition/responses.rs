@@ -3870,6 +3870,7 @@ impl StaticTransitionPlan<'_> {
                         identity.emission_owner(), ContinuationEmissionOwner::Predeclared(_)
                     ) && !phase_a.demands.iter().any(|other|
                         other.producer_call_origin == demand.producer_call_origin
+                            && other.k_identity.producer_owner() == demand.k_identity.producer_owner()
                             && self.pre_schema_transport_sources.contains(&other.k_identity)
                             && !matches!(other.k_identity.emission_owner(),
                                 ContinuationEmissionOwner::Predeclared(_))
@@ -3962,7 +3963,7 @@ impl StaticTransitionPlan<'_> {
                 continue;
             }
             let owners = transport_producer_owners
-                .entry(demand.producer_call_origin)
+                .entry((demand.producer_call_origin, demand.k_identity.producer_owner()))
                 .or_insert((false, false));
             match demand.k_identity.emission_owner() {
                 ContinuationEmissionOwner::Predeclared(_) => owners.0 = true,
@@ -4035,7 +4036,7 @@ impl StaticTransitionPlan<'_> {
             let suppress_execute = false;
             let transport_source = transport_sources.contains(&demand.k_identity);
             let exclusively_predeclared_stage = transport_producer_owners
-                .get(&demand.producer_call_origin)
+                .get(&(demand.producer_call_origin, demand.k_identity.producer_owner()))
                 .is_some_and(|owners| *owners == (true, false));
             let relay_promote = relay_promotions.iter().any(|(source, _, edge)|
                 *source == demand.vis_origin && *edge == demand.k_identity

@@ -136,61 +136,58 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
     });
 }
 
-/// Promise class: transition sentinel, retired by
-/// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: argv_env_pipe and live_child
-/// each reach exactly one typed mixed-owner relay refusal, at relay source
-/// 1724 and 1228. Each has two region exits with one return-fold owner each,
-/// and the exit its returned-Vis plane reaches has one returning Vis.
-/// CLAIMED: planning gets past the return fold and, for argv_env_pipe, past
-/// the host-response leaf walk through closure continuations, to the
-/// mixed-owner transport stage. THE GAP: that stage stays refused here.
+/// Promise class: transition sentinel, retired by this WP's Increment 2.
+/// MEASURED: argv_env_pipe reaches the exact W7 caller-cut wall, while
+/// live_child reaches the P2 detached-result seat with two producers for
+/// result 1104. Each retains its exact static region-exit owners.
+/// CLAIMED: the W3 instance key admits the distinct provenance owners at
+/// one call without weakening either downstream one-producer guard.
+/// THE GAP: neither program is built or executed natively at these walls.
 #[test]
-fn px10_argv_and_live_plan_to_the_mixed_owner_stage() {
+fn px10_argv_and_live_advance_to_w7_and_p2() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
-    for (name, source, relay, expected) in [
+    for (name, source, wall, expected, seat) in [
         (
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
-            1724,
-            [
+            "one checked-IH caller transport has more than one detached source return cut",
+            &[
                 (ReturnFold, 1160, 571),
                 (ReturnFold, 1429, 1165),
                 (ReturnedVisSettlement, 1160, 1984),
-            ],
+                (ReturnedVisSettlement, 1429, 1537),
+            ][..],
+            None,
         ),
         (
             "px10_census_live_child",
             LIVE_CHILD,
-            1228,
-            [
+            "the detached-result seat projected 2 undischarged causal calls onto one unit result",
+            &[
                 (ReturnFold, 601, 12),
                 (ReturnFold, 870, 606),
                 (ReturnedVisSettlement, 601, 1488),
-            ],
+                (ReturnedVisSettlement, 870, 1043),
+            ][..],
+            Some(ken_runtime::DetachedResultSeatRefusalObservation {
+                edges: vec![(1104, 1073), (1104, 1101)],
+            }),
         ),
     ] {
         in_census_thread(name, move || {
-            let ((built, owners), refusals) =
-                ken_runtime::with_mixed_relay_refusal_observations(|| {
+            let ((built, owners), seat_refusals) =
+                ken_runtime::with_detached_result_seat_refusals(|| {
                     ken_runtime::with_region_exit_owner_observations(|| {
                         emit_below_gate(name, source)
                     })
                 });
+            assert_object_emission_wall(built, wall);
             assert_eq!(
-                refusals.len(),
-                1,
-                "{name}: one mixed-owner stage reaches the guard"
+                seat_refusals,
+                seat.into_iter().collect::<Vec<_>>(),
+                "{name}: exact downstream detached-result seat"
             );
-            assert_eq!(refusals[0].source, relay, "{name}: relay source");
-            assert!(
-                !refusals[0].edge_identity.is_empty(),
-                "{name}: the refused edge is causal"
-            );
-            assert_region_exit_owners(name, &owners, &expected);
-            assert_object_emission_wall(
-                built,
-                &format!("relay source StaticOriginId({relay}) has a mixed-owner transport stage"),
-            );
+            assert_region_exit_owners(name, &owners, expected);
         });
     }
 }

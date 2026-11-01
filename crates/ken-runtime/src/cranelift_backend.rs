@@ -207,6 +207,7 @@ pub use lowering::core::{
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,
     with_branched_scrutinee_unit_body_route1, with_handler_owned_deferred_response_mutation,
     with_match_recursor_census, with_exit_code_case_of_case_route_count,
+    with_detached_result_seat_refusals, DetachedResultSeatRefusalObservation,
     BranchedScrutineeUnitBodyRoute1, HandlerOwnedDeferredResponseMutation,
     MatchRecursorCensusRow,
 };
