@@ -23,7 +23,7 @@ arbitrary predicates or an unbounded search mechanism.
 
 ## Definition
 
-The public operation and its four laws lead. The private outcome invariant
+The public operation and its five laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
@@ -111,6 +111,12 @@ pub theorem find_below_stable
           }
   }
 
+pub theorem find_below_refuted
+      (p : Nat → Bool) (bound : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False)
+      → Equal (Option Nat) (find_below p bound) (None Nat) =
+  refuted_outcome_none p bound (find_below p bound) Refl
+
 fn find_next (p : Nat → Bool) (below : Nat) (prior : Option Nat) : Option Nat =
   match prior {
     None ↦ found_at below (p below);
@@ -164,6 +170,38 @@ theorem found_some_least
         (Equal Bool (lt_nat n bound) True)
         (And (Equal Bool (p n) True) (none_below p n))
         spec)
+
+theorem refuted_outcome_none
+      (p : Nat → Bool) (bound : Nat) (outcome : Option Nat)
+    : Equal (Option Nat) (find_below p bound) outcome
+      → none_below p bound
+      → Equal (Option Nat) (find_below p bound) (None Nat) =
+  match outcome {
+    None ↦ λobserved. λrefuted. observed;
+    Some n ↦
+      λobserved.
+        λrefuted.
+          absurd
+            (trans
+              Bool
+              True
+              (p n)
+              False
+              (sym
+                Bool
+                (p n)
+                True
+                (and_snd
+                  (Equal Bool (lt_nat n bound) True)
+                  (Equal Bool (p n) True)
+                  (find_below_sound p bound n observed)))
+              (refuted
+                n
+                (and_fst
+                  (Equal Bool (lt_nat n bound) True)
+                  (Equal Bool (p n) True)
+                  (find_below_sound p bound n observed))))
+  }
 
 theorem find_below_correct
       (p : Nat → Bool) (bound : Nat)
@@ -289,13 +327,21 @@ range. See the checked examples and refusals in the
 `find_below_sound` establishes that a reported witness is within the strict
 bound and satisfies the predicate. `find_below_least` establishes that no
 smaller number is a hit. `find_below_complete` establishes that an absent
-answer entails no hit anywhere below the bound. These three checked proof
-bodies transport `find_below_correct` across the actual result equality.
+answer entails no hit anywhere below the bound. Conversely,
+`find_below_refuted` establishes `None` from a proof that every number strictly
+below the bound fails the predicate.
+The first three checked proof bodies transport `find_below_correct` across
+the actual result equality.
 `find_below_stable` proves that an observed `Some n` persists when the bound
 grows. Its proof inducts over the larger bound: an earlier bound fits within
 the predecessor and reuses the induction hypothesis, or equals the new bound
 and transports the observed result. No corresponding `None` law holds: a
 larger range can contain a new hit.
+
+`refuted_outcome_none` matches the observed result through an explicit outcome
+equality. The `None` case returns that equality; the `Some n` case combines
+`find_below_sound`'s in-range hit with the premise refuting all in-range hits,
+yielding a contradiction.
 
 `find_below_correct` inducts over the bound. Its private `found_spec` states
 the stronger outcome invariant: `None` entails `none_below`, while `Some n`
@@ -311,15 +357,17 @@ new-bound branch without adding a public order law.
 
 The public contract fixes the least result or its absence, not an iteration
 order or a number of predicate calls. A bound controls the domain without
-introducing an equality operation on predicates. The outcome invariant and
-`lt_suc_not_lt_same` and `leq_suc_not_leq_same` are private proof
-scaffolding, not additional public laws.
+introducing an equality operation on predicates. The outcome invariant,
+`refuted_outcome_none`, `lt_suc_not_lt_same` and `leq_suc_not_leq_same`
+are private proof scaffolding, not additional public laws.
 Unlike `argmin` over an existing nonempty list, this package searches a numeric
 range and can return `None`.
 
 ## References
 
-- [Finite bounded-search contract](../../../../spec/50-stdlib/72-optimization.md#2-least-witness-below-a-finite-bound) — the four public laws and scope.
+- [Finite bounded-search contract](
+  ../../../../spec/50-stdlib/72-optimization.md#2-least-witness-below-a-finite-bound)
+  — the five public laws and scope.
 - [Argmin](Argmin.ken.md) — least-cost selection from a nonempty input,
   with a different carrier.
 - [Brute-force search](https://en.wikipedia.org/wiki/Brute-force_search) —
@@ -329,7 +377,7 @@ range and can return `None`.
 ## Trust & derivation
 
 The source implements the contract in `spec/50-stdlib/72-optimization.md` §2.
-Its public interface consists of `find_below` and the four named laws above;
+Its public interface consists of `find_below` and the five named laws above;
 all invariant and proof helpers are private. For the operation and its proof
 family, read Definition; for a closed client, follow Using it; for proof
 structure and scope, read Laws & proofs and Design notes.
@@ -340,5 +388,6 @@ Nat order. Its declarations add no `Axiom`, postulate, primitive, or foreign
 trust; the package inherits only its imports' existing assumptions. The
 [bounded-search seed](../../../../conformance/stdlib/optimization/seed-bounded-search.md)
 and [bound-stability seed](../../../../conformance/stdlib/optimization/seed-bounded-search-bound-stability.md)
-exercise the operation, all four public laws and the false results in
-package tests. No time, space, or predicate-call-count guarantee is claimed.
+exercise the operation, the four earlier public laws and the false results
+in package tests. The generic client checks the fifth law over open predicates
+and bounds. No time, space, or predicate-call-count guarantee is claimed.
