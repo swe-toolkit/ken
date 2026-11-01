@@ -7,10 +7,14 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
-use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
+use ken_elaborator::{extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole};
 use ken_kernel::Decl;
 
 const GRAPH: &str = "Algorithm.Graphs.Dependency";
+const SEED: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../conformance/stdlib/graphs/seed-reverse-involution.md"
+));
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -23,6 +27,29 @@ fn graph_env() -> ElabEnv {
     env.elaborate_module_from_roots(&[root()], GRAPH)
         .expect("§10 Graphs Dependency roots-loads");
     env
+}
+
+fn seed_source_containing(theorem: &str) -> &'static str {
+    let mut selected = None;
+    for fence in extract_ken_md(SEED)
+        .expect("§10 seed fences extract")
+        .fences
+        .into_iter()
+        .filter(|fence| fence.role == KenMdFenceRole::Source)
+    {
+        let source = &SEED[fence.body_range];
+        if parse_decls(source)
+            .expect("§10 source fence parses")
+            .iter()
+            .any(|decl| matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == theorem))
+        {
+            assert!(
+                selected.replace(source).is_none(),
+                "one source fence declares {theorem}"
+            );
+        }
+    }
+    selected.unwrap_or_else(|| panic!("§10 seed declares {theorem}"))
 }
 
 const GENERIC_CLIENT: &str = r#"
@@ -147,6 +174,43 @@ theorem double_walk_same_form :
     chain_walk =
   Refl
 "#;
+
+/// MEASURED: the CV-owned seed's complete accepted source block elaborates
+/// through both public laws and both double-Refl controls. After a fresh
+/// accepted prefix, its isolated one-reversal claim refuses at its own Refl.
+/// CLAIMED: the seed's accepted/refused Ken blocks are buildable against this
+/// candidate, and its discriminator selects graph direction rather than a
+/// malformed prelude. THE GAP: this is package-test elaboration of selected
+/// seed blocks, not execution through the official conformance runner.
+#[test]
+fn seed_accepted_client_checks_and_one_reversal_refuses_at_refl() {
+    let accepted_source = seed_source_containing("graph_reverse_law_client");
+    let refused_source = seed_source_containing("seed_neg");
+    let mut accepted = graph_env();
+    accepted
+        .elaborate_file(accepted_source)
+        .expect("CV seed's laws and double-Refl controls check");
+    let parsed = parse_decls(refused_source).expect("isolated seed refusal parses");
+    let [SourceDecl::TheoremDecl { name, body, .. }] = parsed.as_slice() else {
+        panic!("seed refusal is one theorem");
+    };
+    assert_eq!(name, "seed_neg");
+    let claim_span = body.span();
+    let mut rejecting = graph_env();
+    rejecting
+        .elaborate_file(accepted_source)
+        .expect("fresh accepted CV seed prefix before refusal");
+    match rejecting.elaborate_file(refused_source) {
+        Err(ElabError::TypeMismatch {
+            span: failure,
+            reason,
+        }) if reason == "Refl: the two sides of the goal are not convertible"
+            && claim_span.start <= failure.start
+            && failure.start < failure.end
+            && failure.end <= claim_span.end => {}
+        other => panic!("seed's one-reversal Refl must refuse: {other:?}"),
+    }
+}
 
 const FALSE_ONCE: &str = r#"
 theorem false_one_reverse :

@@ -8,7 +8,8 @@
 > SPEC-GRAPHS-REACHABILITY-TARGET-MONOTONE §6;
 > SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE §7;
 > SPEC-GRAPHS-REVERSE-REACHABILITY §8;
-> SPEC-GRAPHS-WALK-REVERSE-APPEND §9).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-WALK-REVERSE-APPEND §9;
+> SPEC-GRAPHS-REVERSE-INVOLUTION §10).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -44,6 +45,12 @@
 > The seed is authored but not Ken-checked or run through the official
 > conformance runner. Candidate-local tests establish no official
 > conformance, CI, publication, landing or measured landed trust.
+> Section 10 states two public reversal-involution laws. Architect's
+> AC-0 checked the proposed bodies in scratch on `b46d344f0` with no
+> `Axiom` and equal trusted identity sets 114 → 114. This Spec-only
+> child does not add §10 catalog exports, a package test or a CV seed;
+> scratch checks do not establish official conformance-runner execution,
+> CI, publication, landing or measured landed trust.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -909,3 +916,98 @@ same-endpoint walk by this law. These closed observations delimit the
 contract but do not replace its generic checked proof. The historical
 spec-only child authored no seed; the assembled candidate contains the
 CV-authored seed, which remains unexecuted.
+
+## 10. Reversing a graph and its walks twice
+
+> **Section 10 status: DRAFT v0
+> (SPEC-GRAPHS-REVERSE-INVOLUTION).** Architect AC-0 on landed base
+> `b46d344f0` checked both proposed public proofs and their three
+> private lemmas in scratch with no `Axiom` and equal `trusted_base()`
+> identity sets 114 → 114. This Spec-only child states the law types;
+> the §10 catalog exports, package-owned test and CV seed are not in
+> this child. Scratch checks are not official conformance-runner
+> execution, CI, publication, landing or measured landed trust.
+
+### 10.1 Two public checked laws
+
+`Algorithm.Graphs.Dependency` must export these two Transparent
+checked theorems, in this order, immediately after
+`walk_reverse_append` and before `contains`. Their public types are:
+
+```ken
+pub theorem graph_reverse_involutive
+      (q : Type) (g : Graph q)
+    : Equal (Graph q) (graph_reverse q (graph_reverse q g)) g
+
+pub theorem walk_reverse_involutive
+      (q : Type) (step : q → q → Bool) (s : q) (t : q) (walk : Walk q (MkGraph q step) s t)
+    : Equal
+        (Walk q (MkGraph q step) s t)
+        (walk_reverse
+          q
+          (graph_reverse q (MkGraph q step))
+          t
+          s
+          (walk_reverse q (MkGraph q step) s t walk))
+        walk
+```
+
+The graph law holds for an arbitrary, including open, `g : Graph q`:
+reversing its adjacency twice gives the original graph as a **proved**
+`Equal (Graph q)`, not as a definitional equality for an open `g`.
+The kernel has function and pair η, but no general η for `Graph`
+data. At a written `MkGraph q step`, the twice-reversed graph is
+definitionally equal to that graph by function η. The walk law is
+therefore stated at **that matched representation**. Its conclusion
+is equality of indexed `Walk` data, not merely equality of endpoints
+or reachability, and requires no `Finite q`, `DecEq q`, nonempty-walk
+condition or additional edge premise. Stating the result directly
+at an open `g` without transport is ill-typed: its twice-reversed
+walk belongs to `Walk q (graph_reverse q (graph_reverse q g)) s t`,
+not `Walk q g s t` by conversion. Neither public law changes any
+§1–§9 operation or law type.
+
+### 10.2 Private proof boundary and client transport
+
+The graph law matches on `g` and dispatches to the **private**
+`graph_reverse_involutive_at q step`, whose `MkGraph` goal closes by
+`Refl` using function η. A direct `Refl` in the elaborator's
+`MkGraph` match arm does not supply that checked proof; the applied
+private lemma does. The walk law matches on its written `walk`.
+The `WalkHere` case uses private `walk_reverse_involutive_here`,
+closed by `Proved` in the checked development rather than `Refl` for
+that open goal. The `WalkStep` case uses private `walk_reverse_prepend` to commute
+reversal across the unchanged private `walk_prepend`, then lifts the
+induction hypothesis under `WalkStep` with `cong` and composes the
+steps with `trans`.
+These three new lemmas and the existing `walk_prepend` remain private;
+the module gains no import, axiom, kernel or surface requirement.
+
+A client needing an open-`g` walk result may match `g` to obtain
+`MkGraph step`, apply `walk_reverse_involutive q step` in that arm,
+and use `graph_reverse_involutive q g` to transport through a
+**client-named** family mapping a graph `h` to `Walk q h s t`.
+The transport form is derivable, not a third public theorem. The
+family must be a named function: this parser refuses an inline `λ`
+in a type position. A closed graph applies the public walk law with
+`edge q g` as its `step`; the checked three-vertex chain client
+applies it to its two-edge walk. No helper becomes public merely
+because a client can perform this transport.
+
+### 10.3 Closed discriminator and evidence limit
+
+For a directed chain `V0 → V1 → V2` with no edge `V1 → V0`,
+`graph_reverse Vertex3 chain` cannot equal `chain`: its edge between
+`V0` and `V1` has the opposite direction. After a fresh accepted
+client applying both laws to `chain` and its two-edge `chain_walk`,
+the isolated one-reversal claim
+`Equal (Graph Vertex3) (graph_reverse Vertex3 chain) chain` with
+`Refl` must refuse at its own proof span. The same-form control
+`Equal (Graph Vertex3)
+  (graph_reverse Vertex3 (graph_reverse Vertex3 chain)) chain`
+with `Refl` accepts on the same fixture. Architect's D0 measured
+that `Proved` refuses both, so it cannot discriminate the false
+claim. The closed twice-reversed `chain_walk` equality accepts
+`Refl` while refusing `Proved`. These finite checks distinguish
+one reversal from two; they do not replace the generic proofs or
+establish official conformance-runner execution.
