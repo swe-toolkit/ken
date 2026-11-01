@@ -46,7 +46,7 @@ const INFER_STACK_BYTES: usize = 1_920 * 1024;
 // prelude is built on the child's default 2-MiB libtest thread, with ambient
 // RUST_MIN_STACK removed; only tower elaboration runs on the stated worker.
 // The first passing 64-KiB grid point is 1,344 KiB; 1,280 KiB overflows after
-// PRELUDE_OK. The 1,280-KiB lldb unwind has 66 resolve_type frames and zero
+// PRELUDE_OK. The 1,280-KiB lldb unwind has 65 resolve_type frames and zero
 // elab_type, elab_type_app or zonk_term_with frames: the resolver, not this
 // outlined elab cycle, sets the baseline floor. The candidate's per-level
 // elab_type frame is 448 bytes and elab_type_app is 3,392 bytes (objdump).
