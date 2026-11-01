@@ -762,6 +762,76 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+    /// One labelled checked-IH transport arm, shared by the PX8 labelled unit
+    /// switch and the PX10 issued-alternative switch. A labelled arm returns a
+    /// value; no forward-Ret collapse inside the switch.
+    fn lower_labelled_checked_ih_transport_arm(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        projection: Option<&(
+            CheckedIhGeneratedEntryProjection,
+            PendingCheckedIhCall,
+            StaticOriginId,
+        )>,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let authority = match self
+            .function_local
+            .checked_ih_generated_entry_access
+            .as_ref()
+        {
+            Some(access) => self.composed_return_forward_ret_authority(access, transport)?,
+            None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+        };
+        match authority {
+            #[cfg(feature = "px8-ds-test-support")]
+            ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "ComposedReturnForwardRetAuthority",
+                    "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                ));
+            }
+            #[cfg(feature = "px8-ds-test-support")]
+            ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                return Err(unsupported(LoweringCause::PlannerInvariant, "ComposedReturnForwardRetAuthority",
+                    "a validated Tail producer-to-Ret route formed more than one post-selection authority"));
+            }
+            ComposedReturnForwardRetAuthorityOutcome::NonApplicable
+            | ComposedReturnForwardRetAuthorityOutcome::Formed(_)
+            | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
+            | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {}
+            #[cfg(feature = "px8-ds-test-support")]
+            ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
+        }
+        if let Some((projection, pending, callee_origin)) = projection {
+            match projection.route() {
+                CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
+                    return Ok(self
+                        .call_direct_checked_ih_transport_from_case_environment(
+                            builder,
+                            transport,
+                            projection,
+                            *pending,
+                            *callee_origin,
+                            env,
+                        )?
+                        .into_routed_answer()
+                        .value);
+                }
+                CheckedIhGeneratedEntryRoute::TailProducerToRet => {
+                    // A labelled arm returns a value;
+                    // no forward-Ret collapse inside the switch.
+                    return self.call_tail_checked_ih_transport_from_case_environment(
+                        builder, transport, env,
+                    );
+                }
+            }
+        }
+        self.call_tail_checked_ih_transport_from_case_environment(builder, transport, env)
+    }
+
     pub(super) fn lower_source_machine(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -4673,8 +4743,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 selection.require_trivial_residual_continuation()?;
                             }
                             if let Some(selection @ RecursiveUnitBodySelection::Labelled { .. }) = body {
-                                // The sole switch is in calls.rs. Its callback
-                                // receives an exact body in each arm, so an S4
+                                // The exact-body switch is in calls.rs. Its
+                                // callback receives one body per arm, so an S4
                                 // arrival cannot borrow S3's unique transport.
                                 let coordinates = CarriedInvocationCoordinates::of(invocation)?;
                                 let owner = self.defining_emission_owner.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
@@ -4758,50 +4828,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             let _ = this.checked_ih_transport_child(
                                                 builder, LoweringOperand::Residual(word), &transport,
                                             )?;
-                                            let authority = match this.function_local
-                                                .checked_ih_generated_entry_access.as_ref() {
-                                                Some(access) => this.composed_return_forward_ret_authority(
-                                                    access, &transport,
-                                                )?,
-                                                None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
-                                            };
-                                            match authority {
-                                                #[cfg(feature = "px8-ds-test-support")]
-                                                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
-                                                    return Err(unsupported(LoweringCause::PlannerInvariant, "ComposedReturnForwardRetAuthority",
-                                                        "a validated Tail producer-to-Ret route has no exact post-selection authority"));
-                                                }
-                                                #[cfg(feature = "px8-ds-test-support")]
-                                                ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
-                                                    return Err(unsupported(LoweringCause::PlannerInvariant, "ComposedReturnForwardRetAuthority",
-                                                        "a validated Tail producer-to-Ret route formed more than one post-selection authority"));
-                                                }
-                                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable
-                                                | ComposedReturnForwardRetAuthorityOutcome::Formed(_)
-                                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
-                                                | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {}
-                                                #[cfg(feature = "px8-ds-test-support")]
-                                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
-                                            }
-                                            if let Some((projection, pending, callee_origin)) = &projection {
-                                                match projection.route() {
-                                                    CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
-                                                        return Ok(this.call_direct_checked_ih_transport_from_case_environment(
-                                                            builder, &transport, projection, *pending, *callee_origin,
-                                                            &env,
-                                                        )?.into_routed_answer().value);
-                                                    }
-                                                    CheckedIhGeneratedEntryRoute::TailProducerToRet => {
-                                                        // A labelled arm returns a value;
-                                                        // no forward-Ret collapse inside the switch.
-                                                        return this.call_tail_checked_ih_transport_from_case_environment(
-                                                            builder, &transport, &env,
-                                                        );
-                                                    }
-                                                }
-                                            }
-                                            this.call_tail_checked_ih_transport_from_case_environment(
-                                                builder, &transport, &env,
+                                            this.lower_labelled_checked_ih_transport_arm(
+                                                builder, &transport, projection.as_ref(), &env,
                                             )
                                         } else {
                                             // S4 has no transport; None is the
@@ -5485,62 +5513,8 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         let value = self.select_checked_ih_transport_alternative(
                             builder, &set, &members, residual,
                             |this, builder, transport| {
-                                let authority = match this.function_local
-                                    .checked_ih_generated_entry_access.as_ref() {
-                                    Some(access) => this.composed_return_forward_ret_authority(
-                                        access, transport,
-                                    )?,
-                                    None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
-                                };
-                                match authority {
-                                    ComposedReturnForwardRetAuthorityOutcome::Formed(_)
-                                        if this.tail_worker_body_is_ret_kmatch(transport)?
-                                            && this.tail_route_is_forward_edge_collapsible(transport)? =>
-                                    {
-                                        return Err(unsupported(LoweringCause::PlannerInvariant,
-                                            "CheckedIhEnvironmentTransport",
-                                            "a labelled checked-IH transport requires forward-Ret collapse inside the switch",
-                                        ));
-                                    }
-                                    #[cfg(feature = "px8-ds-test-support")]
-                                    ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
-                                        return Err(unsupported(LoweringCause::PlannerInvariant,
-                                            "ComposedReturnForwardRetAuthority",
-                                            "a validated Tail producer-to-Ret route has no exact post-selection authority",
-                                        ));
-                                    }
-                                    #[cfg(feature = "px8-ds-test-support")]
-                                    ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
-                                        return Err(unsupported(LoweringCause::PlannerInvariant,
-                                            "ComposedReturnForwardRetAuthority",
-                                            "a validated Tail producer-to-Ret route formed more than one post-selection authority",
-                                        ));
-                                    }
-                                    ComposedReturnForwardRetAuthorityOutcome::NonApplicable
-                                    | ComposedReturnForwardRetAuthorityOutcome::Formed(_)
-                                    | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
-                                    | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {}
-                                    #[cfg(feature = "px8-ds-test-support")]
-                                    ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
-                                }
-                                if let Some((projection, pending, callee_origin)) =
-                                    &current_checked_ih_projection {
-                                    match projection.route() {
-                                        CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
-                                            return Ok(this.call_direct_checked_ih_transport_from_case_environment(
-                                                builder, transport, projection, *pending,
-                                                *callee_origin, &env,
-                                            )?.into_routed_answer().value);
-                                        }
-                                        CheckedIhGeneratedEntryRoute::TailProducerToRet => {
-                                            return this.call_tail_checked_ih_transport_from_case_environment(
-                                                builder, transport, &env,
-                                            );
-                                        }
-                                    }
-                                }
-                                this.call_tail_checked_ih_transport_from_case_environment(
-                                    builder, transport, &env,
+                                this.lower_labelled_checked_ih_transport_arm(
+                                    builder, transport, current_checked_ih_projection.as_ref(), &env,
                                 )
                             },
                         )?;

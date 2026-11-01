@@ -869,8 +869,8 @@ impl<'a> Lowering<'a> {
                 })
         }
 
-        /// One switch per label carrier: this slot-residual switch selects an
-        /// exact worker body; the R2 Record switch selects an exact transport.
+        /// This slot-residual switch selects an exact worker body. A separate
+        /// issued-set transport switch also selects by its source slot label.
         /// Neither switch issues a transport/materialization edge.
         pub(super) fn select_recursive_position_unit<F>(
             &mut self,
