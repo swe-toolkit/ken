@@ -535,11 +535,6 @@ fn zero_annihilation_seed_checks_and_nonzero_input_refuses_at_refl() {
     };
     assert_eq!(name, "seed_neg");
     assert_eq!(proof, "Refl");
-    assert_eq!(
-        type_shape(theorem),
-        proposition_shape("Equal (Vec Nat two) (matrix_vector two two a u) zero2"),
-        "refusal keeps the false nonzero matrix-vector operand"
-    );
     let mut rejecting = matrix_env();
     rejecting
         .elaborate_file(accepted)
@@ -555,6 +550,11 @@ fn zero_annihilation_seed_checks_and_nonzero_input_refuses_at_refl() {
                 && span.start < span.end => {}
         other => panic!("§11 false nonzero input must refuse at its Refl: {other:?}"),
     }
+    assert_eq!(
+        type_shape(theorem),
+        proposition_shape("Equal (Vec Nat two) (matrix_vector two two a u) zero2"),
+        "refusal keeps the false nonzero matrix-vector operand"
+    );
 }
 
 // Sixteen positive, closed oracles from the sixteen-case conformance seed. The
