@@ -42,6 +42,8 @@ both regroupings of addition and multiplication by mutual inclusion. Two
 more checked laws give the least outer bound of a hull and the greatest
 inner bound of an intersection, including inverted intervals. Four additional
 laws regroup hull and intersection in both directions by endpoint inclusion.
+Four further laws place an interval inside its sum with the point zero and its
+product with the point one, and conversely, including inverted intervals.
 
 ```ken
 import Core.Logic.Conjunction (And, and_intro)
@@ -60,7 +62,9 @@ import Data.Numeric.Rational
     rational_add_mono,
     rational_mul_mono,
     rational_min,
-    rational_max)
+    rational_max,
+    rational_zero,
+    rational_one)
 
 pub data Interval : Type where {
   MkInterval : (lo : Rational) → (hi : Rational) → Interval
@@ -1172,6 +1176,78 @@ pub theorem interval_intersect_assoc_rev_inside
         (interval_intersect_inside_right i j))
       (interval_intersect_inside_right (interval_intersect i j) k))
 
+pub theorem interval_add_zero_l_inside
+      (i : Interval)
+    : IsTrue (interval_inside (interval_add (interval_point rational_zero) i) i) =
+  match i {
+    MkInterval a b ↦
+      (proof intro for bool_and)
+        (rational_leq a (rational_add rational_zero a))
+        (rational_leq (rational_add rational_zero b) b)
+        (equiv_leq
+          a
+          (rational_add rational_zero a)
+          ((proof sym for rational_equiv)
+            (rational_add rational_zero a)
+            a
+            ((proof zero_l for rational_add) a)))
+        (equiv_leq (rational_add rational_zero b) b ((proof zero_l for rational_add) b))
+  }
+
+pub theorem interval_add_zero_l_rev_inside
+      (i : Interval)
+    : IsTrue (interval_inside i (interval_add (interval_point rational_zero) i)) =
+  match i {
+    MkInterval a b ↦
+      (proof intro for bool_and)
+        (rational_leq (rational_add rational_zero a) a)
+        (rational_leq b (rational_add rational_zero b))
+        (equiv_leq (rational_add rational_zero a) a ((proof zero_l for rational_add) a))
+        (equiv_leq
+          b
+          (rational_add rational_zero b)
+          ((proof sym for rational_equiv)
+            (rational_add rational_zero b)
+            b
+            ((proof zero_l for rational_add) b)))
+  }
+
+pub theorem interval_mul_one_l_inside
+      (i : Interval)
+    : IsTrue (interval_inside (interval_mul (interval_point rational_one) i) i) =
+  match i {
+    MkInterval a b ↦
+      (proof intro for bool_and)
+        (rational_leq a (rational_mul rational_one a))
+        (rational_leq (rational_mul rational_one b) b)
+        (equiv_leq
+          a
+          (rational_mul rational_one a)
+          ((proof sym for rational_equiv)
+            (rational_mul rational_one a)
+            a
+            ((proof one_l for rational_mul) a)))
+        (equiv_leq (rational_mul rational_one b) b ((proof one_l for rational_mul) b))
+  }
+
+pub theorem interval_mul_one_l_rev_inside
+      (i : Interval)
+    : IsTrue (interval_inside i (interval_mul (interval_point rational_one) i)) =
+  match i {
+    MkInterval a b ↦
+      (proof intro for bool_and)
+        (rational_leq (rational_mul rational_one a) a)
+        (rational_leq b (rational_mul rational_one b))
+        (equiv_leq (rational_mul rational_one a) a ((proof one_l for rational_mul) a))
+        (equiv_leq
+          b
+          (rational_mul rational_one b)
+          ((proof sym for rational_equiv)
+            (rational_mul rational_one b)
+            b
+            ((proof one_l for rational_mul) b)))
+  }
+
 theorem equiv_leq
       (x : Rational) (y : Rational)
     : rational_equiv x y → IsTrue (rational_leq x y) =
@@ -1314,6 +1390,14 @@ grouping's two operands. Transitivity connects each nested inclusion. This
 argument does not require an interval to have an ordered pair of endpoints,
 and proves mutual endpoint-value inclusion, not structural equality.
 
+Point zero and point one act as left units for endpoint-value inclusion in
+both directions. Each proof splits the interval's two stored endpoints, uses
+Rational's left-unit value law for each endpoint, and turns that equivalence
+into an order comparison through the private `equiv_leq`. The proof applies
+to inverted intervals without requiring membership or ordered endpoints.
+Right-unit inclusions compose the public swap, left-unit and transitivity
+laws; no separate right-unit theorem is exported.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -1357,13 +1441,14 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and forty checked interval
+   `interval_intersect`, `interval_inside` and forty-four checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
    including endpoint inclusion, its witnessed converse, the four
-   distributivity/factoring inclusions and hull/intersection regrouping.
+   distributivity/factoring inclusions, hull/intersection regrouping and
+   the four point-unit inclusions.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -1376,7 +1461,9 @@ API.
    Rational order transitivity; the four swap inclusions reuse Rational
    commutativity or public min/max bounds without a new helper. Hull and
    intersection regrouping reuse only the public bound and transitivity laws.
-4. **Trusted-base delta.** Zero: all forty laws have checked proof bodies,
+   The four point-unit inclusions reuse Rational's left-unit value proofs
+   through the existing private `equiv_leq`, without a new helper.
+4. **Trusted-base delta.** Zero: all forty-four laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1390,7 +1477,9 @@ API.
    and [absorption seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersect-absorption.md)
    supply separately constructed positive values and false controls;
    those finite cases do not replace the generic checked proof bodies. The
-   distributivity seed's accepting client and dropped-product refusal, and the
+   [§10 seed](../../../../conformance/stdlib/numerical/seed-interval-point-units.md)
+   is authored but has not been Ken-checked or officially conformance-run.
+   The distributivity seed's accepting client and dropped-product refusal, and the
    inclusion-order seed's accepted client and two chain refusals, run in package
    tests. The associativity seed's whole accepted client, including its two
    closed `Refl` controls, and isolated false prefix-inclusion claim are checked
@@ -1402,6 +1491,9 @@ API.
    refusal against the two new public laws. The §9 package test checks four
    generic regrouping exports, three-interval computations, inverted inputs
    and the dropped-third-operand refusal. Its own fixture is not an official
-   conformance seed.
-   These package tests do not establish official conformance-runner execution,
+   conformance seed. The §10 package test checks all four generic left-point
+   laws, derives the four right-point forms from public exports, and separates
+   an accepted one-point product from a false zero-point product using `Proved`
+   on the same interval. These closed cases do not execute a §10 conformance
+   seed. These package tests do not establish official conformance-runner execution,
    CI, publication or landing.
