@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-ALL-IDENTITY
 title: "Spec 69 says which events a window keeps (§2 membership) and how windows compose, split and distribute, but not that a window covering every event of a trace returns the trace itself: membership cannot yield list equality, which needs order and duplicates. Rule from a checked D0 at zero trust that if every member of a trace lies in the window, the window is the trace, and state the law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
