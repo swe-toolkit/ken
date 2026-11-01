@@ -5522,6 +5522,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         captures,
                         params,
                         body,
+                        boundary_environment,
                         ..
                     } = base
                     else {
@@ -5530,6 +5531,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                             "recursive constructor field is not a closure",
                         ));
                     };
+                    Self::refuse_unrouted_boundary_environment(boundary_environment.is_some())?;
                     if params.len() != args.len() {
                         return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalMatch",

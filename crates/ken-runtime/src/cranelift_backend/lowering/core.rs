@@ -11238,13 +11238,13 @@ impl<'a> Lowering<'a> {
                 "the ruled recursive position names no field of the planned producer constructor",
             )
         })?;
-        let (selected_captures, selected_body, selected_arity) = match selected {
+        let (selected_captures, selected_body, selected_arity, selected_environment) = match selected {
             LoweringOperand::Specialized(Lowered::Closure {
                 captures,
                 params,
                 body,
-                ..
-            }) => (captures, *body, params.len()),
+                boundary_environment,
+            }) => (captures, *body, params.len(), *boundary_environment),
             LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
                 return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
@@ -11297,6 +11297,26 @@ impl<'a> Lowering<'a> {
                 ),
             ));
         }
+        // A returned boundary carrier stores captures in its environment's
+        // positional order. Tie the record to this worker before ordinal reads.
+        let environment_origins = match selected_environment {
+            Some(record) => {
+                let environment = self
+                    .static_transition_plan
+                    .boundary_closure_environment_by_record(record)?;
+                if environment.seat() != unit.worker_closure_origin()
+                    || environment.body_origin() != selected_body
+                    || environment.capture_origins().len() != selected_captures.len()
+                {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ContinuationSpecialization",
+                        "the selected closure's boundary environment is not this continuation's worker closure run",
+                    ));
+                }
+                Some(environment.capture_origins().to_vec())
+            }
+            None => None,
+        };
         let mut ordinary = Vec::with_capacity(envelope.len());
         let mut worker_captures = Vec::with_capacity(unit.worker_capture_count());
         let mut checked_capture_suffix = Some(Vec::new());
@@ -11383,11 +11403,30 @@ impl<'a> Lowering<'a> {
                     }
                     match source {
                         ContinuationWorkerCaptureSource::Lexical(origin) => {
+                            if let Some(origins) = environment_origins.as_ref() {
+                                if origins.get(*ordinal as usize) != Some(origin) {
+                                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                                        "ContinuationSpecialization",
+                                        format!(
+                                            "the ordinary envelope's capture ordinal {ordinal} names \
+                                             lexical origin {origin:?}, but the selected closure's \
+                                             boundary environment holds {:?} at that position",
+                                            origins.get(*ordinal as usize)
+                                        ),
+                                    ));
+                                }
+                            }
                             if let Some(suffix) = checked_capture_suffix.as_mut() {
                                 suffix.push((*ordinal, *origin));
                             }
                         }
                         ContinuationWorkerCaptureSource::Seed => {
+                            if environment_origins.is_some() {
+                                return Err(unsupported(LoweringCause::PlannerInvariant,
+                                    "ContinuationSpecialization",
+                                    "a seed capture source names a closure reconstructed from a positional boundary environment",
+                                ));
+                            }
                             checked_capture_suffix = None;
                         }
                     }

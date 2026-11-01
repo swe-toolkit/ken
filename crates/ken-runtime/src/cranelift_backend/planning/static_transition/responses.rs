@@ -3950,9 +3950,10 @@ impl StaticTransitionPlan<'_> {
         #[cfg(not(feature = "px8-ds-test-support"))]
         let _ = count_install_applications;
         // Execute-then-resume serves a composed response plane: at least two
-        // producer groups have exclusively predeclared transport sources.
-        // A producer that also has a specialization/fusion-owned source is a
-        // mixed-owner fan-out and does not increase the composition count. When
+        // producer instances (call, provenance owner) have exclusively
+        // predeclared transport sources. An instance that also has a
+        // specialization/fusion-owned source is a mixed-owner fan-out and
+        // does not increase the composition count. When
         // P1 is present it also cannot borrow the ordinary groups' promotion
         // authority; P1-free composed planes preserve their existing promotion.
         // This keeps single-stage and P1-bearing mixed-owner residuals on their

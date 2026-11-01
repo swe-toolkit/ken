@@ -7,6 +7,8 @@
 
 mod abi;
 mod aggregates;
+mod alternatives;
+pub(in crate::cranelift_backend) use alternatives::ProducerAlternativeSet;
 mod brackets;
 pub(in crate::cranelift_backend) use brackets::{
     BracketSettlement, BracketSettlementControlView, BracketSettlementId,

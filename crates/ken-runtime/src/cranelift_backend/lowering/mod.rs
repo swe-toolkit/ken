@@ -13699,13 +13699,21 @@ impl<'a> Lowering<'a> {
         // Taken BEFORE any of the construction below can fail, so a refusal
         // downstream cannot leave the capability outstanding and silently
         // re-spendable by a later edge.
-        let recursive_unit_body = recursive_unit_body.or_else(|| match &recursive {
-            LoweringOperand::Specialized(Lowered::Closure { body, .. }) => {
-                Some(RecursiveUnitBodySelection::Exact(*body))
+        let recursive_unit_body = match recursive_unit_body {
+            Some(selection) => Ok(Some(selection)),
+            None => match &recursive {
+                LoweringOperand::Specialized(Lowered::Closure {
+                    body,
+                    boundary_environment,
+                    ..
+                }) => Self::refuse_unrouted_boundary_environment(
+                    boundary_environment.is_some(),
+                )
+                .map(|()| Some(RecursiveUnitBodySelection::Exact(*body))),
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)
+                | LoweringOperand::Residual(_) => Ok(None),
             },
-            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)
-            | LoweringOperand::Residual(_) => None,
-        });
+        }?;
         let (residual, payload) = decompose_computational_recursor(recursive);
         let active_instance = self.active_recursive_invocations.last().copied();
         // ⛔ **The frame identity is TRANSPORTED, never inferred**
