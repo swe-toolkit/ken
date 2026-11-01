@@ -1320,6 +1320,14 @@ impl<'e> ElabCtx<'e> {
         self
     }
 
+    /// Install the checked effect-row plane on a context that has no class
+    /// environment, so a standalone expression classifies a performed `let`
+    /// RHS exactly as a declaration body does (`36 §2.4`).
+    fn with_effect_rows(mut self, effect_rows: CheckedEffectRows<'e>) -> Self {
+        self.effect_rows = Some(effect_rows);
+        self
+    }
+
     fn with_recursive_group(mut self, recursive_group: &HashSet<GlobalId>) -> Self {
         self.recursive_group = recursive_group.clone();
         self
@@ -27803,19 +27811,21 @@ fn recover_escaping_pattern_binder(
 
 // ----- standalone expression elaboration -----
 
-pub(crate) fn elaborate_rexpr(
-    env: &mut GlobalEnv,
-    globals: &HashMap<String, GlobalId>,
+pub(crate) fn elaborate_rexpr<'e>(
+    env: &'e mut GlobalEnv,
+    globals: &'e HashMap<String, GlobalId>,
     preconditions: &HashMap<GlobalId, (usize, usize)>,
-    num_values: &mut HashMap<GlobalId, NumericLitVal>,
-    numeric_env: &NumericEnv,
-    refinement_facts: &RefinementFacts,
+    num_values: &'e mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &'e NumericEnv,
+    refinement_facts: &'e RefinementFacts,
+    effect_rows: CheckedEffectRows<'e>,
     owner_label: impl Into<String>,
     rexpr: &RExpr,
 ) -> Result<(Term, Term), ElabError> {
     let (core, ty, expr_span) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, owner_label)
-            .with_preconditions(preconditions, PremiseHoles::Refused);
+            .with_preconditions(preconditions, PremiseHoles::Refused)
+            .with_effect_rows(effect_rows);
         let (core_raw, ty_raw) = infer(&mut cx, rexpr)?;
         let c = cx.metas.zonk_term(&core_raw);
         let t = cx.metas.zonk_term(&ty_raw);

@@ -1092,6 +1092,7 @@ impl ElabEnv {
                     &mut env.num_values,
                     &env.numeric_env,
                     &env.refinement_facts,
+                    elab::CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
                     owner_label,
                     &rexpr,
                 )
