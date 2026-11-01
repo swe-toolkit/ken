@@ -18856,42 +18856,11 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     let first = env.next_global_id();
-    let mut result = elaborate_rdecl_v1_with_effect_rows_inner(
-        env, globals, preconditions, num_values, numeric_env, class_env, provenance,
-        standard_operators, effect_rows, fixities, fixity_spans, ctor_decl_spans,
-        refinement_facts, declared_fixity, rdecl,
-    )?;
-    result.postulate_ids = env
-        .decls()
-        .filter(|decl| matches!(decl, ken_kernel::Decl::Opaque { .. }))
-        .map(ken_kernel::Decl::id)
-        .filter(|id| *id >= first && *id != result.def_id && !result.auxiliary_ids.contains(id))
-        .collect();
-    Ok(result)
-}
-
-fn elaborate_rdecl_v1_with_effect_rows_inner(
-    env: &mut GlobalEnv,
-    globals: &mut HashMap<String, GlobalId>,
-    preconditions: &mut HashMap<GlobalId, (usize, usize)>,
-    num_values: &mut HashMap<GlobalId, NumericLitVal>,
-    numeric_env: &NumericEnv,
-    class_env: &mut ClassEnv,
-    provenance: &mut Vec<crate::classes::InstanceResolution>,
-    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
-    effect_rows: &CheckedEffectRows<'_>,
-    fixities: &mut HashMap<GlobalId, Fixity>,
-    fixity_spans: &mut HashMap<GlobalId, Span>,
-    ctor_decl_spans: &mut HashMap<String, Span>,
-    refinement_facts: &mut RefinementFacts,
-    declared_fixity: Option<(Fixity, Span)>,
-    rdecl: &RDecl,
-) -> Result<ElabResult, ElabError> {
     let self_reference_waits_for_preadmission = !globals.contains_key(&rdecl.name)
         && rexpr_mentions_name(&rdecl.body, &rdecl.name)
         && matches!(rdecl.kind, RDeclKind::View { .. } | RDeclKind::Let);
-    if self_reference_waits_for_preadmission || !rdecl.contains_infix_spine {
-        return elaborate_associated_rdecl(
+    let mut outcome = if self_reference_waits_for_preadmission || !rdecl.contains_infix_spine {
+        elaborate_associated_rdecl(
             env,
             globals,
             preconditions,
@@ -18907,27 +18876,44 @@ fn elaborate_rdecl_v1_with_effect_rows_inner(
             refinement_facts,
             declared_fixity,
             rdecl,
-        );
+        )
+    } else {
+        let associated = reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators))?
+            .expect("a declaration marked with an infix spine must be reassociated");
+        elaborate_associated_rdecl(
+            env,
+            globals,
+            preconditions,
+            num_values,
+            numeric_env,
+            class_env,
+            provenance,
+            standard_operators,
+            effect_rows,
+            fixities,
+            fixity_spans,
+            ctor_decl_spans,
+            refinement_facts,
+            declared_fixity,
+            &associated,
+        )
+    };
+    if let Ok(result) = outcome.as_mut() {
+        attach_postulate_ids(env, first, result);
     }
-    let associated = reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators))?
-        .expect("a declaration marked with an infix spine must be reassociated");
-    elaborate_associated_rdecl(
-        env,
-        globals,
-        preconditions,
-        num_values,
-        numeric_env,
-        class_env,
-        provenance,
-        standard_operators,
-        effect_rows,
-        fixities,
-        fixity_spans,
-        ctor_decl_spans,
-        refinement_facts,
-        declared_fixity,
-        &associated,
-    )
+    outcome
+}
+
+/// Record the opaque identities this root result minted. Kept out of line so
+/// its iterator temporaries are not part of the elaboration recursion's frame.
+#[inline(never)]
+fn attach_postulate_ids(env: &GlobalEnv, first: GlobalId, result: &mut ElabResult) {
+    result.postulate_ids = env
+        .decls()
+        .filter(|decl| matches!(decl, ken_kernel::Decl::Opaque { .. }))
+        .map(ken_kernel::Decl::id)
+        .filter(|id| *id >= first && *id != result.def_id && !result.auxiliary_ids.contains(id))
+        .collect();
 }
 
 #[inline(never)]
