@@ -47,10 +47,15 @@
 > conformance, CI, publication, landing or measured landed trust.
 > Section 10 states two public reversal-involution laws. Architect's
 > AC-0 checked the proposed bodies in scratch on `b46d344f0` with no
-> `Axiom` and equal trusted identity sets 114 → 114. This Spec-only
-> child does not add §10 catalog exports, a package test or a CV seed;
-> scratch checks do not establish official conformance-runner execution,
-> CI, publication, landing or measured landed trust.
+> `Axiom` and equal trusted identity sets 114 → 114. The historical
+> Spec-only child `f08893523` stated the laws without catalog exports,
+> a package test or a CV seed. This assembled candidate includes the two
+> checked catalog laws, three private helpers, corrected CV seed and
+> package-owned test. Foundation QA reports the exact-tip named package
+> test passed 3/3 with candidate-local trusted identities 114 → 114.
+> Neither scratch nor package-test evidence establishes official
+> conformance-runner execution; none is claimed here. No CI,
+> publication, landing or measured landed trust is claimed.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -923,10 +928,17 @@ CV-authored seed, which remains unexecuted.
 > (SPEC-GRAPHS-REVERSE-INVOLUTION).** Architect AC-0 on landed base
 > `b46d344f0` checked both proposed public proofs and their three
 > private lemmas in scratch with no `Axiom` and equal `trusted_base()`
-> identity sets 114 → 114. This Spec-only child states the law types;
-> the §10 catalog exports, package-owned test and CV seed are not in
-> this child. Scratch checks are not official conformance-runner
-> execution, CI, publication, landing or measured landed trust.
+> identity sets 114 → 114. The historical Spec-only child `f08893523`
+> stated the public types but did not add catalog laws, a package test
+> or a CV seed. This assembled candidate includes both checked public
+> laws, three private helpers, a corrected CV-authored seed and a
+> package-owned test. Foundation QA reports that the named §10 test
+> passed 3/3 at exact candidate `b17ea8ec` with candidate-local trusted
+> identities 114 → 114; its checks include the accepted seed source
+> blocks and the isolated false `Refl` refusal. Those package-test
+> checks do not establish official conformance-runner execution, and
+> none is claimed here. Neither scratch AC-0 nor candidate-local tests
+> establish CI, publication, landing or measured landed trust.
 
 ### 10.1 Two public checked laws
 
