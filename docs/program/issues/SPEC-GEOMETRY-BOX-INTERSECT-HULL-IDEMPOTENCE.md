@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE
 title: "Spec 67 makes box intersection and hull commutative (§6), associative (§7), absorptive (§8) and distributive (§9) as structural Equal Box laws, but states no idempotence: §1.3, §6.2 and §8.1 each say so. A client cannot rewrite intersect b b or hull b b to b without recomposing absorption. Rule from a checked D0 at zero trust and state both laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
