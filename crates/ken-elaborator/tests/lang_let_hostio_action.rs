@@ -130,6 +130,41 @@ fn annotated_action_type_is_result_type_mismatch() {
         if reason.contains("annotated result type differs from the action's result type")));
 }
 
+/// Promise class: durable invariant (36 §2.4). The public standalone
+/// expression API used by REPL evaluation/type routes must reach the same
+/// checked bind identity as declaration elaboration, with the first write
+/// occupying bind's action argument rather than an ordinary Let value.
+#[test]
+fn public_standalone_performed_let_binds_the_first_checked_action() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let (core, ty) = env
+        .elaborate_expr(
+            "standalone_effectful_let",
+            "let r = write ConsoleStream.Stdout (bytes_encode \"a\") in \
+         write ConsoleStream.Stdout (bytes_encode \"b\")",
+        )
+        .expect("standalone action let elaborates");
+    let args = assert_bind(&env, &core);
+    let (first_head, _) = spine(args[4]);
+    assert!(
+        matches!(first_head, Term::Const { id, .. } if *id == env.globals["write"]),
+        "the first action, not its unevaluated tree value, is passed to bind"
+    );
+    let (type_head, _) = spine(&ty);
+    assert!(matches!(type_head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id));
+}
+
+/// Promise class: durable invariant. A pure standalone let retains the same
+/// ordinary kernel Let, independent of effect-row metadata on the context.
+#[test]
+fn public_standalone_pure_let_retains_kernel_let() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let (core, _) = env
+        .elaborate_expr("standalone_pure_let", "let n = 1 in n")
+        .expect("pure standalone let elaborates");
+    assert!(matches!(core, Term::Let { .. }));
+}
+
 #[test]
 fn annotated_non_tree_proc_result_remains_an_ordinary_let() {
     let mut env = ElabEnv::new().expect("checked prelude");
