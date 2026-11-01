@@ -89,7 +89,8 @@ SITE-IDENTITY lands.
    typed planner refusal, now the computational-occurrence
    PlannerInvariant (`aggregates.rs:465`), and the interpreter still
    reaches both FsReadFile operations.
-2. **Increment 2, R1 to R4**, with the per-guard disposition report.
+2. **Increment 2, R1 to R4**, with the per-guard disposition report and
+   the boundary-environment checks of AC-2e.
 
 ## Acceptance
 
@@ -122,6 +123,18 @@ Increment 2:
   - A mutant that writes the bare payload without its label is caught by
     the reader assertion before any field projection.
 - **AC-2d (no regression).** As AC-1c.
+- **AC-2e (boundary environments; Adversary evt_1sk82gw1hvv76,
+  Architect evt_5e2dn1gb0kvg8, evt_4qqmh8t0hgk81, evt_6epa2xgs5mkqf).**
+  Increment 1 landed the W3 key alone, so these move here.
+  - `core.rs:11212` takes the local capture-order check exactly as ruled
+    in evt_6epa2xgs5mkqf, not the unrouted-environment refusal. In
+    scratch, reversing the environment origins makes smoke's census run
+    refuse at that check.
+  - `mod.rs:13702` takes the ruled guard, through a `match` that returns
+    `Result` outside `or_else`.
+  - `source.rs:5521` takes `refuse_unrouted_boundary_environment` once
+    its arrival count over the census and the four instrumented bracket
+    suites reads 0. A nonzero count stops to the Architect.
 
 ## Stop conditions
 
