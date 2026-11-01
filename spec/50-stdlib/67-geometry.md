@@ -166,8 +166,8 @@ empty. They do not assert an `Eq Box` equation for two representations
 of an intersection. The §1 hull laws each preserve membership from
 one input; they do not themselves prove a least-hull statement.
 Section 5 states least-hull containment for every box, including
-inverted boxes, without asserting structural idempotence or equality
-between hull and union. The distance laws establish symmetry and
+inverted boxes, without asserting equality between hull and union;
+§13 states structural idempotence. The distance laws establish symmetry and
 zero at identical points, not triangle inequality. Architect D0 checked
 all six laws generically with private per-axis lemmas and existing
 checked `Nat`/Boolean laws; no closed seed replaces these proofs.
@@ -689,8 +689,8 @@ coordinate equalities give equality of both `Point` corners and then
 **structural `Equal Box`**. This includes inverted boxes: the
 coordinate formulas remain total and the proof does not infer
 identity from an empty set of members. It does not equate every
-representation of an empty box, idempotence or a complement law.
-Section 7 separately states associativity for each operation.
+representation of an empty box or state a complement law; §13 states
+idempotence. Section 7 separately states associativity for each operation.
 
 The private `point_equal` from the existing package stays private.
 The new `box_with_lo`, `box_with_hi` and `box_equal` are private
@@ -856,9 +856,10 @@ Each law returns the **left** natural argument after one nested
 opposite extremum, for all `m` and `n`. Clients use `(proof absorb
 for min) m n` or `(proof absorb for max) m n`; no premise about
 their order is needed. These are distinct from §6's commutativity
-and §7's associativity, and do not export a separate idempotence
-interface. All existing Nat selectors keep their types. An internal
-checked proof helper may support a recursive case; it is not a new
+and §7's associativity, and do not export a separate Nat idempotence
+interface; §13 derives box idempotence from the §8.2 laws without one.
+All existing Nat selectors keep their types. An internal checked proof
+helper may support a recursive case; it is not a new
 public law or a new source-visible operation.
 
 ### 8.2 Two structural box equalities
@@ -1178,3 +1179,46 @@ A negative `Equal Box` row must use `Refl`, not `Proved`, so refusal
 reflects the false structural equality rather than a malformed
 proof form. The historical spec-only child authored no seed; the
 assembled candidate contains the CV-authored but unexecuted seed.
+
+## 13. Idempotence of box intersection and hull
+
+> **Section 13 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE).** Architect AC-0
+> checked both generic proofs on the landed §12 base with no new `Axiom`
+> and unchanged scratch trusted identities 114 → 114 → 114. This
+> candidate adds the two catalog theorems, a closed seed and a
+> package-owned test. Candidate checks do not establish official
+> conformance-runner execution, CI, publication, landing or a measured
+> landed-trust result.
+
+`Algorithm.Geometry.NatBox` exports two public Transparent checked
+proofs immediately after `hull_intersect_absorb`, before the §9.2
+structural distribution laws:
+
+```ken
+pub theorem intersect_idempotent (b : Box) : Equal Box (intersect b b) b
+
+pub theorem hull_idempotent (b : Box) : Equal Box (hull b b) b
+```
+
+Both are structural equalities of stored corners for **every** box,
+including inverted `(3,3)–(1,1)`. They require no point witness or
+validity premise, and do not identify differently represented empty
+boxes. Each derives directly from the two §8.2 absorption theorems:
+`hull_intersect_absorb b b` rewrites the second argument of
+`intersect b (hull b (intersect b b))` to `b`, while
+`intersect_hull_absorb b (intersect b b)` reduces the whole to `b`.
+The dual proof uses `intersect_hull_absorb b b` under `hull b` and
+`hull_intersect_absorb b (hull b b)`. Equality transport (`cong`,
+`sym`, `trans`) composes these checked generic proofs. No Nat
+idempotence selector, new helper, assumption, operation change or
+§1–§12 law-type change is needed.
+
+The closed seed applies both public theorems to a valid box and an
+inverted box. Its same-form true control checks
+`Equal Box (intersect large large) large = Refl`. Its isolated false
+claim uses the same `Equal Box`/`Refl` form for
+`intersect small large = large`, where `small` is strictly inside
+`large`, so the intersection is `small`. The control distinguishes the
+wrong result from a rejected proof form; closed examples do not
+replace the generic proofs.

@@ -1,8 +1,9 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. Six box-and-distance laws, eight structural
-commutativity, associativity, absorption and distribution laws, three metric
+geometry operations. Six box-and-distance laws, ten structural
+commutativity, associativity, absorption, idempotence and distribution laws,
+three metric
 laws, two corner-membership laws, seven corner-wise containment laws, four
 inclusion-order laws, and three area laws carry kernel-checked generic proofs.
 
@@ -28,9 +29,9 @@ point set is empty.
 
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
-box-and-distance laws lead the definition; eight structural commutativity,
-associativity, absorption and distribution laws follow intersection and hull,
-ahead of the three metric laws. The two corner-membership laws
+box-and-distance laws lead the definition; ten structural commutativity,
+associativity, absorption, idempotence and distribution laws follow
+intersection and hull, ahead of the three metric laws. The two corner-membership laws
 follow the three metric laws. The corner-wise `inside` operation and its seven
 laws come next, then the four inclusion-order laws, followed by `area` and its
 three laws. Per-axis proof helpers and distance helpers stay private.
@@ -655,6 +656,36 @@ pub theorem hull_intersect_absorb (a : Box) (b : Box) : Equal Box (hull a (inter
           }
       }
   }
+
+pub theorem intersect_idempotent (b : Box) : Equal Box (intersect b b) b =
+  trans
+    Box
+    (intersect b b)
+    (intersect b (hull b (intersect b b)))
+    b
+    (cong
+      Box
+      Box
+      b
+      (hull b (intersect b b))
+      (intersect b)
+      (sym Box (hull b (intersect b b)) b (hull_intersect_absorb b b)))
+    (intersect_hull_absorb b (intersect b b))
+
+pub theorem hull_idempotent (b : Box) : Equal Box (hull b b) b =
+  trans
+    Box
+    (hull b b)
+    (hull b (intersect b (hull b b)))
+    b
+    (cong
+      Box
+      Box
+      b
+      (intersect b (hull b b))
+      (hull b)
+      (sym Box (intersect b (hull b b)) b (intersect_hull_absorb b b)))
+    (hull_intersect_absorb b (hull b b))
 
 pub theorem intersect_hull_distrib
       (a : Box) (b : Box) (c : Box)
@@ -2527,7 +2558,9 @@ mixed absorption proofs keep their shared box as the left operand.
 and `min::absorb` for its upper coordinates; `hull_intersect_absorb` uses
 the opposite selectors. `point_equal` and `box_equal` assemble the four
 coordinate equalities into structural `Equal Box`, including when a box
-has inverted corners and no member.
+has inverted corners and no member. `intersect_idempotent` and
+`hull_idempotent` compose the two public absorption laws using `sym`,
+`cong` and `trans`; no Nat selector or validity premise is needed.
 
 `inside_sound` transports point membership along the four corner comparisons
 of `inside`; `inside_refl` uses checked order reflexivity, including for
@@ -2581,8 +2614,10 @@ and antisymmetric; intersection is a greatest lower bound and hull a least
 upper bound for that order. The two
 mixed absorption laws return structural `Equal Box` to their shared left
 operand, without identifying boxes merely because they have the same points.
-The separate distribution laws prove both mixed operations distribute over
-each other by structural equality, not by identifying point-set equivalents.
+Intersection and hull are each idempotent on stored corners, even for
+inverted boxes. The separate distribution laws prove that the two
+operations distribute over each other by structural equality, not by
+identifying point-set equivalents.
 Different inverted boxes can have the same zero area without being structurally
 equal.
 Signed orientation remains outside this interface.
@@ -2598,8 +2633,8 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–12](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and thirty-three public checked law types,
+1. **Contract.** [Exact geometry, §§1–13](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and thirty-five public checked law types,
    including the two structural distribution, two corner-membership and
    inside-antisymmetry laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
@@ -2607,7 +2642,8 @@ Signed orientation remains outside this interface.
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
    `intersect_comm`, `hull_comm`, `intersect_assoc`, `hull_assoc`,
    `intersect_hull_absorb`, `hull_intersect_absorb`,
-   `intersect_hull_distrib`, `hull_intersect_distrib`, `manhattan_symm`,
+   `intersect_idempotent`, `hull_idempotent`, `intersect_hull_distrib`,
+   `hull_intersect_distrib`, `manhattan_symm`,
    `manhattan_self`, `manhattan_triangle`, `manhattan_zero_equal`,
    `manhattan_box_diameter`, `contains_lo_corner`, `contains_hi_corner`,
    `inside`, `inside_sound`, `inside_refl`, `intersect_inside_left`,
@@ -2678,5 +2714,10 @@ Signed orientation remains outside this interface.
    is authored in this candidate but has not been Ken-checked or officially
    conformance-run. Its accepted small-box self-inclusion and refused reverse
    inclusion and inverted-box equality are expectations, not executed evidence.
-   All twelve authored seeds supplement rather than replace the checked
+   The [idempotence seed][id]
+   applies both public proofs to regular and inverted boxes and refuses a
+   false same-form box equality in its package-owned roots-loader test.
+   All thirteen authored seeds supplement rather than replace the checked
    generic law bodies.
+
+[id]: ../../../../conformance/stdlib/geometry/seed-box-intersect-hull-idempotence.md
