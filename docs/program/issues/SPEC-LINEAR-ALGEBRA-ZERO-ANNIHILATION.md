@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION
 title: "Spec 65 §10 gives the zero vector as the unit of vector_add and states that scaling by Zero and a dot product with a left zero vector both yield zero, but states no law that the zero vector is absorbed: dot with a right zero vector, scaling the zero vector, and a matrix applied to the zero vector. A client must recompose dot_comm, vector_scale_zero and matrix_vector_homogeneous to rewrite any of them. Rule from a checked D0 at zero trust and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
