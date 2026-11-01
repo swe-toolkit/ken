@@ -253,6 +253,29 @@ missing-capability surface diagnostic. Opaque `Cap`, driver-only minting, and
 downward-only attenuation bound reachable authority by the declaration. This
 is ordinary Π/λ checking, not a new kernel rule or trusted primitive.
 
+The checked HostIO composition names are exported by
+`Capability.Process.Exit`, not admitted as new floor identities. The
+source imports the package for the exact pre-source `host_fs`,
+`host_pure` and `host_bind` identities:
+
+```ken
+proc host_fs (a : Auth) (r : Type) (m : FS a r)
+  : HostIO a r visits [FS]
+fn host_pure (a : Auth) (r : Type) (x : r) : HostIO a r
+fn host_bind (a : Auth) (x : Type) (y : Type)
+  (m : HostIO a x) (k : x → HostIO a y) : HostIO a y
+```
+
+`host_fs` lifts an FS action, `host_pure` returns a value as a HostIO
+action, and `host_bind` sequences two HostIO actions. The last two
+are checked prelude definitions homed by package export, not new
+effect labels or definitions authored in `Exit.ken.md`. The
+compiler-internal `FSOp`, `AmbientOp` and `host_exit` names are not
+made source APIs by these exports, and no generic `bind`/`ret` source
+promise follows. This admission changes neither the `main` type
+above nor any CLI resolution route: an isolated route still uses
+Legacy until its separate strict flip.
+
 Neither header takes a name token. The file path is the single identity of the
 program or package boundary; a spelling such as `program App` or `package Lib`
 is a syntax error. The header's presence is the signal, and an ordinary comment
@@ -399,17 +422,22 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
-  BufferSpan, Char, ConsoleStream, Coproduct, CreatePolicy, Equal,
-  ExitCode, FileError, HostIO, IOError, ITree, Instant, List, Nat,
-  Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
-  ResourceError, ResourceKind, Result, Top, TransferCount, Unit,
-  Utf8Error, eqChar}`. This floor subset contains thirty-two exact
-  identities: the prior thirty plus `ConsoleStream` and `eqChar`
-  (`30-taxonomy §4`). These are not thirty-two types: `Top` and
-  `Bottom` are proposition constants, `Proved` is a proof binding,
-  `HostIO` is a type-level function, and `eqChar` is a checked
-  comparator operation, not an inductive type or constructor family.
-  For an inductive floor type, its per-type
+  BufferSpan, Char, ChildExit, ConsoleStream, Coproduct, CreatePolicy,
+  Equal, ExitCode, FileError, HostIO, IOError, ITree, Instant, List,
+  MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
+  Prop, Proved, ReadProgress, ResourceError, ResourceKind,
+  ResourceOpenMode, Result, Top, TransferCount, Unit, Utf8Error,
+  WriteProgress, eqChar, run_state, state_get, state_put}`. This floor
+  subset contains forty exact identities: the prior thirty-two, five
+  scoped families and three State operations (`30-taxonomy §4`). It
+  is the ambiently nameable checked-identity roster, not a roster of
+  forty types. `Top` and `Bottom` are proposition constants, `Proved`
+  is a proof binding, `HostIO` is a type-level function, and `eqChar`,
+  `run_state`, `state_get` and `state_put` are checked operations, not
+  inductive types or constructor families. The space desugarer reads
+  the three State operations by their exact pre-source IDs (`36 §4.5`);
+  all three enter protected B, while bare `get` and `put` remain
+  unreserved by this floor. For an inductive floor type, its per-type
   **scoped constructors** property determines whether its whole exact
   constructor family also occupies bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
@@ -448,7 +476,14 @@ is a **surface error** (`24`) — it never reaches the kernel:
   resolve only as `ResourceError.C`, with no bare error name in B.
   `BufferSpan` and `TransferCount` are scoped, but `PrivateBufferSpan`
   and `PrivateTransferCount` remain constructor-private: neither bare
-  names nor qualified `T.C` paths expose them to source.
+  names nor qualified `T.C` paths expose them to source. The five
+  additional scoped families expose only `ReadProgress.ReadSome`,
+  `ReadProgress.ReadEof`, `WriteProgress.Wrote`,
+  `ResourceOpenMode.ResourceRead`,
+  `ResourceOpenMode.ResourceMetadata`,
+  `ResourceOpenMode.ResourceWriteCreate`, `MappingProt.ReadOnly`,
+  `MappingProt.ReadWrite`, `ChildExit.Exited` and
+  `ChildExit.Signaled`, with no bare constructor reservation.
   `ProcessInput`, `Prod`, and `Unit` are unscoped: `MkProcessInput`,
   `MkProd`, and `MkUnit` are bare names in B, with their exact parent
   identities. `Auth`'s `ANone`/`APartial`/`AFull`, `Bool`'s

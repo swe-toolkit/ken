@@ -271,6 +271,19 @@ six families. None is a new primitive or a trusted-base entry. Native
 `CreatePolicy::CreateNew` (and its sibling policy leaves); constructor
 scoping changes source paths, not these checked identities or leaves.
 
+Five further scoped families meet that same two-witness rule:
+`ReadProgress` and `WriteProgress` are the checked results of bounded
+buffer and pipe transfers (`38 §1.7.2`, §1.11); `ResourceOpenMode`
+selects the checked FS acquisition mode (`38 §1.3.1`); `MappingProt`
+selects the checked mapping protection (`38 §1.9`); and `ChildExit`
+is the checked result of waiting for a child (`38 §1.11`). Native
+operation signatures and result handling use each family's exact
+pre-source identity and constructor IDs, while the surface must name
+the matching type and its public cases. A same-shaped source family
+cannot replace a native-keyed identity. The five types, not their
+constructor leaves, are new counted floor members. All five families
+are scoped; source names the cases only as `T.C`.
+
 The Console stream carrier and the character comparator meet the same
 internal-provision conjunction. The host interpreter selects the exact
 checked `Stdin`, `Stdout`, and `Stderr` constructor IDs and their parent;
@@ -291,18 +304,23 @@ literal patterns must read that same registered ID rather than a
 mutable spelling lookup. The candidate rekeys that reader, so a
 same-spelling source declaration cannot change its comparator.
 
-Thus the closed **floor-identity roster** has thirty-two names:
-**`{Auth, Bool, Bottom, BufferSpan, Char, ConsoleStream, Coproduct,
-CreatePolicy, Equal, ExitCode, FileError, HostIO, IOError, ITree,
-Instant, List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
-Prop, Proved, ResourceError, ResourceKind, Result, Top, TransferCount,
-Unit, Utf8Error, eqChar}`**. The earlier thirty identities plus
-`ConsoleStream` and `eqChar` remain re-checked; floor admission alone
-adds no postulate or `trusted_base()` entry. The three scoped Console
-constructors and the Pair companions are separate from this 32-name
-count. These identities are not all types: `Top` and `Bottom` are
-proposition constants, `Proved` is a proof binding, `HostIO` a
-type-level function, and `eqChar` a checked comparator operation.
+Thus the closed **floor-identity roster** has forty names: the exact
+checked identities Strict source may name without an import, not a type
+roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
+ConsoleStream, Coproduct, CreatePolicy, Equal, ExitCode, FileError,
+HostIO, IOError, ITree, Instant, List, MappingProt, Nat, Option, Pair,
+ProcessInput, Prod, ProgramCaps, Prop, Proved, ReadProgress,
+ResourceError, ResourceKind, ResourceOpenMode, Result, Top,
+TransferCount, Unit, Utf8Error, WriteProgress, eqChar, run_state,
+state_get, state_put}`**. The prior thirty-two identities, five new
+scoped families and three State operations are re-checked; floor
+admission alone adds no postulate or `trusted_base()` entry. Their
+qualified constructors and the Pair companions are separate from this
+40-name count. These identities are not all types: `Top` and `Bottom`
+are proposition constants, `Proved` is a proof binding, `HostIO` a
+type-level function, and `eqChar`, `run_state`, `state_get` and
+`state_put` are checked operations. Bare `get` and `put` are not floor
+names or reserved by these operations.
 The definable `And`/`Dec`/`Yes`/`No` stay **out**
 (source-constructible, with a `Core/Logic` package home, and no
 internal-provision witness). The `Empty` needed by `space` desugaring
@@ -362,23 +380,37 @@ is scoped as the complete twelve-constructor family: source uses
 and `TransferCount` are scoped; their `PrivateBufferSpan` and
 `PrivateTransferCount` constructors retain their checked IDs and private
 visibility, with no bare reservation or newly public qualified path.
-`ProcessInput`, `Prod` and `Unit` are unscoped: their whole constructor
-families, respectively `MkProcessInput`, `MkProd` and `MkUnit`, are bare
-reserved names. `HostIO`, `Char`, and transparent `Pair` have no
-constructor family; `eqChar` is an operation, not a family. A
-same-shaped source family or definition has a different identity and
-is not the floor member. Every floor identity, constructor, and
+The new scoped families expose `ReadProgress.ReadSome`,
+`ReadProgress.ReadEof`, `WriteProgress.Wrote`,
+`ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata`,
+`ResourceOpenMode.ResourceWriteCreate`, `MappingProt.ReadOnly`,
+`MappingProt.ReadWrite`, `ChildExit.Exited` and `ChildExit.Signaled`
+at their exact checked constructor IDs; none reserves a bare leaf.
+`ResourceOpenMode.ResourceWriteCreate` carries the existing
+`CreatePolicy` value. `ProcessInput`, `Prod` and `Unit` are unscoped:
+their whole constructor families, respectively `MkProcessInput`,
+`MkProd` and `MkUnit`, are bare reserved names. `HostIO`, `Char`,
+and transparent `Pair` have no constructor family; `eqChar`,
+`run_state`, `state_get` and `state_put` are operations, not families.
+A same-shaped source family or definition has a different identity
+and is not the floor member. Every floor identity, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
 
 **Other effect-surface and Program-I identities remain candidates.** The
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
 also holds. `Unit`, `Coproduct`, `Instant` and `ITree` are admitted on exact-ID
-keying and independent `36` source needs; the six FS/resource families
-above are admitted on exact-ID keying and independent `38` source
-needs. `ConsoleStream`'s constructor family and `eqChar` also have
-separate exact-ID keying and source-need witnesses. Mere registration
-does not admit any identity. A source wrapper over an ABI (for example
+keying and independent `36` source needs; the six earlier FS/resource
+families and the five newly scoped families above are admitted on
+exact-ID keying and independent `38` source needs. The
+`ConsoleStream` constructor family and `eqChar` also have separate
+exact-ID keying and source-need witnesses. The space
+desugarer reads the exact pre-source IDs of `run_state`, `state_get` and
+`state_put` when it builds State effects (`36 §4.5`); that section
+independently requires programs to name those operations. They enter
+protected B as floor identities, not Pair companions or mere names in
+a mutable global table. Mere registration does not admit any
+identity. A source wrapper over an ABI (for example
 `Capability/Process/Exit`'s `exit_with`/`exit_from_result`) does not become
 an intrinsic identity by using one. `host_exit` is keyed but has no independent
 source-name requirement: it remains compiler-internal; an example using that
@@ -409,7 +441,7 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the thirty-two-identity set above and that candidate has no new
+remains the forty-identity set above and that candidate has no new
 ambient availability. `BufferWindow`, `ResourceBodyResult`,
 `ResourceBracketResult`, the `FS` source alias, `read_bytes` and `write_file`
 are source-promised but unkeyed: they remain outside B as package material,
@@ -433,12 +465,16 @@ The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
 **Implementation staging.** The specification fixes the
-thirty-two-identity floor and Pair's three checked companions as the
-current target. The thirty prior identities are present on this base;
-this candidate adds `ConsoleStream` and `eqChar`, the complete scoped
-Console constructor family, and the source-name migration atomically
-with the roster/count. The five unkeyed, source-promised Console/Char
-operations or aliases remain package identities: `IO`, `write`, and
+forty-identity floor and Pair's three checked companions as the
+current target. The prior thirty-two identities are present on this
+base; Increment 2 admits `ReadProgress`, `WriteProgress`,
+`ResourceOpenMode`, `MappingProt` and `ChildExit` as complete scoped
+families, plus the three checked State operations. This Spec child's
+code parent `1fc285c6` enumerates all forty, with the roster/count
+and source-name migration made atomically in the Language candidate.
+Candidate-local tests do not establish official conformance, CI or
+landing. The five unkeyed, source-promised Console/Char operations
+or aliases remain package identities: `IO`, `write`, and
 `print_line` are exported at their exact pre-source IDs by
 `Capability.Console.Text`; `charToInt` and `leqChar` by
 `Core.Classes.LawfulClasses`. These existing homes export the captured

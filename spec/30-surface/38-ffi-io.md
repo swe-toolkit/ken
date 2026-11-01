@@ -199,6 +199,20 @@ writeFile : Cap AFull -> Bytes -> CreatePolicy -> Bytes
   -> FS AFull (Result FileError Unit)
 ```
 
+The checked public `withResource` acquisition selects its mode with
+the existing pre-source `ResourceOpenMode` family:
+
+```ken
+data ResourceOpenMode = ResourceRead | ResourceMetadata | ResourceWriteCreate CreatePolicy
+```
+
+The family is scoped: callers use `ResourceOpenMode.ResourceRead` for
+reading, `ResourceOpenMode.ResourceMetadata` for metadata and
+`ResourceOpenMode.ResourceWriteCreate policy` for a write with the
+existing `CreatePolicy` value. None of these leaves is bare-reserved;
+their exact checked IDs, not same-shaped local modes, drive the FS
+acquisition. This does not change the `readFile` or `writeFile` types.
+
 `readFile` wraps `read_bytes`; `writeFile` wraps `write_file`. The wrappers do
 not re-type or replace those raw producers. A read-and-write program calls
 `readFile fullCap path` directly: the read wrapper accepts the authority carried
@@ -564,11 +578,12 @@ Derived `readAt` admits a raw `BufferWindow` in this exact order:
    `start`, a negative `length`, or `start > capacity` as `InvalidBounds`.
 3. Compute `effective = min(length, capacity - start)`. This subtraction is
    nonnegative because step 2 has established `start ≤ capacity`.
-4. If and only if `effective = 0`, return `ReadEof` from checked code without
-   emitting a private read operation or visiting the host. Thus
+4. If and only if `effective = 0`, return `ReadProgress.ReadEof` from
+   checked code without emitting a private read operation or visiting
+   the host. Thus
    `start = capacity` is an admitted closed endpoint: at capacity `8`, the raw
-   request `(start = 8, length = 4)` returns `ReadEof` without a host visit,
-   while `start = 9` returns `InvalidBounds`.
+   request `(start = 8, length = 4)` returns `ReadProgress.ReadEof`
+   without a host visit, while `start = 9` returns `InvalidBounds`.
 5. Otherwise invoke the positive-length private read operation with the exact
    resource stored in the handle and the range `(start, effective)`.
    Offset-plus-effective overflow returns `InvalidOffset` before host I/O.
@@ -577,8 +592,8 @@ Consequently a start in the closed range `0 ≤ start ≤ capacity` with a lengt
 beyond the available tail is capped to that tail, producing ordinary short
 progress when the effective range is positive. A zero raw length and an
 in-range closed endpoint are the two ways to derive a zero-effective
-`ReadEof`; neither may invoke a positive-length primitive. A caller-supplied
-capacity is never consulted.
+`ReadProgress.ReadEof`; neither may invoke a positive-length
+primitive. A caller-supplied capacity is never consulted.
 
 A mutating read invalidates the prior live window before the host operation.
 Positive success installs exactly the bytes actually read. EOF or error leaves
@@ -597,6 +612,13 @@ data WriteProgress
   = Wrote TransferCount
 ```
 
+These are two complete, scoped checked families: source matches
+`ReadProgress.ReadSome`, `ReadProgress.ReadEof` and
+`WriteProgress.Wrote` at their exact constructor identities. Bare
+`ReadSome`, `ReadEof` and `Wrote` are not reserved by these families;
+constructor declarations in the family above retain their original
+checked IDs.
+
 `TransferCount` is constructor-private, strictly positive, and bounded by the
 effective request: the post-validation length after any in-range tail cap. For
 `readAt`, this is the post-cap window length; for `writeAt`, it is the remaining
@@ -605,8 +627,8 @@ remaining request budget is `effective request - n`; the raw caller-requested
 length is not a progress bound after capping. Thus a tail-capped `readAt` with
 raw request 8, effective request 4, and count and span length 4 has remaining
 request budget 0 and total request budget `count + remaining = 4`. It has an
-`Int` projection. `ReadSome`'s `BufferSpan` and count are minted together, and
-the span length equals the count by construction.
+`Int` projection. `ReadProgress.ReadSome`'s `BufferSpan` and count are
+minted together, and the span length equals the count by construction.
 `Complete` and `Partial` are derived comparisons between the count and effective
 request; they are not runtime constructors or statuses. The checked view of a
 count carries its positivity and upper-bound witnesses; user code cannot detach
@@ -618,10 +640,10 @@ For a positive effective request, the partition is exact:
 
 | Host observation | Result |
 |---|---|
-| read returns zero | `ReadEof` |
-| read returns `0 < n ≤ effective request` | `ReadSome span n`, including a short read |
-| write returns `0 < n ≤ effective request` | `Wrote n`, including a short write |
-| write returns zero | error `NoProgress`, never `Wrote` |
+| read returns zero | `ReadProgress.ReadEof` |
+| read returns `0 < n ≤ effective request` | `ReadProgress.ReadSome span n`, including a short read |
+| write returns `0 < n ≤ effective request` | `WriteProgress.Wrote n`, including a short write |
+| write returns zero | error `NoProgress`, never `WriteProgress.Wrote` |
 
 `NoProgress` is the surface identity for the write-zero condition (also called
 `WriteZero` at a host boundary); it is not a successful progress value.
@@ -642,10 +664,11 @@ include these propositions (`remaining` and `effective_request` denote the
 `Int` budgets fixed above):
 
 - **write positivity/bounds:** successful `writeAt` on positive remaining bytes
-  yields `Wrote n` with `And (IsTrue (leq_int 1 n))
+  yields `WriteProgress.Wrote n` with `And (IsTrue (leq_int 1 n))
   (IsTrue (leq_int n remaining))`;
 - **read positivity/bounds:** successful `readAt` on a positive effective
-  request yields either `ReadEof` or `ReadSome span n` with
+  request yields either `ReadProgress.ReadEof` or
+  `ReadProgress.ReadSome span n` with
   `And (IsTrue (leq_int 1 n)) (IsTrue (leq_int n effective_request))`
   and `Equal Int (length span) n`;
 - **position and bounds:** every transfer uses the explicit nonnegative file
@@ -689,10 +712,11 @@ Let `N = n₁ + … + nₖ`. The required theorem is the conjunction of:
 
 The executable helper matches the structural budget. Empty input succeeds
 without a host call. In the `Suc fuel` branch it performs one positive-length
-`writeAt`; `Wrote n` advances offset and span by `n`, decreases remaining bytes
-strictly, and recurses with `fuel`; an error returns unchanged. Since every
-successful count is positive and at most the remaining length, no more than the
-original byte length successful steps are possible. Fuel exhaustion with bytes
+`writeAt`; `WriteProgress.Wrote n` advances offset and span by `n`,
+decreases remaining bytes strictly, and recurses with `fuel`; an error
+returns unchanged. Since every successful count is positive and at
+most the remaining length, no more than the original byte length
+successful steps are possible. Fuel exhaustion with bytes
 remaining is excluded by the positivity lemma and is not a user-visible error.
 
 PX8-F must supply real kernel-checked terms that consume the checked
@@ -766,8 +790,9 @@ token. Every access is a **bounded-view copy** — bytes out of, or caller bytes
 into, a bounds-checked window — never a mutable pointer into the region. Access
 is **window-direct**: a mapping exposes no separate view token. `Buffer`'s
 `BufferSpan` (`§1.7.1`) earns its keep only because `readAt` **caps** — the
-actually transferred subrange can be smaller than the request (`ReadSome
-BufferSpan _`, `§1.7.2`) — so a minted token must carry what was actually read.
+actually transferred subrange can be smaller than the request
+(`ReadProgress.ReadSome BufferSpan _`, `§1.7.2`) — so a minted token
+must carry what was actually read.
 A mapping does **not** cap: it bounds-checks each window against a fixed extent
 and rejects an out-of-range one (below), so a live window's subrange **is** the
 window and no span carries an invariant the window does not. This is the
@@ -808,8 +833,8 @@ cannot restore it.
 **Source, offset, protection, and views.** `withMapping` takes the mapping
 source — anonymous with a length, or a file `Resource ResourceKind.FsHandle`
 with a length (the mapping starts at file offset 0) — and a requested
-protection (`ReadOnly` or `ReadWrite`). Ken observes only the opaque
-`MappingHandle`, an immutable `MappingWindow`
+protection (`MappingProt.ReadOnly` or `MappingProt.ReadWrite`). Ken
+observes only the opaque `MappingHandle`, an immutable `MappingWindow`
 (offset, length) naming a read subrange, and the scalar extent. A read view
 (`mapBytes`) copies a window's bytes out; a write view (`mapWrite offset bytes`)
 copies the caller's `bytes` into the subrange `[offset, offset + len bytes)`. The
@@ -845,8 +870,10 @@ proc mapWrite (a : Auth) (mapping : MappingHandle) (offset : Int) (bytes : Bytes
 where the read window `MappingWindow = MkMappingWindow Int Int` (offset, length),
 `MappingSource = Anonymous Int | FileBacked (Resource ResourceKind.FsHandle) Int`
 (each a length; a `FileBacked` mapping starts at file offset 0), and
-`MappingProt = ReadOnly | ReadWrite`. A `ReadOnly` mapping refuses `mapWrite`
-with a fail-visible `ResourceError`.
+`MappingProt = ReadOnly | ReadWrite`. These are checked, scoped cases:
+source selects only `MappingProt.ReadOnly` or `MappingProt.ReadWrite`,
+not bare `ReadOnly` or `ReadWrite`. A `MappingProt.ReadOnly` mapping
+refuses `mapWrite` with a fail-visible `ResourceError`.
 
 **The surface is 1:1 with the frozen wire — no validate-and-discard parameter.**
 Every checked parameter of the mapping surface passes through to a frozen-wire
@@ -973,6 +1000,11 @@ pub fn with_stdout (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
 pub fn with_stderr (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
 ```
 
+`ChildExit` is a scoped, exact checked family: source uses
+`ChildExit.Exited` and `ChildExit.Signaled` with their `UInt8`
+payloads, not bare `Exited` or `Signaled`. This does not make the
+separate `ChildStdio` family a floor admission.
+
 `spawn_plan` sets the environment to empty and all three child streams to
 `ChildNull`. `with_environment` replaces, rather than adds to, the plan's
 environment; each stdio builder sets its named target. A plan is inert until
@@ -1075,9 +1107,10 @@ stdin end. Together with `ResourceKind.FsHandle`,
 seven-kind inventory of this slice. All seven constructors are scoped
 `ResourceKind.C` paths; none is a bare reserved name. `read_pipe` uses
 an existing `BufferHandle` and admitted `BufferWindow`, yielding
-`ReadSome` with a bounded span and count or `ReadEof`. `write_pipe` uses
-a `BufferSpan` from that same buffer acquisition and returns `Wrote`
-with the actual count; a short write remains the caller's work. Neither
+`ReadProgress.ReadSome` with a bounded span and count or
+`ReadProgress.ReadEof`. `write_pipe` uses a `BufferSpan` from that
+same buffer acquisition and returns `WriteProgress.Wrote` with the
+actual count; a short write remains the caller's work. Neither
 exposes a raw file descriptor or pointer. A pipe client also needs the
 existing `withBuffer` bracket and its `[FS]` effect, so its combined
 row is `[FS, Process]`. A write after the child closes its read end
@@ -1089,9 +1122,10 @@ the Ken edge by SIGPIPE.
 closing an end invalidates every copy, and a repeated close returns
 `Closed`. The bracket still owns and settles an end closed early by the
 body. `wait_child` blocks until the child exits or is killed by a signal,
-returning `Exited code` or `Signaled signal`, with the observed code or
-signal number as `UInt8`. Its successful result is cached: another
-`wait_child` on that live child returns the same `ChildExit`. Stopped and
+returning `ChildExit.Exited code` or `ChildExit.Signaled signal`,
+with the observed code or signal number as `UInt8`. Its successful
+result is cached: another `wait_child` on that live child returns the
+same `ChildExit`. Stopped and
 continued states are not wait results. At bracket settlement, taken and
 untaken pipe ends are released **before** the child, in reverse
 acquisition order; an unwaited child is reaped. On terminal-error
@@ -1154,8 +1188,8 @@ Ken does not reset SIGCHLD or promise a successful wait in that
 environment. This is a measured residual, not permission to change
 the inherited-disposition rule of §1.10. Outside that residual, the
 AC-1 observations include an argv/environment echo through a stdout
-pipe followed by `Exited 0`, and a self-SIGTERM child yielding
-`Signaled 15`, under the checked interpreter. AC-2 observes the live
+pipe followed by `ChildExit.Exited 0`, and a self-SIGTERM child yielding
+`ChildExit.Signaled 15`, under the checked interpreter. AC-2 observes the live
 child's three descriptors, default SIGPIPE and inherited mask while a
 non-CLOEXEC parent descriptor is present. Deny-by-default descriptors
 and SIGPIPE reset are independent obligations: removing either must
