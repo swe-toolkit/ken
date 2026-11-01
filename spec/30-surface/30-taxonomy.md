@@ -456,6 +456,32 @@ alone does not admit a name, and registering it in `globals` proves
 neither clause. Each added checked floor member remains out
 of `trusted_base()`.
 
+**Increment 2b explicit-import home roster (outside the floor).**
+The following two catalog modules home the D0 §3 mapping and
+child-process remainders at their existing checked pre-source IDs.
+They add no member to the forty-identity floor, no primitive, no
+postulate and no `trusted_base()` identity (§38 §1.9, §1.11):
+
+- `Capability.System.Mapping` (8): `MappingHandle`, `MappingWindow`,
+  `MkMappingWindow`, `MappingSource`, `Anonymous`, `FileBacked`,
+  `mapBytes`, `mapWrite`. `MappingHandle` is abstract: its private
+  constructor and fields are not exported. The two public families
+  include all their constructors.
+- `Capability.Process.Child` (12): `ChildStdio`, `ChildPipe`,
+  `ChildNull`, `ChildInherit`, `spawn_plan`, `with_environment`,
+  `with_stdin`, `with_stdout`, `withChild`, `wait_child`,
+  `take_stdout`, `read_pipe`. `ChildStdio` is exported with all three
+  public constructors; the plan constructor stays private.
+
+`ChildExit` and `MappingProt` remain scoped floor families, not
+package-home rows. `withMapping` remains in
+`Capability.System.Resource`. The later `SpawnPlan`, `with_stderr`,
+`take_stdin` and `take_stderr` home promises are not Increment 2b
+rows; Increment 3 AC-0 owns their resolution. An explicit import
+makes each homed name available in Strict isolated source, whereas
+an unimported use refuses `UnboundName`. These homes change neither
+CLI routes nor the separate Legacy-root guarantees below.
+
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
 and it has no internal-provision witness. It is therefore a standard-package
