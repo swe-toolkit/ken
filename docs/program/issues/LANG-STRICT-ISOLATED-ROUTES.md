@@ -119,6 +119,11 @@ Increment 3:
   shadow `fn write` imports its provider on an isolated file, and
   `--resolution-report` records `write` as `source-declared` on all
   three routes.
+- **AC-3e (conformance, CV; Steward evt_3p2y0qq0g1j43).** Conformance
+  cases for 33 §3.2 root discovery from the source file, including a
+  relative spelling and a `..` spelling, and for 70 §1.4: a root-owned
+  `= Axiom`, `axiom` and `ensures` hole each report as
+  `source-declared`.
 
 Increment 2:
 
