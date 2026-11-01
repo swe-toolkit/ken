@@ -67,6 +67,36 @@ pub fn with_exit_code_case_of_case_route_count<T>(operation: impl FnOnce() -> T)
     (result, count)
 }
 
+/// Test-only observation at the actual multi-edge detached-result refusal.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DetachedResultSeatRefusalObservation {
+    pub result: u32,
+    pub constructs: Vec<u32>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static DETACHED_RESULT_SEAT_REFUSALS:
+        std::cell::RefCell<Option<Vec<DetachedResultSeatRefusalObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_detached_result_seat_refusals<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<DetachedResultSeatRefusalObservation>) {
+    DETACHED_RESULT_SEAT_REFUSALS.with(|slot| {
+        assert!(slot.borrow().is_none(), "detached-result observation windows cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let rows = DETACHED_RESULT_SEAT_REFUSALS.with(|slot| {
+        slot.borrow_mut().take().expect("detached-result observation window")
+    });
+    (result, rows)
+}
+
 mod primitive;
 
 #[cfg(test)]
@@ -12751,6 +12781,16 @@ impl<'a> Lowering<'a> {
             [] => return Ok(lowered),
             [edge] => *edge,
             _ => {
+                #[cfg(feature = "px8-ds-test-support")]
+                DETACHED_RESULT_SEAT_REFUSALS.with(|slot| {
+                    if let Some(rows) = slot.borrow_mut().as_mut() {
+                        rows.push(DetachedResultSeatRefusalObservation {
+                            result: residual[0].producer_result_origin.observation_ordinal(),
+                            constructs: residual.iter().map(|edge|
+                                edge.producer_construct_origin.observation_ordinal()).collect(),
+                        });
+                    }
+                });
                 return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
