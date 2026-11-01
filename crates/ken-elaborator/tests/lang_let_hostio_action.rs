@@ -6,9 +6,15 @@
 //! independently observe execution order. A performing RHS inside a
 //! non-tree-result proc with a non-empty row is elaborated by the unmodified
 //! ordinary-let fallback and is not sequenced; pre-existing on the exact
-//! base; filed separately.
+//! base; filed separately. An RHS whose effect comes only from a local
+//! binder's latent row (for example a callback parameter `f : A ->[E] B`
+//! applied as `f a`) is not classified as performing, because the shared
+//! row plane (`infer_expr_row_type`) does not yet carry local latent rows
+//! (36 §1.2 `latent(typeof(Γ,f))`). Such a let behaves exactly as on the
+//! base. The same plane gap makes the effect-escape gate accept those calls;
+//! both are closed by `LANG-EFFECT-ROW-LOCAL-LATENT`, not by this WP.
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, Term};
 
 fn checked_def<'a>(env: &'a ElabEnv, id: ken_kernel::GlobalId) -> (&'a Term, &'a Term) {
@@ -80,6 +86,44 @@ fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_bo
         4,
         "Ret must wrap the pure body exactly once"
     );
+}
+
+/// Promise class: transition sentinel for 36 §2.4 inclusion. A valid
+/// different signature is unsupported until `incl` is built; an annotated
+/// result mismatch remains an ill-typed expression, not that limitation.
+#[test]
+fn valid_inclusion_reports_unsupported_variant_but_bad_annotation_is_type_mismatch() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let error = env
+        .elaborate_decl(
+            "proc cross : HostIO APartial ExitCode visits [Console] = \
+         let x = write ConsoleStream.Stdout (bytes_encode \"a\") in \
+           host_program APartial (print_line \"b\")",
+        )
+        .expect_err("signature inclusion is not built");
+    assert!(
+        error
+            .to_string()
+            .starts_with("unsupported: 36 §2.4 inclusion of effect signature"),
+        "{error}"
+    );
+    let ElabError::UnsupportedEffectInclusion { from, to, .. } = error else {
+        panic!("a valid cross-signature call is not an ill-typed RHS: {error:?}")
+    };
+    assert_ne!(from, to, "the signatures really differ");
+
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let error = env
+        .elaborate_decl(
+            "proc wrong_result : HostIO APartial ExitCode visits [Console] = \
+         let p : HostIO APartial (Result IOError Unit) = \
+           host_console APartial (Result IOError Unit) \
+             (write ConsoleStream.Stdout (bytes_encode \"a\")) in \
+           host_program APartial (print_line \"b\")",
+        )
+        .expect_err("annotation names the action, not its result");
+    assert!(matches!(error, ElabError::TypeMismatch { reason, .. }
+        if reason.contains("annotated result type differs from the action's result type")));
 }
 
 #[test]
