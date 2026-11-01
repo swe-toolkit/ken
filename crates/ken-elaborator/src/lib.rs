@@ -533,6 +533,7 @@ impl ElabEnv {
         // declarations admitted after this pre-source boundary belong to a
         // package's duplicate-name set; prelude names keep their own guards.
         elab.module_state.package_definitions.clear();
+        elab.module_state.finish_prelude_source_registration();
         Ok(elab)
     }
 
@@ -646,6 +647,26 @@ impl ElabEnv {
     pub fn elaborate_file_v1(&mut self, src: &str) -> Result<Vec<ElabResult>, ElabError> {
         let decls = parser::parse_decls(src)?;
         modules::expand_and_elaborate(self, &decls)
+    }
+
+    /// Elaborate an isolated `.ken` source with explicit Strict catalog roots.
+    /// Callers with a source path can obtain the nearest root through
+    /// [`modules::isolated_catalog_root`]; pathless callers supply their roots.
+    pub fn elaborate_isolated_file_strict_v1(
+        &mut self,
+        roots: &[std::path::PathBuf],
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::elaborate_isolated_strict_v1(self, src, false, roots)
+    }
+
+    /// Elaborate an isolated literate source after extracting its Ken fences.
+    pub fn elaborate_isolated_ken_md_file_strict_v1(
+        &mut self,
+        roots: &[std::path::PathBuf],
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::elaborate_isolated_strict_v1(self, src, true, roots)
     }
 
     /// Elaborate the in-repo compilation unit named by `entry` under the

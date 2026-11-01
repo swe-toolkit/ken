@@ -168,6 +168,22 @@ remain deferred to the package-manager round (MRES-1(a)/MRES-2). The plural form
 is nevertheless the normative resolver input, so adding roots changes the
 input data rather than the module-path contract.
 
+For a path-bearing isolated `.ken` or `.ken.md` source, discover that
+single in-repo root **from its source path**: inspect the file's parent,
+then its ancestors nearest first. The first directory `D` for which
+`D/catalog/packages` exists as a directory supplies that root. A source
+already under `catalog/packages` takes the existing catalog-unit path
+rule above **first**; isolated-root discovery does not reinterpret a
+catalog entry. There is no separate environment-variable, CLI-flag or
+build-machine root. With no discovered root, a file needing no external
+catalog unit proceeds through ordinary elaboration; an `import` or
+facade-export edge to such a unit refuses at its own span with
+`UnboundName` for the dotted module path. Locally declared inline
+modules remain locally resolvable. An absent unit under a discovered
+root refuses at its dependency edge as well. This selection neither
+enables multiple-root precedence nor switches a CLI route's resolution
+mode or makes an unimported dependency visible.
+
 The loader discovers compilation units lazily, following `import` and facade
 `export M (…)` edges from units already being compiled; it does not scan a
 catalog tree eagerly. Each unit is loaded and elaborated at most once in a

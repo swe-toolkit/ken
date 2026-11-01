@@ -96,6 +96,10 @@ pub struct ModuleState {
     module_path_owners: HashMap<String, ModuleUnitOwner>,
     /// The next distinct in-memory unit identity, committed only on success.
     next_in_memory_unit: u64,
+    /// Entering a Legacy in-memory source locks this environment's resolution
+    /// mode even when a later declaration fails after earlier admissions.
+    /// Prelude registration uses the same entry and resets this at its end.
+    legacy_in_memory_source_started: bool,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
     /// V1 results owned by each loaded file unit, retained for cached roots
@@ -199,6 +203,10 @@ impl ModuleState {
         for path in paths {
             self.module_path_owners.insert(path, owner.clone());
         }
+    }
+
+    pub(crate) fn finish_prelude_source_registration(&mut self) {
+        self.legacy_in_memory_source_started = false;
     }
 
     pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
@@ -2088,6 +2096,28 @@ pub struct CatalogModulePath {
 /// root, paths without a source extension, and paths containing an invalid
 /// module component are not catalog module paths and return `None` so callers
 /// can retain their isolated-file behavior.
+/// Find the nearest in-repo catalog root from an isolated source path alone.
+/// Catalog source paths retain their separate `catalog_module_from_path` entry.
+pub fn isolated_catalog_root(path: &Path) -> Option<PathBuf> {
+    // Ancestors are those of the absolute path: a relative path continues
+    // above the working directory, and `..` removes a component lexically
+    // rather than naming a child directory as an ancestor.
+    let mut parent = PathBuf::new();
+    for component in std::path::absolute(path).ok()?.parent()?.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                parent.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => parent.push(other),
+        }
+    }
+    parent
+        .ancestors()
+        .map(|dir| dir.join("catalog").join("packages"))
+        .find(|root| root.is_dir())
+}
+
 pub fn catalog_module_from_path(path: &Path) -> Option<CatalogModulePath> {
     let parent = path.parent()?;
     let root = parent.ancestors().find(|ancestor| {
@@ -2605,6 +2635,85 @@ fn elaborate_module_from_roots_with_mode_v1(
         ));
     }
     load_unit(elab, entry, &Span::zero(), mode)
+}
+
+/// Strict entry for an isolated source. Unlike the file-unit entry, the
+/// source itself is an in-memory root; only explicit imports load catalog
+/// units. The legacy standalone entries remain unchanged.
+pub fn elaborate_isolated_strict_v1(
+    elab: &mut ElabEnv,
+    src: &str,
+    literate: bool,
+    roots: &[PathBuf],
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    require_fixed_proved_identity(&elab.env, &elab.globals)?;
+    require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
+    if roots.len() > 1 {
+        return Err(ElabError::ParseError {
+            msg: format!(
+                "N2 requires exactly one populated catalog root, found {}",
+                roots.len()
+            ),
+            span: Span::zero(),
+        });
+    }
+    if elab.module_state.roots_resolution_mode == Some(ResolutionMode::Legacy)
+        || elab.module_state.legacy_in_memory_source_started
+    {
+        return Err(ElabError::Internal(
+            "resolution mode cannot change during one elaboration run".to_string(),
+        ));
+    }
+    if elab.module_state.roots_resolution_mode.is_some()
+        && elab.module_state.catalog_roots != roots
+    {
+        return Err(ElabError::ParseError {
+            msg: "catalog roots cannot change during one elaboration run".to_string(),
+            span: Span::zero(),
+        });
+    }
+    let decls = if literate {
+        let extracted = crate::literate::extract_ken_md(src)?;
+        crate::parser::parse_decls(&extracted.source)?
+    } else {
+        crate::parser::parse_decls(src)?
+    };
+    let mut local_modules = HashSet::new();
+    declared_module_paths(&decls, "", &mut local_modules);
+    let mut imports = Vec::new();
+    imported_module_paths(&decls, "", &mut imports);
+    for (dependency, owner, span) in &imports {
+        if declared_inline_import(owner, None, dependency, &local_modules).is_none()
+            && roots.is_empty()
+        {
+            return Err(ElabError::UnboundName {
+                name: dependency.clone(),
+                span: span.clone(),
+            });
+        }
+    }
+    if elab.module_state.roots_resolution_mode.is_none() {
+        elab.module_state.catalog_roots = roots.to_vec();
+        elab.module_state.roots_resolution_mode = Some(ResolutionMode::Strict);
+    }
+    for (dependency, owner, span) in imports {
+        if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
+            load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
+        }
+    }
+    if elab.module_state.root_scope.mode != ResolutionMode::Strict {
+        let mut scope = Scope::with_mode(
+            ResolutionMode::Strict,
+            elab.module_state.strict_builtin_names.clone(),
+        );
+        scope.private_ids.clone_from(&elab.module_state.private_ids);
+        elab.module_state.root_scope = scope;
+    }
+    if literate {
+        elab.elaborate_ken_md_file_v1(src)
+    } else {
+        elab.elaborate_file_v1(src)
+    }
 }
 
 /// Rename the declared name(s) of a raw surface `Decl` to their fully
@@ -6218,6 +6327,12 @@ pub fn expand_and_elaborate(
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     let boundary = admission_boundary(decls)?;
+    // A failed file can leave an earlier declaration admitted without ever
+    // committing its in-memory unit counter. An empty file can commit a unit
+    // without declaring anything. Lock the mode at entry for both cases.
+    if elab.module_state.root_scope.mode == ResolutionMode::Legacy {
+        elab.module_state.legacy_in_memory_source_started = true;
+    }
     let mut local_modules = HashSet::new();
     declared_module_paths(decls, "", &mut local_modules);
     let owner = match elab.module_state.active_imports.last() {
