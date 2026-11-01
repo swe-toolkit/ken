@@ -304,3 +304,108 @@ fn report_is_unlinked_when_elaboration_fails() {
         );
     }
 }
+
+/// Promise class: durable invariant. Root-minted opaque identities in an
+/// Axiom theorem, an axiom declaration and an ensures obligation belong to
+/// their checked source result on every unchanged Legacy CLI route. A theorem
+/// proved by Proved and a prove hole are controls against reclassifying all
+/// postulates or changing their already-owned report bytes.
+#[test]
+fn root_postulates_have_checked_source_owners_on_all_three_routes() {
+    let source = format!(
+        "{ACCEPTED}\n\
+         theorem assumed : Equal Nat Zero (Suc Zero) = Axiom\n\
+         axiom assumed_named : Equal Nat Zero (Suc Zero)\n\
+         fn constrained (n : Nat) : Nat ensures Equal Nat result Zero = n\n\
+         theorem proved : Equal Nat Zero Zero = Proved\n\
+         prove deferred : Equal Nat (Suc Zero) Zero\n"
+    );
+    let root = base("resolution-report-postulate-owners");
+    for route in ["check", "run", "native-build"] {
+        let dir = root.join(route);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (doc, _) = document(&dir, route, &source);
+        for declaration in ["assumed", "assumed_named", "constrained"] {
+            assert!(
+                has(
+                    refs(&doc, declaration),
+                    "source-declared",
+                    "declaration",
+                    declaration
+                ),
+                "{route}: root {declaration} must own its own checked opaque identity"
+            );
+        }
+        let proved = refs(&doc, "proved");
+        let deferred = refs(&doc, "deferred");
+        assert!(!proved.iter().any(|r| r["class"] == "source-declared"));
+        assert!(!deferred.iter().any(|r| r["class"] == "source-declared"));
+        assert_eq!(
+            serde_json::to_string(proved).unwrap(),
+            r#"[{"class":"pre-source","name":"Equal"},{"class":"pre-source","name":"Nat"},{"class":"pre-source","name":"Proved"},{"class":"pre-source","name":"Zero"}]"#,
+            "{route}: Proved control's already-established report bytes"
+        );
+        assert_eq!(
+            serde_json::to_string(deferred).unwrap(),
+            r#"[{"class":"pre-source","name":"Equal"},{"class":"pre-source","name":"Nat"},{"class":"pre-source","name":"Suc"},{"class":"pre-source","name":"Zero"}]"#,
+            "{route}: prove control's already-established report bytes"
+        );
+    }
+}
+
+/// Promise class: durable invariant. This independent control has no Axiom
+/// result; deleting the additional ownership attribution must leave it green.
+#[test]
+fn proved_and_prove_controls_keep_their_preexisting_report_bytes() {
+    let dir = base("resolution-report-postulate-control");
+    let source = "theorem proved : Equal Nat Zero Zero = Proved\n\
+                  prove deferred : Equal Nat (Suc Zero) Zero\n";
+    let (doc, text) = document(&dir, "check", source);
+    assert_eq!(
+        text,
+        "{\"schema\":\"ken.resolution/v1\",\"route\":\"check\",\"module\":null,\"declarations\":[{\"declaration\":\"proved\",\"references\":[{\"class\":\"pre-source\",\"name\":\"Equal\"},{\"class\":\"pre-source\",\"name\":\"Nat\"},{\"class\":\"pre-source\",\"name\":\"Proved\"},{\"class\":\"pre-source\",\"name\":\"Zero\"}]},{\"declaration\":\"deferred\",\"references\":[{\"class\":\"pre-source\",\"name\":\"Equal\"},{\"class\":\"pre-source\",\"name\":\"Nat\"},{\"class\":\"pre-source\",\"name\":\"Suc\"},{\"class\":\"pre-source\",\"name\":\"Zero\"}]}]}\n"
+    );
+    assert_eq!(refs(&doc, "proved").len(), 4);
+}
+
+/// Promise class: durable invariant. Real catalog Axiom roots report through
+/// ken check without treating checked package-owned holes as unattributed.
+#[test]
+fn three_catalog_axiom_roots_check_and_emit_complete_reports() {
+    let dir = base("resolution-report-catalog-axioms");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    for (module, file, axiom) in [
+        (
+            "Core.Classes.LawfulClasses",
+            "Core/Classes/LawfulClasses.ken.md",
+            "ord_int_refl",
+        ),
+        (
+            "Data.Binary.BytesPrimitiveContracts",
+            "Data/Binary/BytesPrimitiveContracts.ken.md",
+            "bytes_concat_list_view",
+        ),
+        (
+            "Data.Text.StringBijection",
+            "Data/Text/StringBijection.ken.md",
+            "string_to_list_char_retraction",
+        ),
+    ] {
+        let report = dir.join(format!("{module}.json"));
+        let output = invoke("check", &root.join(file), &dir, Some(&report));
+        assert!(
+            output.status.success(),
+            "{module}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let doc: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(report).unwrap()).unwrap();
+        assert_eq!(doc["module"], module);
+        assert!(
+            has(refs(&doc, axiom), "source-declared", "declaration", axiom),
+            "{module}: {axiom}"
+        );
+    }
+}

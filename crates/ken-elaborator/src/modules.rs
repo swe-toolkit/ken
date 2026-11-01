@@ -96,6 +96,10 @@ pub struct ModuleState {
     module_path_owners: HashMap<String, ModuleUnitOwner>,
     /// The next distinct in-memory unit identity, committed only on success.
     next_in_memory_unit: u64,
+    /// Prelude registration itself elaborates in-memory units. Snapshot the
+    /// boundary before user source can speak, so a fresh strict entry does not
+    /// mistake those compiler-owned units for a preceding Legacy source.
+    pre_source_in_memory_units: u64,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
     /// V1 results owned by each loaded file unit, retained for cached roots
@@ -199,6 +203,10 @@ impl ModuleState {
         for path in paths {
             self.module_path_owners.insert(path, owner.clone());
         }
+    }
+
+    pub(crate) fn capture_source_unit_boundary(&mut self) {
+        self.pre_source_in_memory_units = self.next_in_memory_unit;
     }
 
     pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
@@ -2638,7 +2646,8 @@ pub fn elaborate_isolated_strict_v1(
     }
     if elab.module_state.roots_resolution_mode == Some(ResolutionMode::Legacy)
         || (elab.module_state.root_scope.mode != ResolutionMode::Strict
-            && elab.module_state.next_in_memory_unit != 0)
+            && elab.module_state.next_in_memory_unit
+                != elab.module_state.pre_source_in_memory_units)
     {
         return Err(ElabError::Internal(
             "resolution mode cannot change during one elaboration run".to_string(),
