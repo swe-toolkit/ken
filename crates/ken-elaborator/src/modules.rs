@@ -2088,6 +2088,15 @@ pub struct CatalogModulePath {
 /// root, paths without a source extension, and paths containing an invalid
 /// module component are not catalog module paths and return `None` so callers
 /// can retain their isolated-file behavior.
+/// Find the nearest in-repo catalog root from an isolated source path alone.
+/// Catalog source paths retain their separate `catalog_module_from_path` entry.
+pub fn isolated_catalog_root(path: &Path) -> Option<PathBuf> {
+    path.parent()?
+        .ancestors()
+        .map(|dir| dir.join("catalog").join("packages"))
+        .find(|root| root.is_dir())
+}
+
 pub fn catalog_module_from_path(path: &Path) -> Option<CatalogModulePath> {
     let parent = path.parent()?;
     let root = parent.ancestors().find(|ancestor| {
@@ -2605,6 +2614,86 @@ fn elaborate_module_from_roots_with_mode_v1(
         ));
     }
     load_unit(elab, entry, &Span::zero(), mode)
+}
+
+/// Strict entry for an isolated source. Unlike the file-unit entry, the
+/// source itself is an in-memory root; only explicit imports load catalog
+/// units. The legacy standalone entries remain unchanged.
+pub fn elaborate_isolated_strict_v1(
+    elab: &mut ElabEnv,
+    src: &str,
+    literate: bool,
+    roots: &[PathBuf],
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    require_fixed_proved_identity(&elab.env, &elab.globals)?;
+    require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
+    if roots.len() > 1 {
+        return Err(ElabError::ParseError {
+            msg: format!(
+                "N2 requires exactly one populated catalog root, found {}",
+                roots.len()
+            ),
+            span: Span::zero(),
+        });
+    }
+    if elab.module_state.roots_resolution_mode == Some(ResolutionMode::Legacy)
+        || (elab.module_state.root_scope.mode != ResolutionMode::Strict
+            && elab.module_state.next_in_memory_unit != 0)
+    {
+        return Err(ElabError::Internal(
+            "resolution mode cannot change during one elaboration run".to_string(),
+        ));
+    }
+    if elab.module_state.roots_resolution_mode.is_some()
+        && elab.module_state.catalog_roots != roots
+    {
+        return Err(ElabError::ParseError {
+            msg: "catalog roots cannot change during one elaboration run".to_string(),
+            span: Span::zero(),
+        });
+    }
+    let decls = if literate {
+        let extracted = crate::literate::extract_ken_md(src)?;
+        crate::parser::parse_decls(&extracted.source)?
+    } else {
+        crate::parser::parse_decls(src)?
+    };
+    let mut local_modules = HashSet::new();
+    declared_module_paths(&decls, "", &mut local_modules);
+    let mut imports = Vec::new();
+    imported_module_paths(&decls, "", &mut imports);
+    for (dependency, owner, span) in &imports {
+        if declared_inline_import(owner, None, dependency, &local_modules).is_none()
+            && roots.is_empty()
+        {
+            return Err(ElabError::UnboundName {
+                name: dependency.clone(),
+                span: span.clone(),
+            });
+        }
+    }
+    if elab.module_state.roots_resolution_mode.is_none() {
+        elab.module_state.catalog_roots = roots.to_vec();
+        elab.module_state.roots_resolution_mode = Some(ResolutionMode::Strict);
+    }
+    for (dependency, owner, span) in imports {
+        if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
+            load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
+        }
+    }
+    if elab.module_state.root_scope.mode != ResolutionMode::Strict {
+        let mut scope = Scope::with_mode(
+            ResolutionMode::Strict,
+            elab.module_state.strict_builtin_names.clone(),
+        );
+        scope.private_ids.clone_from(&elab.module_state.private_ids);
+        elab.module_state.root_scope = scope;
+    }
+    if literate {
+        elab.elaborate_ken_md_file_v1(src)
+    } else {
+        elab.elaborate_file_v1(src)
+    }
 }
 
 /// Rename the declared name(s) of a raw surface `Decl` to their fully

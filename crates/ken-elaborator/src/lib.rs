@@ -648,6 +648,26 @@ impl ElabEnv {
         modules::expand_and_elaborate(self, &decls)
     }
 
+    /// Elaborate an isolated `.ken` source with explicit Strict catalog roots.
+    /// Callers with a source path can obtain the nearest root through
+    /// [`modules::isolated_catalog_root`]; pathless callers supply their roots.
+    pub fn elaborate_isolated_file_strict_v1(
+        &mut self,
+        roots: &[std::path::PathBuf],
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::elaborate_isolated_strict_v1(self, src, false, roots)
+    }
+
+    /// Elaborate an isolated literate source after extracting its Ken fences.
+    pub fn elaborate_isolated_ken_md_file_strict_v1(
+        &mut self,
+        roots: &[std::path::PathBuf],
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::elaborate_isolated_strict_v1(self, src, true, roots)
+    }
+
     /// Elaborate the in-repo compilation unit named by `entry` under the
     /// plural catalog-root input (`33 §3.2`, ADR 0014 MRES-1/2/3a).
     ///
