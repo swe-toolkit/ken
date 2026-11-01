@@ -89,10 +89,9 @@ fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_bo
 }
 
 /// Promise class: transition sentinel for 36 §2.4 inclusion. A valid
-/// different signature is unsupported until `incl` is built; an annotated
-/// result mismatch remains an ill-typed expression, not that limitation.
+/// different signature is unsupported until `incl` is built.
 #[test]
-fn valid_inclusion_reports_unsupported_variant_but_bad_annotation_is_type_mismatch() {
+fn valid_inclusion_reports_unsupported_variant() {
     let mut env = ElabEnv::new().expect("checked prelude");
     let error = env
         .elaborate_decl(
@@ -111,7 +110,12 @@ fn valid_inclusion_reports_unsupported_variant_but_bad_annotation_is_type_mismat
         panic!("a valid cross-signature call is not an ill-typed RHS: {error:?}")
     };
     assert_ne!(from, to, "the signatures really differ");
+}
 
+/// Promise class: durable invariant. An annotation naming an action instead
+/// of its returned value is ill-typed regardless of future `incl` support.
+#[test]
+fn annotated_action_type_is_result_type_mismatch() {
     let mut env = ElabEnv::new().expect("checked prelude");
     let error = env
         .elaborate_decl(
