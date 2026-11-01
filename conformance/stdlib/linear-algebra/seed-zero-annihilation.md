@@ -133,7 +133,15 @@ theorem seed_neg : Equal (Vec Nat two) (matrix_vector two two a u) zero2 = Refl
 
 The Spec child and new catalog exports are not on the authoring base
 `a39d385c8`. Architect AC-0 checked the generic proofs and measured
-the proof-form pair in scratch; it did not run this seed. This seed has
-not been Ken-checked against the catalog candidate or through the
-official conformance runner. No CI, publication, landing, or
-landed-trust result is claimed.
+the proof-form pair in scratch; it did not run this seed.
+
+Foundation reports that its package-owned test
+`cat_linear_algebra_nat_matrix` passed 7/7 at assembled candidate
+`fb7e0934bb7e464f3ff11330a0b391d5f782c097`. The test elaborated the
+accepted and refused Ken source blocks in that tip's seed file, whose
+blob matched seed child
+`06f5aaa022c4e36f9548228615aafda9b58401b5` exactly, against
+root-loaded `NatMatrix`. This is package-test elaboration, not official
+conformance-runner execution. This package-test evidence does not
+establish official conformance-runner execution; none is claimed here.
+No CI, publication, landing, or landed-trust result is claimed.
