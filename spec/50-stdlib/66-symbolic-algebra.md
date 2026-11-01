@@ -993,13 +993,16 @@ states all three.
 ## 11. Canonical polynomial equality is an equivalence
 
 > **Section 11 status: DRAFT v0
-> (SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE).** This spec-only child
-> states the three public law types. Architect's AC-0 on this base
-> checked the proposed bodies in scratch with no new `Axiom` and
-> identical trusted identity sets (114 → 114). This child adds no
-> catalog export, package test or CV seed; scratch proof checks are
-> not an official conformance run, CI, publication, landing or a
-> measurement of landed trust.
+> (SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE).** Architect's AC-0 on
+> `166d74d86` checked the three proposed bodies in scratch with no new
+> `Axiom` and identical trusted identity sets (114 → 114). This
+> assembled candidate contains the three checked §11 catalog theorems,
+> the package-owned test and CV's authored seed. Foundation's named
+> package test reported 2/2 with equal trusted GlobalId identity sets
+> 114 → 114. CV authored the seed but did not Ken-check or officially
+> conformance-run it. Scratch and candidate-local checks are not an
+> official conformance run, CI, publication, landing or a measurement
+> of landed trust.
 
 `Algorithm.SymbolicAlgebra.NatPolynomial` must export three public
 Transparent theorems with checked bodies, in this order, immediately
