@@ -1,10 +1,10 @@
-//! Behavioural stack guards for two recursive elaborator cycles.
+//! Behavioural stack guards for three recursive elaborator cycles.
 //!
 //! Promise class: durable, bounded performance invariant. MEASURED: each
 //! fixed-depth workload completes on its stated stack after the full prelude.
-//! CLAIMED: a frame increase on the match or inference cycle reddens its own
-//! row before unrelated CI shards overflow. THE GAP: these two paths are
-//! representatives, not a universal bound for every source or AST shape.
+//! CLAIMED: a frame increase on the match, inference or type-position cycle
+//! reddens its own row before unrelated CI shards overflow. THE GAP: these
+//! paths are representatives, not a universal bound for every AST shape.
 //!
 //! The threshold alone does not attribute an overflow. The calibration below
 //! also records the low-stack unwind, and each row was separately tested
@@ -14,7 +14,7 @@ use std::io::Read;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use ken_elaborator::{Decl, ElabEnv, Expr, Span};
+use ken_elaborator::{Decl, ElabEnv, Expr, Span, Type};
 
 // Measured on 2026-10-13 with rustc 1.97.1 / LLVM 22.1.6, Linux x86_64,
 // via scripts/ken-cargo test -p ken-elaborator --test
@@ -42,10 +42,23 @@ const MATCH_STACK_BYTES: usize = 3_072 * 1024;
 // public AST construction isolates the elaborator cycle under test.
 const INFER_DEPTH: usize = 128;
 const INFER_STACK_BYTES: usize = 1_920 * 1024;
+// Row T, 32 nested swapped H aliases in two type-position binders. The full
+// prelude is built on the child's default 2-MiB libtest thread, with ambient
+// RUST_MIN_STACK removed; only tower elaboration runs on the stated worker.
+// The first passing 64-KiB grid point is 1,344 KiB; 1,280 KiB overflows after
+// PRELUDE_OK. The 1,280-KiB lldb unwind has 66 resolve_type frames and zero
+// elab_type, elab_type_app or zonk_term_with frames: the resolver, not this
+// outlined elab cycle, sets the baseline floor. The candidate's per-level
+// elab_type frame is 448 bytes and elab_type_app is 3,392 bytes (objdump).
+// The 11-helper inline mutation must make this row red at 1,344 KiB with
+// elab_type on the failing stack, so it guards the cycle, not its exact minimum.
+const TYPE_DEPTH: usize = 32;
+const TYPE_STACK_BYTES: usize = 1_344 * 1024;
 const CHILD_TIMEOUT: Duration = Duration::from_secs(600);
 const REGRESSION_MESSAGE: &str = "the elaborator's recursive cycle \
-    (check / infer / check_dependent_branch_body) grew: outline the new block \
-    with #[inline(never)], or re-measure and re-record GUARD_STACK with the evidence";
+    (check / infer / check_dependent_branch_body / elab_type and helpers / \
+    resolve_type) grew: outline the new block with #[inline(never)], or \
+    re-measure the stated stack";
 
 fn scrutinee(index: &str) -> String {
     format!("(frame_budget_id {index})")
@@ -136,6 +149,11 @@ fn ascription_infer_cycle_fits_stated_stack() {
 }
 
 #[test]
+fn type_position_elab_cycle_fits_stated_stack() {
+    run_guard("T", TYPE_STACK_BYTES, TYPE_DEPTH);
+}
+
+#[test]
 #[ignore = "invoked in an isolated process by each guard row"]
 fn frame_budget_child() {
     assert_eq!(std::env::var("FRAME_BUDGET_CHILD").as_deref(), Ok("1"));
@@ -151,16 +169,32 @@ fn frame_budget_child() {
     assert!(
         matches!(
             (row.as_str(), depth),
-            ("M", MATCH_DEPTH) | ("I", INFER_DEPTH)
+            ("M", MATCH_DEPTH) | ("I", INFER_DEPTH) | ("T", TYPE_DEPTH)
         ),
-        "only the two fixed-depth guard rows invoke this child"
+        "only the three fixed-depth guard rows invoke this child"
     );
+    // Row T measures only the type-position cycle. Full prelude formation
+    // requires more stack than that cycle; build it on the child process's
+    // ordinary test thread, then move the same checked environment to the
+    // stated-stack worker. M and I retain their original worker setup.
+    let type_env = if row == "T" {
+        let env = ElabEnv::new().expect("full prelude for type-position row");
+        eprintln!("FRAME_BUDGET PRELUDE_OK row={row} depth={depth}");
+        Some(env)
+    } else {
+        None
+    };
     std::thread::Builder::new()
         .name(format!("frame-budget-{row}-depth-{depth}"))
         .stack_size(bytes)
         .spawn(move || {
-            let mut env = ElabEnv::new().expect("full prelude");
-            eprintln!("FRAME_BUDGET PRELUDE_OK row={row} depth={depth}");
+            let mut env = if let Some(env) = type_env {
+                env
+            } else {
+                let env = ElabEnv::new().expect("full prelude");
+                eprintln!("FRAME_BUDGET PRELUDE_OK row={row} depth={depth}");
+                env
+            };
             if row == "M" {
                 env.elaborate_decl("fn frame_budget_id (n : Nat) : Nat = n")
                     .expect("checked identity applied to each scrutinee");
@@ -173,6 +207,40 @@ fn frame_budget_child() {
                 );
                 env.elaborate_decl(&declaration)
                     .expect("fixed-depth dependent theorem must elaborate");
+            } else if row == "T" {
+                env.elaborate_decl("fn H (b : Type 1) (a : Bool) : Type 1 = b -> Int")
+                    .expect("checked swapped H alias");
+                // Parse a shallow declaration, then install the same K=32
+                // swapped H tower into TYPE positions of both F's domain and
+                // x's binder. Source parsing has its own earlier stack cliff.
+                let declaration = format!(
+                    "fn frame_budget_type_{depth} (F : Type -> Type) \
+                     (x : Type) (o : F x) (n : Int) : Int = n"
+                );
+                let mut decls = ken_elaborator::parser::parse_decls(&declaration)
+                    .expect("shallow function declaration parses");
+                let [Decl::ViewDecl { params, .. }] = decls.as_mut_slice() else {
+                    panic!("expected one function declaration")
+                };
+                assert_eq!(params.len(), 4, "F, x, o and n binders");
+                let mut tower = Type::TUniv(None, Span::zero());
+                for _ in 0..depth {
+                    let head = Type::TCon("H".to_owned(), Span::zero());
+                    let flag = Type::TCon("True".to_owned(), Span::zero());
+                    tower = Type::TApp(
+                        Box::new(Type::TApp(Box::new(head), Box::new(tower), Span::zero())),
+                        Box::new(flag),
+                        Span::zero(),
+                    );
+                }
+                params[0].ty = Type::TArr(
+                    Box::new(tower.clone()),
+                    Box::new(Type::TUniv(None, Span::zero())),
+                    Span::zero(),
+                );
+                params[1].ty = tower;
+                ken_elaborator::modules::expand_and_elaborate(&mut env, &decls)
+                    .expect("fixed-depth type-position binder tower must elaborate");
             } else {
                 // Parse a shallow, real fn declaration and grow only its body.
                 // This exercises the public parser/AST plus production module
