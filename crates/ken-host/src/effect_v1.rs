@@ -2699,6 +2699,10 @@ pub struct HostDispatchReplyV1 {
     /// own result, in the order they happened. The trace appender emits these
     /// ahead of the dispatch event.
     pub prior_settlements: Vec<ResourceSettlementObservationV1>,
+    /// Settlements of an input this dispatch consumes. The trace appender emits
+    /// these after the dispatch event, so the consuming use is recorded while
+    /// its input is still live and the input settles exactly once afterwards.
+    pub consumed_settlements: Vec<ResourceSettlementObservationV1>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3210,6 +3214,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
     let mut minted_resource = None;
     let mut resource_bindings = Vec::new();
     let mut prior_settlements = Vec::new();
+    let mut consumed_settlements = Vec::new();
     let outcome = match (operation, request) {
         (HostOpV1::ConsoleRead, CanonicalRequestV1::ConsoleRead { stream, limit }) => backend
             .console_read(*stream, *limit)
@@ -3784,9 +3789,10 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 let provenance = provenance.ok_or(ResourceErrorV1::MalformedResource).map_err(SemanticErrorV1::Resource)?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
                 // A spawn attempt retires the live plan even when admission or
-                // the backend refuses to create the child.
+                // the backend refuses to create the child. The spawn consumes
+                // the plan, so its settlement follows the spawn event.
                 let (plan, _, provenance) = resources.take_plan(token).map_err(SemanticErrorV1::Resource)?;
-                prior_settlements.push(ResourceSettlementObservationV1 {
+                consumed_settlements.push(ResourceSettlementObservationV1 {
                     schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
                     resource_kind: ResourceKindV1::SpawnPlan,
                     identity,
@@ -3905,6 +3911,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             Err(error) => CanonicalOutcomeV1::Error(error),
         },
         prior_settlements,
+        consumed_settlements,
     })
 }
 
@@ -4008,6 +4015,7 @@ fn path_denied(
         resource_bindings: Vec::new(),
         outcome: CanonicalOutcomeV1::Error(file_error(operation, &request_path(request), cause)),
         prior_settlements: Vec::new(),
+        consumed_settlements: Vec::new(),
     }
 }
 
@@ -4034,6 +4042,7 @@ fn error_denied(error: SemanticErrorV1) -> HostDispatchReplyV1 {
         resource_bindings: Vec::new(),
         outcome: CanonicalOutcomeV1::Error(error),
         prior_settlements: Vec::new(),
+        consumed_settlements: Vec::new(),
     }
 }
 
@@ -4456,8 +4465,9 @@ pub struct EffectEvent {
     pub outcome: CanonicalOutcomeV1,
 }
 
-/// Append each settlement performed by a dispatch before the dispatch event.
-/// This is the sole dispatch-to-trace conversion for both executors.
+/// Append each settlement performed by a dispatch before the dispatch event,
+/// and each settlement of an input it consumed after it. This is the sole
+/// dispatch-to-trace conversion for both executors.
 pub fn append_dispatch_events(
     trace: &mut Vec<EffectEvent>,
     operation: HostOpV1,
@@ -4475,6 +4485,9 @@ pub fn append_dispatch_events(
         request,
         outcome: reply.outcome.clone(),
     });
+    for settlement in &reply.consumed_settlements {
+        append_settlement_event(trace, settlement);
+    }
 }
 
 /// Append a target-bound ResourceRelease event for an observed settlement.

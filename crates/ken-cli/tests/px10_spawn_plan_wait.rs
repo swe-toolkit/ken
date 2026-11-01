@@ -24,6 +24,7 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
     )
     .expect("checked Process program executes in the interpreter");
     assert_eq!(observed.exit_status, 0, "{:?}", observed.effect_trace);
+    assert_exported_resource_lifetime_template_holds(&observed.effect_trace);
     assert_eq!(observed.terminal_error, None);
     assert_eq!(
         observed
@@ -37,8 +38,8 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
             ken_host::HostOpV1::ProcessPlanPush,
             ken_host::HostOpV1::ProcessPlanPush,
             ken_host::HostOpV1::ProcessPlanPush,
-            ken_host::HostOpV1::ResourceRelease,
             ken_host::HostOpV1::ProcessSpawn,
+            ken_host::HostOpV1::ResourceRelease,
             ken_host::HostOpV1::ProcessWait,
             ken_host::HostOpV1::ResourceRelease,
         ],
@@ -238,8 +239,9 @@ fn ac1_checked_interpreter_stdout_pipe_preserves_argv_and_environment() {
 /// Promise class: durable invariant (spec 38 §1.11.2; spec 71 settlement
 /// template). MEASURED: checked withChild takes and reads its stdout pipe,
 /// waits, and records one target-bound release per acquired plan, pipe and
-/// child identity, with the pipe before the child. A failed spawn still
-/// records its plan release before the error. CLAIMED: dispatch-time
+/// child identity, with the pipe before the child. The plan settles after the
+/// spawn that consumed it, and a failed spawn still settles its plan once,
+/// after the error. CLAIMED: dispatch-time
 /// retirement and bracket cleanup cannot silently lose or duplicate these
 /// settlements. THE GAP: only one taken pipe is exercised; pipe close is a
 /// drop today, so a pipe ReleaseFailed is not reachable in this fixture.
@@ -276,6 +278,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
         .expect("interpreter fixture thread completes")
         .expect("checked stdout-pipe program executes");
     assert_eq!(observed.exit_status, 0, "{:?}", observed.effect_trace);
+    assert_exported_resource_lifetime_template_holds(&observed.effect_trace);
     let trace = &observed.effect_trace;
     let acquired = |op, kind| {
         let events = trace
@@ -333,7 +336,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
         .find(|event| event.operation == Op::ProcessSpawn)
         .unwrap()
         .sequence;
-    assert!(plan_at < spawn_at && spawn_at < pipe_at && pipe_at < child_at);
+    assert!(spawn_at < plan_at && plan_at < pipe_at && pipe_at < child_at);
     assert!(
         trace.iter().any(|event| matches!(
             (&event.operation, &event.outcome),
@@ -369,6 +372,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
     )
     .expect("failed spawn remains a checked interpreter observation");
     let failed_trace = &failed.effect_trace;
+    assert_exported_resource_lifetime_template_holds(failed_trace);
     let failed_plan = failed_trace
         .iter()
         .find_map(|event| match (&event.operation, &event.outcome) {
@@ -418,7 +422,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
                 && observation.identity == failed_plan
                 && observation.outcome == Settlement::Released
     ));
-    assert!(failed_settlements[0].sequence < errors[0].sequence);
+    assert!(errors[0].sequence < failed_settlements[0].sequence);
 }
 
 struct NonCloexecFd9 {
@@ -645,6 +649,7 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
         .expect("interpreter worker completes")
         .expect("checked child wait returns after SIGTERM");
     assert_eq!(observed.exit_status, 0, "{:?}", observed.effect_trace);
+    assert_exported_resource_lifetime_template_holds(&observed.effect_trace);
     assert!(
         observed.effect_trace.iter().any(|event| matches!(
             (&event.operation, &event.outcome),
@@ -728,4 +733,133 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
         parent_mask,
         "the child must inherit the spawning thread's exact signal mask"
     );
+}
+
+/// The resource-lifetime obligation from live_child's own target export.
+/// That program reaches every Process acquisition the template plans (plan,
+/// child, read pipe), and each plan is the global per-kind inventory restricted
+/// to the program's alphabet, so applying it to a trace whose program reaches a
+/// subset of those sites is no weaker than that program's own specialization.
+/// The smoke program cannot supply its own: its export refuses with
+/// `PerformedEffectOutsideDeclaredRow { effect: "FS" }`, because it declares
+/// `visits [Process]` only.
+fn exported_process_resource_lifetime_obligation(
+) -> ken_elaborator::export::ResourceLifetimeObligation {
+    let source = LIVE_CHILD.to_owned();
+    // Elaborating the program needs the fixture stack the interpreter runs use:
+    // 3292 KiB resident on AC-1, provisioned at 16 MiB.
+    std::thread::Builder::new()
+        .name("px10-lifetime-template-export".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let denotation = ken_elaborator::compiler_driver::compile_checked_target_denotation(
+                "px10_resource_lifetime_template",
+                ken_elaborator::compiler_driver::CompilerSource::new("src/main.ken", &source),
+                "main",
+            )
+            .expect("checked Process program denotation");
+            ken_elaborator::export::emit_checked_target_export(
+                &denotation,
+                &[],
+                &std::collections::BTreeSet::new(),
+                vec![],
+                vec![],
+            )
+            .expect("checked Process program export")
+            .resource_lifetime_obligation
+            .expect("a Process program exports a resource-lifetime obligation")
+        })
+        .expect("stated export stack")
+        .join()
+        .expect("export thread completes")
+}
+
+/// Promise: durable invariant. MEASURED: the exported resource-lifetime
+/// obligation applied to one interpreter trace: every identity a plan binds on
+/// successful acquisition settles exactly once, and no listed use of it
+/// succeeds after that settlement. CLAIMED: the exported Ward template's two
+/// settlement criteria hold for the trace, so the template is tested here
+/// rather than only emitted. THE GAP: this evaluates the two criteria Ken can
+/// state over one trace; the terminal live-identity check and the monitor
+/// itself remain external Ward behavior.
+fn assert_exported_resource_lifetime_template_holds(trace: &[ken_host::EffectEvent]) {
+    use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
+    use ken_host::{HostOpV1 as Op, ResourceBindingRole as Role, ResourceErrorV1};
+
+    let obligation = exported_process_resource_lifetime_obligation();
+    assert!(
+        obligation
+            .monitor_template
+            .successful_acquire_settles_exactly_once
+    );
+    assert!(
+        obligation
+            .monitor_template
+            .forbid_successful_use_after_settlement
+    );
+    let spawn_plan = obligation
+        .plans
+        .iter()
+        .find(|plan| plan.resource_kind == ken_host::ResourceKindV1::SpawnPlan)
+        .expect("the exported template carries the spawn-plan lifetime");
+    assert!(
+        spawn_plan
+            .require_same_at
+            .iter()
+            .any(|site| { site.operation == Op::ProcessSpawn && site.role == Role::Target }),
+        "the spawn must be a listed plan use, or this check cannot see it: {spawn_plan:?}"
+    );
+    for plan in &obligation.plans {
+        for (acquired_at, event) in trace.iter().enumerate() {
+            let acquired = event.operation == plan.bind_at.operation
+                && matches!(
+                    &event.outcome,
+                    Outcome::Success(Reply::ResourceAcquired { resource_kind, .. })
+                        if *resource_kind == plan.resource_kind
+                );
+            if !acquired {
+                continue;
+            }
+            let identity = event
+                .resource_bindings
+                .iter()
+                .find(|(role, _)| *role == plan.bind_at.role)
+                .map(|(_, identity)| *identity)
+                .expect("a successful acquisition binds its identity at the plan's role");
+            let settlements = trace[acquired_at + 1..]
+                .iter()
+                .enumerate()
+                .filter(|(_, later)| {
+                    later.operation == Op::ResourceRelease
+                        && later.resource_bindings.contains(&(Role::Target, identity))
+                        && match &later.outcome {
+                            Outcome::Success(Reply::ResourceSettlement(_)) => true,
+                            Outcome::Error(ken_host::SemanticErrorV1::Resource(
+                                ResourceErrorV1::ReleaseFailed { .. },
+                            )) => true,
+                            _ => false,
+                        }
+                })
+                .map(|(offset, _)| acquired_at + 1 + offset)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                settlements.len(),
+                1,
+                "{:?} identity {identity:?} must settle exactly once: {trace:?}",
+                plan.resource_kind
+            );
+            for later in &trace[settlements[0] + 1..] {
+                let use_site = plan.require_same_at.iter().any(|site| {
+                    later.operation == site.operation
+                        && later.resource_bindings.contains(&(site.role, identity))
+                });
+                assert!(
+                    !(use_site && matches!(later.outcome, Outcome::Success(_))),
+                    "{:?} identity {identity:?} has a successful use after its \
+                     settlement: {later:?} in {trace:?}",
+                    plan.resource_kind
+                );
+            }
+        }
+    }
 }
