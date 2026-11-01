@@ -313,7 +313,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 40] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 61] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 81] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "print_line"),
@@ -375,6 +375,26 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 61] = [
     ("Capability.Process.Exit", "host_fs"),
     ("Capability.Process.Exit", "host_pure"),
     ("Capability.Process.Exit", "host_bind"),
+    ("Capability.System.Mapping", "MappingHandle"),
+    ("Capability.System.Mapping", "MappingWindow"),
+    ("Capability.System.Mapping", "MkMappingWindow"),
+    ("Capability.System.Mapping", "MappingSource"),
+    ("Capability.System.Mapping", "Anonymous"),
+    ("Capability.System.Mapping", "FileBacked"),
+    ("Capability.System.Mapping", "mapBytes"),
+    ("Capability.System.Mapping", "mapWrite"),
+    ("Capability.Process.Child", "ChildStdio"),
+    ("Capability.Process.Child", "ChildPipe"),
+    ("Capability.Process.Child", "ChildNull"),
+    ("Capability.Process.Child", "ChildInherit"),
+    ("Capability.Process.Child", "spawn_plan"),
+    ("Capability.Process.Child", "with_environment"),
+    ("Capability.Process.Child", "with_stdin"),
+    ("Capability.Process.Child", "with_stdout"),
+    ("Capability.Process.Child", "withChild"),
+    ("Capability.Process.Child", "wait_child"),
+    ("Capability.Process.Child", "take_stdout"),
+    ("Capability.Process.Child", "read_pipe"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
