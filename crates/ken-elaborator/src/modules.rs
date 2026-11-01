@@ -6315,9 +6315,9 @@ pub fn expand_and_elaborate(
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     let boundary = admission_boundary(decls)?;
     // A failed file can leave an earlier declaration admitted without ever
-    // committing its in-memory unit counter. Lock the mode at entry instead
-    // of inferring it from the number of completed units.
-    if !decls.is_empty() && elab.module_state.root_scope.mode == ResolutionMode::Legacy {
+    // committing its in-memory unit counter. An empty file can commit a unit
+    // without declaring anything. Lock the mode at entry for both cases.
+    if elab.module_state.root_scope.mode == ResolutionMode::Legacy {
         elab.module_state.legacy_in_memory_source_started = true;
     }
     let mut local_modules = HashSet::new();

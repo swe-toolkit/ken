@@ -179,6 +179,19 @@ fn partial_legacy_admission_cannot_switch_to_strict() {
     load(&mut parse_only, &[], "const fresh : Nat = Zero\n").unwrap();
 }
 
+/// Promise class: durable invariant. Even an empty but successful Legacy
+/// source commits an in-memory unit. It cannot be followed by a Strict entry
+/// that changes the mode of the same environment.
+#[test]
+fn completed_empty_legacy_unit_cannot_switch_to_strict() {
+    let mut env = ElabEnv::new().unwrap();
+    assert!(env.elaborate_file_v1("").unwrap().is_empty());
+    match load(&mut env, &[], "const after_empty_legacy : Nat = Zero\n") {
+        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
+        other => panic!("completed empty Legacy unit must keep its mode lock, got {other:?}"),
+    }
+}
+
 /// Promise class: durable invariant. A continuing strict scope retains
 /// imports and locals. Root changes, multiple roots and a prior Legacy unit
 /// refuse before a second source can reinterpret checked identities.
