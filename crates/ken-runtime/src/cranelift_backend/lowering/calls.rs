@@ -1632,12 +1632,9 @@ impl<'a> Lowering<'a> {
                     ),
                 ));
             }
-            if call.local_telescope.len() as u64 != call.arity {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "OrientedSubcontinuationPlanV1",
-                    "checked recursive invocation's local telescope does not cover its arity",
-                ));
-            }
+            // `local_telescope` is the caller occurrence's whole kernel context,
+            // not the callee's parameters; arity is joined above against `params`
+            // and the telescope is bound by the occurrence fingerprint.
             // ── Same-SCC identity and admission.
             //
             // ⭐ **What makes this call *same-SCC* is that its callee is itself a
