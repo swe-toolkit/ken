@@ -4627,6 +4627,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 Ok(SourceCallOutcome::Complete(called))
             }
             mut recursor @ Lowered::ComputationalRecursorClosure { .. } => {
+                let mut transport_alternatives = None;
                 let transport = match (self.pending_computational_ih_call, &recursor) {
                     (Some(pending), Lowered::ComputationalRecursorClosure { invocation, .. }) => {
                         let plan =
@@ -4859,14 +4860,24 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     "a checked-IH transport force has no destination emission owner",
                                 )
                             })?;
-                            self.static_transition_plan
-                                .checked_ih_environment_transport_for_invocation(
+                            match self.static_transition_plan
+                                .resolve_checked_ih_environment_transports_for_invocation(
                                     destination_owner,
                                     body,
                                     coordinates.continuation_origin,
                                     coordinates.recursive_position,
-                                )?
-                                .cloned()
+                                )? {
+                                Some(CheckedIhTransportResolution::Single(transport)) => {
+                                    Some(transport.clone())
+                                }
+                                Some(CheckedIhTransportResolution::Alternatives { set, members }) => {
+                                    transport_alternatives = Some((
+                                        set.clone(), members.into_iter().cloned().collect::<Vec<_>>(),
+                                    ));
+                                    None
+                                }
+                                None => None,
+                            }
                         }
                     }
                     (None, Lowered::ComputationalRecursorClosure { .. }) => None,
@@ -5463,6 +5474,80 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         recursive_unit_body,
                         rt_continuation_kinds(&suspended.continuation),
                     ));
+                    if let Some((set, members)) = transport_alternatives {
+                        Self::reject_carried_residual_arguments(args.len())?;
+                        let LoweringOperand::Carried(wrapped) = runtime_value else {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ProducerAlternativeSet",
+                                "an alternative checked-IH transport force has no carried R2 record",
+                            ));
+                        };
+                        let value = self.select_checked_ih_transport_alternative(
+                            builder, &set, &members, wrapped,
+                            |this, builder, transport| {
+                                let authority = match this.function_local
+                                    .checked_ih_generated_entry_access.as_ref() {
+                                    Some(access) => this.composed_return_forward_ret_authority(
+                                        access, transport,
+                                    )?,
+                                    None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+                                };
+                                match authority {
+                                    ComposedReturnForwardRetAuthorityOutcome::Formed(_)
+                                        if this.tail_worker_body_is_ret_kmatch(transport)?
+                                            && this.tail_route_is_forward_edge_collapsible(transport)? =>
+                                    {
+                                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                                            "CheckedIhEnvironmentTransport",
+                                            "a labelled checked-IH transport requires forward-Ret collapse inside the switch",
+                                        ));
+                                    }
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                                            "ComposedReturnForwardRetAuthority",
+                                            "a validated Tail producer-to-Ret route has no exact post-selection authority",
+                                        ));
+                                    }
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                                            "ComposedReturnForwardRetAuthority",
+                                            "a validated Tail producer-to-Ret route formed more than one post-selection authority",
+                                        ));
+                                    }
+                                    ComposedReturnForwardRetAuthorityOutcome::NonApplicable
+                                    | ComposedReturnForwardRetAuthorityOutcome::Formed(_)
+                                    | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_)
+                                    | ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {}
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
+                                }
+                                if let Some((projection, pending, callee_origin)) =
+                                    &current_checked_ih_projection {
+                                    match projection.route() {
+                                        CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
+                                            return Ok(this.call_direct_checked_ih_transport_from_case_environment(
+                                                builder, transport, projection, *pending,
+                                                *callee_origin, &env,
+                                            )?.into_routed_answer().value);
+                                        }
+                                        CheckedIhGeneratedEntryRoute::TailProducerToRet => {
+                                            return this.call_tail_checked_ih_transport_from_case_environment(
+                                                builder, transport, &env,
+                                            );
+                                        }
+                                    }
+                                }
+                                this.call_tail_checked_ih_transport_from_case_environment(
+                                    builder, transport, &env,
+                                )
+                            },
+                        )?;
+                        return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+                            value: RoutedAnswer::direct(value), control: suspended,
+                        }));
+                    }
                     if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
                         let value = self.call_selected_recursive_position_unit(

@@ -256,7 +256,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    CheckedIhTransportResolution, CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
     StrictRetSinkAssessment, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,

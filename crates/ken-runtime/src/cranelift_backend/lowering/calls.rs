@@ -869,9 +869,9 @@ impl<'a> Lowering<'a> {
                 })
         }
 
-        /// The sole label switch. The arm receives the *exact* worker body;
-        /// callers may take its governed force route or an ordinary unit call.
-        /// The switch itself issues no transport/materialization edge.
+        /// One switch per label carrier: this slot-residual switch selects an
+        /// exact worker body; the R2 Record switch selects an exact transport.
+        /// Neither switch issues a transport/materialization edge.
         pub(super) fn select_recursive_position_unit<F>(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
@@ -966,6 +966,70 @@ impl<'a> Lowering<'a> {
                         self.decode_residual_child(builder, residual)?,
                     LoweringOperand::Specialized(_) => return Err(unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual", "a labelled unit returned a specialized value across its ABI",
+                    )),
+                };
+                builder.ins().jump(join, &[answer.word.into()]);
+                builder.switch_to_block(next);
+            }
+            let refused = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[refused]);
+            builder.switch_to_block(join);
+            Ok(LoweringOperand::Carried(joined))
+        }
+
+        /// Select exactly one planner-issued environment transport by the R2
+        /// Record label. The selected arm alone reads its Child and emits its
+        /// call; a non-member label has no implicit default transport.
+        pub(super) fn select_checked_ih_transport_alternative<F>(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            set: &ProducerAlternativeSet,
+            members: &[CheckedIhEnvironmentTransport],
+            wrapped: CarriedBoundaryWord,
+            mut arm: F,
+        ) -> Result<LoweringOperand, CraneliftBackendError>
+        where
+            F: FnMut(&mut Self, &mut FunctionBuilder<'_>, &CheckedIhEnvironmentTransport)
+                -> Result<LoweringOperand, CraneliftBackendError>,
+        {
+            if members.len() != set.members.len() || members.iter().zip(&set.members).any(
+                |(transport, member)| transport.source_call_identity() != member
+            ) {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "ProducerAlternativeSet",
+                    "a checked-IH transport switch differs from its issued member order",
+                ));
+            }
+            let ordinal = self.assert_producer_alternative_record(builder, set, wrapped)?;
+            let join = builder.create_block();
+            let CarriedBlockParam::Value(joined) = append_carried_block_param(
+                builder, join, Representation::Value,
+            ) else { unreachable!("an alternative transport joins in the value plane") };
+            for (index, transport) in members.iter().enumerate() {
+                let selected = builder.create_block();
+                let next = builder.create_block();
+                let matched = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    ordinal,
+                    i64::try_from(index).map_err(|_| unsupported(
+                        LoweringCause::Capacity, "ProducerAlternativeSet",
+                        "a checked-IH alternative label exceeds the carrier ABI",
+                    ))?,
+                );
+                builder.ins().brif(matched, selected, &[], next, &[]);
+                builder.switch_to_block(selected);
+                let child = self.emit_carrier_field(builder, wrapped, 0)?;
+                let _ = self.checked_ih_transport_child(
+                    builder, LoweringOperand::Carried(child), transport,
+                )?;
+                let result = arm(self, builder, transport)?;
+                let answer = match result {
+                    LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Residual(residual) =>
+                        self.decode_residual_child(builder, residual)?,
+                    LoweringOperand::Specialized(_) => return Err(unsupported(
+                        LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                        "a checked-IH alternative returned a specialized value across its ABI",
                     )),
                 };
                 builder.ins().jump(join, &[answer.word.into()]);

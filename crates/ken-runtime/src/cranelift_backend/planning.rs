@@ -152,7 +152,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhCapabilityInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    CheckedIhTransportResolution, CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
     StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,

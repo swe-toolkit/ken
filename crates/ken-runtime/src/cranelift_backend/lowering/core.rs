@@ -13061,7 +13061,7 @@ impl<'a> Lowering<'a> {
 
     /// Validate the private boundary schema before any reader projects a
     /// field. The seat also invokes this before returning a multi-edge word.
-    fn assert_producer_alternative_record(
+    pub(super) fn assert_producer_alternative_record(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         set: &ProducerAlternativeSet,

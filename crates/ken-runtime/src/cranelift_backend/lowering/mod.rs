@@ -433,7 +433,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim,
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
     CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, StrictRetSinkStatus,
+    CheckedIhTransportResolution, CheckedIhForwardRetPlanProof, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
     CheckedIhGeneratedEntryRoute,
