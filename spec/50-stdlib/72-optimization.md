@@ -6,6 +6,7 @@
 > SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT §1.6;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
 > SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
@@ -38,7 +39,18 @@
 > scratch nor parent tests are current-tip execution. No official
 > conformance, CI, publication, landing or landed trust is claimed.
 > The §2.4 law and package-owned seed test are on main; their local
-> execution is not official conformance or landed trust.
+> execution is not official conformance or landed trust. This candidate
+> adds §2.5's public law, catalog theorem, package-owned test and
+> CV-authored seed. On catalog tip `161b75d`, both named package tests
+> passed 3/3 and the trusted identity set was 114 → 114; declaration
+> order was corrected at `1cea32a`, where the bounded-search target
+> passed 3/3. These are candidate-local results. On a tree byte-identical
+> to prior candidate `aaf1759d6`, Architect extracted the seed's two Ken
+> blocks. The accepted client checked successfully. A fresh client copy
+> with the appended false claim was rejected at its theorem
+> (`KernelRejected TypeMismatch`, span 1271..1377; 1/1, rc 0). This is
+> candidate-local scratch evidence, not an official conformance run; no
+> CI, publication, landing or landed-trust claim is made.
 
 ## 1. Least-cost candidate
 
@@ -447,7 +459,14 @@ No new primitive, kernel or surface feature is introduced.
 > catalog export and package-owned test are on main. The roots-loaded
 > test checks the authored seed, the complete public type, and the
 > rejected `None` counterpart. These local tests do not establish
-> official conformance-runner execution, CI or landed trust.
+> official conformance-runner execution, CI or landed trust. Section
+> 2.5 adds the converse as the fifth public law. The candidate carries
+> its catalog theorem, package-owned test and CV-authored seed. The
+> seed's two Ken blocks received the focused scratch check recorded in
+> the opening status. It has not been run by the official conformance
+> runner. Candidate-local catalog tests and scratch checks are not
+> official conformance, CI, publication, landing or a landed trust
+> measurement.
 
 ### 2.1 Carrier and result
 
@@ -515,7 +534,7 @@ is false because `3` is a hit. Bound `3` returns `None` because none
 of `0, 1, 2` satisfies `p`, and bound `Zero` also returns `None`.
 A claimed `Some 2` at bound `3` is false for a different reason:
 `p 2 = False`. These are behavioral illustrations, not a claim that
-the separately owned conformance seed has been committed or run.
+the conformance seed has been run by the official conformance runner.
 
 ### 2.3 Proof evidence and boundary
 
@@ -618,6 +637,49 @@ GlobalId sets before and after loading (114 → 114), and refuses selective
 import of the private helper. These local checks are **not** official
 conformance-runner execution, CI, publication, landing or a landed trust
 measurement.
+
+### 2.5 A fully refuted range returns no witness
+
+`Algorithm.Optimization.BoundedSearch` must export a public
+Transparent theorem with a checked body, immediately after
+`find_below_complete` and before `find_below_stable`. Its exact public
+type takes the predicate and bound first, then a refutation for every
+natural number strictly below that bound:
+
+```ken
+pub theorem find_below_refuted
+      (p : Nat → Bool) (bound : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False)
+      → Equal (Option Nat) (find_below p bound) (None Nat)
+```
+
+This is the converse of §2.2's `find_below_complete`: a `None` result
+refutes every in-range predicate hit, and a refuted range now entails
+`None`. There is no premise about the predicate outside the bound,
+no finite enumeration supplied by the client, and no promise of
+`None` when the bound grows. The conclusion concerns the actual
+`Option Nat` result, not a new search operation or a performance
+bound.
+
+The ruled proof route binds the computed `Option Nat` outcome and
+carries its result equation through a private case analysis. In the
+`Some n` case, `find_below_sound` yields both `lt_nat n bound = True`
+and `p n = True`; the premise gives `p n = False` at that same `n`, a
+contradiction. The `None` case establishes the result directly. The
+private `refuted_outcome_none` helper is not imported or mentioned in
+the public type, and no new assumption, primitive, kernel or surface
+form is needed. Sections 1–3 retain their existing operation and law
+types. Architect's exact-base AC-0 checked the generic law and helper
+in scratch with no new `Axiom` and equal trusted identity sets
+114 → 114. The assembled candidate adds the catalog theorem,
+package-owned test and CV-authored seed. On a tree byte-identical to
+prior candidate `aaf1759d6`, Architect extracted the seed's two Ken
+blocks. The accepted client checked successfully; a fresh client copy
+with the appended false claim was rejected at its theorem
+(`KernelRejected TypeMismatch`, span 1271..1377; 1/1, rc 0). This
+candidate-local scratch evidence is not an official conformance run.
+Component-local checks and scratch evidence do not establish official
+conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 3. Greatest-cost candidate
 
