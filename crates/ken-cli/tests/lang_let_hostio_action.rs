@@ -42,7 +42,7 @@ fn expect_stdout(name: &str, body: &str, expected: &[u8]) {
 }
 
 #[test]
-fn performed_let_single_grouped_and_io_proc_run_in_order() {
+fn performed_single_let_runs_before_its_continuation() {
     let single = r#"  let x = host_console APartial (Result IOError Unit)
     (write ConsoleStream.Stdout (bytes_encode "a"))
   in host_bind APartial (Result IOError Unit) ExitCode
@@ -50,7 +50,10 @@ fn performed_let_single_grouped_and_io_proc_run_in_order() {
       (write ConsoleStream.Stdout (bytes_encode "b")))
     (\_. host_pure APartial ExitCode ExitCode.Success)"#;
     expect_stdout("single", single, b"ab");
+}
 
+#[test]
+fn grouped_lets_run_each_rhs_once_in_source_order() {
     let grouped = r#"  let x = host_console APartial (Result IOError Unit)
     (write ConsoleStream.Stdout (bytes_encode "a"));
         y = host_console APartial (Result IOError Unit)
@@ -60,7 +63,10 @@ fn performed_let_single_grouped_and_io_proc_run_in_order() {
       (write ConsoleStream.Stdout (bytes_encode "c")))
     (\_. host_pure APartial ExitCode ExitCode.Success)"#;
     expect_stdout("grouped", grouped, b"abc");
+}
 
+#[test]
+fn let_inside_io_proc_body_runs_before_its_continuation() {
     // A proc's IO body reaches the same check_let_once path as main's HostIO.
     let io_proc = r#"proc action : IO (Result IOError Unit) visits [Console] =
   let x = write ConsoleStream.Stdout (bytes_encode "a") in
