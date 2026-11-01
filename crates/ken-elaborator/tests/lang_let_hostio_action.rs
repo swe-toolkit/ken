@@ -4,8 +4,9 @@
 //! continuation. CLAIMED: a performed RHS is not lowered as ordinary Let.
 //! THE GAP: these declarations do not exhaust all effect rows; CLI tests
 //! independently observe execution order. A performing RHS inside a
-//! non-tree-result proc with a non-empty row remains on the pre-existing
-//! ordinary-let fallback and is not sequenced; reported for separate tracking.
+//! non-tree-result proc with a non-empty row is elaborated by the unmodified
+//! ordinary-let fallback and is not sequenced; pre-existing on the exact
+//! base; filed separately.
 
 use ken_elaborator::ElabEnv;
 use ken_kernel::{Decl, Term};
