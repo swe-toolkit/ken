@@ -490,6 +490,10 @@ impl StaticTransitionPlan<'_> {
                 "returned bracket settlement {origin:?} is reached from outside its region",
             )));
         }
+        #[cfg(feature = "px8-ds-test-support")]
+        super::brackets::record_region_exit_owner(
+            super::brackets::RegionExitPlane::ReturnedVisSettlement, origin, from,
+        );
         Ok(Some(region.id))
     }
 

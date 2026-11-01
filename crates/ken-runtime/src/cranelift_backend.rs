@@ -176,6 +176,7 @@ pub use planning::{
     with_suppressed_execute_then_resume_response, with_suppressed_relay_promotion,
     with_mixed_relay_refusal_observations, MixedRelayRefusalObservation,
     with_forced_underived_owner,
+    with_region_exit_owner_observations, RegionExitOwnerObservation, RegionExitPlane,
     with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,

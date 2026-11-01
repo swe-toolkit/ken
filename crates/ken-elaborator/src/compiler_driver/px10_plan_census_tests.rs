@@ -42,8 +42,10 @@ fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
         .expect("census thread");
 }
 
-fn assert_object_emission_refusal(
+/// The object-emission refusal each px10 program stops at, with its wall text.
+fn assert_object_emission_wall(
     built: Result<NativeProgramBuildOutput, NativeProgramBuildError>,
+    wall: &str,
 ) {
     let error = built.expect_err("each px10 program still stops before an artifact");
     let NativeProgramBuildError::Packaging(packaging) = error else {
@@ -57,21 +59,59 @@ fn assert_object_emission_refusal(
         packaging.source_cause,
         Some(ken_runtime::LoweringCause::PlannerInvariant)
     );
+    assert!(
+        packaging.reason.contains(wall),
+        "expected the wall `{wall}`, got: {}",
+        packaging.reason
+    );
+}
+
+/// Each static region exit (a region's settlement Vis) has exactly one owner
+/// per plane, and the planes name exactly `expected`.
+fn assert_region_exit_owners(
+    name: &str,
+    observed: &[ken_runtime::RegionExitOwnerObservation],
+    expected: &[(ken_runtime::RegionExitPlane, u32, u32)],
+) {
+    let mut owners = std::collections::BTreeMap::<_, Vec<u32>>::new();
+    for row in observed {
+        owners
+            .entry((row.plane, row.exit))
+            .or_default()
+            .push(row.owner);
+    }
+    for ((plane, exit), found) in &owners {
+        assert_eq!(
+            found.len(),
+            1,
+            "{name}: exit {exit} has {found:?} as {plane:?} owners"
+        );
+    }
+    let observed: Vec<_> = observed
+        .iter()
+        .map(|row| (row.plane, row.exit, row.owner))
+        .collect();
+    assert_eq!(observed, expected, "{name}: region exit owners");
 }
 
 /// Promise class: transition sentinel, retired by
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke program's static
 /// transition plan completes, recording one feasibility diagnostic with no
-/// returned-Vis protocol error. CLAIMED: the return fold is found by the tail
-/// up-walk from the acquire dispatch, and a returned bracket settlement is owned
-/// by the Vis whose response returns it, not by the protocol root. THE GAP:
-/// lowering then refuses at the detached-result seat, so nothing executes.
+/// returned-Vis protocol error, and lowering stops at the P2 wall. Its one
+/// region exit, settlement 647, resumes through fold 12 and is returned by Vis
+/// 682. CLAIMED: the return fold is found by the tail up-walk from the acquire
+/// dispatch, a returned bracket settlement is owned by the Vis whose response
+/// returns it, and every specialized closure call reaches its graph-derived
+/// target. THE GAP: the detached-result seat refuses, so nothing executes.
 #[test]
 fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
+    use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
     in_census_thread("px10-census-smoke", || {
-        let (built, diagnostics) =
+        let ((built, owners), diagnostics) =
             ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                emit_below_gate("px10_census_smoke", SMOKE)
+                ken_runtime::with_region_exit_owner_observations(|| {
+                    emit_below_gate("px10_census_smoke", SMOKE)
+                })
             });
         assert_eq!(
             diagnostics.len(),
@@ -84,36 +124,73 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
                 "returned-Vis protocol refused: {protocol:?}"
             );
         }
-        assert_object_emission_refusal(built);
+        assert_region_exit_owners(
+            "smoke",
+            &owners,
+            &[(ReturnFold, 647, 12), (ReturnedVisSettlement, 647, 682)],
+        );
+        assert_object_emission_wall(
+            built,
+            "the detached-result seat projected 2 undischarged causal calls onto one unit result",
+        );
     });
 }
 
 /// Promise class: transition sentinel, retired by
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: argv_env_pipe and live_child
-/// each reach exactly one typed mixed-owner relay refusal. CLAIMED: planning
-/// gets past the return fold and, for argv_env_pipe, past the host-response
-/// leaf walk through closure continuations, to the mixed-owner transport
-/// stage. THE GAP: that stage stays refused here.
+/// each reach exactly one typed mixed-owner relay refusal, at relay source
+/// 1724 and 1228. Each has two region exits with one return-fold owner each,
+/// and the exit its returned-Vis plane reaches has one returning Vis.
+/// CLAIMED: planning gets past the return fold and, for argv_env_pipe, past
+/// the host-response leaf walk through closure continuations, to the
+/// mixed-owner transport stage. THE GAP: that stage stays refused here.
 #[test]
 fn px10_argv_and_live_plan_to_the_mixed_owner_stage() {
-    for (name, source) in [
-        ("px10_census_argv_env_pipe", ARGV_ENV_PIPE),
-        ("px10_census_live_child", LIVE_CHILD),
+    use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
+    for (name, source, relay, expected) in [
+        (
+            "px10_census_argv_env_pipe",
+            ARGV_ENV_PIPE,
+            1724,
+            [
+                (ReturnFold, 1160, 571),
+                (ReturnFold, 1429, 1165),
+                (ReturnedVisSettlement, 1160, 1984),
+            ],
+        ),
+        (
+            "px10_census_live_child",
+            LIVE_CHILD,
+            1228,
+            [
+                (ReturnFold, 601, 12),
+                (ReturnFold, 870, 606),
+                (ReturnedVisSettlement, 601, 1488),
+            ],
+        ),
     ] {
         in_census_thread(name, move || {
-            let (built, refusals) = ken_runtime::with_mixed_relay_refusal_observations(|| {
-                emit_below_gate(name, source)
-            });
+            let ((built, owners), refusals) =
+                ken_runtime::with_mixed_relay_refusal_observations(|| {
+                    ken_runtime::with_region_exit_owner_observations(|| {
+                        emit_below_gate(name, source)
+                    })
+                });
             assert_eq!(
                 refusals.len(),
                 1,
                 "{name}: one mixed-owner stage reaches the guard"
             );
+            assert_eq!(refusals[0].source, relay, "{name}: relay source");
             assert!(
                 !refusals[0].edge_identity.is_empty(),
                 "{name}: the refused edge is causal"
             );
-            assert_object_emission_refusal(built);
+            assert_region_exit_owners(name, &owners, &expected);
+            assert_object_emission_wall(
+                built,
+                &format!("relay source StaticOriginId({relay}) has a mixed-owner transport stage"),
+            );
         });
     }
 }
