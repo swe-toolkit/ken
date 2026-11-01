@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REVERSE-INVOLUTION
 title: "Spec 62 §8 reverses a directed graph and its walks, and §9 reverses a composed walk, but states no law that reversal is an involution: reversing a graph twice gives back the graph, and reversing a walk twice gives back the walk. A client that reverses twice cannot return to its original graph or walk without reopening the representation. Rule from a checked D0 at zero trust and state the laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
