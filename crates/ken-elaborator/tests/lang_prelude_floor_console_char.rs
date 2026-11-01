@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 61] = [
+const PACKAGED: [(&str, &str); 81] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "print_line"),
@@ -80,6 +80,26 @@ const PACKAGED: [(&str, &str); 61] = [
     ("Capability.Process.Exit", "host_fs"),
     ("Capability.Process.Exit", "host_pure"),
     ("Capability.Process.Exit", "host_bind"),
+    ("Capability.System.Mapping", "MappingHandle"),
+    ("Capability.System.Mapping", "MappingWindow"),
+    ("Capability.System.Mapping", "MkMappingWindow"),
+    ("Capability.System.Mapping", "MappingSource"),
+    ("Capability.System.Mapping", "Anonymous"),
+    ("Capability.System.Mapping", "FileBacked"),
+    ("Capability.System.Mapping", "mapBytes"),
+    ("Capability.System.Mapping", "mapWrite"),
+    ("Capability.Process.Child", "ChildStdio"),
+    ("Capability.Process.Child", "ChildPipe"),
+    ("Capability.Process.Child", "ChildNull"),
+    ("Capability.Process.Child", "ChildInherit"),
+    ("Capability.Process.Child", "spawn_plan"),
+    ("Capability.Process.Child", "with_environment"),
+    ("Capability.Process.Child", "with_stdin"),
+    ("Capability.Process.Child", "with_stdout"),
+    ("Capability.Process.Child", "withChild"),
+    ("Capability.Process.Child", "wait_child"),
+    ("Capability.Process.Child", "take_stdout"),
+    ("Capability.Process.Child", "read_pipe"),
 ];
 
 fn load(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
