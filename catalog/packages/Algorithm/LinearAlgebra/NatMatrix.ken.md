@@ -2945,8 +2945,8 @@ proof's `vector_cons_eq` also remains private. `vector_zero`,
 `dot_zero_right`, `vector_scale_zero_vector` and `matrix_vector_zero`
 follow in that order. All thirty-three laws have checked bodies. This
 package adds no Axiom, postulate, primitive, `Float` or trusted-base
-entry; dependencies retain their own trust posture. Root-loaded acceptance tests check generic
-imports, closed values and indexed relations, isolated refused claims, and
+entry; dependencies retain their own trust posture. Root-loaded acceptance
+tests check generic imports, closed values and indexed relations, isolated refused claims, and
 the exact trusted-identity set. The indexed-sum package test checks the authored
 positive client and four isolated refusals; the matrix-vector linearity test
 checks its authored accepted client and isolated refusal. The transpose
