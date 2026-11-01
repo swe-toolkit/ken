@@ -1,18 +1,19 @@
-# Zero annihilation in natural linear algebra
+# Zero annihilation for dot, scaling, and matrix application
 
 Format: `../../README.md`.
-Spec: `spec/50-stdlib/65-linear-algebra.md` §11.
+Spec: `spec/50-stdlib/65-linear-algebra.md` §11, Spec child
+`261efd4ccaf39693467d5ec0b2a6b72ca42804d9`.
+Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION.md`.
 
-Status: authored; not officially conformance-run. The accepted client
-applies all three public checked laws at arbitrary dimensions and at
-length two. Closed values fix a nonzero matrix's output independently
-of the laws. They do not replace the generic proof obligations.
+Status: authored; not executed. The laws quantify over all dimensions.
+This seed applies each law with open dimensions and at `two`; its closed
+vectors do not replace the generic theorem obligations.
 
 ## Accepted shared client
 
-Take `u = [1,2]` and the matrix with rows `[1,2]` and `[2,1]`.
-The matrix contains nonzero entries and sends `u` to `[5,4]`,
-whereas it sends the zero vector to `[0,0]`.
+Let `u = [1,2]`, `zero2 = [0,0]`, and let `a` have rows `[1,2]`
+and `[2,1]`. The entries of `a` are nonzero. Its image of `u` is
+`[5,4]`, while its image of `zero2` is `zero2`.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons)
@@ -35,88 +36,104 @@ const a : Vec (Vec Nat two) two =
   VCons (Vec Nat two) one (pair one two)
     (VCons (Vec Nat two) Zero (pair two one) (VNil (Vec Nat two)))
 
-theorem dot_open (n : Nat) (v : Vec Nat n)
-  : Equal Nat (dot n v (vector_zero n)) Zero = dot_zero_right n v
+theorem dot_open (n : Nat) (xs : Vec Nat n)
+  : Equal Nat (dot n xs (vector_zero n)) Zero =
+  dot_zero_right n xs
 
-theorem scale_open (n : Nat) (f : Nat)
-  : Equal (Vec Nat n) (vector_scale n f (vector_zero n)) (vector_zero n) =
-  vector_scale_zero_vector n f
+theorem scale_open (n : Nat) (factor : Nat)
+  : Equal (Vec Nat n)
+      (vector_scale n factor (vector_zero n)) (vector_zero n) =
+    vector_scale_zero_vector n factor
 
-theorem mv_open (m : Nat) (n : Nat) (b : Vec (Vec Nat n) m)
-  : Equal (Vec Nat m) (matrix_vector m n b (vector_zero n)) (vector_zero m) =
-  matrix_vector_zero m n b
+theorem matrix_vector_open
+    (m : Nat) (n : Nat) (rows : Vec (Vec Nat n) m)
+  : Equal (Vec Nat m)
+      (matrix_vector m n rows (vector_zero n)) (vector_zero m) =
+    matrix_vector_zero m n rows
 
-theorem dot_two : Equal Nat (dot two u (vector_zero two)) Zero =
-  dot_zero_right two u
+theorem dot_two
+  : Equal Nat (dot two u (vector_zero two)) Zero =
+    dot_zero_right two u
 
-theorem scale_two : Equal (Vec Nat two)
-    (vector_scale two two (vector_zero two)) (vector_zero two) =
-  vector_scale_zero_vector two two
+theorem dot_two_value
+  : Equal Nat (dot two u (vector_zero two)) Zero = Proved
 
-theorem mv_two : Equal (Vec Nat two)
-    (matrix_vector two two a (vector_zero two)) (vector_zero two) =
-  matrix_vector_zero two two a
+theorem scale_two
+  : Equal (Vec Nat two)
+      (vector_scale two two (vector_zero two)) (vector_zero two) =
+    vector_scale_zero_vector two two
 
-theorem matrix_nonzero_value : Equal (Vec Nat two)
-    (matrix_vector two two a u) (pair five four) = Refl
+theorem scale_two_value
+  : Equal (Vec Nat two)
+      (vector_scale two two (vector_zero two)) zero2 = Refl
 
-theorem matrix_zero_value : Equal (Vec Nat two)
-    (matrix_vector two two a zero2) zero2 = Refl
+theorem matrix_vector_two
+  : Equal (Vec Nat two)
+      (matrix_vector two two a (vector_zero two)) (vector_zero two) =
+    matrix_vector_zero two two a
 
-theorem zero_vector_value : Equal (Vec Nat two) (vector_zero two) zero2 = Refl
+theorem matrix_vector_nonzero_value
+  : Equal (Vec Nat two) (matrix_vector two two a u) (pair five four) = Refl
 
-theorem matrix_zero_same_form_control : Equal (Vec Nat two)
-    (matrix_vector two two a zero2) zero2 = Refl
+theorem matrix_vector_zero_control
+  : Equal (Vec Nat two) (matrix_vector two two a zero2) zero2 = Refl
 ```
 
-### stdlib/linear-algebra/zero-annihilation-open
+### `stdlib/linear-algebra/zero-annihilation-laws-open`
 
-- spec: §11.
+- spec: §11.1.
 - promise class: durable invariant.
-- given: arbitrary `n`, `m`, scalar factor, vector and matrix.
-- expect: all three public generic laws check without a premise.
-- claimed: a right zero vector annihilates dot, scaling preserves the
-  zero vector, and a matrix sends the zero vector to its output zero.
-- the gap: applying the exported laws does not check their bodies;
-  the package checker checks their proofs separately.
+- given: arbitrary dimensions and vectors, rows, and natural scale factor.
+- expect: the three public laws apply at their stated generic types;
+  each also applies to the closed length-two fixture.
+- claimed: the laws hold without premises for every natural dimension.
+- gap: applying the exports does not check their generic proof bodies.
 
-### stdlib/linear-algebra/zero-annihilation-two
+### `stdlib/linear-algebra/zero-annihilation-laws-closed`
 
-- spec: §11.
+- spec: §11.1–§11.2.
 - promise class: durable invariant.
-- given: the stated vector and nonzero two-by-two matrix.
-- expect: each public law applies at length two. The independently
-  constructed `[5,4]` checks the nonzero input's matrix result;
-  the zero input checks as `[0,0]` with `Refl`.
-- claimed: the two inputs have different matrix results for these
-  fixed values.
-- the gap: these examples alone cannot prove the arbitrary-index
-  equalities.
+- given: `u = [1,2]`, `zero2 = [0,0]`, and the nonzero matrix
+  `a = [[1,2],[2,1]]`.
+- expect: the matrix sends `u` to `[5,4]` and `zero2` to `zero2`;
+  the three law applications at `two` check.
+- claimed: dot with the right zero vector is zero, scaling the zero
+  vector preserves it, and every matrix sends a zero vector to zero.
+- gap: these instances do not establish the three generic proofs.
 
 ## Isolated refused claim
 
-Start from a fresh copy of the full accepted client and append only
-this false theorem. It uses the same matrix, output `zero2`, result
-type and `Refl` proof form as `matrix_zero_same_form_control`; only
-the input vector changes from `zero2` to `u`.
+Start from a fresh complete copy of the accepted client and append only
+`seed_neg` below. The accepted `matrix_vector_zero_control` keeps the
+matrix, result type, expected `zero2`, and `Refl` proof form fixed; the
+false claim changes only the vector input from `zero2` to `u`. The
+accepted `matrix_vector_nonzero_value` independently checks that the
+same input maps to `[5,4]`, not `zero2`.
 
-### stdlib/linear-algebra/reject-nonzero-matrix-input-as-zero
+### `stdlib/linear-algebra/reject-nonzero-matrix-vector-as-zero`
 
-- spec: §11.
+- spec: §11.2.
 - promise class: durable invariant.
-- given: the accepted prefix, where the matrix maps `u` to `[5,4]`.
-- expect: the false equality refuses at its own `Refl`.
-- control: the accepted same-form zero-input theorem checks with
-  `Refl`, excluding an inadmissible proof form as the explanation.
-- the gap: this false closed claim does not replace the public proof.
+- given: `a = [[1,2],[2,1]]`, `u = [1,2]`, and `zero2 = [0,0]`.
+- expect: refuse `seed_neg` at its own `Refl` with
+  ``Refl expects an `Eq`-shaped goal``; the same-form `zero2` control
+  accepts.
+- claimed: the public zero-input law does not say a matrix sends a
+  nonzero vector to zero.
+- why: the computed image is `[5,4]`, not `zero2`. `Refl` separates
+  this false equality from the same-form accepted control; `Proved`
+  refuses that true control too.
+- gap: the isolated refusal does not establish the generic laws.
 
 ```ken
-theorem seed_neg : Equal (Vec Nat two)
-    (matrix_vector two two a u) zero2 = Refl
+theorem seed_neg : Equal (Vec Nat two) (matrix_vector two two a u) zero2 = Refl
 ```
 
 ## Evidence boundary
 
-The seed is authored, not officially conformance-run. Its package-owned
-roots-loader test is candidate-local checking, not runner execution.
-No CI, publication, landing or landed trust measurement is claimed.
+The Spec child and new catalog exports are not on the authoring base
+`a39d385c8`. Architect AC-0 checked the generic proofs and measured
+the proof-form pair in scratch; it did not run this seed. This seed has
+not been Ken-checked against the catalog candidate or through the
+official conformance runner. No CI, publication, landing, or
+landed-trust result is claimed.

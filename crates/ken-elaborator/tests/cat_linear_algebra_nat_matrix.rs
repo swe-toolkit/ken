@@ -493,21 +493,21 @@ fn zero_annihilation_seed_checks_and_nonzero_input_refuses_at_refl() {
     for name in [
         "dot_open",
         "scale_open",
-        "mv_open",
+        "matrix_vector_open",
         "dot_two",
+        "dot_two_value",
         "scale_two",
-        "mv_two",
-        "matrix_nonzero_value",
-        "matrix_zero_value",
-        "zero_vector_value",
-        "matrix_zero_same_form_control",
+        "scale_two_value",
+        "matrix_vector_two",
+        "matrix_vector_nonzero_value",
+        "matrix_vector_zero_control",
     ] {
         let id = env.globals[name];
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
     let positive = parse_decls(accepted).expect("§11 accepted client parses");
     let control = positive.iter().find(|decl| {
-        matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == "matrix_zero_same_form_control")
+        matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == "matrix_vector_zero_control")
     });
     let Some(SourceDecl::TheoremDecl {
         theorem: control_goal,
