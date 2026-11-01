@@ -6,6 +6,7 @@
 > SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT §1.6;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
 > SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
@@ -38,7 +39,11 @@
 > scratch nor parent tests are current-tip execution. No official
 > conformance, CI, publication, landing or landed trust is claimed.
 > The §2.4 law and package-owned seed test are on main; their local
-> execution is not official conformance or landed trust.
+> execution is not official conformance or landed trust. Section 2.5
+> is a spec-only addition here: Architect's exact-base AC-0 checked
+> its proposed proof with no new `Axiom` and equal scratch trusted
+> identities 114 → 114. The catalog theorem, package test and CV seed
+> are later turns, not delivered or executed by this child.
 
 ## 1. Least-cost candidate
 
@@ -447,7 +452,10 @@ No new primitive, kernel or surface feature is introduced.
 > catalog export and package-owned test are on main. The roots-loaded
 > test checks the authored seed, the complete public type, and the
 > rejected `None` counterpart. These local tests do not establish
-> official conformance-runner execution, CI or landed trust.
+> official conformance-runner execution, CI or landed trust. Section
+> 2.5 states a fifth public law in this spec-only child; AC-0 is
+> scratch proof evidence, not catalog delivery, an authored or run
+> §2.5 seed, official conformance, CI or a landed trust measurement.
 
 ### 2.1 Carrier and result
 
@@ -618,6 +626,43 @@ GlobalId sets before and after loading (114 → 114), and refuses selective
 import of the private helper. These local checks are **not** official
 conformance-runner execution, CI, publication, landing or a landed trust
 measurement.
+
+### 2.5 A fully refuted range returns no witness
+
+`Algorithm.Optimization.BoundedSearch` must export a public
+Transparent theorem with a checked body, immediately after
+`find_below_complete` and before `find_below_stable`. Its exact public
+type takes the predicate and bound first, then a refutation for every
+natural number strictly below that bound:
+
+```ken
+pub theorem find_below_refuted
+      (p : Nat → Bool) (bound : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False)
+      → Equal (Option Nat) (find_below p bound) (None Nat)
+```
+
+This is the converse of §2.2's `find_below_complete`: a `None` result
+refutes every in-range predicate hit, and a refuted range now entails
+`None`. There is no premise about the predicate outside the bound,
+no finite enumeration supplied by the client, and no promise of
+`None` when the bound grows. The conclusion concerns the actual
+`Option Nat` result, not a new search operation or a performance
+bound.
+
+The ruled proof route binds the computed `Option Nat` outcome and
+carries its result equation through a private case analysis. In the
+`Some n` case, `find_below_sound` yields both `lt_nat n bound = True`
+and `p n = True`; the premise gives `p n = False` at that same `n`, a
+contradiction. The `None` case establishes the result directly. The
+private `refuted_outcome_none` helper is not imported or mentioned in
+the public type, and no new assumption, primitive, kernel or surface
+form is needed. Sections 1–3 retain their existing operation and law
+types. Architect's exact-base AC-0 checked the generic law and helper
+in scratch with no new `Axiom` and equal trusted identity sets
+114 → 114; it is not a catalog export, package-test execution,
+CV-authored seed, official conformance run, CI, publication, landing
+or measurement of landed trust.
 
 ## 3. Greatest-cost candidate
 
