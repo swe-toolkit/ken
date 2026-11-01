@@ -11,7 +11,8 @@
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-DISTRIBUTIVITY §9;
 > SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER §10;
 > SPEC-GEOMETRY-BOX-CORNER-MEMBERSHIP §11;
-> SPEC-GEOMETRY-BOX-INSIDE-ANTISYMMETRY §12).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INSIDE-ANTISYMMETRY §12;
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE §13).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -51,7 +52,10 @@
 > package-owned test and CV-authored seed. The seed is authored but
 > unexecuted. Neither it nor candidate-local checks establish official
 > conformance-runner execution, CI, publication, landing or a measured
-> landed-trust result for §12.
+> landed-trust result for §12. Section 13's two catalog laws, closed
+> seed and package-owned test are authored in this candidate. Its
+> candidate-local checks do not establish official conformance-runner
+> execution, CI, publication, landing or a landed-trust result for §13.
 
 ## 1. Points and closed boxes over natural coordinates
 
