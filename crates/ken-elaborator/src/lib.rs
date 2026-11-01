@@ -533,7 +533,7 @@ impl ElabEnv {
         // declarations admitted after this pre-source boundary belong to a
         // package's duplicate-name set; prelude names keep their own guards.
         elab.module_state.package_definitions.clear();
-        elab.module_state.capture_source_unit_boundary();
+        elab.module_state.finish_prelude_source_registration();
         Ok(elab)
     }
 

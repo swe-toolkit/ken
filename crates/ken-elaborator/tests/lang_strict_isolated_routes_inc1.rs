@@ -153,6 +153,32 @@ fn imported_main_does_not_become_the_roots_entrypoint() {
     assert!(env.globals.contains_key("Lib.main"));
 }
 
+/// Promise class: durable invariant. A partially committed Legacy file is
+/// still an active Legacy run: the first checked declaration survives a later
+/// refusal even though no complete in-memory unit was recorded. Strict must
+/// not replace its scope and quietly admit a second source.
+#[test]
+fn partial_legacy_admission_cannot_switch_to_strict() {
+    let (_dir, root) = root_with_lib();
+    let mut env = ElabEnv::new().unwrap();
+    assert!(env
+        .elaborate_file_v1("const leaked : Nat = Zero\nconst broken : Bool = Zero\n")
+        .is_err());
+    assert!(
+        env.globals.contains_key("leaked"),
+        "earlier Legacy declaration was admitted"
+    );
+    match load(&mut env, &[root], "const fresh : Nat = Zero\n") {
+        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
+        other => panic!("partial Legacy admission must keep its mode lock, got {other:?}"),
+    }
+    let mut parse_only = ElabEnv::new().unwrap();
+    assert!(parse_only
+        .elaborate_file_v1("const invalid : Nat =")
+        .is_err());
+    load(&mut parse_only, &[], "const fresh : Nat = Zero\n").unwrap();
+}
+
 /// Promise class: durable invariant. A continuing strict scope retains
 /// imports and locals. Root changes, multiple roots and a prior Legacy unit
 /// refuse before a second source can reinterpret checked identities.

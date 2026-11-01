@@ -96,10 +96,10 @@ pub struct ModuleState {
     module_path_owners: HashMap<String, ModuleUnitOwner>,
     /// The next distinct in-memory unit identity, committed only on success.
     next_in_memory_unit: u64,
-    /// Prelude registration itself elaborates in-memory units. Snapshot the
-    /// boundary before user source can speak, so a fresh strict entry does not
-    /// mistake those compiler-owned units for a preceding Legacy source.
-    pre_source_in_memory_units: u64,
+    /// Entering a Legacy in-memory source locks this environment's resolution
+    /// mode even when a later declaration fails after earlier admissions.
+    /// Prelude registration uses the same entry and resets this at its end.
+    legacy_in_memory_source_started: bool,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
     /// V1 results owned by each loaded file unit, retained for cached roots
@@ -205,8 +205,8 @@ impl ModuleState {
         }
     }
 
-    pub(crate) fn capture_source_unit_boundary(&mut self) {
-        self.pre_source_in_memory_units = self.next_in_memory_unit;
+    pub(crate) fn finish_prelude_source_registration(&mut self) {
+        self.legacy_in_memory_source_started = false;
     }
 
     pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
@@ -2645,9 +2645,7 @@ pub fn elaborate_isolated_strict_v1(
         });
     }
     if elab.module_state.roots_resolution_mode == Some(ResolutionMode::Legacy)
-        || (elab.module_state.root_scope.mode != ResolutionMode::Strict
-            && elab.module_state.next_in_memory_unit
-                != elab.module_state.pre_source_in_memory_units)
+        || elab.module_state.legacy_in_memory_source_started
     {
         return Err(ElabError::Internal(
             "resolution mode cannot change during one elaboration run".to_string(),
@@ -6316,6 +6314,12 @@ pub fn expand_and_elaborate(
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     let boundary = admission_boundary(decls)?;
+    // A failed file can leave an earlier declaration admitted without ever
+    // committing its in-memory unit counter. Lock the mode at entry instead
+    // of inferring it from the number of completed units.
+    if !decls.is_empty() && elab.module_state.root_scope.mode == ResolutionMode::Legacy {
+        elab.module_state.legacy_in_memory_source_started = true;
+    }
     let mut local_modules = HashSet::new();
     declared_module_paths(decls, "", &mut local_modules);
     let owner = match elab.module_state.active_imports.last() {
