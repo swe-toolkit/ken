@@ -9,7 +9,8 @@
 > SPEC-LINEAR-ALGEBRA-TRANSPOSE-ADJOINT §7;
 > SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC §8;
 > SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION §9;
-> SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT §10).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT §10;
+> SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION §11).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -25,13 +26,18 @@
 > seed and package-owned test are now on main. Its isolated D0 had equal
 > scratch trusted identities 114 → 114; neither that scratch work nor
 > candidate-local tests establish official conformance-runner execution
-> or a measured landed trust result. Section 10 specifies one zero-vector
-> operation and four checked laws, taking the intended public roster to
-> nine operations and thirty laws (thirty-nine names). Architect AC-0
-> checked their generic proofs only in scratch with equal trusted
-> identity sets 109 → 109. This spec-only child adds no §10 catalog
-> operation, theorem, package test or CV seed; no §10 official
-> conformance, CI, publication, landing or landed trust is established.
+> or a measured landed trust result. Section 10's zero-vector operation,
+> four checked laws, authored seed and package-owned test are on main:
+> nine operations and thirty laws, thirty-nine public names. Architect's
+> §10 AC-0 checked generic proofs in scratch with equal trusted identity
+> sets 109 → 109. This assembled candidate contains §11's three
+> checked catalog laws, CV's authored seed and a package-owned test.
+> Foundation reports the named `cat_linear_algebra_nat_matrix` target
+> passed 7/7 on the assembled content. Separately, Architect AC-0 on
+> `a39d385c8` checked proposed bodies in scratch with no new `Axiom`
+> and equal trusted identities 109 → 109. These candidate-local and
+> scratch checks are not official §11 conformance-runner execution,
+> CI, publication, landing or a measured landed trust result.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -882,10 +888,10 @@ conformance-runner execution or a measured landed trust result.
 > base `42ba094f3` checked generic proofs with `ken check` and
 > `ken fmt --check` rc 0, no new `Axiom`, and equal scratch
 > `trusted_base()` identity sets 109 → 109. That is isolated design
-> evidence, not a candidate catalog check or a landed trust result.
-> This spec-only child adds no §10 catalog export, package test or CV
-> seed. No §10 official conformance-runner execution, CI, publication,
-> landing or measured landed trust is established.
+> evidence, not a measurement of landed trust. The §10 operation and
+> four checked laws, authored seed and package-owned test are on main.
+> Neither scratch D0 nor that test establishes official conformance-
+> runner execution, fresh CI or a measured landed trust result.
 
 ### 10.1 Public definition and premise-free checked laws
 
@@ -968,3 +974,88 @@ The new names are owned by `NatMatrix`, not by `Data.Vector.Vector`;
 must advance to thirty-nine names with the catalog child. Architect
 AC-0 measured this roster and equal scratch trust identities, not
 candidate-local package tests, official conformance, CI or landing.
+§11 advances the roster to nine operations and thirty-three laws,
+forty-two public names.
+
+## 11. Zero annihilation for dot, scaling and matrix application
+
+> **Section 11 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION).** Architect AC-0 on exact
+> base `a39d385c8` checked the three proposed generic proof bodies in
+> scratch with no new `Axiom` and equal `trusted_base()` identity sets
+> 109 → 109. The assembled candidate contains all three checked §11
+> catalog laws, CV's authored seed and the package-owned test.
+> Foundation's named package test reported 7/7 on this content; the
+> seed was package-tested. That result does not establish official
+> conformance-runner execution, and none is claimed here. Neither that
+> candidate-local test nor scratch AC-0 establishes CI,
+> publication, landing or a measured landed trust result.
+
+### 11.1 Three premise-free public checked laws
+
+`Algorithm.LinearAlgebra.NatMatrix` must export these three Transparent
+checked theorems, in this order, immediately after `dot_zero_left`
+and before `matrix_vector_additive`. Each parameter follows its
+operation's argument order. The laws hold for every natural dimension,
+including zero, with no premise or change to any §1–§10 operation or
+public law type.
+
+```ken
+pub theorem dot_zero_right
+      (n : Nat) (xs : Vec Nat n)
+    : Equal Nat (dot n xs (vector_zero n)) Zero
+
+pub theorem vector_scale_zero_vector
+      (n : Nat) (factor : Nat)
+    : Equal (Vec Nat n) (vector_scale n factor (vector_zero n)) (vector_zero n)
+
+pub theorem matrix_vector_zero
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec Nat m) (matrix_vector m n a (vector_zero n)) (vector_zero m)
+```
+
+`dot_zero_right` places the zero vector on the **right** of `dot`;
+it is not a duplicate spelling of §10's left-zero law.
+`vector_scale_zero_vector` scales the zero vector by **any** natural
+factor, distinct from §10's `vector_scale_zero`, which scales any
+vector by the particular factor `Zero`. `matrix_vector_zero`
+sends the zero vector of length `n` to the zero vector of length `m`
+for any indexed `m × n` matrix, not merely a square or zero matrix.
+All three conclusions are structural `Equal` over their indicated
+carriers; there is no nonzero-dimension exception, new scalar tier,
+semiring abstraction, kernel rule, surface form or postulate.
+
+### 11.2 Proof boundary and closed discriminator
+
+The right-zero dot law is derived directly by `dot_comm n xs
+(vector_zero n)` followed by §10's `dot_zero_left n xs`.
+`vector_scale_zero_vector` matches on the **written `n`**, which
+occurs in both sides of its indexed goal; the base case is empty,
+and the successor transports its tail induction hypothesis under
+`VCons Nat k Zero` using `cong`. Its head is `mul factor Zero`,
+which reduces to `Zero` because `mul` recurses on its second argument.
+No `mul::zero_r` is available to this module or required by the
+proof; the law does not borrow a new public multiplication lemma.
+`matrix_vector_zero` uses the symmetry of
+`vector_scale_zero n (vector_zero n)` to express its input as the
+zero scaling of itself, then `matrix_vector_homogeneous` at factor
+`Zero`, followed by `vector_scale_zero` at length `m` on the image.
+It has no match of its own. The existing `repeat` and
+`vector_cons_eq` remain private; none of these laws exports a helper
+or changes the earlier private proof boundary.
+
+For a closed discriminator take `n = m = two`,
+`u = [1,2]`, `zero2 = [0,0]`, and the nonzero matrix with rows
+`[1,2]` and `[2,1]`. Its image of `u` is `[5,4]`, not `zero2`;
+its image of `zero2` is `zero2`. After a fresh accepted prefix
+that applies all three public laws, append alone the false claim
+`matrix_vector two two a u = zero2` using `Refl`; it must refuse at
+its own proof span. The otherwise identical claim with `zero2`
+as the input, also using `Refl`, is an accepted same-form control.
+Architect's D0 measured this proof-form distinction: `Proved`
+refuses even the true vector-equality control, so it cannot serve
+as the negative's discriminating proof form. A closed true
+`Equal Nat` dot-zero claim likewise does not accept `Refl`; apply
+`dot_zero_right` to establish the generic dot equality instead.
+These finite rows separate values and proof forms; they do not
+replace the generic checked theorems or claim a seed was run.

@@ -15,6 +15,10 @@ use ken_kernel::{Decl, KernelError};
 
 const MATRIX: &str = "Algorithm.LinearAlgebra.NatMatrix";
 const VECTOR: &str = "Data.Vector.Vector";
+const ZERO_SEED: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../conformance/stdlib/linear-algebra/seed-zero-annihilation.md"
+));
 const SHIPPED_SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../conformance/stdlib/linear-algebra/seed-nat-matrix.md"
@@ -154,7 +158,7 @@ fn matrix_env() -> ElabEnv {
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: exact owned, transparent law identities, selective imports of
-/// all thirty-nine names and generic clients for fourteen specified propositions.
+/// all forty-two names and generic clients for seventeen specified propositions.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -219,6 +223,9 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "vector_add_zero_right",
         "vector_scale_zero",
         "dot_zero_left",
+        "dot_zero_right",
+        "vector_scale_zero_vector",
+        "matrix_vector_zero",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -235,7 +242,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         .collect::<BTreeSet<_>>();
     assert!(
         expected.is_subset(&owned_names),
-        "all thirty-nine public names are owned"
+        "all forty-two public names are owned"
     );
     for name in &expected {
         let id = env.globals[&format!("{MATRIX}.{name}")];
@@ -266,7 +273,8 @@ import Algorithm.LinearAlgebra.NatMatrix
    matrix_product, identity, dot_comm, dot_distrib, transpose_invol,
    vector_identity, matrix_identity_right, matrix_identity_left,
    matrix_product_assoc, dot_scale, matrix_vector_product, transpose_product,
-   vector_add_zero_left, vector_add_zero_right, vector_scale_zero, dot_zero_left)
+   vector_add_zero_left, vector_add_zero_right, vector_scale_zero, dot_zero_left,
+   dot_zero_right, vector_scale_zero_vector, matrix_vector_zero)
 fn client_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
   vector_add n xs ys
 fn client_scale (n : Nat) (f : Nat) (xs : Vec Nat n) : Vec Nat n =
@@ -334,9 +342,19 @@ theorem client_scale_zero (n : Nat) (u : Vec Nat n) :
 theorem client_dot_zero (n : Nat) (u : Vec Nat n) :
   Equal Nat (dot n (vector_zero n) u) Zero =
   dot_zero_left n u
+theorem client_dot_zero_right (n : Nat) (u : Vec Nat n) :
+  Equal Nat (dot n u (vector_zero n)) Zero =
+  dot_zero_right n u
+theorem client_scale_zero_vector (n : Nat) (f : Nat) :
+  Equal (Vec Nat n) (vector_scale n f (vector_zero n)) (vector_zero n) =
+  vector_scale_zero_vector n f
+theorem client_matrix_vector_zero (m : Nat) (n : Nat)
+  (a : Vec (Vec Nat n) m) :
+  Equal (Vec Nat m) (matrix_vector m n a (vector_zero n)) (vector_zero m) =
+  matrix_vector_zero m n a
 "#,
     )
-    .expect("generic clients independently state fourteen law types");
+    .expect("generic clients independently state seventeen law types");
 }
 
 /// SOURCE: spec/50-stdlib/65-linear-algebra.md §10. PROMISE CLASS:
@@ -418,6 +436,125 @@ theorem scale_one_same_form : Equal (Vec Nat two)
             && reason.contains("Refl expects an `Eq`-shaped goal") => {}
         other => panic!("false scale-zero equality must refuse at Refl: {other:?}"),
     }
+}
+
+fn zero_seed_case(name: &str) -> &'static str {
+    let mut selected = None;
+    for fence in extract_ken_md(ZERO_SEED)
+        .expect("§11 seed fences extract")
+        .fences
+        .into_iter()
+        .filter(|fence| fence.role == KenMdFenceRole::Source)
+    {
+        let source = &ZERO_SEED[fence.body_range];
+        let found = parse_decls(source)
+            .expect("§11 seed Ken parses")
+            .into_iter()
+            .any(|decl| matches!(decl, SourceDecl::TheoremDecl { name: actual, .. } if actual == name));
+        if found {
+            assert!(
+                selected.replace(source).is_none(),
+                "duplicate §11 seed case {name}"
+            );
+        }
+    }
+    selected.unwrap_or_else(|| panic!("missing §11 seed case {name}"))
+}
+
+// The seed's own value rows check the two images. This separate client
+// pins the zero-input and nonzero-input fixture labels to their constructed
+// values, not to computations using the operation under test.
+const ZERO_SEED_FIXTURE: &str = r#"
+theorem zero_seed_u_fixture : Equal (Vec Nat two) u (pair one two) = Refl
+theorem zero_seed_a_fixture : Equal (Vec (Vec Nat two) two) a
+  (VCons (Vec Nat two) one (pair one two)
+    (VCons (Vec Nat two) Zero (pair two one) (VNil (Vec Nat two)))) = Refl
+theorem zero_seed_zero_fixture : Equal (Vec Nat two) zero2 (pair Zero Zero) = Refl
+"#;
+
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §11.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the full closed and generic seed checks via roots; its fixed
+/// matrix and vector fixtures have independent constructor-valued checks,
+/// and its false same-form proposition refuses at its own Refl after a
+/// fresh full accepted prefix. CLAIMED: §11's finite, nonzero matrix
+/// distinguishes its zero input from its nonzero input. THE GAP: these
+/// closed values cannot establish the three generic public laws; the
+/// exact roster, generic type clients, and checked bodies are tested above.
+#[test]
+fn zero_annihilation_seed_checks_and_nonzero_input_refuses_at_refl() {
+    let accepted = zero_seed_case("dot_open");
+    let refused = zero_seed_case("seed_neg");
+    let mut env = matrix_env();
+    env.elaborate_file(accepted)
+        .expect("complete accepted §11 client and same-form control check");
+    env.elaborate_file(ZERO_SEED_FIXTURE)
+        .expect("§11 seed's nonzero and zero fixtures retain their values");
+    for name in [
+        "dot_open",
+        "scale_open",
+        "matrix_vector_open",
+        "dot_two",
+        "dot_two_value",
+        "scale_two",
+        "scale_two_value",
+        "matrix_vector_two",
+        "matrix_vector_nonzero_value",
+        "matrix_vector_zero_control",
+    ] {
+        let id = env.globals[name];
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+    }
+    let positive = parse_decls(accepted).expect("§11 accepted client parses");
+    let control = positive.iter().find(|decl| {
+        matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == "matrix_vector_zero_control")
+    });
+    let Some(SourceDecl::TheoremDecl {
+        theorem: control_goal,
+        body: Expr::ECon(control_proof, _),
+        ..
+    }) = control
+    else {
+        panic!("§11 accepted same-form control must be a closed theorem");
+    };
+    assert_eq!(control_proof, "Refl");
+    assert_eq!(
+        type_shape(control_goal),
+        proposition_shape("Equal (Vec Nat two) (matrix_vector two two a zero2) zero2"),
+        "accepted same-form control uses the zero vector operand"
+    );
+    let negative = parse_decls(refused).expect("isolated §11 refusal parses");
+    let [SourceDecl::TheoremDecl {
+        name,
+        theorem,
+        body: Expr::ECon(proof, proof_span),
+        ..
+    }] = negative.as_slice()
+    else {
+        panic!("§11 refusal is one closed Refl theorem");
+    };
+    assert_eq!(name, "seed_neg");
+    assert_eq!(proof, "Refl");
+    let mut rejecting = matrix_env();
+    rejecting
+        .elaborate_file(accepted)
+        .expect("fresh full §11 accepted prefix checks before refusal");
+    rejecting
+        .elaborate_file(ZERO_SEED_FIXTURE)
+        .expect("fresh independent fixture checks before refusal");
+    match rejecting.elaborate_file(refused) {
+        Err(ElabError::TypeMismatch { reason, span })
+            if reason == "Refl expects an `Eq`-shaped goal"
+                && span.start >= proof_span.start
+                && span.end <= proof_span.end
+                && span.start < span.end => {}
+        other => panic!("§11 false nonzero input must refuse at its Refl: {other:?}"),
+    }
+    assert_eq!(
+        type_shape(theorem),
+        proposition_shape("Equal (Vec Nat two) (matrix_vector two two a u) zero2"),
+        "refusal keeps the false nonzero matrix-vector operand"
+    );
 }
 
 // Sixteen positive, closed oracles from the sixteen-case conformance seed. The
