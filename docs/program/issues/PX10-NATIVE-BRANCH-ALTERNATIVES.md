@@ -70,8 +70,12 @@ origin and the selection is read in another function.
   - R1, the planner record `ProducerAlternativeSet` keyed on (emission
     owner, result), with members sorted by target and the label as the
     index. The admission predicate and record are verbatim in the ruling.
-  - R2, the set's transport word is the private tag-1 Record `[Child,
-    Label]`. Each member's source writes its own label inside its arm.
+  - R2 (ruled evt_4r4n10cjeeqgf on the advisory evt_2jvqarpm2hb6y), one
+    planned tag-1 Record `[Child, Label]` per issued set, keyed on the
+    set's (emission owner, result) and governed through
+    `emit_checked_aggregate_alloc`. Every member writes that one record
+    in its own arm. Sets issue from `pre_schema_transport_sources`
+    before any ownership build reads them.
   - R3, one resolver returns `Single` or `Alternatives`. A reader handed
     `Alternatives` emits the closed label switch, and a reader with no
     such arm refuses with a typed PlannerInvariant.
@@ -135,11 +139,21 @@ Increment 2:
   - `source.rs:5521` takes `refuse_unrouted_boundary_environment` once
     its arrival count over the census and the four instrumented bracket
     suites reads 0. A nonzero count stops to the Architect.
+- **AC-2f (record identity, evt_4r4n10cjeeqgf).** Each fixture's census
+  reports its issued set count, measured. For smoke, exactly one
+  `SynthesizedUse { role: ProducerAlternative }` record exists, keyed on
+  its set with two members, and the ledger relates to that id as many
+  events as `checked_ih_transport_emissions` holds for set members.
 
 ## Stop conditions
 
 - A kernel or trust change, or a post-fork callback.
-- A third advancing stop on the native-lowering chain (§1a count 2).
+- The sixth advancing stop on the native-lowering chain (§1a count 5;
+  the third was discharged by the R2 ruling).
+- A stop named in the R2 ruling: `occurrence_authority` refuses for a
+  set's result, a set member does not reach
+  `call_checked_ih_environment_transport`, or a set's meet differs
+  between the two ownership builds.
 
 Checks: 7 fired: under the W3 key, `rt_performing_mixed_owner` no longer
 reaches the mixed-owner guard and fails closed at a separate wall, so the
