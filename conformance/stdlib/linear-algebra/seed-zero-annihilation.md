@@ -5,7 +5,9 @@ Spec: `spec/50-stdlib/65-linear-algebra.md` §11, Spec child
 `261efd4ccaf39693467d5ec0b2a6b72ca42804d9`.
 Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION.md`.
 
-Status: authored; not executed. The laws quantify over all dimensions.
+Status: authored; package-test elaboration of the source blocks is
+reported below; no official conformance-runner result is claimed. The
+laws quantify over all dimensions.
 This seed applies each law with open dimensions and at `two`; its closed
 vectors do not replace the generic theorem obligations.
 
