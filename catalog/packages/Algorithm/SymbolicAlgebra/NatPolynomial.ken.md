@@ -40,11 +40,12 @@ so a reader can find each contract before its supporting proofs. The
 additional `Poly` carrier stores coefficients in a recursive Horner form;
 `canonicalize` builds it from distributed monomials, and `poly_eq` decides
 whether two expressions denote the same value under every total environment.
-Its three operations and seven public laws follow the original definitions in
-the same module; the remaining Horner helpers and proof invariants are private.
-Canonical equality is preserved under `EAdd` and `EMul` when both corresponding
-operand pairs compare equal. Substitution is a simultaneous single pass: an
-inserted expression is not substituted again. `compose_env` evaluates each
+Its three operations and seven original public laws follow their definitions
+in the same module; the Horner helpers and proof invariants remain private.
+Canonical equality is reflexive, symmetric and transitive, and it is preserved
+under `EAdd` and `EMul` when both corresponding operand pairs compare equal.
+Substitution is a simultaneous single pass: an inserted expression is not
+substituted again. `compose_env` evaluates each
 variable's replacement under the original environment, and two laws relate
 that operation to evaluation
 and the forward direction of polynomial equality. These laws do not claim
@@ -761,6 +762,32 @@ pub theorem poly_eq_false_refutes
     True
     (sym Bool (poly_eq e1 e2) False hf)
     (poly_eq_complete e1 e2 h)
+
+pub theorem poly_eq_refl (e : Expr) : IsTrue (poly_eq e e) = poly_same_refl (canonicalize e)
+
+pub theorem poly_eq_sym
+      (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq e2 e1) =
+  poly_eq_complete e2 e1 (λenv. sym Nat (eval env e1) (eval env e2) (poly_eq_sound e1 e2 h env))
+
+pub theorem poly_eq_trans
+      (e1 : Expr)
+      (e2 : Expr)
+      (e3 : Expr)
+      (h12 : IsTrue (poly_eq e1 e2))
+      (h23 : IsTrue (poly_eq e2 e3))
+    : IsTrue (poly_eq e1 e3) =
+  poly_eq_complete
+    e1
+    e3
+    (λenv.
+      trans
+        Nat
+        (eval env e1)
+        (eval env e2)
+        (eval env e3)
+        (poly_eq_sound e1 e2 h12 env)
+        (poly_eq_sound e2 e3 h23 env))
 
 pub theorem poly_eq_add
       (a1 : Expr)
@@ -2825,6 +2852,12 @@ to semantic equality; `poly_eq_false_refutes` rules out a false answer when a
 proof of agreement under every environment is supplied. It does not construct
 an environment witnessing inequality.
 
+`poly_eq_refl` applies the private reflexivity of the Horner comparison to the
+canonical form. `poly_eq_sym` and `poly_eq_trans` turn their premises into
+equal evaluations with `poly_eq_sound`, apply `sym` or `trans` over `Nat`, and
+return through `poly_eq_complete`; they add no hypothesis beyond their
+`poly_eq` premises.
+
 `poly_eq_add` and `poly_eq_mul` turn each operand-pair premise into equal
 evaluations with `poly_eq_sound`, combine them with the private Nat
 `add_cong` or `mul_cong`, and return the result through `poly_eq_complete`;
@@ -2913,7 +2946,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–9 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–11 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -2926,8 +2959,8 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md)
 specify the public surface and closed observations. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and twenty-four checked theorems; Horner, substitution and differentiation expose
-no additional helper beyond those named operations and laws. Definition
+and twenty-seven checked theorems; Horner, substitution and differentiation
+expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
 representations and limits.
@@ -2938,7 +2971,11 @@ Private functions and lemmas implement distribution, Horner collection,
 canonicity, positivity, substitution, differentiation and expression
 congruence, and proof rearrangements.
 The root-loaded acceptance target compares exact trusted-`GlobalId` sets
-before and after loading the
-package on its providers. The extension adds no Axiom, postulate, primitive,
+before and after loading the package on its providers. The §11 package test
+applies all three laws at arbitrary expressions, accepts a `Proved` decision
+for equal polynomials, and refuses a false decision with the same proof form.
+Its closed examples are separate from any conformance seed and do not
+establish official conformance execution. The extension adds no Axiom,
+postulate, primitive,
 or foreign operation; inherited trust from the prelude and dependencies
 remains distinct from local trust.
