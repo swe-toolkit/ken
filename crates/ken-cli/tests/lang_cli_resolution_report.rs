@@ -305,6 +305,25 @@ fn report_is_unlinked_when_elaboration_fails() {
     }
 }
 
+/// Promise class: durable invariant. A single Axiom result is the isolated
+/// discriminator for the root-postulate ownership mutation. The independent
+/// Proved/prove control below remains green when this ownership is removed.
+#[test]
+fn axiom_sugar_reports_its_own_checked_root_identity() {
+    let dir = base("resolution-report-axiom-discriminator");
+    let (doc, _) = document(
+        &dir,
+        "check",
+        "theorem assumed : Equal Nat Zero (Suc Zero) = Axiom\n",
+    );
+    assert!(has(
+        refs(&doc, "assumed"),
+        "source-declared",
+        "declaration",
+        "assumed"
+    ));
+}
+
 /// Promise class: durable invariant. Root-minted opaque identities in an
 /// Axiom theorem, an axiom declaration and an ensures obligation belong to
 /// their checked source result on every unchanged Legacy CLI route. A theorem
