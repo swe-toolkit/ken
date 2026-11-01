@@ -2044,12 +2044,10 @@ fn let_signature_matches(cx: &ElabCtx<'_>, lhs: &(Term, Term, Term), rhs: &(Term
 fn let_inclusion_unavailable(
     span: &Span, from: &(Term, Term, Term), to: &(Term, Term, Term),
 ) -> ElabError {
-    ElabError::TypeMismatch {
+    ElabError::UnsupportedEffectInclusion {
+        from: format!("({:?}, {:?})", from.0, from.1),
+        to: format!("({:?}, {:?})", to.0, to.1),
         span: span.clone(),
-        reason: format!(
-            "unsupported: 36 §2.4 inclusion into the enclosing effect signature is not built: RHS ({:?}, {:?}), enclosing ({:?}, {:?})",
-            from.0, from.1, to.0, to.1,
-        ),
     }
 }
 
