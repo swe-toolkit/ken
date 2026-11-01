@@ -11,12 +11,13 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 32] = [
+const TYPE_FLOOR: [&str; 37] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
+    "ChildExit",
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
@@ -28,6 +29,7 @@ const TYPE_FLOOR: [&str; 32] = [
     "ITree",
     "Instant",
     "List",
+    "MappingProt",
     "Nat",
     "Option",
     "Pair",
@@ -36,13 +38,16 @@ const TYPE_FLOOR: [&str; 32] = [
     "ProgramCaps",
     "Prop",
     "Proved",
+    "ReadProgress",
     "ResourceError",
     "ResourceKind",
+    "ResourceOpenMode",
     "Result",
     "Top",
     "TransferCount",
     "Unit",
     "Utf8Error",
+    "WriteProgress",
     "eqChar",
 ];
 
@@ -209,7 +214,8 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 /// five source-required entrypoint-ABI identities, three effect/clock identities,
 /// ITree, and six FS/resource families (BufferSpan, CreatePolicy, FileError,
 /// IOError, ResourceError, TransferCount), ConsoleStream, and the separate
-/// checked Char comparator eqChar close the floor to thirty-two entries.
+/// checked Char comparator eqChar and five scoped resource families close the
+/// floor to thirty-seven entries.
 /// The separately configured companion inventory has three checked-transparent
 /// constants keyed to the exact Pair identity. CLAIMED: type and binding
 /// membership are independent closed
@@ -239,20 +245,25 @@ fn prelude_signature_inventory_is_executable_and_closed() {
                     | "Unit"
                     | "Bottom"
                     | "BufferSpan"
+                    | "ChildExit"
                     | "CreatePolicy"
                     | "Equal"
                     | "ExitCode"
                     | "FileError"
                     | "HostIO"
                     | "IOError"
+                    | "MappingProt"
                     | "ProcessInput"
                     | "Prod"
                     | "ProgramCaps"
                     | "Prop"
                     | "Proved"
+                    | "ReadProgress"
                     | "ResourceError"
+                    | "ResourceOpenMode"
                     | "TransferCount"
                     | "Top"
+                    | "WriteProgress"
             )
         })
         .map(|name| env.globals[name])
@@ -270,20 +281,25 @@ fn prelude_signature_inventory_is_executable_and_closed() {
         "Unit",
         "Bottom",
         "BufferSpan",
+        "ChildExit",
         "CreatePolicy",
         "Equal",
         "ExitCode",
         "FileError",
         "HostIO",
         "IOError",
+        "MappingProt",
         "ProcessInput",
         "Prod",
         "ProgramCaps",
         "Prop",
         "Proved",
+        "ReadProgress",
         "ResourceError",
+        "ResourceOpenMode",
         "TransferCount",
         "Top",
+        "WriteProgress",
     ]
     .map(|name| env.globals[name])
     .into_iter()

@@ -26,13 +26,13 @@ proc drain_pipe
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
                 (Result ResourceError Unit)
                 (Err ResourceError Unit error);
-            Ok ReadEof ↦
+            Ok ReadProgress.ReadEof ↦
               ITree.Ret
                 (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
                 (Result ResourceError Unit)
                 (Ok ResourceError Unit MkUnit);
-            Ok (ReadSome span count) ↦
+            Ok (ReadProgress.ReadSome span count) ↦
               bind
                 (Coproduct (FSOp AFull) AmbientOp)
                 (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)

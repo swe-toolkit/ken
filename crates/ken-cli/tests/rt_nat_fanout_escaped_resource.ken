@@ -17,18 +17,18 @@ proc after_read (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferH
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Ok progress |-> match progress {
-      ReadEof |-> second_read file_closed buffer;
-      ReadSome span count |->
+      ReadProgress.ReadEof |-> second_read file_closed buffer;
+      ReadProgress.ReadSome span count |->
         bind (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
           (match buffer_span_budget span {
             Zero |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadProgress.ReadEof);
             Suc m |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
               (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadProgress.ReadEof)
           })
           (\_ignored. second_read file_closed buffer)
     }
@@ -70,7 +70,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
         (withResource AFull Unit (Resource ResourceKind.FsHandle)
-          cap (bytes_encode "held.bin") ResourceRead
+          cap (bytes_encode "held.bin") ResourceOpenMode.ResourceRead
           (\resource. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
             (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
             (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))

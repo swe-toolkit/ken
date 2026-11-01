@@ -42,7 +42,11 @@ export ResourceBodyResult,
   ResourceBracketOk,
   ResourceBracketBodyError,
   ResourceBracketReleaseError,
-  ResourceBracketBodyAndReleaseError
+  ResourceBracketBodyAndReleaseError,
+  withResource,
+  withBuffer,
+  withMapping,
+  release
 
 fn resource_body_success (e : Type) (a : Type) (value : a) : ResourceBodyResult e a =
   ResourceBodyOk e a value

@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 46] = [
+const PACKAGED: [(&str, &str); 61] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "print_line"),
@@ -65,6 +65,21 @@ const PACKAGED: [(&str, &str); 46] = [
         "Capability.System.Resource",
         "ResourceBracketBodyAndReleaseError",
     ),
+    ("Capability.Process.Exit", "host_program"),
+    ("Capability.Process.Exit", "host_program_then"),
+    ("Capability.Process.Exit", "host_console"),
+    ("Capability.System.Resource", "withResource"),
+    ("Capability.System.Resource", "withBuffer"),
+    ("Capability.System.Resource", "withMapping"),
+    ("Capability.System.Resource", "release"),
+    ("Capability.System.IO", "readAt"),
+    ("Capability.System.IO", "spanBytes"),
+    ("Capability.Filesystem.Authority", "readFile"),
+    ("Capability.Filesystem.Authority", "writeFile"),
+    ("Capability.System.Buffer", "BufferHandle"),
+    ("Capability.Process.Exit", "host_fs"),
+    ("Capability.Process.Exit", "host_pure"),
+    ("Capability.Process.Exit", "host_bind"),
 ];
 
 fn load(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
@@ -144,7 +159,11 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
         PRELUDE_FLOOR_NAMES.len(),
         "closed floor has no duplicate"
     );
-    assert_eq!(floor.len(), 32, "30 §4 floor count on this pre-flip slice");
+    assert_eq!(
+        floor.len(),
+        37,
+        "30 §4 floor count with five scoped families"
+    );
     assert!(floor.contains("ConsoleStream") && floor.contains("eqChar"));
     assert!(!floor.contains("Stream"));
     for (_, name) in PACKAGED {

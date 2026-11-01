@@ -52,7 +52,7 @@ proc file_body (file : Resource ResourceKind.FsHandle)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult UInt8 Unit))
     (ResourceBodyResult UInt8 Unit)
-    (withMapping AFull UInt8 Unit (FileBacked file (8 : Int)) ReadWrite mapping_body)
+    (withMapping AFull UInt8 Unit (FileBacked file (8 : Int)) MappingProt.ReadWrite mapping_body)
     (\outcome. after_mapping outcome)
 
 fn finish_file_read (code : UInt8) (outcome : Result FileError Bytes)
@@ -89,6 +89,6 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult UInt8 Unit)) ExitCode
         (withResource AFull UInt8 Unit cap (bytes_encode "mapped.bin")
-          ResourceRead file_body)
+          ResourceOpenMode.ResourceRead file_body)
         (\outcome. finish cap outcome)
   }

@@ -142,7 +142,7 @@ impl Fixture {
     fn acquire_file_with(&mut self, cap: EvalVal, path: &[u8]) -> EvalVal {
         let full = self.full();
         let unit = self.eval_expr("Unit");
-        let mode = self.ctor("ResourceRead");
+        let mode = self.ctor("ResourceOpenMode.ResourceRead");
         // The bracket body is unreachable: capture_first replaces the first
         // Vis continuation. The op and response family are checked prelude.
         self.call(
@@ -178,7 +178,7 @@ impl Fixture {
         let full = self.full();
         let unit = self.eval_expr("Unit");
         let source = self.construct("Anonymous", [EvalVal::Int(length)]);
-        let protection = self.ctor("ReadOnly");
+        let protection = self.ctor("MappingProt.ReadOnly");
         self.call(
             "withMapping",
             [

@@ -355,6 +355,7 @@ fn primitive_signature_inventory_is_executable_and_closed() {
         [
             "Bottom",
             "BufferSpan",
+            "ChildExit",
             "Coproduct",
             "ConsoleStream",
             "eqChar",
@@ -366,15 +367,19 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "IOError",
             "ITree",
             "Instant",
+            "MappingProt",
             "ProcessInput",
             "Prod",
             "ProgramCaps",
             "Prop",
             "Proved",
+            "ReadProgress",
             "ResourceError",
+            "ResourceOpenMode",
             "Top",
             "TransferCount",
             "Unit",
+            "WriteProgress",
         ]
         .map(|name| env.globals[name]),
     );

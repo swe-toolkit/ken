@@ -38,7 +38,7 @@ proc stage (cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "held.bin")
-      ResourceMetadata metadata_chain)
+      ResourceOpenMode.ResourceMetadata metadata_chain)
     (\outcome. finish outcome)
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)

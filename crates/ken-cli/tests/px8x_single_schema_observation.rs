@@ -36,7 +36,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "held.bin")
-          ResourceMetadata px8x_body)
+          ResourceOpenMode.ResourceMetadata px8x_body)
         (\outcome. px8x_after outcome)
   }
 "#;

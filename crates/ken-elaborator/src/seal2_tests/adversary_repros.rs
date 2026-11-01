@@ -80,7 +80,7 @@ fn direct_buffer_span_forgery_routes_all_reject() {
         (
             "rebuild from a destructured ReadSome",
             "fn forged (p : ReadProgress) : BufferSpan = \
-             match p { ReadSome span count |-> PrivateBufferSpan 0 99; ReadEof |-> \
+             match p { ReadProgress.ReadSome span count |-> PrivateBufferSpan 0 99; ReadProgress.ReadEof |-> \
              PrivateBufferSpan 0 0 }",
         ),
         (
@@ -109,7 +109,7 @@ fn direct_transfer_count_forgery_routes_all_reject() {
         (
             "rebuild from a destructured Wrote",
             "fn forged (w : WriteProgress) : TransferCount = \
-             match w { Wrote count |-> PrivateTransferCount 0 99 }",
+             match w { WriteProgress.Wrote count |-> PrivateTransferCount 0 99 }",
         ),
     ] {
         let mut env = ElabEnv::empty().expect("prelude");

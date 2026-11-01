@@ -14,7 +14,8 @@ stated as kernel proofs. The checked structural budget and count witnesses used
 by `writeAll`, however, are ordinary Ken data and their laws are kernel-checked.
 
 ```ken
-export BufferWindow,
+export BufferHandle,
+  BufferWindow,
   MkBufferWindow,
   buffer_span_length,
   buffer_span_budget,

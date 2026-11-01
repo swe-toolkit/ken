@@ -2,8 +2,9 @@
 
 `System.IO` exposes explicitly positioned, single-transfer buffer I/O.
 `readAt` and `writeAt` never maintain a hidden file cursor. `readAt` returns
-`ReadEof` or a positive `ReadSome`; `writeAt` returns a positive `Wrote`, while
-a zero host write is the distinct `NoProgress` error. `spanBytes` (`freeze`)
+`ReadProgress.ReadEof` or a positive `ReadProgress.ReadSome`; `writeAt`
+returns a positive `WriteProgress.Wrote`, while a zero host write is the
+distinct `NoProgress` error. `spanBytes` (`freeze`)
 copies only the validated current span.
 
 `writeAll` recurses over its initial `BufferSpan` budget. Its checked prelude
@@ -35,7 +36,7 @@ import Capability.System.Buffer
     transfer_count_predecessor,
     transfer_count_remaining)
 
-export write_all_exact_prefix_prop
+export write_all_exact_prefix_prop, readAt, spanBytes
 
 import Core.Logic.Transport (cong, sym, trans)
 

@@ -55,7 +55,7 @@ proc read_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly read_body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly read_body)
     (\outcome. finish outcome)
 
 proc after_write (mapping : MappingHandle)
@@ -83,7 +83,7 @@ proc write_read_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite write_read_body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite write_read_body)
     (\outcome. finish outcome)
 
 proc after_read (mapping : MappingHandle)
@@ -111,7 +111,7 @@ proc read_write_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite read_write_body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite read_write_body)
     (\outcome. finish outcome)
 
 proc after_read_to_read (mapping : MappingHandle)
@@ -223,7 +223,7 @@ proc matrix_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite __MATRIX_BODY__)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite __MATRIX_BODY__)
     (\outcome. finish outcome)
 
 fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
@@ -255,7 +255,7 @@ proc out_of_range_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly out_of_range_body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly out_of_range_body)
     (\outcome. finish outcome)
 
 proc out_of_range_write_body (mapping : MappingHandle)
@@ -271,7 +271,7 @@ proc out_of_range_write_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite
       out_of_range_write_body)
     (\outcome. finish outcome)
 
@@ -289,7 +289,7 @@ proc negative_window_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly negative_window_body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly negative_window_body)
     (\outcome. finish outcome)
 
 fn expect_read_only_refusal (outcome : Result ResourceError Unit)
@@ -325,7 +325,7 @@ proc read_then_read_only_write_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly
       read_then_read_only_write_body)
     (\outcome. finish outcome)
 
@@ -354,7 +354,7 @@ proc read_then_out_of_range_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly
       read_then_out_of_range_body)
     (\outcome. finish outcome)
 
@@ -371,7 +371,7 @@ proc read_only_write_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly read_only_write_body)
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly read_only_write_body)
     (\outcome. finish outcome)
 
 proc accounting_body (_mapping : MappingHandle)
@@ -383,7 +383,7 @@ proc one_byte_accounting_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (1 : Int)) ReadOnly accounting_body)
+    (withMapping AFull Unit Unit (Anonymous (1 : Int)) MappingProt.ReadOnly accounting_body)
     (\outcome. finish outcome)
 
 proc over_page_accounting_stage (_cap : Cap AFull)
@@ -391,7 +391,7 @@ proc over_page_accounting_stage (_cap : Cap AFull)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withMapping AFull Unit Unit (Anonymous (4097 : Int)) ReadOnly accounting_body)
+    (withMapping AFull Unit Unit (Anonymous (4097 : Int)) MappingProt.ReadOnly accounting_body)
     (\outcome. finish outcome)
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)

@@ -217,10 +217,10 @@ proc b_after_read (buffer_b : BufferHandle) (span_a : BufferSpan)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Ok progress |-> match progress {
-      ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+      ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-      ReadSome span_b count |-> do_freezes buffer_b span_a span_b
+      ReadProgress.ReadSome span_b count |-> do_freezes buffer_b span_a span_b
     }
   }
 
@@ -253,10 +253,10 @@ proc a_body (file : Resource ResourceKind.FsHandle) (buffer_a : BufferHandle)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_a count |-> a_after_read file span_a
+        ReadProgress.ReadSome span_a count |-> a_after_read file span_a
       }
     })
 
@@ -288,7 +288,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
       bind (Coproduct (FSOp AFull) AmbientOp)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-        (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceRead file_body)
+        (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceOpenMode.ResourceRead file_body)
         (\outcome. finish outcome)
   }
 "#;
@@ -465,10 +465,10 @@ proc a_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_a count |-> a_after_read dest span_a
+        ReadProgress.ReadSome span_a count |-> a_after_read dest span_a
       }
     })
 
@@ -487,7 +487,7 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceRead
+    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceOpenMode.ResourceRead
       (source_body dest))
     (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -512,7 +512,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
+          (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -598,10 +598,10 @@ proc b_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_b count |-> do_write dest buffer_b span_b
+        ReadProgress.ReadSome span_b count |-> do_write dest buffer_b span_b
       }
     })
 
@@ -620,7 +620,7 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceRead
+    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceOpenMode.ResourceRead
       (source_body dest))
     (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
@@ -645,7 +645,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
+          (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -661,7 +661,7 @@ fn sp_a_own_span_write_succeeds_with_bytes_interp() {
             ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::WriteProgress(
                 ken_runtime::WriteProgressV1::Wrote(count),
             )) if count.get() == 4 && count.effective_request() == 4 => {}
-            other => panic!("interp: own write must be exactly Wrote 4 (effective request 4), got {other:?}"),
+            other => panic!("interp: own write must be exactly WriteProgress.Wrote 4 (effective request 4), got {other:?}"),
         }
         assert_eq!(
             files[0], b"BBBB",
@@ -747,8 +747,8 @@ proc b_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
     (\outcome. match outcome {
       Err error |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_b count |-> reuse_fresh dest buffer_b span_old span_b
+        ReadProgress.ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
+        ReadProgress.ReadSome span_b count |-> reuse_fresh dest buffer_b span_old span_b
       }
     })
 
@@ -796,11 +796,11 @@ proc read_a (source : Resource ResourceKind.FsHandle) (buffer_a : BufferHandle)
         (ResourceBodyResult Unit (Prod (BufferHandle) BufferSpan))
         (ResourceBodyErr Unit (Prod (BufferHandle) BufferSpan) MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        ReadProgress.ReadEof |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (ResourceBodyResult Unit (Prod (BufferHandle) BufferSpan))
           (ResourceBodyErr Unit (Prod (BufferHandle) BufferSpan) MkUnit);
-        ReadSome span_a count |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
+        ReadProgress.ReadSome span_a count |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
           (ResourceBodyResult Unit (Prod (BufferHandle) BufferSpan))
           (ResourceBodyOk Unit (Prod (BufferHandle) BufferSpan)
@@ -822,7 +822,7 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceRead
+    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceOpenMode.ResourceRead
       (source_body dest))
     (\outcome. ret_body (from_file_alloc outcome))
 
@@ -845,7 +845,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
+          (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -878,7 +878,7 @@ fn sp_c_released_span_not_revived_by_slot_reuse_interp() {
             ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::WriteProgress(
                 ken_runtime::WriteProgressV1::Wrote(count),
             )) if count.get() == 4 && count.effective_request() == 4 => {}
-            other => panic!("fresh-span write must be exactly Wrote 4, got {other:?}"),
+            other => panic!("fresh-span write must be exactly WriteProgress.Wrote 4, got {other:?}"),
         }
         // The rejected Closed/InvalidBounds writes target offset 0; the fresh
         // write targets offset 4. A forbidden backend effect from either rejected
@@ -964,8 +964,8 @@ proc b_rewindow (dest : Resource ResourceKind.FsHandle) (source : Resource Resou
     (\outcome. match outcome {
       Err error |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_new count |-> four_ops dest buffer_b span_a span_b0
+        ReadProgress.ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
+        ReadProgress.ReadSome span_new count |-> four_ops dest buffer_b span_a span_b0
       }
     })
 
@@ -979,8 +979,8 @@ proc b_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
     (\outcome. match outcome {
       Err error |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_b0 count |-> b_rewindow dest source span_a span_b0 buffer_b
+        ReadProgress.ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
+        ReadProgress.ReadSome span_b0 count |-> b_rewindow dest source span_a span_b0 buffer_b
       }
     })
 
@@ -1001,8 +1001,8 @@ proc a_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
     (\outcome. match outcome {
       Err error |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
       Ok progress |-> match progress {
-        ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
-        ReadSome span_a count |-> a_after_read dest source span_a
+        ReadProgress.ReadEof |-> ret_body (ResourceBodyErr Unit Unit MkUnit);
+        ReadProgress.ReadSome span_a count |-> a_after_read dest source span_a
       }
     })
 
@@ -1019,7 +1019,7 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceRead
+    (withResource AFull Unit Unit cap (bytes_encode "spanseed.bin") ResourceOpenMode.ResourceRead
       (source_body dest))
     (\outcome. ret_body (from_file_alloc outcome))
 
@@ -1042,7 +1042,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
+          (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;
@@ -1180,8 +1180,8 @@ proc a_body (dest : Resource ResourceKind.FsHandle) (source : Resource ResourceK
     (\outcome. match outcome {
       Err error |-> ret_code (ok_code (ExitCode.Failure 88));
       Ok progress |-> match progress {
-        ReadEof |-> ret_code (ok_code (ExitCode.Failure 89));
-        ReadSome span_a count |-> a_after_read dest span_a
+        ReadProgress.ReadEof |-> ret_code (ok_code (ExitCode.Failure 89));
+        ReadProgress.ReadSome span_a count |-> a_after_read dest span_a
       }
     })
 
@@ -1198,7 +1198,7 @@ proc dest_body (cap : Cap AFull) (dest : Resource ResourceKind.FsHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result FileError (ResourceBracketResult Unit ExitCode)) (ResourceBodyResult Unit ExitCode)
-    (withResource AFull Unit ExitCode cap (bytes_encode "spanseed.bin") ResourceRead
+    (withResource AFull Unit ExitCode cap (bytes_encode "spanseed.bin") ResourceOpenMode.ResourceRead
       (source_body dest))
     (\outcome. ret_code (from_file_alloc outcome))
 
@@ -1221,7 +1221,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
         (Result FileError (ResourceBracketResult Unit ExitCode)) ExitCode
         (withResource AFull Unit ExitCode cap (bytes_encode "dest.bin")
-          (ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
+          (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (dest_body cap))
         (\outcome. finish outcome)
   }
 "#;

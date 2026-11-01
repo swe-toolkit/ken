@@ -1125,7 +1125,7 @@ fn register_prelude_state(elab: &mut ElabEnv, unit_id: GlobalId, mkunit_id: Glob
         unit_id,
     )
     .map_err(ElabError::Internal)?;
-    elab.globals.insert("get".to_string(), get_fn_id);
+    elab.globals.insert("state_get".to_string(), get_fn_id);
 
     let put_fn_id = state_eff::declare_put(
         &mut elab.env,
@@ -1142,7 +1142,7 @@ fn register_prelude_state(elab: &mut ElabEnv, unit_id: GlobalId, mkunit_id: Glob
         mkunit_id,
     )
     .map_err(ElabError::Internal)?;
-    elab.globals.insert("put".to_string(), put_fn_id);
+    elab.globals.insert("state_put".to_string(), put_fn_id);
 
     // `inject_l`/`inject_r` — the general coproduct injection morphism
     // (`effect-composition` D2, doc §D2.1): the un-specialized form of
@@ -3240,6 +3240,19 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
          host_program_then a action Success",
     )
     .map_err(|e| ElabError::Internal(format!("prelude host_program failed: {}", e)))?;
+    elab.elaborate_decl(
+        "fn host_pure (a : Auth) (r : Type) (x : r) : HostIO a r = \
+         Ret (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) r x",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_pure failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn host_bind (a : Auth) (x : Type) (y : Type) (m : HostIO a x) \
+           (k : x → HostIO a y) : HostIO a y = \
+         bind (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) x y m k",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_bind failed: {e}")))?;
 
     // I-4 Option-(ii) program-facing wrappers. These are ordinary checked Ken
     // definitions over the unchanged authority-polymorphic I-3 producers.
@@ -3589,6 +3602,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "IOError",
         "CreatePolicy",
         "ResourceError",
+        "ReadProgress",
+        "WriteProgress",
+        "ResourceOpenMode",
+        "MappingProt",
+        "ChildExit",
     ] {
         let parent_id = elab.globals[name];
         elab.module_state.scope_constructor_family(

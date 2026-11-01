@@ -267,12 +267,13 @@ impl ModuleState {
 /// inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 32] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 37] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
+    "ChildExit",
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
@@ -284,6 +285,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 32] = [
     "ITree",
     "Instant",
     "List",
+    "MappingProt",
     "Nat",
     "Option",
     "Pair",
@@ -292,20 +294,23 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 32] = [
     "ProgramCaps",
     "Prop",
     "Proved",
+    "ReadProgress",
     "ResourceError",
     "ResourceKind",
+    "ResourceOpenMode",
     "Result",
     "Top",
     "TransferCount",
     "Unit",
     "Utf8Error",
+    "WriteProgress",
     "eqChar",
 ];
 
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 46] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 61] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "print_line"),
@@ -352,6 +357,21 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 46] = [
     ("Capability.System.Resource", "ResourceBracketBodyError"),
     ("Capability.System.Resource", "ResourceBracketReleaseError"),
     ("Capability.System.Resource", "ResourceBracketBodyAndReleaseError"),
+    ("Capability.Process.Exit", "host_program"),
+    ("Capability.Process.Exit", "host_program_then"),
+    ("Capability.Process.Exit", "host_console"),
+    ("Capability.System.Resource", "withResource"),
+    ("Capability.System.Resource", "withBuffer"),
+    ("Capability.System.Resource", "withMapping"),
+    ("Capability.System.Resource", "release"),
+    ("Capability.System.IO", "readAt"),
+    ("Capability.System.IO", "spanBytes"),
+    ("Capability.Filesystem.Authority", "readFile"),
+    ("Capability.Filesystem.Authority", "writeFile"),
+    ("Capability.System.Buffer", "BufferHandle"),
+    ("Capability.Process.Exit", "host_fs"),
+    ("Capability.Process.Exit", "host_pure"),
+    ("Capability.Process.Exit", "host_bind"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
@@ -582,6 +602,7 @@ impl ModuleState {
         env: &ken_kernel::GlobalEnv,
         globals: &HashMap<String, ken_kernel::GlobalId>,
         native_trusted_base: &std::collections::BTreeSet<ken_kernel::GlobalId>,
+        state_bindings: [(ken_kernel::GlobalId, &str); 3],
     ) -> Result<(), ElabError> {
         let floor_ids: HashMap<_, _> = PRELUDE_FLOOR_NAMES
             .iter()
@@ -688,9 +709,25 @@ impl ModuleState {
         }
         self.prelude_binding_names.insert("Proved".to_string());
         self.strict_builtin_names.insert("Proved".to_string());
+        for (id, name) in state_bindings {
+            if globals.get(name) != Some(&id)
+                || !matches!(env.lookup(id), Some(ken_kernel::Decl::Transparent { .. }))
+            {
+                return Err(ElabError::Internal(format!(
+                    "pre-source State binding `{name}` has no checked identity"
+                )));
+            }
+            self.prelude_binding_names.insert(name.to_string());
+            self.strict_builtin_names.insert(name.to_string());
+        }
 
-        let package_home_ids =
-            package_home_table(env, globals, &self.strict_builtin_names, &PRELUDE_PACKAGE_HOMES)?;
+        let package_home_ids = package_home_table(
+            env,
+            globals,
+            &self.strict_builtin_names,
+            &self.private_ids,
+            &PRELUDE_PACKAGE_HOMES,
+        )?;
         self.package_home_ids = package_home_ids;
         Ok(())
     }
@@ -705,6 +742,7 @@ fn package_home_table(
     env: &ken_kernel::GlobalEnv,
     globals: &HashMap<String, ken_kernel::GlobalId>,
     strict_builtin_names: &HashSet<String>,
+    private_ids: &HashSet<ken_kernel::GlobalId>,
     homes: &[(&str, &str)],
 ) -> Result<HashMap<String, Vec<(String, ken_kernel::GlobalId)>>, ElabError> {
     let mut table: HashMap<String, Vec<(String, ken_kernel::GlobalId)>> = HashMap::new();
@@ -746,7 +784,12 @@ fn package_home_table(
                     .copied()
                     .filter(|m| env.constructor(*m).is_some_and(|(parent, _)| parent.id == *id))
                     .collect();
-                if actual != selected {
+                // An abstract family is homed as its type alone when every
+                // constructor is an exact, withheld prelude identity.
+                let abstract_family = selected.is_empty()
+                    && !actual.is_empty()
+                    && actual.iter().all(|ctor| private_ids.contains(ctor));
+                if actual != selected && !abstract_family {
                     return Err(ElabError::Internal(format!(
                         "package family `{name}` for `{home}` has incomplete checked constructor set"
                     )));
@@ -6590,7 +6633,16 @@ mod namespace_effect_tests {
         env.globals.insert("Proved".to_string(), other);
         match env
             .module_state
-            .capture_strict_builtin_names(&env.env, &env.globals, &native)
+            .capture_strict_builtin_names(
+                &env.env,
+                &env.globals,
+                &native,
+                [
+                    (env.prelude_env.get_fn_id, "state_get"),
+                    (env.prelude_env.put_fn_id, "state_put"),
+                    (env.prelude_env.run_state_id, "run_state"),
+                ],
+            )
         {
             Err(ElabError::Internal(message)) => {
                 assert!(message.contains("Proved"), "wrong guard: {message}");
@@ -10038,6 +10090,7 @@ mod strict_catalog_home_tests {
                 &elab.env,
                 &elab.globals,
                 &elab.module_state.strict_builtin_names,
+                &elab.module_state.private_ids,
                 rows,
             )
             .expect_err("invalid home must refuse")
@@ -10081,9 +10134,36 @@ mod strict_catalog_home_tests {
             &elab.env,
             &elab.globals,
             &elab.module_state.strict_builtin_names,
+            &elab.module_state.private_ids,
             &[("A", "BufferWindow"), ("A", "MkBufferWindow")],
         )
         .expect("complete family is a legal home");
+
+        let abstract_home = [("A", "BufferHandle")];
+        let handle = elab.globals["BufferHandle"];
+        let constructor = elab.env.inductive(handle).unwrap().constructors[0].id;
+        assert!(elab.module_state.private_ids.contains(&constructor));
+        package_home_table(
+            &elab.env,
+            &elab.globals,
+            &elab.module_state.strict_builtin_names,
+            &elab.module_state.private_ids,
+            &abstract_home,
+        )
+        .expect("entire checked constructor family is private");
+        let mut unprivate = elab.module_state.private_ids.clone();
+        unprivate.remove(&constructor);
+        let refused = package_home_table(
+            &elab.env,
+            &elab.globals,
+            &elab.module_state.strict_builtin_names,
+            &unprivate,
+            &abstract_home,
+        )
+        .expect_err("a publicly constructible family needs all members");
+        assert!(refused
+            .to_string()
+            .contains("incomplete checked constructor set"));
     }
 
     /// Promise class: durable invariant. MEASURED: the Legacy resolver keeps
