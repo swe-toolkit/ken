@@ -30,12 +30,14 @@
 > four checked laws, authored seed and package-owned test are on main:
 > nine operations and thirty laws, thirty-nine public names. Architect's
 > §10 AC-0 checked generic proofs in scratch with equal trusted identity
-> sets 109 → 109. Section 11 adds three law contracts to the Spec only;
-> Architect AC-0 on `a39d385c8` checked proposed bodies in scratch with
-> no new `Axiom` and equal trusted identities 109 → 109. This child does
-> not add the §11 catalog theorems, package test or CV seed. Scratch
-> checks and prior package tests are not official §11 conformance-runner
-> execution, CI, publication, landing or measured landed trust.
+> sets 109 → 109. This assembled candidate contains §11's three
+> checked catalog laws, CV's authored seed and a package-owned test.
+> Foundation reports the named `cat_linear_algebra_nat_matrix` target
+> passed 7/7 on the assembled content. Separately, Architect AC-0 on
+> `a39d385c8` checked proposed bodies in scratch with no new `Axiom`
+> and equal trusted identities 109 → 109. These candidate-local and
+> scratch checks are not official §11 conformance-runner execution,
+> CI, publication, landing or a measured landed trust result.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -981,10 +983,13 @@ forty-two public names.
 > (SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION).** Architect AC-0 on exact
 > base `a39d385c8` checked the three proposed generic proof bodies in
 > scratch with no new `Axiom` and equal `trusted_base()` identity sets
-> 109 → 109. This Spec-only child adds three public law contracts but
-> no §11 catalog theorem, package test or CV seed. Scratch evidence
-> does not establish official conformance-runner execution, CI,
-> publication, landing or measured landed trust.
+> 109 → 109. The assembled candidate contains all three checked §11
+> catalog laws, CV's authored seed and the package-owned test.
+> Foundation's named package test reported 7/7 on this content; the
+> seed was package-tested. That result does not establish official
+> conformance-runner execution, and none is claimed here. Neither that
+> candidate-local test nor scratch AC-0 establishes CI,
+> publication, landing or a measured landed trust result.
 
 ### 11.1 Three premise-free public checked laws
 
