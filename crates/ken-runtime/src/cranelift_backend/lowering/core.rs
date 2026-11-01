@@ -3449,7 +3449,7 @@ impl<'a> Lowering<'a> {
             captures,
             params,
             body,
-            ..
+            boundary_environment,
         } = residual
         else {
             return Err(unsupported(LoweringCause::Fragment,
@@ -3457,6 +3457,7 @@ impl<'a> Lowering<'a> {
                 "recursive constructor field is not a closure",
             ));
         };
+        Self::refuse_unrouted_boundary_environment(boundary_environment.is_some())?;
         let mut call_env = args
             .iter()
             .enumerate()
@@ -6463,7 +6464,7 @@ impl<'a> Lowering<'a> {
                 captures,
                 params,
                 body,
-                ..
+                boundary_environment,
             }) => {
                 if params.len() != args.len() {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
@@ -6497,12 +6498,11 @@ impl<'a> Lowering<'a> {
                 // authority -- there is no route back the other way.
                 call_inputs.extend(captures);
                 let returned = self.with_grafted_spine_call_source(static_origin, |this| {
-                    this.call_declared_unit(
+                    this.invoke_specialized_closure(
                         builder,
+                        boundary_environment,
                         body,
                         &call_inputs,
-                        #[cfg(test)]
-                        None,
                     )
                 })?;
                 if let Some(row) = self
@@ -6717,7 +6717,7 @@ impl<'a> Lowering<'a> {
                     captures,
                     params,
                     body,
-                    ..
+                    boundary_environment,
                 } = base
                 else {
                     return Err(unsupported(LoweringCause::Fragment,
@@ -6756,12 +6756,11 @@ impl<'a> Lowering<'a> {
                 call_inputs.extend(captures);
                 self.enter_oriented_semantic_region(installed.checked);
                 let returned = self.with_grafted_spine_call_source(static_origin, |this| {
-                    this.call_declared_unit(
+                    this.invoke_specialized_closure(
                         builder,
+                        boundary_environment,
                         body,
                         &call_inputs,
-                        #[cfg(test)]
-                        None,
                     )
                 })?;
                 let returned = self.lower_computational_match_value_composed(
@@ -18004,23 +18003,12 @@ impl<'a> Lowering<'a> {
                         // environment role is the bare installation with no
                         // enclosing spine behind it.
                         call_inputs.extend(captures);
-                        if let Some(environment) = boundary_environment {
-                            return self.with_grafted_spine_call_source(static_origin, |this| {
-                                this.call_boundary_closure_environment(
-                                    builder,
-                                    environment,
-                                    body,
-                                    &call_inputs,
-                                )
-                            });
-                        }
                         self.with_grafted_spine_call_source(static_origin, |this| {
-                            this.call_declared_unit(
+                            this.invoke_specialized_closure(
                                 builder,
+                                boundary_environment,
                                 body,
                                 &call_inputs,
-                                #[cfg(test)]
-                                None,
                             )
                         })
                     }
@@ -18126,7 +18114,7 @@ impl<'a> Lowering<'a> {
                             captures,
                             params,
                             body,
-                            ..
+                            boundary_environment,
                         } = base
                         else {
                             return Err(unsupported(LoweringCause::Fragment,
@@ -18134,6 +18122,9 @@ impl<'a> Lowering<'a> {
                                 "recursive constructor field is not a closure",
                             ));
                         };
+                        Self::refuse_unrouted_boundary_environment(
+                            boundary_environment.is_some(),
+                        )?;
                         let mut call_inputs = args
                             .iter()
                             .enumerate()

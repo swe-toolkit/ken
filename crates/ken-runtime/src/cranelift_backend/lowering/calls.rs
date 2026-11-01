@@ -1833,6 +1833,47 @@ impl<'a> Lowering<'a> {
             .map(|(operand, _)| operand)
         }
 
+        /// Invoke a specialized closure's body. A closure reconstructed from
+        /// a transported boundary environment dispatches through that
+        /// environment's declared worker target; any other closure calls its
+        /// graph-derived unit. This is the one place the choice is made, so no
+        /// invoker can drop the environment and reach the wrong target.
+        pub(super) fn invoke_specialized_closure(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            boundary_environment: Option<AggregateOccurrenceId>,
+            body: StaticOriginId,
+            inputs: &[LoweringOperand],
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            match boundary_environment {
+                Some(environment) => {
+                    self.call_boundary_closure_environment(builder, environment, body, inputs)
+                }
+                None => self.call_declared_unit(
+                    builder,
+                    body,
+                    inputs,
+                    #[cfg(test)]
+                    None,
+                ),
+            }
+        }
+
+        /// An invoker that lowers the body in place, or through a
+        /// recursive-position unit, has no route for a boundary environment.
+        /// It refuses rather than reaching the body's ordinary unit.
+        pub(super) fn refuse_unrouted_boundary_environment(
+            has_boundary_environment: bool,
+        ) -> Result<(), CraneliftBackendError> {
+            if has_boundary_environment {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "BoundaryClosureEnvironment",
+                    "a closure reconstructed from a boundary environment reached an invoker with no environment route",
+                ));
+            }
+            Ok(())
+        }
+
         pub(super) fn with_grafted_spine_call_source<T>(
             &mut self,
             source: StaticOriginId,

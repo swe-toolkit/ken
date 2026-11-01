@@ -167,6 +167,10 @@ pub use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use returned_vis::with_forced_underived_owner;
+#[cfg(feature = "px8-ds-test-support")]
+pub use brackets::{
+    with_region_exit_owner_observations, RegionExitOwnerObservation, RegionExitPlane,
+};
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
 };

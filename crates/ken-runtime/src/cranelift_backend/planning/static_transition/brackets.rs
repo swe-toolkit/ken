@@ -12,6 +12,58 @@ use crate::{CheckedBracketMarkRole, CheckedBracketRegionMarker,
     CheckedComputationalIHInvocationKind, NativeProcessSymbols, RuntimeDeclaration,
     RuntimeDeclarationKind, RuntimeExpr, RuntimeSymbol};
 
+/// Which planning plane named a static region exit's owner.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum RegionExitPlane {
+    /// The positional return fold a region's settlement resumes through.
+    ReturnFold,
+    /// The Vis whose response returns a region's settlement.
+    ReturnedVisSettlement,
+}
+
+/// Typed test-only evidence of one (static region exit, owner) pair. The exit
+/// is the region's settlement Vis; the owner is the fold or the returning Vis
+/// the named plane keyed it on.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct RegionExitOwnerObservation {
+    pub plane: RegionExitPlane,
+    pub exit: u32,
+    pub owner: u32,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static REGION_EXIT_OWNERS:
+        std::cell::RefCell<Option<std::collections::BTreeSet<RegionExitOwnerObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_region_exit_owner_observations<T>(operation: impl FnOnce() -> T)
+    -> (T, Vec<RegionExitOwnerObservation>)
+{
+    REGION_EXIT_OWNERS.with(|slot| {
+        assert!(slot.borrow().is_none(), "region exit observations cannot nest");
+        *slot.borrow_mut() = Some(std::collections::BTreeSet::new());
+    });
+    let result = operation();
+    let observations = REGION_EXIT_OWNERS.with(|slot| slot.borrow_mut().take().unwrap());
+    (result, observations.into_iter().collect())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn record_region_exit_owner(
+    plane: RegionExitPlane, exit: StaticOriginId, owner: StaticOriginId,
+) {
+    REGION_EXIT_OWNERS.with(|slot| {
+        if let Some(observed) = slot.borrow_mut().as_mut() {
+            observed.insert(RegionExitOwnerObservation { plane, exit: exit.0, owner: owner.0 });
+        }
+    });
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct BracketRoles {
     ret: RuntimeSymbol,
@@ -580,9 +632,14 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
                 _ => break,
             }
         }
-        let Some(&f) = folds.last() else {
-            return Err(planner_error("acquire dispatch has no positional return fold"));
-        };
+        let f = return_fold(plan, &parents, roles, k)?;
+        // Where the downward descent from the acquire continuation reaches a
+        // fold, the tail up-walk must name the same one.
+        if folds.last().is_some_and(|down| *down != f) {
+            return Err(planner_error(
+                "the positional return fold disagrees with the acquire continuation's fold chain",
+            ));
+        }
         let RuntimeExpr::Match { scrutinee, .. } = expr(plan, k)? else {
             return Err(planner_error("acquire response is not dispatched at its own continuation"));
         };
@@ -616,6 +673,8 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
         let mut crossed = BTreeSet::new();
         body_walk(plan, body_entry, roles, &key, 0, &mut body, &mut exits, &mut crossed)?;
         require_body_exits(&exits, settlement)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        record_region_exit_owner(RegionExitPlane::ReturnFold, settlement, f);
         regions.push(BracketStaticRegion {
             key, acquire: a, acquire_failure_resume: acquire_error, body_entry, body,
             settlement, outcome_merge, resume, crossed_settlements: crossed, parent: None,
@@ -623,6 +682,37 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
     }
     assign_parent_forest(&mut regions)?;
     Ok(regions)
+}
+
+// The positional return fold is the innermost ComputationalMatch whose
+// scrutinee tail-contains the acquire's Result dispatch. The walk climbs only
+// through tail positions: Match branches, frame and join bodies, closure
+// bodies, Let bodies, Vis continuations, and the Ret case of an enclosing fold.
+fn return_fold(plan: &StaticTransitionPlan<'_>, parents: &ParentMap, roles: &BracketRoles,
+    dispatch: StaticOriginId) -> Result<StaticOriginId, CraneliftBackendError>
+{
+    let refuse = || planner_error("acquire dispatch has no positional return fold");
+    let mut cur = dispatch;
+    while let Some(&(p, pos)) = parents.get(&cur) {
+        let tail = match expr(plan, p)? {
+            RuntimeExpr::ComputationalMatch { .. } if pos == 0 => return Ok(p),
+            RuntimeExpr::ComputationalMatch { .. } => {
+                let (ret, _) = select_cases(plan, p, &roles.ret, &roles.vis)?;
+                pos == 1 + ret
+            }
+            RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::LexicalClosure { .. } => pos == 0,
+            RuntimeExpr::Match { .. } => pos >= 1,
+            RuntimeExpr::Let { .. } => pos == 1,
+            _ => pos == 1 && is_construct(plan, p, &roles.vis, 2)?,
+        };
+        if !tail {
+            return Err(refuse());
+        }
+        cur = p;
+    }
+    Err(refuse())
 }
 
 fn require_body_exits(

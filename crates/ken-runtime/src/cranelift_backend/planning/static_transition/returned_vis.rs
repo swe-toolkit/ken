@@ -474,7 +474,7 @@ impl StaticTransitionPlan<'_> {
     /// Body. Anything else stays underived; no ordinary row is consulted.
     fn returned_bracket_settlement(
         &self,
-        owner: &StaticResponseContinuation,
+        from: StaticOriginId,
         origin: StaticOriginId,
     ) -> Result<Option<super::brackets::BracketSettlementId>, CraneliftBackendError> {
         let mut instances = self.bracket_settlements.regions.iter()
@@ -485,12 +485,15 @@ impl StaticTransitionPlan<'_> {
                 "returned Vis {origin:?} names two bracket settlement instances",
             )));
         }
-        let from = owner.vis_origin();
         if from != region.acquire && !region.body.contains(&from) {
             return Err(planner_error(format!(
                 "returned bracket settlement {origin:?} is reached from outside its region",
             )));
         }
+        #[cfg(feature = "px8-ds-test-support")]
+        super::brackets::record_region_exit_owner(
+            super::brackets::RegionExitPlane::ReturnedVisSettlement, origin, from,
+        );
         Ok(Some(region.id))
     }
 
@@ -517,11 +520,13 @@ impl StaticTransitionPlan<'_> {
         let contexts = self.continuation_contexts()?;
         let units = self.emittable_units()?;
         let edges = self.emittable_call_edges()?;
-        let mut pending = vec![owner.k_context()];
+        // Each pending context carries the Vis whose response continuation
+        // it is: that Vis, not the protocol's root owner, returns a member.
+        let mut pending = vec![(owner.k_context(), owner.vis_origin())];
         let mut seen = BTreeSet::new();
         let mut results = Vec::new();
         let mut excluded_by_relay = false;
-        while let Some(context_id) = pending.pop() {
+        while let Some((context_id, returning)) = pending.pop() {
             if !seen.insert(context_id) {
                 continue;
             }
@@ -563,7 +568,7 @@ impl StaticTransitionPlan<'_> {
                 }
                 let successor = matches.first().map(|row| (*row).clone());
                 let bracket = if relay || successor.is_some() { None } else {
-                    self.returned_bracket_settlement(owner, origin)?
+                    self.returned_bracket_settlement(returning, origin)?
                 };
                 if !relay && bracket.is_none() {
                     if !matches!(
@@ -587,7 +592,7 @@ impl StaticTransitionPlan<'_> {
                             "returned Vis {origin:?} has no planned host effect seat",
                         )));
                     }
-                    pending.push(row.k_context());
+                    pending.push((row.k_context(), row.vis_origin()));
                 }
                 members.push(ReturnedVisMember {
                     origin,

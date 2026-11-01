@@ -3845,6 +3845,34 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             },
         ]));
     const UNIT: SynthesizedAggregateNode = N::nullary(R::Unit);
+    /// `ResourceStreamRead` success: the `FsReadAt` shape, with the span bound
+    /// to the seat's operand 1 (the stream read's buffer token).
+    const STREAM_READ_PROGRESS: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::nullary(R::ReadEof),
+            N::Fixed {
+                role: R::ReadSome,
+                children: &[
+                    N::Fixed {
+                        role: R::PrivateBufferSpan,
+                        children: &[N::SiteOperand(1), N::native_int(), N::bounded_nat()],
+                    },
+                    TRANSFER_COUNT,
+                ],
+            },
+        ]));
+    /// `ProcessWait` success: `Exited(Int)` or `Signaled(Int)`.
+    const CHILD_EXIT: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::Fixed {
+                role: R::ChildExitExited,
+                children: &[N::native_int()],
+            },
+            N::Fixed {
+                role: R::ChildExitSignaled,
+                children: &[N::native_int()],
+            },
+        ]));
 
     let (error, ok) = match operation {
         // Returns a `Bool` before any synthesized producer runs, so neither arm
@@ -3878,6 +3906,13 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::ResourceRelease => (RESOURCE_SURFACE, UNIT),
         Op::FsReadAt => (RESOURCE_SURFACE, READ_PROGRESS),
         Op::FsWriteAt => (RESOURCE_SURFACE, WROTE),
+        Op::ProcessPlanOpen | Op::ProcessSpawn | Op::ProcessTakePipe => {
+            (RESOURCE_SURFACE, N::Absent)
+        }
+        Op::ProcessPlanPush => (RESOURCE_SURFACE, UNIT),
+        Op::ProcessWait => (RESOURCE_SURFACE, CHILD_EXIT),
+        Op::ResourceStreamRead => (RESOURCE_SURFACE, STREAM_READ_PROGRESS),
+        Op::ResourceStreamWrite => (RESOURCE_SURFACE, WROTE),
         // Not an admitted consumer; `lower_process_host_effect` refuses it
         // before any synthesized producer runs.
         _ => (N::Absent, N::Absent),
@@ -11642,6 +11677,27 @@ mod tests {
     use super::super::*;
     use super::super::tests::unit;
     use crate::RuntimeValue;
+
+    /// Promise class: durable invariant. MEASURED: every operation in
+    /// `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` has a non-Absent error root in
+    /// `host_effect_recipe_tree`, except the two whose dispatch returns before
+    /// any synthesized producer runs. CLAIMED: a consumer admitted without its
+    /// error recipe is caught here, not at native build as a seat with no
+    /// planned record. THE GAP: the ok root's shape is not checked against the
+    /// host reply.
+    #[test]
+    fn every_admitted_host_effect_consumer_has_an_error_recipe() {
+        use ken_host::HostOpV1 as Op;
+        const NO_ERROR_RECIPE: [Op; 2] = [Op::ConsoleIsTerminal, Op::ClockWallNow];
+        for operation in super::super::effects::CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
+            let tree = super::host_effect_recipe_tree(operation);
+            assert_eq!(
+                matches!(tree.error, SynthesizedAggregateNode::Absent),
+                NO_ERROR_RECIPE.contains(&operation),
+                "{operation:?}: error recipe presence disagrees with the allowed inventory",
+            );
+        }
+    }
 
     /// Promise class: durable invariant.
     ///
