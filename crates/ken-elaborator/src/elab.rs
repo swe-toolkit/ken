@@ -1635,52 +1635,8 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         }
         RType::RUniv(Some(n), _) => Ok(Term::ty(level_from_nat(*n))),
 
-        RType::RCheckedGlobal { id, .. } => {
-            let id = *id;
-            if cx.env.constructor(id).is_some() {
-                Ok(Term::Constructor { id, level_args: vec![] })
-            } else if cx.env.inductive(id).is_some() {
-                Ok(Term::IndFormer { id, level_args: vec![] })
-            } else {
-                Ok(Term::const_(id, vec![]))
-            }
-        }
-        RType::RCon(name, span) => {
-            if name == "Omega" {
-                return Ok(Term::omega(Level::Zero));
-            }
-            let id = cx
-                .globals
-                .get(name)
-                .copied()
-                .ok_or_else(|| ElabError::UnresolvedCon {
-                    name: name.clone(),
-                    span: span.clone(),
-                })?;
-            // Inductive type formers must be Term::IndFormer, and
-            // CONSTRUCTORS must be Term::Constructor, so the kernel's
-            // eliminator / conversion rules treat them correctly — a
-            // constructor value (e.g. `True`) embedded in a TYPE position
-            // (a law-field return-type annotation like
-            // `Equal Bool (bool_or True False) True`, ES4-classes) that
-            // silently became a bare `Term::Const` would never match
-            // `whnf`'s ι-reduction head check (`if let
-            // Term::Constructor{..} = head`), permanently stalling
-            // reduction on an otherwise-concrete scrutinee.
-            if let Some(_) = cx.env.constructor(id) {
-                Ok(Term::Constructor {
-                    id,
-                    level_args: vec![],
-                })
-            } else if cx.env.inductive(id).is_some() {
-                Ok(Term::IndFormer {
-                    id,
-                    level_args: vec![],
-                })
-            } else {
-                Ok(Term::const_(id, vec![]))
-            }
-        }
+        RType::RCheckedGlobal { id, .. } => elab_type_checked_global(cx, ty),
+        RType::RCon(..) => elab_type_con(cx, ty),
 
         // `Eq A a b` — the kernel's native equality TYPE, spelled directly
         // (`34 §3.4`, `50-stdlib/53-transport.md §2`, whose combinator
@@ -1697,75 +1653,29 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         // needs no level parameter at all: the level is read off `A`'s own
         // classification when the surrounding declaration is later checked,
         // exactly as `check.rs`'s own `Term::Eq` inference arm already does.
-        RType::RApp(..) if peel_named_rtype_app(ty, SUGAR_EQ, 3).is_some() => {
-            let args = peel_named_rtype_app(ty, SUGAR_EQ, 3).expect("checked by guard");
-            let a_ty_k = elab_type(cx, args[0])?;
-            let a_k = elab_type(cx, args[1])?;
-            let b_k = elab_type(cx, args[2])?;
-            unify_eq_endpoint_sort(cx, &a_ty_k, &a_k);
-            unify_eq_endpoint_sort(cx, &a_ty_k, &b_k);
-            Ok(Term::Eq(Box::new(a_ty_k), Box::new(a_k), Box::new(b_k)))
-        }
+        RType::RApp(..) if peel_named_rtype_app(ty, SUGAR_EQ, 3).is_some() => elab_type_eq(cx, ty),
 
-        RType::RApp(f, a, span) => {
-            let f_k = elab_type(cx, f)?;
-            let a_k = elab_type(cx, a)?;
-            unify_type_position_argument_sort(cx, &f_k, &a_k);
-            let a_k = introduce_type_position_argument(cx, &f_k, &a_k, span)?;
-            Ok(Term::app(f_k, a_k))
-        }
+        RType::RApp(..) => elab_type_app(cx, ty),
 
         RType::RVarTy(index, name, span) => elab_type_named_variable(cx, *index, name, span),
-        RType::RPatternAliasTy(slot, name, _) => {
-            infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
-        }
+        RType::RPatternAliasTy(..) => elab_type_pattern_alias(cx, ty),
 
-        RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => {
-            let (domain_slot, codomain_slot) = match slot {
-                RefinementSlot::Signature { .. } => (RefinementSlot::Outermost, slot),
-                _ => (RefinementSlot::None, RefinementSlot::None),
-            };
-            let a_core = elab_type_in_slot(cx, a, domain_slot)?;
-            let b_core = elab_type_in_slot(cx, b, codomain_slot)?;
-            Ok(Term::pi(a_core, weaken(&b_core, 1)))
-        }
+        RType::RArr(..) | RType::REffectArr(..) => elab_type_arrow(cx, ty, slot),
 
-        RType::RPi(_, a, b, _) => {
-            let (domain_slot, codomain_slot) = match slot {
-                RefinementSlot::Signature { .. } => (RefinementSlot::Outermost, slot),
-                _ => (RefinementSlot::None, RefinementSlot::None),
-            };
-            let a_core = elab_type_in_slot(cx, a, domain_slot)?;
-            cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
-            let b_result = elab_type_in_slot(cx, b, codomain_slot);
-            cx.ctx.pop();
-            Ok(Term::pi(a_core, b_result?))
-        }
+        RType::RPi(..) => elab_type_pi(cx, ty, slot),
 
-        RType::RSigma(_, a, b, _) => {
-            let a_core = elab_type(cx, a)?;
-            cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
-            let b_core = elab_type(cx, b)?;
-            cx.ctx.pop();
-            Ok(Term::sigma(a_core, b_core))
-        }
+        RType::RSigma(..) => elab_type_sigma(cx, ty),
 
         // Refinements are genuine subset Σ types. The predicate is checked at
         // Ω under the carrier binder, irrespective of its nesting position.
-        RType::RRefine(_, carrier, phi, _) => {
-            let carrier = elab_type(cx, carrier)?;
-            cx.ctx.push(carrier.clone());
-            let predicate = elab_prop_at_omega(cx, phi, phi.span());
-            cx.ctx.pop();
-            Ok(Term::sigma(carrier, predicate?))
-        },
+        RType::RRefine(..) => elab_type_refine(cx, ty),
 
         // `‖A‖` — propositional truncation formation in annotation position
         // (`16 §6`, LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES D1). Raw structural
         // build to `Term::Trunc`, mirroring the `Term::Eq` arm above; the
         // kernel's own `Term::Trunc` inference (`‖A‖ : Ω_l` for `A : Type l`)
         // validates it when the surrounding declaration is checked.
-        RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(elab_type(cx, inner)?))),
+        RType::RTrunc(..) => elab_type_trunc(cx, ty),
 
         // `d.Query` in type position (`33 §6.3`, `58b §1`). Delegates to the
         // SAME `infer_proj` the expression-position `RExpr::RProj` uses, so the
@@ -1784,11 +1694,151 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         // arm deliberately mints no third rejection of its own, because `AC-2`
         // names two and a third with no reaching fixture would be an
         // unexercised arm.
-        RType::RProj(base, field, span) => {
-            let (value, _field_type) = infer_proj(cx, base, field, span)?;
-            Ok(value)
-        }
+        RType::RProj(..) => elab_type_proj(cx, ty),
     }
+}
+
+#[inline(never)]
+fn elab_type_checked_global(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RCheckedGlobal { id, .. } = ty else { unreachable!("elab_type dispatches checked_global") };
+    let id = *id;
+    if cx.env.constructor(id).is_some() {
+        Ok(Term::Constructor { id, level_args: vec![] })
+    } else if cx.env.inductive(id).is_some() {
+        Ok(Term::IndFormer { id, level_args: vec![] })
+    } else {
+        Ok(Term::const_(id, vec![]))
+    }
+}
+
+#[inline(never)]
+fn elab_type_con(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RCon(name, span) = ty else { unreachable!("elab_type dispatches con") };
+    if name == "Omega" {
+        return Ok(Term::omega(Level::Zero));
+    }
+    let id = cx
+        .globals
+        .get(name)
+        .copied()
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: name.clone(),
+            span: span.clone(),
+        })?;
+    // Inductive type formers must be Term::IndFormer, and
+    // CONSTRUCTORS must be Term::Constructor, so the kernel's
+    // eliminator / conversion rules treat them correctly — a
+    // constructor value (e.g. `True`) embedded in a TYPE position
+    // (a law-field return-type annotation like
+    // `Equal Bool (bool_or True False) True`, ES4-classes) that
+    // silently became a bare `Term::Const` would never match
+    // `whnf`'s ι-reduction head check (`if let
+    // Term::Constructor{..} = head`), permanently stalling
+    // reduction on an otherwise-concrete scrutinee.
+    if let Some(_) = cx.env.constructor(id) {
+        Ok(Term::Constructor {
+            id,
+            level_args: vec![],
+        })
+    } else if cx.env.inductive(id).is_some() {
+        Ok(Term::IndFormer {
+            id,
+            level_args: vec![],
+        })
+    } else {
+        Ok(Term::const_(id, vec![]))
+    }
+}
+
+#[inline(never)]
+fn elab_type_eq(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RApp(..) = ty else { unreachable!("elab_type dispatches eq") };
+    let args = peel_named_rtype_app(ty, SUGAR_EQ, 3).expect("checked by guard");
+    let a_ty_k = elab_type(cx, args[0])?;
+    let a_k = elab_type(cx, args[1])?;
+    let b_k = elab_type(cx, args[2])?;
+    unify_eq_endpoint_sort(cx, &a_ty_k, &a_k);
+    unify_eq_endpoint_sort(cx, &a_ty_k, &b_k);
+    Ok(Term::Eq(Box::new(a_ty_k), Box::new(a_k), Box::new(b_k)))
+}
+
+/// Out of line so type-position recursion holds only the RApp arm's
+/// temporaries, not every arm's (opt-level 0 allocates all slots).
+#[inline(never)]
+fn elab_type_app(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RApp(f, a, span) = ty else { unreachable!("elab_type dispatches app") };
+    let f_k = elab_type(cx, f)?;
+    let a_k = elab_type(cx, a)?;
+    unify_type_position_argument_sort(cx, &f_k, &a_k);
+    let a_k = introduce_type_position_argument(cx, &f_k, &a_k, span)?;
+    Ok(Term::app(f_k, a_k))
+}
+
+#[inline(never)]
+fn elab_type_pattern_alias(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RPatternAliasTy(slot, name, _) = ty else { unreachable!("elab_type dispatches pattern_alias") };
+    infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
+}
+
+#[inline(never)]
+fn elab_type_arrow(cx: &mut ElabCtx, ty: &RType, slot: RefinementSlot) -> Result<Term, ElabError> {
+    let (RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _)) = ty else {
+        unreachable!("elab_type dispatches arrow")
+    };
+    let (domain_slot, codomain_slot) = match slot {
+        RefinementSlot::Signature { .. } => (RefinementSlot::Outermost, slot),
+        _ => (RefinementSlot::None, RefinementSlot::None),
+    };
+    let a_core = elab_type_in_slot(cx, a, domain_slot)?;
+    let b_core = elab_type_in_slot(cx, b, codomain_slot)?;
+    Ok(Term::pi(a_core, weaken(&b_core, 1)))
+}
+
+#[inline(never)]
+fn elab_type_pi(cx: &mut ElabCtx, ty: &RType, slot: RefinementSlot) -> Result<Term, ElabError> {
+    let RType::RPi(_, a, b, _) = ty else { unreachable!("elab_type dispatches pi") };
+    let (domain_slot, codomain_slot) = match slot {
+        RefinementSlot::Signature { .. } => (RefinementSlot::Outermost, slot),
+        _ => (RefinementSlot::None, RefinementSlot::None),
+    };
+    let a_core = elab_type_in_slot(cx, a, domain_slot)?;
+    cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
+    let b_result = elab_type_in_slot(cx, b, codomain_slot);
+    cx.ctx.pop();
+    Ok(Term::pi(a_core, b_result?))
+}
+
+#[inline(never)]
+fn elab_type_sigma(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RSigma(_, a, b, _) = ty else { unreachable!("elab_type dispatches sigma") };
+    let a_core = elab_type(cx, a)?;
+    cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
+    let b_core = elab_type(cx, b)?;
+    cx.ctx.pop();
+    Ok(Term::sigma(a_core, b_core))
+}
+
+#[inline(never)]
+fn elab_type_refine(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RRefine(_, carrier, phi, _) = ty else { unreachable!("elab_type dispatches refine") };
+    let carrier = elab_type(cx, carrier)?;
+    cx.ctx.push(carrier.clone());
+    let predicate = elab_prop_at_omega(cx, phi, phi.span());
+    cx.ctx.pop();
+    Ok(Term::sigma(carrier, predicate?))
+}
+
+#[inline(never)]
+fn elab_type_trunc(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RTrunc(inner, _) = ty else { unreachable!("elab_type dispatches trunc") };
+    Ok(Term::Trunc(Box::new(elab_type(cx, inner)?)))
+}
+
+#[inline(never)]
+fn elab_type_proj(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let RType::RProj(base, field, span) = ty else { unreachable!("elab_type dispatches proj") };
+    let (value, _field_type) = infer_proj(cx, base, field, span)?;
+    Ok(value)
 }
 
 // ----- bidirectional elaboration -----
