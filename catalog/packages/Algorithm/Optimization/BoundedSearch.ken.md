@@ -71,6 +71,12 @@ pub theorem find_below_complete
       → Equal Bool (p m) False =
   λmissing. J (λr _. found_spec p bound r) (find_below_correct p bound) missing
 
+pub theorem find_below_refuted
+      (p : Nat → Bool) (bound : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False)
+      → Equal (Option Nat) (find_below p bound) (None Nat) =
+  refuted_outcome_none p bound (find_below p bound) Refl
+
 pub theorem find_below_stable
       (p : Nat → Bool) (bound : Nat) (larger : Nat) (n : Nat)
     : Equal Bool (leq_nat bound larger) True
@@ -110,12 +116,6 @@ pub theorem find_below_stable
                 found
           }
   }
-
-pub theorem find_below_refuted
-      (p : Nat → Bool) (bound : Nat)
-    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False)
-      → Equal (Option Nat) (find_below p bound) (None Nat) =
-  refuted_outcome_none p bound (find_below p bound) Refl
 
 fn find_next (p : Nat → Bool) (below : Nat) (prior : Option Nat) : Option Nat =
   match prior {
