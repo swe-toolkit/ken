@@ -796,6 +796,10 @@ jobs:
       # no duplicate `id`, and every depends_on/blocks reference resolves.
       - name: Validate issue schema
         run: scripts/check-issue-schema.sh
+      - name: Check test environment pins
+        run: |
+          python3 scripts/test-check-test-environment-pins.py
+          python3 scripts/check-test-environment-pins.py
       # Regeneration gate: docs/program/IMPLEMENTATION-PROGRESS.md is fully
       # derived from docs/program/issues/*.md — this fails if the committed
       # file is stale (regeneration must be idempotent modulo the timestamp

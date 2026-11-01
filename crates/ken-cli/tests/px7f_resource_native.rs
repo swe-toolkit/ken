@@ -547,8 +547,8 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
     assert_exact_operation_and_terminal_parity(&observation, &interpreted);
 }
 
-/// Promise class: transition sentinel for fixture-local planner origins;
-/// the independent caller-allocation/owner-region relation is durable.
+/// Promise class: durable invariant over the fixture's owner/member roles;
+/// source-origin ordinals may change when unrelated prelude bindings grow.
 /// MEASURED: returned source origins, derived rows, actual K captures, and
 /// the emitted owner region against the caller's actual CLIF payload slot.
 /// CLAIMED: each selected px7f owner call allocates exactly its closed-chain
@@ -561,12 +561,11 @@ fn linked_public_second_release_is_closed_and_the_handle_closes_once() {
 fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     use std::collections::{BTreeMap, BTreeSet};
 
-    let fixtures: &[(&str, &str, u32, &[(u32, &[u32])], u32)] = &[
-        ("right-denial-protocol", RIGHT_NOT_HELD, 664, &[(0, &[641])], 641),
-        ("double-release-protocol", DOUBLE_RELEASE, 695,
-            &[(1, &[684]), (0, &[603])], 603),
+    let fixtures: &[(&str, &str, &[(u32, &[usize])])] = &[
+        ("right-denial-protocol", RIGHT_NOT_HELD, &[(0, &[0])]),
+        ("double-release-protocol", DOUBLE_RELEASE, &[(0, &[0]), (1, &[1])]),
     ];
-    for &(label, source, owner, expected, bracket_origin) in fixtures {
+    for &(label, source, expected) in fixtures {
         let dir = output_dir(label);
         let ((((compiled, plans), captures), frames), callers) =
             ken_runtime::with_pending_vis_caller_payload_observations(|| {
@@ -583,27 +582,41 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
             });
         let _output = compiled.expect("static-operation fixture compiles without execution");
         let observed = plans.iter().flat_map(|plan| &plan.returned_vis_protocols)
-            .filter(|protocol| protocol.owner_origin == owner).collect::<Vec<_>>();
+            .collect::<Vec<_>>();
         assert_eq!(observed.len(), 1, "{label}: exactly one generated response owner");
         let observed = observed[0];
+        let owner = observed.owner_origin;
         assert!(observed.error.is_none(), "{label}: {:?}", observed.error);
         assert!(!observed.excluded_by_relay, "{label}: static-operation owner excluded");
-        eprintln!("RT-OWNER-VIS FIXPOINT {label} owner={owner} contexts={:?}",
-            observed.contexts);
+        let mut ordinals = BTreeMap::<u32, usize>::new();
+        let actual = observed.contexts.iter()
+            .map(|(context, members)| (*context, members))
+            .collect::<BTreeMap<_, _>>()
+            .into_iter().map(|(context, members)| {
+                let names = members.iter().map(|member| {
+                    let next = ordinals.len();
+                    *ordinals.entry(member.origin).or_insert(next)
+                }).collect::<BTreeSet<_>>();
+                (context, names)
+            }).collect::<BTreeMap<_, _>>();
         let expected = expected.iter().map(|(context, members)|
             (*context, members.iter().copied().collect::<BTreeSet<_>>())
         ).collect::<BTreeMap<_, _>>();
-        let actual = observed.contexts.iter().map(|(context, members)|
-            (*context, members.iter().map(|member| member.origin).collect::<BTreeSet<_>>())
-        ).collect::<BTreeMap<_, _>>();
-        assert_eq!(actual, expected, "{label}: actual returned-origin fixpoint");
+        assert_eq!(actual, expected, "{label}: returned-origin context/member shape");
+        let context_zero = observed.contexts.iter().filter(|(context, _)| *context == 0)
+            .collect::<Vec<_>>();
+        assert_eq!(context_zero.len(), 1, "{label}: one context-0 origin group");
+        let marked = plans.iter().flat_map(|plan| &plan.bracket_response_rows)
+            .filter(|row| context_zero[0].1.iter().any(|member| member.origin == row.vis_origin))
+            .collect::<Vec<_>>();
+        assert_eq!(marked.len(), 1, "{label}: context-0 member is bracket-owned");
+        let bracket_origin = marked[0].vis_origin;
+        eprintln!("RT-OWNER-VIS FIXPOINT {label} owner={owner} contexts={:?}",
+            observed.contexts);
         let owner_frames = frames.iter().filter(|frame| frame.owner_origin == owner)
             .collect::<Vec<_>>();
         assert_eq!(owner_frames.len(), 1,
             "{label}: actual response-owner frame was not emitted exactly once");
-        let marked = plans.iter().flat_map(|plan| &plan.bracket_response_rows)
-            .filter(|row| row.vis_origin == bracket_origin).collect::<Vec<_>>();
-        assert_eq!(marked.len(), 1, "{label}: the former returned-Vis row is bracket-owned");
         assert!(plans.iter().any(|plan|
             plan.bracket_settlement_vis_origins.contains(&bracket_origin)),
             "{label}: the moved Vis must belong to an authenticated S");
@@ -778,16 +791,19 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
 #[test]
 fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     let dir = output_dir("double-release-unchecked-k-result");
-    let ((compiled, frames), applications) = ken_runtime::with_static_response_owner_body_mutation(
-        ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
-        || ken_runtime::with_pending_vis_owner_frame_observations(|| {
-            ken_cli::build_native_program(
-                DOUBLE_RELEASE, ken_cli::SourceFormat::Ken,
-                "double-release-unchecked-k-result", dir.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-        }),
-    );
+    let (((compiled, plans), frames), applications) =
+        ken_runtime::with_static_response_owner_body_mutation(
+            ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
+            || ken_runtime::with_pending_vis_owner_frame_observations(|| {
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        DOUBLE_RELEASE, ken_cli::SourceFormat::Ken,
+                        "double-release-unchecked-k-result", dir.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    )
+                })
+            }),
+        );
     assert_eq!(applications, 1, "the pending-Vis owner must receive the K mutation");
     let error = compiled.expect_err("an unchecked K result must not emit an object");
     assert_eq!(error.code().as_str(), "N0004", "finished-code cause: {error:?}");
@@ -801,8 +817,12 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     // The refusal code is shared with the Ret-only verifier. The refused owner
     // is the last one emitted; its planned record tail places it on the
     // pending-Vis verifier.
+    let ordinary = plans.iter().flat_map(|plan| &plan.all_static_response_rows)
+        .filter(|row| row.operation == "ResourceRelease").collect::<Vec<_>>();
+    assert_eq!(ordinary.len(), 1, "one same-build ordinary ResourceRelease owner");
     let refused = frames.last().expect("the refused owner was emitted");
-    assert_eq!(refused.owner_origin, 695, "the refused owner is the ordinary K protocol owner");
+    assert_eq!(refused.owner_origin, ordinary[0].vis_origin,
+        "the refused owner is the ordinary K protocol owner");
     assert!(refused.widths.is_some(), "the refused owner took the pending-Vis arm: {frames:?}");
 }
 

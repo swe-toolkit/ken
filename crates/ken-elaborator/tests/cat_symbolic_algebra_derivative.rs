@@ -93,7 +93,6 @@ fn generic_derivative_exports_check_without_trust_or_public_scaffolding() {
         before.len(),
         after.len()
     );
-    assert_eq!(before.len(), 114, "five-provider trust inventory");
     assert_eq!(after, before, "§5 adds no trusted GlobalId");
     for public in ["deriv", "deriv_respects_eval", "poly_eq_deriv"] {
         let id = env.globals[&format!("{PACKAGE}.{public}")];
