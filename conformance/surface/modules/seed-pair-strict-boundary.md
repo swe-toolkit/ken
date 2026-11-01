@@ -1,9 +1,11 @@
 # Compiler-origin Pair floor-provider boundary
 
 Format: `../../README.md`. These cases pin the general internal-provision arm,
-the historical ten-type Pair slice (now part of the twenty-three-type floor),
-and its first compiler-origin member (`spec/30-surface/30
-§4`, `33 §3.3`, `34 §"Canonical non-dependent pair floor family"`, `39 §2.0`).
+the historical ten-type Pair slice and its first compiler-origin member
+(`30 §4`, `33 §3.3`, `34 §"Canonical non-dependent pair floor family"`,
+`39 §2.0`). Pair is one member of the current 32-name
+floor-identity roster; this seed's Pair-specific evidence does not establish
+the rest of that roster.
 They supersede this seed's former exact-nine, bare-name rejection, and future
 package-provider contract.
 
@@ -15,8 +17,8 @@ are distinct from kernel `Term::Sigma`/`Term::Pair`/`Term::Proj1`/
 Kernel and runtime forms carry no provider `GlobalId`.
 
 The Pair floor required by the acceptance rows below was realized by
-`LANG-MOD-CANONICAL-PAIR-PACKAGE` and included in the fifteen-name floor
-landed at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The rows describe
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` and joined the then-current fifteen-name
+floor at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. The rows describe
 Pair behavior; they do not certify this candidate's three effect/clock
 additions: `Coproduct`, `Instant`, and `Unit`. The Pair landing authorizes no
 package, alias, registry, or ambient fallback. The representation-only
@@ -72,7 +74,7 @@ unchanged kernel behavior.
 - why: Pair acceptance must be attributable to the closed floor, not to cached
   globals or a hidden import leak.
 
-## AC2 — the current floor is twenty-three types plus three Pair companions
+## AC2 — derive the exact 32-name floor-identity roster and Pair companions
 
 ### surface/taxonomy/prelude-internal-provision-inventory-is-executable-and-closed
 
@@ -82,23 +84,29 @@ unchanged kernel behavior.
 - given: traverse every built-in primitive declaration type and collect its
   Ken-defined identities. Independently enumerate the internal-provision
   witnesses by explicit internal origin and exact pre-source identity. Derive
-  the configured type floor as their union. Derive companion bindings separately
-  from the admitted type contract and checked identity references.
+  the configured floor-identity roster as their union. Derive companion
+  bindings separately from the admitted type contract and checked identity
+  references.
 - expect: the signature inventory is exactly
-  `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`; the
-  internal-provision type inventory is exactly `{Nat, Pair, Equal, ExitCode,
-  HostIO, ProcessInput, Prod, ProgramCaps, Prop, Proved, Top, Bottom,
-  Coproduct, Instant, Unit}`. `Nat` is kernel-origin and `Pair` is
-  compiler-bootstrap-origin. Their union is the exact twenty-three-type floor
-  recorded in `minimality.md`. Pair's companion inventory is exactly
-  `{mk_pair, pair_fst, pair_snd}`. The floor count is twenty-three: companions
-  are bindings, not type formers.
+  `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`. The
+  exact floor-identity roster, in `PRELUDE_FLOOR_NAMES` order, is
+  `{Auth, Bool, Bottom, BufferSpan, Char, ConsoleStream, Coproduct,
+  CreatePolicy, Equal, ExitCode, FileError, HostIO, IOError, ITree, Instant,
+  List, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
+  ResourceError, ResourceKind, Result, Top, TransferCount, Unit, Utf8Error,
+  eqChar}`. These are 32 floor identities: 8 signature and 24
+  internal-provision identities. The roster includes non-types such as `Top`,
+  `Bottom`, `Proved`, `HostIO`, and `eqChar`. `Nat` is kernel-origin and `Pair`
+  is compiler-bootstrap-origin. Pair's companion inventory is exactly
+  `{mk_pair, pair_fst, pair_snd}`; companions are bindings, not floor
+  identities.
 - controls: add the compiler-internal `Empty` identity, which has no independent
-  source-name requirement, to the configured type inventory; exact equality
-  fails with one extra type. Move a Pair companion into the type inventory;
-  the type-count and kind assertions fail. Delete either internal witness or
-  substitute a same-shaped fresh id; exact identity equality fails closed.
-- why: a hard-coded twenty-three-name list does not prove derivation.
+  source-name requirement, to the configured floor-identity roster; exact
+  equality fails with one extra floor identity. Move a Pair companion into the
+  floor-identity roster; the identity-count and kind assertions fail. Delete
+  either internal witness or substitute a same-shaped fresh id; exact identity
+  equality fails closed.
+- why: a hard-coded roster does not prove derivation.
   Independent arm, origin, identity, kind, and companion assertions prevent
   both under-inclusion and compiler-global-map widening.
 
@@ -349,17 +357,18 @@ unchanged kernel behavior.
 - **CLAIMED at the historical spec base:** the ten-type Pair floor, exact
   three companions, four Strict accepts on existing ids, collision behavior,
   and fresh Strict catalog closure. The Pair floor landed at
-  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e` as part of the fifteen-name
-  roster; those rows do not by themselves prove this candidate's three
-  effect/clock additions.
+  `0a94e80dc11c1fab00d6b0b14addb55b0a47192e` as part of the then-current
+  fifteen-name roster; those rows do not by themselves prove this candidate's
+  three effect/clock additions.
 - **THE GAP for this candidate:** exact effect/clock identities and constructor
   scopes, census deletion, and unchanged trust require their own executable
   evidence, stated in `minimality.md` and `seed-modules.md`.
 
 ## Consistency and realization boundary
 
-- The current type floor is exactly the twenty-three-name roster in
-  `minimality.md`; its internal-provision arm includes the five entrypoint-ABI
+- The current floor-identity roster is the exact 32-name roster in
+  `minimality.md`; not all roster members are type formers. Its
+  internal-provision arm includes the five entrypoint-ABI
   and three effect/clock identities. Pair's companion bindings remain exactly
   `{mk_pair, pair_fst, pair_snd}`.
 - The four names reuse one compiler-installed transparent declaration family.
