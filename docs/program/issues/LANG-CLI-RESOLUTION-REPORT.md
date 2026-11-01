@@ -1,7 +1,7 @@
 ---
 id: LANG-CLI-RESOLUTION-REPORT
 title: "Spec 33 §3.3 promises that the standalone and non-catalog CLI routes resolve the five Console/Char pre-source names to their exact pre-source identities, but no ken check, run or native-build observation carries identity, so conformance cannot test the promise at those routes. Add an opt-in machine-readable resolution report to each of the three routes, produced by the route's own elaboration, and pin it with an accepted root and a type-compatible shadow control"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1
