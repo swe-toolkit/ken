@@ -27,9 +27,13 @@ then `find_below p bound` equals `None Nat`. This is the converse of
 - **The forward laws exist, public.** `find_below_sound` turns `Some n`
   into `n < bound` and `p n = True`, and `find_below_complete` turns
   `None` into the refuted range (`BoundedSearch.ken.md:42`, `:66`).
-- **A proof route.** Case the result: `None` is immediate. `Some n`
-  meets `find_below_sound`'s `p n = True` against the premise's
-  `p n = False` at the same `n`, which is absurd.
+- **A proof route** (Architect AC-0 evt_6bgw9h9v84f0p). Casing the
+  result directly is refused: `match ... eqn:` takes only nullary enums.
+  A private helper `refuted_outcome_none` binds the result as `outcome`
+  with its equation. `None` is immediate. `Some n` meets
+  `find_below_sound`'s `p n = True` against the premise's `p n = False`
+  at the same `n`, which is absurd. The public law
+  `find_below_refuted p bound` instantiates it with `Refl`.
 - **Not yet stated.** Spec 72 §2.1 to §2.4 and the package have no
   converse. §2.2 (`72-optimization.md:503`) says the three laws
   determine the result, but no law concludes `None`.
@@ -57,12 +61,16 @@ candidate.
 - **AC-1.** §2.5 states the ruled law by its public type. The Spec
   Leader and CV review it, with a Decision.
 - **AC-2.** The seed's accepted client applies the law to `above_two`
-  at bound `three`, with the refuted-range premise discharged.
-  - Its refused block pins `find_below above_two ten = None Nat` by
-    `Refl`. The search computes `Some three`.
-  - Its accepted same-form control is `find_below above_two three =
-    None Nat` by `Refl`, so the refusal is the bound, not the form.
-    Both goals are Eq-shaped, so `Refl` discriminates.
+  at bound `three`, with the premise discharged by
+  `above_two_refuted_below_three` (its arms by `Proved`).
+  - Its refused block pins `Equal (Option Nat) (find_below above_two
+    ten) (None Nat)` by `Proved`, on a fresh accepted prefix. The search
+    computes `Some three`, so it is refused with KernelRejected
+    TypeMismatch.
+  - Its accepted same-form control is the same claim at bound `three`
+    by `Proved`, so the refusal is the bound, not the form. `Refl` does
+    not discriminate: an `Equal` goal is not Eq-shaped, so `Refl`
+    refuses the true control too (AC-0).
 
 ## Stop conditions
 
@@ -74,5 +82,5 @@ Checks: 4 fired: the converse is written from the public
 `find_below_sound`, read at its line, and a case on the result; the
 package was grepped for a law concluding `None`, and there was no hit.
 8 fired: the refused row and its control share `above_two` and the
-claim form and differ only in the bound, and the control is true by
-computation.
+claim form and differ only in the bound. Under `Proved` the control is
+accepted and only the false claim is refused (AC-0, d0c to d0f).

@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-POINT-UNITS
 title: "Spec 68 regroups, distributes and bounds interval arithmetic by endpoint-value inclusion, but states no unit: Algorithm.Numeric.RationalInterval has no law that adding the point zero, or multiplying by the point one, leaves an interval in place. Rule from a checked D0 at zero trust that each unit result is inside its operand and conversely, and state the four laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
