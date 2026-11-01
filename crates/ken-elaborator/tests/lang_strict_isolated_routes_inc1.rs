@@ -252,3 +252,41 @@ fn strict_scope_continues_but_root_or_mode_cannot_change_mid_run() {
         other => panic!("expected roots mode-lock refusal, got {other:?}"),
     }
 }
+
+/// Promise class: durable invariant. Discovery walks the source file's own
+/// ancestors: a `..` component never makes a child directory an ancestor.
+#[test]
+fn discovery_never_takes_a_child_directory_through_parent_components() {
+    let dir = tempfile::tempdir().unwrap();
+    let child_root = dir.path().join("a/b/catalog/packages");
+    std::fs::create_dir_all(&child_root).unwrap();
+    // The file is <dir>/a/x.ken; <dir>/a/b is a child of its directory, so
+    // discovery answers exactly as it does for the file's own spelling.
+    let through_parent = isolated_catalog_root(&dir.path().join("a/b/../x.ken"));
+    assert_ne!(through_parent.as_ref(), Some(&child_root));
+    assert_eq!(
+        through_parent,
+        isolated_catalog_root(&dir.path().join("a/x.ken"))
+    );
+    // The file is <dir>/a/b/x.ken, whose own directory holds the root.
+    assert_eq!(
+        isolated_catalog_root(&dir.path().join("a/b/src/../x.ken")),
+        Some(child_root)
+    );
+}
+
+/// Promise class: durable invariant. A relative source path names a file
+/// below the working directory; its ancestors continue above that directory.
+#[test]
+fn discovery_from_a_relative_path_climbs_past_the_working_directory() {
+    // Cargo runs integration tests in the package directory, two levels below
+    // the repository root that holds catalog/packages.
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .unwrap();
+    assert_eq!(
+        isolated_catalog_root(Path::new("tests/root.ken")).map(|root| root.canonicalize().unwrap()),
+        Some(repo_root)
+    );
+}

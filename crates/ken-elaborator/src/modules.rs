@@ -2099,7 +2099,20 @@ pub struct CatalogModulePath {
 /// Find the nearest in-repo catalog root from an isolated source path alone.
 /// Catalog source paths retain their separate `catalog_module_from_path` entry.
 pub fn isolated_catalog_root(path: &Path) -> Option<PathBuf> {
-    path.parent()?
+    // Ancestors are those of the absolute path: a relative path continues
+    // above the working directory, and `..` removes a component lexically
+    // rather than naming a child directory as an ancestor.
+    let mut parent = PathBuf::new();
+    for component in std::path::absolute(path).ok()?.parent()?.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                parent.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => parent.push(other),
+        }
+    }
+    parent
         .ancestors()
         .map(|dir| dir.join("catalog").join("packages"))
         .find(|root| root.is_dir())
