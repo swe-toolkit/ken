@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE
 title: "Spec 66 decides semantic equality of polynomial expressions with poly_eq and states that it is preserved by EAdd and EMul, but states no law that poly_eq is an equivalence: §10 names reflexivity, symmetry and transitivity as relational laws and exports none. A client must recompose poly_eq_sound and poly_eq_complete to rewrite in either direction or chain two facts. Rule from a checked D0 at zero trust and state the three laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
