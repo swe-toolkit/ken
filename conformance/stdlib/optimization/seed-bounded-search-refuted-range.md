@@ -15,8 +15,12 @@ The expected finite results follow from §2.1: below three, the range is
 `0, 1, 2`, none of which satisfies `2 < n`; below ten, `3` is the least
 satisfying index. The Architect's AC-2 scratch measurement reports the
 bound-three `Proved` control accepted and the isolated bound-ten `Proved`
-claim refused with `KernelRejected TypeMismatch`. This seed has not been
-Ken-checked or officially executed.
+claim refused with `KernelRejected TypeMismatch`. Separately, on a scratch
+tree byte-identical to prior candidate `aaf1759d6`, Architect extracted both
+Ken blocks. The accepted client checked successfully; a fresh client copy
+with the appended false claim was rejected at its theorem
+(`KernelRejected TypeMismatch`, span 1271..1377; 1/1, rc 0). This is
+candidate-local scratch evidence, not an official conformance run.
 
 ## Accepted client and controls
 

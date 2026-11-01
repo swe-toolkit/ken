@@ -44,9 +44,13 @@
 > CV-authored seed. On catalog tip `161b75d`, both named package tests
 > passed 3/3 and the trusted identity set was 114 → 114; declaration
 > order was corrected at `1cea32a`, where the bounded-search target
-> passed 3/3. These are candidate-local results. The new seed is
-> authored, not Ken-checked or officially run; no CI, publication,
-> landing or landed-trust claim is made.
+> passed 3/3. These are candidate-local results. On a tree byte-identical
+> to prior candidate `aaf1759d6`, Architect extracted the seed's two Ken
+> blocks. The accepted client checked successfully. A fresh client copy
+> with the appended false claim was rejected at its theorem
+> (`KernelRejected TypeMismatch`, span 1271..1377; 1/1, rc 0). This is
+> candidate-local scratch evidence, not an official conformance run; no
+> CI, publication, landing or landed-trust claim is made.
 
 ## 1. Least-cost candidate
 
@@ -458,9 +462,11 @@ No new primitive, kernel or surface feature is introduced.
 > official conformance-runner execution, CI or landed trust. Section
 > 2.5 adds the converse as the fifth public law. The candidate carries
 > its catalog theorem, package-owned test and CV-authored seed. The
-> seed is not yet Ken-checked or officially executed. Candidate-local
-> catalog tests are not official conformance, CI, publication, landing
-> or a landed trust measurement.
+> seed's two Ken blocks received the focused scratch check recorded in
+> the opening status. It has not been run by the official conformance
+> runner. Candidate-local catalog tests and scratch checks are not
+> official conformance, CI, publication, landing or a landed trust
+> measurement.
 
 ### 2.1 Carrier and result
 
@@ -528,7 +534,7 @@ is false because `3` is a hit. Bound `3` returns `None` because none
 of `0, 1, 2` satisfies `p`, and bound `Zero` also returns `None`.
 A claimed `Some 2` at bound `3` is false for a different reason:
 `p 2 = False`. These are behavioral illustrations, not a claim that
-the conformance seed has been Ken-checked or run.
+the conformance seed has been run by the official conformance runner.
 
 ### 2.3 Proof evidence and boundary
 
@@ -666,10 +672,14 @@ form is needed. Sections 1–3 retain their existing operation and law
 types. Architect's exact-base AC-0 checked the generic law and helper
 in scratch with no new `Axiom` and equal trusted identity sets
 114 → 114. The assembled candidate adds the catalog theorem,
-package-owned test and CV-authored seed. The new seed is authored,
-not Ken-checked or officially executed. Component-local checks and
-scratch AC-0 evidence are not official conformance-runner execution,
-CI, publication, landing or landed trust.
+package-owned test and CV-authored seed. On a tree byte-identical to
+prior candidate `aaf1759d6`, Architect extracted the seed's two Ken
+blocks. The accepted client checked successfully; a fresh client copy
+with the appended false claim was rejected at its theorem
+(`KernelRejected TypeMismatch`, span 1271..1377; 1/1, rc 0). This
+candidate-local scratch evidence is not an official conformance run.
+Component-local checks and scratch evidence do not establish official
+conformance-runner execution, CI, publication, landing or landed trust.
 
 ## 3. Greatest-cost candidate
 

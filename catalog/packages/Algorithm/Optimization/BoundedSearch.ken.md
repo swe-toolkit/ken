@@ -322,10 +322,14 @@ of three returns `None Nat`. A bound of `Zero` always has an empty search
 range. See the checked examples and refusals in the
 [bounded-search seed](
   ../../../../conformance/stdlib/optimization/seed-bounded-search.md).
-The [refuted-range seed](
+The authored [refuted-range seed](
   ../../../../conformance/stdlib/optimization/seed-bounded-search-refuted-range.md)
-exercises the converse with a closed client; it is authored but has not yet
-been Ken-checked or run by the conformance runner.
+exercises the converse with a closed client. On a tree byte-identical to
+prior candidate `aaf1759d6`, Architect extracted both Ken blocks. The
+accepted client checked successfully; a fresh client copy with the appended
+false claim was rejected at its theorem (`KernelRejected TypeMismatch`,
+span 1271..1377; 1/1, rc 0). This is candidate-local scratch evidence,
+not an official conformance run.
 
 ## Laws & proofs
 
@@ -399,5 +403,6 @@ exercise the operation and the four earlier public laws in package tests.
 The generic client checks the fifth law over open predicates and bounds. The
 [refuted-range seed](
   ../../../../conformance/stdlib/optimization/seed-bounded-search-refuted-range.md)
-is authored but has not been Ken-checked or run by the conformance runner. No
+is authored; its two Ken blocks received the focused scratch check described
+in Using it. The seed has not been run by the official conformance runner. No
 time, space, or predicate-call-count guarantee is claimed.
