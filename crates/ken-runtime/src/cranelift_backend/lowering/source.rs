@@ -5476,14 +5476,14 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                     ));
                     if let Some((set, members)) = transport_alternatives {
                         Self::reject_carried_residual_arguments(args.len())?;
-                        let LoweringOperand::Carried(wrapped) = runtime_value else {
+                        let LoweringOperand::Residual(residual) = runtime_value else {
                             return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "ProducerAlternativeSet",
-                                "an alternative checked-IH transport force has no carried R2 record",
+                                "an alternative checked-IH transport force has no issued slot residual",
                             ));
                         };
                         let value = self.select_checked_ih_transport_alternative(
-                            builder, &set, &members, wrapped,
+                            builder, &set, &members, residual,
                             |this, builder, transport| {
                                 let authority = match this.function_local
                                     .checked_ih_generated_entry_access.as_ref() {

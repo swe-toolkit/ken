@@ -977,15 +977,15 @@ impl<'a> Lowering<'a> {
             Ok(LoweringOperand::Carried(joined))
         }
 
-        /// Select exactly one planner-issued environment transport by the R2
-        /// Record label. The selected arm alone reads its Child and emits its
-        /// call; a non-member label has no implicit default transport.
+        /// Select exactly one planner-issued environment transport by the PX8
+        /// slot residual's label. The issued set binds members, but the slot
+        /// supplies their runtime labels; an unhandled label traps.
         pub(super) fn select_checked_ih_transport_alternative<F>(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             set: &ProducerAlternativeSet,
             members: &[CheckedIhEnvironmentTransport],
-            wrapped: CarriedBoundaryWord,
+            residual: CarriedResidualWord,
             mut arm: F,
         ) -> Result<LoweringOperand, CraneliftBackendError>
         where
@@ -1000,27 +1000,60 @@ impl<'a> Lowering<'a> {
                     "a checked-IH transport switch differs from its issued member order",
                 ));
             }
-            let ordinal = self.assert_producer_alternative_record(builder, set, wrapped)?;
+            let first = members.first().ok_or_else(|| unsupported(
+                LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                "an alternative transport force has no members",
+            ))?;
+            let slot = self.static_transition_plan
+                .recursive_carrier_for_specialization(first.source_specialization())?
+                .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                    "ProducerAlternativeSet", "an alternative transport source has no issued slot"))?
+                .clone();
+            if residual.slot() != RecursiveCarrierSlotKey::of(&slot) {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "ProducerAlternativeSet", "an alternative transport force names a foreign slot"));
+            }
+            let ordinal = self.residual_label_ordinal(builder, residual, &slot)?;
+            let mut labels = BTreeSet::new();
             let join = builder.create_block();
             let CarriedBlockParam::Value(joined) = append_carried_block_param(
                 builder, join, Representation::Value,
             ) else { unreachable!("an alternative transport joins in the value plane") };
-            for (index, transport) in members.iter().enumerate() {
+            for transport in members {
+                let source = transport.source_specialization();
+                if self.static_transition_plan.recursive_carrier_for_specialization(source)?
+                    .map(RecursiveCarrierSlotKey::of) != Some(RecursiveCarrierSlotKey::of(&slot))
+                {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet", "alternative transport members name different slots"));
+                }
+                let label = slot.variant(source)?.label.ok_or_else(|| unsupported(
+                    LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                    "an alternative transport member has no slot label",
+                ))?;
+                if !labels.insert(label) {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet", "two alternative transport members share one slot label"));
+                }
+                let disposition = self.static_transition_plan
+                    .recursive_residual_for_specialization(source)?
+                    .filter(|entry| entry.wrapped() && entry.label == Some(label))
+                    .cloned()
+                    .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet",
+                        "an alternative transport member has no wrapped disposition for its slot label",
+                    ))?;
                 let selected = builder.create_block();
                 let next = builder.create_block();
                 let matched = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
-                    ordinal,
-                    i64::try_from(index).map_err(|_| unsupported(
-                        LoweringCause::Capacity, "ProducerAlternativeSet",
-                        "a checked-IH alternative label exceeds the carrier ABI",
-                    ))?,
+                    ordinal, i64::from(label),
                 );
                 builder.ins().brif(matched, selected, &[], next, &[]);
                 builder.switch_to_block(selected);
-                let child = self.emit_carrier_field(builder, wrapped, 0)?;
+                let _ = self.assert_recursive_carrier_variant(builder, residual, &disposition)?;
                 let _ = self.checked_ih_transport_child(
-                    builder, LoweringOperand::Carried(child), transport,
+                    builder, LoweringOperand::Residual(residual), transport,
                 )?;
                 let result = arm(self, builder, transport)?;
                 let answer = match result {
