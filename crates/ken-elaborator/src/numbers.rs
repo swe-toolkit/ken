@@ -150,6 +150,9 @@ pub struct NumericEnv {
     fixed_int_literal_descriptors: Vec<FixedIntLiteralDescriptor>,
     /// Non-numeric literal roles captured from their pre-source registrars.
     literal_plan_ids: Option<LiteralPlanIds>,
+    /// Checked ITree, Ret and bind identities, installed together after bind
+    /// registration; absent while the prelude itself is still being built.
+    effect_sequencing_ids: Option<(GlobalId, GlobalId, GlobalId)>,
     /// Bytes registrar's two carrier IDs, available before prelude source is
     /// elaborated (which itself contains string literal values).
     literal_carriers: Option<(GlobalId, GlobalId)>,
@@ -256,6 +259,22 @@ impl NumericEnv {
 
     pub(crate) fn literal_plan_ids(&self) -> Option<LiteralPlanIds> {
         self.literal_plan_ids
+    }
+
+    pub(crate) fn install_effect_sequencing_ids(
+        &mut self,
+        itree: GlobalId,
+        ret: GlobalId,
+        bind: GlobalId,
+    ) {
+        assert!(
+            self.effect_sequencing_ids.replace((itree, ret, bind)).is_none(),
+            "effect sequencing IDs are captured once"
+        );
+    }
+
+    pub(crate) fn effect_sequencing_ids(&self) -> Option<(GlobalId, GlobalId, GlobalId)> {
+        self.effect_sequencing_ids
     }
 
     /// Register (or replace) the `+` dispatch entry for `ty_id` — used by
@@ -736,6 +755,7 @@ pub fn register_numeric_env(
         abi_scalar_conversion_trusted_delta: Vec::new(),
         fixed_int_literal_descriptors,
         literal_plan_ids: None,
+        effect_sequencing_ids: None,
         literal_carriers: None,
         add_table,
         eq_table,

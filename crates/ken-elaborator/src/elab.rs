@@ -953,6 +953,9 @@ struct ElabCtx<'e> {
     /// caught downstream by the kernel check. That arm's residual carries the
     /// reachability argument.
     standard_operators: Option<&'e HashMap<StandardOperatorRole, GlobalId>>,
+    /// Checked per-owner effect rows for local-let sequencing. Absent only in
+    /// prelude and throwaway contexts that have no production declaration body.
+    effect_rows: Option<CheckedEffectRows<'e>>,
     /// The sink `§6.2` instance search appends its provenance to.
     ///
     /// **Carried beside `class_env`, not inside it.** The registry itself is
@@ -1196,6 +1199,7 @@ impl<'e> ElabCtx<'e> {
             result_predicates: Vec::new(),
             class_env: None,
             standard_operators: None,
+            effect_rows: None,
             provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
@@ -1298,21 +1302,21 @@ impl<'e> ElabCtx<'e> {
     /// up missing on a path nobody enumerated. Taking both makes every call
     /// site a compile error until it supplies both -- the audit is bounded by
     /// the compiler, not by a grep.
-    /// **All three together, on purpose.** Taking them in one call makes
-    /// every call site a compile error until it supplies all of them, so the
-    /// audit is bounded by the compiler rather than by a grep. The provenance
-    /// sink belongs in the bundle for the same reason the other two do:
-    /// completion needs the identity to recognise an occurrence, the registry
-    /// to resolve its dictionary, and the sink to record what it resolved.
+    /// All four together: the class registry, provenance sink, certified
+    /// operator identities and checked effect rows must reach every body
+    /// elaboration route. The fourth argument makes missing routes fail to
+    /// compile, rather than silently skipping a performed local let.
     fn with_classes(
         mut self,
         class_env: &'e ClassEnv,
         provenance: &'e mut Vec<crate::classes::InstanceResolution>,
         standard_operators: &'e HashMap<StandardOperatorRole, GlobalId>,
+        effect_rows: CheckedEffectRows<'e>,
     ) -> Self {
         self.class_env = Some(class_env);
         self.provenance = Some(provenance);
         self.standard_operators = Some(standard_operators);
+        self.effect_rows = Some(effect_rows);
         self
     }
 
@@ -2015,6 +2019,93 @@ fn ascribe_introduction_let_value(val: Term, ty: &Term) -> Term {
     }
 }
 
+/// The three checked arguments of an ITree type, after alias reduction.
+/// Names alone cannot identify the carrier: only the prelude registrar's ID
+/// does, even when a source declaration shadows `ITree`.
+fn let_itree_parts(cx: &ElabCtx<'_>, ty: &Term) -> Option<(Term, Term, Term)> {
+    let (itree_id, _, _) = cx.numeric_env.effect_sequencing_ids()?;
+    let normalized = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(ty));
+    let Term::App(result, value) = normalized else { return None };
+    let Term::App(response, result) = *result else { return None };
+    let Term::App(carrier, response) = *response else { return None };
+    if !matches!(*carrier, Term::IndFormer { id, .. } if id == itree_id) {
+        return None;
+    }
+    Some((*response, *result, *value))
+}
+
+fn let_signature_matches(cx: &ElabCtx<'_>, lhs: &(Term, Term, Term), rhs: &(Term, Term, Term)) -> bool {
+    let (lhs_effect, lhs_response, _) = lhs;
+    let (rhs_effect, rhs_response, _) = rhs;
+    convert_type(cx.env, &cx.ctx, lhs_effect, rhs_effect)
+        && convert_type(cx.env, &cx.ctx, lhs_response, rhs_response)
+}
+
+fn let_inclusion_unavailable(
+    span: &Span, from: &(Term, Term, Term), to: &(Term, Term, Term),
+) -> ElabError {
+    ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: format!(
+            "unsupported: 36 §2.4 inclusion into the enclosing effect signature is not built: RHS ({:?}, {:?}), enclosing ({:?}, {:?})",
+            from.0, from.1, to.0, to.1,
+        ),
+    }
+}
+
+/// Return a performed ITree RHS and the type of the value it *returns*, not
+/// the type of the action itself. An annotation constrains this returned type.
+/// In the direct-style non-tree case, roll back the speculative annotated
+/// inference and let the existing checked-RHS path handle it unchanged.
+fn prepare_performed_let_rhs(
+    cx: &mut ElabCtx<'_>, ty_opt: &Option<RType>, rhs: &RExpr, span: &Span,
+) -> Result<Option<(Term, Term, (Term, Term, Term), Term)>, ElabError> {
+    let Some(rows) = cx.effect_rows else { return Ok(None) };
+    if cx.numeric_env.effect_sequencing_ids().is_none()
+        || infer_expr_row_type(rhs, &rows, None) == crate::effects::RowType::empty()
+    {
+        return Ok(None);
+    }
+    let annotation = ty_opt.as_ref()
+        .map(|ty| elab_type_in_slot(cx, ty, RefinementSlot::Outermost))
+        .transpose()?;
+    let snapshot = annotation.as_ref().map(|_| refinement_snapshot::Snapshot::capture(cx));
+    let (mut rhs_core, mut rhs_ty) = infer(cx, rhs)?;
+    refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
+    let Some(tree) = let_itree_parts(cx, &rhs_ty) else {
+        if let Some(snapshot) = snapshot {
+            snapshot.rollback(cx)?;
+        }
+        return Ok(None);
+    };
+    let binder_ty = if let Some(annotation) = annotation {
+        if !convert_type(cx.env, &cx.ctx, &cx.metas.zonk_term(&annotation), &tree.2) {
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "annotated result type differs from the action's result type".into(),
+            });
+        }
+        annotation
+    } else {
+        tree.2.clone()
+    };
+    Ok(Some((rhs_core, rhs_ty, tree, binder_ty)))
+}
+
+fn bind_let_core(
+    cx: &ElabCtx<'_>, tree: &(Term, Term, Term), result_ty: Term,
+    rhs_core: Term, rhs_ty: &Term, binder_ty: Term, body_core: Term,
+) -> Result<Term, ElabError> {
+    let (_, _, bind_id) = cx.numeric_env.effect_sequencing_ids().ok_or_else(|| {
+        ElabError::Internal("sequenced let reached before bind registration".into())
+    })?;
+    let rhs_core = ascribe_introduction_let_value(rhs_core, rhs_ty);
+    Ok([tree.0.clone(), tree.1.clone(), tree.2.clone(), result_ty, rhs_core,
+        Term::lam(binder_ty, body_core)]
+        .into_iter()
+        .fold(Term::const_(bind_id, vec![]), Term::app))
+}
+
 /// Check a local `let` outside `check`'s always-paid recursive frame. The
 /// helper remains live only for an actual `RLet`; unrelated deep match trees
 /// pay the original single-call dispatch frame.
@@ -2051,6 +2142,34 @@ fn check_let_once(
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
     expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
+    if let Some(expected_tree) = let_itree_parts(cx, expected) {
+        if let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
+            prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
+        {
+            if !let_signature_matches(cx, &rhs_tree, &expected_tree) {
+                return Err(let_inclusion_unavailable(span, &rhs_tree, &expected_tree));
+            }
+            if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
+                return Err(ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: "let result has no informative checked equation".into(),
+                });
+            }
+            if !result_predicates.is_empty() {
+                return Err(ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: "ensures on a sequenced let needs an explicit checked result".into(),
+                });
+            }
+            cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
+            let checked = check_result_position(cx, body, &weaken(expected, 1), span, &[]);
+            cx.ctx.pop();
+            let body_core = checked?;
+            return bind_let_core(
+                cx, &rhs_tree, expected_tree.2, rhs_core, &rhs_ty, binder_ty, body_core,
+            );
+        }
+    }
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
@@ -14127,6 +14246,72 @@ fn infer_let_once(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
 ) -> Result<(Term, Term), ElabError> {
+    if let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
+        prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
+    {
+        if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "inferred let has no informative checked equation".into(),
+            });
+        }
+        cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
+        let inferred = infer(cx, body);
+        let (body_core, body_ty) = match inferred {
+            Ok(inferred) => inferred,
+            Err(error) => {
+                cx.ctx.pop();
+                return Err(error);
+            }
+        };
+        let body_row = cx.effect_rows
+            .map(|rows| infer_expr_row_type(body, &rows, None))
+            .unwrap_or_else(crate::effects::RowType::empty);
+        let body_tree = let_itree_parts(cx, &body_ty);
+        let tree_is_performed = body_row != crate::effects::RowType::empty();
+        let (body_for_bind, inside_ty) = if tree_is_performed {
+            if let Some(body_tree) = body_tree {
+                let outer_signature = (
+                    weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), rhs_tree.2.clone(),
+                );
+                if !let_signature_matches(cx, &outer_signature, &body_tree) {
+                    cx.ctx.pop();
+                    return Err(let_inclusion_unavailable(span, &rhs_tree, &body_tree));
+                }
+                (body_core, body_tree.2)
+            } else {
+                let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
+                    .expect("performed RHS has checked ITree IDs");
+                let lifted = [
+                    weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), body_ty.clone(), body_core,
+                ].into_iter().fold(Term::constructor(ret_id, vec![]), Term::app);
+                (lifted, body_ty)
+            }
+        } else {
+            let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
+                .expect("performed RHS has checked ITree IDs");
+            let lifted = [
+                weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), body_ty.clone(), body_core,
+            ].into_iter().fold(Term::constructor(ret_id, vec![]), Term::app);
+            (lifted, body_ty)
+        };
+        let result_ty = lower_binders(&inside_ty, 1, 0).map_err(|_| {
+            ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "sequenced let result type depends on its bound value".into(),
+            }
+        });
+        cx.ctx.pop();
+        let result_ty = result_ty?;
+        let core = bind_let_core(
+            cx, &rhs_tree, result_ty.clone(), rhs_core, &rhs_ty, binder_ty, body_for_bind,
+        )?;
+        let (itree_id, _, _) = cx.numeric_env.effect_sequencing_ids()
+            .expect("performed RHS has checked ITree IDs");
+        let tree_ty = [rhs_tree.0, rhs_tree.1, result_ty]
+            .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app);
+        return Ok((core, tree_ty));
+    }
     let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
     let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
@@ -16013,6 +16198,8 @@ pub(crate) fn elaborate_rdecl(
     // discarded it -- same refactor, opposite right answer, decided by where
     // the old field's owner outlived the call.
     let mut discarded_provenance = Vec::new();
+    let no_names = HashMap::new();
+    let no_checked_ids = HashMap::new();
     let result = elaborate_rdecl_v1(
         env,
         globals,
@@ -16021,6 +16208,7 @@ pub(crate) fn elaborate_rdecl(
         &mut sentinel,
         &mut discarded_provenance,
         &no_standard_operators,
+        &CheckedEffectRows::new(&no_names, &no_checked_ids),
         rdecl,
     )?;
     Ok(result.def_id)
@@ -17275,6 +17463,7 @@ fn collect_bound_dictionary_params(
 /// Two indices for one effect assertion: mutable spellings support local
 /// forward declarations; checked imported IDs preserve their owner's row
 /// after a different provider overwrites the same canonical spelling.
+#[derive(Clone, Copy)]
 pub(crate) struct CheckedEffectRows<'a> {
     names: &'a HashMap<String, crate::effects::RowType>,
     ids: &'a HashMap<GlobalId, crate::effects::RowType>,
@@ -18822,6 +19011,7 @@ pub(crate) fn elaborate_rdecl_v1(
     // silently drop it on this path.
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     let mut fixities = HashMap::new();
@@ -18831,8 +19021,6 @@ pub(crate) fn elaborate_rdecl_v1(
     // registry travels through the module path via `ElabEnv::ctor_decl_spans`.
     let mut ctor_decl_spans = HashMap::new();
     let mut refinement_facts = RefinementFacts::default();
-    let no_names = HashMap::new();
-    let no_checked_ids = HashMap::new();
     let mut preconditions = HashMap::new();
     elaborate_rdecl_v1_with_effect_rows(
         env,
@@ -18843,7 +19031,7 @@ pub(crate) fn elaborate_rdecl_v1(
         class_env,
         provenance,
         standard_operators,
-        &CheckedEffectRows::new(&no_names, &no_checked_ids),
+        effect_rows,
         &mut fixities,
         &mut fixity_spans,
         &mut ctor_decl_spans,
@@ -18866,6 +19054,7 @@ fn declaration_param_context(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
 ) -> Result<Context, ElabError> {
     // This walks the declaration's OWN parameter telescope, so it is the FIRST
@@ -18875,7 +19064,7 @@ fn declaration_param_context(
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
         .deferring_type_introductions()
-        .with_classes(class_env, provenance, standard_operators)
+        .with_classes(class_env, provenance, standard_operators, *effect_rows)
         .with_preconditions(preconditions, PremiseHoles::Refused);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
@@ -18997,6 +19186,7 @@ fn elaborate_associated_rdecl(
                 class_env,
                 provenance,
                 standard_operators,
+                effect_rows,
                 rdecl,
             )?;
             // Resolve each constraint into its fully applied dictionary term.
@@ -19043,6 +19233,7 @@ fn elaborate_associated_rdecl(
                 class_env,
                 provenance,
                 standard_operators,
+                effect_rows,
                 rdecl,
                 &local_dicts,
                 refinement_facts,
@@ -19064,6 +19255,7 @@ fn elaborate_associated_rdecl(
             class_env,
             provenance,
             standard_operators,
+            effect_rows,
             rdecl,
             &HashMap::new(),
             refinement_facts,
@@ -19084,6 +19276,7 @@ fn elaborate_associated_rdecl(
             class_env,
             provenance,
             standard_operators,
+            effect_rows,
             rdecl,
             intros,
         ),
@@ -19097,6 +19290,7 @@ fn elaborate_associated_rdecl(
             class_env,
             provenance,
             standard_operators,
+            effect_rows,
             rdecl,
             None,
         ),
@@ -19110,6 +19304,7 @@ fn elaborate_associated_rdecl(
             class_env,
             provenance,
             standard_operators,
+            effect_rows,
             rdecl,
             Some(subject),
         ),
@@ -20141,7 +20336,7 @@ fn elab_instance_decl(
                 refinement_facts,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env, provenance, standard_operators)
+            .with_classes(&*class_env, provenance, standard_operators, *effect_rows)
             .with_preconditions(preconditions, PremiseHoles::Reported);
             push_type0_params(&mut cx, head_params.len());
             for (index, constraint_ty) in constraint_core_types.iter().enumerate() {
@@ -20187,7 +20382,7 @@ fn elab_instance_decl(
                 refinement_facts,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env, provenance, standard_operators)
+            .with_classes(&*class_env, provenance, standard_operators, *effect_rows)
             .with_preconditions(preconditions, PremiseHoles::Reported);
             push_type0_params(&mut cx, head_params.len());
             let (ordered_vals, field_effect_rows) = compute_ordered_field_values(
@@ -20755,6 +20950,7 @@ fn elaborate_view_or_let(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     refinement_facts: &mut RefinementFacts,
@@ -20778,6 +20974,7 @@ fn elaborate_view_or_let(
             class_env,
             provenance,
             standard_operators,
+            effect_rows,
             rdecl,
             local_dicts,
             refinement_facts,
@@ -20796,6 +20993,7 @@ fn elaborate_view_or_let(
         class_env,
         provenance,
         standard_operators,
+        effect_rows,
         rdecl,
         local_dicts,
         refinement_facts,
@@ -21026,6 +21224,7 @@ pub(crate) fn elaborate_space_decl(
             &elab.class_env,
             &mut elab.resolution_provenance,
             &elab.standard_operators,
+            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
         )
         .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
@@ -21284,6 +21483,7 @@ fn elaborate_v0(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     refinement_facts: &mut RefinementFacts,
@@ -21305,6 +21505,7 @@ fn elaborate_v0(
             class_env,
             provenance,
             standard_operators,
+            effect_rows,
             refinement_facts,
             fixities,
             fixity_spans,
@@ -21314,7 +21515,7 @@ fn elaborate_v0(
     }
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators)
+            .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
             .with_local_dicts(local_dicts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -21423,6 +21624,7 @@ fn elaborate_recursive_view(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -21432,7 +21634,7 @@ fn elaborate_recursive_view(
     // 1. Elaborate the declared type (recursive views are annotated).
     let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators)
+            .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
@@ -21481,7 +21683,7 @@ fn elaborate_recursive_view(
     let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators)
+            .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
@@ -21553,6 +21755,7 @@ pub(crate) fn elaborate_mutual_group(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     refinement_facts: &mut RefinementFacts,
@@ -21687,7 +21890,7 @@ pub(crate) fn elaborate_mutual_group(
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let before = env.decls().count();
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                .with_classes(class_env, provenance, standard_operators)
+                .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
                 .with_preconditions(preconditions, PremiseHoles::Reported)
                 .with_recursive_group(&recursive_group);
@@ -21924,6 +22127,7 @@ fn prepare_contract_ensures(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     preconditions: &HashMap<GlobalId, (usize, usize)>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     rdecl: &RDecl,
@@ -21943,7 +22147,7 @@ fn prepare_contract_ensures(
     for ens in ensures {
         let (psi, nested_obligations) = elab_in_ctx_at_omega(
             env, globals, num_values, numeric_env, refinement_facts, class_env, provenance,
-            standard_operators, preconditions, local_dicts, &ens_ctx,
+            standard_operators, effect_rows, preconditions, local_dicts, &ens_ctx,
             requires, param_types.len(), ens, &rdecl.span, &rdecl.name,
         )?;
         absorb_obligations(&mut obligations, nested_obligations);
@@ -21966,6 +22170,7 @@ fn elaborate_view_with_spec(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     refinement_facts: &mut RefinementFacts,
@@ -22009,7 +22214,7 @@ fn elaborate_view_with_spec(
             let (carrier_ty, assumptions, req_cores) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                        .with_classes(class_env, provenance, standard_operators)
+                        .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -22050,7 +22255,7 @@ fn elaborate_view_with_spec(
             // recursive calls in the body must see the *final* Σ result type.
             let (predicates, psi_obligations) = prepare_contract_ensures(
                 env, globals, num_values, numeric_env, &*refinement_facts, class_env, provenance,
-                standard_operators, preconditions, local_dicts, rdecl,
+                standard_operators, effect_rows, preconditions, local_dicts, rdecl,
                 &all_ensures, &param_types, &req_cores, &source_result,
             )?;
             absorb_obligations(&mut decl_obligations, psi_obligations);
@@ -22077,7 +22282,7 @@ fn elaborate_view_with_spec(
             let (full_body, body_inner) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                        .with_classes(class_env, provenance, standard_operators)
+                        .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -22109,7 +22314,7 @@ fn elaborate_view_with_spec(
             )
         } else {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                .with_classes(class_env, provenance, standard_operators)
+                .with_classes(class_env, provenance, standard_operators, *effect_rows)
 
                 .with_local_dicts(local_dicts)
                 .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -22331,6 +22536,7 @@ fn elaborate_prop_decl(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
     intros: &[RPropIntro],
 ) -> Result<ElabResult, ElabError> {
@@ -22347,7 +22553,7 @@ fn elaborate_prop_decl(
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators)
+            .with_classes(class_env, provenance, standard_operators, *effect_rows)
             .with_preconditions(preconditions, PremiseHoles::Refused);
         let ty = elab_signature(&mut cx, prop_ty, false)?;
         let ty = cx.metas.zonk_term(&ty);
@@ -22401,6 +22607,7 @@ fn elaborate_prop_decl(
             &mut Vec::new(),
             // Sentinel path -- see `elaborate_rdecl_v1`'s call above.
             &HashMap::new(),
+            effect_rows,
             &helper_rdecl,
             None,
         )?;
@@ -22421,6 +22628,7 @@ fn elaborate_checked_theorem(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     rdecl: &RDecl,
     attached_subject: Option<&str>,
 ) -> Result<ElabResult, ElabError> {
@@ -22433,7 +22641,7 @@ fn elaborate_checked_theorem(
 
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators)
+            .with_classes(class_env, provenance, standard_operators, *effect_rows)
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
@@ -22838,6 +23046,7 @@ fn elab_in_ctx_at_omega(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    effect_rows: &CheckedEffectRows<'_>,
     preconditions: &HashMap<GlobalId, (usize, usize)>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
@@ -22855,7 +23064,7 @@ fn elab_in_ctx_at_omega(
         refinement_facts,
         owner_label.to_string(),
     )
-    .with_classes(class_env, provenance, standard_operators)
+    .with_classes(class_env, provenance, standard_operators, *effect_rows)
     .with_local_dicts(local_dicts)
     .with_preconditions(preconditions, PremiseHoles::Reported);
     // Populate cx.ctx from the snapshot. The requires binders are real entries
@@ -30105,6 +30314,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &standard_operators,
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
             &rdecl,
         )
         .expect("const with concrete D1 visits row must elaborate");
@@ -30117,6 +30327,39 @@ mod surf1_visits_row_production_path {
             RowType::singleton("Console"),
             "written [Console] must reach production checking as a RowType"
         );
+    }
+
+    /// Promise class: durable invariant (36 §2.4). The standalone V1
+    /// elaboration route receives the same checked effect rows as module
+    /// loading; a performed local let must emit the registered bind, not Let.
+    #[test]
+    fn standalone_v1_performed_let_emits_checked_bind() {
+        let src = "proc standalone : IO (Result IOError Unit) visits [Console] = \
+            let r = write ConsoleStream.Stdout (bytes_encode \"a\") in \
+            write ConsoleStream.Stdout (bytes_encode \"b\")";
+        let decls = parse_decls(src).expect("standalone proc parses");
+        let rdecl = resolve_decl(&decls[0]).expect("standalone proc resolves");
+        let mut env = crate::ElabEnv::new().expect("checked prelude");
+        let id = elaborate_rdecl_v1(
+            &mut env.env,
+            &mut env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            &mut env.class_env,
+            &mut env.resolution_provenance,
+            &no_standard_operators(src),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
+            &rdecl,
+        ).expect("standalone V1 elaborates").def_id;
+        let (_, body) = env.env.transparent_body(id).expect("checked definition");
+        let mut head = &body;
+        let mut arity = 0;
+        while let Term::App(function, _) = head {
+            arity += 1;
+            head = function.as_ref();
+        }
+        assert_eq!(arity, 6);
+        assert!(matches!(head, Term::Const { id, .. } if *id == env.prelude_env.bind_id));
     }
 
     /// SURF-1 D1 production path: row variables fail closed unless the same
@@ -30138,6 +30381,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &standard_operators,
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
             &rdecl,
         )
         .expect_err("unbound visits row variable must reject fail-closed");

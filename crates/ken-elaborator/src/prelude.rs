@@ -1090,6 +1090,7 @@ fn register_prelude_state(elab: &mut ElabEnv, unit_id: GlobalId, mkunit_id: Glob
 
     let bind_id =
         state_eff::declare_bind(&mut elab.env, itree_id, vis_id).map_err(ElabError::Internal)?;
+    elab.numeric_env.install_effect_sequencing_ids(itree_id, ret_id, bind_id);
     elab.globals.insert("bind".to_string(), bind_id);
 
     let run_state_id = state_eff::declare_run_state(

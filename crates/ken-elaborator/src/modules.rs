@@ -5402,6 +5402,7 @@ fn elaborate_mutual_group_with_fixities(
         &elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_for_group,
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.refinement_facts,
