@@ -320,7 +320,12 @@ theorem leq_suc_not_leq_same
 For `λn. lt_nat two n`, a bound of ten returns `Some Nat three` and a bound
 of three returns `None Nat`. A bound of `Zero` always has an empty search
 range. See the checked examples and refusals in the
-[bounded-search seed](../../../../conformance/stdlib/optimization/seed-bounded-search.md).
+[bounded-search seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search.md).
+The [refuted-range seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-refuted-range.md)
+exercises the converse with a closed client; it is authored but has not yet
+been Ken-checked or run by the conformance runner.
 
 ## Laws & proofs
 
@@ -386,8 +391,13 @@ The result carrier is the existing `Option Nat`. The implementation uses Nat
 recursion, Boolean case analysis, transport/congruence, and the checked strict
 Nat order. Its declarations add no `Axiom`, postulate, primitive, or foreign
 trust; the package inherits only its imports' existing assumptions. The
-[bounded-search seed](../../../../conformance/stdlib/optimization/seed-bounded-search.md)
-and [bound-stability seed](../../../../conformance/stdlib/optimization/seed-bounded-search-bound-stability.md)
-exercise the operation, the four earlier public laws and the false results
-in package tests. The generic client checks the fifth law over open predicates
-and bounds. No time, space, or predicate-call-count guarantee is claimed.
+[bounded-search seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search.md)
+and [bound-stability seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-bound-stability.md)
+exercise the operation and the four earlier public laws in package tests.
+The generic client checks the fifth law over open predicates and bounds. The
+[refuted-range seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-refuted-range.md)
+is authored but has not been Ken-checked or run by the conformance runner. No
+time, space, or predicate-call-count guarantee is claimed.

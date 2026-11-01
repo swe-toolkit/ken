@@ -39,11 +39,14 @@
 > scratch nor parent tests are current-tip execution. No official
 > conformance, CI, publication, landing or landed trust is claimed.
 > The §2.4 law and package-owned seed test are on main; their local
-> execution is not official conformance or landed trust. Section 2.5
-> is a spec-only addition here: Architect's exact-base AC-0 checked
-> its proposed proof with no new `Axiom` and equal scratch trusted
-> identities 114 → 114. The catalog theorem, package test and CV seed
-> are later turns, not delivered or executed by this child.
+> execution is not official conformance or landed trust. This candidate
+> adds §2.5's public law, catalog theorem, package-owned test and
+> CV-authored seed. On catalog tip `161b75d`, both named package tests
+> passed 3/3 and the trusted identity set was 114 → 114; declaration
+> order was corrected at `1cea32a`, where the bounded-search target
+> passed 3/3. These are candidate-local results. The new seed is
+> authored, not Ken-checked or officially run; no CI, publication,
+> landing or landed-trust claim is made.
 
 ## 1. Least-cost candidate
 
@@ -453,9 +456,11 @@ No new primitive, kernel or surface feature is introduced.
 > test checks the authored seed, the complete public type, and the
 > rejected `None` counterpart. These local tests do not establish
 > official conformance-runner execution, CI or landed trust. Section
-> 2.5 states a fifth public law in this spec-only child; AC-0 is
-> scratch proof evidence, not catalog delivery, an authored or run
-> §2.5 seed, official conformance, CI or a landed trust measurement.
+> 2.5 adds the converse as the fifth public law. The candidate carries
+> its catalog theorem, package-owned test and CV-authored seed. The
+> seed is not yet Ken-checked or officially executed. Candidate-local
+> catalog tests are not official conformance, CI, publication, landing
+> or a landed trust measurement.
 
 ### 2.1 Carrier and result
 
@@ -523,7 +528,7 @@ is false because `3` is a hit. Bound `3` returns `None` because none
 of `0, 1, 2` satisfies `p`, and bound `Zero` also returns `None`.
 A claimed `Some 2` at bound `3` is false for a different reason:
 `p 2 = False`. These are behavioral illustrations, not a claim that
-the separately owned conformance seed has been committed or run.
+the conformance seed has been Ken-checked or run.
 
 ### 2.3 Proof evidence and boundary
 
@@ -660,9 +665,11 @@ the public type, and no new assumption, primitive, kernel or surface
 form is needed. Sections 1–3 retain their existing operation and law
 types. Architect's exact-base AC-0 checked the generic law and helper
 in scratch with no new `Axiom` and equal trusted identity sets
-114 → 114; it is not a catalog export, package-test execution,
-CV-authored seed, official conformance run, CI, publication, landing
-or measurement of landed trust.
+114 → 114. The assembled candidate adds the catalog theorem,
+package-owned test and CV-authored seed. The new seed is authored,
+not Ken-checked or officially executed. Component-local checks and
+scratch AC-0 evidence are not official conformance-runner execution,
+CI, publication, landing or landed trust.
 
 ## 3. Greatest-cost candidate
 
