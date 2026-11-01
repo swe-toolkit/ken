@@ -2,8 +2,10 @@
 //! Promise class: durable invariant. MEASURED: checked ITree and bind IDs
 //! occur at the elaborated term, with one Ret inside an inferred pure-body
 //! continuation. CLAIMED: a performed RHS is not lowered as ordinary Let.
-//! THE GAP: these concrete declarations do not exhaust all effect rows;
-//! CLI run-output tests independently observe execution order.
+//! THE GAP: these declarations do not exhaust all effect rows; CLI tests
+//! independently observe execution order. A performing RHS inside a
+//! non-tree-result proc with a non-empty row remains on the pre-existing
+//! ordinary-let fallback and is not sequenced; reported for separate tracking.
 
 use ken_elaborator::ElabEnv;
 use ken_kernel::{Decl, Term};
