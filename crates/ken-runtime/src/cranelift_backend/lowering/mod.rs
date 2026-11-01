@@ -443,6 +443,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
     ContinuationInputView, ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
+    ProducerAlternativeSet, ProducerResultResolution,
     ContinuationWorkerCaptureSource,
     ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
     ContinuationSourceCoordinate,

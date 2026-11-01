@@ -5412,7 +5412,7 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn checked_ih_static_response_return_boundary(
         &self,
         selected_caller: &ContinuationCallIdentity,
-    ) -> Result<Option<CheckedIhStaticResponseReturnBoundary>, CraneliftBackendError> {
+    ) -> Result<Option<Vec<CheckedIhStaticResponseReturnBoundary>>, CraneliftBackendError> {
         let owners = self
             .static_response_owner_specializations()?
             .map_err(|infeasible| {
@@ -5540,9 +5540,7 @@ impl StaticTransitionPlan<'_> {
             .iter()
             .filter(|transport| transport.source_call_identity() == selected_caller)
         {
-            let Some(caller_cut) = self.checked_ih_detached_caller_cut(caller_transport)? else {
-                continue;
-            };
+            for caller_cut in self.checked_ih_detached_caller_cuts(caller_transport)? {
             let matching_consumers = self
                 .checked_ih_post_call_consumers
                 .iter()
@@ -5591,6 +5589,7 @@ impl StaticTransitionPlan<'_> {
             };
             boundary.required_consumer_incoming_edge()?;
             boundaries.push(boundary);
+            }
         }
         #[cfg(feature = "px8-ds-test-support")]
         if !boundaries.is_empty()
@@ -5602,17 +5601,25 @@ impl StaticTransitionPlan<'_> {
         }
         match boundaries.as_slice() {
             [] => Ok(None),
-            [boundary] => Ok(Some(boundary.clone())),
-            _ => Err(planner_error(
-                "one selected static-response caller has more than one complete detached return boundary",
-            )),
+            [boundary] => Ok(Some(vec![boundary.clone()])),
+            _ => {
+                let members = boundaries.iter().map(|boundary| {
+                    boundary.caller_cut().producer_transport().source_call_identity()
+                }).collect::<Vec<_>>();
+                match self.resolve_producer_alternative_members(&members)? {
+                    super::ProducerResultResolution::Alternatives(_) => Ok(Some(boundaries)),
+                    super::ProducerResultResolution::Single => Err(planner_error(
+                        "one selected static-response caller has more than one complete detached return boundary",
+                    )),
+                }
+            }
         }
     }
 
-    pub(in crate::cranelift_backend) fn checked_ih_detached_caller_cut(
+    pub(in crate::cranelift_backend) fn checked_ih_detached_caller_cuts(
         &self,
         caller_transport: &CheckedIhEnvironmentTransport,
-    ) -> Result<Option<CheckedIhDetachedCallerCut>, CraneliftBackendError> {
+    ) -> Result<Vec<CheckedIhDetachedCallerCut>, CraneliftBackendError> {
         let mut matches = Vec::new();
         let mut saw_boundary = false;
         for row in &self.checked_ih_post_call_consumers {
@@ -5627,11 +5634,17 @@ impl StaticTransitionPlan<'_> {
             [] if saw_boundary => Err(planner_error(
                 "a detached checked-IH caller cut has no exact producer-to-caller transport endpoint join",
             )),
-            [] => Ok(None),
-            [cut] => Ok(Some(cut.clone())),
-            _ => Err(planner_error(
-                "one checked-IH caller transport has more than one detached source return cut",
-            )),
+            [] | [_] => Ok(matches),
+            _ => {
+                let members = matches.iter().map(|cut| cut.producer_transport().source_call_identity())
+                    .collect::<Vec<_>>();
+                match self.resolve_producer_alternative_members(&members)? {
+                    super::ProducerResultResolution::Alternatives(_) => Ok(matches),
+                    super::ProducerResultResolution::Single => Err(planner_error(
+                        "one checked-IH caller transport has more than one detached source return cut",
+                    )),
+                }
+            }
         }
     }
 

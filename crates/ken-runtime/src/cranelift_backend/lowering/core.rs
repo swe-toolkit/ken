@@ -12853,30 +12853,39 @@ impl<'a> Lowering<'a> {
                 self.defining_function_id,
             );
         }
-        let edge = match residual.as_slice() {
-            [] => return Ok(lowered),
-            [edge] => *edge,
-            _ => {
-                #[cfg(feature = "px8-ds-test-support")]
-                DETACHED_RESULT_SEAT_REFUSALS.with(|slot| {
-                    if let Some(rows) = slot.borrow_mut().as_mut() {
-                        rows.push(DetachedResultSeatRefusalObservation {
-                            edges: residual.iter().map(|edge| (
-                                edge.producer_result_origin.observation_ordinal(),
-                                edge.producer_construct_origin.observation_ordinal(),
-                            )).collect(),
-                        });
-                    }
-                });
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "ContinuationSpecialization",
-                    format!(
-                        "the detached-result seat projected {} undischarged causal calls onto one \
-                         unit result; a multi-member projection is a hard stop, never a preference \
-                         rule, because one result value cannot discharge two causal calls",
-                        residual.len()
-                    ),
-                ));
+        // Repeated edges are not alternatives, even when the result belongs
+        // to an issued set. Keep the original D5a refusal's exact site.
+        if residual.len() > 1 && residual.iter().enumerate().any(|(index, edge)| {
+            residual[index + 1..].iter().any(|other| other.identity == edge.identity)
+        }) {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "ContinuationSpecialization",
+                format!("the detached-result seat projected {} undischarged causal calls onto one \
+                    unit result; duplicate residual edges are never runtime alternatives", residual.len()),
+            ));
+        }
+        let resolution = if residual.is_empty() {
+            None
+        } else {
+            Some(self.static_transition_plan.resolve_producer_result_edges(&residual)?)
+        };
+        let edge = match resolution {
+            None => return Ok(lowered),
+            Some(ProducerResultResolution::Single) => residual[0],
+            Some(ProducerResultResolution::Alternatives(set)) => {
+                // R4: each selected member has already discharged its causal
+                // edge at its own transport writer. Preserve the labelled
+                // word for the caller's R3 reader; it cannot be projected as
+                // any one of these source constructors at this seat.
+                let set = set.clone();
+                let LoweringOperand::Carried(wrapped) = lowered else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet",
+                        "an issued alternative result has no labelled carried word at its detached seat",
+                    ));
+                };
+                self.assert_producer_alternative_record(builder, &set, wrapped)?;
+                return Ok(LoweringOperand::Carried(wrapped));
             }
         };
         #[cfg(test)]
@@ -13048,6 +13057,34 @@ impl<'a> Lowering<'a> {
                 builder, &identity, &field_run, position, unit_env, &[],
             )?
             .value)
+    }
+
+    /// Validate the private boundary schema before any reader projects a
+    /// field. The seat also invokes this before returning a multi-edge word.
+    fn assert_producer_alternative_record(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        set: &ProducerAlternativeSet,
+        wrapped: CarriedBoundaryWord,
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        let class = self.emit_carrier_class(builder, wrapped)?;
+        Self::require_i64(builder, class, BoundaryClass::Record as i64);
+        let tag = self.emit_carrier_tag(builder, wrapped)?;
+        Self::require_i64(builder, tag, 1);
+        let count = self.emit_carrier_field_count(builder, wrapped)?;
+        Self::require_i64(builder, count, 2);
+        let label_word = self.emit_carrier_field(builder, wrapped, 1)?;
+        let ordinal = Self::emit_carrier_label_ordinal(builder, label_word);
+        let in_range = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::UnsignedLessThan,
+            ordinal,
+            i64::try_from(set.members.len()).map_err(|_| unsupported(
+                LoweringCause::Capacity, "ProducerAlternativeSet",
+                "an alternative set exceeds the carrier ABI",
+            ))?,
+        );
+        Self::require_i64(builder, in_range, 1);
+        Ok(ordinal)
     }
 
     /// **`D3` -- the callee-only consumer.**

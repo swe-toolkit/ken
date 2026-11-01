@@ -1,12 +1,12 @@
 //! Closed, runtime-selected alternative transports for a continuation result.
 
-use super::continuations::ContinuationCallIdentity;
+use super::continuations::{ContinuationCallIdentity, ContinuationResultEdge};
 use super::occurrences::{occurrence_subtree_contains, StaticOriginId};
 use super::{
     planner_error, ContinuationEmissionOwner, CraneliftBackendError, StaticTransitionPlan,
 };
 use crate::RuntimeExpr;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The closed set of producer transports that can reach one result. Members
 /// are sorted by target specialization and a member's label is its index. A
@@ -35,7 +35,78 @@ impl ProducerAlternativeSet {
     }
 }
 
+/// A reader either has the one original static producer or exactly the
+/// closed member set the planner issued for this owner and result.
+pub(in crate::cranelift_backend) enum ProducerResultResolution<'a> {
+    Single,
+    Alternatives(&'a ProducerAlternativeSet),
+}
+
 impl StaticTransitionPlan<'_> {
+    /// The only authority for admitting a multi-member reader. All offered
+    /// identities must equal the issued set, not a guessed subset of it.
+    pub(in crate::cranelift_backend) fn resolve_producer_alternative_members(
+        &self,
+        members: &[&ContinuationCallIdentity],
+    ) -> Result<ProducerResultResolution<'_>, CraneliftBackendError> {
+        let Some(first) = members.first() else {
+            return Err(planner_error(
+                "a producer result reader has no source identities",
+            ));
+        };
+        if members.len() == 1 {
+            return Ok(ProducerResultResolution::Single);
+        }
+        let key = (first.emission_owner(), first.producer_result_origin());
+        let mut sets = self
+            .producer_alternative_sets
+            .iter()
+            .filter(|set| (set.emission_owner, set.result) == key);
+        let set = sets.next().ok_or_else(|| {
+            planner_error("a multi-member result reader has no issued producer alternative set")
+        })?;
+        if sets.next().is_some() {
+            return Err(planner_error("two alternative sets name one result reader"));
+        }
+        let identities = members
+            .iter()
+            .map(|member| (*member).clone())
+            .collect::<BTreeSet<_>>();
+        if identities.len() != members.len()
+            || identities != set.members.iter().cloned().collect::<BTreeSet<_>>()
+            || members
+                .iter()
+                .any(|member| (member.emission_owner(), member.producer_result_origin()) != key)
+        {
+            return Err(planner_error(
+                "the result reader's expected member set differs from the issued producer alternative set",
+            ));
+        }
+        Ok(ProducerResultResolution::Alternatives(set))
+    }
+
+    /// Resolve the detached seat's exact edges through that same authority.
+    pub(in crate::cranelift_backend) fn resolve_producer_result_edges(
+        &self,
+        edges: &[&ContinuationResultEdge],
+    ) -> Result<ProducerResultResolution<'_>, CraneliftBackendError> {
+        let Some(first) = edges.first() else {
+            return Err(planner_error(
+                "a producer result reader has no residual edges",
+            ));
+        };
+        if edges.iter().any(|edge| {
+            edge.identity.producer_construct_origin() != edge.producer_construct_origin
+                || edge.producer_result_origin != first.producer_result_origin
+        }) {
+            return Err(planner_error(
+                "a result reader's source edges disagree with their own result",
+            ));
+        }
+        let members = edges.iter().map(|edge| &edge.identity).collect::<Vec<_>>();
+        self.resolve_producer_alternative_members(&members)
+    }
+
     /// Issue a set only for distinct checked-IH sources whose paths from one
     /// result diverge at a source data Match in different arms. Two producers
     /// on the same path and duplicate edges are never alternatives.

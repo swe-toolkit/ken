@@ -92,6 +92,7 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
 pub(in crate::cranelift_backend) use static_transition::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim, TransportCarriedClaim,
+    ProducerAlternativeSet, ProducerResultResolution,
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
     FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
     PendingVisRecordProtocol, ResponseOwnerSettlement, BracketSettlement,
