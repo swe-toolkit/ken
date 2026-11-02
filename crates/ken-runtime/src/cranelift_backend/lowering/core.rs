@@ -6484,11 +6484,19 @@ impl<'a> Lowering<'a> {
                         self.lower_expr(builder, argument, producer_env)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                self.with_grafted_spine_call_source(static_origin, |this| {
+                // `RT-DECL-CLOSURE-PORT` `D4`, consumer 2 of 3. The declared
+                // unit returns its tree; the pending eliminators still receive
+                // it, exactly as the `Closure` arm composes its invocation.
+                let returned = self.with_grafted_spine_call_source(static_origin, |this| {
                     this.call_declaration_closure_unit(
                         builder, reference, &symbol, &params, captures, args,
                     )
-                })
+                })?;
+                self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(returned),
+                    eliminators,
+                )
             }
             LoweringOperand::Specialized(Lowered::Closure {
                 captures,

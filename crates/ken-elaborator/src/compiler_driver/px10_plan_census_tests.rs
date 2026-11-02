@@ -2,8 +2,7 @@
 //!
 //! The Process gate refuses all three before object emission, so this census
 //! hands each preparation straight to the emission the gate guards. Nothing
-//! here runs a native program; each still stops at a wall the
-//! PX10-NATIVE-BRANCH-ALTERNATIVES node owns.
+//! here runs a native program; emission beneath that gate establishes no parity.
 
 use super::*;
 
@@ -40,30 +39,6 @@ fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
         .expect("spawn census thread")
         .join()
         .expect("census thread");
-}
-
-/// The expected object-emission refusal for a still-blocked px10 program.
-fn assert_object_emission_wall(
-    built: Result<NativeProgramBuildOutput, NativeProgramBuildError>,
-    wall: &str,
-) {
-    let error = built.expect_err("this px10 program must still stop before an artifact");
-    let NativeProgramBuildError::Packaging(packaging) = error else {
-        panic!("the census refusal must come from native object planning: {error:?}");
-    };
-    assert_eq!(
-        packaging.stage,
-        ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
-    );
-    assert_eq!(
-        packaging.source_cause,
-        Some(ken_runtime::LoweringCause::PlannerInvariant)
-    );
-    assert!(
-        packaging.reason.contains(wall),
-        "expected the wall `{wall}`, got: {}",
-        packaging.reason
-    );
 }
 
 /// Each static region exit (a region's settlement Vis) has exactly one owner
@@ -132,22 +107,18 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
 }
 
 /// Promise class: transition sentinel, retired by this WP's Increment 2.
-/// MEASURED: argv_env_pipe reaches the response-owner call-coverage wall
-/// after its generated context-4 Result contract becomes None; live_child
-/// builds an artifact beneath the separate Process gate. Both retain exact
-/// static region-exit owners. CLAIMED: the planner cannot confuse an ordinary
-/// successor Vis under Excluded{Relay} with a completed K Ret publication.
-/// THE GAP: the argv program does not build, and no program runs natively.
+/// MEASURED: argv_env_pipe and live_child build artifacts beneath the separate
+/// Process gate after argv's generated context-4 Result contract becomes None.
+/// Both retain exact static region-exit owners. CLAIMED: the planner cannot
+/// confuse an ordinary successor Vis under Excluded{Relay} with a completed
+/// K Ret publication. THE GAP: neither program runs natively here.
 #[test]
-fn px10_argv_and_live_advance_to_w7_and_p2() {
+fn px10_argv_and_live_emit_below_process_gate() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
-    for (name, source, wall, expected, seat) in [
+    for (name, source, expected, seat) in [
         (
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
-            Some(
-                "a forward-declared response owner has no verified selected incoming call: owner=StaticResponseOwnerId(1), context=ContinuationContextId(7)",
-            ),
             &[
                 (ReturnFold, 1160, 571),
                 (ReturnFold, 1429, 1165),
@@ -159,7 +130,6 @@ fn px10_argv_and_live_advance_to_w7_and_p2() {
         (
             "px10_census_live_child",
             LIVE_CHILD,
-            None,
             &[
                 (ReturnFold, 601, 12),
                 (ReturnFold, 870, 606),
@@ -190,11 +160,7 @@ fn px10_argv_and_live_advance_to_w7_and_p2() {
                     "an ordinary successor Vis is not a completed K Ret: {contracts:?}"
                 );
             }
-            if let Some(wall) = wall {
-                assert_object_emission_wall(built, wall);
-            } else {
-                let _built = built.expect("live child emits an artifact beneath the Process gate");
-            }
+            let _built = built.expect("px10 program emits an artifact beneath the Process gate");
             assert_eq!(
                 seat_refusals,
                 seat.into_iter().collect::<Vec<_>>(),
