@@ -104,6 +104,42 @@ fn go4 (g : Unit -> HostIO APartial Unit)
 }
 
 #[test]
+fn as_pattern_alias_does_not_shift_a_pure_outer_callback() {
+    // An occurrence-backed alias (`as whole`) has no de Bruijn slot.
+    // The same outer f must resolve as on the no-alias arm.
+    assert_accept(
+        "as-pattern-pure",
+        r#"program capabilities FS APartial
+data Box = MkBox Unit
+fn good (f : Unit -> Bool) (b : Box) : Bool =
+  match b { MkBox x as whole ↦ f MkUnit }
+"#,
+    );
+    assert_accept(
+        "no-alias-pure",
+        r#"program capabilities FS APartial
+data Box = MkBox Unit
+fn good (f : Unit -> Bool) (b : Box) : Bool =
+  match b { MkBox x ↦ f MkUnit }
+"#,
+    );
+}
+
+#[test]
+fn as_pattern_alias_still_releases_an_outer_console_callback() {
+    assert_escape(
+        "as-pattern-console",
+        r#"program capabilities FS APartial
+data Box = MkBox Unit
+fn bad (f : Unit ->[Console] Bool) (b : Box) : Bool =
+  match b { MkBox x as whole ↦ f MkUnit }
+"#,
+        "bad",
+        "Console",
+    );
+}
+
+#[test]
 fn an_unbound_written_row_variable_is_not_the_empty_row() {
     assert_escape(
         "row-tail",
