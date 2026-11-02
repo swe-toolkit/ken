@@ -182,6 +182,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         "run_with",
         "Console",
     );
+}
+
+#[test]
+fn alias_whole_result_type_releases_callback_row() {
     assert_escape(
         "alias-whole",
         r#"program capabilities FS APartial
@@ -191,6 +195,10 @@ fn run_with : Runner = \f. f MkUnit
         "run_with",
         "Console",
     );
+}
+
+#[test]
+fn pure_alias_headed_spine_remains_accepted() {
     assert_accept(
         "alias-pure",
         &with_action(
@@ -205,7 +213,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 }
 
 #[test]
-fn returned_closure_and_named_proc_share_pay_at_build_policy() {
+fn returned_closure_releases_its_body_row() {
     assert_escape(
         "returned-closure",
         &with_action(
@@ -216,6 +224,10 @@ fn returned_closure_and_named_proc_share_pay_at_build_policy() {
         "mk",
         "Console",
     );
+}
+
+#[test]
+fn named_proc_return_is_still_charged_at_the_pure_boundary() {
     assert_escape(
         "returned-global",
         &with_action(
