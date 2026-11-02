@@ -184,6 +184,10 @@ pub enum PendingRefusal {
     RouteLookupFailed,
     /// A de Bruijn route shift overflowed the u32 index space.
     RouteIndexOverflow,
+    /// The producer's result has an issued alternative set. That set is the
+    /// result's only transport authority (R3); a pending-owner route proof
+    /// here would be a second one.
+    ProducerHasAlternativeSet,
     MissingDeclaredMembers,
     RelocatedWorkMissingLoweringBinding,
     SelectedPendingLeafRelocatesUnaccountedJoins,
@@ -200,7 +204,9 @@ impl PendingRefusal {
             | Self::RelocatedWorkMissingLoweringBinding
             | Self::SelectedPendingLeafRelocatesUnaccountedJoins
             | Self::PendingResultNotValidatedByResponseOwner => LoweringCause::Fragment,
-            Self::RouteLookupFailed => LoweringCause::PlannerInvariant,
+            Self::RouteLookupFailed | Self::ProducerHasAlternativeSet => {
+                LoweringCause::PlannerInvariant
+            }
             Self::RouteIndexOverflow => LoweringCause::Capacity,
         }
     }
@@ -268,6 +274,7 @@ fn plan_selected_pending_calls(
         let position = selected_case.recursive_positions[0];
         let mut candidates = Vec::with_capacity(source_arms.len());
         let mut declared_bodies = Vec::with_capacity(source_arms.len());
+        let mut member_identities = Vec::with_capacity(source_arms.len());
         let mut eligible = source_arms.len() >= 2;
         let mut candidate_refusal = None;
         for (arm, case) in source_arms.iter().enumerate() {
@@ -332,6 +339,7 @@ fn plan_selected_pending_calls(
             ))?;
             let callee = plan.resolved_continuation_callee(&identity)?;
             declared_bodies.push(unit.worker_body_origin());
+            member_identities.push(identity);
             candidates.push(PendingCandidate {
                 arm,
                 construct: construct_origin,
@@ -356,6 +364,21 @@ fn plan_selected_pending_calls(
         // this read-only preflight. L2 still runs, unchanged, at lowering.
         if let Some(admission) = agreed_unit_nonpackage(declared_bodies) {
             by_producer.insert(producer, admission);
+            continue;
+        }
+        // R3: an issued alternative set is this result's only transport
+        // authority, so the pending-owner route proof does not run for it.
+        if member_identities
+            .iter()
+            .map(|identity| plan.producer_alternative_set_of(identity))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .any(|set| set.is_some())
+        {
+            by_producer.insert(
+                producer,
+                PendingCallAdmission::Refused(PendingRefusal::ProducerHasAlternativeSet),
+            );
             continue;
         }
         let owner = occurrence_authority(plan, producer)?.owner;
@@ -474,9 +497,18 @@ impl StaticTransitionPlan<'_> {
                 }
                 Ok(true)
             }
-            Some(PendingCallAdmission::Refused(reason)) => Err(unsupported(
-                reason.cause(), "PendingCallAdmission", format!("refused pending call: {reason:?}"),
-            )),
+            Some(PendingCallAdmission::Refused(reason)) => {
+                let description = if *reason == PendingRefusal::ProducerHasAlternativeSet {
+                    format!("refused pending call for producer {producer:?}: {reason:?}")
+                } else {
+                    format!("refused pending call: {reason:?}")
+                };
+                Err(unsupported(
+                    reason.cause(),
+                    "PendingCallAdmission",
+                    description,
+                ))
+            }
             Some(PendingCallAdmission::NotApplicable) | None => Ok(false),
         }
     }
@@ -1550,6 +1582,13 @@ mod tests {
     fn route_refusal_predicates_keep_distinct_typed_causes() {
         assert_eq!(PendingRefusal::UnsupportedRouteEdge.cause().code().as_str(), "N0001");
         assert_eq!(PendingRefusal::RouteLookupFailed.cause().code().as_str(), "N0003");
+        assert_eq!(
+            PendingRefusal::ProducerHasAlternativeSet
+                .cause()
+                .code()
+                .as_str(),
+            "N0003"
+        );
         assert_eq!(PendingRefusal::RouteIndexOverflow.cause().code().as_str(), "N0002");
         assert_eq!(
             PendingRefusal::PendingResultNotValidatedByResponseOwner
