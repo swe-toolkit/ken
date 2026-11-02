@@ -2120,7 +2120,7 @@ fn prepare_performed_let_rhs(
     let outer = |index, name: &str| cx.surface_latent(index, name);
     let mut scope = LatentScope::new(&outer);
     if cx.numeric_env.effect_sequencing_ids().is_none()
-        || d0_consumer_row(rhs, &rows, None, &mut scope, &cx.owner_label, "prepare_performed_let_rhs") == crate::effects::RowType::empty()
+        || infer_expr_row_type(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
     {
         return Ok(None);
     }
@@ -2173,7 +2173,7 @@ fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bo
     let outer = |index, name: &str| cx.surface_latent(index, name);
     let mut scope = LatentScope::new(&outer);
     cx.numeric_env.effect_sequencing_ids().is_some()
-        && d0_consumer_row(rhs, &rows, None, &mut scope, &cx.owner_label, "let_may_perform") != crate::effects::RowType::empty()
+        && infer_expr_row_type(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
         && expected.map_or(true, |expected| let_itree_parts(cx, expected).is_some())
 }
 
@@ -14370,7 +14370,7 @@ fn infer_performed_let(
     let body_row = cx.effect_rows
         .map(|rows| {
             let outer = |index, name: &str| cx.surface_latent(index, name);
-            d0_consumer_row(body, &rows, None, &mut LatentScope::new(&outer), &cx.owner_label, "infer_performed_let_body")
+            infer_expr_row_type(body, &rows, None, &mut LatentScope::new(&outer))
         })
         .unwrap_or_else(crate::effects::RowType::empty);
     let body_tree = let_itree_parts(cx, &body_ty);
@@ -17692,10 +17692,6 @@ fn written_latent_row(row: &crate::ast::EffectRowSyntax) -> crate::effects::RowT
 }
 
 fn unknown_local_row(name: &str) -> crate::effects::RowType {
-    if std::env::var_os("KEN_LATENT_ROW_D0").is_some() {
-        let file = std::env::var("KEN_LATENT_ROW_FILE").unwrap_or_else(|_| "unknown".into());
-        eprintln!("LATENT_D0_MISMATCH\tfile={file}\tlocal={name}");
-    }
     crate::effects::RowType::singleton(format!("unknown latent row of local `{name}`"))
 }
 
@@ -17760,10 +17756,9 @@ fn let_binder_latent(
     }
     match val {
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
-        RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => d0_consumer_row(
+        RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => infer_expr_row_type(
             val, effect_rows, None,
             &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
-            "let", "let_binder_latent_global",
         ),
         _ => crate::effects::RowType::empty(),
     }
@@ -17908,38 +17903,6 @@ fn infer_expr_row_type(
     }
 }
 
-// D0-only, exact prior row plane. Both this include and recorder are removed
-// before a candidate is reviewed or handed to QA.
-include!("row_plane_d0_legacy.rs");
-
-fn d0_consumer_row(
-    expr: &RExpr,
-    effect_rows: &CheckedEffectRows<'_>,
-    projection_ctx: Option<&ProjectionPurityCtx<'_>>,
-    scope: &mut LatentScope<'_>,
-    declaration: &str,
-    consumer: &str,
-) -> crate::effects::RowType {
-    let new = infer_expr_row_type(expr, effect_rows, projection_ctx, scope);
-    if std::env::var_os("KEN_LATENT_ROW_D0").is_some() {
-        let old = infer_expr_row_type_before_latent(expr, effect_rows, projection_ctx);
-        if old != new {
-            let file = std::env::var("KEN_LATENT_ROW_FILE").unwrap_or_else(|_| "unknown".into());
-            let cause = if format!("{new:?}").contains("unknown latent row of local") {
-                "mismatch"
-            } else if effect_rows.carried_ids.values().chain(effect_rows.carried_names.values())
-                .any(|carried| carried != &crate::effects::RowType::empty()
-                    && carried.is_subset_of(&new)) {
-                "carried"
-            } else {
-                "written"
-            };
-            eprintln!("LATENT_D0\tfile={file}\tdecl={declaration}\tconsumer={consumer}\tcause={cause}\told={old:?}\tnew={new:?}");
-        }
-    }
-    new
-}
-
 /// SURF-1 D2 purity-keyword check (`36 §1.6`) over the current production
 /// declaration path. Legacy `view` stays unchecked until the D3/D4 migration.
 pub(crate) fn check_surface_purity(
@@ -17978,13 +17941,8 @@ pub(crate) fn check_surface_purity(
     let mut scope = LatentScope::new(&|_, _| crate::effects::RowType::empty());
     scope.entered = declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, &rows)
         .into_iter().map(|(name, latent)| (Some(name), latent)).collect();
-    let inferred = d0_consumer_row(
-        decl_eval_body(&rdecl.body),
-        &rows,
-        Some(&projection_ctx),
-        &mut scope,
-        &rdecl.name,
-        "check_surface_purity",
+    let inferred = infer_expr_row_type(
+        decl_eval_body(&rdecl.body), &rows, Some(&projection_ctx), &mut scope,
     );
     let decl =
         crate::effects::EffectDecl::new(&rdecl.name).with_declared_row_type(declared.clone());
@@ -20294,11 +20252,9 @@ fn compute_ordered_field_values(
             local_constraints: constraints,
             bound_dict_classes: &bound_dict_classes,
         };
-        let field_row = d0_consumer_row(
+        let field_row = infer_expr_row_type(
             &fields[pos].1, effect_rows, Some(&projection_ctx),
             &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
-            fname,
-            "instance_field_row",
         );
         if let Some(keyword) = field_purities[i] {
             check_instance_field_purity(
@@ -20344,11 +20300,9 @@ fn check_instance_field_purity(
         local_constraints: constraints,
         bound_dict_classes,
     };
-    let inferred = d0_consumer_row(
+    let inferred = infer_expr_row_type(
         expr, effect_rows, Some(&projection_ctx),
         &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
-        field_name,
-        "check_instance_field_purity",
     );
     let impure = !is_empty_closed_row(&inferred);
     match keyword {
@@ -21569,13 +21523,8 @@ pub(crate) fn elaborate_space_decl(
         scope.entered = operation.params.iter().map(|(name, ty)| {
             (Some(name.clone()), written_type_row(ty, &rows))
         }).collect();
-        let inferred_row = d0_consumer_row(
-            &operation.body,
-            &CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
-            None,
-            &mut scope,
-            &qualified_name,
-            "elaborate_space_decl",
+        let inferred_row = infer_expr_row_type(
+            &operation.body, &rows, None, &mut scope,
         )
             .join(crate::effects::RowType::singleton(space.name.clone()));
         let effect_decl = crate::effects::EffectDecl::new(&qualified_name)

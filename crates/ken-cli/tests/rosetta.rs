@@ -382,6 +382,29 @@ fn run_example(slug: &str, ken_src_path: &Path, tmp_dir: &Path) -> Option<(Strin
     }
 }
 
+/// Promise class: durable invariant (spec 36 §1.2, LATENT AC-4).
+/// MEASURED: the real Collections-prefixed Closures example checks and runs
+/// to its output oracle through the existing flat-source CLI route.
+/// CLAIMED: a pure callback carried by a catalog data field is not falsely
+/// charged for an undeclared effect. THE GAP: this is one representative
+/// example; the independent D0 paired census covers other affected sources.
+#[test]
+fn closures_carries_pure_callback_through_catalog_prelude() {
+    let root = rosetta_dir().join("closures");
+    let tmp = std::env::temp_dir().join(format!("ken-rosetta-closures-{}", std::process::id()));
+    fs::create_dir_all(&tmp).expect("create isolated example output directory");
+    let (output, successful) = run_example("closures", &root.join("closures.ken"), &tmp)
+        .expect("the Collections-prefixed Closures example must complete");
+    assert!(successful, "the checked example must be accepted");
+    let Oracle::Expected(expected) = oracle_for(&root) else {
+        panic!("the Closures example needs a checked output oracle");
+    };
+    assert_eq!(
+        output, expected,
+        "the accepted example must preserve its output"
+    );
+}
+
 #[test]
 fn rosetta_examples_match_their_oracles() {
     let root = rosetta_dir();
