@@ -7,7 +7,7 @@ use ken_elaborator::{
     ElabEnv, Expr,
 };
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::Term;
+use ken_kernel::{GlobalId, Term};
 
 fn erase_spans(mut debug: String) -> String {
     const PREFIX: &str = "Span { start: ";
@@ -24,6 +24,23 @@ fn resolved_shape(source: &str) -> String {
     let parsed = parse_expr(source).expect("fixture parses");
     let resolved = resolve_expr_standalone(&parsed).expect("fixture resolves");
     erase_spans(format!("{resolved:?}"))
+}
+
+/// Split a fully applied registered `bind E R A B action k` into
+/// (action, k); None for any other term, including the pre-`36 §2.4`
+/// `Let` shape.
+fn bind_parts(term: &Term, bind: GlobalId) -> Option<(&Term, &Term)> {
+    let mut args = Vec::new();
+    let mut head = term;
+    while let Term::App(function, arg) = head {
+        args.push(arg.as_ref());
+        head = function.as_ref();
+    }
+    args.reverse();
+    match (head, args.as_slice()) {
+        (Term::Const { id, .. }, [_, _, _, _, action, k]) if *id == bind => Some((*action, *k)),
+        _ => None,
+    }
 }
 
 fn assert_group_len(source: &str, expected: usize) {
@@ -123,6 +140,9 @@ fn ac2_ac3_group_and_nested_forms_resolve_and_lower_identically() {
     assert_eq!(grouped_ty, nested_ty);
 }
 
+/// Promise class: durable invariant. Grouped and nested pure bindings have
+/// identical core and strict value order; performed bindings produce checked
+/// binds in source order, anchored by the first single-binding action.
 #[test]
 fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
     let grouped = "let x : Nat = Zero; y : Nat = Suc x in Suc y";
@@ -159,25 +179,38 @@ fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
         "let first = print_line \"first\" in let second = print_line \"second\" in second";
     let mut effect_grouped_env = ElabEnv::new().unwrap();
     let mut effect_nested_env = ElabEnv::new().unwrap();
-    let (effect_grouped_core, effect_grouped_ty) =
-        effect_grouped_env
-            .elaborate_expr("ac4_effectful_lowering_source_order", effect_grouped)
-            .unwrap();
-    let (effect_nested_core, effect_nested_ty) =
-        effect_nested_env
-            .elaborate_expr("ac4_effectful_lowering_source_order", effect_nested)
-            .unwrap();
+    let (effect_grouped_core, effect_grouped_ty) = effect_grouped_env
+        .elaborate_expr("ac4_effectful_lowering_source_order", effect_grouped)
+        .unwrap();
+    let (effect_nested_core, effect_nested_ty) = effect_nested_env
+        .elaborate_expr("ac4_effectful_lowering_source_order", effect_nested)
+        .unwrap();
     assert_eq!(effect_grouped_core, effect_nested_core);
     assert_eq!(effect_grouped_ty, effect_nested_ty);
-    let Term::Let {
-        val: first, body, ..
-    } = effect_grouped_core
-    else {
-        panic!("first effect must remain the outer let value");
+    // `36 §2.4`: both effects are performed, outer first. The anchor is a
+    // single-binding let in a fresh environment, whose one action is
+    // unambiguously `print_line "first"`.
+    let bind = effect_grouped_env.prelude_env.bind_id;
+    let (first, outer_k) = bind_parts(&effect_grouped_core, bind)
+        .expect("first effect must be the outer bind's action");
+    let mut anchor_env = ElabEnv::new().unwrap();
+    let (anchor_core, _) = anchor_env
+        .elaborate_expr(
+            "ac4_effectful_lowering_source_order",
+            "let only = print_line \"first\" in only",
+        )
+        .unwrap();
+    let (first_anchor, _) = bind_parts(&anchor_core, anchor_env.prelude_env.bind_id)
+        .expect("a performed single let lowers to bind");
+    assert_eq!(
+        first, first_anchor,
+        "the outer bind performs the first binding"
+    );
+    let Term::Lam(_, outer_body) = outer_k else {
+        panic!("the outer bind's continuation must bind `first`");
     };
-    let Term::Let { val: second, .. } = *body else {
-        panic!("second effect must remain the inner let value");
-    };
+    let (second, _) =
+        bind_parts(outer_body, bind).expect("second effect must be the inner bind's action");
     assert_ne!(
         first, second,
         "distinguishable effects must retain their order"

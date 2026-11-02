@@ -190,6 +190,14 @@ pub enum ElabError {
     /// A block-form `space` appeared in a placement whose qualification and
     /// export contract is not part of the top-level P1 subset.
     UnsupportedSpacePlacement { placement: String, span: Span },
+    /// A `let` RHS whose effect signature differs from the enclosing one,
+    /// where the `36 §2.4` signature inclusion is not built yet. An
+    /// ill-typed RHS stays `TypeMismatch`.
+    UnsupportedEffectInclusion {
+        from: String,
+        to: String,
+        span: Span,
+    },
     /// A `ConId` with no global declaration.
     UnresolvedCon { name: String, span: Span },
     /// Two distinct checked declarations occupy one canonical identity key.
@@ -669,6 +677,12 @@ impl fmt::Display for ElabError {
                 f,
                 "{placement} space block at {}-{} is unsupported; \
                  P1 admits top-level private spaces only",
+                span.start, span.end,
+            ),
+            ElabError::UnsupportedEffectInclusion { from, to, span } => write!(
+                f,
+                "unsupported: 36 §2.4 inclusion of effect signature {from} into \
+                 the enclosing signature {to} at {}-{} is not built",
                 span.start, span.end,
             ),
             ElabError::UnresolvedCon { name, span } => {

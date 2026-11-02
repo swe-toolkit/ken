@@ -53,6 +53,7 @@ ken_diagnostic::define_error_codes! {
     Self::OldPreStateUnsupported { .. } => ("E0024", "elab.old_pre_state_unsupported"),
     Self::MutationOutsideSpace { .. } => ("E0025", "elab.mutation_outside_space"),
     Self::UnsupportedSpacePlacement { .. } => ("E0026", "elab.unsupported_space_placement"),
+    Self::UnsupportedEffectInclusion { .. } => ("E0087", "elab.unsupported_effect_inclusion"),
     Self::UnresolvedCon { .. } => ("E0027", "elab.unresolved_con"),
     Self::DeclarationIdentityCollision { .. } => ("E0028", "elab.declaration_identity_collision"),
     Self::ModuleOwnerClash { .. } => ("E0086", "elab.module_owner_clash"),
