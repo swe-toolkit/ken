@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-COMMUTATION
 title: "Spec 69 §5 fuses two windows into one at max of the lower bounds and min of the upper bounds, and says outright that this is not a commutation law. No law states that two windows commute: applying [lo1, hi1) then [lo2, hi2) selects the same list, in order, as applying them in the other order. A client must apply trace_window_window twice and rewrite the bounds with Nat.Order's comm for max and comm for min. Rule from a checked D0 at zero trust and state the law with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
