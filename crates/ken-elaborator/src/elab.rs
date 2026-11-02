@@ -2251,6 +2251,52 @@ fn check_let(
     result
 }
 
+/// `36 §2.4` sequences a performed let RHS, but a non-tree expected type has
+/// no tree to bind it into while a non-tree proc result elaborates directly
+/// (`§2.5` makes it a tree). Refuse at check time rather than drop the action:
+/// an elaboration gap, lifted when proc results conform.
+#[inline(never)]
+fn refuse_unsequenced_performed_let(
+    cx: &ElabCtx<'_>,
+    rhs: &RExpr,
+    rhs_ty: &Term,
+    expected: Option<&Term>,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if let_itree_parts(cx, rhs_ty).is_none() || !let_may_perform(cx, rhs, None) {
+        return Ok(());
+    }
+    // A proof of an Ω proposition never runs, so its let binds the tree as a
+    // value under study and drops no action.
+    if let Some(expected) = expected {
+        if let Ok(classifier) = kernel_infer_in_context_open(cx, &cx.ctx, expected) {
+            if matches!(whnf(cx.env, &cx.ctx, &classifier), Term::Omega(_)) {
+                return Ok(());
+            }
+        }
+    }
+    Err(ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "this let's right-hand side performs an action, but its result type is not an action tree, so the action cannot be sequenced (36 §2.4); §2.5 makes a proc with a non-empty row return a tree, and this refusal lifts when proc results conform; perform the action in a tree-result proc, or hold it as a value without `let`".into(),
+    })
+}
+
+/// `check_let_once`'s one post-RHS call: refine the RHS, then refuse it if it
+/// performs unsequenced. One call site keeps that recursive frame at its base
+/// size (`elab_recursive_frame_budget` row M).
+#[inline(never)]
+fn refine_checked_let_rhs(
+    cx: &ElabCtx<'_>,
+    rhs: &RExpr,
+    rhs_core: &mut Term,
+    rhs_ty: &mut Term,
+    expected: &Term,
+    span: &Span,
+) -> Result<(), ElabError> {
+    refine_let_rhs(cx, rhs_core, rhs_ty)?;
+    refuse_unsequenced_performed_let(cx, rhs, rhs_ty, Some(expected), span)
+}
+
 #[inline(never)]
 fn check_let_once(
     cx: &mut ElabCtx,
@@ -2262,7 +2308,7 @@ fn check_let_once(
         return check_performed_let(cx, ty_opt, rhs, body, expected, span, result_predicates);
     }
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
-    refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
+    refine_checked_let_rhs(cx, rhs, &mut rhs_core, &mut rhs_ty, expected, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
     let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
     let latent = cx.pending_let_latent(ty_opt, rhs);
@@ -14421,6 +14467,21 @@ fn infer_performed_let(
     Ok((core, tree_ty))
 }
 
+/// `infer_let_once`'s one RHS call: prepare the RHS, then refuse it if it
+/// performs unsequenced. One call site keeps that recursive frame, which every
+/// inferred `let` holds across its body, at its base size.
+#[inline(never)]
+fn prepare_inferred_let_rhs(
+    cx: &mut ElabCtx<'_>,
+    ty_opt: &Option<RType>,
+    rhs: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
+    refuse_unsequenced_performed_let(cx, rhs, &rhs_ty, None, span)?;
+    Ok((rhs_core, rhs_ty))
+}
+
 #[inline(never)]
 fn infer_let_once(
     cx: &mut ElabCtx,
@@ -14430,7 +14491,7 @@ fn infer_let_once(
     if sequencing && let_may_perform(cx, rhs, None) {
         return infer_performed_let(cx, ty_opt, rhs, body, span);
     }
-    let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
+    let (rhs_core, rhs_ty) = prepare_inferred_let_rhs(cx, ty_opt, rhs, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
     let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
     let latent = cx.pending_let_latent(ty_opt, rhs);
