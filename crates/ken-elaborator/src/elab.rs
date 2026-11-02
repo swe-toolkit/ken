@@ -17818,7 +17818,9 @@ fn let_binder_latent(
 ) -> crate::effects::RowType {
     ty_opt
         .as_ref()
-        .map_or_else(crate::effects::RowType::empty, |ty| written_type_row(ty, effect_rows))
+        .map_or_else(crate::effects::RowType::empty, |ty| {
+            written_type_row(ty, effect_rows)
+        })
         .join(bound_value_latent(val, effect_rows, scope))
 }
 
@@ -17832,15 +17834,18 @@ fn bound_value_latent(
     match val {
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
         RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => infer_expr_row_type(
-            val, effect_rows, None,
+            val,
+            effect_rows,
+            None,
             &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
         ),
         RExpr::RLam(..) => {
             let outer = |index, name: &str| scope.lookup(index, name);
             infer_expr_row_type(val, effect_rows, None, &mut LatentScope::new(&outer))
         }
-        RExpr::RAsc(inner, ty, _) => written_type_row(ty, effect_rows)
-            .join(bound_value_latent(inner, effect_rows, scope)),
+        RExpr::RAsc(inner, ty, _) => {
+            written_type_row(ty, effect_rows).join(bound_value_latent(inner, effect_rows, scope))
+        }
         _ => crate::effects::RowType::empty(),
     }
 }
@@ -17892,7 +17897,9 @@ fn infer_expr_row_type(
         // A closure pays its body's row where it is built. The plane has no
         // inferred arrow latent, so this over-approximates `36 §1.2`/`§1.3`.
         RExpr::RLam(name, body, _) => {
-            scope.entered.push((Some(name.clone()), crate::effects::RowType::empty()));
+            scope
+                .entered
+                .push((Some(name.clone()), crate::effects::RowType::empty()));
             let row = infer_expr_row_type(body, effect_rows, projection_ctx, scope);
             scope.entered.pop();
             row
@@ -17917,7 +17924,7 @@ fn infer_expr_row_type(
             let body_row = infer_expr_row_type(body, effect_rows, projection_ctx, scope);
             scope.entered.pop();
             row.join(body_row)
-        },
+        }
         RExpr::RAsc(e, _, _) | RExpr::ROld(e, _) | RExpr::RBecomes(_, _, e, _) => {
             infer_expr_row_type(e, effect_rows, projection_ctx, scope)
         }
