@@ -3999,7 +3999,7 @@ impl<'a> Lowering<'a> {
                     }),
             );
             let status = builder.inst_results(call)[0];
-            Self::require_i64(builder, status, 0);
+            Self::require_host_dispatch_ok(builder, status, operation);
             builder.ins().jump(decoded, &[]);
 
             builder.switch_to_block(synthesize);
@@ -4063,7 +4063,7 @@ impl<'a> Lowering<'a> {
                     }),
             );
             let status = builder.inst_results(call)[0];
-            Self::require_i64(builder, status, 0);
+            Self::require_host_dispatch_ok(builder, status, operation);
         }
         let tag = builder.ins().stack_load(
             types::I64,

@@ -115,6 +115,123 @@ fn px10_issued_set_reader_mismatch_refuses_at_planning() {
     });
 }
 
+/// Promise class: transition sentinel. MEASURED: the unavailable Process
+/// operation reaches native dispatch only on this census route, not through
+/// a product program (emission or the Process gate refuses first). Its host
+/// status is decoded as ProcessPlanOpen, and the executable names the operation
+/// rather than reporting malformed borrowed input. CLAIMED: when this refusal
+/// reaches a native process, the diagnostic preserves its cause. THE GAP: no
+/// labelled-transport execution parity or product admission is established.
+#[test]
+fn unavailable_process_operation_names_its_host_refusal() {
+    in_census_thread("px10-unavailable-native-diagnostic", || {
+        let preparation = prepare_native_program_sources(
+            "px10_unavailable_native_diagnostic",
+            vec![CompilerSource::new("src/main.ken", SMOKE)],
+        )
+        .expect("px10 smoke prepares");
+        assert!(
+            preparation.plan.process_declared,
+            "the Process gate still owns admission"
+        );
+        let root = tempfile::tempdir().expect("census output root");
+        let output = emit_native_program_preparation(
+            preparation,
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect("smoke emits only beneath its Process gate");
+        let error = ken_runtime::run_bound_process_effect_observation(
+            &output.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: Vec::new(),
+                environment: Vec::new(),
+                cwd: root.path().to_owned(),
+                plan_hash: output.plan_transport_hash,
+            },
+        )
+        .expect_err("the unavailable operation cannot run natively");
+        let ran = std::process::Command::new(&output.artifact.executable_path)
+            .current_dir(root.path())
+            .output()
+            .expect("linked census artifact runs");
+        assert!(
+            matches!(
+                &error,
+                ken_runtime::NativeEffectRunErrorV1::OperationUnavailable {
+                    operation: ken_host::HostOpV1::ProcessPlanOpen
+                }
+            ),
+            "the exact host refusal must survive: {error:?}; stderr: {:?}",
+            String::from_utf8_lossy(&ran.stderr)
+        );
+        assert_eq!(ran.status.code(), Some(1), "stderr: {:?}", ran.stderr);
+        assert_eq!(
+            ran.stderr,
+            b"ken native trap: host operation ProcessPlanOpen (0x0601) is unavailable to native code\n"
+        );
+        assert!(!String::from_utf8_lossy(&ran.stderr).contains("malformed borrowed process input"));
+    });
+}
+
+/// Promise class: regression. A NativeTested ConsoleWrite still completes and
+/// yields its one unchanged event. The unavailable-op refusal has no product
+/// witness today: emission or the Process gate refuses first.
+#[test]
+fn native_tested_console_write_retains_its_single_event() {
+    const SOURCE: &str = r#"program capabilities FS APartial
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  host_program APartial (print_line "unavailable-control")
+"#;
+    in_census_thread("native-tested-unavailable-control", || {
+        let preparation = prepare_native_program_sources(
+            "native_tested_unavailable_control",
+            vec![CompilerSource::new("src/main.ken", SOURCE)],
+        )
+        .expect("NativeTested Console program prepares");
+        assert!(
+            !preparation.plan.process_declared,
+            "Console does not use the Process gate"
+        );
+        let root = tempfile::tempdir().expect("control output root");
+        let output = emit_native_program_preparation(
+            preparation,
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect("NativeTested Console program emits");
+        let observed = ken_runtime::run_bound_process_effect_observation(
+            &output.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: Vec::new(),
+                environment: Vec::new(),
+                cwd: root.path().to_owned(),
+                plan_hash: output.plan_transport_hash,
+            },
+        )
+        .expect("NativeTested Console program runs");
+        assert_eq!(observed.exit_status, 0);
+        assert_eq!(observed.stdout, b"unavailable-control\n");
+        assert_eq!(
+            observed.effect_trace,
+            vec![ken_runtime::EffectEvent {
+                sequence: 0,
+                operation: ken_host::HostOpV1::ConsoleWrite,
+                capability: None,
+                resource_bindings: Vec::new(),
+                request: ken_runtime::CanonicalRequestV1::ConsoleWrite {
+                    stream: ken_runtime::ConsoleStreamV1::Stdout,
+                    bytes: b"unavailable-control\n".to_vec(),
+                },
+                outcome: ken_runtime::CanonicalOutcomeV1::Success(
+                    ken_runtime::CanonicalReplyV1::Unit,
+                ),
+            }]
+        );
+    });
+}
+
 fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
     std::thread::Builder::new()
         .name(name.to_owned())
