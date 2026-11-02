@@ -88,6 +88,9 @@ pub(crate) struct RMatchArm {
     pub guard: Option<RExpr>,
     pub body: RExpr,
     pub span: Span,
+    /// Surface binders seen by the guard and body beyond the match scope:
+    /// pattern bindings plus the optional equation binder.
+    pub scope_width: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -2429,6 +2432,7 @@ fn resolve_expr_ctx_ematch(
                 guard: rguard,
                 body: rbody,
                 span: arm.span.clone(),
+                scope_width: bound_names.len() + usize::from(equation.is_some()),
             });
         }
         Ok(RExpr::RMatch {

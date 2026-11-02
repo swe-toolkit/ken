@@ -3463,6 +3463,7 @@ fn rewrite_rexpr_inner_rmatch(
                     .transpose()?,
                 body: rewrite_rexpr(scope, exports, arm.body)?,
                 span: arm.span,
+                scope_width: arm.scope_width,
             });
         }
         let arms = rewritten_arms;
