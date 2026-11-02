@@ -1,7 +1,7 @@
 ---
 id: PX10-NATIVE-BRANCH-ALTERNATIVES
 title: "The native static-transition plan assumes every continuation result has exactly one producer construct, so a result that joins two Vis alternatives chosen by a runtime scrutinee refuses at the detached-result seat, the caller cut and the invocation transport. A producer call whose transport sources mix a predeclared and a specialization owner refuses as a mixed-owner relay. PX10's withChild fixtures hit one or the other. Lift both refusals for these shapes without weakening any guard for static results, and bring the three fixtures to native build with interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
@@ -182,6 +182,17 @@ Increment 2:
   `SynthesizedUse { role: ProducerAlternative }` record exists, keyed on
   its set with two members, and the ledger relates to that id as many
   events as `checked_ih_transport_emissions` holds for set members.
+
+## §1b inventory
+
+Entries 1 to 14 are in the WP thread `thr_6453d9qss09kv`. Entry 15
+(Architect evt_5d3tqjfeyk4vv, ruled evt_1aydv5585q4tn):
+
+15. A declaration-reference producer call composed into a carried
+    Match: the planner summarizes its result SpecializedOnly while the
+    emitter returns a carried word. Keyed on callee syntax
+    (DeclarationRef against Closure) instead of how the callee is
+    emitted. It shares entry 13's predicate.
 
 ## Stop conditions
 

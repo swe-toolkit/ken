@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-POINT-AREA
 title: "Spec 67 §4.1 says a point box has area one, and the area seed checks one closed point box, but no public law states it. A client that needs the area of `MkBox p p` must unfold `area` and reach the private `axis_span_point`. Rule from a checked D0 at zero trust and state the law with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
