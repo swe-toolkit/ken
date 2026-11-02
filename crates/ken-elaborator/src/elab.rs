@@ -2257,7 +2257,11 @@ fn check_let(
 /// an elaboration gap, lifted when proc results conform.
 #[inline(never)]
 fn refuse_unsequenced_performed_let(
-    cx: &ElabCtx<'_>, rhs: &RExpr, rhs_ty: &Term, expected: Option<&Term>, span: &Span,
+    cx: &ElabCtx<'_>,
+    rhs: &RExpr,
+    rhs_ty: &Term,
+    expected: Option<&Term>,
+    span: &Span,
 ) -> Result<(), ElabError> {
     if let_itree_parts(cx, rhs_ty).is_none() || !let_may_perform(cx, rhs, None) {
         return Ok(());
@@ -2282,7 +2286,11 @@ fn refuse_unsequenced_performed_let(
 /// size (`elab_recursive_frame_budget` row M).
 #[inline(never)]
 fn refine_checked_let_rhs(
-    cx: &ElabCtx<'_>, rhs: &RExpr, rhs_core: &mut Term, rhs_ty: &mut Term, expected: &Term,
+    cx: &ElabCtx<'_>,
+    rhs: &RExpr,
+    rhs_core: &mut Term,
+    rhs_ty: &mut Term,
+    expected: &Term,
     span: &Span,
 ) -> Result<(), ElabError> {
     refine_let_rhs(cx, rhs_core, rhs_ty)?;
@@ -14464,7 +14472,10 @@ fn infer_performed_let(
 /// inferred `let` holds across its body, at its base size.
 #[inline(never)]
 fn prepare_inferred_let_rhs(
-    cx: &mut ElabCtx<'_>, ty_opt: &Option<RType>, rhs: &RExpr, span: &Span,
+    cx: &mut ElabCtx<'_>,
+    ty_opt: &Option<RType>,
+    rhs: &RExpr,
+    span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refuse_unsequenced_performed_let(cx, rhs, &rhs_ty, None, span)?;
