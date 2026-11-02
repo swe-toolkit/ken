@@ -259,3 +259,37 @@ fn named_proc_return_is_still_charged_at_the_pure_boundary() {
         "Console",
     );
 }
+
+// The original effect-composition program, before its declaration names the
+// closure body's Console row. A tree-typed result is not an exemption.
+const P8_TREE_VALUE: &str = r#"program capabilities FS APartial
+const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =
+  run_state Nat ConsoleOp console_resp Unit Zero
+    (bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
+      (state_get Nat ConsoleOp console_resp MkUnit)
+      (\n . inject_r (StateOp Nat) ConsoleOp (resp_state Nat) console_resp Unit (print_line "state-console-pairing")))
+
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+       (Pair Unit Nat) ExitCode
+    (host_console APartial (Pair Unit Nat) prog)
+    (\_ . host_exit APartial ExitCode.Success)
+"#;
+
+#[test]
+fn tree_typed_value_closure_requires_a_declared_row() {
+    assert_escape("p8-const-tree-value", P8_TREE_VALUE, "prog", "Console");
+    let declared = P8_TREE_VALUE.replacen(
+        "const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =",
+        "proc prog : ITree ConsoleOp console_resp (Pair Unit Nat) visits [Console] =",
+        1,
+    );
+    assert_accept("p8-declared-tree-value", &declared);
+    assert_run(
+        "p8-declared-tree-value",
+        &declared,
+        b"state-console-pairing\n",
+    );
+}
