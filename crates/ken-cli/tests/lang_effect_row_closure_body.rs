@@ -167,6 +167,24 @@ fn a_let_lambda_is_still_a_value_not_a_performed_rhs() {
 }
 
 #[test]
+fn ascribed_let_lambda_is_a_value_and_releases_body_where_named() {
+    let source = with_action(
+        r#"proc run_with (u : Unit)
+  : HostIO APartial ExitCode visits [Console] =
+  let k : Unit -> HostIO APartial Unit =
+    ((\x. action x) : Unit -> HostIO APartial Unit) in
+  let ignored = k MkUnit in
+    host_program APartial (print_line "b")
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  run_with MkUnit
+"#,
+    );
+    assert_accept("ascribed-let-lambda-value", &source);
+    assert_run("ascribed-let-lambda", &source, b"ab\n");
+}
+
+#[test]
 fn alias_headed_result_spine_releases_callback_row() {
     assert_escape(
         "alias-spine",
