@@ -1,8 +1,11 @@
-//! Transition sentinel for the Increment 1 isolated-source strict frontier.
+//! Transition sentinel for the isolated-source strict frontier.
 //! Contract: docs/program/issues/LANG-STRICT-ISOLATED-ROUTES.md AC-1c.
-//! This deliberately stops when Increment 2 adds homes or Increment 3 migrates
-//! the population; those increments must replace this baseline with their
-//! updated behavioral acceptance, not update these numbers as a snapshot.
+//! New Ken files or migrations deliberately turn this baseline red. Re-pin
+//! only after classifying each added file by checker outcome; a count alone
+//! is not a license to re-record today's repository snapshot. Increment 3
+//! retires this pre-switch AC-1c census when check, run, and native-build
+//! switch to Strict after source migration; AC-3a then checks every isolated
+//! file Legacy-clean on its cut base through the strict route.
 
 use ken_elaborator::modules::isolated_catalog_root;
 use ken_elaborator::{ElabEnv, ElabError};
@@ -24,10 +27,15 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Promise class: transition sentinel. The input is the behavior of Ken
 /// sources in examples/, conformance/, and crates/*/tests, not the spelling,
 /// placement, line counts, or prose of any repository file. The AC-0 measured
-/// 91 files, 62 Legacy-clean, 12 Strict-clean, 50 Strict-UnboundName. Intended
-/// new package homes and migrations will turn this sentinel red by design.
+/// 91 files, 62 Legacy-clean, 12 Strict-clean, 50 Strict-UnboundName. This
+/// WP adds six Ken fixtures: five refuse in Legacy for their intended Console
+/// escape, while qa_higher_order_let is Legacy-clean and Strict-UnboundName
+/// at `host_bind`. The resulting boundary is 97/63/12/51. Future homes and
+/// source migrations turn this sentinel red by design. Increment 3's strict
+/// route switch and migration retire it in favor of AC-3a's acceptance gate
+/// for every cut-base Legacy-clean isolated file.
 #[test]
-fn strict_isolated_baseline_accepts_twelve_of_sixty_two_legacy_clean_files() {
+fn strict_isolated_frontier_before_increment_three_route_switch() {
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
@@ -80,6 +88,6 @@ fn strict_isolated_baseline_accepts_twelve_of_sixty_two_legacy_clean_files() {
     eprintln!("isolated strict frontier: files={} legacy_clean={legacy_clean} strict_clean={strict_clean} strict_unbound={strict_unbound}", files.len());
     assert_eq!(
         (files.len(), legacy_clean, strict_clean, strict_unbound),
-        (91, 62, 12, 50)
+        (97, 63, 12, 51)
     );
 }

@@ -28,6 +28,7 @@ fn dummy_arm(body: RExpr) -> RMatchArm {
         guard: None,
         body,
         span,
+        scope_width: 0,
     }
 }
 

@@ -205,6 +205,10 @@ pub struct ElabEnv {
     /// table above may later be overwritten by another provider with the
     /// same canonical name; purity inference must use the selected ID.
     pub(crate) effect_rows_by_id: HashMap<ken_kernel::GlobalId, effects::RowType>,
+    /// Every effect row carried by a named data, record, or alias's written
+    /// field types. The identity map survives later spelling overwrites.
+    pub(crate) type_carried_rows: HashMap<String, effects::RowType>,
+    pub(crate) type_carried_rows_by_id: HashMap<ken_kernel::GlobalId, effects::RowType>,
     /// Generated initial-state definitions for surface `space` blocks.
     ///
     /// These are elaboration metadata, not source-visible `Space.initial`
@@ -270,6 +274,8 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
         foreign_env: _,
         effect_rows: _,
         effect_rows_by_id: _,
+        type_carried_rows: _,
+        type_carried_rows_by_id: _,
         space_metadata: _,
         prelude_env: _,
         class_env: _,
@@ -408,6 +414,8 @@ impl ElabEnv {
             foreign_env: foreign::ForeignEnv::empty(),
             effect_rows,
             effect_rows_by_id: HashMap::new(),
+            type_carried_rows: HashMap::new(),
+            type_carried_rows_by_id: HashMap::new(),
             space_metadata: SpaceElaborationMetadata::default(),
             // placeholder; `register_prelude` fills it (and needs `&mut self`).
             prelude_env: prelude::empty_prelude_env(),
@@ -1027,6 +1035,8 @@ impl ElabEnv {
             foreign_env,
             effect_rows,
             effect_rows_by_id,
+            type_carried_rows,
+            type_carried_rows_by_id,
             space_metadata,
             prelude_env,
             class_env,
@@ -1057,6 +1067,8 @@ impl ElabEnv {
         foreign_env.scrub_global_ids(&removed_ids);
         effect_rows.retain(|name, _| !removed_names.contains(name));
         effect_rows_by_id.retain(|id, _| !removed_ids.contains(id));
+        type_carried_rows.retain(|name, _| !removed_names.contains(name));
+        type_carried_rows_by_id.retain(|id, _| !removed_ids.contains(id));
         space_metadata
             .initial_states
             .retain(|_, id| !removed_ids.contains(id));
@@ -1092,7 +1104,10 @@ impl ElabEnv {
                     &mut env.num_values,
                     &env.numeric_env,
                     &env.refinement_facts,
-                    elab::CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
+                    elab::CheckedEffectRows::new(
+                        &env.effect_rows, &env.effect_rows_by_id,
+                        &env.type_carried_rows, &env.type_carried_rows_by_id,
+                    ),
                     owner_label,
                     &rexpr,
                 )

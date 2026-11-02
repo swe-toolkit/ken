@@ -1,0 +1,13 @@
+program capabilities FS APartial
+proc action (x : Unit) : HostIO APartial Unit visits [Console] =
+  host_bind APartial (Result IOError Unit) Unit
+    (host_console APartial (Result IOError Unit)
+      (write ConsoleStream.Stdout (bytes_encode "a")))
+    (\_. host_pure APartial Unit MkUnit)
+proc run_with (f : Unit ->[Console] HostIO APartial Unit)
+  : HostIO APartial ExitCode visits [Console] =
+  let ignored = f MkUnit in
+    host_program APartial (print_line "b")
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  run_with action

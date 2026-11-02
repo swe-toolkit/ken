@@ -88,6 +88,10 @@ pub(crate) struct RMatchArm {
     pub guard: Option<RExpr>,
     pub body: RExpr,
     pub span: Span,
+    /// De Bruijn binders seen by the guard and body beyond the match scope:
+    /// pattern value slots plus the optional equation binder. Occurrence-backed
+    /// pattern aliases are lexical names, not additional binder slots.
+    pub scope_width: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -2429,6 +2433,11 @@ fn resolve_expr_ctx_ematch(
                 guard: rguard,
                 body: rbody,
                 span: arm.span.clone(),
+                scope_width: bound_names
+                    .iter()
+                    .filter(|binding| binding.alias_slot.is_none())
+                    .count()
+                    + usize::from(equation.is_some()),
             });
         }
         Ok(RExpr::RMatch {
