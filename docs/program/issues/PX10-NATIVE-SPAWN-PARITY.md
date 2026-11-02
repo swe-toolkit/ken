@@ -1,7 +1,7 @@
 ---
 id: PX10-NATIVE-SPAWN-PARITY
 title: "PX10's spawn and wait run only on the interpreter: the native bracket planner keys every region on an acquire in head position, so withChild, whose acquire follows the plan-open response match, has no return fold and no owned settlement. Give the native planner bracket regions whose acquire is not in head position, then promote the PX10 host operations to NativeTested with interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
