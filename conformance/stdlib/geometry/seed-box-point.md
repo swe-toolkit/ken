@@ -19,18 +19,24 @@ coordinate, which is outside the singleton interval `[5,5]`.
 import Core.Classes.LawfulClasses (IsTrue)
 
 import Algorithm.Geometry.NatBox
-  (Point, MkPoint, MkBox, contains, area,
-   contains_point_box, area_point_box)
+  (Point, MkPoint, MkBox, contains, area, contains_point_box, area_point_box)
 
 const n0 : Nat = Zero
+
 const n1 : Nat = Suc n0
+
 const n2 : Nat = Suc n1
+
 const n3 : Nat = Suc n2
+
 const n4 : Nat = Suc n3
+
 const n5 : Nat = Suc n4
 
 const origin : Point = MkPoint n0 n0
+
 const off : Point = MkPoint n3 n5
+
 const other : Point = MkPoint n3 n4
 
 theorem origin_coordinates : Equal Point origin (MkPoint n0 n0) = Refl
@@ -39,20 +45,15 @@ theorem off_coordinates : Equal Point off (MkPoint n3 n5) = Refl
 
 theorem other_coordinates : Equal Point other (MkPoint n3 n4) = Refl
 
-theorem origin_area_law
-    : Equal Nat (area (MkBox origin origin)) n1 = area_point_box origin
+theorem origin_area_law : Equal Nat (area (MkBox origin origin)) n1 = area_point_box origin
 
-theorem off_area_law
-    : Equal Nat (area (MkBox off off)) n1 = area_point_box off
+theorem off_area_law : Equal Nat (area (MkBox off off)) n1 = area_point_box off
 
-theorem off_contains_law
-    : IsTrue (contains (MkBox off off) off) = contains_point_box off
+theorem off_contains_law : IsTrue (contains (MkBox off off) off) = contains_point_box off
 
-theorem off_area_value
-    : Equal Nat (area (MkBox off off)) (Suc Zero) = Proved
+theorem off_area_value : Equal Nat (area (MkBox off off)) (Suc Zero) = Proved
 
-theorem off_contains_value
-    : IsTrue (contains (MkBox off off) off) = Proved
+theorem off_contains_value : IsTrue (contains (MkBox off off) off) = Proved
 ```
 
 ### `stdlib/geometry/point-box-area-and-membership`
@@ -92,8 +93,7 @@ claim, not at an import or an earlier declaration.
 
 ```ken
 -- Reject: inclusive point-box spans give area one, not zero.
-theorem seed_area_neg
-    : Equal Nat (area (MkBox off off)) Zero = Proved
+theorem seed_area_neg : Equal Nat (area (MkBox off off)) Zero = Proved
 ```
 
 ## Refuse containment of a distinct point
@@ -120,8 +120,7 @@ only the tested point changes from `off` to `other`. Expect
 
 ```ken
 -- Reject: other is outside the singleton y-coordinate of off.
-theorem seed_contains_neg
-    : IsTrue (contains (MkBox off off) other) = Proved
+theorem seed_contains_neg : IsTrue (contains (MkBox off off) other) = Proved
 ```
 
 ## Evidence boundary
