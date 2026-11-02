@@ -191,6 +191,8 @@ fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
     // single-binding let in a fresh environment, whose one action is
     // unambiguously `print_line "first"`.
     let bind = effect_grouped_env.prelude_env.bind_id;
+    let (first, outer_k) = bind_parts(&effect_grouped_core, bind)
+        .expect("first effect must be the outer bind's action");
     let mut anchor_env = ElabEnv::new().unwrap();
     let (anchor_core, _) = anchor_env
         .elaborate_expr(
@@ -200,8 +202,6 @@ fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
         .unwrap();
     let (first_anchor, _) = bind_parts(&anchor_core, anchor_env.prelude_env.bind_id)
         .expect("a performed single let lowers to bind");
-    let (first, outer_k) = bind_parts(&effect_grouped_core, bind)
-        .expect("first effect must be the outer bind's action");
     assert_eq!(
         first, first_anchor,
         "the outer bind performs the first binding"
