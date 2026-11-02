@@ -4,6 +4,7 @@
 > SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
 > SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5;
 > SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT §1.6;
+> SPEC-OPTIMIZATION-ARGMIN-OPTION-COST-ORDER-INVARIANCE §1.7, §3.7;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
@@ -50,7 +51,21 @@
 > with the appended false claim was rejected at its theorem
 > (`KernelRejected TypeMismatch`, span 1271..1377; 1/1, rc 0). This is
 > candidate-local scratch evidence, not an official conformance run; no
-> CI, publication, landing or landed-trust claim is made.
+> CI, publication, landing or landed-trust claim is made. Sections
+> 1.7 and 3.7 state the public Option cost-order-invariance laws for
+> argmin and argmax, respectively. Architect AC-0 on landed base
+> `dd421ad35` checked both generic bodies and the closed discriminator
+> in scratch: `ken check` and `ken fmt --check` rc 0, no new `Axiom`,
+> unchanged trusted GlobalId identity sets 114 → 114 over the nine-
+> provider closure and probe test 2/2. The historical Spec-only child
+> `5998938f4` added neither catalog export, CV seed nor package test.
+> Foundation's assembled tip `56b8864` contains both checked exports,
+> CV's authored seed and the package-owned test. Foundation reports
+> its exact-`56b8864` named test 2/2 and unchanged trusted GlobalId
+> identity sets 114 → 114 (`evt_6ch2ekksk284x`). This does not attest
+> the later status-respinned tip; neither these candidate-local checks
+> nor AC-0 scratch establish official conformance-runner execution,
+> CI, publication, landing or measured landed trust.
 
 ## 1. Least-cost candidate
 
@@ -449,6 +464,70 @@ mutation reddens the isolated refusal at its behavioral assertion.
 Neither the scratch D0 nor these candidate-local checks are official
 conformance-runner execution, CI, publication, landing or landed trust.
 No new primitive, kernel or surface feature is introduced.
+
+### 1.7 Option selector under a strict-order-preserving cost transform
+
+`Algorithm.Optimization.Argmin` must export the following public
+Transparent checked theorem immediately after `argmin_option_least`
+and before `argmax`. Its binder order is §1.5's, with `List a` in
+place of `NonEmpty a`. This is the fifth public `argmin_option` law
+alongside §1.4's four; it does not change any existing law or operation
+signature:
+
+```ken
+pub theorem argmin_option_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : List a)
+    : Equal (Option a) (argmin_option a (comp a Nat Nat f cost) xs) (argmin_option a cost xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦
+      cong
+        a
+        (Option a)
+        (argmin a (comp a Nat Nat f cost) (nonempty_cons a x rest))
+        (argmin a cost (nonempty_cons a x rest))
+        (Some a)
+        (argmin_cost_order_invariant a cost f same_order (nonempty_cons a x rest))
+  }
+```
+
+The premise is §1.5's strict-order-preservation premise, unchanged.
+The conclusion is structural `Equal (Option a)` of the selected
+options, not equality of numeric costs. `Nil` reduces to two `None`
+results; its proof uses `Proved`, not `Refl`, because the reduced goal
+is not syntactically Eq-headed. On `Cons`, §1.5's checked `Equal a`
+is lifted through `Some` with public `cong`. There is no extra
+premise, new import or exported helper. Section 1.4's operation and
+four public laws and §1.5's public type and proof body remain unchanged.
+
+The shared closed seed at
+`conformance/stdlib/optimization/seed-argmin-option-cost-order-invariance.md`
+uses five labels with costs `[5, 2, 7, 2, 7]`: the original and
+order-preservingly shifted selectors choose `Some 1`, the earlier of
+the tied minima, whereas a flattened cost chooses head `Some 0`.
+Its `Nil` application checks the empty case. The isolated false
+flattened-cost equality is paired with the shifted-cost accepted
+control on the **same list and `Proved` proof form**. A `Refl` body
+refuses both and cannot discriminate the premise; the false claim
+on `Nil` would instead be true. These closed rows distinguish the
+behavior but do not prove this generic law.
+
+Architect's AC-0 on landed base `dd421ad35` checked the generic
+body, a closed accepted client and the isolated flattened-cost
+refusal in scratch, with `ken check` and `ken fmt --check` rc 0, no
+new `Axiom`, equal nine-provider trusted GlobalId sets 114 → 114
+and probe test 2/2. The historical Spec-only child `5998938f4`
+stated the law and proof form without the catalog export, CV seed or
+package test. Foundation's assembled tip `56b8864` includes all
+three; its named package test passed 2/2 with unchanged trusted
+GlobalId identity sets 114 → 114 (`evt_6ch2ekksk284x`). These are
+Foundation's exact-`56b8864` checks, not tests of the later status
+respin or official conformance-runner execution, CI, publication,
+landing or measured landed trust.
 
 ## 2. Least witness below a finite bound
 
@@ -1042,3 +1121,68 @@ Separate positive selections of both parts isolate the tie: a
 selector that takes right on ties would produce a different value.
 These closed cases discriminate the branch rule; the generic laws
 rest on checked proof bodies, not the closed instances.
+
+### 3.7 Option selector under a strict-order-preserving cost transform
+
+`Algorithm.Optimization.Argmin` must export the `argmax_option` twin
+as a public Transparent checked theorem immediately after
+`argmax_option_greatest` and before the private `argmin_from`. Its
+binder order and premise are §3.5's, with `List a` in place of
+`NonEmpty a`. This is the fifth public `argmax_option` law alongside
+§3.4's four; existing operation and law types remain unchanged:
+
+```ken
+pub theorem argmax_option_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : List a)
+    : Equal (Option a) (argmax_option a (comp a Nat Nat f cost) xs) (argmax_option a cost xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦
+      cong
+        a
+        (Option a)
+        (argmax a (comp a Nat Nat f cost) (nonempty_cons a x rest))
+        (argmax a cost (nonempty_cons a x rest))
+        (Some a)
+        (argmax_cost_order_invariant a cost f same_order (nonempty_cons a x rest))
+  }
+```
+
+The same unchanged strict-order-preservation premise preserves and
+reflects the comparisons used by §3.5. The result is structural
+`Equal (Option a)` of selected input values, not equality of costs.
+On `Nil`, both results reduce to `None`, so the proof is `Proved`;
+`Refl` is refused on the reduced goal. On `Cons`, the public §3.5
+law lifts through `Some` by `cong`. This does not change the types
+or bodies of §3.4's four laws or §3.5's non-empty law.
+
+The same CV seed names the five-label list with costs
+`[5, 2, 7, 2, 7]`. The original and shifted selectors choose
+`Some 2`, the earlier of the tied maxima; the flattened selector
+chooses head `Some 0`. It applies this law on that list and on
+`Nil`. An isolated false flattened-cost equality is refused at
+its own claim and compared with the accepted shifted-cost control
+on the same list, both using `Proved`. On `Nil`, flattening would
+preserve the `None` result and is no counterexample. These are
+closed behavioral discriminators, not the generic proof.
+
+Architect AC-0 on `dd421ad35` checked this twin and the min law
+with `ken check` and `ken fmt --check` rc 0, no new `Axiom`,
+unchanged scratch trusted GlobalId identity sets 114 → 114 over
+the nine-provider closure and probe test 2/2. The historical Spec-only
+child `5998938f4` contained no §3.7 catalog export, CV seed or package
+test. Foundation's assembled tip `56b8864` contains all three.
+The corresponding package-owned test,
+`crates/ken-elaborator/tests/cat_optimization_argmin_option_cost_order.rs`,
+must check both laws as public Transparent exports, a selective-import
+generic client, the actual CV seed and exact provider-preloaded trusted
+identity-set equality.
+Foundation reports this test passed 2/2 with unchanged trusted GlobalId
+identity sets 114 → 114 on exact `56b8864` (`evt_6ch2ekksk284x`).
+These candidate-local checks are distinct from AC-0 scratch and do not
+attest the later status respin, official conformance-runner execution,
+CI, publication, landing or measured landed trust.

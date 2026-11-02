@@ -28,8 +28,8 @@ tail. On a possibly empty `List`, each Option selector returns no value on
 ## Definition
 
 The minimum selector and its ten laws lead, followed by its Option selector
-and four laws. The maximum selector and its ten laws follow, then its Option
-selector and four laws. Private shared selection helpers, inductive proofs and
+and five laws. The maximum selector and its ten laws follow, then its Option
+selector and five laws. Private shared selection helpers, inductive proofs and
 Option proof helpers close the definition. Two generic Nat-order facts come
 from their canonical owner, `Data.Numeric.Nat.Order`.
 
@@ -217,6 +217,25 @@ pub theorem argmin_option_least
       → IsTrue (leq_nat (cost y) (cost z)) =
   λfound. J (λr _. option_least a cost xs r) (argmin_option_least_base a cost xs) found
 
+pub theorem argmin_option_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : List a)
+    : Equal (Option a) (argmin_option a (comp a Nat Nat f cost) xs) (argmin_option a cost xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦
+      cong
+        a
+        (Option a)
+        (argmin a (comp a Nat Nat f cost) (nonempty_cons a x rest))
+        (argmin a cost (nonempty_cons a x rest))
+        (Some a)
+        (argmin_cost_order_invariant a cost f same_order (nonempty_cons a x rest))
+  }
+
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
 
@@ -384,6 +403,25 @@ pub theorem argmax_option_greatest
       → list_elem a z xs
       → IsTrue (leq_nat (cost z) (cost y)) =
   λfound. J (λr _. option_greatest a cost xs r) (argmax_option_greatest_base a cost xs) found
+
+pub theorem argmax_option_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (xs : List a)
+    : Equal (Option a) (argmax_option a (comp a Nat Nat f cost) xs) (argmax_option a cost xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦
+      cong
+        a
+        (Option a)
+        (argmax a (comp a Nat Nat f cost) (nonempty_cons a x rest))
+        (argmax a cost (nonempty_cons a x rest))
+        (Some a)
+        (argmax_cost_order_invariant a cost f same_order (nonempty_cons a x rest))
+  }
 
 fn argmin_from (a : Type) (cost : a → Nat) (x : a) (rest : List a) : a =
   select_from a cost lt_nat x rest
@@ -1085,6 +1123,8 @@ parameterized by the comparison and take its two transitivity facts, which
 laws finish by selecting the corresponding branch of the private `choose`.
 No constructor of `NonEmpty` is exposed in these proofs.
 
+`argmin_option_cost_order_invariant` closes the empty case by reduction;
+on a nonempty list, it lifts the checked cost-order law through `Some`.
 `argmin_option_nil` and `argmin_option_cons` reduce the selector on both list
 constructors. The private `option_member` and `option_least` predicates assign
 `Top` to a missing result and the corresponding list proposition to `Some`.
@@ -1111,6 +1151,8 @@ shared `select_append_choice` with `costlier`, whose transitivity facts
 `lt_nat` ones; the public premise compares the left maximum's cost against the
 right's directly through `lt_nat`.
 
+`argmax_option_cost_order_invariant` likewise closes the empty case by
+reduction and lifts the maximum cost-order law through `Some` otherwise.
 `argmax_option_nil` and `argmax_option_cons` reduce the maximum selector on
 both list constructors. The existing private `option_member` assigns `Top`
 to `None` and membership to `Some`. New private `option_greatest` similarly
@@ -1149,14 +1191,16 @@ algorithm.
 
 **Public API:** `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
-`argmin_append_takes_right`; `argmin_option` and
-its four §1.4 laws; `argmax` and the seven §3.2 laws `argmax_member`,
+`argmin_append_takes_right`; `argmin_option` and its five laws:
+`argmin_option_nil`, `argmin_option_cons`, `argmin_option_member`,
+`argmin_option_least` and `argmin_option_cost_order_invariant`;
+`argmax` and the seven §3.2 laws `argmax_member`,
 `argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
 `argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`, plus
 `argmax_cost_order_invariant`, `argmax_append_keeps_left` and
-`argmax_append_takes_right`; and `argmax_option` with its four §3.4 laws
-`argmax_option_nil`,
-`argmax_option_cons`, `argmax_option_member` and `argmax_option_greatest`.
+`argmax_append_takes_right`; and `argmax_option` with five laws:
+`argmax_option_nil`, `argmax_option_cons`, `argmax_option_member`,
+`argmax_option_greatest` and `argmax_option_cost_order_invariant`.
 Selection helpers, branch proofs, the shared membership induction and all
 Option proof helpers are private. The carrier, list view, membership predicate and
 Nat order retain their provider identities.
@@ -1185,7 +1229,7 @@ instances and false-result refusals. Its scoped acceptance target checks the
 client programs and the generic seven law types. The
 [§1.5 cost-order seed](../../../../conformance/stdlib/optimization/seed-argmin-cost-order-invariance.md)
 adds a four-label non-head earliest tie, an open strict-order proof,
-and a flattened-cost false result on the same input. The candidate's
+and a flattened-cost false result on the same input. The
 `cat_optimization_argmin_cost_order` package test root-loads the
 checked public law, checks the whole accepted seed client and refuses
 the isolated false claim. The
@@ -1199,7 +1243,7 @@ package-owned test checks the complete accepted client and refuses the
 isolated later-tie claim. These are candidate-local checks, not official
 conformance-runner execution, CI, publication, landing or landed trust.
 `conformance/stdlib/optimization/seed-argmin-option.md` adds empty,
-singleton and non-degenerate tie cases, instances of the four Option laws,
+singleton and non-degenerate tie cases, instances of the four §1.4 Option laws,
 and an isolated false `Some`-on-`Nil` refusal. The Option target root-loads
 the public declarations, executes those cases and compares exact
 trusted-base identities with the same provider closure.
@@ -1207,7 +1251,7 @@ trusted-base identities with the same provider closure.
 maximum and a false later-tie result; its package test checks the full
 positive client before refusing the false equality.
 `conformance/stdlib/optimization/seed-argmax-option.md` supplies empty,
-singleton and non-head earliest-tie cases, instances of all four Option laws,
+singleton and non-head earliest-tie cases, instances of the four §3.4 Option laws,
 and five isolated false-result refusals. Its package test checks the full
 positive client and then each refusal against a fresh accepted prefix. The
 [§3.5 cost-order seed](../../../../conformance/stdlib/optimization/seed-argmax-cost-order-invariance.md)
@@ -1215,5 +1259,10 @@ adds four labelled costs with a non-head earliest tied maximum, an open
 strict-order proof, both independently checked shifted/original selections,
 and a constant-cost false equality. The package-owned §3.5 test root-loads the
 checked generic law and the complete accepted seed before refusing the
-isolated false claim. These are candidate-local checks, not official
+isolated false claim. The
+[Option cost-order seed](../../../../conformance/stdlib/optimization/seed-argmin-option-cost-order-invariance.md)
+checks both public §1.7 and §3.7 laws on an earliest-tie list and `Nil`;
+its `cat_optimization_argmin_option_cost_order` package test checks both
+open laws and compares each isolated flattened-cost refusal with its
+accepted `Proved` control. These are candidate-local checks, not official
 conformance-runner execution, CI, publication, landing or landed trust.
