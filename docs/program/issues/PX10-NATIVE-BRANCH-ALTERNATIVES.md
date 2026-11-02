@@ -120,18 +120,27 @@ Increment 2:
   that issues a set reaches object emission within this scope (D0-17,
   Architect evt_573z7twxznjt9). Execution parity of the labelled
   transport is `PX10-NATIVE-SPAWN-PARITY` AC-1.
-- **AC-2g (containment, Ruling 3 of evt_573z7twxznjt9).** A plan that
-  issues a set and whose host operations are all NativeTested refuses
-  before emission, keyed on `HostOpV1::availability()` alone.
-  - c1: candidates 3 and 5, as committed NativeTested ken-cli fixtures,
-    refuse with the containment message. Deleting the `core.rs` call
-    returns candidate 5 to `aggregates.rs:1955` and candidate 3 to
-    PendingCallAdmission.
-  - c2: the below-gate census rows for smoke, argv and live (set counts
-    3, 4 and 4, emission Ok) are unchanged.
-  - c3: every test target that issues a set carries an unpromoted
-    operation. Any that does not is a stop to the Architect, not an
-    adjustment.
+- **AC-2g (containment, Ruling 3 as re-ruled in evt_5q4vj0d8mrwae, with
+  the conjunct of evt_7ag036jhpsg60).** The plan records how many sets
+  it issued. Every native execution and object-finish choke point refuses
+  a nonzero count: the JIT `run_with_profile`, the runtime-IR object, the
+  bound-process object and the test objects. The bound-process route
+  exempts a plan only when its Process bit is set and the build enables
+  `px8-ds-test-support` (`bound_process_transport_exempt`). A
+  caller-filled bit on the public builder therefore exempts nothing in a
+  product build.
+  - c0: one set builder runs per CompiledModule (3, 4 and 4).
+  - c1a and c1b: smoke with the Process bit off refuses at the
+    containment, and deleting the bound-process call builds an artifact.
+  - c1c: a hand-built JIT module with count 1 refuses, and count 0 runs.
+  - c1d: in a feature-off `ken-runtime --lib` build,
+    `bound_process_transport_exempt(true)` is false (1 passed). Dropping
+    the `cfg!` conjunct reddens it.
+  - c2: the census rows for smoke, argv and live (sets 3, 4 and 4,
+    emission Ok, bit true) are unchanged.
+  - c3: CI is the closure witness (evt_19b0mzzpf2yds). A failing test
+    whose log carries the containment message, or that goes green with
+    the calls deleted, is a stop to the Architect.
 - **No admission route.** This WP adds no feature, init flag or shim that
   runs an unpromoted operation natively. Promotion is
   `PX10-NATIVE-SPAWN-PARITY` Increment B.
@@ -145,9 +154,17 @@ Increment 2:
 - **AC-2c (negative, QA).**
   - A reader whose expected member set differs from the issued set
     refuses at planning, with a named row.
+  - A single-member reader of a result that has an issued set refuses
+    instead of resolving Single, with a named row and a mutation. Its
+    arrival count is measured first, and a nonzero count is a stop to the
+    Architect (evt_7ag036jhpsg60).
   - The label-swap and bare-payload mutants need an executing artifact
     and are `PX10-NATIVE-SPAWN-PARITY` AC-1's.
 - **AC-2d (no regression).** As AC-1c.
+  `carried_nat_two_leaf_pending_route_stays_typed_unsupported` now
+  refuses at admission as `ProducerHasAlternativeSet` (PlannerInvariant).
+  Its pin is amended only once its printed reason confirms that cause
+  (evt_7ag036jhpsg60).
 - **AC-2e (boundary environments; Adversary evt_1sk82gw1hvv76,
   Architect evt_5e2dn1gb0kvg8, evt_4qqmh8t0hgk81, evt_6epa2xgs5mkqf).**
   Increment 1 landed the W3 key alone, so these move here.
