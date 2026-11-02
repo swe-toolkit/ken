@@ -18,64 +18,68 @@ The rows of `a` are `[1,2]` and `[2,1]`. `empty` has zero rows and
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons)
+
 import Algorithm.LinearAlgebra.NatMatrix
-  (matrix_add, matrix_zero, matrix_vector, vector_zero,
-   matrix_add_zero_left, matrix_add_zero_right,
-   matrix_vector_zero_matrix)
+  (matrix_add,
+    matrix_zero,
+    matrix_vector,
+    vector_zero,
+    matrix_add_zero_left,
+    matrix_add_zero_right,
+    matrix_vector_zero_matrix)
 
 const one : Nat = Suc Zero
+
 const two : Nat = Suc one
 
-fn pair (x : Nat) (y : Nat) : Vec Nat two =
-  VCons Nat one x (VCons Nat Zero y (VNil Nat))
+fn pair (x : Nat) (y : Nat) : Vec Nat two = VCons Nat one x (VCons Nat Zero y (VNil Nat))
 
-fn rows2 (r0 : Vec Nat two) (r1 : Vec Nat two)
-    : Vec (Vec Nat two) two =
-  VCons (Vec Nat two) one r0
-    (VCons (Vec Nat two) Zero r1 (VNil (Vec Nat two)))
+fn rows2 (r0 : Vec Nat two) (r1 : Vec Nat two) : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one r0 (VCons (Vec Nat two) Zero r1 (VNil (Vec Nat two)))
 
 const a : Vec (Vec Nat two) two = rows2 (pair one two) (pair two one)
+
 const empty : Vec (Vec Nat two) Zero = VNil (Vec Nat two)
+
 const u : Vec Nat two = pair one two
 
-theorem matrix_add_zero_left_nonzero :
-  Equal (Vec (Vec Nat two) two)
-    (matrix_add two two (matrix_zero two two) a) a =
+theorem matrix_add_zero_left_nonzero
+    : Equal (Vec (Vec Nat two) two) (matrix_add two two (matrix_zero two two) a) a =
   matrix_add_zero_left two two a
 
-theorem matrix_add_zero_right_nonzero :
-  Equal (Vec (Vec Nat two) two)
-    (matrix_add two two a (matrix_zero two two)) a =
+theorem matrix_add_zero_right_nonzero
+    : Equal (Vec (Vec Nat two) two) (matrix_add two two a (matrix_zero two two)) a =
   matrix_add_zero_right two two a
 
-theorem matrix_vector_zero_matrix_nonzero :
-  Equal (Vec Nat two)
-    (matrix_vector two two (matrix_zero two two) u) (vector_zero two) =
+theorem matrix_vector_zero_matrix_nonzero
+    : Equal (Vec Nat two) (matrix_vector two two (matrix_zero two two) u) (vector_zero two) =
   matrix_vector_zero_matrix two two u
 
-theorem matrix_add_zero_left_empty :
-  Equal (Vec (Vec Nat two) Zero)
-    (matrix_add Zero two (matrix_zero Zero two) empty) empty =
+theorem matrix_add_zero_left_empty
+    : Equal (Vec (Vec Nat two) Zero) (matrix_add Zero two (matrix_zero Zero two) empty) empty =
   matrix_add_zero_left Zero two empty
 
-theorem matrix_add_zero_right_empty :
-  Equal (Vec (Vec Nat two) Zero)
-    (matrix_add Zero two empty (matrix_zero Zero two)) empty =
+theorem matrix_add_zero_right_empty
+    : Equal (Vec (Vec Nat two) Zero) (matrix_add Zero two empty (matrix_zero Zero two)) empty =
   matrix_add_zero_right Zero two empty
 
-theorem matrix_vector_zero_matrix_empty :
-  Equal (Vec Nat Zero)
-    (matrix_vector Zero two (matrix_zero Zero two) u) (vector_zero Zero) =
+theorem matrix_vector_zero_matrix_empty
+    : Equal
+        (Vec Nat Zero)
+        (matrix_vector Zero two (matrix_zero Zero two) u)
+        (vector_zero Zero) =
   matrix_vector_zero_matrix Zero two u
 
-theorem matrix_zero_two_by_two_value :
-  Equal (Vec (Vec Nat two) two)
-    (matrix_zero two two)
-    (rows2 (pair Zero Zero) (pair Zero Zero)) = Refl
+theorem matrix_zero_two_by_two_value
+    : Equal
+        (Vec (Vec Nat two) two)
+        (matrix_zero two two)
+        (rows2 (pair Zero Zero) (pair Zero Zero)) =
+  Refl
 
-theorem matrix_add_zero_left_same_form_control :
-  Equal (Vec (Vec Nat two) two)
-    (matrix_add two two (matrix_zero two two) a) a = Refl
+theorem matrix_add_zero_left_same_form_control
+    : Equal (Vec (Vec Nat two) two) (matrix_add two two (matrix_zero two two) a) a =
+  Refl
 ```
 
 ### stdlib/linear-algebra/matrix-zero-unit-laws-closed
@@ -134,10 +138,12 @@ than at an earlier import or application.
 Append only this theorem to a fresh copy of the accepted client:
 
 ```ken
-theorem reject_zero_as_sum :
-  Equal (Vec (Vec Nat two) two)
-    (matrix_add two two (matrix_zero two two) a)
-    (matrix_zero two two) = Refl
+theorem reject_zero_as_sum
+    : Equal
+        (Vec (Vec Nat two) two)
+        (matrix_add two two (matrix_zero two two) a)
+        (matrix_zero two two) =
+  Refl
 ```
 
 ## Evidence boundary
