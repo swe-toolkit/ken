@@ -1265,8 +1265,9 @@ fn carried_nat_single_level_controls_match_interpreter() {
 #[cfg(target_os = "linux")]
 // Promise class: current boundary, until the selected-pending route admits
 // two Vis leaves with this non-marked continuation. MEASURED: a two-leaf
-// two-deep match refuses the native build with a typed Fragment cause and
-// PendingCallAdmission UnsupportedRouteEdge, not an ObjectEmission internal
+// two-deep match refuses the native build with a typed PlannerInvariant cause
+// and PendingCallAdmission ProducerHasAlternativeSet (the producer's result
+// has an issued alternative set, Ruling 1), not an ObjectEmission internal
 // error. CLAIMED: this WP does not widen pending-call admission. THE GAP: the
 // refusal says nothing about whether a later separately ruled route could
 // safely admit this shape.
@@ -1297,12 +1298,16 @@ fn carried_nat_two_leaf_pending_route_stays_typed_unsupported() {
         );
         assert_eq!(
             packaging.source_cause,
-            Some(ken_runtime::LoweringCause::Fragment)
+            Some(ken_runtime::LoweringCause::PlannerInvariant)
         );
         assert!(
             packaging
                 .reason
-                .contains("PendingCallAdmission: refused pending call: UnsupportedRouteEdge"),
+                .contains("PendingCallAdmission: refused pending call for producer"),
+            "wrong refusal route: {error:?}"
+        );
+        assert!(
+            packaging.reason.contains("ProducerHasAlternativeSet"),
             "wrong refusal route: {error:?}"
         );
     });

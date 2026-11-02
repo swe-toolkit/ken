@@ -42,6 +42,44 @@ pub(in crate::cranelift_backend) enum ProducerResultResolution<'a> {
     Alternatives(&'a ProducerAlternativeSet),
 }
 
+/// Test-only negative readers of a real, issued two-member set. The extra
+/// identity has the same result/owner but is not in the issued set.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProducerAlternativeReaderNegativeObservation {
+    pub result: u32,
+    pub issued_members: usize,
+    pub extra_member_refusal: Option<String>,
+    pub dropped_member_refusal: Option<String>,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static PRODUCER_ALTERNATIVE_READER_NEGATIVES:
+        std::cell::RefCell<Option<Vec<ProducerAlternativeReaderNegativeObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_producer_alternative_reader_negative_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<ProducerAlternativeReaderNegativeObservation>) {
+    PRODUCER_ALTERNATIVE_READER_NEGATIVES.with(|slot| {
+        assert!(
+            slot.borrow().is_none(),
+            "alternative reader observation windows cannot nest"
+        );
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = PRODUCER_ALTERNATIVE_READER_NEGATIVES.with(|slot| {
+        slot.borrow_mut()
+            .take()
+            .expect("alternative reader observation window")
+    });
+    (result, observations)
+}
+
 impl StaticTransitionPlan<'_> {
     /// The only authority for admitting a multi-member reader. All offered
     /// identities must equal the issued set, not a guessed subset of it.
@@ -55,6 +93,16 @@ impl StaticTransitionPlan<'_> {
             ));
         };
         if members.len() == 1 {
+            let key = (first.emission_owner(), first.producer_result_origin());
+            if self
+                .producer_alternative_sets
+                .iter()
+                .any(|set| (set.emission_owner, set.result) == key)
+            {
+                return Err(planner_error(
+                    "a single-producer result reader names a result with an issued producer alternative set",
+                ));
+            }
             return Ok(ProducerResultResolution::Single);
         }
         let key = (first.emission_owner(), first.producer_result_origin());
@@ -83,6 +131,47 @@ impl StaticTransitionPlan<'_> {
             ));
         }
         Ok(ProducerResultResolution::Alternatives(set))
+    }
+
+    /// Probe the resolver against a real issued set, changing only the reader
+    /// population. This runs only inside an explicit test-support observation
+    /// window and cannot change the plan or its emission.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn record_producer_alternative_reader_negatives(&self) {
+        let active = PRODUCER_ALTERNATIVE_READER_NEGATIVES.with(|slot| slot.borrow().is_some());
+        if !active {
+            return;
+        }
+        for set in &self.producer_alternative_sets {
+            let [first, second] = set.members.as_slice() else {
+                continue;
+            };
+            let foreign = (0..=set.members.len() as u32)
+                .map(|position| first.with_test_recursive_position(position))
+                .find(|identity| !set.members.contains(identity))
+                .expect("two issued identities leave a foreign recursive position");
+            let extra = [first, second, &foreign];
+            let dropped = [first];
+            let extra_member_refusal = self
+                .resolve_producer_alternative_members(&extra)
+                .err()
+                .map(|error| error.to_string());
+            let dropped_member_refusal = self
+                .resolve_producer_alternative_members(&dropped)
+                .err()
+                .map(|error| error.to_string());
+            PRODUCER_ALTERNATIVE_READER_NEGATIVES.with(|slot| {
+                slot.borrow_mut()
+                    .as_mut()
+                    .expect("the observer is active")
+                    .push(ProducerAlternativeReaderNegativeObservation {
+                        result: set.result.0,
+                        issued_members: set.members.len(),
+                        extra_member_refusal,
+                        dropped_member_refusal,
+                    });
+            });
+        }
     }
 
     /// Resolve the detached seat's exact edges through that same authority.

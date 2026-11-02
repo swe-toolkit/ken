@@ -71,6 +71,50 @@ fn px10_set_issuing_smoke_without_process_gate_refuses_containment() {
     });
 }
 
+/// Promise class: durable invariant. MEASURED: a real smoke
+/// planner issues two-member sets, builds beneath the Process gate, and
+/// rejects readers that add one foreign same-result identity or drop a
+/// member. CLAIMED: a reader cannot interpret an issued labelled word with
+/// a different member set. THE GAP: these two probes do not enumerate every
+/// possible foreign identity; they pin both cardinality directions at the
+/// actual issued-set resolver.
+#[test]
+fn px10_issued_set_reader_mismatch_refuses_at_planning() {
+    in_census_thread("px10-reader-member-mismatch", || {
+        let (built, readers) =
+            ken_runtime::with_producer_alternative_reader_negative_observations(|| {
+                emit_below_gate("px10_reader_member_mismatch", SMOKE)
+            });
+        built.expect("the unchanged smoke fixture builds beneath its Process gate");
+        assert_eq!(readers.len(), 3, "smoke must issue three reader sets");
+        for reader in readers {
+            assert_eq!(
+                reader.issued_members, 2,
+                "smoke reader set at {}",
+                reader.result
+            );
+            assert!(
+                reader
+                    .extra_member_refusal
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains(
+                        "the result reader's expected member set differs from the issued producer alternative set"
+                    )),
+                "foreign reader at {}: {reader:?}", reader.result
+            );
+            assert!(
+                reader
+                    .dropped_member_refusal
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains(
+                        "a single-producer result reader names a result with an issued producer alternative set"
+                    )),
+                "singleton reader at {}: {reader:?}", reader.result
+            );
+        }
+    });
+}
+
 fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
     std::thread::Builder::new()
         .name(name.to_owned())

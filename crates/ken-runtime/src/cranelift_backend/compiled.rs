@@ -64,6 +64,14 @@ pub(crate) fn root_trap_catalog_index(magnitude: u64) -> Option<usize> {
         .and_then(|identity| usize::try_from(identity - 1).ok())
 }
 
+/// The bound-process exemption from the labelled-transport containment: a
+/// plan whose Process bit the driver's gate refuses, in a build with the PX10
+/// census feature. No normal build enables that feature, so a caller-filled
+/// bit on the public bound-process builder cannot exempt a product artifact.
+pub(super) const fn bound_process_transport_exempt(process_declared: bool) -> bool {
+    process_declared && cfg!(feature = "px8-ds-test-support")
+}
+
 impl<M> CompiledModule<M> {
     /// Transparent one-to-one packing seam (RT-SPLIT §10.4a). Exists so the
     /// five construction-only fields (`func_id`, `decoder`, `result_table`,
@@ -106,9 +114,8 @@ impl<M> CompiledModule<M> {
 
     /// PX10 Increment 2 containment: labelled alternative transport has no
     /// native execution evidence yet (PX10-NATIVE-SPAWN-PARITY Increment B
-    /// deletes this). `process_gated` is true only on the bound-process
-    /// route for a plan whose Process bit the driver's gate refuses, which
-    /// therefore never executes.
+    /// deletes this). `process_gated` is `bound_process_transport_exempt`'s
+    /// result on the bound-process route and false on every other route.
     pub(super) fn require_alternative_transport_contained(
         &self,
         process_gated: bool,

@@ -431,7 +431,9 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
             &mut source_exprs,
         )
     })?;
-    compiled.require_alternative_transport_contained(process_declared)?;
+    compiled.require_alternative_transport_contained(
+        crate::cranelift_backend::compiled::bound_process_transport_exempt(process_declared),
+    )?;
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();

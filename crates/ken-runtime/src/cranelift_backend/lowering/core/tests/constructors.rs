@@ -9007,6 +9007,18 @@ pub(in crate::cranelift_backend::lowering) fn first_effect_seat(plan: &StaticTra
     None
 }
 
+// MEASURED: without the PX10 census feature, a Process bit filled in by the
+// caller of the public bound-process builder exempts no plan from the
+// labelled-transport containment. CLAIMED: no product build emits unexecuted
+// labelled transport. THE GAP: a test-feature build trusts its caller, as
+// every px8-ds-test-support hook does.
+#[cfg(not(feature = "px8-ds-test-support"))]
+#[test]
+fn a_caller_filled_process_bit_exempts_nothing_in_a_normal_build() {
+    assert!(!crate::cranelift_backend::compiled::bound_process_transport_exempt(true));
+    assert!(!crate::cranelift_backend::compiled::bound_process_transport_exempt(false));
+}
+
 /// **`D7` — the dynamic-alternative consumer fails closed on a missing record.**
 ///
 /// MEASURED: at a real `FsWriteAt` seat whose error root is the eleven-alternative

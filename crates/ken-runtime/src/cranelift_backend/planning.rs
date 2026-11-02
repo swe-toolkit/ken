@@ -48,6 +48,8 @@ pub use static_transition::{
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_bracket_ordinary_owner_mutation,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
+    with_producer_alternative_reader_negative_observations,
+    ProducerAlternativeReaderNegativeObservation,
     with_pending_checked_ret_sink_applications,
     with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
     PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic, PerEmitterOwnerDiagnostic,

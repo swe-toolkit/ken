@@ -9,6 +9,11 @@ mod abi;
 mod aggregates;
 mod alternatives;
 pub(in crate::cranelift_backend) use alternatives::{ProducerAlternativeSet, ProducerResultResolution};
+#[cfg(feature = "px8-ds-test-support")]
+pub use alternatives::{
+    with_producer_alternative_reader_negative_observations,
+    ProducerAlternativeReaderNegativeObservation,
+};
 mod brackets;
 pub(in crate::cranelift_backend) use brackets::{
     BracketSettlement, BracketSettlementControlView, BracketSettlementId,

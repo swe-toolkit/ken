@@ -1463,6 +1463,8 @@ impl<'src> Planner<'src> {
         self.plan.pre_schema_transport_sources =
             derive_checked_ih_transport_source_population(&self.plan)?;
         self.plan.producer_alternative_sets = self.plan.build_producer_alternative_sets()?;
+        #[cfg(feature = "px8-ds-test-support")]
+        self.plan.record_producer_alternative_reader_negatives();
         self.plan.pre_schema_relay_promotions =
             self.plan.derive_pre_schema_relay_promotions()?;
         self.plan.preselected_response_callers =
