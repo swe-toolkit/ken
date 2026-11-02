@@ -10,7 +10,8 @@
 > SPEC-LINEAR-ALGEBRA-IDENTITY-SYMMETRIC §8;
 > SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION §9;
 > SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT §10;
-> SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION §11).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION §11;
+> SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT §12).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1059,3 +1060,93 @@ as the negative's discriminating proof form. A closed true
 `dot_zero_right` to establish the generic dot equality instead.
 These finite rows separate values and proof forms; they do not
 replace the generic checked theorems or claim a seed was run.
+
+The §11 roster is nine operations and thirty-three laws, forty-two
+public names. Section 12 advances it to ten operations and thirty-six
+laws, forty-six public names; the three new laws do not alter §11's
+three law types.
+
+## 12. The zero matrix and the unit of matrix addition
+
+> **Section 12 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT).** Architect AC-0
+> `evt_1dgts6nkb7ky2` checked the four public declarations and generic
+> clients in scratch on exact base
+> `f53d7cfb5bee6a082328d2246827f5ce46cc1130`: `ken check` and
+> `ken fmt --check` rc 0, no added `Axiom`, and equal trusted-base
+> `GlobalId` identity sets 109 → 109, measured across the provider
+> closure and NatMatrix. These are isolated D0 measurements, not
+> checks on this Spec child or an assembled candidate. They establish
+> neither official conformance-runner execution, CI, publication,
+> landing nor measured landed trust. CV owns the separate seed;
+> Foundation owns the catalog export and package tests.
+
+### 12.1 Public zero matrix and three premise-free checked laws
+
+`Algorithm.LinearAlgebra.NatMatrix` must export the following four
+public Transparent declarations. `matrix_zero` immediately follows
+`matrix_add` (§4.1). The three theorems follow `matrix_vector_zero`
+(§11.1) in the order displayed, before `matrix_vector_additive`.
+Their public types are exactly:
+
+```ken
+pub fn matrix_zero (m : Nat) (n : Nat) : Vec (Vec Nat n) m
+
+pub theorem matrix_add_zero_left
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_add m n (matrix_zero m n) a) a
+
+pub theorem matrix_add_zero_right
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_add m n a (matrix_zero m n)) a
+
+pub theorem matrix_vector_zero_matrix
+      (m : Nat) (n : Nat) (v : Vec Nat n)
+    : Equal (Vec Nat m) (matrix_vector m n (matrix_zero m n) v) (vector_zero m)
+```
+
+`matrix_zero m n` has `m` rows, each the `vector_zero n` of §10.
+The two matrix-add laws give it both unit orientations for every
+indexed `m × n` matrix. `matrix_vector_zero_matrix` fixes the
+**matrix** to zero and leaves its length-`n` vector arbitrary;
+it complements §11's `matrix_vector_zero`, which fixes the input
+**vector** to zero and leaves the matrix arbitrary. All three laws
+hold for every `m`, `n`, and well-typed operand, including zero
+dimensions, without a premise. At `m = Zero`, the zero matrix and
+matrix-add results are `VNil (Vec Nat n)`; the matrix-vector result
+is `VNil Nat`, the value of `vector_zero Zero`. No nonempty-row or
+nonzero-column exception is implied.
+
+### 12.2 Proof boundary, public roster and closed discriminator
+
+`matrix_zero` repeats `vector_zero n` through the existing private
+`repeat (Vec Nat n) m`. The left unit matches on the **written**
+matrix `a` and lifts §10's `vector_add_zero_left` across each row
+with `cong`, `trans`, and its tail induction hypothesis. The right
+unit composes `matrix_add_comm m n a (matrix_zero m n)` with the
+left unit; it is a public law rather than a client obligation to
+compose commutativity. The zero-matrix action matches on the
+**written** row count `m`: each successor result uses the checked
+`dot_zero_left n v` at its head and the induction hypothesis at
+its tail, transported through the existing private `vector_cons_eq`.
+`repeat` and `vector_cons_eq` remain private. No new helper,
+import, `Axiom`, kernel or surface rule is required, and no
+§1–§11 operation or law type changes.
+
+The §12 public roster specifies **ten operations and thirty-six laws,
+forty-six public names**: `matrix_zero` adds one operation to §11's
+nine, and these three laws add to §11's thirty-three. The exact
+public-inventory test must advance with the catalog child, not
+assert these exports are already landed on this Spec-only child.
+
+The closed seed must apply each of the three laws both to a nonzero
+`2 × 2` example and to a zero-row matrix, for six public-law
+applications. A direct `matrix_zero two two` value row checks its
+two zero rows. A same-form `Refl` control equates
+`matrix_add two two (matrix_zero two two) a` with the nonzero `a`;
+the isolated false claim keeps that sum and proof form but replaces
+the right side with `matrix_zero two two`. Architect's D0 accepted
+the control and refused the false claim; `Proved` refused both
+`Equal (Vec …)` claims, so it cannot distinguish their values.
+These closed rows delimit the unit laws and proof-form boundary;
+they do not replace the checked generic proofs.

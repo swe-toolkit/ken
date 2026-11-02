@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and thirty-three algebraic laws have checked proofs.
+all arithmetic is exact, and thirty-six algebraic laws have checked proofs.
 
 ## Contents
 
@@ -27,9 +27,10 @@ scaling, the zero vector and dot product, followed by matrix-vector
 multiplication, transpose, matrix product and diagonal identity. Row-wise
 matrix addition and its six public laws follow those operations and laws,
 alongside two vector sum laws, four vector-scaling laws, four zero-vector
-unit laws and three zero-annihilation laws. The named private stages
-build columns and row products; no second matrix carrier or numeric
-primitive is needed.
+unit laws and three zero-annihilation laws, followed by the zero matrix,
+its two unit laws for matrix addition and its action on every vector.
+The named private stages build columns and row products; no second matrix
+carrier or numeric primitive is needed.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
@@ -472,6 +473,9 @@ pub fn matrix_add
       (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
     : Vec (Vec Nat n) m =
   zip_with (Vec Nat n) (Vec Nat n) (Vec Nat n) m (vector_add n) a b
+
+pub fn matrix_zero (m : Nat) (n : Nat) : Vec (Vec Nat n) m =
+  repeat (Vec Nat n) m (vector_zero n)
 
 pub theorem matrix_product_distrib_left
       (m : Nat)
@@ -983,6 +987,64 @@ pub theorem matrix_vector_zero
       (vector_zero m)
       (matrix_vector_homogeneous m n Zero a (vector_zero n))
       (vector_scale_zero m (matrix_vector m n a (vector_zero n))))
+
+pub theorem matrix_add_zero_left
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_add m n (matrix_zero m n) a) a =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      trans
+        (Vec (Vec Nat n) (Suc k))
+        (VCons
+          (Vec Nat n)
+          k
+          (vector_add n (vector_zero n) row)
+          (matrix_add k n (matrix_zero k n) rest))
+        (VCons (Vec Nat n) k row (matrix_add k n (matrix_zero k n) rest))
+        (VCons (Vec Nat n) k row rest)
+        (cong
+          (Vec Nat n)
+          (Vec (Vec Nat n) (Suc k))
+          (vector_add n (vector_zero n) row)
+          row
+          (λr. VCons (Vec Nat n) k r (matrix_add k n (matrix_zero k n) rest))
+          (vector_add_zero_left n row))
+        (cong
+          (Vec (Vec Nat n) k)
+          (Vec (Vec Nat n) (Suc k))
+          (matrix_add k n (matrix_zero k n) rest)
+          rest
+          (VCons (Vec Nat n) k row)
+          (matrix_add_zero_left k n rest))
+  }
+
+pub theorem matrix_add_zero_right
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_add m n a (matrix_zero m n)) a =
+  trans
+    (Vec (Vec Nat n) m)
+    (matrix_add m n a (matrix_zero m n))
+    (matrix_add m n (matrix_zero m n) a)
+    a
+    (matrix_add_comm m n a (matrix_zero m n))
+    (matrix_add_zero_left m n a)
+
+pub theorem matrix_vector_zero_matrix
+      (m : Nat) (n : Nat) (v : Vec Nat n)
+    : Equal (Vec Nat m) (matrix_vector m n (matrix_zero m n) v) (vector_zero m) =
+  match m {
+    Zero ↦ Proved;
+    Suc k ↦
+      vector_cons_eq
+        k
+        (dot n (vector_zero n) v)
+        Zero
+        (matrix_vector k n (matrix_zero k n) v)
+        (vector_zero k)
+        (dot_zero_left n v)
+        (matrix_vector_zero_matrix k n v)
+  }
 
 pub theorem matrix_vector_additive
       (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat n)
@@ -2883,6 +2945,12 @@ left dot-zero law. `vector_scale_zero_vector` inducts on the written length;
 the multiplication head reduces to zero. `matrix_vector_zero` transports
 the zero input through `matrix_vector_homogeneous` and zero scaling at both
 dimensions. These three zero-annihilation laws need no new helper or premise.
+`matrix_zero` repeats the zero vector as every row through the private
+`repeat`. `matrix_add_zero_left` lifts the row-level left unit across rows,
+`matrix_add_zero_right` composes `matrix_add_comm` with it, and
+`matrix_vector_zero_matrix` inducts on the written row count with
+`dot_zero_left` at each row. These laws include zero dimensions and need
+no new helper or premise.
 
 `matrix_vector_additive` uses the private right-argument dot-distribution
 lemma to transport each row's head, then transports the tail by induction.
@@ -2923,8 +2991,8 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–11 owns
-forty-two public names across nine operations and thirty-three laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–12 owns
+forty-six public names across ten operations and thirty-six laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -2943,7 +3011,10 @@ proof's `vector_cons_eq` also remains private. `vector_zero`,
 `vector_add_zero_left`, `vector_add_zero_right`, `vector_scale_zero` and
 `dot_zero_left` are public in source order. The three §11 laws
 `dot_zero_right`, `vector_scale_zero_vector` and `matrix_vector_zero`
-follow in that order. All thirty-three laws have checked bodies. This
+follow in that order. `matrix_zero` follows `matrix_add`, and the §12 laws
+`matrix_add_zero_left`, `matrix_add_zero_right` and
+`matrix_vector_zero_matrix` follow `matrix_vector_zero` in that order.
+All thirty-six laws have checked bodies. This
 package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -2960,5 +3031,10 @@ a same-form scale-one control. The [zero-annihilation
 seed](../../../../conformance/stdlib/linear-algebra/seed-zero-annihilation.md)
 is authored, not officially conformance-run; its package-owned test checks
 all three open laws, fixed nonzero matrix values and the isolated false
-same-form `Refl` claim. These tests use root-loaded exports. They are
-not official conformance-runner runs or claims of CI, publication or landing.
+same-form `Refl` claim. The [zero-matrix
+seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-zero-unit.md)
+is authored, not officially conformance-run; its package-owned test checks
+all six public-law applications, the closed zero-matrix value, a same-form
+accepted control and an isolated false-result refusal. These tests use
+root-loaded exports. They are not official conformance-runner runs or claims
+of CI, publication or landing.
