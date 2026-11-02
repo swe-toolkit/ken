@@ -4,7 +4,8 @@
 //! separate programs and attributes each refusal to its named declaration.
 //! CLAIMED: no undeclared written callback row escapes through a local binder.
 //! THE GAP: the current surface row walk does not infer rows not written
-//! anywhere (nor the body of a built lambda, owned by CLOSURE-BODY).
+//! anywhere (nor a match binder's latent in the let consumer, owned by its own
+//! node).
 
 use std::process::{Command, Output};
 
