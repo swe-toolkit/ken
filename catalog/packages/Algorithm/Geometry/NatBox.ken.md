@@ -5,7 +5,8 @@ geometry operations. Six box-and-distance laws, ten structural
 commutativity, associativity, absorption, idempotence and distribution laws,
 three metric
 laws, two corner-membership laws, seven corner-wise containment laws, four
-inclusion-order laws, and three area laws carry kernel-checked generic proofs.
+inclusion-order laws, three area laws, and two point-box laws carry
+kernel-checked generic proofs.
 
 ## Contents
 
@@ -32,9 +33,10 @@ client can build a point and a box. Five original operations and six
 box-and-distance laws lead the definition; ten structural commutativity,
 associativity, absorption, idempotence and distribution laws follow
 intersection and hull, ahead of the three metric laws. The two corner-membership laws
-follow the three metric laws. The corner-wise `inside` operation and its seven
-laws come next, then the four inclusion-order laws, followed by `area` and its
-three laws. Per-axis proof helpers and distance helpers stay private.
+follow the three metric laws, and `contains_point_box` follows them. The
+corner-wise `inside` operation and its seven laws come next, then the four
+inclusion-order laws, followed by `area`, its three laws and `area_point_box`.
+Per-axis proof helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -1161,6 +1163,24 @@ pub theorem contains_hi_corner
       }
   }
 
+pub theorem contains_point_box (p : Point) : IsTrue (contains (MkBox p p) p) =
+  match p {
+    MkPoint x y ↦
+      (proof intro for bool_and)
+        (axis_contains x x x)
+        (axis_contains y y y)
+        ((proof intro for bool_and)
+          (leq_nat x x)
+          (leq_nat x x)
+          ((proof refl for leq_nat) x)
+          ((proof refl for leq_nat) x))
+        ((proof intro for bool_and)
+          (leq_nat y y)
+          (leq_nat y y)
+          ((proof refl for leq_nat) y)
+          ((proof refl for leq_nat) y))
+  }
+
 theorem axis_distance_triangle
       (a : Nat) (b : Nat) (c : Nat)
     : IsTrue (leq_nat (axis_distance a c) (add (axis_distance a b) (axis_distance b c))) =
@@ -2163,6 +2183,24 @@ pub theorem area_inverted_y
       (λw. mul (axis_span lx hx) w)
       (axis_span_inverted ly hy h)
 
+pub theorem area_point_box (p : Point) : Equal Nat (area (MkBox p p)) (Suc Zero) =
+  match p {
+    MkPoint x y ↦
+      trans
+        Nat
+        (mul (axis_span x x) (axis_span y y))
+        (mul (Suc Zero) (axis_span y y))
+        (Suc Zero)
+        (cong
+          Nat
+          Nat
+          (axis_span x x)
+          (Suc Zero)
+          (λw. mul w (axis_span y y))
+          (axis_span_point x))
+        (cong Nat Nat (axis_span y y) (Suc Zero) (λw. mul (Suc Zero) w) (axis_span_point y))
+  }
+
 fn axis_within (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) : Bool =
   bool_and (leq_nat l2 l1) (leq_nat h1 h2)
 
@@ -2546,12 +2584,14 @@ both axis memberships from the point witness, apply the corresponding private
 per-axis corner lemmas, then reassemble the corner memberships with `bool_and`.
 Together with `manhattan_box_diameter`, they show the distance bound is attained
 by the two stored corners whenever the box contains a point.
+`contains_point_box` needs no witness: each axis of `MkBox p p` contains its
+own coordinate by `leq_nat` reflexivity.
 
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
 `max::assoc` on the lower corners and `min::assoc` on the upper corners
 for intersection, reversing those selectors for hull. `point_equal` and
-`box_equal` assemble structural box equality; none of the thirty
+`box_equal` assemble structural box equality; none of the thirty-three
 pre-area public laws identifies boxes by their sets of members. Both
 mixed absorption proofs keep their shared box as the left operand.
 `intersect_hull_absorb` uses `max::absorb` to restore its lower coordinates
@@ -2585,7 +2625,9 @@ monotonicity and antitonicity of saturating subtraction, then combines the
 bounds with multiplication monotonicity, including zero factors. An
 inverted outer box needs no added premise: `inside` forces the inner box
 to be inverted on that axis too. `area_inverted_x` and `area_inverted_y`
-use the checked saturation law separately for either axis. The private
+use the checked saturation law separately for either axis. `area_point_box`
+rewrites each factor with the private `axis_span_point`; the closed product
+`mul (Suc Zero) (Suc Zero)` then reduces to one. The private
 intersection-area bounds apply `area_inside` to the existing
 `intersect_inside_left` and `intersect_inside_right` laws.
 
@@ -2633,10 +2675,10 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–13](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and thirty-five public checked law types,
-   including the two structural distribution, two corner-membership and
-   inside-antisymmetry laws.
+1. **Contract.** [Exact geometry, §§1–14](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and thirty-seven public checked law types,
+   including the two structural distribution, two corner-membership,
+   inside-antisymmetry and two point-box laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
@@ -2646,12 +2688,12 @@ Signed orientation remains outside this interface.
    `hull_intersect_distrib`, `manhattan_symm`,
    `manhattan_self`, `manhattan_triangle`, `manhattan_zero_equal`,
    `manhattan_box_diameter`, `contains_lo_corner`, `contains_hi_corner`,
-   `inside`, `inside_sound`, `inside_refl`, `intersect_inside_left`,
-   `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
+   `contains_point_box`, `inside`, `inside_sound`, `inside_refl`,
+   `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
    `inside_complete`, `inside_trans`, `inside_antisym`,
    `intersect_greatest`, `hull_least`, `area`, `area_inside`, `area_inverted_x`,
-   and `area_inverted_y`. `axis_within`, `axis_span`, `box_with_lo`,
-   `box_with_hi`, `box_equal`, generic subtraction and
+   `area_inverted_y`, and `area_point_box`. `axis_within`, `axis_span`,
+   `box_with_lo`, `box_with_hi`, `box_equal`, generic subtraction and
    multiplication bounds, per-axis lemmas and proof transport helpers
    remain private.
 3. **Source map.** Definition contains the constructors and operations,
@@ -2679,6 +2721,11 @@ Signed orientation remains outside this interface.
    [area seed](../../../../conformance/stdlib/geometry/seed-box-area.md)
    checks inclusive and inverted values and a nested pair, with a strictly
    larger inner-area claim separately refused. The
+   [point-box seed](../../../../conformance/stdlib/geometry/seed-box-point.md)
+   applies both checked laws at the origin and a point with distinct nonzero
+   coordinates, accepts direct area and membership controls, and isolates false
+   zero-area and distinct-point membership claims in its package-owned test.
+   The source-shaped checks are not official conformance-runner execution. The
    [order seed](../../../../conformance/stdlib/geometry/seed-box-inside-order.md)
    checks an inverted transitive chain, an overlapping meet and a hull with an
    inverted operand, followed by three isolated false reverse inclusions.
@@ -2717,7 +2764,7 @@ Signed orientation remains outside this interface.
    The [idempotence seed][id]
    applies both public proofs to regular and inverted boxes and refuses a
    false same-form box equality in its package-owned roots-loader test.
-   All thirteen authored seeds supplement rather than replace the checked
+   All fourteen authored seeds supplement rather than replace the checked
    generic law bodies.
 
 [id]: ../../../../conformance/stdlib/geometry/seed-box-intersect-hull-idempotence.md

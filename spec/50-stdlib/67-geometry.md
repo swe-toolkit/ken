@@ -1226,3 +1226,52 @@ claim uses the same `Equal Box`/`Refl` form for
 `large`, so the intersection is `small`. The control distinguishes the
 wrong result from a rejected proof form; closed examples do not
 replace the generic proofs.
+
+## 14. Point boxes
+
+> **Section 14 status: DRAFT v0 (SPEC-GEOMETRY-BOX-POINT-AREA).**
+> Architect AC-0 `evt_1wj4gfxnmacan` checked both generic proof bodies
+> on landed base `fcc816c65` in scratch: `ken check` and
+> `ken fmt --check` rc 0, no new `Axiom`, and equal trusted-base
+> `GlobalId` identity sets 114 → 114 over the provider closure and
+> `NatBox`. Both scratch theorems were `NatBox`-owned and Transparent;
+> an open-point client checked. These are Architect's scratch results,
+> not this Spec author's tests, an exact assembled-tip gate, official
+> conformance-runner execution, CI, publication, landing or measured
+> landed trust. The catalog exports, seed and package test belong to
+> the separate Foundation and CV assembly.
+
+`Algorithm.Geometry.NatBox` must export two public Transparent checked
+proofs for every `p : Point`, with no premise. `contains_point_box`
+follows `contains_hi_corner` at the end of the corner-membership
+block (§11), and `area_point_box` follows `area_inverted_y` before
+the private `axis_within` (§4.2). Their exact public types are:
+
+```ken
+pub theorem contains_point_box (p : Point) : IsTrue (contains (MkBox p p) p)
+
+pub theorem area_point_box (p : Point) : Equal Nat (area (MkBox p p)) (Suc Zero)
+```
+
+Every point box contains its own point. Each axis includes its own
+coordinate by checked `leq_nat` reflexivity; the generic proof uses
+the existing Boolean conjunction introduction. A point box has
+area one, including at the origin: §4.1's spans count inclusive
+natural-coordinate positions, not a continuous measure. The area
+proof rewrites both factors of `mul` by the existing private
+`axis_span_point`; `cong` and `trans` compose these steps, and
+`mul (Suc Zero) (Suc Zero)` reduces to `Suc Zero`. `axis_span_point`
+and `axis_span` remain private; neither is a client-visible helper.
+No new helper, operation or §1–§13 law type changes.
+
+The closed seed at `conformance/stdlib/geometry/seed-box-point.md`
+applies both laws at the origin and at an off-origin point with
+distinct nonzero coordinates. Its same-box area control claims
+`Equal Nat (area (MkBox off off)) (Suc Zero) = Proved`; the isolated
+false claim replaces only `Suc Zero` with `Zero`, also using
+`Proved`. `Refl` refuses both `Equal Nat` claims as non-`Eq`-shaped
+and cannot discriminate the wrong value. The containment control
+uses `IsTrue (contains (MkBox off off) off) = Proved`; its isolated
+false twin uses the same point box but a distinct point outside it,
+again with `Proved`. The controls establish the proof forms and
+refusal boundaries, not the two checked generic laws.
