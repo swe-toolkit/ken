@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-UNAVAILABLE-OP-DIAGNOSTIC
-title: "A native program that calls a host operation not yet promoted to native is refused by the host with OperationUnavailable, but the emitted code's require_i64 turns every nonzero host status into -1, and the C starter prints \"malformed borrowed process input\" for any -1. The one refusal a user of an unpromoted operation meets therefore names the wrong cause. Carry the unavailable-operation refusal to the process boundary as its own status and diagnostic, without changing which operations are admitted"
+title: "When the host refuses an operation as unavailable inside a native process, the emitted code's require_i64 turns the status into -1 and the C starter prints \"malformed borrowed process input\". No product program reaches that refusal today: emission or the Process gate refuses first (Architect evt_59z2v4tgmnvs4). It is reached on the px8-ds-test-support census route, where PX10-NATIVE-SPAWN-PARITY Increment B works and where the BRANCH-ALT stop-11 misread happened. Carry the refusal to the process boundary as its own status and diagnostic naming the operation, without changing which operations are admitted"
 status: active
 owner: runtime
 size: S
@@ -16,9 +16,12 @@ origin: "Architect ruling evt_4qb22p4991jmm on PX10-NATIVE-BRANCH-ALTERNATIVES s
 
 ## Objective
 
-A native program whose host operation is refused as unavailable exits
-nonzero with a diagnostic that names an unavailable operation, distinct
-from every other trap. The admitted operation set does not change.
+When the host's unavailable-operation refusal reaches a native process,
+by any route, the process exits nonzero with a diagnostic naming the
+operation, distinct from every other trap. No product program reaches
+the refusal today, so the fixture is built on the px8-ds-test-support
+census route, and the candidate says so. The admitted operation set
+does not change (Steward re-scope evt_19rfcye3rj7s4).
 
 ## Settled inputs (main `80525e894`)
 
@@ -54,10 +57,10 @@ diagnostic, with the pins below.
   propagate the host's status instead of `-1`, the status value, and
   whether the diagnostic names the operation. Rule the sweep of
   existing tests that assert the old stderr line or exit status.
-- **AC-1.** A native fixture calling one unpromoted operation exits
-  nonzero and prints the ruled unavailable-operation diagnostic, not
-  "malformed borrowed process input". A mutation restoring `-1` at the
-  ruled site reddens it.
+- **AC-1.** A native fixture on the census route calling one
+  unpromoted operation exits nonzero and prints the ruled
+  unavailable-operation diagnostic, not "malformed borrowed process
+  input". A mutation restoring `-1` at the ruled site reddens it.
 - **AC-2.** A control whose borrowed process input is malformed still
   prints the malformed-input line. A NativeTested-only fixture still
   exits 0 with an unchanged trace.

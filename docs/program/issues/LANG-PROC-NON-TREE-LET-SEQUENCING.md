@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-NON-TREE-LET-SEQUENCING
 title: "A direct-style proc whose declared result is not a tree but whose row is non-empty elaborates a let through the ordinary-let fallback, so a performing right-hand side whose binder is unused never runs. `proc read : Int visits [Console] = let r = write ... \"a\" in 1`, called from main, prints only main's own output, with exit 0. Spec 36 §2.4 says a let sequences its right-hand side. Rule the normative reading, then repair or refuse fail-closed"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1
