@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-UNAVAILABLE-OP-DIAGNOSTIC
 title: "A native program that calls a host operation not yet promoted to native is refused by the host with OperationUnavailable, but the emitted code's require_i64 turns every nonzero host status into -1, and the C starter prints \"malformed borrowed process input\" for any -1. The one refusal a user of an unpromoted operation meets therefore names the wrong cause. Carry the unavailable-operation refusal to the process boundary as its own status and diagnostic, without changing which operations are admitted"
-status: ready
+status: active
 owner: runtime
 size: S
 tier: T1
