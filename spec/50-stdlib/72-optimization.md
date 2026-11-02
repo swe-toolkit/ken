@@ -57,10 +57,15 @@
 > `dd421ad35` checked both generic bodies and the closed discriminator
 > in scratch: `ken check` and `ken fmt --check` rc 0, no new `Axiom`,
 > unchanged trusted GlobalId identity sets 114 → 114 over the nine-
-> provider closure and probe test 2/2. This Spec-only child adds no
-> §1.7 or §3.7 catalog export, CV seed or package test. AC-0 scratch
-> evidence is not an exact assembled-tip gate, official conformance-
-> runner execution, CI, publication, landing or landed trust.
+> provider closure and probe test 2/2. The historical Spec-only child
+> `5998938f4` added neither catalog export, CV seed nor package test.
+> Foundation's assembled tip `56b8864` contains both checked exports,
+> CV's authored seed and the package-owned test. Foundation reports
+> its exact-`56b8864` named test 2/2 and unchanged trusted GlobalId
+> identity sets 114 → 114 (`evt_6ch2ekksk284x`). This does not attest
+> the later status-respinned tip; neither these candidate-local checks
+> nor AC-0 scratch establish official conformance-runner execution,
+> CI, publication, landing or measured landed trust.
 
 ## 1. Least-cost candidate
 
@@ -515,11 +520,14 @@ Architect's AC-0 on landed base `dd421ad35` checked the generic
 body, a closed accepted client and the isolated flattened-cost
 refusal in scratch, with `ken check` and `ken fmt --check` rc 0, no
 new `Axiom`, equal nine-provider trusted GlobalId sets 114 → 114
-and probe test 2/2. This Spec-only child states the law and proof
-form; it does not add a catalog export, CV seed or package test.
-Those are separate assembly artifacts. Scratch evidence establishes
-neither an exact assembled-tip check nor official conformance-runner
-execution, CI, publication, landing or measured landed trust.
+and probe test 2/2. The historical Spec-only child `5998938f4`
+stated the law and proof form without the catalog export, CV seed or
+package test. Foundation's assembled tip `56b8864` includes all
+three; its named package test passed 2/2 with unchanged trusted
+GlobalId identity sets 114 → 114 (`evt_6ch2ekksk284x`). These are
+Foundation's exact-`56b8864` checks, not tests of the later status
+respin or official conformance-runner execution, CI, publication,
+landing or measured landed trust.
 
 ## 2. Least witness below a finite bound
 
@@ -1165,13 +1173,16 @@ closed behavioral discriminators, not the generic proof.
 Architect AC-0 on `dd421ad35` checked this twin and the min law
 with `ken check` and `ken fmt --check` rc 0, no new `Axiom`,
 unchanged scratch trusted GlobalId identity sets 114 → 114 over
-the nine-provider closure and probe test 2/2. No §3.7 catalog
-export, CV seed or package test is included in this Spec-only child.
+the nine-provider closure and probe test 2/2. The historical Spec-only
+child `5998938f4` contained no §3.7 catalog export, CV seed or package
+test. Foundation's assembled tip `56b8864` contains all three.
 The corresponding package-owned test,
 `crates/ken-elaborator/tests/cat_optimization_argmin_option_cost_order.rs`,
 must check both laws as public Transparent exports, a selective-import
 generic client, the actual CV seed and exact provider-preloaded trusted
 identity-set equality.
-That future assembled test cannot be inferred from AC-0: no exact
-assembled-tip, official conformance-runner, CI, publication, landing
-or measured landed-trust result is claimed.
+Foundation reports this test passed 2/2 with unchanged trusted GlobalId
+identity sets 114 → 114 on exact `56b8864` (`evt_6ch2ekksk284x`).
+These candidate-local checks are distinct from AC-0 scratch and do not
+attest the later status respin, official conformance-runner execution,
+CI, publication, landing or measured landed trust.

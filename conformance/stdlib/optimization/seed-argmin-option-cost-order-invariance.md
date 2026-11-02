@@ -273,6 +273,15 @@ claim was rejected with `KernelRejected TypeMismatch` at the appended
 claim. These are Architect scratch measurements, not execution of
 this exact seed by CV.
 
-CV ran no tests. This seed does not claim official conformance-runner
-execution, CI, publication, landing, or measured landed trust. The
-closed cases do not replace the two generic checked catalog laws.
+Foundation reports that assembled exact-tip candidate
+`56b8864bbe064a8da8f059b4537714d8770437cb` passed the new
+`cat_optimization_argmin_option_cost_order` target 2/2, with the full
+trusted GlobalId identity set unchanged at 114 → 114
+(`evt_6ch2ekksk284x`). This Foundation-reported package-test and
+identity evidence is distinct from Architect's AC-0 scratch; CV ran no
+tests. The measurements apply only to this exact candidate and do not
+carry to the status-corrected respin.
+
+Neither report establishes official conformance-runner execution, CI,
+publication, landing, or measured landed trust. The closed cases do not
+replace the two generic checked catalog laws.
