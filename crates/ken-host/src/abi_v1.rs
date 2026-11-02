@@ -2764,13 +2764,33 @@ mod tests {
     }
 
     /// No product program reaches this refusal today: emission or the Process
-    /// gate refuses first. This pins the census-route status and its separation
-    /// from starter statuses and planned trap tokens.
+    /// gate refuses first. This pins the census-route status below reserved
+    /// root statuses and away from planned trap tokens. The inverse formula
+    /// alone cannot exclude a collision with a reserved status.
     #[test]
     fn unavailable_operation_status_is_its_own_band() {
         let base = crate::OPERATION_UNAVAILABLE_STATUS_BASE_V1;
+        // Check collisions first, across the full operation inventory: a bad
+        // base may also produce unrelated positive statuses early in ALL.
         for operation in HostOpV1::ALL {
             let status = crate::operation_unavailable_status_v1(operation);
+            for reserved in [
+                -1,
+                -2,
+                -3,
+                -4,
+                crate::CAPACITY_EXHAUSTED_STATUS_V1,
+                crate::SELECTED_CALL_INTEGRITY_STATUS_V1,
+            ] {
+                assert_ne!(status, reserved, "{operation:?} collides with {reserved}");
+            }
+        }
+        for operation in HostOpV1::ALL {
+            let status = crate::operation_unavailable_status_v1(operation);
+            assert!(
+                status < -8,
+                "{operation:?} status {status} overlaps reserved root statuses"
+            );
             assert_ne!(
                 operation as u16 & 0xff,
                 0xff,
