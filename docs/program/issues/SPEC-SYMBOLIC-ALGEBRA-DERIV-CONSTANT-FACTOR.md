@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR
 title: "Spec 66 differentiates EMul by the product rule and decides semantic equality with poly_eq, but states no constant-factor law: the derivative of a constant times an expression is canonically equal to the constant times the expression's derivative. deriv leaves a zero summand, EAdd (EMul (EConst 0) e) (EMul (EConst k) (deriv v e)), which a client must clear by evaluating both sides and calling poly_eq_complete. Rule from a checked D0 at zero trust and state the law with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
