@@ -200,6 +200,52 @@ fn open_alias (f : Callback) : HostIO APartial Unit = f MkUnit
     );
 }
 
+/// Promise class: durable invariant (spec 36 §1.1–1.4, LATENT AC-0b).
+/// MEASURED: the production roots loader resolves an imported type to a
+/// checked GlobalId, and the CLI refuses only when that provider's field
+/// carries Console. CLAIMED: the carried row survives imported checked
+/// identity lookup. THE GAP: this exercises an exported data constructor;
+/// local record and alias admission are guarded by the separate rows above.
+#[test]
+fn imported_checked_carrier_releases_its_field_row_by_identity() {
+    fn check_import(name: &str, arrow: &str) -> Output {
+        let root = std::env::temp_dir().join(format!(
+            "ken-local-latent-import-{name}-{}",
+            std::process::id()
+        ));
+        let catalog = root.join("catalog/packages");
+        std::fs::create_dir_all(&catalog).expect("isolated catalog root");
+        std::fs::write(
+            catalog.join("Carrier.ken.md"),
+            format!("# Carrier\n\n```ken\ndata Box = MkBox (Unit {arrow} HostIO APartial Unit)\nexport Box, MkBox\n```\n"),
+        ).expect("write exported carrier");
+        let user = catalog.join("User.ken.md");
+        std::fs::write(&user, "# User\n\n```ken\nimport Carrier (Box, MkBox)\nfn open (b : Box) : HostIO APartial Unit =\n  match b { MkBox g ↦ g MkUnit }\n```\n")
+            .expect("write importing consumer");
+        Command::new(env!("CARGO_BIN_EXE_ken"))
+            .arg("check")
+            .arg(user)
+            .output()
+            .expect("check imported source through production CLI")
+    }
+
+    let pure = check_import("pure", "->");
+    assert_eq!(
+        pure.status.code(),
+        Some(0),
+        "pure imported carrier: {}",
+        String::from_utf8_lossy(&pure.stderr)
+    );
+    let effectful = check_import("console", "->[Console]");
+    let stderr = String::from_utf8_lossy(&effectful.stderr);
+    assert_eq!(effectful.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("error[E0038]"), "{stderr}");
+    assert!(
+        stderr.contains("EffectEscapes in 'User.open': Console"),
+        "{stderr}"
+    );
+}
+
 #[test]
 fn higher_order_let_keeps_its_checked_dispatch_and_output_order() {
     let out = cli("qa-higher-order", "run", QA_LET);
