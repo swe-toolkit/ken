@@ -41,6 +41,24 @@ fn spine(mut term: &Term) -> (&Term, Vec<&Term>) {
     (term, args)
 }
 
+fn assert_value_bound_write<'a>(env: &ElabEnv, term: &'a Term) -> &'a Term {
+    let Term::Let { val, body, .. } = term else {
+        panic!("a proposition binds its tree as a value, got {term:?}")
+    };
+    let (first_head, _) = spine(val);
+    assert!(
+        matches!(first_head, Term::Const { id, .. } if *id == env.globals["write"]),
+        "the ordinary let holds the first checked write as a value"
+    );
+    let (body_head, _) = spine(body);
+    assert!(
+        !matches!(body_head, Term::Const { id, .. } if *id == env.prelude_env.bind_id)
+            && !matches!(body_head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id),
+        "the proposition is neither bind- nor Ret-embedded"
+    );
+    body
+}
+
 fn assert_bind<'a>(env: &ElabEnv, term: &'a Term) -> Vec<&'a Term> {
     let (head, args) = spine(term);
     assert!(
@@ -93,6 +111,51 @@ fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_bo
         4,
         "Ret must wrap the pure body exactly once"
     );
+}
+
+/// Promise class: durable invariant (36 §2.4). A performing tree in a
+/// refinement's Ω predicate is a value under study, not an action to run.
+/// The exact QA counterexample must remain a checked ordinary Let in the
+/// admitted parameter type, even when its declaration context carries rows.
+#[test]
+fn refinement_predicate_let_retains_value_binding_under_checked_rows() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let id = env
+        .elaborate_decl(
+            "fn f (x : { n : Int | let t = write ConsoleStream.Stdout (bytes_encode \"a\") \
+         in Equal Int n n }) : Int = 0",
+        )
+        .expect("proof-position tree remains a value");
+    let (ty, _) = checked_def(&env, id);
+    let Term::Pi(domain, _) = ty else {
+        panic!("f has one explicit parameter")
+    };
+    let Term::Sigma(_, predicate) = domain.as_ref() else {
+        panic!("a refinement parameter is a subset Sigma")
+    };
+    assert_value_bound_write(&env, predicate);
+}
+
+/// Promise class: durable invariant. A requires assumption is Ω-valued at
+/// the same row-installed declaration boundary as a refinement predicate.
+#[test]
+fn requires_proposition_let_retains_value_binding_under_checked_rows() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let id = env
+        .elaborate_decl(
+            "fn g (n : Int) : Int requires \
+         let t = write ConsoleStream.Stdout (bytes_encode \"a\") \
+         in Equal Int n n = n",
+        )
+        .expect("requires holds the action as a value");
+    let (ty, _) = checked_def(&env, id);
+    let Term::Pi(_, rest) = ty else {
+        panic!("g has an Int parameter")
+    };
+    let Term::Pi(requirement, _) = rest.as_ref() else {
+        panic!("requires adds a proof parameter")
+    };
+    assert_value_bound_write(&env, requirement);
 }
 
 /// Promise class: transition sentinel for 36 §2.4 inclusion. A valid

@@ -1849,7 +1849,7 @@ fn elab_type_trunc(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
 #[inline(never)]
 fn elab_type_proj(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
     let RType::RProj(base, field, span) = ty else { unreachable!("elab_type dispatches proj") };
-    let (value, _field_type) = infer_proj(cx, base, field, span)?;
+    let (value, _field_type) = in_value_position(cx, |cx| infer_proj(cx, base, field, span))?;
     Ok(value)
 }
 
@@ -15502,10 +15502,25 @@ fn close_goal(ctx: &Context, assumptions: &[Assumption], goal: Term) -> Term {
     result
 }
 
+/// An Ω proposition or a type-position expression is a value position: a
+/// tree there is a value under study, never a performance (`36 §2.4`
+/// sequences tree-expected positions only). Hide the effect-row plane for
+/// exactly that elaboration, so a `let` inside it stays an ordinary `Let`,
+/// and restore the plane on every exit.
+fn in_value_position<'e, T>(
+    cx: &mut ElabCtx<'e>,
+    elaborate: impl FnOnce(&mut ElabCtx<'e>) -> Result<T, ElabError>,
+) -> Result<T, ElabError> {
+    let rows = cx.effect_rows.take();
+    let result = elaborate(cx);
+    cx.effect_rows = rows;
+    result
+}
+
 /// Check a requires or ensures proposition in the current context before it
 /// becomes an elaborator-only hypothesis or an obligation.
 fn elab_prop_at_omega(cx: &mut ElabCtx<'_>, expr: &RExpr, span: &Span) -> Result<Term, ElabError> {
-    let (raw, inferred) = infer(cx, expr)?;
+    let (raw, inferred) = in_value_position(cx, |cx| infer(cx, expr))?;
     let prop = cx.metas.zonk_term(&raw);
     let ty = cx.metas.zonk_term(&inferred);
     let omega = Term::omega(Level::Zero);
