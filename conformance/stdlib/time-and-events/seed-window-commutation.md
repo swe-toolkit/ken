@@ -9,12 +9,15 @@ establish the law's generic quantifiers.
 
 The Architect's AC-0 reports that its scratch clients accepted the
 same-form commutation control and refused the dropped-inner-window claim
-at `Refl` (rc 0 and rc 1, respectively). Those observations are not
-execution of this seed or of the candidate package test. CV has not run
-the seed. The `trusted_base()` identity-set measurement belongs in
-Foundation's candidate package test; no D0 identity measurement is
-claimed here. No official conformance-runner, CI, publication, or landing
-result is claimed.
+at `Refl` (rc 0 and rc 1, respectively). Those D0 scratch observations
+are separate from Foundation's later assembled-working-tree package test.
+Foundation reports that `cat_time_window_commutation` passed 2/2 on the
+actual seed fences, including the accepted block and isolated refusal, and
+measured the full `trusted_base()` GlobalId identity set as 114→114. This
+is Foundation's assembled-working-tree package-test evidence, not an
+exact committed-tip gate or official conformance-runner run. CV ran no
+tests; AC-0 did not measure the identity set. These results do not
+establish CI, publication, landing, or a landed trust measurement.
 
 ## Accepted client
 
@@ -135,8 +138,10 @@ theorem refuse_dropping_inner_window :
 Architect AC-0 measured the same-form commutation control at rc 0 and
 the dropped-inner-window claim at rc 1, with `E0038` at `Refl`. Those
 scratch clients ground the expected behavior but are not execution of
-this seed. This CV child adds only the conformance seed; the new §11
-Spec and catalog law are assembled separately. Foundation owns the
-candidate package test and the exact `trusted_base()` identity-set
-comparison. CV ran no tests. No official conformance-runner execution,
-CI, publication, landing, or landed trust measurement is claimed.
+this seed. Foundation later reports that its assembled working tree
+contains the separate §11 Spec and catalog law and that its named
+package test checked the actual seed fences 2/2 with GlobalId identities
+114→114. This CV child contains no Spec or catalog edits; the Foundation
+result is working-tree evidence, not a committed-tip gate or official
+conformance-runner execution. CV ran no tests. No CI, publication,
+landing, or landed trust measurement is claimed.
