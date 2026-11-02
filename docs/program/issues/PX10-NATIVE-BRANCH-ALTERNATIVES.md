@@ -110,11 +110,24 @@ Increment 1:
 
 Increment 2:
 
-- **AC-2a (parity).** Smoke, argv_env_pipe and live_child build natively
-  with the Process operations admitted in the test configuration. Each
-  native run reports the same (request, outcome) pairs as the
-  interpreter, under a bounded wait, so a regression fails rather than
-  hanging on live_child's `read line`.
+- **AC-2a-build.** Smoke, argv_env_pipe and live_child build natively,
+  each with its census row (issued set count, measured, as AC-2f). No row
+  asserts a native run result for these three: the host's native-dispatch
+  gate refuses the unpromoted Process operations, and the run's -1 does
+  not name its site. Their native run parity is
+  `PX10-NATIVE-SPAWN-PARITY` AC-1 (Architect evt_4qb22p4991jmm).
+- **AC-2a-exec (parity).** A fixture whose host operations are all
+  NativeTested issues a producer alternative set: census set count at
+  least 1, and exactly one `SynthesizedUse { role: ProducerAlternative }`
+  record for that set. It runs once per label, and the two alternatives
+  give distinguishable (request, outcome) traces. Each native run reports
+  the same pairs as the interpreter, under a bounded wait. The
+  Architect's D0-12 measures the fixture before it is ruled. If no
+  NativeTested-only shape issues a set, that is a stop to the Architect;
+  do not widen admission to get one.
+- **No admission route.** This WP adds no feature, init flag or shim that
+  runs an unpromoted operation natively. Promotion is
+  `PX10-NATIVE-SPAWN-PARITY` Increment B.
 - **AC-2b (guards intact).** `DuplicateResidualEdge` is refused by the
   predicate, plus one named row at the seat. A guard no fixture reaches
   with an issued set keeps its single-producer refusal, and the build
@@ -122,8 +135,8 @@ Increment 2:
 - **AC-2c (negative, QA).**
   - A reader whose expected member set differs from the issued set
     refuses at planning, with a named row.
-  - A mutant that swaps two members' labels at the writer reddens
-    smoke's parity row.
+  - A mutant that swaps two members' labels at the writer reddens the
+    AC-2a-exec parity row.
   - A mutant that writes the bare payload without its label is caught by
     the reader assertion before any field projection.
 - **AC-2d (no regression).** As AC-1c.
@@ -149,8 +162,8 @@ Increment 2:
 
 - A kernel or trust change, or a post-fork callback.
 - An advancing stop the Architect does not rule within Increment 2.
-  The Architect holds the §1a count (6 at the carried-Nat ruling
-  `evt_7v00f7vzkhdpr`), and Research re-triggers at the ninth.
+  The Architect holds the §1a count (11 at evt_4qb22p4991jmm), and
+  Research is called before the ruling on the twelfth.
 - A stop named in the R2 ruling: `occurrence_authority` refuses for a
   set's result, a set member does not reach
   `call_checked_ih_environment_transport`, or a set's meet differs
@@ -162,5 +175,6 @@ pin is re-anchored on its promise rather than its count. 2 fired: the
 guard fan-in is eight (six framed, `responses.rs:511` reached behind a
 bypass, `:6885` by sweep), so the rule is one resolver, not a list. 8
 fired: native build is a proxy, since bypass builds trapped or hung;
-AC-2a compares traces with the interpreter, and AC-2c's label swap must
-redden parity.
+AC-2a-exec compares traces with the interpreter on admitted operations,
+since a native -1 on a Process fixture can come from any of 18 sites,
+and AC-2c's label swap must redden that row.

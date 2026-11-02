@@ -77,7 +77,10 @@ base, stop and report the mismatch; do not build around it.
 
 - **AC-1 (parity).** PX10 slice 1's AC-1 rows pass natively, and
   `rt_parity_native` reports the same (request, outcome) pairs as the
-  interpreter.
+  interpreter. This includes native run parity for the smoke,
+  argv_env_pipe and live_child fixtures, which
+  `PX10-NATIVE-BRANCH-ALTERNATIVES` brings only to native build
+  (Architect evt_4qb22p4991jmm).
 - **AC-1b (settlement).** For a `withChild` body that takes stdout and
   waits, the trace settles the `PipeRead` and the `SpawnPlan` exactly
   once each, before the child, in reverse acquisition order, on both
