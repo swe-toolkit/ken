@@ -280,12 +280,16 @@ instance QaProvider Int { evidence = Axiom }"#,
         BTreeSet::new(),
         "the failed outer operation rolls back the instance's Axiom trust"
     );
-    assert!(matches!(
-        result,
-        Err(ElabError::KernelRejected {
-            error: KernelError::TypeMismatch { .. }, ..
-        }) | Err(ElabError::TypeMismatch { .. })
-    ), "actual refusal: {result:?}");
+    assert!(
+        matches!(
+            result,
+            Err(ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }) | Err(ElabError::TypeMismatch { .. })
+        ),
+        "actual refusal: {result:?}"
+    );
     let head_id = removed_head.expect("provider head was registered");
     let transient_class_id = removed_class.expect("transient class was registered");
     let instance_id = removed_instance.expect("provider instance was registered");
@@ -547,4 +551,50 @@ fn failed_refined_record_snapshot_preserves_outer_env_mark() {
             )
         },
     );
+}
+
+/// Promise class: durable invariant (spec 36 §1.2, LATENT AC-4).
+/// MEASURED: a successful row-bearing data admission under the real outer
+/// mark populates both maps, then a forced rollback clears both and lets a
+/// pure same-name replacement reuse its checked ID. CLAIMED: a rolled-back
+/// type cannot leak a stale Console row into the next declaration. THE GAP:
+/// this explicitly forces the outer rollback; other failed declarations
+/// still depend on their callers entering the same transaction.
+#[test]
+fn carried_type_row_rollback_clears_name_and_identity_before_reuse() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let start = env.env.next_global_id();
+    let trusted = env.env.trusted_base();
+    let result: Result<(), ElabError> = env.with_env_mark_rollback(|env| {
+        let admitted = env.elaborate_decl_v1(
+            "data Ephemeral = MkEphemeral (Unit ->[Console] HostIO APartial Unit)",
+        )?;
+        let row = RowType::singleton("Console");
+        assert_eq!(env.type_carried_rows.get("Ephemeral"), Some(&row));
+        assert_eq!(
+            env.type_carried_rows_by_id.get(&admitted.def_id),
+            Some(&row)
+        );
+        Err(ElabError::Internal("test forces enclosing rollback".into()))
+    });
+    assert!(
+        matches!(result, Err(ElabError::Internal(reason)) if reason == "test forces enclosing rollback")
+    );
+    assert_eq!(env.env.next_global_id(), start);
+    assert!(env.type_carried_rows.is_empty());
+    assert!(env.type_carried_rows_by_id.is_empty());
+    assert_eq!(env.env.trusted_base(), trusted);
+
+    let replacement = env
+        .elaborate_decl_v1("data Ephemeral = MkEphemeral (Unit -> HostIO APartial Unit)")
+        .expect("pure same-name replacement");
+    assert_eq!(replacement.def_id, start);
+    assert!(!env.type_carried_rows.contains_key("Ephemeral"));
+    assert!(!env.type_carried_rows_by_id.contains_key(&start));
+    env.elaborate_decl_v1(
+        "fn use_ephemeral (e : Ephemeral) : HostIO APartial Unit = \
+         match e { MkEphemeral f ↦ f MkUnit }",
+    )
+    .expect("pure replacement cannot inherit stale Console row");
+    assert_eq!(env.env.trusted_base(), trusted);
 }
