@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION
 title: "Spec 68 §10 gives point zero as the left unit of interval_add and point one as the left unit of interval_mul, but states no law that point zero absorbs interval_mul: the product of point zero with any interval is the point zero interval by endpoint-value inclusion. A client must unfold interval_mul and transport Rational's public zero_l for rational_mul through the package's private equiv_leq to rewrite it. Rule from a checked D0 at zero trust and state both inclusion directions with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
