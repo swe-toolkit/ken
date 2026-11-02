@@ -2112,6 +2112,48 @@ fn bind_let_core(
         .fold(Term::const_(bind_id, vec![]), Term::app))
 }
 
+/// The `36 §2.4` sequenced arm of `check_let_once`, outlined so its
+/// locals never enlarge the frame every ordinary checked `let` holds
+/// across its body (row M of elab_recursive_frame_budget).
+#[inline(never)]
+fn check_performed_let(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
+    expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
+) -> Result<Option<Term>, ElabError> {
+    let Some(expected_tree) = let_itree_parts(cx, expected) else {
+        return Ok(None);
+    };
+    let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
+        prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
+    else {
+        return Ok(None);
+    };
+    if !let_signature_matches(cx, &rhs_tree, &expected_tree) {
+        return Err(let_inclusion_unavailable(span, &rhs_tree, &expected_tree));
+    }
+    if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "let result has no informative checked equation".into(),
+        });
+    }
+    if !result_predicates.is_empty() {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "ensures on a sequenced let needs an explicit checked result".into(),
+        });
+    }
+    cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
+    let checked = check_result_position(cx, body, &weaken(expected, 1), span, &[]);
+    cx.ctx.pop();
+    let body_core = checked?;
+    bind_let_core(
+        cx, &rhs_tree, expected_tree.2, rhs_core, &rhs_ty, binder_ty, body_core,
+    )
+    .map(Some)
+}
+
 /// Check a local `let` outside `check`'s always-paid recursive frame. The
 /// helper remains live only for an actual `RLet`; unrelated deep match trees
 /// pay the original single-call dispatch frame.
@@ -2148,33 +2190,10 @@ fn check_let_once(
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
     expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
-    if let Some(expected_tree) = let_itree_parts(cx, expected) {
-        if let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
-            prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
-        {
-            if !let_signature_matches(cx, &rhs_tree, &expected_tree) {
-                return Err(let_inclusion_unavailable(span, &rhs_tree, &expected_tree));
-            }
-            if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
-                return Err(ElabError::TypeMismatch {
-                    span: span.clone(),
-                    reason: "let result has no informative checked equation".into(),
-                });
-            }
-            if !result_predicates.is_empty() {
-                return Err(ElabError::TypeMismatch {
-                    span: span.clone(),
-                    reason: "ensures on a sequenced let needs an explicit checked result".into(),
-                });
-            }
-            cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
-            let checked = check_result_position(cx, body, &weaken(expected, 1), span, &[]);
-            cx.ctx.pop();
-            let body_core = checked?;
-            return bind_let_core(
-                cx, &rhs_tree, expected_tree.2, rhs_core, &rhs_ty, binder_ty, body_core,
-            );
-        }
+    if let Some(core) =
+        check_performed_let(cx, ty_opt, rhs, body, expected, span, result_predicates)?
+    {
+        return Ok(core);
     }
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
@@ -14247,52 +14266,48 @@ fn infer_let(
     result
 }
 
+/// The `36 §2.4` sequenced arm of `infer_let_once`, outlined so an
+/// ordinary inferred let does not hold its arm's locals across its body.
 #[inline(never)]
-fn infer_let_once(
+fn infer_performed_let(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
-) -> Result<(Term, Term), ElabError> {
-    if let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
+) -> Result<Option<(Term, Term)>, ElabError> {
+    let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
         prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
-    {
-        if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
-            return Err(ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "inferred let has no informative checked equation".into(),
-            });
+    else {
+        return Ok(None);
+    };
+    if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "inferred let has no informative checked equation".into(),
+        });
+    }
+    cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
+    let inferred = infer(cx, body);
+    let (body_core, body_ty) = match inferred {
+        Ok(inferred) => inferred,
+        Err(error) => {
+            cx.ctx.pop();
+            return Err(error);
         }
-        cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
-        let inferred = infer(cx, body);
-        let (body_core, body_ty) = match inferred {
-            Ok(inferred) => inferred,
-            Err(error) => {
+    };
+    let body_row = cx.effect_rows
+        .map(|rows| infer_expr_row_type(body, &rows, None))
+        .unwrap_or_else(crate::effects::RowType::empty);
+    let body_tree = let_itree_parts(cx, &body_ty);
+    let tree_is_performed = body_row != crate::effects::RowType::empty();
+    let (body_for_bind, inside_ty) = if tree_is_performed {
+        if let Some(body_tree) = body_tree {
+            let outer_signature = (
+                weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), rhs_tree.2.clone(),
+            );
+            if !let_signature_matches(cx, &outer_signature, &body_tree) {
                 cx.ctx.pop();
-                return Err(error);
+                return Err(let_inclusion_unavailable(span, &rhs_tree, &body_tree));
             }
-        };
-        let body_row = cx.effect_rows
-            .map(|rows| infer_expr_row_type(body, &rows, None))
-            .unwrap_or_else(crate::effects::RowType::empty);
-        let body_tree = let_itree_parts(cx, &body_ty);
-        let tree_is_performed = body_row != crate::effects::RowType::empty();
-        let (body_for_bind, inside_ty) = if tree_is_performed {
-            if let Some(body_tree) = body_tree {
-                let outer_signature = (
-                    weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), rhs_tree.2.clone(),
-                );
-                if !let_signature_matches(cx, &outer_signature, &body_tree) {
-                    cx.ctx.pop();
-                    return Err(let_inclusion_unavailable(span, &rhs_tree, &body_tree));
-                }
-                (body_core, body_tree.2)
-            } else {
-                let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
-                    .expect("performed RHS has checked ITree IDs");
-                let lifted = [
-                    weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), body_ty.clone(), body_core,
-                ].into_iter().fold(Term::constructor(ret_id, vec![]), Term::app);
-                (lifted, body_ty)
-            }
+            (body_core, body_tree.2)
         } else {
             let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
                 .expect("performed RHS has checked ITree IDs");
@@ -14300,23 +14315,40 @@ fn infer_let_once(
                 weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), body_ty.clone(), body_core,
             ].into_iter().fold(Term::constructor(ret_id, vec![]), Term::app);
             (lifted, body_ty)
-        };
-        let result_ty = lower_binders(&inside_ty, 1, 0).map_err(|_| {
-            ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "sequenced let result type depends on its bound value".into(),
-            }
-        });
-        cx.ctx.pop();
-        let result_ty = result_ty?;
-        let core = bind_let_core(
-            cx, &rhs_tree, result_ty.clone(), rhs_core, &rhs_ty, binder_ty, body_for_bind,
-        )?;
-        let (itree_id, _, _) = cx.numeric_env.effect_sequencing_ids()
+        }
+    } else {
+        let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
             .expect("performed RHS has checked ITree IDs");
-        let tree_ty = [rhs_tree.0, rhs_tree.1, result_ty]
-            .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app);
-        return Ok((core, tree_ty));
+        let lifted = [
+            weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), body_ty.clone(), body_core,
+        ].into_iter().fold(Term::constructor(ret_id, vec![]), Term::app);
+        (lifted, body_ty)
+    };
+    let result_ty = lower_binders(&inside_ty, 1, 0).map_err(|_| {
+        ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "sequenced let result type depends on its bound value".into(),
+        }
+    });
+    cx.ctx.pop();
+    let result_ty = result_ty?;
+    let core = bind_let_core(
+        cx, &rhs_tree, result_ty.clone(), rhs_core, &rhs_ty, binder_ty, body_for_bind,
+    )?;
+    let (itree_id, _, _) = cx.numeric_env.effect_sequencing_ids()
+        .expect("performed RHS has checked ITree IDs");
+    let tree_ty = [rhs_tree.0, rhs_tree.1, result_ty]
+        .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app);
+    Ok(Some((core, tree_ty)))
+}
+
+#[inline(never)]
+fn infer_let_once(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let Some(result) = infer_performed_let(cx, ty_opt, rhs, body, span)? {
+        return Ok(result);
     }
     let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
