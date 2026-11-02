@@ -116,29 +116,37 @@ Increment 2:
   gate refuses the unpromoted Process operations, and the run's -1 does
   not name its site. Their native run parity is
   `PX10-NATIVE-SPAWN-PARITY` AC-1 (Architect evt_4qb22p4991jmm).
-- **AC-2a-exec (parity).** A fixture whose host operations are all
-  NativeTested issues a producer alternative set: census set count at
-  least 1, and exactly one `SynthesizedUse { role: ProducerAlternative }`
-  record for that set. It runs once per label, and the two alternatives
-  give distinguishable (request, outcome) traces. Each native run reports
-  the same pairs as the interpreter, under a bounded wait. The
-  Architect's D0-12 measures the fixture before it is ruled. If no
-  NativeTested-only shape issues a set, that is a stop to the Architect;
-  do not widen admission to get one.
+- **Execution parity is not in this WP.** No NativeTested-only program
+  that issues a set reaches object emission within this scope (D0-17,
+  Architect evt_573z7twxznjt9). Execution parity of the labelled
+  transport is `PX10-NATIVE-SPAWN-PARITY` AC-1.
+- **AC-2g (containment, Ruling 3 of evt_573z7twxznjt9).** A plan that
+  issues a set and whose host operations are all NativeTested refuses
+  before emission, keyed on `HostOpV1::availability()` alone.
+  - c1: candidates 3 and 5, as committed NativeTested ken-cli fixtures,
+    refuse with the containment message. Deleting the `core.rs` call
+    returns candidate 5 to `aggregates.rs:1955` and candidate 3 to
+    PendingCallAdmission.
+  - c2: the below-gate census rows for smoke, argv and live (set counts
+    3, 4 and 4, emission Ok) are unchanged.
+  - c3: every test target that issues a set carries an unpromoted
+    operation. Any that does not is a stop to the Architect, not an
+    adjustment.
 - **No admission route.** This WP adds no feature, init flag or shim that
   runs an unpromoted operation natively. Promotion is
   `PX10-NATIVE-SPAWN-PARITY` Increment B.
 - **AC-2b (guards intact).** `DuplicateResidualEdge` is refused by the
   predicate, plus one named row at the seat. A guard no fixture reaches
   with an issued set keeps its single-producer refusal, and the build
-  reports each guard's disposition and the row that reached it.
+  reports each guard's disposition and the row that reached it. The
+  selected-pending admission refuses a producer with an issued set as
+  `ProducerHasAlternativeSet` (Ruling 1, evt_2z25qzj9ma98q, g1 to g3 as
+  restated in evt_573z7twxznjt9).
 - **AC-2c (negative, QA).**
   - A reader whose expected member set differs from the issued set
     refuses at planning, with a named row.
-  - A mutant that swaps two members' labels at the writer reddens the
-    AC-2a-exec parity row.
-  - A mutant that writes the bare payload without its label is caught by
-    the reader assertion before any field projection.
+  - The label-swap and bare-payload mutants need an executing artifact
+    and are `PX10-NATIVE-SPAWN-PARITY` AC-1's.
 - **AC-2d (no regression).** As AC-1c.
 - **AC-2e (boundary environments; Adversary evt_1sk82gw1hvv76,
   Architect evt_5e2dn1gb0kvg8, evt_4qqmh8t0hgk81, evt_6epa2xgs5mkqf).**
@@ -175,6 +183,5 @@ pin is re-anchored on its promise rather than its count. 2 fired: the
 guard fan-in is eight (six framed, `responses.rs:511` reached behind a
 bypass, `:6885` by sweep), so the rule is one resolver, not a list. 8
 fired: native build is a proxy, since bypass builds trapped or hung;
-AC-2a-exec compares traces with the interpreter on admitted operations,
-since a native -1 on a Process fixture can come from any of 18 sites,
-and AC-2c's label swap must redden that row.
+execution parity moved to SPAWN-PARITY with the label-swap mutant, and
+AC-2g keeps unexecuted transport out of a production artifact until then.
