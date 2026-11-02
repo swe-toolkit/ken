@@ -7,6 +7,13 @@
 
 mod abi;
 mod aggregates;
+mod alternatives;
+pub(in crate::cranelift_backend) use alternatives::{ProducerAlternativeSet, ProducerResultResolution};
+#[cfg(feature = "px8-ds-test-support")]
+pub use alternatives::{
+    with_producer_alternative_reader_negative_observations,
+    ProducerAlternativeReaderNegativeObservation,
+};
 mod brackets;
 pub(in crate::cranelift_backend) use brackets::{
     BracketSettlement, BracketSettlementControlView, BracketSettlementId,
@@ -254,7 +261,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    CheckedIhTransportResolution, CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
     StrictRetSinkAssessment, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
@@ -765,6 +772,8 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// Exact parent-field/owner dispositions, installed before ownership.
     recursive_residual_dispositions: Vec<RecursiveResidualDisposition>,
     recursive_carrier_boxed_stores: Vec<RecursiveCarrierBoxedStore>,
+    /// Closed runtime-selected result flows, issued before aggregate ownership.
+    producer_alternative_sets: Vec<ProducerAlternativeSet>,
     /// Issued sum schema and exact writer edges for each wrapped recursive slot.
     recursive_carrier_slots: Vec<RecursiveCarrierSlot>,
     /// The exact two-endpoint transports that carry a force-materialized

@@ -4013,7 +4013,8 @@ impl<'a> Lowering<'a> {
                                 SynthesizedAggregateRoot::HostResultError
                                 | SynthesizedAggregateRoot::HostResultOk
                                 | SynthesizedAggregateRoot::UnitBoundaryEnvironment
-                                | SynthesizedAggregateRoot::RecursivePositionResidual => {
+                                | SynthesizedAggregateRoot::RecursivePositionResidual
+                                | SynthesizedAggregateRoot::ProducerAlternative => {
                                     return Err(unsupported(LoweringCause::PlannerInvariant,
                                         "BoundaryClosureEnvironment",
                                         "a positional closure capture was reconciled under a non-capture aggregate root",

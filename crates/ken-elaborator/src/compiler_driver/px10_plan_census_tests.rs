@@ -2,8 +2,7 @@
 //!
 //! The Process gate refuses all three before object emission, so this census
 //! hands each preparation straight to the emission the gate guards. Nothing
-//! here runs a native program; each still stops at a wall the
-//! PX10-NATIVE-BRANCH-ALTERNATIVES node owns.
+//! here runs a native program; emission beneath that gate establishes no parity.
 
 use super::*;
 
@@ -30,6 +29,92 @@ fn emit_below_gate(
     )
 }
 
+/// Promise class: transition sentinel, retired when PX10-NATIVE-SPAWN-PARITY
+/// promotes Process and removes the labelled-transport containment.
+/// MEASURED: removing the Process bit from the checked smoke preparation
+/// refuses its issued transport before object finish, on the named construct.
+/// CLAIMED: the census-only emission route cannot ship unexecuted transport
+/// merely because a caller mistakenly treats the plan as Process-free.
+/// THE GAP: this test does not establish labelled-transport execution parity.
+#[test]
+fn px10_set_issuing_smoke_without_process_gate_refuses_containment() {
+    in_census_thread("px10-containment-without-process-bit", || {
+        let mut preparation = prepare_native_program_sources(
+            "px10_containment_without_process_bit",
+            vec![CompilerSource::new("src/main.ken", SMOKE)],
+        )
+        .expect("smoke prepares");
+        assert!(
+            preparation.plan.process_declared,
+            "the original plan is gated"
+        );
+        preparation.plan.process_declared = false;
+        let root = tempfile::tempdir().expect("census output root");
+        let error = emit_native_program_preparation(
+            preparation,
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect_err("an ungated set-issuing plan cannot emit an artifact");
+        let NativeProgramBuildError::Packaging(error) = error else {
+            panic!("expected a packaging refusal, got {error:?}");
+        };
+        assert_eq!(
+            error.stage,
+            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
+        );
+        assert_eq!(
+            error.source_cause,
+            Some(ken_runtime::LoweringCause::Fragment)
+        );
+        assert!(error.reason.contains("ProducerAlternativeSet"), "{error:?}");
+    });
+}
+
+/// Promise class: durable invariant. MEASURED: a real smoke
+/// planner issues two-member sets, builds beneath the Process gate, and
+/// rejects readers that add one foreign same-result identity or drop a
+/// member. CLAIMED: a reader cannot interpret an issued labelled word with
+/// a different member set. THE GAP: these two probes do not enumerate every
+/// possible foreign identity; they pin both cardinality directions at the
+/// actual issued-set resolver.
+#[test]
+fn px10_issued_set_reader_mismatch_refuses_at_planning() {
+    in_census_thread("px10-reader-member-mismatch", || {
+        let (built, readers) =
+            ken_runtime::with_producer_alternative_reader_negative_observations(|| {
+                emit_below_gate("px10_reader_member_mismatch", SMOKE)
+            });
+        built.expect("the unchanged smoke fixture builds beneath its Process gate");
+        assert_eq!(readers.len(), 3, "smoke must issue three reader sets");
+        for reader in readers {
+            assert_eq!(
+                reader.issued_members, 2,
+                "smoke reader set at {}",
+                reader.result
+            );
+            assert!(
+                reader
+                    .extra_member_refusal
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains(
+                        "the result reader's expected member set differs from the issued producer alternative set"
+                    )),
+                "foreign reader at {}: {reader:?}", reader.result
+            );
+            assert!(
+                reader
+                    .dropped_member_refusal
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains(
+                        "a single-producer result reader names a result with an issued producer alternative set"
+                    )),
+                "singleton reader at {}: {reader:?}", reader.result
+            );
+        }
+    });
+}
+
 fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
     std::thread::Builder::new()
         .name(name.to_owned())
@@ -40,30 +125,6 @@ fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
         .expect("spawn census thread")
         .join()
         .expect("census thread");
-}
-
-/// The object-emission refusal each px10 program stops at, with its wall text.
-fn assert_object_emission_wall(
-    built: Result<NativeProgramBuildOutput, NativeProgramBuildError>,
-    wall: &str,
-) {
-    let error = built.expect_err("each px10 program still stops before an artifact");
-    let NativeProgramBuildError::Packaging(packaging) = error else {
-        panic!("the census refusal must come from native object planning: {error:?}");
-    };
-    assert_eq!(
-        packaging.stage,
-        ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
-    );
-    assert_eq!(
-        packaging.source_cause,
-        Some(ken_runtime::LoweringCause::PlannerInvariant)
-    );
-    assert!(
-        packaging.reason.contains(wall),
-        "expected the wall `{wall}`, got: {}",
-        packaging.reason
-    );
 }
 
 /// Each static region exit (a region's settlement Vis) has exactly one owner
@@ -95,14 +156,12 @@ fn assert_region_exit_owners(
 }
 
 /// Promise class: transition sentinel, retired by
-/// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke program's static
-/// transition plan completes, recording one feasibility diagnostic with no
-/// returned-Vis protocol error, and lowering stops at the P2 wall. Its one
-/// region exit, settlement 647, resumes through fold 12 and is returned by Vis
-/// 682. CLAIMED: the return fold is found by the tail up-walk from the acquire
-/// dispatch, a returned bracket settlement is owned by the Vis whose response
-/// returns it, and every specialized closure call reaches its graph-derived
-/// target. THE GAP: the detached-result seat refuses, so nothing executes.
+/// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
+/// recording one feasibility diagnostic with no returned-Vis protocol error,
+/// and builds an artifact beneath the separate Process admission gate. Its
+/// settlement 647 resumes through fold 12 and is returned by Vis 682.
+/// CLAIMED: the return fold and returned bracket settlement retain their
+/// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
 fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
@@ -129,28 +188,23 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
             &owners,
             &[(ReturnFold, 647, 12), (ReturnedVisSettlement, 647, 682)],
         );
-        assert_object_emission_wall(
-            built,
-            "the detached-result seat projected 2 undischarged causal calls onto one unit result",
-        );
+        let _built = built.expect("smoke emits an artifact beneath the Process gate");
     });
 }
 
 /// Promise class: transition sentinel, retired by this WP's Increment 2.
-/// MEASURED: argv_env_pipe reaches the exact W7 caller-cut wall, while
-/// live_child reaches the P2 detached-result seat with two producers for
-/// result 1104. Each retains its exact static region-exit owners.
-/// CLAIMED: the W3 instance key admits the distinct provenance owners at
-/// one call without weakening either downstream one-producer guard.
-/// THE GAP: neither program is built or executed natively at these walls.
+/// MEASURED: argv_env_pipe and live_child build artifacts beneath the separate
+/// Process gate after argv's generated context-4 Result contract becomes None.
+/// Both retain exact static region-exit owners. CLAIMED: the planner cannot
+/// confuse an ordinary successor Vis under Excluded{Relay} with a completed
+/// K Ret publication. THE GAP: neither program runs natively here.
 #[test]
-fn px10_argv_and_live_advance_to_w7_and_p2() {
+fn px10_argv_and_live_emit_below_process_gate() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
-    for (name, source, wall, expected, seat) in [
+    for (name, source, expected, seat) in [
         (
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
-            "one checked-IH caller transport has more than one detached source return cut",
             &[
                 (ReturnFold, 1160, 571),
                 (ReturnFold, 1429, 1165),
@@ -162,26 +216,37 @@ fn px10_argv_and_live_advance_to_w7_and_p2() {
         (
             "px10_census_live_child",
             LIVE_CHILD,
-            "the detached-result seat projected 2 undischarged causal calls onto one unit result",
             &[
                 (ReturnFold, 601, 12),
                 (ReturnFold, 870, 606),
                 (ReturnedVisSettlement, 601, 1488),
                 (ReturnedVisSettlement, 870, 1043),
             ][..],
-            Some(ken_runtime::DetachedResultSeatRefusalObservation {
-                edges: vec![(1104, 1073), (1104, 1101)],
-            }),
+            None,
         ),
     ] {
         in_census_thread(name, move || {
-            let ((built, owners), seat_refusals) =
-                ken_runtime::with_detached_result_seat_refusals(|| {
-                    ken_runtime::with_region_exit_owner_observations(|| {
-                        emit_below_gate(name, source)
+            let (((built, owners), seat_refusals), diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_runtime::with_detached_result_seat_refusals(|| {
+                        ken_runtime::with_region_exit_owner_observations(|| {
+                            emit_below_gate(name, source)
+                        })
                     })
                 });
-            assert_object_emission_wall(built, wall);
+            if name == "px10_census_argv_env_pipe" {
+                let contracts = diagnostics
+                    .iter()
+                    .flat_map(|diagnostic| &diagnostic.generated_context_result_contracts)
+                    .filter(|(context, _)| *context == 4)
+                    .collect::<Vec<_>>();
+                assert!(!contracts.is_empty(), "the argv K context must be queried");
+                assert!(
+                    contracts.iter().all(|(_, contract)| contract.is_none()),
+                    "an ordinary successor Vis is not a completed K Ret: {contracts:?}"
+                );
+            }
+            let _built = built.expect("px10 program emits an artifact beneath the Process gate");
             assert_eq!(
                 seat_refusals,
                 seat.into_iter().collect::<Vec<_>>(),

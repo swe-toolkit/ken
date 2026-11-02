@@ -21,8 +21,8 @@ use std::collections::BTreeSet;
 
 use super::{
     planner_capacity_error, planner_error, AbiSchedulingIngress, AbiSlotKind, AbiUnitDefinition,
-    CraneliftBackendError, EdgeKind, PredeclaredFunctionId, StaticOriginId,
-    StaticTransitionPlan,
+    CraneliftBackendError, DeclarationCallTargetClass, EdgeKind, PredeclaredFunctionId,
+    StaticOriginId, StaticTransitionPlan,
 };
 use super::construction::Planner;
 use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
@@ -563,8 +563,19 @@ fn summarize_result_phase(
             }
             summary
         }
+        RuntimeExpr::DeclarationRef { .. } => {
+            // A reference targeting the declaration-owned callable unit returns
+            // its boundary word. Read the planned entry-point class validated by
+            // lowering, not the reference's source spelling.
+            if plan.declaration_call_target_class(origin)
+                == Some(DeclarationCallTargetClass::CallableDeclaration)
+            {
+                ResultPhaseSummary::callable(ResultPhase::CarrierRequired)
+            } else {
+                ResultPhaseSummary::SPECIALIZED
+            }
+        }
         RuntimeExpr::Value(_)
-        | RuntimeExpr::DeclarationRef { .. }
         | RuntimeExpr::ImportedDeclarationRef { .. }
         | RuntimeExpr::Effect { .. } => ResultPhaseSummary::SPECIALIZED,
     };

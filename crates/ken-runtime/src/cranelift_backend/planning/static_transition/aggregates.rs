@@ -33,7 +33,8 @@ use super::{
     ContinuationSpecializationId, CraneliftBackendError, DeclarationCallTargetClass,
     EmittableCallKind, FieldIdentity,
     JoinResultRepresentation, PlannedOccurrenceChildAuthority, PlannedReferentLifetime,
-    PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
+    PredeclaredFunctionId, ProducerAlternativeSet, ProducerResultResolution, StaticOriginId,
+    StaticTransitionPlan, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
 };
 use super::closure::{derive_case_producer_fact, CaseProducerSet};
@@ -152,6 +153,9 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// A defunctionalized recursive-position residual: forwarded child,
     /// worker Parameter tail, then the complete context Capture run.
     RecursivePositionResidual,
+    /// The [Child, Label] Record one issued producer alternative set returns;
+    /// keyed on the set and written by every member in its own arm.
+    ProducerAlternative,
 }
 
 /// One parent-field disposition shared by the producer and both consumers.
@@ -393,6 +397,15 @@ pub(in crate::cranelift_backend) struct CheckedIhEnvironmentTransport {
         ContinuationSourceCoordinate,
         CheckedIhTransportInputDestination,
     )>,
+}
+
+pub(in crate::cranelift_backend) enum CheckedIhTransportResolution<'p> {
+    Single(&'p CheckedIhEnvironmentTransport),
+    /// One exact transport per issued member, in the set's label order.
+    Alternatives {
+        set: &'p ProducerAlternativeSet,
+        members: Vec<&'p CheckedIhEnvironmentTransport>,
+    },
 }
 
 /// Construction authority for a required consumer paired with the exact
@@ -3335,6 +3348,7 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     /// closure whose body is selected statically.
     BoundaryClosureEnvironment,
     RecursivePositionResidual,
+    ProducerAlternative,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -3937,7 +3951,8 @@ impl SynthesizedHostResultTree {
             SynthesizedAggregateRoot::UnitBoundaryEnvironment
             | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
             | SynthesizedAggregateRoot::BoundaryClosureEnvironment
-            | SynthesizedAggregateRoot::RecursivePositionResidual => {
+            | SynthesizedAggregateRoot::RecursivePositionResidual
+            | SynthesizedAggregateRoot::ProducerAlternative => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -4743,6 +4758,65 @@ impl StaticTransitionPlan<'_> {
         self.checked_ih_environment_transports
             .iter()
             .find(|transport| &transport.source_call_identity == identity)
+    }
+
+    /// Resolve an invocation through its exact source set before a reader
+    /// dispatches on the label. A partial or foreign set is not authority.
+    pub(in crate::cranelift_backend) fn resolve_checked_ih_environment_transports_for_invocation(
+        &self,
+        destination_owner: ContinuationEmissionOwner,
+        worker_body_origin: Option<StaticOriginId>,
+        continuation_origin: StaticOriginId,
+        recursive_position: u32,
+    ) -> Result<Option<CheckedIhTransportResolution<'_>>, CraneliftBackendError> {
+        let matched = self.checked_ih_environment_transports.iter().filter(|transport| {
+            transport.destination_owner == destination_owner
+                && worker_body_origin
+                    .is_none_or(|body| transport.source_worker_body_origin == body)
+                && transport.source_continuation_origin == continuation_origin
+                && transport.source_recursive_position == recursive_position
+        }).collect::<Vec<_>>();
+        match matched.as_slice() {
+            [] => Ok(None),
+            [transport] => Ok(Some(CheckedIhTransportResolution::Single(transport))),
+            _ => {
+                let identities = matched.iter()
+                    .map(|transport| &transport.source_call_identity)
+                    .collect::<Vec<_>>();
+                let ProducerResultResolution::Alternatives(set) =
+                    self.resolve_producer_alternative_members(&identities)? else {
+                    return Err(planner_error(
+                        "one checked-IH invocation resolves more than one authorized environment transport",
+                    ));
+                };
+                let members = set.members.iter().map(|member| {
+                    let mut hits = matched.iter()
+                        .filter(|transport| &transport.source_call_identity == member);
+                    match (hits.next(), hits.next()) {
+                        (Some(transport), None) => Ok(*transport),
+                        _ => Err(planner_error(
+                            "an alternative member has no exact checked-IH environment transport",
+                        )),
+                    }
+                }).collect::<Result<Vec<_>, _>>()?;
+                if members.iter().zip(&set.members).any(|(transport, member)| {
+                    transport.destination_construct_origin != member.producer_construct_origin()
+                }) {
+                    return Err(planner_error(
+                        "an alternative member's destination construct differs from its issued source construct",
+                    ));
+                }
+                let bodies = members.iter()
+                    .map(|transport| transport.source_worker_body_origin)
+                    .collect::<BTreeSet<_>>();
+                if bodies.len() != members.len() {
+                    return Err(planner_error(
+                        "two alternative members share one checked-IH worker body",
+                    ));
+                }
+                Ok(Some(CheckedIhTransportResolution::Alternatives { set, members }))
+            }
+        }
     }
 
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_for_invocation(
@@ -6037,6 +6111,60 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             shape: PlannedAggregateShape::Record,
             declared_children: Some(positional_capture_declared_children(2)?),
             children, meet, allocation,
+        });
+    }
+    // One governed [Child, Label] Record per set, shared by every member's
+    // writing arm. Child is the same result occurrence for every member.
+    for set in &plan.producer_alternative_sets {
+        let authority = occurrence_authority(plan, set.result)?;
+        let child = PlannedOccurrenceChildAuthority {
+            origin: set.result,
+            position: 0,
+            owner: authority.owner,
+            lifetime: authority.lifetime,
+        };
+        let owners = aggregate_child_referent_owners(plan, &child)?;
+        if owners.is_empty() {
+            return Err(planner_error("producer alternative Child has no referent owner"));
+        }
+        let children = vec![
+            PlannedAggregateChild {
+                position: 0,
+                origin: Some(set.result),
+                field_identity: None,
+                lifetime: authority.lifetime,
+                owners,
+            },
+            PlannedAggregateChild {
+                position: 1,
+                origin: None,
+                field_identity: None,
+                lifetime: PlannedReferentLifetime::Persistent,
+                owners: lifetime_referent_affinity(PlannedReferentLifetime::Persistent),
+            },
+        ];
+        let escapes = children.iter().any(|field| {
+            field.owners.contains(&BoundaryReferentOwner::InvocationArena)
+        });
+        let (meet, allocation) = if escapes {
+            (PlannedReferentLifetime::ActivationOwned, PlannedAggregateAllocation::InvocationAggregate)
+        } else {
+            (PlannedReferentLifetime::Persistent, PlannedAggregateAllocation::PersistentGround)
+        };
+        records.push(PlannedAggregateOwnership {
+            id: AggregateOccurrenceId(0),
+            producer: AggregateOccurrenceProducer::SynthesizedUse {
+                owner: set.emission_owner,
+                seat: set.result,
+                path: SynthesizedAggregatePath::root(SynthesizedAggregateRoot::ProducerAlternative),
+                role: SynthesizedAggregateRole::ProducerAlternative,
+            },
+            owner: plan.semantic.function_owner(set.result)?,
+            shape: PlannedAggregateShape::Record,
+            declared_children: Some(positional_capture_declared_children(2)?),
+            children,
+            meet,
+            allocation,
         });
     }
     records.sort_by(|left, right| left.producer.cmp(&right.producer));
@@ -10527,6 +10655,32 @@ impl<'src> StaticTransitionPlan<'src> {
         }
         Ok(record.id)
     }
+    /// The one aggregate allocation issued for a whole result alternative set.
+    /// This is resolved from current ownership (which may have been rebuilt),
+    /// not cached in the set or derived from an emitting member.
+    pub(in crate::cranelift_backend) fn producer_alternative_record(
+        &self,
+        set: &super::ProducerAlternativeSet,
+    ) -> Result<AggregateOccurrenceId, CraneliftBackendError> {
+        let producer = AggregateOccurrenceProducer::SynthesizedUse {
+            owner: set.emission_owner,
+            seat: set.result,
+            path: SynthesizedAggregatePath::root(SynthesizedAggregateRoot::ProducerAlternative),
+            role: SynthesizedAggregateRole::ProducerAlternative,
+        };
+        let mut matching = self.aggregate_ownership.iter().filter(|record| record.producer == producer);
+        let record = matching.next().ok_or_else(|| planner_error(
+            "a producer alternative set has no governed Record allocation",
+        ))?;
+        if matching.next().is_some()
+            || record.shape != PlannedAggregateShape::Record
+            || record.children.len() != 2
+        {
+            return Err(planner_error("a producer alternative Record is duplicated or is not [Child, Label]"));
+        }
+        Ok(record.id)
+    }
+
     /// The occurrence identity of one **compiler-synthesized** aggregate use.
     ///
     /// ⛔ The key is `owner + seat + path + full role`, never the role alone. A

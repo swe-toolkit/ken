@@ -32,6 +32,7 @@
 
 use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
+use super::source::SelectedCheckedIhTransportExit;
 
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
@@ -869,9 +870,9 @@ impl<'a> Lowering<'a> {
                 })
         }
 
-        /// The sole label switch. The arm receives the *exact* worker body;
-        /// callers may take its governed force route or an ordinary unit call.
-        /// The switch itself issues no transport/materialization edge.
+        /// This slot-residual switch selects an exact worker body. A separate
+        /// issued-set transport switch also selects by its source slot label.
+        /// Neither switch issues a transport/materialization edge.
         pub(super) fn select_recursive_position_unit<F>(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
@@ -975,6 +976,141 @@ impl<'a> Lowering<'a> {
             builder.ins().return_(&[refused]);
             builder.switch_to_block(join);
             Ok(LoweringOperand::Carried(joined))
+        }
+
+        /// Select exactly one planner-issued environment transport by the PX8
+        /// slot residual's label. The issued set binds members, but the slot
+        /// supplies their runtime labels; an unhandled label traps.
+        pub(super) fn select_checked_ih_transport_alternative<F>(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            set: &ProducerAlternativeSet,
+            members: &[CheckedIhEnvironmentTransport],
+            residual: CarriedResidualWord,
+            mut arm: F,
+        ) -> Result<SelectedCheckedIhTransportExit, CraneliftBackendError>
+        where
+            F: FnMut(&mut Self, &mut FunctionBuilder<'_>, &CheckedIhEnvironmentTransport)
+                -> Result<SelectedCheckedIhTransportExit, CraneliftBackendError>,
+        {
+            if members.len() != set.members.len() || members.iter().zip(&set.members).any(
+                |(transport, member)| transport.source_call_identity() != member
+            ) {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "ProducerAlternativeSet",
+                    "a checked-IH transport switch differs from its issued member order",
+                ));
+            }
+            let first = members.first().ok_or_else(|| unsupported(
+                LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                "an alternative transport force has no members",
+            ))?;
+            let slot = self.static_transition_plan
+                .recursive_carrier_for_specialization(first.source_specialization())?
+                .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                    "ProducerAlternativeSet", "an alternative transport source has no issued slot"))?
+                .clone();
+            if residual.slot() != RecursiveCarrierSlotKey::of(&slot) {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "ProducerAlternativeSet", "an alternative transport force names a foreign slot"));
+            }
+            let ordinal = self.residual_label_ordinal(builder, residual, &slot)?;
+            let mut labels = BTreeSet::new();
+            let mut joined_routing: Option<(SourceComputationalAnswerRoute, EliminatorRole)> = None;
+            let mut join: Option<(Block, CarriedBoundaryWord)> = None;
+            let mut completed = None;
+            for transport in members {
+                let source = transport.source_specialization();
+                if self.static_transition_plan.recursive_carrier_for_specialization(source)?
+                    .map(RecursiveCarrierSlotKey::of) != Some(RecursiveCarrierSlotKey::of(&slot))
+                {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet", "alternative transport members name different slots"));
+                }
+                let label = slot.variant(source)?.label.ok_or_else(|| unsupported(
+                    LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                    "an alternative transport member has no slot label",
+                ))?;
+                if !labels.insert(label) {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet", "two alternative transport members share one slot label"));
+                }
+                let disposition = self.static_transition_plan
+                    .recursive_residual_for_specialization(source)?
+                    .filter(|entry| entry.wrapped() && entry.label == Some(label))
+                    .cloned()
+                    .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "ProducerAlternativeSet",
+                        "an alternative transport member has no wrapped disposition for its slot label",
+                    ))?;
+                let selected = builder.create_block();
+                let next = builder.create_block();
+                let matched = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    ordinal, i64::from(label),
+                );
+                builder.ins().brif(matched, selected, &[], next, &[]);
+                builder.switch_to_block(selected);
+                let _ = self.assert_recursive_carrier_variant(builder, residual, &disposition)?;
+                let _ = self.checked_ih_transport_child(
+                    builder, LoweringOperand::Residual(residual), transport,
+                )?;
+                match arm(self, builder, transport)? {
+                    SelectedCheckedIhTransportExit::Value(answer) => {
+                        // A value join is a meet: all arriving arms agree on route and role.
+                        let routing = (answer.route, answer.role);
+                        if *joined_routing.get_or_insert(routing) != routing {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ProducerAlternativeSet",
+                                "checked-IH alternative value arms arrive on different answer routes"));
+                        }
+                        let word = match answer.value {
+                            LoweringOperand::Carried(word) => word,
+                            LoweringOperand::Residual(residual) =>
+                                self.decode_residual_child(builder, residual)?,
+                            LoweringOperand::Specialized(_) => return Err(unsupported(
+                                LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                                "a checked-IH alternative returned a specialized value across its ABI")),
+                        };
+                        let (join, _) = *join.get_or_insert_with(|| {
+                            let block = builder.create_block();
+                            let CarriedBlockParam::Value(joined) = append_carried_block_param(
+                                builder, block, Representation::Value,
+                            ) else { unreachable!("an alternative transport joins in the value plane") };
+                            (block, joined)
+                        });
+                        builder.ins().jump(join, &[word.word.into()]);
+                    }
+                    SelectedCheckedIhTransportExit::Complete(operand) => {
+                        let block = builder.current_block().ok_or_else(|| unsupported(
+                            LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                            "a completing alternative arm left no current block"))?;
+                        let terminated = builder.func.layout.last_inst(block)
+                            .is_some_and(|inst| builder.func.dfg.insts[inst].opcode().is_terminator());
+                        if !terminated
+                            || !matches!(operand, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ProducerAlternativeSet",
+                                "a completing checked-IH alternative arm did not end in its own closeout"));
+                        }
+                        completed = Some(operand);
+                    }
+                }
+                builder.switch_to_block(next);
+            }
+            let refused = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[refused]);
+            match (join, joined_routing, completed) {
+                (Some((join, joined)), Some((route, role)), _) => {
+                    builder.switch_to_block(join);
+                    Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::forward(
+                        LoweringOperand::Carried(joined), route, role,
+                    )))
+                }
+                (None, None, Some(operand)) => Ok(SelectedCheckedIhTransportExit::Complete(operand)),
+                _ => Err(unsupported(LoweringCause::PlannerInvariant, "ProducerAlternativeSet",
+                    "a checked-IH alternative switch produced no arm")),
+            }
         }
 
         pub(super) fn call_declared_recursive_position_unit(
@@ -1632,12 +1768,9 @@ impl<'a> Lowering<'a> {
                     ),
                 ));
             }
-            if call.local_telescope.len() as u64 != call.arity {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "OrientedSubcontinuationPlanV1",
-                    "checked recursive invocation's local telescope does not cover its arity",
-                ));
-            }
+            // `local_telescope` is the caller occurrence's whole kernel context,
+            // not the callee's parameters; arity is joined above against `params`
+            // and the telescope is bound by the occurrence fingerprint.
             // ── Same-SCC identity and admission.
             //
             // ⭐ **What makes this call *same-SCC* is that its callee is itself a

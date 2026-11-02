@@ -525,12 +525,20 @@ impl<'a> Lowering<'a> {
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
             }
             if exact_nat_family {
-                // A Nat family can arrive as a validated BoundedNat, as a
-                // deforested StructuralNat, or as a represented constructor.
-                // Split on the two existing immediate tags and keep the node
-                // route unchanged for the represented form. The exact Nat case
-                // family is the static authority for this adapter; runtime tags
-                // select only among representations already admitted here.
+                // The three representations select two source arms, not three
+                // copies of their bodies. Immediate predecessors retain their
+                // input tag; represented children retain their projected word.
+                let zero = cases.iter().enumerate().find(|(_, case)| {
+                    case.constructor == self.process_symbols.nat_zero && case.binders == 0
+                }).ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                    "an exact carried Nat match has no Zero arm".to_string()))?;
+                let suc = cases.iter().enumerate().find(|(_, case)| {
+                    case.constructor == self.process_symbols.nat_suc && case.binders == 1
+                }).ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                    "an exact carried Nat match has no Suc arm".to_string()))?;
+                let zero_arm = builder.create_block();
+                let suc_arm = builder.create_block();
+                builder.append_block_param(suc_arm, types::I64);
                 let tag = builder.ins().band_imm(
                     scrutinee.word,
                     crate::boundary_value::BOUNDARY_TAG_MASK as i64,
@@ -550,44 +558,24 @@ impl<'a> Lowering<'a> {
                     tag,
                     BoundaryTag::ImmediateBoundedNat as i64,
                 );
-                builder
-                    .ins()
-                    .brif(is_bounded, bounded, &[], structural_probe, &[]);
-                let mut merge_kind = None;
+                builder.ins().brif(is_bounded, bounded, &[], structural_probe, &[]);
 
                 builder.switch_to_block(bounded);
                 let value = builder.ins().ushr_imm(
                     scrutinee.word,
                     i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
                 );
-                let bounded_result = self.lower_bounded_nat_match_with_plan(
-                    builder,
-                    BoundedNatV1::derived_from_validated(value),
-                    false,
-                    cases,
-                    default,
-                    static_origin,
-                    env,
-                    &join_plan,
-                    composed_suffix,
+                let is_zero = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal, value, 0,
+                );
+                let bounded_suc = builder.create_block();
+                builder.ins().brif(is_zero, zero_arm, &[], bounded_suc, &[]);
+                builder.switch_to_block(bounded_suc);
+                let predecessor = BoundedNatV1::derived_from_validated(value).predecessor(builder);
+                let pred = self.emit_carrier_immediate(
+                    builder, BoundaryTag::ImmediateBoundedNat, predecessor.value,
                 )?;
-                if !self.seal_source_trap_branch(builder, &bounded_result)? {
-                    let merge = merge.ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
-                            "join plan omitted a merge despite a continuing carried BoundedNat predecessor"
-                                .to_string(),
-                        )
-                    })?;
-                    self.jump_planned_join_arm(
-                        builder,
-                        merge,
-                        &join_plan,
-                        static_origin,
-                        bounded_result,
-                        &mut merge_kind,
-                        "a carried BoundedNat representation",
-                    )?;
-                }
+                builder.ins().jump(suc_arm, &[pred.word.into()]);
 
                 builder.switch_to_block(structural_probe);
                 #[cfg(test)]
@@ -605,84 +593,131 @@ impl<'a> Lowering<'a> {
                     tag,
                     structural_tag as i64,
                 );
-                builder
-                    .ins()
-                    .brif(is_structural, structural, &[], represented, &[]);
+                builder.ins().brif(is_structural, structural, &[], represented, &[]);
 
                 builder.switch_to_block(structural);
                 let value = builder.ins().ushr_imm(
                     scrutinee.word,
                     i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
                 );
-                let structural_result = self.lower_bounded_nat_match_with_plan(
-                    builder,
-                    BoundedNatV1::derived_from_validated(value),
-                    true,
-                    cases,
-                    default,
-                    static_origin,
-                    env,
-                    &join_plan,
-                    composed_suffix,
+                let is_zero = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal, value, 0,
+                );
+                let structural_suc = builder.create_block();
+                builder.ins().brif(is_zero, zero_arm, &[], structural_suc, &[]);
+                builder.switch_to_block(structural_suc);
+                let predecessor = BoundedNatV1::derived_from_validated(value).predecessor(builder);
+                let pred = self.emit_carrier_immediate(
+                    builder, BoundaryTag::ImmediateStructuralNat, predecessor.value,
                 )?;
-                if !self.seal_source_trap_branch(builder, &structural_result)? {
-                    let merge = merge.ok_or_else(|| {
-                        backend_module(LoweringCause::PlannerInvariant,
-                            "join plan omitted a merge despite a continuing carried \
-                             StructuralNat predecessor"
-                                .to_string(),
-                        )
-                    })?;
-                    self.jump_planned_join_arm(
-                        builder,
-                        merge,
-                        &join_plan,
-                        static_origin,
-                        structural_result,
-                        &mut merge_kind,
-                        "a carried StructuralNat representation",
-                    )?;
-                }
+                builder.ins().jump(suc_arm, &[pred.word.into()]);
 
                 builder.switch_to_block(represented);
-                let represented_result = self.lower_nonborrowed_carried_match(
-                    builder,
-                    scrutinee,
-                    cases,
-                    default,
-                    static_origin,
-                    env,
-                    &join_plan,
-                    composed_suffix,
-                )?;
-                if !self.seal_source_trap_branch(builder, &represented_result)? {
+                let class = self.emit_carrier_class(builder, scrutinee)?;
+                Self::require_i64(builder, class, BoundaryClass::Constructor as i64);
+                let constructor_tag = self.emit_carrier_tag(builder, scrutinee)?;
+                let field_count = self.emit_carrier_field_count(builder, scrutinee)?;
+                for (arm, (index, case)) in [(zero_arm, zero), (suc_arm, suc)] {
+                    let constructor_identity = self.static_transition_plan
+                        .case_constructor_identity(static_origin, index)?;
+                    let identity = Self::carrier_identity_immediate(
+                        builder, constructor_identity.tag_abi_word()?,
+                    );
+                    let selected = builder.create_block();
+                    let next = builder.create_block();
+                    let matched = builder.ins().icmp(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal,
+                        constructor_tag,
+                        identity,
+                    );
+                    builder.ins().brif(matched, selected, &[], next, &[]);
+                    builder.switch_to_block(selected);
+                    let binders = i64::try_from(case.binders).map_err(|_| {
+                        unsupported(LoweringCause::Capacity,
+                            "BoundaryCarrier",
+                            "a case binds more binders than the carrier ABI can count",
+                        )
+                    })?;
+                    Self::require_i64(builder, field_count, binders);
+                    if arm == suc_arm {
+                        let child = self.emit_carrier_field(builder, scrutinee, 0)?;
+                        let expected = self.static_transition_plan
+                            .recursive_residual_binder_affected(constructor_identity, 0);
+                        #[cfg(feature = "px8-ds-test-support")]
+                        let before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                        #[cfg(feature = "px8-ds-test-support")]
+                        let emit = recursive_residual_guard_enabled(expected);
+                        #[cfg(not(feature = "px8-ds-test-support"))]
+                        let emit = expected;
+                        if emit {
+                            self.refuse_private_recursive_residual(builder, child)?;
+                        }
+                        #[cfg(feature = "px8-ds-test-support")]
+                        record_recursive_residual_match_guard(
+                            "joins", constructor_identity, 0, expected,
+                            recursive_residual_class_calls(builder.func, self.carrier_refs()?.class) - before,
+                        )?;
+                        builder.ins().jump(arm, &[child.word.into()]);
+                    } else {
+                        builder.ins().jump(arm, &[]);
+                    }
+                    builder.switch_to_block(next);
+                }
+                let defaulted = LoweringOperand::Specialized(Lowered::Trap(default.clone()));
+                if !self.seal_source_trap_branch(builder, &defaulted)? {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "Match",
+                        "the carried match's closed default did not seal its branch",
+                    ));
+                }
+
+                let mut merge_kind = None;
+                let mut terminal_trap = None;
+                for (arm, (index, case)) in [(zero_arm, zero), (suc_arm, suc)] {
+                    builder.switch_to_block(arm);
+                    let case_env = if arm == suc_arm {
+                        let pred = CarriedBoundaryWord { word: builder.block_params(arm)[0] };
+                        env_with_operands([LoweringOperand::Carried(pred)], env)
+                    } else {
+                        env.to_vec()
+                    };
+                    let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                    let lowered = match composed_suffix {
+                        Some(suffix) if !suffix.is_empty() => {
+                            self.lower_computational_producer_expr(builder, body, &case_env, suffix)?
+                        }
+                        Some(_) | None => self.lower_expr(builder, body, &case_env)?,
+                    };
+                    if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
+                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    }
+                    if self.seal_source_trap_branch(builder, &lowered)? {
+                        continue;
+                    }
                     let merge = merge.ok_or_else(|| {
                         backend_module(LoweringCause::PlannerInvariant,
-                            "join plan omitted a merge despite a continuing carried Nat constructor predecessor"
+                            "join plan omitted a merge despite a continuing carried Nat arm"
                                 .to_string(),
                         )
                     })?;
                     self.jump_planned_join_arm(
-                        builder,
-                        merge,
-                        &join_plan,
-                        static_origin,
-                        represented_result,
-                        &mut merge_kind,
-                        "a carried Nat constructor representation",
+                        builder, merge, &join_plan, body.static_origin,
+                        lowered, &mut merge_kind, "a carried Nat arm",
                     )?;
                 }
-
                 let Some(merge) = merge else {
                     let unreachable = builder.create_block();
                     builder.switch_to_block(unreachable);
-                    return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
+                    let trap = terminal_trap.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "a carried Nat join has neither a continuing arm nor a source trap"
+                                .to_string(),
+                        )
+                    })?;
+                    return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
                 };
                 return self.finish_planned_join(
-                    builder,
-                    merge,
-                    &join_plan,
-                    merge_kind,
+                    builder, merge, &join_plan, merge_kind,
                     "a carried Nat representation split",
                 );
             }

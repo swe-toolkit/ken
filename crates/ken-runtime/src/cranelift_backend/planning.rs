@@ -48,6 +48,8 @@ pub use static_transition::{
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
     with_bracket_ordinary_owner_mutation,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
+    with_producer_alternative_reader_negative_observations,
+    ProducerAlternativeReaderNegativeObservation,
     with_pending_checked_ret_sink_applications,
     with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
     PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic, PerEmitterOwnerDiagnostic,
@@ -92,6 +94,7 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
 pub(in crate::cranelift_backend) use static_transition::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim, TransportCarriedClaim,
+    ProducerAlternativeSet, ProducerResultResolution,
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
     FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
     PendingVisRecordProtocol, ResponseOwnerSettlement, BracketSettlement,
@@ -151,7 +154,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhCapabilityInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    CheckedIhTransportResolution, CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
     StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,

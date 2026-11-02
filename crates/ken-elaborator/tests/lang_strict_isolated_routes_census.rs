@@ -27,10 +27,13 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Promise class: transition sentinel. The input is the behavior of Ken
 /// sources in examples/, conformance/, and crates/*/tests, not the spelling,
 /// placement, line counts, or prose of any repository file. The AC-0 measured
-/// 91 files, 62 Legacy-clean, 12 Strict-clean, 50 Strict-UnboundName. This
-/// WP adds six Ken fixtures: five refuse in Legacy for their intended Console
-/// escape, while qa_higher_order_let is Legacy-clean and Strict-UnboundName
-/// at `host_bind`. The resulting boundary is 97/63/12/51. Future homes and
+/// 91 files, 62 Legacy-clean, 12 Strict-clean, 50 Strict-UnboundName.
+/// LANG-EFFECT-ROW-LOCAL-LATENT added six Ken fixtures: five refuse in
+/// Legacy for their intended Console escape; qa_higher_order_let is
+/// Legacy-clean and Strict-UnboundName at `host_bind`. That WP's boundary
+/// was 97/63/12/51. PX10-NATIVE-BRANCH-ALTERNATIVES Increment 2 adds
+/// px10_native_tested_pending_overlap.ken, which is Legacy-clean and
+/// Strict-UnboundName. The boundary is now 98/64/12/52. Future homes and
 /// source migrations turn this sentinel red by design. Increment 3's strict
 /// route switch and migration retire it in favor of AC-3a's acceptance gate
 /// for every cut-base Legacy-clean isolated file.
@@ -88,6 +91,6 @@ fn strict_isolated_frontier_before_increment_three_route_switch() {
     eprintln!("isolated strict frontier: files={} legacy_clean={legacy_clean} strict_clean={strict_clean} strict_unbound={strict_unbound}", files.len());
     assert_eq!(
         (files.len(), legacy_clean, strict_clean, strict_unbound),
-        (97, 63, 12, 51)
+        (98, 64, 12, 52)
     );
 }

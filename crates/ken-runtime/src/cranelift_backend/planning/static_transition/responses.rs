@@ -311,6 +311,8 @@ enum RequiredConsumerIncomingEdgeSelection {
     CallerCompleted {
         caller_cut: CheckedIhDetachedCallerCut,
         caller_exit_index: usize,
+        /// Index into the whole selected exit chain, as in `SelfDefining`.
+        /// Below `caller_exit_index`, the owner completed the consumer.
         incoming_consumer_edge_index: usize,
     },
     /// The defining call has no caller and completed none of its exit chain.
@@ -358,6 +360,21 @@ impl<'plan> RequiredConsumerIncomingEdge<'plan> {
             | RequiredConsumerIncomingEdgeSelection::SelfDefining {
                 incoming_consumer_edge_index,
             } => *incoming_consumer_edge_index,
+        }
+    }
+
+    /// The consumer's edge within `executable_exits`, or `None` when the owner
+    /// completed it before the caller cut.
+    pub(in crate::cranelift_backend) fn executable_consumer_edge_index(&self) -> Option<usize> {
+        match self.selection {
+            RequiredConsumerIncomingEdgeSelection::CallerCompleted {
+                caller_exit_index,
+                incoming_consumer_edge_index,
+                ..
+            } => (*incoming_consumer_edge_index).checked_sub(*caller_exit_index),
+            RequiredConsumerIncomingEdgeSelection::SelfDefining {
+                incoming_consumer_edge_index,
+            } => Some(*incoming_consumer_edge_index),
         }
     }
 }
@@ -416,8 +433,7 @@ impl CheckedIhStaticResponseReturnBoundary {
         if caller_cut.producer_transport() != self.consumer.transport()
             || *caller_exit_index
                 != checked_ih_post_call_caller_exit_index(&self.consumer, caller_cut)?
-            || *incoming_consumer_edge_index
-                >= self.consumer.selected_case_exits()[*caller_exit_index..].len()
+            || *incoming_consumer_edge_index >= self.consumer.selected_case_exits().len()
         {
             return Err(planner_error(
                 "a static-response return boundary disagrees with its caller-completed consumer edge",
@@ -482,33 +498,36 @@ fn checked_ih_post_call_caller_exit_index(
     Ok(index)
 }
 
+/// The required consumer's exact edge in the WHOLE selected exit chain, by the
+/// destination's own (eliminator, checked frame) identity, as the self-defining
+/// edge selects it. An index below `caller_exit_index` means the owner
+/// completed the consumer before the caller cut. Containment is not an
+/// identity: it also holds for every ancestor eliminator, including the
+/// consumed continuation's own exit.
 fn checked_ih_caller_completed_required_consumer_edge_index(
-    plan: &StaticTransitionPlan<'_>,
     consumer: &CheckedIhPostCallConsumer,
-    caller_exit_index: usize,
 ) -> Result<usize, CraneliftBackendError> {
     let required_call = consumer.required_consumer().ok_or_else(|| {
         planner_error("a caller-completed required-consumer edge has no exact destination")
     })?;
-    let (consumer_origin, _) = required_call.destination().consumer_occurrence();
-    let executable_exits = &consumer.selected_case_exits()[caller_exit_index..];
-    let mut matching = Vec::new();
-    for (index, step) in executable_exits.iter().enumerate() {
-        if occurrence_subtree_contains(
-            plan,
-            step.occurrence().eliminator_origin(),
-            consumer_origin,
-        )? {
-            matching.push(index);
-        }
-    }
+    let consumer_occurrence = required_call.destination().consumer_occurrence();
+    let matching = consumer
+        .selected_case_exits()
+        .iter()
+        .enumerate()
+        .filter(|(_, step)| {
+            (step.occurrence().eliminator_origin(), step.checked_frame_id())
+                == consumer_occurrence
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
     match matching.as_slice() {
         [index] => Ok(*index),
         [] => Err(planner_error(
             "a caller-completed required consumer has no exact incoming edge",
         )),
         _ => Err(planner_error(
-            "a caller-completed required consumer has more than one incoming edge",
+            "a caller-completed required consumer has more than one exact incoming edge",
         )),
     }
 }
@@ -616,7 +635,9 @@ impl CheckedIhPostCallConsumer {
         let Some(edge) = self.required_consumer_incoming_edge()? else {
             return Ok(None);
         };
-        let index = edge.incoming_consumer_edge_index();
+        let index = edge.executable_consumer_edge_index().ok_or_else(|| {
+            planner_error("an owner-completed required consumer has no executable incoming edge")
+        })?;
         Ok(Some(&edge.executable_exits()[index..]))
     }
 }
@@ -3950,9 +3971,10 @@ impl StaticTransitionPlan<'_> {
         #[cfg(not(feature = "px8-ds-test-support"))]
         let _ = count_install_applications;
         // Execute-then-resume serves a composed response plane: at least two
-        // producer groups have exclusively predeclared transport sources.
-        // A producer that also has a specialization/fusion-owned source is a
-        // mixed-owner fan-out and does not increase the composition count. When
+        // producer instances (call, provenance owner) have exclusively
+        // predeclared transport sources. An instance that also has a
+        // specialization/fusion-owned source is a mixed-owner fan-out and
+        // does not increase the composition count. When
         // P1 is present it also cannot borrow the ordinary groups' promotion
         // authority; P1-free composed planes preserve their existing promotion.
         // This keeps single-stage and P1-bearing mixed-owner residuals on their
@@ -5411,7 +5433,7 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn checked_ih_static_response_return_boundary(
         &self,
         selected_caller: &ContinuationCallIdentity,
-    ) -> Result<Option<CheckedIhStaticResponseReturnBoundary>, CraneliftBackendError> {
+    ) -> Result<Option<Vec<CheckedIhStaticResponseReturnBoundary>>, CraneliftBackendError> {
         let owners = self
             .static_response_owner_specializations()?
             .map_err(|infeasible| {
@@ -5519,10 +5541,27 @@ impl StaticTransitionPlan<'_> {
                 .any(|returned| {
                     returned.context == owner.k_context() && !returned.members.is_empty()
                 }),
-            Some(
-                super::returned_vis::ResponseOwnerSettlement::RetOnly
-                | super::returned_vis::ResponseOwnerSettlement::Excluded { .. },
-            ) => false,
+            // An Excluded owner has no protocol record, but its K context may
+            // still return an ordinary successor Vis: that member, like a
+            // Protocol member, is not a Ret publication of K. Relay and
+            // bracket-settlement members keep their baseline treatment.
+            Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
+                reason: super::returned_vis::ExcludedSettlement::Relay,
+            }) => self
+                .returned_vis_protocol(row.vis_origin())?
+                .contexts
+                .iter()
+                .filter(|returned| returned.context == owner.k_context())
+                .flat_map(|returned| &returned.members)
+                .any(|member| !member.relay && member.bracket.is_none()),
+            Some(super::returned_vis::ResponseOwnerSettlement::RetOnly) => false,
+            Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
+                reason: super::returned_vis::ExcludedSettlement::Underived(_),
+            }) => {
+                return Err(planner_error(
+                    "a static-response return boundary names an Underived response owner",
+                ))
+            }
             None => {
                 return Err(planner_error(
                     "a static-response return boundary names a response row with no owner settlement",
@@ -5539,9 +5578,7 @@ impl StaticTransitionPlan<'_> {
             .iter()
             .filter(|transport| transport.source_call_identity() == selected_caller)
         {
-            let Some(caller_cut) = self.checked_ih_detached_caller_cut(caller_transport)? else {
-                continue;
-            };
+            for caller_cut in self.checked_ih_detached_caller_cuts(caller_transport)? {
             let matching_consumers = self
                 .checked_ih_post_call_consumers
                 .iter()
@@ -5572,11 +5609,7 @@ impl StaticTransitionPlan<'_> {
             let caller_exit_index =
                 checked_ih_post_call_caller_exit_index(&consumer, &caller_cut)?;
             let incoming_consumer_edge_index =
-                checked_ih_caller_completed_required_consumer_edge_index(
-                    self,
-                    &consumer,
-                    caller_exit_index,
-                )?;
+                checked_ih_caller_completed_required_consumer_edge_index(&consumer)?;
             let boundary = CheckedIhStaticResponseReturnBoundary {
                 response: row.clone(),
                 owner: owner.clone(),
@@ -5590,6 +5623,7 @@ impl StaticTransitionPlan<'_> {
             };
             boundary.required_consumer_incoming_edge()?;
             boundaries.push(boundary);
+            }
         }
         #[cfg(feature = "px8-ds-test-support")]
         if !boundaries.is_empty()
@@ -5601,17 +5635,25 @@ impl StaticTransitionPlan<'_> {
         }
         match boundaries.as_slice() {
             [] => Ok(None),
-            [boundary] => Ok(Some(boundary.clone())),
-            _ => Err(planner_error(
-                "one selected static-response caller has more than one complete detached return boundary",
-            )),
+            [boundary] => Ok(Some(vec![boundary.clone()])),
+            _ => {
+                let members = boundaries.iter().map(|boundary| {
+                    boundary.caller_cut().producer_transport().source_call_identity()
+                }).collect::<Vec<_>>();
+                match self.resolve_producer_alternative_members(&members)? {
+                    super::ProducerResultResolution::Alternatives(_) => Ok(Some(boundaries)),
+                    super::ProducerResultResolution::Single => Err(planner_error(
+                        "one selected static-response caller has more than one complete detached return boundary",
+                    )),
+                }
+            }
         }
     }
 
-    pub(in crate::cranelift_backend) fn checked_ih_detached_caller_cut(
+    pub(in crate::cranelift_backend) fn checked_ih_detached_caller_cuts(
         &self,
         caller_transport: &CheckedIhEnvironmentTransport,
-    ) -> Result<Option<CheckedIhDetachedCallerCut>, CraneliftBackendError> {
+    ) -> Result<Vec<CheckedIhDetachedCallerCut>, CraneliftBackendError> {
         let mut matches = Vec::new();
         let mut saw_boundary = false;
         for row in &self.checked_ih_post_call_consumers {
@@ -5626,11 +5668,17 @@ impl StaticTransitionPlan<'_> {
             [] if saw_boundary => Err(planner_error(
                 "a detached checked-IH caller cut has no exact producer-to-caller transport endpoint join",
             )),
-            [] => Ok(None),
-            [cut] => Ok(Some(cut.clone())),
-            _ => Err(planner_error(
-                "one checked-IH caller transport has more than one detached source return cut",
-            )),
+            [] | [_] => Ok(matches),
+            _ => {
+                let members = matches.iter().map(|cut| cut.producer_transport().source_call_identity())
+                    .collect::<Vec<_>>();
+                match self.resolve_producer_alternative_members(&members)? {
+                    super::ProducerResultResolution::Alternatives(_) => Ok(matches),
+                    super::ProducerResultResolution::Single => Err(planner_error(
+                        "one checked-IH caller transport has more than one detached source return cut",
+                    )),
+                }
+            }
         }
     }
 

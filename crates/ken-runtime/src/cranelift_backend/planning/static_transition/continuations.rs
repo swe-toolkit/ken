@@ -1546,6 +1546,15 @@ impl ContinuationCallIdentity {
     pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
         self.token.producer_construct_origin
     }
+
+    /// Test-only foreign member: keep the issued result and emission owner,
+    /// changing only the recursive position that participates in identity.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn with_test_recursive_position(&self, position: u32) -> Self {
+        let mut foreign = self.clone();
+        foreign.recursive_position = position;
+        foreign
+    }
 }
 
 /// The direct callee selected by the response-owner resolver, shared by
