@@ -1,7 +1,7 @@
 ---
 id: PX10-NATIVE-BRANCH-ALTERNATIVES
 title: "The native static-transition plan assumes every continuation result has exactly one producer construct, so a result that joins two Vis alternatives chosen by a runtime scrutinee refuses at the detached-result seat, the caller cut and the invocation transport. A producer call whose transport sources mix a predeclared and a specialization owner refuses as a mixed-owner relay. PX10's withChild fixtures hit one or the other. Lift both refusals for these shapes without weakening any guard for static results, and bring the three fixtures to native build with interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
