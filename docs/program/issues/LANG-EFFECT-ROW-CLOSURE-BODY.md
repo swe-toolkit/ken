@@ -23,9 +23,14 @@ gate then refuses `p5`.
 
 ## Settled inputs (main `3aaea53e4`)
 
-- **The rule.** Spec 36 §1.2 joins every subexpression's row, and §1.4
-  makes the escape check the single soundness-relevant gate. Globals
-  already pay their row where they are named (`RCon -> row(g)`).
+- **The rule.** Spec 36 §1.2 gives `λ` the row ∅ and defers its body's
+  row to the arrow's latent, which §1.3 releases at the call; §1.4 makes
+  the escape check the single soundness-relevant gate. The as-built
+  plane carries no inferred arrow latent, since the kernel Pi erases
+  rows, so a closure is charged where it is built. That is a sound
+  over-approximation of §1.2 and §1.3, the policy the plane already
+  applies: globals pay where they are named (`RCon -> row(g)`)
+  (Architect AC-0 evt_1sygjr8yf6cgd).
 - **As built.** In `infer_expr_row_type` (`elab.rs:17767`), the `RLam`
   arm (`:17795`) returns the empty row and does not walk the body. No
   consumer releases a closure's row when a higher-order function such as
