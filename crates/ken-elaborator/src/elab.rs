@@ -2112,6 +2112,17 @@ fn bind_let_core(
         .fold(Term::const_(bind_id, vec![]), Term::app))
 }
 
+/// Whether a `let` can take the `36 §2.4` sequenced arm. It reads only
+/// the syntactic row plane and the expected type, so an ordinary `let`
+/// holds a `bool` in its frame and none of the arm's temporaries.
+#[inline(never)]
+fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bool {
+    let Some(rows) = cx.effect_rows else { return false };
+    cx.numeric_env.effect_sequencing_ids().is_some()
+        && infer_expr_row_type(rhs, &rows, None) != crate::effects::RowType::empty()
+        && expected.map_or(true, |expected| let_itree_parts(cx, expected).is_some())
+}
+
 /// The `36 §2.4` sequenced arm of `check_let_once`, outlined so its
 /// locals never enlarge the frame every ordinary checked `let` holds
 /// across its body (row M of elab_recursive_frame_budget).
@@ -2120,14 +2131,14 @@ fn check_performed_let(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
     expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
-) -> Result<Option<Term>, ElabError> {
+) -> Result<Term, ElabError> {
     let Some(expected_tree) = let_itree_parts(cx, expected) else {
-        return Ok(None);
+        return check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, false);
     };
     let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
         prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
     else {
-        return Ok(None);
+        return check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, false);
     };
     if !let_signature_matches(cx, &rhs_tree, &expected_tree) {
         return Err(let_inclusion_unavailable(span, &rhs_tree, &expected_tree));
@@ -2151,7 +2162,6 @@ fn check_performed_let(
     bind_let_core(
         cx, &rhs_tree, expected_tree.2, rhs_core, &rhs_ty, binder_ty, body_core,
     )
-    .map(Some)
 }
 
 /// Check a local `let` outside `check`'s always-paid recursive frame. The
@@ -2170,13 +2180,13 @@ fn check_let(
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
     let snapshot = refinement_snapshot::Snapshot::capture(cx);
-    let first = check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates);
+    let first = check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, true);
     let result = match first {
         Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
             if requested == split_id => {
             snapshot.rollback(cx)?;
             cx.convoy_splits.insert(split_id);
-            check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates)
+            check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, true)
         }
         other => other,
     };
@@ -2189,11 +2199,10 @@ fn check_let_once(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
     expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
+    sequencing: bool,
 ) -> Result<Term, ElabError> {
-    if let Some(core) =
-        check_performed_let(cx, ty_opt, rhs, body, expected, span, result_predicates)?
-    {
-        return Ok(core);
+    if sequencing && let_may_perform(cx, rhs, Some(expected)) {
+        return check_performed_let(cx, ty_opt, rhs, body, expected, span, result_predicates);
     }
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
@@ -14252,13 +14261,13 @@ fn infer_let(
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
     let snapshot = refinement_snapshot::Snapshot::capture(cx);
-    let first = infer_let_once(cx, ty_opt, rhs, body, span);
+    let first = infer_let_once(cx, ty_opt, rhs, body, span, true);
     let result = match first {
         Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
             if requested == split_id => {
             snapshot.rollback(cx)?;
             cx.convoy_splits.insert(split_id);
-            infer_let_once(cx, ty_opt, rhs, body, span)
+            infer_let_once(cx, ty_opt, rhs, body, span, true)
         }
         other => other,
     };
@@ -14272,11 +14281,11 @@ fn infer_let(
 fn infer_performed_let(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
-) -> Result<Option<(Term, Term)>, ElabError> {
+) -> Result<(Term, Term), ElabError> {
     let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
         prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
     else {
-        return Ok(None);
+        return infer_let_once(cx, ty_opt, rhs, body, span, false);
     };
     if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
         return Err(ElabError::TypeMismatch {
@@ -14339,16 +14348,17 @@ fn infer_performed_let(
         .expect("performed RHS has checked ITree IDs");
     let tree_ty = [rhs_tree.0, rhs_tree.1, result_ty]
         .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app);
-    Ok(Some((core, tree_ty)))
+    Ok((core, tree_ty))
 }
 
 #[inline(never)]
 fn infer_let_once(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
+    sequencing: bool,
 ) -> Result<(Term, Term), ElabError> {
-    if let Some(result) = infer_performed_let(cx, ty_opt, rhs, body, span)? {
-        return Ok(result);
+    if sequencing && let_may_perform(cx, rhs, None) {
+        return infer_performed_let(cx, ty_opt, rhs, body, span);
     }
     let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
