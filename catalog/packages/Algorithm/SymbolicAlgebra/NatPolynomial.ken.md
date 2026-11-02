@@ -1193,6 +1193,27 @@ pub theorem deriv_substitute
           (deriv_substitute v s b env hv hw))
   }
 
+pub theorem deriv_const_factor
+      (v : Nat) (k : Nat) (e : Expr)
+    : IsTrue (poly_eq (deriv v (EMul (EConst k) e)) (EMul (EConst k) (deriv v e))) =
+  poly_eq_complete
+    (deriv v (EMul (EConst k) e))
+    (EMul (EConst k) (deriv v e))
+    (λenv.
+      trans
+        Nat
+        (add (mul Zero (eval env e)) (mul k (eval env (deriv v e))))
+        (add Zero (mul k (eval env (deriv v e))))
+        (mul k (eval env (deriv v e)))
+        (cong
+          Nat
+          Nat
+          (mul Zero (eval env e))
+          Zero
+          (λt. add t (mul k (eval env (deriv v e))))
+          ((proof zero_l for mul) (eval env e)))
+        ((proof zero_l for add) (mul k (eval env (deriv v e)))))
+
 pub theorem normalize_poly_eq (e : Expr) : IsTrue (poly_eq (normalize e) e) =
   poly_eq_complete (normalize e) e (λenv. normalize_sound env e)
 
@@ -2898,6 +2919,15 @@ then lifts the induction hypotheses through multiplication and addition
 congruence. Both new comparison helpers remain private; no equality of
 expression trees or every-environment substitution claim follows.
 
+`deriv_const_factor` proves canonical equality of a left constant factor and
+its derivative by applying `poly_eq_complete` to their evaluations. The product
+rule leaves a zero-left product that does not reduce for a variable environment;
+`zero_l for mul` removes it under `cong`, and `zero_l for add` finishes the
+`trans` chain. The right-constant-factor form is a one-call consequence of
+`poly_eq_complete` with a reflexive evaluation, not a separate export: its
+zero-right product and sum reduce definitionally. Neither form claims that the
+expression trees are structurally equal.
+
 `normalize_poly_eq` composes `normalize_sound` with `poly_eq_complete` to show
 that the normalized expression and its source have the same polynomial
 function. `deriv_normalize` and `substitute_normalize` apply the existing
@@ -2946,7 +2976,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–11 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–12 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -2955,6 +2985,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
 [independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md),
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
+[constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md), and
@@ -2963,7 +2994,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and twenty-seven checked theorems; Horner, substitution and differentiation
+and twenty-eight checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -2979,7 +3010,12 @@ before and after loading the package on its providers. The §11 package test
 applies all three laws at arbitrary expressions, accepts a `Proved` decision
 for equal polynomials, and refuses a false decision with the same proof form.
 Its closed examples are separate from any conformance seed and do not
-establish official conformance execution. The extension adds no Axiom,
-postulate, primitive,
-or foreign operation; inherited trust from the prelude and dependencies
-remains distinct from local trust.
+establish official conformance execution. The §12 package test applies the
+premise-free generic law under a selective import, checks its owner, checked
+body and unchanged trusted-`GlobalId` identities, then checks the actual
+constant-factor seed's complete accepted client before its isolated
+`Proved` refusal. The accepted control retains the derivative on the right;
+the refused claim drops it. Package tests are not official conformance-runner
+execution or CI. The extension adds no Axiom, postulate, primitive or foreign
+operation; inherited trust from the prelude and dependencies remains distinct
+from local trust.
