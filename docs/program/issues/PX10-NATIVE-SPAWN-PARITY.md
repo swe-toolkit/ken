@@ -80,7 +80,12 @@ base, stop and report the mismatch; do not build around it.
   interpreter. This includes native run parity for the smoke,
   argv_env_pipe and live_child fixtures, which
   `PX10-NATIVE-BRANCH-ALTERNATIVES` brings only to native build
-  (Architect evt_4qb22p4991jmm).
+  (Architect evt_4qb22p4991jmm). Those fixtures issue 3, 4 and 4
+  producer alternative sets, so these rows are also the labelled
+  transport's execution parity (evt_573z7twxznjt9). A mutant that swaps
+  two members' labels at the writer reddens one of them, and a mutant
+  that writes the bare payload without its label is caught at run time
+  by the reader assertion.
 - **AC-1b (settlement).** For a `withChild` body that takes stdout and
   waits, the trace settles the `PipeRead` and the `SpawnPlan` exactly
   once each, before the child, in reverse acquisition order, on both
@@ -101,8 +106,9 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
 - **Increment A** is the settlement repair (R1) and AC-1b on the
   interpreter. It lands on its own.
 - **Increment B** is R2, R3, the recipe rows, the promotion, the gate
-  deletion and native parity. It waits for `PX10-NATIVE-SITE-IDENTITY`
-  and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
+  deletion and native parity. It also deletes BRANCH-ALTERNATIVES'
+  AC-2g containment once its parity rows exist. It waits for
+  `PX10-NATIVE-SITE-IDENTITY` and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
 
 The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6) has five entries:
