@@ -171,6 +171,51 @@ fn theorem<'a>(decls: &'a [SourceDecl], name: &str) -> (&'a SourceType, &'a Sour
     *one
 }
 
+fn expr_applied<'a>(expr: &'a SourceExpr, name: &str) -> Vec<&'a SourceExpr> {
+    let mut args = Vec::new();
+    let mut head = expr;
+    while let SourceExpr::EApp(function, argument, _) = head {
+        args.push(argument.as_ref());
+        head = function;
+    }
+    args.reverse();
+    assert!(
+        matches!(head, SourceExpr::EVar(actual, _) if actual == name),
+        "expected checked law {name}, found {head:?}"
+    );
+    args
+}
+
+fn expr_shape(expr: &SourceExpr) -> String {
+    match expr {
+        SourceExpr::EVar(name, _) | SourceExpr::ECon(name, _) => format!("name:{name}"),
+        SourceExpr::EApp(function, argument, _) => {
+            format!("({} {})", expr_shape(function), expr_shape(argument))
+        }
+        other => panic!("unexpected seed law application: {other:?}"),
+    }
+}
+
+fn assert_law_instance(decls: &[SourceDecl], name: &str, selector: &str, empty: bool) {
+    let (_, body) = theorem(decls, name);
+    let law = format!("arg{selector}_option_cost_order_invariant");
+    let [candidate, cost, transform, same_order, list] = expr_applied(body, &law)
+        .try_into()
+        .expect("five generic law arguments");
+    assert_eq!(expr_shape(candidate), "name:Nat");
+    assert_eq!(expr_shape(cost), "name:label_cost");
+    assert_eq!(expr_shape(transform), "name:shifted");
+    assert_eq!(expr_shape(same_order), "name:add_three_same_order");
+    assert_eq!(
+        expr_shape(list),
+        if empty {
+            "(name:Nil name:Nat)"
+        } else {
+            "name:labelled"
+        }
+    );
+}
+
 fn assert_selected_output(
     decls: &[SourceDecl],
     name: &str,
@@ -276,6 +321,14 @@ fn assert_control_and_refusal(control: &SourceType, refusal: &SourceType, select
 fn actual_seed_accepts_and_both_flattened_claims_refuse_at_own_proved_form() {
     let accepted = seed_case("min_law_on_tie");
     let positives = parse_decls(accepted).expect("full accepted seed parses");
+    for (name, selector, empty) in [
+        ("min_law_on_tie", "min", false),
+        ("min_law_on_nil", "min", true),
+        ("max_law_on_tie", "max", false),
+        ("max_law_on_nil", "max", true),
+    ] {
+        assert_law_instance(&positives, name, selector, empty);
+    }
     let mut positive = package_env();
     positive
         .elaborate_file(accepted)
