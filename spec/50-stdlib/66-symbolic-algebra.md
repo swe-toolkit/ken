@@ -10,7 +10,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION §8;
 > SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT §9;
 > SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10;
-> SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11).** The §1–9 catalog
+> SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11;
+> SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12).** The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
 > conformance or landed trust. Section 8's conditional
@@ -32,7 +33,22 @@
 > red/restored on assembled tip `073725e`. No test or mutation reran
 > on the subsequent catalog-prose-only `dd6f1` child. CV authored the
 > seed but did not Ken-check or officially conformance-run it. No CI,
-> publication, landing or landed trust is claimed.
+> publication, landing or landed trust is claimed. Section 11's three
+> checked equivalence theorems, seed and package-owned test are on this
+> base; candidate-local evidence is not official conformance-runner
+> execution or measured landed trust. Section 12 states one premise-free
+> constant-factor derivative law. Architect AC-0 on `bddc92ad3` checked
+> the generic proof and closed discriminator in scratch with rc 0,
+> no `Axiom` and identical trusted GlobalId sets 114 → 114; its probe
+> test passed 2/2. The historical Spec-only child `a45b84e43` lacked
+> the §12 catalog export, package test and CV seed. Foundation reports
+> in `evt_62fdfyzp5r2nn` that its assembled working tree has all three:
+> `ken fmt --check` and `ken check` rc 0, the named package test 2/2
+> against the actual CV seed fences, unchanged full preloaded-provider
+> trusted GlobalId sets 114 → 114, an owner-local Transparent check and
+> a selective-import generic client. These are Foundation's working-tree
+> results, not an exact committed-tip gate, official conformance-runner
+> execution, CI, publication, landing or measured landed trust.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -1038,3 +1054,78 @@ Boolean canonical decision, not structural `Equal Expr` laws or
 function equalities. No further premise, new helper, postulate,
 primitive, kernel or surface change, or alteration to any §1–§10
 operation or law type is required.
+
+## 12. Differentiation through a constant left factor
+
+> **Section 12 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR).** Architect AC-0
+> on landed base `bddc92ad3` checked the proposed generic body with
+> `ken check` and `ken fmt --check` rc 0, no `Axiom`, identical scratch
+> `trusted_base()` GlobalId identity sets 114 → 114, and a scratch
+> probe test 2/2. The historical Spec-only child `a45b84e43`
+> stated the law type without the §12 catalog theorem, package test or
+> CV seed. Foundation reports in `evt_62fdfyzp5r2nn` that its assembled
+> working tree includes all three. `ken fmt --check` and `ken check`
+> returned rc 0; `cat_symbolic_algebra_deriv_constant_factor` passed
+> 2/2 against the actual CV seed's accepted and isolated refused fences.
+> The full trusted GlobalId set after provider preload was unchanged
+> at 114 → 114 on loading NatPolynomial; the owner-local Transparent
+> assertion and selective-import generic client passed. These reported
+> working-tree checks are separate from Architect's scratch results and
+> do not establish an exact committed-tip gate, official conformance-
+> runner execution, CI, publication, landing or measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent theorem, immediately after `deriv_substitute` and before
+`normalize_poly_eq`. Its argument order is derivative variable `v`,
+constant coefficient `k`, then expression `e`. It has no premise:
+
+```ken
+pub theorem deriv_const_factor
+      (v : Nat) (k : Nat) (e : Expr)
+    : IsTrue (poly_eq (deriv v (EMul (EConst k) e)) (EMul (EConst k) (deriv v e)))
+```
+
+The result is canonical **semantic** equality as observed by `poly_eq`,
+not structural `Equal Expr` between the product-rule syntax and the
+factored expression. It holds for every variable, natural constant
+and expression, including ones whose derivative is zero, with no
+environment or nonzero premise. The product rule (§5) leaves the
+left-hand summand `EMul (EConst Zero) e`. At a generic environment,
+that summand evaluates to `mul Zero (eval env e)` inside
+`add (mul Zero (eval env e)) (mul k (eval env (deriv v e)))`.
+Nat `mul` and `add` recurse on their **second** arguments, so the
+zero-left multiplication and subsequent `add Zero _` do not reduce
+for arbitrary `e`. The checked proof uses the public
+`(proof zero_l for mul)` under `cong`, then
+`(proof zero_l for add)` under `trans` to show the two evaluations
+are equal at every environment. Public `poly_eq_complete` returns
+the theorem's `IsTrue` decision. No new private helper, import,
+axiom, kernel rule or surface form is needed; all §§1–11 operations
+and law types remain unchanged.
+
+**Right-factor corollary, not an export.** The analogous expression
+`deriv v (EMul e (EConst k))` is canonically equal to
+`EMul (deriv v e) (EConst k)`, but this form needs no separate public
+theorem. Its zero summand evaluates to `mul (eval env e) Zero` under
+`add _ Zero`; both reduce by the existing definitions. A client can
+therefore apply public `poly_eq_complete` once with `(λenv. Refl)`
+to prove the right-factor `IsTrue (poly_eq …)` result. This is **not**
+a consequence of treating `poly_eq_mul` as commutativity:
+`poly_eq_mul` supplies congruence of a fixed multiplication order,
+not a swap, and no factor-reordering theorem is introduced.
+
+The CV-owned closed seed can apply `deriv_const_factor Zero two`
+where `two = Suc (Suc Zero)` to `EVar Zero` and to
+`EMul (EVar Zero) (EVar (Suc Zero))`. Its accepted same-form
+`Proved` control states that `deriv Zero (EMul (EConst two)
+(EVar Zero))` is canonically equal to
+`EMul (EConst two) (deriv Zero (EVar Zero))`. The isolated false
+claim keeps that left side but replaces the right with
+`EMul (EConst two) (EVar Zero)`, dropping the derivative. Architect
+AC-0 measured `KernelRejected TypeMismatch` on the false `Proved`
+row while the control accepts. A structural `Equal Expr` with `Refl`
+was refused for its proof form in scratch and cannot discriminate the
+false canonical-equality claim. These finite rows distinguish the
+missing derivative but do not replace the generic checked proof or
+establish official conformance-runner execution.
