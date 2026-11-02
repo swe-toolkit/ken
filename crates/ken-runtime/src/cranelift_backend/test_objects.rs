@@ -74,6 +74,7 @@ pub(crate) fn emit_process_entrypoint_object_with_cranelift(
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
     let trap_catalog = compiled.trap_catalog().to_vec();
+    compiled.require_alternative_transport_contained(false)?;
     let object_bytes = compiled
         .module
         .finish()
@@ -511,6 +512,7 @@ pub(crate) fn emit_px8tr_nested_post_effect_object_with_plan(
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
     let trap_catalog = compiled.trap_catalog().to_vec();
+    compiled.require_alternative_transport_contained(false)?;
     let object_bytes = compiled
         .module
         .finish()

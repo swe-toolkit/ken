@@ -29,6 +29,48 @@ fn emit_below_gate(
     )
 }
 
+/// Promise class: transition sentinel, retired when PX10-NATIVE-SPAWN-PARITY
+/// promotes Process and removes the labelled-transport containment.
+/// MEASURED: removing the Process bit from the checked smoke preparation
+/// refuses its issued transport before object finish, on the named construct.
+/// CLAIMED: the census-only emission route cannot ship unexecuted transport
+/// merely because a caller mistakenly treats the plan as Process-free.
+/// THE GAP: this test does not establish labelled-transport execution parity.
+#[test]
+fn px10_set_issuing_smoke_without_process_gate_refuses_containment() {
+    in_census_thread("px10-containment-without-process-bit", || {
+        let mut preparation = prepare_native_program_sources(
+            "px10_containment_without_process_bit",
+            vec![CompilerSource::new("src/main.ken", SMOKE)],
+        )
+        .expect("smoke prepares");
+        assert!(
+            preparation.plan.process_declared,
+            "the original plan is gated"
+        );
+        preparation.plan.process_declared = false;
+        let root = tempfile::tempdir().expect("census output root");
+        let error = emit_native_program_preparation(
+            preparation,
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .expect_err("an ungated set-issuing plan cannot emit an artifact");
+        let NativeProgramBuildError::Packaging(error) = error else {
+            panic!("expected a packaging refusal, got {error:?}");
+        };
+        assert_eq!(
+            error.stage,
+            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
+        );
+        assert_eq!(
+            error.source_cause,
+            Some(ken_runtime::LoweringCause::Fragment)
+        );
+        assert!(error.reason.contains("ProducerAlternativeSet"), "{error:?}");
+    });
+}
+
 fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
     std::thread::Builder::new()
         .name(name.to_owned())

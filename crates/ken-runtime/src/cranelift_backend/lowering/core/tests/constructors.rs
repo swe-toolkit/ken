@@ -250,6 +250,15 @@ fn run_dynamic_constructor_dispatch_fixture(
     discriminator: i64,
     selected_tags: &[i64],
 ) -> Result<i64, CraneliftBackendError> {
+    run_dynamic_constructor_dispatch_fixture_with_sets(discriminator, selected_tags, 0)
+}
+
+#[cfg(test)]
+fn run_dynamic_constructor_dispatch_fixture_with_sets(
+    discriminator: i64,
+    selected_tags: &[i64],
+    alternative_transport_sets: usize,
+) -> Result<i64, CraneliftBackendError> {
     let mut module = new_jit_module()?;
     let mut signature = module.make_signature();
     signature
@@ -487,10 +496,35 @@ fn run_dynamic_constructor_dispatch_fixture(
         true,
         compiler.assumptions,
         compiler.unsupported,
+        alternative_transport_sets,
     );
     compiled
         .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
         .map(|(_, token)| token.expect("fixture returns one scalar"))
+}
+
+/// Promise class: transition sentinel, retired when labelled transport
+/// execution parity exists. MEASURED: two otherwise identical hand-built JIT
+/// modules differ only in the issued-set count; a nonzero count refuses at
+/// the execution boundary, and zero retains the working scalar result.
+/// CLAIMED: JIT cannot execute untested labelled transport.
+/// THE GAP: this does not test a genuinely set-issuing source plan; the
+/// PX10 object-emission controls pin that separate production population.
+#[test]
+fn labelled_transport_jit_entry_refuses_until_execution_parity() {
+    let error = run_dynamic_constructor_dispatch_fixture_with_sets(0, &[], 1)
+        .expect_err("a JIT module with issued transport cannot run");
+    let CraneliftBackendError::Unsupported(error) = error else {
+        panic!("expected a typed containment refusal, got {error:?}");
+    };
+    assert_eq!(error.construct, "ProducerAlternativeSet");
+    assert_eq!(error.cause, LoweringCause::Fragment);
+    assert!(error.reason.contains("PX10-NATIVE-SPAWN-PARITY"));
+    assert_eq!(
+        run_dynamic_constructor_dispatch_fixture_with_sets(0, &[], 0)
+            .expect("an otherwise identical module without transport runs"),
+        -4
+    );
 }
 
 #[test]

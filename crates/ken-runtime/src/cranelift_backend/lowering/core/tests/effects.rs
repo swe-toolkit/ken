@@ -386,6 +386,7 @@ fn run_checked_bounded_nat_fixture(
         true,
         compiler.assumptions,
         compiler.unsupported,
+        0,
     );
     compiled
         .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())

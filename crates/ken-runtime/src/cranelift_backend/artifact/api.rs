@@ -374,6 +374,7 @@ pub(crate) fn emit_runtime_ir_object_with_authority(
     let assumptions = with_admitted_trust(compiled.assumptions.clone(), admitted);
     let unsupported = compiled.unsupported.clone();
     let trap_catalog = compiled.trap_catalog().to_vec();
+    compiled.require_alternative_transport_contained(false)?;
     let object_bytes = compiled
         .module
         .finish()
@@ -399,6 +400,7 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
     entrypoint: &RuntimeExpr,
     symbols: &crate::NativeProcessSymbols,
     entry_symbol: impl Into<String>,
+    process_declared: bool,
 ) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
     let entry_symbol = entry_symbol.into();
     reject_program_blockers(program)?;
@@ -429,6 +431,7 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
             &mut source_exprs,
         )
     })?;
+    compiled.require_alternative_transport_contained(process_declared)?;
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
