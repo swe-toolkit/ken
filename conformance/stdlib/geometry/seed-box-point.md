@@ -4,10 +4,11 @@ Format: `../../README.md`.
 Spec: `spec/50-stdlib/67-geometry.md` §14, Spec child
 `26c9ab59422b742602fab743d4814f9a3cf92123`.
 
-This closed seed applies the two public generic laws at the origin and at
-an off-origin point with distinct nonzero coordinates. The direct
-same-box controls and isolated refusals test the closed values and
-proof forms; they do not establish the generic theorems.
+This closed seed applies `area_point_box` at the origin and at an
+off-origin point with distinct nonzero coordinates, and applies
+`contains_point_box` at that off-origin point. The direct same-box
+controls and isolated refusals test the closed values and proof forms;
+they do not establish either generic theorem.
 
 ## Accepted client
 
@@ -61,8 +62,9 @@ theorem off_contains_value : IsTrue (contains (MkBox off off) off) = Proved
 - spec: §14.
 - promise class: durable invariant.
 - given: the origin and `off` point boxes.
-- expect: both public laws apply to the origin and to `off`; the direct
-  `Proved` controls establish the area and membership values at `off`.
+- expect: `area_point_box` applies at the origin and at `off`, while
+  `contains_point_box` applies at `off`; direct `Proved` controls
+  establish the area and membership values at `off`.
 - measured: when run, three generic-law applications, the two fixture
   coordinate identities, and the same-form closed value controls.
 - claimed: every point box has area one and contains its point.

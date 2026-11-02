@@ -1265,8 +1265,9 @@ and `axis_span` remain private; neither is a client-visible helper.
 No new helper, operation or §1–§13 law type changes.
 
 The closed seed at `conformance/stdlib/geometry/seed-box-point.md`
-applies both laws at the origin and at an off-origin point with
-distinct nonzero coordinates. Its same-box area control claims
+applies `area_point_box` at the origin and at an off-origin point
+with distinct nonzero coordinates, and `contains_point_box` only
+at that off-origin point. Its same-box area control claims
 `Equal Nat (area (MkBox off off)) (Suc Zero) = Proved`; the isolated
 false claim replaces only `Suc Zero` with `Zero`, also using
 `Proved`. `Refl` refuses both `Equal Nat` claims as non-`Eq`-shaped
