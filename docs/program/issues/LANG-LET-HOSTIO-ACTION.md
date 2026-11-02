@@ -1,7 +1,7 @@
 ---
 id: LANG-LET-HOSTIO-ACTION
 title: "Spec 36 §2.4 denotes `let x = e1 in e2` as `bind ⟦e1⟧ (λ x. ⟦e2⟧)`, monadic sequencing, but as built a `let` of a HostIO value is an ordinary `let`: the bound action is dropped without being performed, and the program type-checks. A Ken program can lose an effect silently. Rule which reading is normative, then make the build and the spec agree, with a run-output control"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T1
