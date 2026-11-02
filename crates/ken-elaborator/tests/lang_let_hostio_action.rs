@@ -24,6 +24,13 @@ fn checked_def<'a>(env: &'a ElabEnv, id: ken_kernel::GlobalId) -> (&'a Term, &'a
     (ty, body)
 }
 
+fn space_initial_body<'a>(env: &'a ElabEnv, space: &str) -> &'a Term {
+    let id = env
+        .space_initial_state(space)
+        .expect("space registers its checked initial-state definition");
+    checked_def(env, id).1
+}
+
 fn spine(mut term: &Term) -> (&Term, Vec<&Term>) {
     let mut args = Vec::new();
     while let Term::App(function, argument) = term {
@@ -163,6 +170,61 @@ fn public_standalone_pure_let_retains_kernel_let() {
         .elaborate_expr("standalone_pure_let", "let n = 1 in n")
         .expect("pure standalone let elaborates");
     assert!(matches!(core, Term::Let { .. }));
+}
+
+/// Promise class: durable invariant (36 §2.4). The stored value of an
+/// ITree-typed space cell, not its source or an operation, must contain the
+/// registered bind whose action is the first write. Construction does not
+/// execute the action; it builds a tree to store as the initial state.
+#[test]
+fn space_cell_initial_state_stores_checked_bind_of_first_action() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    env.elaborate_file(
+        "space Holder { \
+           mut action : IO (Result IOError Unit) = \
+             let r = write ConsoleStream.Stdout (bytes_encode \"a\") in \
+               write ConsoleStream.Stdout (bytes_encode \"b\") \
+           proc noop () : Unit visits [Holder] = MkUnit \
+         }",
+    )
+    .expect("ITree-typed cell initializer elaborates");
+    let initial = space_initial_body(&env, "Holder");
+    let args = assert_bind(&env, initial);
+    let (first_head, _) = spine(args[4]);
+    assert!(
+        matches!(first_head, Term::Const { id, .. } if *id == env.globals["write"]),
+        "the stored action starts with the first checked write"
+    );
+}
+
+/// Promise class: durable invariant. Checked rows do not turn either a
+/// literal cell initializer or a pure local let into a performed action.
+#[test]
+fn pure_space_cells_retain_literal_and_ordinary_let_core_shapes() {
+    let mut plain_env = ElabEnv::new().expect("checked prelude");
+    plain_env
+        .elaborate_file(
+            "space Plain { mut n : Int = 0 \
+         proc noop () : Unit visits [Plain] = MkUnit }",
+        )
+        .expect("literal initializer elaborates");
+    let plain = space_initial_body(&plain_env, "Plain");
+    assert!(
+        !matches!(spine(plain).0, Term::Const { id, .. } if *id == plain_env.prelude_env.bind_id),
+        "plain initial state is not a performed action"
+    );
+
+    let mut bound_env = ElabEnv::new().expect("checked prelude");
+    bound_env
+        .elaborate_file(
+            "space Bound { mut n : Int = let k = 1 in k \
+         proc noop () : Unit visits [Bound] = MkUnit }",
+        )
+        .expect("pure let initializer elaborates");
+    assert!(matches!(
+        space_initial_body(&bound_env, "Bound"),
+        Term::Let { .. }
+    ));
 }
 
 #[test]
