@@ -166,8 +166,11 @@ fn a_let_lambda_is_still_a_value_not_a_performed_rhs() {
     assert_accept("let-lambda-value", &with_action(LET_LAMBDA));
 }
 
+// This guards propagation through bound_value_latent's RAsc arm. The
+// ascription itself can infer, so this is not an independent pin on
+// let_rhs_row's value short-circuit (the unannotated case above is).
 #[test]
-fn ascribed_let_lambda_is_a_value_and_releases_body_where_named() {
+fn ascribed_let_lambda_releases_body_where_named() {
     let source = with_action(
         r#"proc run_with (u : Unit)
   : HostIO APartial ExitCode visits [Console] =
