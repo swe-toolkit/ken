@@ -134,29 +134,31 @@ fn applied<'a>(ty: &'a SourceType, name: &str) -> Vec<&'a SourceType> {
     arguments
 }
 
-fn one_theorem<'a>(decls: &'a [SourceDecl], name: &str) -> &'a SourceType {
+fn one_theorem<'a>(decls: &'a [SourceDecl], name: &str) -> (&'a SourceType, &'a SourceExpr) {
     let found = decls
         .iter()
         .filter_map(|decl| match decl {
             SourceDecl::TheoremDecl {
                 name: actual,
                 theorem,
+                body,
                 ..
-            } if actual == name => Some(theorem),
+            } if actual == name => Some((theorem, body)),
             _ => None,
         })
         .collect::<Vec<_>>();
     let [one] = found.as_slice() else {
         panic!("exactly one seed theorem {name} required");
     };
-    one
+    *one
 }
 
 /// SOURCE: CV §12 seed. PROMISE CLASS: durable invariant.
 /// MEASURED: all accepted law instances and the true same-form control check;
 /// after a fresh full prefix, the isolated dropped-derivative claim rejects
 /// with KernelRejected TypeMismatch at its own declaration. Parsed Ken ASTs then
-/// show the same `IsTrue (poly_eq ...)` form and identical left expression,
+/// pin the accepted control's `Proved` body, the same `IsTrue (poly_eq ...)`
+/// form, and identical left expression,
 /// with just the derivative omitted from the refused right expression.
 /// CLAIMED: the derivative of 2*x is not canonically equal to 2*x.
 /// THE GAP: these closed clients do not replace the generic checked proof.
@@ -216,7 +218,11 @@ fn actual_seed_accepts_before_dropped_derivative_refuses_at_own_claim() {
     // Verify the checked Ken goals only after observing the actual refusal;
     // a true-neighbour mutation must first fail at the refusal assertion.
     let positives = parse_decls(accepted).expect("§12 accepted seed parses");
-    let control = one_theorem(&positives, "same_form_proved_control");
+    let (control, control_body) = one_theorem(&positives, "same_form_proved_control");
+    assert!(
+        matches!(control_body, SourceExpr::ECon(name, _) if name == "Proved"),
+        "accepted control must use the same Proved proof form as the refusal"
+    );
     let [control_decision] = applied(control, "IsTrue")
         .try_into()
         .expect("accepted control is an IsTrue decision");
