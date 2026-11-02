@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMIN-OPTION-COST-ORDER-INVARIANCE
 title: "Spec 72 §1.5 states that argmin is unchanged under a strict-order-preserving cost transform, and §1.4 carries member and least over to the Option selector, but no law carries the invariance to argmin_option. A client with a possibly empty list must split on Nil and Cons and lift argmin_cost_order_invariant through Some by hand. Rule from a checked D0 at zero trust and state the law with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
