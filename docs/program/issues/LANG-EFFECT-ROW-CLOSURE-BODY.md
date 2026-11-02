@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-CLOSURE-BODY
 title: "The row plane gives every lambda the empty row and never walks its body, so a closure that performs an undeclared effect escapes once a higher-order function applies it. `fn sneaky ... = host_bind ... (\\_. action MkUnit)`, with `action` a Console proc and the program declaring only FS, checks with rc 0, and `ken run` prints the Console output. Pay a lambda's body row where the lambda is built, as globals already pay at naming"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
@@ -21,13 +21,13 @@ a closure that performs an effect cannot carry that effect past a
 declaration or a program header that does not declare it. The escape
 gate then refuses `p5`.
 
-## Settled inputs (main `6e1eb2e7d`)
+## Settled inputs (main `3aaea53e4`)
 
 - **The rule.** Spec 36 §1.2 joins every subexpression's row, and §1.4
   makes the escape check the single soundness-relevant gate. Globals
   already pay their row where they are named (`RCon -> row(g)`).
-- **As built.** In `infer_expr_row_type` (`elab.rs:17544`), the `RLam`
-  arm (`:17571`) returns the empty row and does not walk the body. No
+- **As built.** In `infer_expr_row_type` (`elab.rs:17767`), the `RLam`
+  arm (`:17795`) returns the empty row and does not walk the body. No
   consumer releases a closure's row when a higher-order function such as
   `host_bind` applies it.
 - **Measured fail-open** (Architect, base binary; fixtures in
@@ -52,12 +52,16 @@ gate then refuses `p5`.
 
   No definition on the path declares Console.
 - **The ruled direction** (AC-0a). The body is walked with
-  LOCAL-LATENT's `LatentScope`, and the lambda's own binders are opaque.
-  This WP builds on that WP's plane, so it starts after LOCAL-LATENT
-  lands.
+  LOCAL-LATENT's `LatentScope` (`elab.rs:17700`), and the lambda's own
+  binders are opaque.
+  LOCAL-LATENT landed as `3aaea53e4`, so this WP builds on its plane.
 - **The refusal population is new.** Every proc continuation that names
   an effect its enclosing declaration does not declare is newly refused.
   The sweep is this WP's own and is not LOCAL-LATENT's.
+- **The census sentinel moves.** `lang_strict_isolated_routes_census.rs`
+  pins a count over every `.ken` and `.ken.md` file under `examples/`,
+  `conformance/` and `crates/*/tests`. A new fixture there re-pins it,
+  classified per file, as LOCAL-LATENT's respin did (`adde8892a`).
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.

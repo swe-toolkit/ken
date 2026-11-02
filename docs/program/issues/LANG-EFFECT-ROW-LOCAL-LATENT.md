@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-LOCAL-LATENT
 title: "The effect-escape gate releases a local binder's latent row: infer_expr_row_type has no typing context, so a callback parameter `f : A ->[Console] B` applied as `f a` contributes the empty row. A declared-pure `fn` that calls a Console callback checks with rc 0 and prints the callback's output, though spec 36 §1.4 makes the escape check the single soundness-relevant gate of the row system. Give the row plane the binders' latent rows, so every consumer of the plane answers alike, and treat an unknown latent row as unknown, never as empty"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
