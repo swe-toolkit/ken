@@ -21117,7 +21117,8 @@ pub(crate) fn elaborate_space_decl(
             &elab.refinement_facts,
             format!("{}.initial", space.name),
         )
-        .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
+        .with_preconditions(&elab.preconditions, PremiseHoles::Reported)
+        .with_effect_rows(CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id));
         let cell_type = elab_type(&mut cx, &cell.ty)?;
         let cell_value = check(&mut cx, &cell.init, &cell_type, &cell.span)?;
         absorb_obligations(&mut cell_obligations, std::mem::take(&mut cx.obligations));
