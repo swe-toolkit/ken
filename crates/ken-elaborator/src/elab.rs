@@ -957,9 +957,9 @@ struct ElabCtx<'e> {
     /// prelude and throwaway contexts that have no production declaration body.
     effect_rows: Option<CheckedEffectRows<'e>>,
     /// Written declaration parameter rows, in outermost-to-innermost order.
-    decl_param_latents: Vec<(String, LocalLatent)>,
+    decl_param_latents: Vec<(String, crate::effects::RowType)>,
     /// Local let rows keyed by stable bottom-relative context position.
-    let_latents: Vec<(usize, LocalLatent)>,
+    let_latents: Vec<(usize, crate::effects::RowType)>,
     /// The sink `§6.2` instance search appends its provenance to.
     ///
     /// **Carried beside `class_env`, not inside it.** The registry itself is
@@ -1276,38 +1276,34 @@ impl<'e> ElabCtx<'e> {
 
     /// Resolve a surface binder by de Bruijn position. The spelling is used
     /// only as a misalignment guard, never as the lookup key.
-    fn surface_latent(&self, index: usize, name: &str) -> LocalLatent {
+    fn surface_latent(&self, index: usize, name: &str) -> crate::effects::RowType {
         let mut count = 0;
         while self.surface_binding_target(count).is_some() {
             count += 1;
         }
         let Some(level) = count.checked_sub(index + 1) else {
-            return LocalLatent::opaque();
+            return crate::effects::RowType::empty();
         };
         if let Some((bound, latent)) = self.decl_param_latents.get(level) {
-            return if bound == name {
-                latent.clone()
-            } else {
-                LocalLatent { row: unknown_local_row(name), arity: usize::MAX }
-            };
+            return if bound == name { latent.clone() } else { unknown_local_row(name) };
         }
         self.surface_binding_position(index)
             .and_then(|position| {
                 self.let_latents.iter().rev().find(|(at, _)| *at == position)
             })
-            .map_or_else(LocalLatent::opaque, |(_, latent)| latent.clone())
+            .map_or_else(crate::effects::RowType::empty, |(_, latent)| latent.clone())
     }
 
     /// Read a let RHS before its binder is pushed. Resolved RHS indices still
     /// address the enclosing scope at this point, including unannotated aliases.
-    fn pending_let_latent(&self, ty_opt: &Option<RType>, rhs: &RExpr) -> LocalLatent {
-        let Some(rows) = self.effect_rows else { return LocalLatent::opaque() };
+    fn pending_let_latent(&self, ty_opt: &Option<RType>, rhs: &RExpr) -> crate::effects::RowType {
+        let Some(rows) = self.effect_rows else { return crate::effects::RowType::empty() };
         let outer = |index, name: &str| self.surface_latent(index, name);
         let scope = LatentScope::new(&outer);
         let_binder_latent(ty_opt, rhs, &rows, &scope)
     }
 
-    fn push_let_latent(&mut self, latent: LocalLatent) {
+    fn push_let_latent(&mut self, latent: crate::effects::RowType) {
         self.let_latents.push((self.ctx.len() - 1, latent));
     }
 
@@ -1359,7 +1355,7 @@ impl<'e> ElabCtx<'e> {
         provenance: &'e mut Vec<crate::classes::InstanceResolution>,
         standard_operators: &'e HashMap<StandardOperatorRole, GlobalId>,
         effect_rows: CheckedEffectRows<'e>,
-        decl_param_latents: Vec<(String, LocalLatent)>,
+        decl_param_latents: Vec<(String, crate::effects::RowType)>,
     ) -> Self {
         self.decl_param_latents = decl_param_latents;
         self.class_env = Some(class_env);
@@ -1375,7 +1371,7 @@ impl<'e> ElabCtx<'e> {
     fn with_effect_rows(
         mut self,
         effect_rows: CheckedEffectRows<'e>,
-        decl_param_latents: Vec<(String, LocalLatent)>,
+        decl_param_latents: Vec<(String, crate::effects::RowType)>,
     ) -> Self {
         self.decl_param_latents = decl_param_latents;
         self.effect_rows = Some(effect_rows);
@@ -16349,7 +16345,7 @@ pub(crate) fn elaborate_rdecl(
         &mut sentinel,
         &mut discarded_provenance,
         &no_standard_operators,
-        &CheckedEffectRows::new(&no_names, &no_checked_ids),
+        &CheckedEffectRows::new(&no_names, &no_checked_ids, &no_names, &no_checked_ids),
         rdecl,
     )?;
     Ok(result.def_id)
@@ -17608,49 +17604,75 @@ fn collect_bound_dictionary_params(
 pub(crate) struct CheckedEffectRows<'a> {
     names: &'a HashMap<String, crate::effects::RowType>,
     ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+    carried_names: &'a HashMap<String, crate::effects::RowType>,
+    carried_ids: &'a HashMap<GlobalId, crate::effects::RowType>,
 }
 
 impl<'a> CheckedEffectRows<'a> {
     pub(crate) fn new(
         names: &'a HashMap<String, crate::effects::RowType>,
         ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+        carried_names: &'a HashMap<String, crate::effects::RowType>,
+        carried_ids: &'a HashMap<GlobalId, crate::effects::RowType>,
     ) -> Self {
-        Self { names, ids }
+        Self { names, ids, carried_names, carried_ids }
     }
 }
 
-/// Surface latent effects of a local binder. Kernel Pi erases `->[row]`,
-/// so this is read from the written type, not recovered from kernel terms.
-#[derive(Clone, Debug)]
-pub(crate) struct LocalLatent {
-    row: crate::effects::RowType,
-    arity: usize,
+/// Join every row written in a surface type, including rows carried by a
+/// named data, record, or alias type. The kernel Pi erases these rows.
+pub(crate) fn written_type_row(
+    ty: &RType,
+    rows: &CheckedEffectRows<'_>,
+) -> crate::effects::RowType {
+    let row = |ty: &RType| written_type_row(ty, rows);
+    match ty {
+        RType::REffectArr(domain, latent, codomain, _) => {
+            written_latent_row(latent).join(row(domain)).join(row(codomain))
+        }
+        RType::RPi(_, a, b, _) | RType::RSigma(_, a, b, _)
+        | RType::RArr(a, b, _) | RType::RApp(a, b, _) => row(a).join(row(b)),
+        RType::RRefine(_, carrier, _, _) | RType::RTrunc(carrier, _) => row(carrier),
+        RType::RCon(name, _) => rows.carried_names.get(name).cloned()
+            .unwrap_or_else(crate::effects::RowType::empty),
+        RType::RCheckedGlobal { id, .. } => rows.carried_ids.get(id).cloned()
+            .unwrap_or_else(crate::effects::RowType::empty),
+        RType::RUniv(..) | RType::RVarTy(..) | RType::RPatternAliasTy(..)
+        | RType::RProj(..) => crate::effects::RowType::empty(),
+    }
 }
 
-impl LocalLatent {
-    pub(crate) fn opaque() -> Self {
-        Self { row: crate::effects::RowType::empty(), arity: 0 }
-    }
-
-    pub(crate) fn of_type(ty: &RType) -> Self {
-        let mut latent = Self::opaque();
-        let mut current = ty;
-        loop {
-            match current {
-                RType::RRefine(_, carrier, _, _) => current = carrier,
-                RType::RPi(_, _, codomain, _) | RType::RArr(_, codomain, _) => {
-                    latent.arity += 1;
-                    current = codomain;
+/// The one admission calculation for every named data, record and type
+/// alias. Only successful declarations are registered by the module sink.
+pub(crate) fn declared_type_carried_row(
+    rdecl: &RDecl,
+    rows: &CheckedEffectRows<'_>,
+) -> crate::effects::RowType {
+    let mut carried = crate::effects::RowType::empty();
+    match &rdecl.kind {
+        RDeclKind::DataDecl { ctors, .. } => {
+            for ctor in ctors {
+                for ty in &ctor.args {
+                    carried = carried.join(written_type_row(ty, rows));
                 }
-                RType::REffectArr(_, row, codomain, _) => {
-                    latent.row = latent.row.join(written_latent_row(row));
-                    latent.arity += 1;
-                    current = codomain;
-                }
-                _ => return latent,
             }
         }
+        RDeclKind::ExplicitDataDecl { ctors, .. } => {
+            for ctor in ctors {
+                for arg in &ctor.args {
+                    carried = carried.join(written_type_row(&arg.ty, rows));
+                }
+            }
+        }
+        RDeclKind::RecordDecl { fields } => {
+            for field in fields {
+                carried = carried.join(written_type_row(&field.ty, rows));
+            }
+        }
+        RDeclKind::TypeAlias { ty } => carried = written_type_row(ty, rows),
+        _ => {}
     }
+    carried
 }
 
 fn written_latent_row(row: &crate::ast::EffectRowSyntax) -> crate::effects::RowType {
@@ -17670,28 +17692,29 @@ fn written_latent_row(row: &crate::ast::EffectRowSyntax) -> crate::effects::RowT
 }
 
 fn unknown_local_row(name: &str) -> crate::effects::RowType {
+    if std::env::var_os("KEN_LATENT_ROW_D0").is_some() {
+        let file = std::env::var("KEN_LATENT_ROW_FILE").unwrap_or_else(|_| "unknown".into());
+        eprintln!("LATENT_D0_MISMATCH\tfile={file}\tlocal={name}");
+    }
     crate::effects::RowType::singleton(format!("unknown latent row of local `{name}`"))
 }
 
 /// Local binders entered during a row traversal, innermost last. A different
 /// name at an entered position witnesses a misaligned walk, never a pure row.
 pub(crate) struct LatentScope<'s> {
-    outer: &'s dyn Fn(usize, &str) -> LocalLatent,
-    entered: Vec<(Option<String>, LocalLatent)>,
+    outer: &'s dyn Fn(usize, &str) -> crate::effects::RowType,
+    entered: Vec<(Option<String>, crate::effects::RowType)>,
 }
 
 impl<'s> LatentScope<'s> {
-    pub(crate) fn new(outer: &'s dyn Fn(usize, &str) -> LocalLatent) -> Self {
+    pub(crate) fn new(outer: &'s dyn Fn(usize, &str) -> crate::effects::RowType) -> Self {
         Self { outer, entered: Vec::new() }
     }
 
-    fn lookup(&self, index: usize, name: &str) -> LocalLatent {
+    fn lookup(&self, index: usize, name: &str) -> crate::effects::RowType {
         match self.entered.len().checked_sub(index + 1) {
             Some(position) => match &self.entered[position] {
-                (Some(bound), _) if bound != name => LocalLatent {
-                    row: unknown_local_row(name),
-                    arity: usize::MAX,
-                },
+                (Some(bound), _) if bound != name => unknown_local_row(name),
                 (_, latent) => latent.clone(),
             },
             None => (self.outer)(index - self.entered.len(), name),
@@ -17699,12 +17722,13 @@ impl<'s> LatentScope<'s> {
     }
 }
 
-/// One latent per leading lambda in the declaration's written type. The
-/// declaration escape gate strips those lambdas before walking their body.
+/// One written-type row per leading declaration lambda. The escape gate
+/// strips these lambdas before walking their body.
 pub(crate) fn declaration_param_latents(
     ty: Option<&RType>,
     body: &RExpr,
-) -> Vec<(String, LocalLatent)> {
+    rows: &CheckedEffectRows<'_>,
+) -> Vec<(String, crate::effects::RowType)> {
     let mut latents = Vec::new();
     let (mut ty, mut body) = (ty, body);
     while let RExpr::RLam(name, inner, _) = body {
@@ -17712,9 +17736,9 @@ pub(crate) fn declaration_param_latents(
             Some(RType::RPi(_, domain, codomain, _))
             | Some(RType::RArr(domain, codomain, _))
             | Some(RType::REffectArr(domain, _, codomain, _)) => {
-                (LocalLatent::of_type(domain), Some(codomain.as_ref()))
+                (written_type_row(domain, rows), Some(codomain.as_ref()))
             }
-            _ => (LocalLatent::opaque(), None),
+            _ => (crate::effects::RowType::empty(), None),
         };
         latents.push((name.clone(), latent));
         ty = next;
@@ -17723,26 +17747,25 @@ pub(crate) fn declaration_param_latents(
     latents
 }
 
-/// A written let binder supplies its latent type; an unannotated direct
-/// alias inherits its source's row. All other inferred values are opaque.
+/// A written let type supplies its carried rows; an unannotated direct
+/// alias inherits the row its source already released.
 fn let_binder_latent(
     ty_opt: &Option<RType>,
     val: &RExpr,
     effect_rows: &CheckedEffectRows<'_>,
     scope: &LatentScope<'_>,
-) -> LocalLatent {
+) -> crate::effects::RowType {
     if let Some(ty) = ty_opt {
-        return LocalLatent::of_type(ty);
+        return written_type_row(ty, effect_rows);
     }
     match val {
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
-        RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => LocalLatent {
-            row: d0_consumer_row(val, effect_rows, None, &mut LatentScope::new(&|_, _| {
-                LocalLatent::opaque()
-            }), "let", "let_binder_latent_global"),
-            arity: usize::MAX,
-        },
-        _ => LocalLatent::opaque(),
+        RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => d0_consumer_row(
+            val, effect_rows, None,
+            &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
+            "let", "let_binder_latent_global",
+        ),
+        _ => crate::effects::RowType::empty(),
     }
 }
 
@@ -17763,7 +17786,7 @@ fn infer_expr_row_type(
             .get(id)
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
-        RExpr::RVar(index, name, _) => scope.lookup(*index, name).row,
+        RExpr::RVar(index, name, _) => scope.lookup(*index, name),
         RExpr::RPatternAlias(_, _, _)
         | RExpr::RCell(_, _, _)
         | RExpr::RRecursiveResult { .. }
@@ -17772,29 +17795,8 @@ fn infer_expr_row_type(
         | RExpr::RStr(_, _)
         | RExpr::RCharLit(_, _)
         | RExpr::RByteStr(_, _) => crate::effects::RowType::empty(),
-        RExpr::RApp(..) => {
-            let mut head = expr;
-            let mut args = Vec::new();
-            while let RExpr::RApp(function, argument, _) = head {
-                args.push(argument.as_ref());
-                head = function.as_ref();
-            }
-            let row = args.iter().fold(crate::effects::RowType::empty(), |row, arg| {
-                row.join(infer_expr_row_type(arg, effect_rows, projection_ctx, scope))
-            });
-            match head {
-                RExpr::RVar(index, name, _) => {
-                    let latent = scope.lookup(*index, name);
-                    let row = row.join(latent.row);
-                    if args.len() > latent.arity {
-                        row.join(unknown_local_row(name))
-                    } else {
-                        row
-                    }
-                }
-                _ => row.join(infer_expr_row_type(head, effect_rows, projection_ctx, scope)),
-            }
-        },
+        RExpr::RApp(f, a, _) => infer_expr_row_type(f, effect_rows, projection_ctx, scope)
+            .join(infer_expr_row_type(a, effect_rows, projection_ctx, scope)),
         RExpr::RLam(_, _, _)
         | RExpr::RPi(_, _, _, _)
         | RExpr::RSigma(_, _, _, _)
@@ -17873,7 +17875,7 @@ fn infer_expr_row_type(
             let mut row = infer_expr_row_type(scrut, effect_rows, projection_ctx, scope);
             for arm in arms {
                 for _ in 0..arm.scope_width {
-                    scope.entered.push((None, LocalLatent::opaque()));
+                    scope.entered.push((None, crate::effects::RowType::empty()));
                 }
                 if let Some(guard) = &arm.guard {
                     row = row.join(infer_expr_row_type(guard, effect_rows, projection_ctx, scope));
@@ -17923,7 +17925,16 @@ fn d0_consumer_row(
         let old = infer_expr_row_type_before_latent(expr, effect_rows, projection_ctx);
         if old != new {
             let file = std::env::var("KEN_LATENT_ROW_FILE").unwrap_or_else(|_| "unknown".into());
-            eprintln!("LATENT_D0\tfile={file}\tdecl={declaration}\tconsumer={consumer}\told={old:?}\tnew={new:?}");
+            let cause = if format!("{new:?}").contains("unknown latent row of local") {
+                "mismatch"
+            } else if effect_rows.carried_ids.values().chain(effect_rows.carried_names.values())
+                .any(|carried| carried != &crate::effects::RowType::empty()
+                    && carried.is_subset_of(&new)) {
+                "carried"
+            } else {
+                "written"
+            };
+            eprintln!("LATENT_D0\tfile={file}\tdecl={declaration}\tconsumer={consumer}\tcause={cause}\told={old:?}\tnew={new:?}");
         }
     }
     new
@@ -17935,6 +17946,8 @@ pub(crate) fn check_surface_purity(
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     effect_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
+    carried_rows: &HashMap<String, crate::effects::RowType>,
+    carried_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
     env: &GlobalEnv,
     refinement_facts: &RefinementFacts,
     globals: &HashMap<String, GlobalId>,
@@ -17961,12 +17974,13 @@ pub(crate) fn check_surface_purity(
         local_constraints: constraints,
         bound_dict_classes: &bound_dict_classes,
     };
-    let mut scope = LatentScope::new(&|_, _| LocalLatent::opaque());
-    scope.entered = declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body)
+    let rows = CheckedEffectRows::new(effect_rows, effect_rows_by_id, carried_rows, carried_rows_by_id);
+    let mut scope = LatentScope::new(&|_, _| crate::effects::RowType::empty());
+    scope.entered = declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, &rows)
         .into_iter().map(|(name, latent)| (Some(name), latent)).collect();
     let inferred = d0_consumer_row(
         decl_eval_body(&rdecl.body),
-        &CheckedEffectRows::new(effect_rows, effect_rows_by_id),
+        &rows,
         Some(&projection_ctx),
         &mut scope,
         &rdecl.name,
@@ -19401,7 +19415,7 @@ fn declaration_param_context(
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
         .deferring_type_introductions()
-        .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+        .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
         .with_preconditions(preconditions, PremiseHoles::Refused);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
@@ -20282,7 +20296,7 @@ fn compute_ordered_field_values(
         };
         let field_row = d0_consumer_row(
             &fields[pos].1, effect_rows, Some(&projection_ctx),
-            &mut LatentScope::new(&|_, _| LocalLatent::opaque()),
+            &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
             fname,
             "instance_field_row",
         );
@@ -20332,7 +20346,7 @@ fn check_instance_field_purity(
     };
     let inferred = d0_consumer_row(
         expr, effect_rows, Some(&projection_ctx),
-        &mut LatentScope::new(&|_, _| LocalLatent::opaque()),
+        &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
         field_name,
         "check_instance_field_purity",
     );
@@ -21460,7 +21474,7 @@ pub(crate) fn elaborate_space_decl(
         )
         .with_preconditions(&elab.preconditions, PremiseHoles::Reported)
         .with_effect_rows(
-            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
             Vec::new(),
         );
         let cell_type = elab_type(&mut cx, &cell.ty)?;
@@ -21546,14 +21560,18 @@ pub(crate) fn elaborate_space_decl(
         }
 
         let qualified_name = format!("{}.{}", space.name, operation.name);
-        let outer = |_: usize, _: &str| LocalLatent::opaque();
+        let outer = |_: usize, _: &str| crate::effects::RowType::empty();
         let mut scope = LatentScope::new(&outer);
+        let rows = CheckedEffectRows::new(
+            &elab.effect_rows, &elab.effect_rows_by_id,
+            &elab.type_carried_rows, &elab.type_carried_rows_by_id,
+        );
         scope.entered = operation.params.iter().map(|(name, ty)| {
-            (Some(name.clone()), LocalLatent::of_type(ty))
+            (Some(name.clone()), written_type_row(ty, &rows))
         }).collect();
         let inferred_row = d0_consumer_row(
             &operation.body,
-            &CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+            &CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
             None,
             &mut scope,
             &qualified_name,
@@ -21583,7 +21601,7 @@ pub(crate) fn elaborate_space_decl(
             &elab.class_env,
             &mut elab.resolution_provenance,
             &elab.standard_operators,
-            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
             Vec::new(),
         )
         .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
@@ -21875,7 +21893,7 @@ fn elaborate_v0(
     }
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
             .with_local_dicts(local_dicts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -21994,7 +22012,7 @@ fn elaborate_recursive_view(
     // 1. Elaborate the declared type (recursive views are annotated).
     let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
@@ -22043,7 +22061,7 @@ fn elaborate_recursive_view(
     let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
@@ -22250,7 +22268,7 @@ pub(crate) fn elaborate_mutual_group(
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let before = env.decls().count();
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+                .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
                 .with_preconditions(preconditions, PremiseHoles::Reported)
                 .with_recursive_group(&recursive_group);
@@ -22574,7 +22592,7 @@ fn elaborate_view_with_spec(
             let (carrier_ty, assumptions, req_cores) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                        .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+                        .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -22642,7 +22660,7 @@ fn elaborate_view_with_spec(
             let (full_body, body_inner) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                        .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+                        .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -22674,7 +22692,7 @@ fn elaborate_view_with_spec(
             )
         } else {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-                .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+                .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
                 .with_local_dicts(local_dicts)
                 .with_preconditions(preconditions, PremiseHoles::Reported);
@@ -22913,7 +22931,7 @@ fn elaborate_prop_decl(
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
             .with_preconditions(preconditions, PremiseHoles::Refused);
         let ty = elab_signature(&mut cx, prop_ty, false)?;
         let ty = cx.metas.zonk_term(&ty);
@@ -23001,7 +23019,7 @@ fn elaborate_checked_theorem(
 
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body))
+            .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
@@ -30676,7 +30694,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &standard_operators,
-            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id),
             &rdecl,
         )
         .expect("const with concrete D1 visits row must elaborate");
@@ -30710,7 +30728,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &no_standard_operators(src),
-            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id),
             &rdecl,
         ).expect("standalone V1 elaborates").def_id;
         let (_, body) = env.env.transparent_body(id).expect("checked definition");
@@ -30743,7 +30761,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &standard_operators,
-            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id),
             &rdecl,
         )
         .expect_err("unbound visits row variable must reject fail-closed");

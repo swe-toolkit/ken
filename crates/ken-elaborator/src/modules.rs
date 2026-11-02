@@ -4232,7 +4232,22 @@ fn register_obligation_holes(elab: &mut ElabEnv, result: &crate::elab::ElabResul
     }
 }
 
-fn register_effect_row(elab: &mut ElabEnv, result: &crate::elab::ElabResult) {
+fn register_effect_row(
+    elab: &mut ElabEnv,
+    rdecl: &RDecl,
+    result: &crate::elab::ElabResult,
+) {
+    let carried = crate::elab::declared_type_carried_row(
+        rdecl,
+        &crate::elab::CheckedEffectRows::new(
+            &elab.effect_rows, &elab.effect_rows_by_id,
+            &elab.type_carried_rows, &elab.type_carried_rows_by_id,
+        ),
+    );
+    if carried != crate::effects::RowType::empty() {
+        elab.type_carried_rows.insert(result.name.clone(), carried.clone());
+        elab.type_carried_rows_by_id.insert(result.def_id, carried);
+    }
     if let Some(row) = &result.effect_row_type {
         elab.effect_rows.insert(result.name.clone(), row.clone());
         elab.effect_rows_by_id.insert(result.def_id, row.clone());
@@ -4556,6 +4571,8 @@ fn elaborate_checked_spine_free(
         rdecl,
         &elab.effect_rows,
         &elab.effect_rows_by_id,
+        &elab.type_carried_rows,
+        &elab.type_carried_rows_by_id,
         &elab.env,
         &elab.refinement_facts,
         &elab.globals,
@@ -4571,7 +4588,7 @@ fn elaborate_checked_spine_free(
         &mut elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_here,
-        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
@@ -4580,7 +4597,7 @@ fn elaborate_checked_spine_free(
         rdecl,
     )?;
     register_obligation_holes(elab, &result);
-    register_effect_row(elab, &result);
+    register_effect_row(elab, rdecl, &result);
     Ok(result)
 }
 
@@ -4594,6 +4611,8 @@ fn elaborate_checked_with_fixity(
         rdecl,
         &elab.effect_rows,
         &elab.effect_rows_by_id,
+        &elab.type_carried_rows,
+        &elab.type_carried_rows_by_id,
         &elab.env,
         &elab.refinement_facts,
         &elab.globals,
@@ -4609,7 +4628,7 @@ fn elaborate_checked_with_fixity(
         &mut elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_here,
-        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
@@ -4621,7 +4640,7 @@ fn elaborate_checked_with_fixity(
         install_declared_fixity(elab, &result.name, result.def_id, pending)?;
     }
     register_obligation_holes(elab, &result);
-    register_effect_row(elab, &result);
+    register_effect_row(elab, rdecl, &result);
     Ok(result)
 }
 
@@ -5403,7 +5422,7 @@ fn elaborate_mutual_group_with_fixities(
         &elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_for_group,
-        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id),
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.refinement_facts,
@@ -6018,6 +6037,8 @@ fn expand_scope(
                                 rdecl,
                                 &group_effect_rows,
                                 &elab.effect_rows_by_id,
+                                &elab.type_carried_rows,
+                                &elab.type_carried_rows_by_id,
                                 &elab.env,
                                 &elab.refinement_facts,
                                 &elab.globals,
@@ -6044,7 +6065,7 @@ fn expand_scope(
                         )?;
                         for (rdecl, result) in members.iter().zip(results) {
                             register_obligation_holes(elab, &result);
-                            register_effect_row(elab, &result);
+                            register_effect_row(elab, rdecl, &result);
                             register_declared_effect_row(elab, rdecl)?;
                             record_checked_local(
                                 scope,
