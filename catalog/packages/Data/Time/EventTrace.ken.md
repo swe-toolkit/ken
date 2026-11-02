@@ -2,8 +2,8 @@
 
 Finite events with natural-number times support half-open windows and a
 left-biased two-list merge with checked ordering, count, membership,
-window/merge distribution, window composition and an adjacent-window
-split. Merge membership holds even for unordered inputs.
+window/merge distribution, window composition and commutation, and an
+adjacent-window split. Merge membership holds even for unordered inputs.
 
 ## Contents
 
@@ -28,8 +28,8 @@ Neither operation reads a clock or sorts unordered input.
 
 The public carrier, operations and the first five generic laws lead the
 checked source, followed by their private recursive merge helper and proof
-lemmas. The window/merge distribution and composition laws, the three merge
-membership laws, merge associativity and the adjacent-window split each lead
+lemmas. The window/merge distribution, composition and commutation laws, the three
+merge membership laws, merge associativity and adjacent-window split lead
 their private lemmas later in the source. The inverted-window law follows
 window append; its private decision lemma sits beside the split's bound lemmas.
 The all-in-window identity follows it and reuses the existing private
@@ -246,6 +246,48 @@ pub theorem trace_window_window
     (event_in_window p (max lo1 lo2) (min hi1 hi2))
     (λe. event_in_window_inter p lo1 hi1 lo2 hi2 e)
     tr
+
+pub theorem trace_window_commute
+      (p : Type) (lo1 : Nat) (hi1 : Nat) (lo2 : Nat) (hi2 : Nat) (tr : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo2 hi2 (trace_window p lo1 hi1 tr))
+        (trace_window p lo1 hi1 (trace_window p lo2 hi2 tr)) =
+  trans
+    (List (Event p))
+    (trace_window p lo2 hi2 (trace_window p lo1 hi1 tr))
+    (trace_window p (max lo1 lo2) (min hi1 hi2) tr)
+    (trace_window p lo1 hi1 (trace_window p lo2 hi2 tr))
+    (trace_window_window p lo1 hi1 lo2 hi2 tr)
+    (trans
+      (List (Event p))
+      (trace_window p (max lo1 lo2) (min hi1 hi2) tr)
+      (trace_window p (max lo2 lo1) (min hi2 hi1) tr)
+      (trace_window p lo1 hi1 (trace_window p lo2 hi2 tr))
+      (trans
+        (List (Event p))
+        (trace_window p (max lo1 lo2) (min hi1 hi2) tr)
+        (trace_window p (max lo2 lo1) (min hi1 hi2) tr)
+        (trace_window p (max lo2 lo1) (min hi2 hi1) tr)
+        (cong
+          Nat
+          (List (Event p))
+          (max lo1 lo2)
+          (max lo2 lo1)
+          (λlo. trace_window p lo (min hi1 hi2) tr)
+          ((proof comm for max) lo1 lo2))
+        (cong
+          Nat
+          (List (Event p))
+          (min hi1 hi2)
+          (min hi2 hi1)
+          (λhi. trace_window p (max lo2 lo1) hi tr)
+          ((proof comm for min) hi1 hi2)))
+      (sym
+        (List (Event p))
+        (trace_window p lo1 hi1 (trace_window p lo2 hi2 tr))
+        (trace_window p (max lo2 lo1) (min hi2 hi1) tr)
+        (trace_window_window p lo2 hi2 lo1 hi1 tr)))
 
 pub theorem trace_window_split
       (p : Type) (lo : Nat) (mid : Nat) (hi : Nat) (tr : List (Event p))
@@ -3085,6 +3127,10 @@ same input list. It needs neither ordering premises nor valid bounds. The
 left empty-merge unit closes by reduction; the right unit exports the
 existing checked induction rather than adding a second proof. The filter
 fusion and natural-order split helpers remain private to this package.
+The commutation proof applies fusion in both orders, rewrites the two
+intersection bounds with public `max` and `min` commutativity, then reverses
+the second fusion equality. It equates the resulting lists in their original
+order without an ordering or range-validity premise, and needs no new helper.
 
 Merge associativity holds as structural equality for arbitrary traces,
 not just `time_ordered` inputs. The proof compares current heads by
@@ -3146,7 +3192,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and seventeen checked law contracts.
+  — the carrier, half-open boundary, left-bias and eighteen checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -3155,7 +3201,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the seventeen laws form the package surface.
+   `trace_merge`, and the eighteen laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -3169,8 +3215,10 @@ merging, not window multiplicity.
    Merge membership reuses `list_elem_later` and ordinary truncated `Or`;
    the one-way window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
-   `max`/`min` bounds and structurally fuses generic list filters. Both merge
-   units use the original merge operation; the right unit reuses its existing
+   `max`/`min` bounds and structurally fuses generic list filters. Window
+   commutation reuses fusion in both orders and the public commutativity
+   proofs for `max` and `min`, with no new helper. Both merge units use the
+   original merge operation; the right unit reuses its existing
    induction, now public under the same name. Merge associativity uses that
    public right unit and the three private head-selection lemmas, with seven
    new private support theorems; it needs no ordered-input premise. The
@@ -3182,7 +3230,7 @@ merging, not window multiplicity.
    checked natural-order transitivity. Its decision helper stays private.
    The all-in-window identity reuses `window_keep` and public Derived
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
-4. **Trusted-base delta.** Zero: all seventeen exported laws have checked proof
+4. **Trusted-base delta.** Zero: all eighteen exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3192,8 +3240,9 @@ merging, not window multiplicity.
    [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md),
    [composition seed](../../../../conformance/stdlib/time-and-events/seed-window-composition.md),
    [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md),
-   [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md)
-   and [window-append seed](../../../../conformance/stdlib/time-and-events/seed-window-append-distribution.md)
+   [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md),
+   [window-append seed](../../../../conformance/stdlib/time-and-events/seed-window-append-distribution.md)
+   and [commutation seed](../../../../conformance/stdlib/time-and-events/seed-window-commutation.md)
    supply independent closed values and refused claims; these clients
    complement, not replace, the generic proofs. The all-in-window
    [seed](../../../../conformance/stdlib/time-and-events/seed-window-all-identity.md)
@@ -3212,5 +3261,8 @@ merging, not window multiplicity.
    theorem to an open membership premise, then accepts a closed all-in-window
    trace and refuses the shorter window's false identity claim at its own
    `Refl`. Its fixture is separate from the authored §10 conformance seed and
-   does not replace the generic checked proof. These tests are not official
-   conformance-runner execution or CI.
+   does not replace the generic checked proof. The
+   `cat_time_window_commutation` test imports the generic §11 law, measures
+   trusted GlobalId identities, checks the complete accepted commutation seed
+   and refuses its isolated dropped-inner-window claim at its own `Refl`.
+   These tests are not official conformance-runner execution or CI.
