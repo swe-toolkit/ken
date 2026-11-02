@@ -9,7 +9,8 @@
 > SPEC-TIME-WINDOW-ADJACENT-SPLIT §7;
 > SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8;
 > SPEC-TIME-INVERTED-WINDOW-EMPTY §9;
-> SPEC-TIME-WINDOW-ALL-IDENTITY §10).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-ALL-IDENTITY §10;
+> SPEC-TIME-WINDOW-COMMUTATION §11).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -47,11 +48,23 @@
 > identities 114 → 114; its candidate-local checks do not establish
 > official conformance-runner execution or measured landed trust.
 > Section 10 specifies identity of a window covering every member of
-> a trace. Architect AC-0 checked its generic proof only in scratch
-> with equal trusted identities 114 → 114. This spec-only child adds no
-> §10 catalog theorem, package test or CV seed. No §10 official
-> conformance, CI, publication, landing or measured landed trust is
-> established.
+> a trace. Its checked catalog theorem, authored CV seed and package-
+> owned test are present on this base; Architect's earlier AC-0 was
+> scratch evidence with equal trusted identities 114 → 114. Neither
+> scratch nor package testing establishes an official conformance-runner
+> result or measured landed trust. Section 11 states one premise-free
+> commutation law for two windows. Architect AC-0 on `80525e894` checked
+> its proof with rc 0, no new `Axiom`, and a discriminating closed
+> control; the trusted identity set was **not measured** in that D0.
+> The historical Spec-only child `096d6f5e1` stated the law without a
+> catalog export, package test or CV seed. Foundation reports that its
+> assembled working tree includes all three: the named package test
+> passed 2/2, checking the actual CV seed's accepted and refused fences,
+> and the full `trusted_base()` GlobalId identity set was 114 → 114
+> before and after loading EventTrace. This is working-tree package-test
+> evidence, not an exact committed-tip gate or official conformance-
+> runner execution; it does not establish CI, publication, landing or
+> measured landed trust.
 
 ## 1. Finite event traces over natural times
 
@@ -535,9 +548,10 @@ order. The two sides filter the **same list**; neither needs
 the bounds, or §3's two ordered-merge premises. The equality holds
 also for disjoint or inverted windows: if the intersected lower
 bound meets or exceeds its upper bound, both sides are empty by
-§1.2. This is not the weaker pair of a commutation law and an
-idempotence law, and it does not require public max/min
-commutativity or idempotence. `max` and `min` are the existing
+§1.2. It is stronger than a commutation law and an idempotence law, and it
+does not itself require public max/min commutativity or idempotence;
+§11 derives window commutation from it with Data.Numeric.Nat.Order's
+`comm for max` and `comm for min`. `max` and `min` are the existing
 `Data.Numeric.Nat.Order` exports, which the catalog module must
 import alongside its existing `lt_nat` import.
 
@@ -921,9 +935,10 @@ or deliver the §9 seed or catalog theorem.
 > `ken fmt --check` rc 0, no new `Axiom`, and equal scratch
 > `trusted_base()` identity sets 114 → 114. This is isolated design
 > evidence, not a candidate catalog check or landed trust result.
-> This spec-only child adds no §10 catalog theorem, package test or
-> CV seed. No §10 official conformance-runner execution, CI,
-> publication, landing or measured landed trust is established.
+> The checked §10 theorem, CV-authored seed and package-owned test are
+> present on this base. Candidate package testing does not establish
+> official conformance-runner execution or a measured landed trust
+> result; it is separate from the earlier scratch AC-0.
 
 `Data.Time.EventTrace` must export one public Transparent theorem
 immediately after `trace_window_inverted_empty` and before
@@ -975,3 +990,72 @@ accepted **same-form** control, so the refusal pins the time-6
 boundary rather than an invalid equality proof form. These closed
 cases do not replace the generic proof. No seed is authored or run
 in this spec-only turn.
+
+## 11. Commutation of two time windows
+
+> **Section 11 status: DRAFT v0
+> (SPEC-TIME-WINDOW-COMMUTATION).** Architect AC-0 on `80525e894`
+> checked the proposed generic proof and closed discriminator with
+> `ken check` and `ken fmt --check` rc 0 for the accepted forms, no
+> new `Axiom`, and a wrong-form refusal at its own `Refl`. The D0
+> trusted-identity set was **not measured** in D0. The historical
+> Spec-only child `096d6f5e1` stated the law type but lacked the §11
+> catalog theorem, package test and CV seed. Foundation reports its
+> assembled working tree now has these three artifacts. Its named
+> `cat_time_window_commutation` package test passed 2/2, including the
+> actual CV seed's accepted fence and isolated own-span `Refl` refusal;
+> the full `trusted_base()` GlobalId set was unchanged at 114 → 114
+> across provider and EventTrace loading. This is Foundation's reported
+> working-tree evidence, not a committed-tip gate, official
+> conformance-runner execution, CI, publication, landing or measured
+> landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent theorem
+immediately after `trace_window_window` and before
+`trace_window_split`, with the same argument order as the window-
+composition law. It has no premise:
+
+```ken
+pub theorem trace_window_commute
+      (p : Type) (lo1 : Nat) (hi1 : Nat) (lo2 : Nat) (hi2 : Nat) (tr : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo2 hi2 (trace_window p lo1 hi1 tr))
+        (trace_window p lo1 hi1 (trace_window p lo2 hi2 tr))
+```
+
+The left side first applies the inner window `[lo1,hi1)` and then the
+outer window `[lo2,hi2)`. The right side reverses that order. Both
+sides retain the **same original list elements in the same order**;
+this is structural `Equal (List (Event p))`, not an equality of
+membership predicates. It holds for arbitrary `p`, trace and bounds,
+including overlapping, disjoint, equal and inverted windows. Neither
+`time_ordered`, a bounds-order premise nor a payload equality decision
+is needed. The theorem changes none of the §§1–10 operation or law
+types.
+
+The checked proof composes the public `trace_window_window` law for
+the first order with the symmetric instance for the reversed order.
+Between the two fused windows, `cong` transports Nat.Order's public
+`comm for max` across the lower bound and `comm for min` across the
+upper bound; `trans` composes those steps and `sym` reverses the
+second fusion equality. `max`, `min`, `cong`, `sym` and `trans` are
+already imported by the catalog module. No new import, private helper,
+axiom, kernel rule or surface form is required. Unlike §5's stronger
+fusion law, commutation alone does not identify the fused bounds.
+
+The CV-owned seed can use `[1,6)` and `[3,9)` on a trace containing
+`e1`, `e4` and `e7`: `e1` lies only in the first window, `e7`
+only in the second, and `e4` in both. Both window orders yield
+`[e4]` by `Refl`, while the outer `[3,9)` window alone yields
+`[e4,e7]`. The accepted client applies `trace_window_commute` to
+this trace; a same-form `Refl` control equates the two compositions.
+The isolated false claim replaces the right-hand composition with
+the outer window alone, so it would improperly retain `e7`; its
+`Refl` must refuse at the claim's own span. Architect AC-0 measured
+accepted control rc 0 and refusal rc 1. `Proved` refuses **both** and
+is not a discriminator for these list equalities. These closed
+observations distinguish the dropped inner window; they do not
+replace the generic checked proof or constitute official conformance
+execution. The CV seed and committed-tip package test remain separate
+from this Spec-only child.
