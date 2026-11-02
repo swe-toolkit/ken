@@ -2,7 +2,10 @@
 //! Contract: docs/program/issues/LANG-STRICT-ISOLATED-ROUTES.md AC-1c.
 //! New Ken files or migrations deliberately turn this baseline red. Re-pin
 //! only after classifying each added file by checker outcome; a count alone
-//! is not a license to re-record today's repository snapshot.
+//! is not a license to re-record today's repository snapshot. Increment 3
+//! retires this pre-switch AC-1c census when check, run, and native-build
+//! switch to Strict after source migration; AC-3a then checks every isolated
+//! file Legacy-clean on its cut base through the strict route.
 
 use ken_elaborator::modules::isolated_catalog_root;
 use ken_elaborator::{ElabEnv, ElabError};
@@ -28,9 +31,11 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 /// WP adds six Ken fixtures: five refuse in Legacy for their intended Console
 /// escape, while qa_higher_order_let is Legacy-clean and Strict-UnboundName
 /// at `host_bind`. The resulting boundary is 97/63/12/51. Future homes and
-/// source migrations turn this sentinel red by design.
+/// source migrations turn this sentinel red by design. Increment 3's strict
+/// route switch and migration retire it in favor of AC-3a's acceptance gate
+/// for every cut-base Legacy-clean isolated file.
 #[test]
-fn strict_isolated_baseline_accepts_twelve_of_sixty_three_legacy_clean_files() {
+fn strict_isolated_frontier_before_increment_three_route_switch() {
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
