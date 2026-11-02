@@ -2,10 +2,13 @@
 
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/65-linear-algebra.md` §12, in Spec child
-`cc148000520a6d02831c55fb7bf8d373ca01c7e`.
+`cc148000520a6d02831c55fb7bf8d373ca01c7e2`.
 Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT.md`.
 
-Status: authored; not executed. Section 12 quantifies over every matrix
+Status: authored. Foundation reports that its package-owned
+`cat_linear_algebra_matrix_zero_unit` target passed 2/2 on candidate
+`d6f1d278d26228bd9d75ab4e9de4b4a4799ffae5`; this is not an official
+conformance-runner execution. Section 12 quantifies over every matrix
 shape and vector. This seed applies the three public laws to a nonzero
 2 × 2 matrix and to a zero-row matrix, and separately checks a closed
 matrix-zero value. Those finite rows do not replace the generic checked
@@ -155,6 +158,9 @@ equal trusted identity sets (109 → 109). Its scratch closed rows
 accepted the same-form `Refl` control and refused the false claim at
 `Refl`; `Proved` refused both and therefore does not discriminate.
 These are Architect-reported D0 results, not execution of this seed.
-This seed is authored but unexecuted. No package test, official
-conformance-runner execution, CI, publication, landing, or landed trust
-measurement is claimed.
+Foundation QA reports that its package-owned
+`cat_linear_algebra_matrix_zero_unit` target passed 2/2 on exact
+candidate `d6f1d278d26228bd9d75ab4e9de4b4a4799ffae5`, exercising the
+seed's accepted and isolated refusal rows. That package test is not an
+official conformance-runner execution. No official runner, CI,
+publication, landing, or landed trust measurement is claimed.
