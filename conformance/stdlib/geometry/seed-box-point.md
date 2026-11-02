@@ -2,7 +2,7 @@
 
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/67-geometry.md` §14, Spec child
-`26c9ab59422b742602fab743d4814f9a3cf92123`.
+`5605fe7e96e3583827001740b1d9fec223fd18ee`.
 
 This closed seed applies `area_point_box` at the origin and at an
 off-origin point with distinct nonzero coordinates, and applies
@@ -65,8 +65,9 @@ theorem off_contains_value : IsTrue (contains (MkBox off off) off) = Proved
 - expect: `area_point_box` applies at the origin and at `off`, while
   `contains_point_box` applies at `off`; direct `Proved` controls
   establish the area and membership values at `off`.
-- measured: when run, three generic-law applications, the two fixture
-  coordinate identities, and the same-form closed value controls.
+- measured: when run, three generic-law applications, three fixture
+  coordinate identities (`origin_coordinates`, `off_coordinates`,
+  `other_coordinates`), and two same-form closed value controls at `off`.
 - claimed: every point box has area one and contains its point.
 - gap: these two closed points do not establish either generic law.
 - why: the law applications use the public theorem names at distinct
