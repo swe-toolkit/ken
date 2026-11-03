@@ -10302,12 +10302,19 @@ mod cat_numeric_interval_public_export_tests {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
         env.elaborate_module_from_roots(&[root], INTERVAL)
             .expect("checked interval package roots-loads");
-        let exports = env
+        let tables = env
             .module_state
             .file_export_tables
             .get(INTERVAL)
-            .and_then(|tables| tables.get(INTERVAL))
-            .expect("owning file's public export table must be captured");
+            .expect("owning file's public export tables must be captured");
+        assert_eq!(
+            tables.keys().map(String::as_str).collect::<BTreeSet<_>>(),
+            BTreeSet::from([INTERVAL]),
+            "a new public inline module also changes the interval surface"
+        );
+        let exports = tables
+            .get(INTERVAL)
+            .expect("owning root's public export table must be captured");
         let actual = exports.keys().map(String::as_str).collect::<BTreeSet<_>>();
         let expected = BTreeSet::from([
             "Interval",
