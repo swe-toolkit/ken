@@ -68,14 +68,55 @@ fn omit_redundant_is_true(source: &str) -> String {
     client
 }
 
-fn seed_programs() -> Vec<String> {
-    extract_ken_md(SEED)
+// The seed's cases, by the theorem each one states (its case entries name
+// them). A case is selected by its parsed theorem, never by how many source
+// fences the seed has or in what order they appear.
+const SEED_ANCHOR: &str = "window_length_bound_instance";
+const SEED_ACCEPTED: [&str; 2] = ["window_keeps_two", "reverse_bound_control_all_events_kept"];
+const SEED_REFUSED: [&str; 2] = [
+    "refuse_keeps_three_wrong",
+    "refuse_reverse_window_length_bound",
+];
+
+fn states(program: &str, theorem: &str) -> bool {
+    parse_decls(program)
+        .expect("seed Ken parses")
+        .into_iter()
+        .any(|decl| matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == theorem))
+}
+
+// The one source fence stating `theorem`. Two fences stating it would leave
+// the case ambiguous, so selection refuses rather than picking one.
+fn seed_case(theorem: &str) -> String {
+    let mut stating = extract_ken_md(SEED)
         .expect("conformance Ken fences are well-formed")
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
         .map(|fence| omit_redundant_is_true(&SEED[fence.body_range]))
-        .collect()
+        .filter(|program| states(program, theorem));
+    let program = stating
+        .next()
+        .unwrap_or_else(|| panic!("the seed states {theorem}"));
+    assert!(stating.next().is_none(), "{theorem} selects one seed case");
+    program
+}
+
+// The seed client that defines the trace, followed by every other accepted
+// case that is stated in a fence of its own.
+fn checked_seed_client() -> ElabEnv {
+    let mut env = loaded_trace();
+    let anchor = seed_case(SEED_ANCHOR);
+    env.elaborate_file(&anchor)
+        .expect("§12 source-shaped law instance checks");
+    for theorem in SEED_ACCEPTED {
+        let program = seed_case(theorem);
+        if program != anchor {
+            env.elaborate_file(&program)
+                .unwrap_or_else(|error| panic!("{theorem} checks: {error:?}"));
+        }
+    }
+    env
 }
 
 fn loaded_trace() -> ElabEnv {
@@ -182,27 +223,23 @@ fn generic_window_length_bound_checks_without_new_trust() {
 
 /// SOURCE: conformance/stdlib/time-and-events/seed-window-length-bound.md.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: the seed has exactly three Ken source fences. Its positive
-/// client checks the law instance on the e1/e4/e7 trace under [3,9), the
-/// two-event lower bound and the [0,9) reverse-bound control. Independent
-/// closed controls check the exact window length 2.
+/// MEASURED: the seed's law instance on the e1/e4/e7 trace under [3,9), its
+/// two-event lower bound and its [0,9) reverse-bound control check, each
+/// selected by the theorem it states. Independent closed controls check the
+/// exact window length 2.
 /// CLAIMED: §12's law applies to outside clients and the closed window
 /// lengths match independently stated values.
 /// THE GAP: closed instances cannot establish the arbitrary-input bound;
 /// the generic checked body and client types are tested above.
 #[test]
 fn closed_seed_checks_window_length_cases() {
-    let programs = seed_programs();
-    assert_eq!(programs.len(), 3, "one positive client and two refusals");
-    loaded_trace()
-        .elaborate_file(&programs[0])
-        .expect("§12 source-shaped positive client checks");
+    checked_seed_client();
     loaded_trace()
         .elaborate_file(CLOSED_CONTROLS)
         .expect("independent closed window lengths check");
 }
 
-fn expect_false_theorem_rejected(env: &mut ElabEnv, negative: &str, label: &str) {
+fn expect_false_theorem_rejected(env: &mut ElabEnv, negative: &str, theorem: &str) {
     match env.elaborate_file(negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
@@ -212,15 +249,18 @@ fn expect_false_theorem_rejected(env: &mut ElabEnv, negative: &str, label: &str)
                 .expect("negative is valid Ken")
                 .into_iter()
                 .any(|decl| {
-                    matches!(decl, SourceDecl::TheoremDecl { span: theorem, .. }
-                        if span.start >= theorem.start && span.end <= theorem.end && span.start < span.end)
+                    matches!(decl, SourceDecl::TheoremDecl { name, span: stated, .. }
+                        if name == theorem
+                            && span.start >= stated.start
+                            && span.end <= stated.end
+                            && span.start < span.end)
                 });
             assert!(
                 in_theorem,
-                "{label}: K0004 must target its false theorem: {span:?}"
+                "{theorem}: K0004 must target {theorem} itself: {span:?}"
             );
         }
-        other => panic!("{label}: expected kernel TypeMismatch, got {other:?}"),
+        other => panic!("{theorem}: expected kernel TypeMismatch, got {other:?}"),
     }
 }
 
@@ -265,34 +305,29 @@ theorem refuse_reverse_proved :
   IsTrue (leq_nat (length (Event Bool) tr) (length (Event Bool) (trace_window Bool t3 t9 tr))) = Proved
 "#;
 
-/// SOURCE: §12 seed's two negative Ken fences.
+/// SOURCE: §12 seed's two refused cases.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: the full positive seed compiles before each of its separate
-/// false theorem submissions. Two independent closed refusals also run
-/// after the checked controls. Every failure is KernelRejected(TypeMismatch)
-/// within its own theorem.
+/// MEASURED: the checked seed client compiles before each of its refused
+/// cases, each selected by the theorem it states. Two independent closed
+/// refusals also run after the checked controls. Every failure is
+/// KernelRejected(TypeMismatch) within the theorem it names.
 /// CLAIMED: the [3,9) window does not hold three events, and the trace's
 /// length is not at most the window's.
 /// THE GAP: these fixed false claims do not characterize arbitrary traces;
 /// the generic law is separately checked.
 #[test]
 fn false_window_length_claims_reject_at_their_own_theorems() {
-    let programs = seed_programs();
-    let (positive, negatives) = programs.split_first().expect("seed has a positive client");
-    assert_eq!(negatives.len(), 2, "the seed has two refusals");
-    for negative in negatives {
-        let mut env = loaded_trace();
-        env.elaborate_file(positive)
-            .expect("positive seed client checks before its negative");
-        expect_false_theorem_rejected(&mut env, negative, "seed refusal");
+    for theorem in SEED_REFUSED {
+        let mut env = checked_seed_client();
+        expect_false_theorem_rejected(&mut env, &seed_case(theorem), theorem);
     }
-    for (negative, label) in [
-        (FALSE_KEEPS_THREE, "three-event window"),
-        (FALSE_REVERSE, "reverse bound"),
+    for (negative, theorem) in [
+        (FALSE_KEEPS_THREE, "window_keeps_three_wrong"),
+        (FALSE_REVERSE, "refuse_reverse_proved"),
     ] {
         let mut env = loaded_trace();
         env.elaborate_file(CLOSED_CONTROLS)
             .expect("independent closed controls check before refusal");
-        expect_false_theorem_rejected(&mut env, negative, label);
+        expect_false_theorem_rejected(&mut env, negative, theorem);
     }
 }
