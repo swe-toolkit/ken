@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-LET-BOUND-SCRUTINEE-LATENT
 title: "After LANG-EFFECT-ROW-MATCH-BINDER-LATENT, a match binder still releases nothing when its scrutinee is an unannotated let-bound constructor application: `let b = MkBox action in match b { MkBox f ↦ let ignored = f MkUnit in host_program (print_line \"b\") }` checks and prints only `b`, while the direct, ascribed and annotated forms print `ab`. bound_value_latent has no arm for RApp, so the binding records an empty latent. Give every let-bound value the latent it releases, or refuse it, and pin the let-bound scrutinee"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1

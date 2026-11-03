@@ -1,6 +1,6 @@
 ---
 id: LANG-EFFECT-ROW-CELL-SCRUTINEE-CARRIED-ROW
-title: "A match directly on a space cell whose type carries an effect row releases nothing to its binders: inside `space Holder { mut held : Box = MkBox action ... }`, `match held { MkBox f ↦ let ignored = f MkUnit in MkUnit }` checks, while the let-bound forms of the same scrutinee refuse with E0038. infer_expr_row_type reads RCell and RRecursiveResult as pure, and the checked type's carried row is joined only at let binders. Give a match scrutinee its checked type's carried row, and pin the direct cell scrutinee"
+title: "A space cell whose type carries an effect row releases nothing to a match binder when it is the scrutinee directly or sits under an operand-joining form: inside `space Holder { mut held : Box = MkBox action ... }`, `match held { MkBox f ↦ let ignored = f MkUnit in MkUnit }` and `let p = (held, MkUnit)` then `match p { (MkBox f, _) ↦ ... }` both check and discard the callback, while `let b = held` and `let b : Box = held` refuse with E0038. RCell reads as pure on the evaluation row, and the checked type's carried row is joined only at a let binder with a named head. Give a cell its type's carried row on the latent plane, and pin both forms"
 status: ready
 owner: verify
 size: S
@@ -9,7 +9,7 @@ gate: architect
 depends_on: [LANG-EFFECT-ROW-LET-BOUND-SCRUTINEE-LATENT]
 blocks: [LANG-PROC-NON-TREE-RESULT-TREE]
 github: null
-origin: "Architect AC-0 evt_2ga9m0e1ewqkk on LANG-EFFECT-ROW-LET-BOUND-SCRUTINEE-LATENT routed fixture q16 to the Steward as a sibling (relayed evt_50zmfe25kty5g). Steward-filed per COORDINATION section 2, sequenced after LET-BOUND-SCRUTINEE on the Verify ring."
+origin: "Architect AC-0 evt_2ga9m0e1ewqkk on LANG-EFFECT-ROW-LET-BOUND-SCRUTINEE-LATENT routed fixture q16 to the Steward as a sibling (relayed evt_50zmfe25kty5g); Verify QA's pair-cell finding evt_1xtw8a05xphx9 was folded in by Steward ruling evt_47wtcjarfvqde, confirmed by the Architect evt_1xzsnhrfrawtt. Steward-filed per COORDINATION section 2, sequenced after LET-BOUND-SCRUTINEE on the Verify ring."
 ---
 
 # A cell scrutinee carries its type's row
@@ -29,29 +29,44 @@ space Holder {
 ```
 
 refuses at check time with the E0038 "cannot be sequenced (36 §2.4)"
-text, as q17 (`let b : Box = held`) and q15 (`let b = held`, once
-LET-BOUND-SCRUTINEE lands) already do.
+text, as q17 (`let b : Box = held`) and q15 (`let b = held`) already
+do. So does the same cell under a pair, Verify QA's probe
+(`/tmp/qa-lbl-7f555-pair-cell.ken`, SHA256 `b9b4bbdc…bc8868`): bind
+`p = (held, MkUnit)`, match `p` as `(MkBox f, _)`, and bind
+`ignored = f MkUnit`.
 
-## Settled inputs (main `e6e13def6`)
+## Settled inputs (main `22d1830e0`, LET-BOUND-SCRUTINEE landed)
 
 - **The path.** In `crates/ken-elaborator/src/elab.rs`,
   `enter_match_latent` (`:1322`) gives a match's binders
-  `infer_expr_row_type(scrut)` joined with `bound_value_latent(scrut)`.
-  The arm at `:17994` reads RCell and RRecursiveResult, along with
-  universes and literals, as the empty row.
-- **The let-binder fix.** The ruled LET-BOUND-SCRUTINEE patch adds
-  `let_latent`, which joins the carried row of the binder's checked type
-  (`core_type_head_id` of the zonked whnf type, looked up in
-  `carried_ids`). That is X3, and it runs only at let binders. Its D0
-  measured q15 refusing under X3, and q16 still checking in all four arms
-  (evt_4sgz06h4twqzf).
-- **The type is at hand.** `infer_space_cell` (`:14699`) types the cell.
-  The written-annotation route, `written_type_row` (`:17773`), reads the
-  same `carried_ids` table by GlobalId (`:17787`).
+  `infer_expr_row_type(scrut)` joined with
+  `bound_value_latent_from_row`. In `infer_expr_row_type` (`:18039`),
+  the arm at `:18058` reads RCell and RRecursiveResult, along with
+  universes and literals, as the empty row. RPair joins its operand
+  rows (`:18106`), and `bound_value_latent`'s default arm reuses that
+  row, so `(held, MkUnit)` is empty joined with empty.
+- **The let-binder rule.** `let_latent` (`:17997`) joins the carried row
+  of the binder's checked type (`:18017`). That runs only at let
+  binders, and only when the type has a named head, so a pair's Sigma
+  gets nothing. LET-BOUND's D0 measured q15 refusing under it and q16
+  still checking (evt_4sgz06h4twqzf). QA measured the pair-cell probe
+  accepted at the pre-LET-BOUND base and at the candidate
+  (evt_42tq2b4qd1hep).
+- **The type is at hand.** `infer_space_cell` (`:14700`) types the cell.
+  `written_type_row` (`:17774`) reads the same `carried_ids` table by
+  GlobalId (`:17788`).
+- **The plane (Architect evt_1xzsnhrfrawtt).** `infer_expr_row_type` is
+  the evaluation row, and reading a cell performs nothing. The cell's
+  carried row is a latent. Putting it on the evaluation row at `:18058`
+  would charge it wherever a cell is read, including a sequenced tree's
+  already-paid row, which LET-BOUND's sequenced branch leaves out.
+- **Stated gap to correct.** The landed test header
+  `lang_effect_row_let_bound_scrutinee_latent.rs` claims "other value
+  forms", while its GAP names only the direct cell q16. This WP corrects
+  the GAP to "RCell directly or nested under an operand-joining form".
 
-Treat anchors as perishable, and re-read them on LET-BOUND-SCRUTINEE's
-landed base. If a settled input is false there, stop and report the
-mismatch; do not build around it.
+Treat anchors as perishable. If a settled input is false on the landed
+base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
@@ -65,32 +80,39 @@ candidate, `/crates` only.
   base: the patch, and the named-binary commands with a bounded timeout.
   The Verify implementer runs it on scratch and reports. The Architect
   rules from that report, and does not build or test. It rules:
-  - where the carried row joins: at `enter_match_latent`, or in a shared
-    helper with `let_latent`, so that the let and match paths read one
-    rule;
-  - every scrutinee form whose infer row omits its type's carried row,
-    enumerated from the `RExpr` variants. RCell and RRecursiveResult are
-    the known two;
-  - that the join does not pay a row twice when the scrutinee's infer
-    row already contains it.
-- **AC-1.** q16 refuses with the E0038 "cannot be sequenced (36 §2.4)"
-  text, and q15 and q17 still refuse the same way. A same-form control
-  with a pure callback in the cell (`MkPBox quiet`) checks. q18, the
-  direct `match MkBox action`, still prints `ab`.
-- **AC-2.** RRecursiveResult has a row, either measured or refused, as
-  ruled. LET-BOUND-SCRUTINEE's pinned fixtures, the 13 MATCH-BINDER rows,
-  the strict census (98, 64, 12, 52), frame budget row M on its unchanged
-  stack, `surf_space_cells_p1`, `class_field_purity` and
-  `purity_keywords` stay green.
+  - the plane, and where the carried row joins. The Architect's
+    expectation is the latent plane: `bound_value_latent` recursing
+    through the operand-joining forms, with RCell reading its cell
+    type's carried row. The match and let paths read one rule;
+  - every form through which a cell reaches a binder, enumerated from
+    the `RExpr` variants: RCell and RRecursiveResult directly, and under
+    RPair, RRecord, RBinOp, RStandardOp, RInfixSpine and the other
+    operand joins;
+  - that no row is paid twice: q11 (a sequenced tree) still prints `b`,
+    and q02 (a pure callback) still prints `b`.
+- **AC-1.** q16 and the pair-cell probe refuse with the E0038 "cannot
+  be sequenced (36 §2.4)" text, and q15 and q17 still refuse the same
+  way. Two same-form controls check: a pure callback in the cell
+  (`MkPBox quiet`), and the constructor pair `(MkBox action, MkUnit)`.
+  q18, the direct `match MkBox action`, still prints `ab`.
+- **AC-2.** RRecursiveResult and each operand-joining form AC-0
+  enumerated have a row, measured or refused, as ruled. The landed
+  test's GAP line is corrected. LET-BOUND-SCRUTINEE's 11 pinned rows,
+  the 13 MATCH-BINDER rows, the strict census (98, 64, 12, 52), frame
+  budget row M on its unchanged stack, `surf_space_cells_p1`,
+  `class_field_purity` and `purity_keywords` stay green.
 
 ## Stop conditions
 
 - A kernel, trust or surface change.
 - A form that can carry its row only by changing a spec 36 §1 rule.
 
-Checks: 2 fired: the `:17994` arm is the fan-in for both cell and
-recursive-result scrutinees, so AC-0 enumerates the forms from the
-`RExpr` variants, not from q16 alone. 7 fired: LET-BOUND's X3 criterion,
-run on the direct-match sibling, fails at q16; AC-2 runs it on every
-scrutinee form. 8 fired: the pure-callback cell control has the same
-space, cell and match form, and checks.
+Checks: 2 fired: the `:18058` arm is the fan-in for a cell however it
+reaches a binder, directly or through an operand join, so AC-0
+enumerates the forms from the `RExpr` variants, not from q16 and one
+probe. 5 fired: the carried row is a latent, not an evaluation row, so
+the plane is named in AC-0 and q11 guards against paying twice. 7 fired:
+LET-BOUND's carried-row criterion, run on the direct and pair siblings,
+fails at both; AC-2 runs it on every enumerated form. 8 fired: the
+pure-callback cell and the constructor pair each share their probe's
+form and check.
