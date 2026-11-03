@@ -141,6 +141,44 @@ fn flattened_directives_ignore_comments_and_refuse_real_omissions_or_duplicates(
     }
 }
 
+/// Promise class: durable invariant (SPEC-TIME-WINDOW-LENGTH-BOUND respin).
+///
+/// MEASURED: the declaration flattener matches its head as active tokens, so
+/// a comment, a string or a longer name spelling the head is not a
+/// declaration, and zero or two active heads fail closed. CLAIMED: a
+/// behavior-neutral catalog comment cannot block Rosetta. THE GAP: the end is
+/// still the head's first closed brace group; the full Rosetta test
+/// exercises the real catalog declarations.
+#[test]
+fn flattened_declarations_ignore_comments_and_refuse_real_omissions_or_duplicates() {
+    let head = "pub fn weaken";
+    let declaration = "pub fn weaken (n : Nat) : Nat = match n { Zero ↦ Zero ; Suc m ↦ m }";
+    let source = format!(
+        "-- {head}\n\
+         const note : String = \"{head}\"\n\
+         pub fn weaken_more (n : Nat) : Nat = match n {{ Zero ↦ Zero ; Suc m ↦ m }}\n\
+         {declaration}\n"
+    );
+    let range = flattened_braced_declaration(&source, "fixture", head);
+    assert_eq!(&source[range], declaration);
+
+    for (input, count) in [
+        (format!("-- {declaration}\n"), 0),
+        (format!("{declaration}\n{declaration}\n"), 2),
+    ] {
+        let failure =
+            std::panic::catch_unwind(|| flattened_braced_declaration(&input, "fixture", head))
+                .expect_err("missing or duplicate active declaration must fail closed");
+        let message = failure
+            .downcast_ref::<String>()
+            .expect("refusal must carry its diagnostic");
+        assert!(
+            message.contains(&format!("exactly one declaration `{head}`, got {count}")),
+            "unexpected refusal: {message}"
+        );
+    }
+}
+
 fn flattened_exact_line_declaration(
     source: &str,
     owner: &str,
@@ -171,28 +209,38 @@ fn flattened_exact_line_declaration(
 }
 
 fn flattened_braced_declaration(source: &str, owner: &str, start: &str) -> std::ops::Range<usize> {
-    let mut starts = source.match_indices(start);
-    let (start_offset, _) = starts
-        .next()
-        .unwrap_or_else(|| panic!("{owner} must carry declaration `{start}`"));
-    assert!(
-        starts.next().is_none(),
-        "{owner} must carry exactly one declaration `{start}`"
-    );
-
-    let body = &source[start_offset..];
+    // Match the declaration head as active tokens, as the directive flattener
+    // does: a comment, a string or a longer name that spells it is not a head.
+    let expected = Lexer::lex(start)
+        .unwrap_or_else(|error| panic!("invalid {owner} declaration head `{start}`: {error:?}"));
+    let expected = &expected[..expected.len() - 1]; // omit Eof
+    let tokens =
+        Lexer::lex(source).unwrap_or_else(|error| panic!("invalid {owner} source: {error:?}"));
+    let heads = tokens
+        .windows(expected.len())
+        .enumerate()
+        .filter(|(_, window)| {
+            window
+                .iter()
+                .zip(expected)
+                .all(|((token, _), (wanted, _))| token == wanted)
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [head] = heads.as_slice() else {
+        panic!(
+            "{owner} must carry exactly one declaration `{start}`, got {}",
+            heads.len()
+        );
+    };
     let mut depth = 0usize;
-    let mut opened = false;
-    for (offset, byte) in body.bytes().enumerate() {
-        match byte {
-            b'{' => {
-                opened = true;
-                depth += 1;
-            }
-            b'}' if opened => {
+    for (token, span) in &tokens[*head..] {
+        match token {
+            Token::LBrace => depth += 1,
+            Token::RBrace if depth > 0 => {
                 depth -= 1;
                 if depth == 0 {
-                    return start_offset..start_offset + offset + 1;
+                    return tokens[*head].1.start..span.end;
                 }
             }
             _ => {}
@@ -235,14 +283,18 @@ fn collections_prelude() -> String {
     let nat_order_source = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
     // This hand-maintained allowlist selects the consumer's operation inventory.
     // New Order exports are excluded instead of entering flat source without dependencies.
-    let nat_order = ["pub fn min", "pub fn sub"]
-        .into_iter()
-        .map(|start| {
-            let declaration = flattened_braced_declaration(&nat_order_source, "Nat.Order", start);
-            &nat_order_source[declaration]
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let nat_order = [
+        "pub fn min",
+        "pub fn sub",
+        "pub theorem leq_nat_weaken_right",
+    ]
+    .into_iter()
+    .map(|start| {
+        let declaration = flattened_braced_declaration(&nat_order_source, "Nat.Order", start);
+        &nat_order_source[declaration]
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
     let arithmetic_source = catalog_source("catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md");
     let nat_arithmetic = [
         "pub fn add",
@@ -283,7 +335,7 @@ fn collections_prelude() -> String {
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
         "import Core.Logic.And (And as Conj)",
         "import Core.Logic.Transport (cong, sym, trans)",
-        "import Data.Numeric.Nat.Order (min, sub)",
+        "import Data.Numeric.Nat.Order (leq_nat_weaken_right, min, sub)",
         "import Data.Numeric.Nat.Arithmetic (add)",
         "import Data.Collections.List (length)",
         "export length",

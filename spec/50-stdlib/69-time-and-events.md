@@ -10,7 +10,8 @@
 > SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8;
 > SPEC-TIME-INVERTED-WINDOW-EMPTY §9;
 > SPEC-TIME-WINDOW-ALL-IDENTITY §10;
-> SPEC-TIME-WINDOW-COMMUTATION §11).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-COMMUTATION §11;
+> SPEC-TIME-WINDOW-LENGTH-BOUND §12).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -807,8 +808,9 @@ is not `time_ordered`. It also holds for empty or inverted windows:
 when `lo ≥ hi`, both sides are empty. The law does not assert that
 windowing sorts events, preserves the length of an input trace, or
 commutes with `trace_merge` without §3's ordered-input premises.
-Unlike §7's adjacent split, it needs no relationship among `lo`,
-`hi` and the event times.
+Section 12 states the length bound that does hold: windowing never
+adds events. Unlike §7's adjacent split, this equality needs no
+relationship among `lo`, `hi` and the event times.
 
 The proof applies the public generic list law `filter::append` from
 `Data.Collections.Derived` once, with element type `Event p` and
@@ -1059,3 +1061,66 @@ observations distinguish the dropped inner window; they do not
 replace the generic checked proof or constitute official conformance
 execution. The CV seed and committed-tip package test remain separate
 from this Spec-only child.
+
+## 12. A time window does not increase trace length
+
+> **Section 12 status: DRAFT v0
+> (SPEC-TIME-WINDOW-LENGTH-BOUND).** Architect AC-0 on the detached
+> `dff99e382` scratch base checked the generic Derived proof, the
+> EventTrace instance and a closed discriminator. D0 and its corrected
+> harness run D0b measured the same `trusted_base()` GlobalId identity
+> set at all three points, 114 → 114 → 114, in one environment;
+> Derived's `Axiom` count stayed 7 → 7 and EventTrace's 1 → 1.
+> These are scratch design results, not an assembled candidate gate,
+> official conformance execution, CI or measured landed trust. The
+> catalog export, named package test and CV seed require separate
+> delivery and verification; this Spec-only section does not attest
+> their assembled execution.
+
+`Data.Time.EventTrace` must export one public Transparent theorem
+immediately after `trace_window_all_identity`, with the same argument
+order as `trace_window`. It has no premise beyond the trace and bounds:
+
+```ken
+pub theorem trace_window_length_bound
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : IsTrue (leq_nat (length (Event p) (trace_window p lo hi tr)) (length (Event p) tr))
+```
+
+The result compares natural lengths, not structural equality of the
+lists or preservation of length. It holds for every `p`, every trace
+whether ordered or not, and every pair of bounds, including empty and
+inverted windows. A window discards zero or more events but cannot
+create one. The theorem changes none of the §§1–11 operations or law
+types; it adds no ordered-trace or valid-window premise.
+
+The generic checked proof is `Data.Collections.Derived`'s public
+`filter::length`, exported as `pub proof length for filter` after
+`filter::append`. It establishes
+`IsTrue (leq_nat (length a (filter a keep xs)) (length a xs))` for any
+`a`, predicate and list. Its private `filter_keep_step_length` uses
+the successor/successor reduction of `leq_nat` when the head is kept
+and Nat.Order's public `leq_nat_weaken_right` when it is dropped.
+The EventTrace body applies that proof once:
+
+```ken
+(proof length for filter) (Event p) (event_in_window p lo hi) tr
+```
+
+`filter::length` is a Derived export, not another §69 law. The
+private Graphs `filter_length_cons` equation stays unchanged: a
+length bound cannot replace the equation used by its consumer.
+No new `Axiom`, kernel rule or surface form is part of this contract.
+
+The CV-owned closed seed can apply `trace_window_length_bound` to a
+trace containing events `e1`, `e4` and `e7` at `[3,9)`; the window
+keeps `e4` and `e7`, so the bound reads 2 ≤ 3. Its isolated false
+claim reverses the comparison at those bounds (3 ≤ 2), while an
+accepted same-form control reverses it at `[0,9)`, where all three
+events remain (3 ≤ 3). Both reverse claims must use `Proved`:
+Architect's corrected scratch D0b accepted the control and refused
+the false claim at its own `KernelRejected TypeMismatch`; `Refl`
+refused both and cannot distinguish them. The seed must explicitly
+import `IsTrue` and `leq_nat` in its catalog-addressed client.
+These observations do not constitute official conformance execution
+or substitute for the generic proof or a committed-tip package test.

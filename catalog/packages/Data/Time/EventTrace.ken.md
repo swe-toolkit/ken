@@ -56,6 +56,7 @@ import Data.Collections.Derived (is_sorted)
 
 import Data.Collections.Derived
   (filter,
+    length,
     list_append,
     count,
     list_elem,
@@ -391,6 +392,11 @@ pub theorem trace_window_all_identity
               t
               (λe. λlater. all e (list_elem_later (Event p) e h t later))))
   }
+
+pub theorem trace_window_length_bound
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : IsTrue (leq_nat (length (Event p) (trace_window p lo hi tr)) (length (Event p) tr)) =
+  (proof length for filter) (Event p) (event_in_window p lo hi) tr
 
 pub theorem trace_merge_nil_left
       (p : Type) (ys : List (Event p))

@@ -65,7 +65,7 @@ import Core.Function.Combinators (comp, idf)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
-import Data.Numeric.Nat.Order (min, sub)
+import Data.Numeric.Nat.Order (leq_nat_weaken_right, min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
 
@@ -385,6 +385,19 @@ theorem filter_keep_step_append
     False ↦ split
   }
 
+theorem filter_keep_step_length
+      (a : Type)
+      (h : a)
+      (kept : List a)
+      (n : Nat)
+      (bounded : IsTrue (leq_nat (length a kept) n))
+      (decision : Bool)
+    : IsTrue (leq_nat (length a (filter_keep_step a h kept decision)) (Suc n)) =
+  match decision {
+    True ↦ bounded;
+    False ↦ leq_nat_weaken_right (length a kept) n bounded
+  }
+
 theorem list_elem_filter_sound_cons
       (a : Type)
       (keep : a → Bool)
@@ -602,6 +615,21 @@ pub proof append for filter
         (filter a keep tail)
         (filter a keep ys)
         ((proof append for filter) a keep tail ys)
+        (keep head)
+  }
+
+pub proof length for filter
+      (a : Type) (keep : a → Bool) (xs : List a)
+    : IsTrue (leq_nat (length a (filter a keep xs)) (length a xs)) =
+  match xs {
+    Nil ↦ Proved;
+    Cons head tail ↦
+      filter_keep_step_length
+        a
+        head
+        (filter a keep tail)
+        (length a tail)
+        ((proof length for filter) a keep tail)
         (keep head)
   }
 
