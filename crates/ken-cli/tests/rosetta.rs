@@ -283,7 +283,7 @@ fn collections_prelude() -> String {
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
         "import Core.Logic.And (And as Conj)",
         "import Core.Logic.Transport (cong, sym, trans)",
-        "import Data.Numeric.Nat.Order (min, sub)",
+        "import Data.Numeric.Nat.Order (leq_nat_weaken_right, min, sub)",
         "import Data.Numeric.Nat.Arithmetic (add)",
         "import Data.Collections.List (length)",
         "export length",
