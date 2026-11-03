@@ -5,10 +5,10 @@ Spec: `spec/50-stdlib/66-symbolic-algebra.md` §13, as ruled by AC-0.
 
 This seed specifies closed clients of the AC-0-ruled
 `poly_eq_substitute_pointwise` contract. The Spec and implementation
-children are separate work; this seed does not establish that either has
-landed. It has not been run by the official conformance runner, and no CI,
-publication, landing, or trust measurement is claimed. `IsTrue` is used
-without an import.
+children are included in the co-turned candidate; their landing is not
+established. It has not been run by the official conformance runner, and
+no CI, publication, landing, or trust measurement is claimed. `IsTrue` is
+used without an import.
 
 Every case has promise class **durable invariant**.
 

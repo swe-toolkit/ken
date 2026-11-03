@@ -1148,8 +1148,8 @@ establish official conformance-runner execution.
 > D0 findings from Foundation's scratch run, not an assembled
 > candidate gate, official conformance execution, CI, publication,
 > landing or a measured landed trust result. The catalog theorem,
-> named package test and CV seed require separate delivery and
-> exact-tip verification.
+> named package test and CV seed are included in the co-turned
+> candidate; this scratch result does not assess that candidate.
 
 `Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
 Transparent theorem immediately after `poly_eq_substitute` and before
