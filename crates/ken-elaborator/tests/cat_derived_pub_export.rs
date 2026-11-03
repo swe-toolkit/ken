@@ -278,10 +278,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
                  import Data.Numeric.Nat.Arithmetic (add)\n"
             }
             "filter::append" => "import Data.Collections.Derived (list_append)\n",
-            "filter::length" => {
-                "import Data.Collections.Derived (length)\n\
-                 import Core.Classes.LawfulClasses (IsTrue, leq_nat)\n"
-            }
+            "filter::length" => "import Data.Collections.Derived (length)\n",
             "insert::count" => "import Data.Collections.Derived (count)\n",
             "sort::perm" => "import Data.Collections.Derived (Perm)\n",
             "insert::sorted" | "sort::sorted" => {
