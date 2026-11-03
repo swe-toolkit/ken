@@ -258,6 +258,32 @@ pub theorem graph_reachable_graph_monotone
           graph_reachable_complete q fq h s t target (walk_lift q g h included s t walk) hit
       }
 
+pub theorem graph_reachable_trans
+      (q : Type) (fq : Finite q) (d : DecEq q) (g : Graph q) (s : q) (t : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq g s (d.eq t)) True
+      → Equal Bool (graph_reachable q fq g t target) True
+      → Equal Bool (graph_reachable q fq g s target) True =
+  λreach_st.
+    λreach_t.
+      let witness =
+        require_some
+          (ReachWitness q g s (d.eq t))
+          (graph_find_walk q fq g s (d.eq t))
+          (graph_find_walk_some q fq g s (d.eq t) reach_st)
+      in
+        match witness {
+          MkReach u hit walk ↦
+            graph_reachable_along_walk
+              q
+              fq
+              g
+              s
+              t
+              target
+              (walk_transport_end q g s u t (sym q t u (d.sound t u hit)) walk)
+              reach_t
+        }
+
 pub fn graph_reverse (q : Type) (g : Graph q) : Graph q = MkGraph q (λs. λt. edge q g t s)
 
 pub theorem graph_reverse_edge
@@ -716,6 +742,10 @@ reachability fixed point, not another graph-specific search. Graph
 monotonicity re-types the witness walk edge by edge: the private `walk_lift`
 replaces each step's checked edge proof with the inclusion premise's proof for
 the larger graph, and completeness then decides along the lifted walk.
+Transitivity extracts the first leg's witness with the private `require_some`,
+turns its hit into `Equal q t u` by `d.sound` and `sym`, moves the walk's end
+to `t` with the private `walk_transport_end`, and carries the second leg back
+along that walk by `graph_reachable_along_walk`.
 Reversal flips adjacency without a second graph representation. Induction on a
 walk prepends each reversed edge to the reversed prefix; the existing private
 `walk_prepend` retains the checked edge proof. Completeness turns that reversed
@@ -2603,7 +2633,7 @@ family rather than assuming data eta.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–10](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–11](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2624,10 +2654,12 @@ adds one edge to the same chain and refuses the converse on the pair. The
 checks graph and walk reversal on a directed chain. The
 [§9 seed](../../../../conformance/stdlib/graphs/seed-walk-reverse-append.md)
 is authored but has not been Ken-checked or officially conformance-run. The
-public API is the graph, path and certificate types, their
-constructors, walk composition and reversal, the graph reversal and
+[§11 seed](../../../../conformance/stdlib/graphs/seed-reachability-trans.md)
+composes reachability through a middle vertex on a one-way chain and refuses
+the reversed claim. The public API is the graph, path and certificate types,
+their constructors, walk composition and reversal, the graph reversal and
 predicate-reachability operations and witness, the dependency-order operation,
-five list/order predicates, and twenty-one kernel-checked laws. Every other
+five list/order predicates, and twenty-two kernel-checked laws. Every other
 helper is private to this package.
 
 | Reader task | Section |
@@ -2659,6 +2691,9 @@ behavior, and reversed reachability on a three-vertex directed chain. The
 two different reversed routes with the same endpoints on a shortcut graph.
 The §10 package test checks the graph and walk involution laws on generic
 inputs and a closed directed chain, with their private proof helpers hidden
-from imports. These package tests do not stand in for official
-conformance-runner execution or CI, and do not establish execution of the §2
+from imports. The §11 package test checks the generic transitivity law, a
+reflexive client derived from public `graph_reachable_complete`, and the §11
+seed's accepted and refused rows, with zero local trust delta. These package
+tests do not stand in for official conformance-runner execution or CI, and do
+not establish execution of the §2
 seed.
