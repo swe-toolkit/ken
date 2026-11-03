@@ -9,7 +9,8 @@
 > SPEC-GRAPHS-REACHABILITY-GRAPH-MONOTONE §7;
 > SPEC-GRAPHS-REVERSE-REACHABILITY §8;
 > SPEC-GRAPHS-WALK-REVERSE-APPEND §9;
-> SPEC-GRAPHS-REVERSE-INVOLUTION §10).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REVERSE-INVOLUTION §10;
+> SPEC-GRAPHS-REACHABILITY-TRANS §11).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1023,3 +1024,74 @@ claim. The closed twice-reversed `chain_walk` equality accepts
 `Refl` while refusing `Proved`. These finite checks distinguish
 one reversal from two; they do not replace the generic proofs or
 establish official conformance-runner execution.
+
+## 11. Reachability is transitive
+
+> **Section 11 status: DRAFT v0
+> (SPEC-GRAPHS-REACHABILITY-TRANS).** Architect AC-0
+> `evt_bvjs9ftn3aw` checked the generic proof and client in isolated
+> scratch on `84b15bb0984e7ba7218da33adf50118b07a7a271`:
+> `ken check` and `ken fmt --check` rc 0, no added `Axiom`, and equal
+> `trusted_base()` identity sets 114 → 114 across the ten-provider
+> closure and `Dependency`. The relevant graph catalog, spec and
+> conformance paths are unchanged at this Spec child's base
+> `395b9cf3128d70a04bbbc3874b735d7b0f2a34c5`. Scratch results
+> do not establish checks on this Spec-only child or an assembled
+> candidate. They establish no official conformance-runner execution,
+> CI, publication, landing or measured landed trust. CV owns the
+> separate seed; Foundation owns the catalog export and package test.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent
+checked theorem immediately after `graph_reachable_graph_monotone`
+(§7) and before `graph_reverse`. Its public type is exactly:
+
+```ken
+pub theorem graph_reachable_trans
+      (q : Type) (fq : Finite q) (d : DecEq q) (g : Graph q) (s : q) (t : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq g s (d.eq t)) True
+      → Equal Bool (graph_reachable q fq g t target) True
+      → Equal Bool (graph_reachable q fq g s target) True
+```
+
+The first premise decides whether `s` reaches the particular vertex
+`t`; the second decides whether `t` reaches `target`. The conclusion
+carries the latter result back to `s`. The vertex predicate `d.eq t`
+is the §1.2 query built from the supplied `DecEq q`, with `t` fixed
+as its first argument. It requires no third premise, exported
+`named` helper, new import or change in surface syntax. An inline
+`λv. d.eq v t` in this theorem's type position is not parseable;
+Architect's D0 measured `ParseError` for that form and checked
+`d.eq t` instead. The orientation is material: the first leg's hit
+at `u` is `d.eq t u = True`, which `d.sound t u` turns into
+`Equal q t u`, then `sym` reverses for endpoint transport.
+
+The generic proof extracts the first reachability witness with
+`graph_find_walk_some` and the existing private `require_some`.
+After the checked hit identifies its endpoint with `t`, the private
+`walk_transport_end` moves that walk's endpoint to `t`. Section 5's
+public `graph_reachable_along_walk` then carries the second premise
+back along the walk. The witness is bound before its dependent match;
+no helper, axiom, kernel form or surface rule is added. The existing
+`require_some`, `walk_transport_end`, `named`,
+`graph_reachable_refl` and `edge_reach_trans` stay private, and
+`edge_reach_trans` is unchanged. No §1–§10 operation or law type
+changes.
+
+Reflexivity is derivable from the existing public API, not a second
+export in this candidate: apply `graph_reachable_complete q fq g s s
+(d.eq s)` to `WalkHere q g s` and `d.complete s s Refl` to obtain
+`Equal Bool (graph_reachable q fq g s (d.eq s)) True`. Together with
+`graph_reachable_trans`, this makes reachability to a vertex a
+preorder. A client can use this derived reflexive base as the first
+leg at `s` and compose it with any reachability from `s` to a target.
+
+The separate CV seed is specified to use a one-way
+`V0 → V1 → V2` chain: accepted first and second legs compose to
+`V0` reaching “is `V2`”. The same-form `Proved` control accepts that
+forward claim; the isolated `Proved` refusal claims `V2` reaches
+“is `V0`” on the same chain. Architect's D0 measured the accepted
+control and refused reverse claim; `Refl` refused both `Equal Bool`
+forms, so it cannot distinguish these values. These closed rows do
+not replace the generic checked proof or establish that the separate
+seed was authored, run as Ken or executed through the official
+conformance runner.
