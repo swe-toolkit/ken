@@ -473,8 +473,9 @@ pin!(
     ),
     RefuseNonTree
 );
-// A binder typed by a type-valued fn releases that fn's registered
-// footprint, read without reducing `Pick On`.
+// A binder typed by a type-valued fn and then matched is refused through
+// the scrutinee join on the dispatched type, with or without Pick's
+// registration.
 pin!(
     c13_lambda_binder_type_function,
     with_pick(space(
@@ -494,6 +495,40 @@ pin!(
         false
     )),
     RefuseNonTree
+);
+
+// No match reaches these two: only Pick's registered footprint, read
+// without reducing `Pick On`, charges Console to a proc that does not visit
+// it. The PBox twin is the same form over a type with no row.
+pin!(
+    c15_parameter_let_type_function,
+    with_pick(space(
+        CELL,
+        "proc peek (b : Pick On) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    )),
+    RefuseFalsePurity
+);
+pin!(
+    c16_lambda_argument_type_function,
+    with_pick(space(
+        CELL,
+        "proc peek (b : Pick On) : Unit visits [Holder] =",
+        r"    ((\x. MkUnit) : Pick On -> Unit) b",
+        false
+    )),
+    RefuseFalsePurity
+);
+pin!(
+    k15_pure_parameter_let,
+    space(
+        CELL,
+        "proc peek (b : PBox) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    ),
+    PrintsB
 );
 
 pin!(
