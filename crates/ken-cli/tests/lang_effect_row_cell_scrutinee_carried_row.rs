@@ -6,7 +6,7 @@
 //! reachable cell-carried callback is
 //! accounted for once, and a non-tree action is refused at check time. THE GAP:
 //! operator forms without a constructible row-bearing result are reviewed
-//! structurally; a type-valued fn's registered footprint over-approximates
+//! structurally; a declaration's registered body footprint over-approximates
 //! its results (Pick Off is charged Box's row), and an arrow-typed lambda
 //! binder whose arrow is written inline, not through an alias, is a sibling, not
 //! guarded here. LET-BOUND's named binary already pins q02, q11 and q15.
@@ -46,6 +46,10 @@ fn PickAlias (f : Flag) : AliasType = match f { On ↦ Box ; Off ↦ PBox }
 const AliasBox : AliasType = Box
 const AliasPBox : AliasType = PBox
 ";
+const LET_ALIAS: &str = "const AliasType : Type 1 = Type 0
+let LetAliasBox : AliasType = Box
+let LetAliasPBox : AliasType = PBox
+";
 
 /// Declares the type-valued fn Pick after the shared prelude.
 fn with_pick(source: String) -> String {
@@ -56,6 +60,12 @@ fn with_pick(source: String) -> String {
 /// universe, so no written codomain is `Type`.
 fn with_alias(source: String) -> String {
     source.replacen(ROSE, &format!("{ROSE}{ALIAS}"), 1)
+}
+
+/// Declares top-level lets with an aliased universe result type, keeping the
+/// type spelling and parameter read identical to the const controls.
+fn with_let_alias(source: String) -> String {
+    source.replacen(ROSE, &format!("{ROSE}{LET_ALIAS}"), 1)
 }
 
 fn space(cell: &str, signature: &str, body: &str, two: bool) -> String {
@@ -560,6 +570,29 @@ pin!(
     with_alias(space(
         CELL,
         "proc peek (b : AliasPBox) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    )),
+    PrintsB
+);
+// A top-level let can also name a carried type. The row-bearing read must
+// charge Console even without a match; the same-form pure let must print b.
+// Removing only RDeclKind::Let from registration distinguishes this pair.
+pin!(
+    c19_alias_codomain_top_level_let,
+    with_let_alias(space(
+        CELL,
+        "proc peek (b : LetAliasBox) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    )),
+    RefuseFalsePurity
+);
+pin!(
+    k17_alias_codomain_pure_top_level_let,
+    with_let_alias(space(
+        CELL,
+        "proc peek (b : LetAliasPBox) : Unit visits [Holder] =",
         "    let c = b in MkUnit",
         false
     )),
