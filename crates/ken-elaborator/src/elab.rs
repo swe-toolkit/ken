@@ -1324,8 +1324,9 @@ impl<'e> ElabCtx<'e> {
             Some(rows) => {
                 let outer = |index, name: &str| self.surface_latent(index, name);
                 let mut scope = LatentScope::new(&outer).with_alias(self.alias_latent());
-                let named = bound_value_latent(scrut, &rows, &scope);
-                infer_expr_row_type(scrut, &rows, None, &mut scope).join(named)
+                let row = infer_expr_row_type(scrut, &rows, None, &mut scope);
+                let named = bound_value_latent_from_row(scrut, &row, &rows, &scope);
+                row.join(named)
             }
             None => crate::effects::RowType::empty(),
         };
@@ -2288,7 +2289,7 @@ fn check_performed_let(
             reason: "ensures on a sequenced let needs an explicit checked result".into(),
         });
     }
-    let latent = cx.pending_let_latent(ty_opt, rhs);
+    let latent = let_latent(cx, ty_opt, rhs, &binder_ty, true);
     cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
     cx.push_let_latent(latent);
     let checked = check_result_position(cx, body, &weaken(expected, 1), span, &[]);
@@ -2390,7 +2391,7 @@ fn check_let_once(
     refine_checked_let_rhs(cx, rhs, &mut rhs_core, &mut rhs_ty, expected, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
     let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
-    let latent = cx.pending_let_latent(ty_opt, rhs);
+    let latent = let_latent(cx, ty_opt, rhs, &rhs_ty, false);
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     cx.push_let_latent(latent);
     let path_base = cx.path_conditions.len();
@@ -14483,7 +14484,7 @@ fn infer_performed_let(
             reason: "inferred let has no informative checked equation".into(),
         });
     }
-    let latent = cx.pending_let_latent(ty_opt, rhs);
+    let latent = let_latent(cx, ty_opt, rhs, &binder_ty, true);
     cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
     cx.push_let_latent(latent);
     let inferred = infer(cx, body);
@@ -14582,7 +14583,7 @@ fn infer_let_once(
     let (rhs_core, rhs_ty) = prepare_inferred_let_rhs(cx, ty_opt, rhs, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
     let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
-    let latent = cx.pending_let_latent(ty_opt, rhs);
+    let latent = let_latent(cx, ty_opt, rhs, &rhs_ty, false);
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     cx.push_let_latent(latent);
     let path_base = cx.path_conditions.len();
@@ -17952,7 +17953,70 @@ fn bound_value_latent(
         RExpr::RAsc(inner, ty, _) => {
             written_type_row(ty, effect_rows).join(bound_value_latent(inner, effect_rows, scope))
         }
-        _ => crate::effects::RowType::empty(),
+        // Any other value releases what evaluating it performs, read in the
+        // closure body's delegating scope. Types and literals read as pure.
+        _ => {
+            let outer = |index, name: &str| scope.lookup(index, name);
+            infer_expr_row_type(
+                val,
+                effect_rows,
+                None,
+                &mut LatentScope::new(&outer).with_alias(scope.alias.clone()),
+            )
+        }
+    }
+}
+
+/// `bound_value_latent` when the caller already holds the value's
+/// evaluation row (`let_rhs_row` or `infer_expr_row_type` in this scope).
+/// The default arm reuses that row, so a nested let or match reads its
+/// value once rather than once per enclosing binder.
+fn bound_value_latent_from_row(
+    val: &RExpr,
+    row: &crate::effects::RowType,
+    effect_rows: &CheckedEffectRows<'_>,
+    scope: &LatentScope<'_>,
+) -> crate::effects::RowType {
+    match val {
+        RExpr::RVar(..)
+        | RExpr::RPatternAlias(..)
+        | RExpr::RCon(..)
+        | RExpr::RCheckedGlobal { .. }
+        | RExpr::RLam(..) => bound_value_latent(val, effect_rows, scope),
+        RExpr::RAsc(inner, ty, _) => written_type_row(ty, effect_rows)
+            .join(bound_value_latent_from_row(inner, row, effect_rows, scope)),
+        _ => row.clone(),
+    }
+}
+
+/// A let binder's latent, read before the binder is pushed. A sequenced
+/// binder whose type is a tree was performed at its bind (`36 §2.4`), so it
+/// releases only its written row. Every binder also releases its checked
+/// type's carried row, so the annotated and unannotated forms agree.
+#[inline(never)]
+fn let_latent(
+    cx: &ElabCtx<'_>,
+    ty_opt: &Option<RType>,
+    rhs: &RExpr,
+    binder_ty: &Term,
+    sequenced: bool,
+) -> crate::effects::RowType {
+    let Some(rows) = cx.effect_rows else {
+        return crate::effects::RowType::empty();
+    };
+    let latent = if sequenced && let_itree_parts(cx, binder_ty).is_some() {
+        ty_opt
+            .as_ref()
+            .map_or_else(crate::effects::RowType::empty, |ty| {
+                written_type_row(ty, &rows)
+            })
+    } else {
+        cx.pending_let_latent(ty_opt, rhs)
+    };
+    let head = core_type_head_id(&whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(binder_ty)));
+    match head.and_then(|id| rows.carried_ids.get(&id)) {
+        Some(carried) => latent.join(carried.clone()),
+        None => latent,
     }
 }
 
@@ -18025,7 +18089,12 @@ fn infer_expr_row_type(
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RLet(name, ty_opt, val, body, _) => {
             let row = let_rhs_row(val, effect_rows, projection_ctx, scope);
-            let latent = let_binder_latent(ty_opt, val, effect_rows, scope);
+            let latent = ty_opt
+                .as_ref()
+                .map_or_else(crate::effects::RowType::empty, |ty| {
+                    written_type_row(ty, effect_rows)
+                })
+                .join(bound_value_latent_from_row(val, &row, effect_rows, scope));
             scope.entered.push((Some(name.clone()), latent));
             let body_row = infer_expr_row_type(body, effect_rows, projection_ctx, scope);
             scope.entered.pop();
