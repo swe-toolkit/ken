@@ -111,7 +111,8 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   `PX10-NATIVE-SITE-IDENTITY` and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
 
 The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
-evt_1jd8yzwewmtf6) has five entries:
+evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
+evt_5kjjy0w0gzma and evt_p37pc6dwdk3h) has eight entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -126,8 +127,26 @@ evt_1jd8yzwewmtf6) has five entries:
    its emitting unit, not its static caller. Keyed on the emitting
    function.
 
-Entries 1, 3, 4 and 5 share one predicate: identity read from the
-emitting unit, not the static owner.
+6. The detached seat's Alternatives arm accepts an issued producer
+   alternative set as discharged when no member has a labelled writer
+   and no destination consumes the set. Keyed on the planner's set,
+   (identity.emission_owner, result), not on what any function emits or
+   forces.
+7. Narrowing the transport-source population for the transport and set
+   planes also narrowed the response plane's P2 deferral and the
+   process-carrier domain, which read the same set as a caller whose K
+   is consumed outside its emitting body. A bracket region got two
+   returned-exit owners. Keyed on pre_schema_transport_sources
+   membership, read under two meanings.
+8. Narrowing the transport records removed the detached-result seat's
+   single-member pass-through (`core.rs:12913`) for those identities,
+   and five lowering mode switches read transport-source emptiness.
+   Keyed on transport-record existence, read as escape crossing.
+
+Entries 1, 3, 4, 5 and 6 share one predicate: an identity read from one
+plane and checked or consumed under another key, such as the emitting
+unit rather than the static owner. Entries 7 and 8 carry entry 6's
+predicate.
 
 ## Stop conditions
 
