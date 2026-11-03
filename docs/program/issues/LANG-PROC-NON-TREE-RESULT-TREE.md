@@ -69,8 +69,10 @@ AC-0 rules.
     application, use as a value and method fields;
   - `proc direct_value : Int visits [Console] = 1`, which becomes
     `Ret 1` in core;
-  - the consumer sweep, measured by running, with a disposition per
-    file;
+  - the consumer sweep, with a disposition per file. The Architect
+    specifies the run and the Verify implementer executes it on
+    scratch, so the Architect rules from the reported result and does
+    not build or test.
   - the frame-budget effect;
   - the increment split.
 - **AC-1.** The NON-TREE-LET probe prints `ab` and a newline. R1 to R3

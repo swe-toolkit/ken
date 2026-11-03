@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT
 title: "Spec 65 §4 gives matrix_add and §5 its commutativity and associativity, but the package exports no zero matrix and no unit law for matrix_add, while §10 gives vector_add its zero and both unit laws. A client that needs the additive identity of indexed matrices must build zero rows from the private repeat and prove the unit by its own induction. Rule from a checked D0 at zero trust a public matrix_zero and its two unit laws, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
