@@ -110,8 +110,9 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   AC-2g containment once its parity rows exist. It waits for
   `PX10-NATIVE-SITE-IDENTITY` and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
   It lands as B-closure, then B1 (the F1 and F2 repairs and the starter
-  trap-classifier fix, evt_5y7e328rr2wd8), then B2 (the containment
-  deletion).
+  trap-classifier fix, evt_5y7e328rr2wd8), then B2: the Process
+  promotion, the gate deletion and the containment deletion, landing
+  with the native parity rows (Architect evt_5vsaybryes08b).
 - **Increment B-closure** is dynamic relay forwarding (Architect
   evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own.
   - Every relay member of every protocol is numbered by its relay
@@ -141,16 +142,27 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     `ExcludedSettlement::Relay` loses its producer (Architect
     evt_4151apntyfsmt, after D0-15 showed no plane can prove a source
     set complete).
-  - **Acceptance.** On argv, null and live, the native result equals the
-    interpreter's (P8 `bound_native == interp`); today they return
-    -8500008, -8500008 and -8004096. A named test pins argv's and null's
-    owners 2 (relay 1247) and 3 (992), and live's owners 2 (688) and 3
-    (433), as Protocol with the relay numbered. The 17 D0-14 binaries run
-    base `928313aa6` against candidate with identical results, except
-    parity changing in the expected direction. Mutations: restoring relay
-    removal for paired owners returns live to -8004096; restoring
-    `Excluded{Relay}` for unpaired owners returns argv to -8500008;
-    fixing dispatch to the first arm turns argv's parity red.
+  - **Acceptance (Architect evt_5vsaybryes08b).** B-closure leaves the
+    Process gate (`compiler_driver.rs:2997`), `HostOpV1::availability`
+    and AC-2g (`compiled.rs:123`) as they are; the run-time refusal in
+    `require_native_operation_v1` (`abi_v1.rs:820`) means a native
+    Process run needs the promotion.
+    - Landed: `px10_relays_are_numbered_protocol_members` in
+      `px10_plan_census_tests.rs`, the Architect's text, pins argv's
+      relays 1247 and 992 and live's 688 and 433 as numbered relay
+      members kept in the settled member set. Base `928313aa6` is red on
+      it, with the reason recorded; a green base is a stop.
+    - Landed evidence: the 17 D0-14 binaries run base against candidate
+      on the committed tree, with identical results or a pre-stated
+      direction; px10's stack overflow is reported as base or new.
+    - Scratch evidence, never committed: under the Architect's overlay
+      (`unit-b-overlay.patch`, md5 629a493c) and the D0 harness
+      `arch_spawnb_d0.rs`, the native result equals the interpreter's on
+      argv, null and live; today they return -8500008, -8500008 and
+      -8004096. Mutations under the same overlay: restoring relay
+      removal for paired owners returns live to -8004096; restoring
+      `Excluded{Relay}` for unpaired owners returns argv to -8500008;
+      fixing dispatch to the first arm turns argv's parity red.
   - **Unmeasured, named.** Relays that are no owner's protocol member are
     built unnumbered (1171 in argv specializations 1 to 11, 612 in live
     specializations 2 to 12). AC-1 parity covers them; a failure there is
