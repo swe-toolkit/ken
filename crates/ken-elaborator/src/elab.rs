@@ -17858,9 +17858,116 @@ pub(crate) fn declared_type_carried_row(
             }
         }
         RDeclKind::TypeAlias { ty } => carried = written_type_row(ty, rows),
+        RDeclKind::View { .. } if is_type_valued(rdecl) => {
+            carried = written_expr_row(&rdecl.body, rows)
+        }
         _ => {}
     }
     carried
+}
+
+/// Whether a declaration's written type ends in a universe after its
+/// binders: a type-valued fn or const, whose result can name a carried type.
+pub(crate) fn is_type_valued(rdecl: &RDecl) -> bool {
+    fn returns_universe(ty: &RType) -> bool {
+        match ty {
+            RType::RPi(_, _, codomain, _)
+            | RType::RArr(_, codomain, _)
+            | RType::REffectArr(_, _, codomain, _) => returns_universe(codomain),
+            RType::RUniv(..) => true,
+            _ => false,
+        }
+    }
+    matches!(rdecl.kind, RDeclKind::View { .. }) && rdecl.ty.as_ref().is_some_and(returns_universe)
+}
+
+/// A type-valued body's footprint: the join of every carried row a type it
+/// names carries, read as written and never reduced, so it over-approximates
+/// every result. A self-reference is not registered yet and adds nothing,
+/// which is the least fixpoint; a mutual group is joined at registration.
+fn written_expr_row(expr: &RExpr, rows: &CheckedEffectRows<'_>) -> crate::effects::RowType {
+    fn all<'e>(
+        exprs: impl Iterator<Item = &'e RExpr>,
+        rows: &CheckedEffectRows<'_>,
+    ) -> crate::effects::RowType {
+        exprs.fold(crate::effects::RowType::empty(), |acc, expr| {
+            acc.join(written_expr_row(expr, rows))
+        })
+    }
+    let row = |expr: &RExpr| written_expr_row(expr, rows);
+    match expr {
+        RExpr::RCon(name, _) => rows
+            .carried_names
+            .get(name)
+            .cloned()
+            .unwrap_or_else(crate::effects::RowType::empty),
+        RExpr::RCheckedGlobal { id, .. } => rows
+            .carried_ids
+            .get(id)
+            .cloned()
+            .unwrap_or_else(crate::effects::RowType::empty),
+        RExpr::RVar(..)
+        | RExpr::RPatternAlias(..)
+        | RExpr::RCell(..)
+        | RExpr::RRecursiveResult { .. }
+        | RExpr::RUniv(..)
+        | RExpr::RNumLit(..)
+        | RExpr::RStr(..)
+        | RExpr::RCharLit(..)
+        | RExpr::RByteStr(..)
+        | RExpr::RAttachedProofRef { .. } => crate::effects::RowType::empty(),
+        RExpr::RApp(a, b, _)
+        | RExpr::RBinOp(_, a, b, _)
+        | RExpr::RArrow(a, b, _)
+        | RExpr::RStandardOp { lhs: a, rhs: b, .. } => row(a).join(row(b)),
+        RExpr::RLam(_, e, _)
+        | RExpr::ROld(e, _)
+        | RExpr::RBecomes(_, _, e, _)
+        | RExpr::RProj(e, _, _)
+        | RExpr::RPosProj(e, _, _)
+        | RExpr::RTrunc(e, _) => row(e),
+        RExpr::RLet(_, annotation, rhs, body, _) => annotation
+            .as_ref()
+            .map_or_else(crate::effects::RowType::empty, |ty| {
+                written_type_row(ty, rows)
+            })
+            .join(row(rhs))
+            .join(row(body)),
+        RExpr::RAsc(e, ty, _) => row(e).join(written_type_row(ty, rows)),
+        RExpr::RPi(_, domain, codomain, _) | RExpr::RSigma(_, domain, codomain, _) => {
+            written_type_row(domain, rows).join(row(codomain))
+        }
+        RExpr::RInfixSpine {
+            operands,
+            operators,
+            ..
+        } => operators
+            .iter()
+            .filter_map(|operator| match operator {
+                RInfixOperator::User(name, _) => rows.carried_names.get(name).cloned(),
+                RInfixOperator::CheckedUser(_, id, _) => rows.carried_ids.get(id).cloned(),
+                RInfixOperator::Builtin(..) => None,
+            })
+            .fold(all(operands.iter(), rows), crate::effects::RowType::join),
+        RExpr::RMatch { scrut, arms, .. } => row(scrut).join(all(
+            arms.iter()
+                .flat_map(|arm| arm.guard.iter().chain([&arm.body])),
+            rows,
+        )),
+        RExpr::RIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => row(condition).join(row(then_branch)).join(row(else_branch)),
+        RExpr::RPair(components, _) => all(components.iter(), rows),
+        RExpr::RRecord { base, fields, .. } => all(
+            base.as_deref()
+                .into_iter()
+                .chain(fields.iter().map(|(_, value, _)| value)),
+            rows,
+        ),
+    }
 }
 
 fn written_latent_row(row: &crate::ast::EffectRowSyntax) -> crate::effects::RowType {
@@ -18050,7 +18157,7 @@ fn type_carried_row(cx: &ElabCtx<'_>, ty: &Term) -> crate::effects::RowType {
     let Some(rows) = cx.effect_rows else {
         return carried;
     };
-    let mut pending = vec![whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(ty))];
+    let mut pending = vec![cx.metas.zonk_term(ty)];
     while let Some(ty) = pending.pop() {
         match ty {
             Term::Sigma(a, b) => {

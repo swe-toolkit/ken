@@ -6,7 +6,9 @@
 //! reachable cell-carried callback is
 //! accounted for once, and a non-tree action is refused at check time. THE GAP:
 //! operator forms without a constructible row-bearing result are reviewed
-//! structurally; an arrow-typed lambda binder (k11) is a separate sibling, not
+//! structurally; a type-valued fn's registered footprint over-approximates
+//! its results (Pick Off is charged Box's row), and an arrow-typed lambda
+//! binder whose arrow is written inline, not through an alias, is a sibling, not
 //! guarded here. LET-BOUND's named binary already pins q02, q11 and q15.
 //! Inline sources avoid adding files to the strict-isolated .ken census.
 
@@ -36,6 +38,13 @@ const CELL: &str = "mut held : Box = MkBox action";
 const TWO_CELLS: &str = "mut idle : PBox = MkPBox quiet\n  mut held : Box = MkBox action";
 const FIRE: &str = "proc fire () : Unit visits [Holder, Console] =";
 const USE_CALLBACK: &str = "MkBox f ↦ let ignored = f MkUnit in MkUnit";
+const ROSE: &str = "data Rose = Leaf | Node (Bag Rose)\n";
+const PICK: &str = "fn Pick (f : Flag) : Type = match f { On ↦ Box ; Off ↦ PBox }\n";
+
+/// Declares the type-valued fn Pick after the shared prelude.
+fn with_pick(source: String) -> String {
+    source.replacen(ROSE, &format!("{ROSE}{PICK}"), 1)
+}
 
 fn space(cell: &str, signature: &str, body: &str, two: bool) -> String {
     format!(
@@ -449,6 +458,41 @@ pin!(
         ),
         true
     ),
+    RefuseNonTree
+);
+
+// The alias Callback is registered with its arrow's latent row; reducing
+// it to the kernel Pi would erase that row.
+pin!(
+    k11_lambda_arrow_alias,
+    space(
+        CELL,
+        FIRE,
+        r"    ((\k. let ignored = k MkUnit in MkUnit) : Callback -> Unit) action",
+        false
+    ),
+    RefuseNonTree
+);
+// A binder typed by a type-valued fn releases that fn's registered
+// footprint, read without reducing `Pick On`.
+pin!(
+    c13_lambda_binder_type_function,
+    with_pick(space(
+        CELL,
+        FIRE,
+        &format!(r"    ((\b. match b {{ {USE_CALLBACK} }}) : Pick On -> Unit) held"),
+        false
+    )),
+    RefuseNonTree
+);
+pin!(
+    c14_let_type_function,
+    with_pick(space(
+        CELL,
+        FIRE,
+        &format!("    let c : Pick On = MkBox action in\n    match c {{ {USE_CALLBACK} }}"),
+        false
+    )),
     RefuseNonTree
 );
 
