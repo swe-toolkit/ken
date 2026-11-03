@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT
 title: "Spec 68 §1.1 says interval membership is a question about rational values, not endpoint spellings, and interval_point_sound returns rational_equiv, yet the package exports no law that membership respects rational_equiv. A client that knows 1/2 is a member and 2/4 is the same value must re-prove membership from the endpoint order, through a private helper it cannot import. Rule from a checked D0 at zero trust a public respect law for interval_contains, with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
