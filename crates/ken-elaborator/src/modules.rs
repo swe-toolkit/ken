@@ -4262,7 +4262,7 @@ fn register_effect_row(
     }
 }
 
-/// Type-valued members of a mutual group can name each other, and each was
+/// Footprinted members of a mutual group can name each other, and each was
 /// registered before the later ones. Each takes the group's join, which
 /// over-approximates its footprint.
 fn join_mutual_carried_rows(elab: &mut ElabEnv, members: &[(String, ken_kernel::GlobalId)]) {
@@ -6083,12 +6083,12 @@ fn expand_scope(
                                 elab, &members, &declared_fixities,
                             ),
                         )?;
-                        let mut type_valued = Vec::new();
+                        let mut footprinted = Vec::new();
                         for (rdecl, result) in members.iter().zip(results) {
                             register_obligation_holes(elab, &result);
                             register_effect_row(elab, rdecl, &result);
-                            if crate::elab::is_type_valued(rdecl) {
-                                type_valued.push((result.name.clone(), result.def_id));
+                            if crate::elab::registers_body_footprint(rdecl) {
+                                footprinted.push((result.name.clone(), result.def_id));
                             }
                             register_declared_effect_row(elab, rdecl)?;
                             record_checked_local(
@@ -6099,7 +6099,7 @@ fn expand_scope(
                             );
                             ids.push(result);
                         }
-                        join_mutual_carried_rows(elab, &type_valued);
+                        join_mutual_carried_rows(elab, &footprinted);
                     }
                 }
                 // Export in textual order after every segment node has a

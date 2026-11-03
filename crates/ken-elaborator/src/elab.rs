@@ -17858,30 +17858,22 @@ pub(crate) fn declared_type_carried_row(
             }
         }
         RDeclKind::TypeAlias { ty } => carried = written_type_row(ty, rows),
-        RDeclKind::View { .. } if is_type_valued(rdecl) => {
-            carried = written_expr_row(&rdecl.body, rows)
-        }
+        _ if registers_body_footprint(rdecl) => carried = written_expr_row(&rdecl.body, rows),
         _ => {}
     }
     carried
 }
 
-/// Whether a declaration's written type ends in a universe after its
-/// binders: a type-valued fn or const, whose result can name a carried type.
-pub(crate) fn is_type_valued(rdecl: &RDecl) -> bool {
-    fn returns_universe(ty: &RType) -> bool {
-        match ty {
-            RType::RPi(_, _, codomain, _)
-            | RType::RArr(_, codomain, _)
-            | RType::REffectArr(_, _, codomain, _) => returns_universe(codomain),
-            RType::RUniv(..) => true,
-            _ => false,
-        }
-    }
-    matches!(rdecl.kind, RDeclKind::View { .. }) && rdecl.ty.as_ref().is_some_and(returns_universe)
+/// Whether admission registers a declaration's body footprint. Every fn,
+/// const and top-level let does: a type can name one anywhere, and a result
+/// type need not be written as a universe (`AliasType`). The footprint
+/// over-approximates, so a value-level body only over-reports, and nothing is
+/// classified or reduced.
+pub(crate) fn registers_body_footprint(rdecl: &RDecl) -> bool {
+    matches!(rdecl.kind, RDeclKind::View { .. } | RDeclKind::Let)
 }
 
-/// A type-valued body's footprint: the join of every carried row a type it
+/// A definitional body's footprint: the join of every carried row a type it
 /// names carries, read as written and never reduced, so it over-approximates
 /// every result. A self-reference is not registered yet and adds nothing,
 /// which is the least fixpoint; a mutual group is joined at registration.

@@ -41,9 +41,21 @@ const USE_CALLBACK: &str = "MkBox f ↦ let ignored = f MkUnit in MkUnit";
 const ROSE: &str = "data Rose = Leaf | Node (Bag Rose)\n";
 const PICK: &str = "fn Pick (f : Flag) : Type = match f { On ↦ Box ; Off ↦ PBox }\n";
 
+const ALIAS: &str = "const AliasType : Type 1 = Type 0
+fn PickAlias (f : Flag) : AliasType = match f { On ↦ Box ; Off ↦ PBox }
+const AliasBox : AliasType = Box
+const AliasPBox : AliasType = PBox
+";
+
 /// Declares the type-valued fn Pick after the shared prelude.
 fn with_pick(source: String) -> String {
     source.replacen(ROSE, &format!("{ROSE}{PICK}"), 1)
+}
+
+/// Declares type-valued declarations whose result type is an alias of a
+/// universe, so no written codomain is `Type`.
+fn with_alias(source: String) -> String {
+    source.replacen(ROSE, &format!("{ROSE}{ALIAS}"), 1)
 }
 
 fn space(cell: &str, signature: &str, body: &str, two: bool) -> String {
@@ -519,6 +531,39 @@ pin!(
         false
     )),
     RefuseFalsePurity
+);
+// The same reads through declarations whose result type is the alias
+// AliasType, not a written universe. Registration does not classify the
+// codomain, so these charge Console like c15; the PBox twin has no row.
+pin!(
+    c17_alias_codomain_type_function,
+    with_alias(space(
+        CELL,
+        "proc peek (b : PickAlias On) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    )),
+    RefuseFalsePurity
+);
+pin!(
+    c18_alias_codomain_const,
+    with_alias(space(
+        CELL,
+        "proc peek (b : AliasBox) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    )),
+    RefuseFalsePurity
+);
+pin!(
+    k16_alias_codomain_pure_const,
+    with_alias(space(
+        CELL,
+        "proc peek (b : AliasPBox) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    )),
+    PrintsB
 );
 pin!(
     k15_pure_parameter_let,
