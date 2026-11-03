@@ -11,7 +11,9 @@
 > SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT §9;
 > SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10;
 > SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11;
-> SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12).** The §1–9 catalog
+> SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12;
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE §13).**
+> The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
 > conformance or landed trust. Section 8's conditional
@@ -1129,3 +1131,72 @@ was refused for its proof form in scratch and cannot discriminate the
 false canonical-equality claim. These finite rows distinguish the
 missing derivative but do not replace the generic checked proof or
 establish official conformance-runner execution.
+
+## 13. Canonical equality under pointwise-equal substitutions
+
+> **Section 13 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE).**
+> Architect AC-0 on landed base `5f070eb32` confirmed the law in a
+> detached scratch D0. The initial closed-input harness stopped on
+> an ambiguous `IsTrue` import; the corrected harness accepted the
+> closed client and same-form control, and rejected both false
+> claims. The generic law, selective-import client and ten existing
+> symbolic-algebra targets checked; `ken check` and `ken fmt --check`
+> returned rc 0. The scratch trusted GlobalId sets were identical
+> before and after the new export (114 → 114); `Axiom` remained 1 → 1
+> and function-extensionality references 0 → 0. These are Architect's
+> D0 findings from Foundation's scratch run, not an assembled
+> candidate gate, official conformance execution, CI, publication,
+> landing or a measured landed trust result. The catalog theorem,
+> named package test and CV seed require separate delivery and
+> exact-tip verification.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent theorem immediately after `poly_eq_substitute` and before
+`compose_subst`. It takes two total substitutions, one expression and
+one pointwise canonical-equality premise, in that order:
+
+```ken
+pub theorem poly_eq_substitute_pointwise
+      (s : Nat → Expr)
+      (t : Nat → Expr)
+      (e : Expr)
+      (h : (v : Nat) → IsTrue (poly_eq (s v) (t v)))
+    : IsTrue (poly_eq (substitute s e) (substitute t e))
+```
+
+The premise compares each pair of replacement expressions by the
+canonical `poly_eq` decision; it does not identify `s` and `t` as
+functions or ask for structural `Equal Expr` of their images. The
+conclusion likewise concerns the canonical equality of the resulting
+expressions, for every `e`. It does not require the original expression
+to be normalized, the images to have the same syntax, or the result
+to be equal as an `Expr`. In particular, §3's `poly_eq_substitute`
+keeps one substitution fixed and varies two expressions; this theorem
+keeps the source expression fixed and varies the substitutions. Both
+are forward congruences, and neither requires a converse. No existing
+§§1–12 operation or law type changes.
+
+The checked proof descends directly on `e`: `EConst` uses public
+`poly_eq_refl`, `EVar v` uses `h v`, and `EAdd` and `EMul` use the
+respective public `poly_eq_add` and `poly_eq_mul` laws on the two
+recursive results. This makes the congruence independent of any
+environment-agreement lemma; neither a public nor a private such
+helper is introduced. No evaluation transport, function
+extensionality, `Axiom`, kernel rule or surface form is required.
+
+A closed seed can replace variable 0 in `EMul (EVar Zero) (EVar Zero)`
+with either `EAdd (EVar Zero) (EVar (Suc Zero))` or its summand-swapped
+form. The replacements agree canonically at variable 0 and are
+identical at every successor variable. An accepted client supplies
+`images_agree`, proved by a split on the variable, to the public law;
+a same-form `Proved` control claims the resulting canonical equality
+directly. A separate refused claim uses `Proved` on the same source
+expression and first substitution, but maps variable 0 of the second
+substitution to `EVar (Suc Zero)` alone. That discards the left
+summand: the images and their substituted results are not canonically
+equal. Architect's corrected scratch D0 rejected this `Proved` claim
+at its own declaration while accepting the control; a false
+pointwise-image claim was separately refused. These observations
+select the distinguishing form but neither replace the generic proof
+nor establish official conformance execution.

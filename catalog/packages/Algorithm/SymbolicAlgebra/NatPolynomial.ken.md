@@ -48,7 +48,9 @@ Substitution is a simultaneous single pass: an inserted expression is not
 substituted again. `compose_env` evaluates each
 variable's replacement under the original environment, and two laws relate
 that operation to evaluation
-and the forward direction of polynomial equality. These laws do not claim
+and the forward direction of polynomial equality. A further checked law says
+that two substitutions whose images are canonically equal at every variable
+give canonically equal results on the same expression. These laws do not claim
 that substitution preserves a `False` answer. `compose_subst` applies its
 second argument first and then its first argument to each inserted expression.
 Two checked laws establish structural composition and constructor identity;
@@ -890,6 +892,33 @@ pub theorem poly_eq_substitute
               (eval env (substitute s e2))
               (eval composed e2)
               (eval_substitute env s e2))))
+
+pub theorem poly_eq_substitute_pointwise
+      (s : Nat → Expr)
+      (t : Nat → Expr)
+      (e : Expr)
+      (h : (v : Nat) → IsTrue (poly_eq (s v) (t v)))
+    : IsTrue (poly_eq (substitute s e) (substitute t e)) =
+  match e {
+    EConst c ↦ poly_eq_refl (EConst c);
+    EVar v ↦ h v;
+    EAdd a b ↦
+      poly_eq_add
+        (substitute s a)
+        (substitute t a)
+        (substitute s b)
+        (substitute t b)
+        (poly_eq_substitute_pointwise s t a h)
+        (poly_eq_substitute_pointwise s t b h);
+    EMul a b ↦
+      poly_eq_mul
+        (substitute s a)
+        (substitute t a)
+        (substitute s b)
+        (substitute t b)
+        (poly_eq_substitute_pointwise s t a h)
+        (poly_eq_substitute_pointwise s t b h)
+  }
 
 pub fn compose_subst (s : Nat → Expr) (t : Nat → Expr) (v : Nat) : Expr = substitute s (t v)
 
@@ -2994,7 +3023,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and twenty-eight checked theorems; Horner, substitution and differentiation
+and twenty-nine checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
