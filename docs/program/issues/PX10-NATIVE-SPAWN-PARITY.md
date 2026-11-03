@@ -120,30 +120,34 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     carried operation word plus the relay K's captures.
     `PendingVisRecordProtocol`'s "only authority" sentence is amended for
     this member kind only.
-  - A finite, artifact-static dispatcher at the operation root reads the
-    carried word's constructor tag and field count and selects exactly
-    one HostOpV1 this artifact interns, in the shape of
-    `emit_carried_constructor_dispatch`. Every path is unique-or-error,
-    and an unmatched tag takes the deterministic failure edge before any
-    host request is built. The path set is closed by the operation
-    signature, not by Vis provenance.
-  - The host response is decoded under the selected HostOpV1 and passed
-    to the relay's own K. Admitted relays, fusion and their consumers are
-    unchanged.
+  - Ken's handler Match is already the operation-keyed, closed dispatch:
+    `host_response_routes` keys each arm, a `Let (Effect op ..)` with its
+    response call, by the arm's operation constructor, and
+    `selected_host_response_route` picks one arm per Vis at plan time
+    (Architect correction evt_mq84ht59na9f). For a relay member, the arm
+    is selected at run time from the carried operation word's
+    constructor tag, and each arm's Effect keeps its existing seats.
+    There is no new dispatcher table, and the path set is that handler's
+    arms. Every path is unique-or-error, and an unmatched tag takes the
+    deterministic failure edge before any host request is built.
+  - The host response is decoded under the selected arm's operation and
+    passed to the relay's own K. Admitted relays, fusion and their
+    consumers are unchanged.
   - **Acceptance.** argv's and null's native runs equal the
     interpreter's operation sequence and terminal; today they return
     -8500008 through owner 2's `Excluded{Relay}`. Smoke is unchanged. A
-    carried tag outside the interned set takes the failure edge, and a
-    mutant that maps a tag to the wrong HostOpV1 reddens a named row.
+    carried tag outside the handler's arms takes the failure edge, and a
+    mutant that selects the wrong arm for a tag reddens a named row.
   - **Its D0.** The Architect specifies it and the runtime implementer
     runs it on the held B ref `928313aa6`. It covers live's trace row,
     every Vis origin reaching relay 688's scrutinee against {988, 932}:
     a superset puts live in scope, un-admitting a relay whose source
     traversal does not close, and an equal set leaves live as its own
-    item, ruled from the trace. It also sweeps the 15 test files under
-    `crates/*/tests` that read `excluded_by_relay` or owner settlement
-    for an `Excluded{Relay}` observation, and counts the HostIO operation
-    constructors that argv's and null's artifacts intern.
+    item, ruled from the trace. It also runs 17 test binaries to measure
+    which fixtures produce an `Excluded{Relay}` owner (three test files
+    read `excluded_by_relay`: `rt_escape_second_resource_native`,
+    `rt_parity_native` and `px7f_resource_native`), and counts the
+    handler-arm population, which is the dispatch's path set.
 - **Later, not part of parity:** `RT-NATIVE-VIS-MAY-YIELD-SUMMARY`, one
   shared per-function may-yield summary that licenses static fusion.
 
