@@ -1,0 +1,439 @@
+//! Spec 36 §§1.1–1.4, 2.4; CELL-SCRUTINEE Architect AC-0 and AC-0b.
+//! Promise class: durable behavioral invariant. MEASURED: effect-carrying
+//! space cells, checked scrutinee types and space-operation parameters release
+//! their callback row before a match or let can discard it; pure/tree controls
+//! remain executable. CLAIMED: every reachable cell-carried callback is
+//! accounted for once, and a non-tree action is refused at check time. THE GAP:
+//! operator forms without a constructible row-bearing result are reviewed
+//! structurally; an arrow-typed lambda binder (k11) is a separate sibling, not
+//! guarded here. LET-BOUND's named binary already pins q02, q11 and q15.
+//! Inline sources avoid adding files to the strict-isolated .ken census.
+
+use std::process::{Command, Output};
+
+const PRE: &str = r#"program capabilities FS APartial
+proc action (x : Unit) : HostIO APartial Unit visits [Console] =
+  host_bind APartial (Result IOError Unit) Unit
+    (host_console APartial (Result IOError Unit)
+      (write ConsoleStream.Stdout (bytes_encode "a")))
+    (\_. host_pure APartial Unit MkUnit)
+fn quiet (x : Unit) : HostIO APartial Unit = host_pure APartial Unit MkUnit
+data Box = MkBox (Unit ->[Console] HostIO APartial Unit)
+data PBox = MkPBox (Unit -> HostIO APartial Unit)
+data Flag = On | Off
+record Slot { bx : Box }
+def Callback = Unit ->[Console] HostIO APartial Unit
+data Bag (a : Type) : Type where { Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a }
+data Rose = Leaf | Node (Bag Rose)
+"#;
+const TWO: &str = "data Two = TA (Unit ->[Console] HostIO APartial Unit) | TB (Unit ->[Console] HostIO APartial Unit)\n";
+const MAIN_B: &str = r#"proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  host_program APartial (print_line "b")
+"#;
+const CELL: &str = "mut held : Box = MkBox action";
+const FIRE: &str = "proc fire () : Unit visits [Holder, Console] =";
+const USE_CALLBACK: &str = "MkBox f ↦ let ignored = f MkUnit in MkUnit";
+
+fn space(cell: &str, signature: &str, body: &str, two: bool) -> String {
+    format!(
+        "{PRE}{}space Holder {{\n  {cell}\n  {signature}\n{body}\n}}\n{MAIN_B}",
+        if two { TWO } else { "" }
+    )
+}
+
+fn top_pick(recursive: bool) -> String {
+    let mut source = PRE.to_owned();
+    source.push_str(if recursive {
+        r#"proc pick (r : Rose) : Box visits [Console] = match r {
+  Leaf ↦ MkBox action ;
+  Node b ↦ match b {
+    Empty ↦ MkBox action ;
+    One x ↦ pick x ;
+    Join xs ys ↦ match (recursive result for xs) { MkBox f ↦ let ignored = f MkUnit in MkBox f } } }
+"#
+    } else {
+        r#"proc pick (r : Rose) : Box visits [Console] = match r {
+  Leaf ↦ MkBox action ;
+  Node b ↦ match b {
+    Empty ↦ MkBox action ;
+    One x ↦ pick x ;
+    Join xs ys ↦ match MkBox action { MkBox f ↦ let ignored = f MkUnit in MkBox f } } }
+"#
+    });
+    source.push_str(MAIN_B);
+    source
+}
+
+fn source_q17_annotated_cell() -> String {
+    space(
+        CELL,
+        FIRE,
+        "    let b : Box = held in\n    match b { MkBox f ↦ let ignored = f MkUnit in MkUnit }",
+        false,
+    )
+}
+
+fn source_q18_direct_constructor() -> String {
+    let mut source = PRE.to_owned();
+    source.push_str(
+        r#"proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  match MkBox action { MkBox f ↦ let ignored = f MkUnit in
+    host_program APartial (print_line "b") }
+"#,
+    );
+    source
+}
+
+#[derive(Clone, Copy)]
+enum Observation {
+    RefuseNonTree,
+    RefuseFalsePurity,
+    PrintsB,
+    PrintsAB,
+}
+
+fn cli(name: &str, source: &str) -> Output {
+    let dir = std::env::temp_dir().join(format!("ken-cell-row-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("fixture directory");
+    let path = dir.join(format!("{name}.ken"));
+    std::fs::write(&path, source).expect("write inline Ken program");
+    let output = Command::new(env!("CARGO_BIN_EXE_ken"))
+        .arg("run")
+        .arg(&path)
+        .output()
+        .expect("run Ken CLI");
+    let _ = std::fs::remove_file(path);
+    output
+}
+
+fn assert_observation(name: &str, source: &str, expected: Observation) {
+    let output = cli(name, source);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    match expected {
+        Observation::RefuseNonTree | Observation::RefuseFalsePurity => {
+            assert_eq!(output.status.code(), Some(1), "{name}: {stderr}");
+            assert!(output.stdout.is_empty(), "{name}: rejected program ran");
+            assert!(stderr.starts_with("error[E0038]"), "{name}: {stderr}");
+            let reason = match expected {
+                Observation::RefuseNonTree => "cannot be sequenced (36 §2.4)",
+                Observation::RefuseFalsePurity => "false purity or effect escape",
+                _ => unreachable!(),
+            };
+            assert!(stderr.contains(reason), "{name}: {stderr}");
+        }
+        Observation::PrintsB | Observation::PrintsAB => {
+            assert_eq!(output.status.code(), Some(0), "{name}: {stderr}");
+            let bytes = if matches!(expected, Observation::PrintsAB) {
+                b"ab\n".as_slice()
+            } else {
+                b"b\n".as_slice()
+            };
+            assert_eq!(output.stdout, bytes, "{name}: missing or doubled action");
+        }
+    }
+}
+
+macro_rules! pin {
+    ($test:ident, $source:expr, $result:ident) => {
+        #[test]
+        fn $test() {
+            assert_observation(stringify!($test), &$source, Observation::$result);
+        }
+    };
+}
+
+pin!(
+    c01_direct_cell,
+    space(
+        CELL,
+        FIRE,
+        &format!("    match held {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(c02_pair_let, space(CELL, FIRE, "    let p = (held, MkUnit) in\n    match p { (MkBox f, _) ↦ let ignored = f MkUnit in MkUnit }", false), RefuseNonTree);
+pin!(
+    c03_pair_direct,
+    space(
+        CELL,
+        FIRE,
+        "    match (held, MkUnit) { (MkBox f, _) ↦ let ignored = f MkUnit in MkUnit }",
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c04_if,
+    space(
+        CELL,
+        FIRE,
+        &format!("    match (if True then held else held) {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c05_match,
+    space(
+        CELL,
+        FIRE,
+        &format!("    match (match On {{ On ↦ held ; Off ↦ held }}) {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c06_nested_let,
+    space(
+        CELL,
+        FIRE,
+        &format!("    match (let c = held in c) {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c07_record_projection,
+    space(
+        CELL,
+        FIRE,
+        &format!("    match ({{ bx = held }} : Slot).bx {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c08_application,
+    space(
+        CELL,
+        FIRE,
+        &format!(r"    match (((\x. x) : Box -> Box) held) {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c09_arm_extracted_callback,
+    space(
+        CELL,
+        FIRE,
+        "    let k = match held { MkBox f ↦ f } in\n    let ignored = k MkUnit in MkUnit",
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c10_lambda_binder_cell,
+    space(
+        CELL,
+        FIRE,
+        &format!(r"    ((\b. match b {{ {USE_CALLBACK} }}) : Box -> Unit) held"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c11_position_projection,
+    space(
+        CELL,
+        FIRE,
+        &format!("    match (held, MkUnit).1 {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    c12_pair_let_projection,
+    space(
+        CELL,
+        FIRE,
+        &format!("    let p = (held, MkUnit) in\n    match p.1 {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+
+pin!(
+    k01_pure_cell,
+    space(
+        "mut held : PBox = MkPBox quiet",
+        FIRE,
+        "    match held { MkPBox f ↦ let ignored = f MkUnit in MkUnit }",
+        false
+    ),
+    PrintsB
+);
+pin!(
+    k02_constructor_pair,
+    {
+        let mut s = PRE.to_owned();
+        s.push_str("proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n  : HostIO APartial ExitCode visits [Console] =\n  let p = (MkBox action, MkUnit) in\n  match p { (MkBox f, _) ↦ let ignored = f MkUnit in\n    host_program APartial (print_line \"b\") }\n");
+        s
+    },
+    PrintsAB
+);
+pin!(
+    k10_lambda_constructor,
+    space(
+        CELL,
+        FIRE,
+        &format!(r"    ((\b. match b {{ {USE_CALLBACK} }}) : Box -> Unit) (MkBox action)"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    k12_pure_parameter,
+    space(
+        CELL,
+        "proc fire (n : Nat) : Unit visits [Holder] =",
+        "    let m = n in MkUnit",
+        false
+    ),
+    PrintsB
+);
+pin!(
+    k13_pure_or_pattern,
+    space(
+        CELL,
+        "proc fire (b : Two) : Unit visits [Holder, Console] =",
+        "    match b { TA f | TB f ↦ MkUnit }",
+        true
+    ),
+    PrintsB
+);
+
+pin!(
+    p0_unused_cell_read,
+    space(
+        CELL,
+        "proc peek () : Unit visits [Holder] =",
+        "    let b = held in MkUnit",
+        false
+    ),
+    RefuseFalsePurity
+);
+pin!(
+    p1_unused_parameter_read,
+    space(
+        CELL,
+        "proc peek (b : Box) : Unit visits [Holder] =",
+        "    let c = b in MkUnit",
+        false
+    ),
+    RefuseFalsePurity
+);
+pin!(
+    p2_space_parameter_match,
+    space(
+        CELL,
+        "proc peek (b : Box) : Unit visits [Holder, Console] =",
+        &format!("    match b {{ {USE_CALLBACK} }}"),
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    p3_top_parameter_match,
+    {
+        let mut s = PRE.to_owned();
+        s.push_str(&format!(
+            "proc g (b : Box) : Unit visits [Console] = match b {{ {USE_CALLBACK} }}\n"
+        ));
+        s.push_str(MAIN_B);
+        s
+    },
+    RefuseNonTree
+);
+pin!(
+    p4_space_arrow_parameter,
+    space(
+        CELL,
+        "proc fire (k : Callback) : Unit visits [Holder, Console] =",
+        "    let ignored = k MkUnit in MkUnit",
+        false
+    ),
+    RefuseNonTree
+);
+
+pin!(r1_recursive_result, top_pick(true), RefuseNonTree);
+pin!(r1k_recursive_constructor, top_pick(false), RefuseNonTree);
+pin!(
+    t1_tree_cell,
+    space(
+        "mut act : HostIO APartial Unit = action MkUnit",
+        "proc peek () : Unit visits [Holder] =",
+        "    let t = act in MkUnit",
+        false
+    ),
+    PrintsB
+);
+
+pin!(
+    s1_or_pattern_parameter,
+    space(
+        CELL,
+        "proc fire (b : Two) : Unit visits [Holder, Console] =",
+        "    match b { TA f | TB f ↦ let ignored = f MkUnit in MkUnit }",
+        true
+    ),
+    RefuseNonTree
+);
+pin!(
+    s2_or_pattern_lambda,
+    space(
+        CELL,
+        FIRE,
+        r"    ((\b. match b { TA f | TB f ↦ let ignored = f MkUnit in MkUnit }) : Two -> Unit) (TA action)",
+        true
+    ),
+    RefuseNonTree
+);
+pin!(
+    s3_inferred_match_parameter,
+    space(
+        CELL,
+        "proc fire (b : Box) : Unit visits [Holder, Console] =",
+        &format!("    let r = match b {{ {USE_CALLBACK} }} in r"),
+        true
+    ),
+    RefuseNonTree
+);
+pin!(
+    s4_inferred_match_lambda,
+    space(
+        CELL,
+        FIRE,
+        &format!(
+            r"    ((\b. let r = match b {{ {USE_CALLBACK} }} in r) : Box -> Unit) (MkBox action)"
+        ),
+        true
+    ),
+    RefuseNonTree
+);
+pin!(
+    x1_inferred_match_unused,
+    space(
+        CELL,
+        FIRE,
+        &format!(
+            r"    ((\b. let r = match b {{ {USE_CALLBACK} }} in MkUnit) : Box -> Unit) (MkBox action)"
+        ),
+        true
+    ),
+    RefuseNonTree
+);
+
+pin!(
+    q17_annotated_cell,
+    source_q17_annotated_cell(),
+    RefuseNonTree
+);
+pin!(
+    q18_direct_constructor,
+    source_q18_direct_constructor(),
+    PrintsAB
+);

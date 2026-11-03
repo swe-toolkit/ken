@@ -3399,8 +3399,14 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                             depth: position,
                         });
                     }
+                    // A lambda binder releases its checked domain's carried
+                    // row, as a let binder does, so a let RHS read before
+                    // its match is elaborated sees what the binder holds.
+                    let binder_latent = type_carried_row(cx, &domain);
                     cx.push_match_binder(domain.clone(), MatchBinderOrigin::UserLocal);
+                    cx.push_let_latent(binder_latent);
                     let body_result = check(cx, body, &cod, lam_span);
+                    cx.pop_let_latent();
                     cx.ctx.pop();
                     cx.assumptions.truncate(assumption_base);
                     body_result.map(|body_core| Term::lam(domain, body_core))
@@ -18034,7 +18040,9 @@ fn bound_value_latent_from_row(
 /// and its Sigma components.
 fn type_carried_row(cx: &ElabCtx<'_>, ty: &Term) -> crate::effects::RowType {
     let mut carried = crate::effects::RowType::empty();
-    let Some(rows) = cx.effect_rows else { return carried };
+    let Some(rows) = cx.effect_rows else {
+        return carried;
+    };
     let mut pending = vec![whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(ty))];
     while let Some(ty) = pending.pop() {
         match ty {
@@ -21835,10 +21843,16 @@ pub(crate) fn elaborate_space_decl(
     let resp_empty = Term::lam(empty_type.clone(), unit_type.clone());
     let cell_latents: Vec<crate::effects::RowType> = {
         let rows = CheckedEffectRows::new(
-            &elab.effect_rows, &elab.effect_rows_by_id,
-            &elab.type_carried_rows, &elab.type_carried_rows_by_id,
+            &elab.effect_rows,
+            &elab.effect_rows_by_id,
+            &elab.type_carried_rows,
+            &elab.type_carried_rows_by_id,
         );
-        space.cells.iter().map(|cell| written_type_row(&cell.ty, &rows)).collect()
+        space
+            .cells
+            .iter()
+            .map(|cell| written_type_row(&cell.ty, &rows))
+            .collect()
     };
 
     for operation in &space.operations {
