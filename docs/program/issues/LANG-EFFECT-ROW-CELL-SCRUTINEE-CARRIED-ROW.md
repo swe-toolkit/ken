@@ -74,6 +74,17 @@ A match scrutinee's latent includes its checked type's carried row, for
 every scrutinee form, or the scrutinee is refused at check time. One
 candidate, `/crates` only.
 
+A binder's carried row is read from its checked type as written, never
+reduced, through the registered identities it names. A type-valued
+declaration (a fn or const whose type ends in a universe) is registered
+at admission with an over-approximate footprint, the join of every
+carried row its body names, and a mutual group takes the join over its
+type-valued members (`elab.rs` `declared_type_carried_row`, `modules.rs`
+mutual registration). Reducing a binder's type is excluded: on CI it
+cost the type-position guards 3 to 20 seconds, and it lost the alias
+row that k11 carries (Architect evt_11pz35xvkdqgr, Research
+evt_4gw4te9hrn1v9).
+
 ## Acceptance
 
 - **AC-0 (D0).** The Architect specifies a development on the landed
@@ -101,6 +112,18 @@ candidate, `/crates` only.
   the 13 MATCH-BINDER rows, the strict census (98, 64, 12, 52), frame
   budget row M on its unchanged stack, `surf_space_cells_p1`,
   `class_field_purity` and `purity_keywords` stay green.
+- **AC-3, cost guards.** Every elaborator cost guard on the check path
+  is a named gate: `elab_recursive_frame_budget`,
+  `lang_branch_goal_contraction_cost`,
+  `lang_branch_goal_delta_duplication`,
+  `lang_type_position_sort_congruence_first` and
+  `lang_type_position_sort_nested_domain`. The sweep key is any
+  `crates/ken-elaborator/tests` file that asserts on elapsed time or
+  frame size. k11 (an arrow alias), c13 (a lambda binder typed by a
+  type-valued fn) and c14 (its let form) refuse with E0038, and deleting
+  the type-valued registration arm makes c13 check again.
+- **Open sibling, not pinned.** k11i, a lambda binder whose latent arrow
+  is written inline rather than through an alias, still drops its action.
 
 ## Stop conditions
 

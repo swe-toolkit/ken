@@ -134,7 +134,15 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     unique-or-error, and an unmatched tag takes the deterministic failure
     edge before any host request is built.
   - The host response is decoded under the selected arm's operation and
-    passed to the relay's own K.
+    passed to the relay's own K. That K is the IH of a recursive fold,
+    carried as an escaping checked-IH environment word, so it is resumed
+    as a defunctionalized frame, never by a call on the word
+    (`core.rs:18337` stays a refusal). The successor is the unique
+    validated response row whose K closure is
+    `recursive_ih_force_site_seat(E, k)`, with the environment's declared
+    children equal to the row's captures. A relay with no such seat or
+    row is still numbered, and its resume is a planned, named trap
+    (Architect evt_ht75yt85jteg, after D0-16).
   - No relay member is removed from numbering. Drive pairs remain a
     fusion optimization: a fused source never builds its Vis, and any
     Vis that is built reaches the numbered relay and forwards. Admission
@@ -150,8 +158,10 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     - Landed: `px10_relays_are_numbered_protocol_members` in
       `px10_plan_census_tests.rs`, the Architect's text, pins argv's
       relays 1247 and 992 and live's 688 and 433 as numbered relay
-      members kept in the settled member set. Base `928313aa6` is red on
-      it, with the reason recorded; a green base is a stop.
+      members kept in the settled member set, and asserts that 1247's
+      and 688's successors are the rows whose Vis are 1484 and 932.
+      Base `928313aa6` is red on it, with the reason recorded; a green
+      base is a stop.
     - Landed evidence: the 17 D0-14 binaries run base against candidate
       on the committed tree, with identical results or a pre-stated
       direction; px10's stack overflow is reported as base or new.
@@ -172,8 +182,8 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
 
 The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
-evt_5kjjy0w0gzma, evt_p37pc6dwdk3h and evt_qkp7qcj87b3q) has nine
-entries:
+evt_5kjjy0w0gzma, evt_p37pc6dwdk3h, evt_qkp7qcj87b3q and
+evt_3nvw9veeqa274) has ten entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -207,6 +217,11 @@ entries:
    direct lexical-closure redex, so argv's and null's relay 1247, whose
    sources sit behind `drain_pipe`, is excluded. Keyed on the producing
    Vis construct inside one function owner.
+10. A relay's continuation was resumed as though it were a lexical
+    closure with a planned response row, but it is the IH of a recursive
+    fold, carried as a runtime word. Keyed on the K being statically
+    known: an identity read off the lexical template for a value the
+    runtime boundary carries.
 
 Entries 1, 3, 4, 5 and 6 share one predicate: an identity read from one
 plane and checked or consumed under another key, such as the emitting
