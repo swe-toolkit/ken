@@ -2120,7 +2120,7 @@ fn prepare_performed_let_rhs(
     let outer = |index, name: &str| cx.surface_latent(index, name);
     let mut scope = LatentScope::new(&outer);
     if cx.numeric_env.effect_sequencing_ids().is_none()
-        || infer_expr_row_type(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
+        || let_rhs_row(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
     {
         return Ok(None);
     }
@@ -2173,7 +2173,7 @@ fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bo
     let outer = |index, name: &str| cx.surface_latent(index, name);
     let mut scope = LatentScope::new(&outer);
     cx.numeric_env.effect_sequencing_ids().is_some()
-        && infer_expr_row_type(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
+        && let_rhs_row(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
         && expected.map_or(true, |expected| let_itree_parts(cx, expected).is_some())
 }
 
@@ -17795,7 +17795,11 @@ pub(crate) fn declaration_param_latents(
             | Some(RType::REffectArr(domain, _, codomain, _)) => {
                 (written_type_row(domain, rows), Some(codomain.as_ref()))
             }
-            _ => (crate::effects::RowType::empty(), None),
+            // Past the syntactic spine (an alias or other named head), every
+            // remaining binder releases every row its residual written type
+            // carries: a sound bound for each binder's own type.
+            Some(other) => (written_type_row(other, rows), Some(other)),
+            None => (crate::effects::RowType::empty(), None),
         };
         latents.push((name.clone(), latent));
         ty = next;
@@ -17804,24 +17808,61 @@ pub(crate) fn declaration_param_latents(
     latents
 }
 
-/// A written let type supplies its carried rows; an unannotated direct
-/// alias inherits the row its source already released.
+/// A let binder releases its written type's rows and the latent of the
+/// value it binds.
 fn let_binder_latent(
     ty_opt: &Option<RType>,
     val: &RExpr,
     effect_rows: &CheckedEffectRows<'_>,
     scope: &LatentScope<'_>,
 ) -> crate::effects::RowType {
-    if let Some(ty) = ty_opt {
-        return written_type_row(ty, effect_rows);
-    }
+    ty_opt
+        .as_ref()
+        .map_or_else(crate::effects::RowType::empty, |ty| {
+            written_type_row(ty, effect_rows)
+        })
+        .join(bound_value_latent(val, effect_rows, scope))
+}
+
+/// The row a bound value releases when it is applied: a named value's row,
+/// a built closure's body row, and the rows an ascription writes.
+fn bound_value_latent(
+    val: &RExpr,
+    effect_rows: &CheckedEffectRows<'_>,
+    scope: &LatentScope<'_>,
+) -> crate::effects::RowType {
     match val {
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
         RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => infer_expr_row_type(
-            val, effect_rows, None,
+            val,
+            effect_rows,
+            None,
             &mut LatentScope::new(&|_, _| crate::effects::RowType::empty()),
         ),
+        RExpr::RLam(..) => {
+            let outer = |index, name: &str| scope.lookup(index, name);
+            infer_expr_row_type(val, effect_rows, None, &mut LatentScope::new(&outer))
+        }
+        RExpr::RAsc(inner, ty, _) => {
+            written_type_row(ty, effect_rows).join(bound_value_latent(inner, effect_rows, scope))
+        }
         _ => crate::effects::RowType::empty(),
+    }
+}
+
+/// A let RHS's own evaluation row (`36 §1.2`: building a closure performs
+/// nothing). A closure that is the whole RHS is paid through its binder's
+/// latent, wherever the binder is named.
+fn let_rhs_row(
+    val: &RExpr,
+    effect_rows: &CheckedEffectRows<'_>,
+    projection_ctx: Option<&ProjectionPurityCtx<'_>>,
+    scope: &mut LatentScope<'_>,
+) -> crate::effects::RowType {
+    match val {
+        RExpr::RLam(..) => crate::effects::RowType::empty(),
+        RExpr::RAsc(inner, _, _) => let_rhs_row(inner, effect_rows, projection_ctx, scope),
+        _ => infer_expr_row_type(val, effect_rows, projection_ctx, scope),
     }
 }
 
@@ -17853,8 +17894,17 @@ fn infer_expr_row_type(
         | RExpr::RByteStr(_, _) => crate::effects::RowType::empty(),
         RExpr::RApp(f, a, _) => infer_expr_row_type(f, effect_rows, projection_ctx, scope)
             .join(infer_expr_row_type(a, effect_rows, projection_ctx, scope)),
-        RExpr::RLam(_, _, _)
-        | RExpr::RPi(_, _, _, _)
+        // A closure pays its body's row where it is built. The plane has no
+        // inferred arrow latent, so this over-approximates `36 §1.2`/`§1.3`.
+        RExpr::RLam(name, body, _) => {
+            scope
+                .entered
+                .push((Some(name.clone()), crate::effects::RowType::empty()));
+            let row = infer_expr_row_type(body, effect_rows, projection_ctx, scope);
+            scope.entered.pop();
+            row
+        }
+        RExpr::RPi(_, _, _, _)
         | RExpr::RSigma(_, _, _, _)
         | RExpr::RArrow(_, _, _)
         | RExpr::RTrunc(_, _) => crate::effects::RowType::empty(),
@@ -17868,13 +17918,13 @@ fn infer_expr_row_type(
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RLet(name, ty_opt, val, body, _) => {
-            let row = infer_expr_row_type(val, effect_rows, projection_ctx, scope);
+            let row = let_rhs_row(val, effect_rows, projection_ctx, scope);
             let latent = let_binder_latent(ty_opt, val, effect_rows, scope);
             scope.entered.push((Some(name.clone()), latent));
             let body_row = infer_expr_row_type(body, effect_rows, projection_ctx, scope);
             scope.entered.pop();
             row.join(body_row)
-        },
+        }
         RExpr::RAsc(e, _, _) | RExpr::ROld(e, _) | RExpr::RBecomes(_, _, e, _) => {
             infer_expr_row_type(e, effect_rows, projection_ctx, scope)
         }

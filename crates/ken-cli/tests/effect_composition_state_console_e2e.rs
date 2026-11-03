@@ -29,8 +29,10 @@ fn workspace_root() -> PathBuf {
 /// `Coproduct (StateOp Nat) ConsoleOp`, run through `run_state` then `run_io`.
 /// `Pair Unit Nat` is a surface-nameable alias for `run_state`'s real return
 /// type `Sigma Unit Nat` (`prelude.rs`'s `Pair := \a b. Sigma a b`).
+/// `prog` declares `visits [Console]`: its bind continuation names
+/// `print_line`, and a built closure pays its body's row where it is built.
 const PROG: &str = r#"program capabilities FS APartial
-const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =
+proc prog : ITree ConsoleOp console_resp (Pair Unit Nat) visits [Console] =
   run_state Nat ConsoleOp console_resp Unit Zero
     (bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
       (state_get Nat ConsoleOp console_resp MkUnit)
