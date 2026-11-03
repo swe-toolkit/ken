@@ -7336,9 +7336,6 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
-        self.static_transition_plan.reject_reached_admitted_relay(
-            static_origin, constructor, args, self.defining_emission_owner,
-        )?;
         if let Some(region) = self.bracket_view.settlement_at(static_origin)?.cloned() {
             match region.mode() {
                 BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
@@ -17486,9 +17483,6 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::Construct { constructor, args } => {
                 self.lowered_construct_origins.insert(static_origin);
-                self.static_transition_plan.reject_reached_admitted_relay(
-                    static_origin, constructor, args, self.defining_emission_owner,
-                )?;
                 // Kept out of this recursive frame: only a claimed Deferred
                 // settlement's Copy id stays live across the arm below.
                 let bracket = match self.lower_construct_bracket_entry(

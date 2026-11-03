@@ -1,9 +1,8 @@
 //! Returned-Vis provenance and settlement for generated response owners.
 //!
 //! This analysis reads planned source occurrences and generated call edges. It
-//! does not install a response row: an admitted relay consumed by static
-//! producer fusion leaves the returned set, while independent static
-//! successors retain their rows.
+//! does not install a response row: every returned relay remains a numbered
+//! member, while independent static successors retain their rows.
 //! A constructor tag is not an occurrence identity, and a locally emitted Vis
 //! is not necessarily a returned Vis.
 
@@ -59,14 +58,13 @@ pub(in crate::cranelift_backend) struct ReturnedVisContext {
 pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
     pub(in crate::cranelift_backend) owner: StaticOriginId,
     pub(in crate::cranelift_backend) contexts: Vec<ReturnedVisContext>,
-    /// No owner may use a partial protocol when any returned member is a relay.
+    /// Whether at least one returned member carries a relay operation.
     pub(in crate::cranelift_backend) excluded_by_relay: bool,
 }
 
 /// A checked, program-local pending-return domain. Each member uses the
-/// *existing response row* as its only identity/ABI/effect authority. The
-/// discriminant is the row id plus one; zero is never a Vis member. No record
-/// exists for an unadmitted relay or an unknown returned-result endpoint.
+/// existing response row or a planned relay origin as its identity. Zero is
+/// never a Vis member. An unknown returned-result endpoint has no record.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) owners:
@@ -82,8 +80,7 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
 /// final plan. No owner is absent; no consumer reads it through a `_` arm.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
-    /// A member of the pending-Vis record protocol after admitted relays
-    /// are projected out of its returned set.
+    /// A member of the pending-Vis record protocol, including forwarded relays.
     Protocol,
     /// The K route returns no Vis member, so a Ret-only body is exact.
     RetOnly,
@@ -93,8 +90,6 @@ pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ExcludedSettlement {
-    /// At least one unsettled returned member forwards a pattern-bound operation.
-    Relay,
     /// The census errored while deriving a returned member (its text).
     Underived(String),
 }
@@ -166,52 +161,11 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
-    /// An admitted owner's forwarded relay is consumed by source fusion. Its
-    /// K must never construct that relay in the same emission owner.
-    pub(in crate::cranelift_backend) fn reject_reached_admitted_relay(
-        &self,
-        origin: StaticOriginId,
-        constructor: &str,
-        args: &[RuntimeExpr],
-        emission_owner: Option<super::continuations::ContinuationEmissionOwner>,
-    ) -> Result<(), CraneliftBackendError> {
-        let Some(emission_owner) = emission_owner else { return Ok(()); };
-        // The reached Construct and its arguments are already the lowering
-        // operand. Do not re-resolve its source occurrence behind the single
-        // origin-to-expression route merely to inspect this shape.
-        if constructor != self.process_symbols.itree_vis.as_str()
-            || args.len() != 2
-            || !matches!(args.first(), Some(RuntimeExpr::Var(_)))
-        {
-            return Ok(());
-        }
-        for owner in &self.static_response_continuations {
-            if owner.base_owner() != emission_owner
-                || !matches!(self.pending_vis_settlements.owners.get(&owner.id()),
-                    Some(ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly))
-            {
-                continue;
-            }
-            let protocol = self.returned_vis_protocol(owner.vis_origin())?;
-            if protocol.contexts.iter().flat_map(|context| &context.members)
-                .any(|member| member.relay && member.origin == origin)
-            {
-                return Err(planner_error(format!(
-                    "an admitted response owner {:?} reached relay construct {origin:?} despite source fusion",
-                    owner.id(),
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Classify every installed response owner. A complete relay-bearing
-    /// fixpoint may activate the record only after the shared source-pair
-    /// authority admits it; a missing or unsettled relay stays excluded.
+    /// Classify every installed response owner, retaining every returned relay
+    /// as a protocol member even when a source-fusion pair was planned.
     pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
         &self,
     ) -> Result<PendingVisSettlements, CraneliftBackendError> {
-        let admitted_relays = super::responses::settled_relay_owners(self);
         let mut settlements = BTreeMap::new();
         let mut bracket_exits = BTreeMap::new();
         let mut owners = BTreeMap::new();
@@ -237,23 +191,8 @@ impl StaticTransitionPlan<'_> {
                 }
                 bracket_exits.insert(owner.id(), exits);
             }
-            // Source fusion consumes an admitted relay before this K returns.
-            // Retain every non-relay successor and its existing exact row;
-            // only an admitted owner's relay members leave the returned set.
-            if protocol.excluded_by_relay && admitted_relays.contains(&owner.id()) {
-                for context in &mut protocol.contexts {
-                    context.members.retain(|member| !member.relay);
-                }
-                protocol.excluded_by_relay = false;
-            }
             if protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
                 settlements.insert(owner.id(), ResponseOwnerSettlement::RetOnly);
-                continue;
-            }
-            if protocol.excluded_by_relay {
-                settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
-                    reason: ExcludedSettlement::Relay,
-                });
                 continue;
             }
             let mut width = PendingVisFrameWidth {
@@ -498,9 +437,8 @@ impl StaticTransitionPlan<'_> {
     }
 
     /// Resolve a response owner's complete returned-Vis K-context fixpoint.
-    /// A relay makes the WHOLE owner ineligible; there is no partial route.
-    /// Derived successors have the existing response-row type and are not
-    /// installed into the planner's live row population in this increment.
+    /// Relay and derived successors remain members of the same protocol;
+    /// derived successors keep their existing response-row identities.
     pub(in crate::cranelift_backend) fn returned_vis_protocol(
         &self,
         owner_vis: StaticOriginId,

@@ -1688,14 +1688,6 @@ impl StaticTransitionPlan<'_> {
     }
 }
 
-/// The same classifier supplies pending-Vis projection before emission:
-/// admitted relay members are consumed by source fusion, not returned.
-pub(in crate::cranelift_backend) fn settled_relay_owners(
-    plan: &StaticTransitionPlan<'_>,
-) -> BTreeSet<StaticResponseContinuationId> {
-    relay_settlement::settled_relay_owners(plan)
-}
-
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
     let mut parents = BTreeMap::new();
     for occurrence in plan.source_occurrences.iter().flatten() {
@@ -5541,19 +5533,6 @@ impl StaticTransitionPlan<'_> {
                 .any(|returned| {
                     returned.context == owner.k_context() && !returned.members.is_empty()
                 }),
-            // An Excluded owner has no protocol record, but its K context may
-            // still return an ordinary successor Vis: that member, like a
-            // Protocol member, is not a Ret publication of K. Relay and
-            // bracket-settlement members keep their baseline treatment.
-            Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
-                reason: super::returned_vis::ExcludedSettlement::Relay,
-            }) => self
-                .returned_vis_protocol(row.vis_origin())?
-                .contexts
-                .iter()
-                .filter(|returned| returned.context == owner.k_context())
-                .flat_map(|returned| &returned.members)
-                .any(|member| !member.relay && member.bracket.is_none()),
             Some(super::returned_vis::ResponseOwnerSettlement::RetOnly) => false,
             Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
                 reason: super::returned_vis::ExcludedSettlement::Underived(_),

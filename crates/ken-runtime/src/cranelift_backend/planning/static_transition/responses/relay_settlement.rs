@@ -1,9 +1,5 @@
-//! Relay-source admission for pending-Vis fusion. A reached unsettled relay
-//! traps at its lowering consumer, not at this planning-time classification.
+//! Relay-source pairs are an optimization; every returned relay still forwards.
 use super::*;
-use crate::cranelift_backend::planning::static_transition::returned_vis::{
-    ExcludedSettlement, ResponseOwnerSettlement,
-};
 
 #[derive(Clone, Debug)]
 struct Source {
@@ -318,92 +314,4 @@ pub(super) fn build_drive_pairs(
         }
     }
     Ok(pairs)
-}
-
-fn classify(plan: &StaticTransitionPlan<'_>) -> BTreeSet<StaticResponseContinuationId> {
-    let mut settled_relay_owners = BTreeSet::new();
-    let parents = response_parents(plan);
-    let candidates = plan.return_protocol_candidate_rows();
-    let contexts = plan.continuation_contexts();
-    for owner in &plan.static_response_continuations {
-        let class = plan.pending_vis_settlements.owners.get(&owner.id());
-        let protocol = plan.returned_vis_protocol(owner.vis_origin());
-        // Underived carries no relay-membership information: keep baseline
-        // emission instead of reading an unavailable protocol as a refusal.
-        let candidate = match class {
-            Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Underived(_) }) => false,
-            Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Relay })
-            | Some(ResponseOwnerSettlement::Protocol)
-            | Some(ResponseOwnerSettlement::RetOnly)
-            | None => protocol.as_ref().is_ok_and(|row| row.excluded_by_relay),
-        };
-        if !candidate { continue; }
-        let mut relay_count = 0usize;
-        let mut omissions = BTreeSet::new();
-        let mut owner_admitted = true;
-        let mut errors = Vec::new();
-        match (&protocol, &parents, &candidates, &contexts) {
-            (Ok(protocol), Ok(parents), Ok(candidates), Ok(contexts)) => {
-                for context in &protocol.contexts {
-                    let root = contexts.iter().find(|v| v.id() == context.context)
-                        .map(|v| v.worker_body_origin());
-                    for member in &context.members {
-                        if !member.relay { continue; }
-                        relay_count += 1;
-                        let traced = root.ok_or_else(|| "missing context root".to_owned())
-                            .and_then(|root| source_for_relay(plan, parents, member.origin, root,
-                                &mut BTreeSet::new(), &mut omissions));
-                        if traced.is_err() { owner_admitted = false; }
-                        match traced {
-                            Err(error) => errors.push(error),
-                            Ok(sources) => for source in sources {
-                                let a_unique_row_and_seat =
-                                    source_seat_row(plan, candidates, source.vis).is_some();
-                                let b_construct_closure = source_shape(plan, source.vis);
-                                let c_tail_forward_only = source.tail_edges;
-                                // (d) is the exact plan-side admission key.
-                                // A proposed source without an issued pair has no route.
-                                let d_pair = plan.relay_drive_pair(source.vis, owner.base_owner());
-                                let deferred = plan.deferred_response_at_vis(source.vis);
-                                let bounded_handler = deferred.as_ref().ok().and_then(Option::as_ref)
-                                    .map(|row| plan.bounded_deferred_response_handler_owner(row));
-                                let unitless_row = source.redex_body
-                                    .map(|body| plan.deferred_no_unit_response_in_body(body));
-                                let admitted_handler = deferred.as_ref().ok().and_then(Option::as_ref)
-                                    .map(|row| plan.admitted_deferred_handler_owner(row));
-                                let drive_result = deferred_drive_settles(plan, source.vis, owner.base_owner());
-                                let drive_settled = matches!(&drive_result, Ok(true));
-                                let relay_drivable = a_unique_row_and_seat
-                                    && b_construct_closure.as_ref().is_ok_and(|b| *b)
-                                    && c_tail_forward_only && matches!(&d_pair, Ok(Some(_)));
-                                let source_ok = drive_settled || relay_drivable;
-                                owner_admitted &= source_ok;
-                                if let Err(error) = d_pair { errors.push(error.to_string()); }
-                                if let Err(error) = drive_result { errors.push(error.to_string()); }
-                                if let Err(error) = b_construct_closure { errors.push(error); }
-                                if let Err(error) = deferred { errors.push(error.to_string()); }
-                                if let Some(Err(error)) = bounded_handler { errors.push(error.to_string()); }
-                                if let Some(Err(error)) = admitted_handler { errors.push(error.to_string()); }
-                                if let Some(Err(error)) = unitless_row { errors.push(error.to_string()); }
-                            },
-                        }
-                    }
-                }
-            }
-            _ => {
-                owner_admitted = false;
-                errors.push(format!("unavailable inputs protocol={:?} parents={:?} candidates={:?} contexts={:?}",
-                    protocol.as_ref().err(), parents.as_ref().err(),
-                    candidates.as_ref().err(), contexts.as_ref().err()));
-            }
-        }
-        if relay_count == 0 { owner_admitted = false; }
-        if !errors.is_empty() { owner_admitted = false; }
-        if owner_admitted { settled_relay_owners.insert(owner.id()); }
-    }
-    settled_relay_owners
-}
-
-pub(super) fn settled_relay_owners(plan: &StaticTransitionPlan<'_>) -> BTreeSet<StaticResponseContinuationId> {
-    classify(plan)
 }
