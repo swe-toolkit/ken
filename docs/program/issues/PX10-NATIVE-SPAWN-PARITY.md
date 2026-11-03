@@ -109,10 +109,48 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   deletion and native parity. It also deletes BRANCH-ALTERNATIVES'
   AC-2g containment once its parity rows exist. It waits for
   `PX10-NATIVE-SITE-IDENTITY` and then `PX10-NATIVE-BRANCH-ALTERNATIVES`.
+  It lands as B-closure, then B1 (the F1 and F2 repairs and the starter
+  trap-classifier fix, evt_5y7e328rr2wd8), then B2 (the containment
+  deletion).
+- **Increment B-closure** is dynamic relay forwarding (Architect
+  evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own.
+  - An owner settled `Excluded{Relay}` with an un-admitted relay becomes
+    Protocol. The relay member is numbered by its relay construct's
+    origin (argv and null: 1247, owner 2, context 0). Its ABI is the
+    carried operation word plus the relay K's captures.
+    `PendingVisRecordProtocol`'s "only authority" sentence is amended for
+    this member kind only.
+  - A finite, artifact-static dispatcher at the operation root reads the
+    carried word's constructor tag and field count and selects exactly
+    one HostOpV1 this artifact interns, in the shape of
+    `emit_carried_constructor_dispatch`. Every path is unique-or-error,
+    and an unmatched tag takes the deterministic failure edge before any
+    host request is built. The path set is closed by the operation
+    signature, not by Vis provenance.
+  - The host response is decoded under the selected HostOpV1 and passed
+    to the relay's own K. Admitted relays, fusion and their consumers are
+    unchanged.
+  - **Acceptance.** argv's and null's native runs equal the
+    interpreter's operation sequence and terminal; today they return
+    -8500008 through owner 2's `Excluded{Relay}`. Smoke is unchanged. A
+    carried tag outside the interned set takes the failure edge, and a
+    mutant that maps a tag to the wrong HostOpV1 reddens a named row.
+  - **Its D0.** The Architect specifies it and the runtime implementer
+    runs it on the held B ref `928313aa6`. It covers live's trace row,
+    every Vis origin reaching relay 688's scrutinee against {988, 932}:
+    a superset puts live in scope, un-admitting a relay whose source
+    traversal does not close, and an equal set leaves live as its own
+    item, ruled from the trace. It also sweeps the 15 test files under
+    `crates/*/tests` that read `excluded_by_relay` or owner settlement
+    for an `Excluded{Relay}` observation, and counts the HostIO operation
+    constructors that argv's and null's artifacts intern.
+- **Later, not part of parity:** `RT-NATIVE-VIS-MAY-YIELD-SUMMARY`, one
+  shared per-function may-yield summary that licenses static fusion.
 
 The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
-evt_5kjjy0w0gzma and evt_p37pc6dwdk3h) has eight entries:
+evt_5kjjy0w0gzma, evt_p37pc6dwdk3h and evt_qkp7qcj87b3q) has nine
+entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -142,17 +180,24 @@ evt_5kjjy0w0gzma and evt_p37pc6dwdk3h) has eight entries:
    single-member pass-through (`core.rs:12913`) for those identities,
    and five lowering mode switches read transport-source emptiness.
    Keyed on transport-record existence, read as escape crossing.
+9. The relay classifier's source traversal refuses a Call that is not a
+   direct lexical-closure redex, so argv's and null's relay 1247, whose
+   sources sit behind `drain_pipe`, is excluded. Keyed on the producing
+   Vis construct inside one function owner.
 
 Entries 1, 3, 4, 5 and 6 share one predicate: an identity read from one
 plane and checked or consumed under another key, such as the emitting
-unit rather than the static owner. Entries 7 and 8 carry entry 6's
-predicate.
+unit rather than the static owner. Entries 7, 8 and 9 carry entry 6's
+predicate. B-closure sidesteps it for parity by forwarding on the
+operation's identity, and `RT-NATIVE-VIS-MAY-YIELD-SUMMARY` replaces the
+per-plane walks.
 
 ## Stop conditions
 
 - A repair that needs a kernel or trust change, or a post-fork callback.
-- A third advancing stop on the native-lowering chain. Its §1a count is
-  2 at the recut, so a third triggers the Research hold.
+- A sixth advancing stop on the native-lowering chain. Its §1a count is
+  5 at this recut (evt_146ymmv8mz9py), and a sixth gets the Architect's
+  marginal-value re-ask to Research.
 
 Checks: 4 fired: the fold search and the settlement refusal were read at
 `brackets.rs:583` and `returned_vis.rs:491` on `903b06068`. The up-walk's

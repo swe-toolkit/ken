@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-LENGTH-BOUND
 title: "Spec 69 §8 says windowing does not assert that it preserves a trace's length, and no section states the bound that does hold: a window keeps a subsequence, so it never has more events than its trace. Data.Time.EventTrace exports ten window laws but none about size, so a client that needs `length (trace_window p lo hi tr) <= length tr` must re-prove it from filter's definition. Rule from a checked D0 at zero trust a public length bound for trace_window, with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
