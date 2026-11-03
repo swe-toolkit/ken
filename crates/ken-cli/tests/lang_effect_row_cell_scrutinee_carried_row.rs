@@ -1,8 +1,9 @@
 //! Spec 36 §§1.1–1.4, 2.4; CELL-SCRUTINEE Architect AC-0 and AC-0b.
 //! Promise class: durable behavioral invariant. MEASURED: effect-carrying
-//! space cells, checked scrutinee types and space-operation parameters release
-//! their callback row before a match or let can discard it; pure/tree controls
-//! remain executable. CLAIMED: every reachable cell-carried callback is
+//! space cells (including nonzero cell indices), checked scrutinee types and
+//! space-operation parameters release their callback row before a match or
+//! let can discard it; pure/tree controls remain executable. CLAIMED: every
+//! reachable cell-carried callback is
 //! accounted for once, and a non-tree action is refused at check time. THE GAP:
 //! operator forms without a constructible row-bearing result are reviewed
 //! structurally; an arrow-typed lambda binder (k11) is a separate sibling, not
@@ -32,6 +33,7 @@ const MAIN_B: &str = r#"proc main (_input : ProcessInput) (_caps : ProgramCaps A
   host_program APartial (print_line "b")
 "#;
 const CELL: &str = "mut held : Box = MkBox action";
+const TWO_CELLS: &str = "mut idle : PBox = MkPBox quiet\n  mut held : Box = MkBox action";
 const FIRE: &str = "proc fire () : Unit visits [Holder, Console] =";
 const USE_CALLBACK: &str = "MkBox f ↦ let ignored = f MkUnit in MkUnit";
 
@@ -224,6 +226,29 @@ pin!(
         false
     ),
     RefuseNonTree
+);
+// Pair on the same two-cell declaration: selection must use the RCell index,
+// not the first cell's row. The c09 path isolates the pre-read of the callback
+// extracted from the second cell; the pure first cell is the same-form control.
+pin!(
+    c09_second_cell_arm_extracted_callback,
+    space(
+        TWO_CELLS,
+        FIRE,
+        "    let k = match held { MkBox f ↦ f } in\n    let ignored = k MkUnit in MkUnit",
+        false
+    ),
+    RefuseNonTree
+);
+pin!(
+    k14_first_cell_pure_before_carried_second,
+    space(
+        TWO_CELLS,
+        FIRE,
+        "    let k = match idle { MkPBox f ↦ f } in\n    let ignored = k MkUnit in MkUnit",
+        false
+    ),
+    PrintsB
 );
 pin!(
     c10_lambda_binder_cell,
