@@ -50,7 +50,10 @@ base, stop and report the mismatch; do not build around it.
 
 The shared summary and its plan-census pins, in one runtime candidate.
 No relay classifier, census walk or transport destination reads it in
-this WP. Each moves onto it later as its own step.
+this WP. Each moves onto it later as its own step, and the summary is
+what later licenses removing an unreached relay case from numbering, a
+performance step that B-closure's forwarding makes optional (Architect
+evt_4151apntyfsmt).
 
 ## Acceptance
 
@@ -64,7 +67,10 @@ this WP. Each moves onto it later as its own step.
     effect-polymorphic or polyvariant;
   - which terminals are open, enumerated from the `RuntimeExpr` call
     forms, not from 1503 alone;
-  - whether `relay_routes` is deleted here or left to the consumer step.
+  - whether `relay_routes` is deleted here or left to the consumer step;
+  - why `emission_owners_containing` (`static_transition.rs:863`) over-
+    and under-reported emission owners in D0-15, and whether the summary
+    replaces it.
 - **AC-1.** Plan-census pins, with D0-8 to D0-13's measurements and
   Increment B-closure's live trace as expected values: argv's and null's
   1503 resolves through `drain_pipe`; live's 688 set is the one
