@@ -1046,6 +1046,9 @@ struct ElabCtx<'e> {
     /// The stable bottom-relative position of the state binder plus the
     /// declared cell types while elaborating one space-operation continuation.
     space_state: Option<(usize, Vec<Term>)>,
+    /// Each declared cell's written-type row, by cell index, while
+    /// elaborating one space operation. A cell read releases it.
+    cell_latents: Vec<crate::effects::RowType>,
     /// The stable bottom-relative pre-state position plus cell types while
     /// elaborating a block-space contract. Absent for modifier `space proc`.
     space_pre_state: Option<(usize, Vec<Term>)>,
@@ -1226,6 +1229,7 @@ impl<'e> ElabCtx<'e> {
             result_refinements: Vec::new(),
             active_index_premise_frames: Vec::new(),
             space_state: None,
+            cell_latents: Vec::new(),
             space_pre_state: None,
             pattern_alias_type_frames: Vec::new(),
             active_pattern_aliases: Vec::new(),
@@ -1323,7 +1327,9 @@ impl<'e> ElabCtx<'e> {
         let latent = match self.effect_rows {
             Some(rows) => {
                 let outer = |index, name: &str| self.surface_latent(index, name);
-                let mut scope = LatentScope::new(&outer).with_alias(self.alias_latent());
+                let mut scope = LatentScope::new(&outer)
+                    .with_alias(self.alias_latent())
+                    .with_cells(&self.cell_latents);
                 let row = infer_expr_row_type(scrut, &rows, None, &mut scope);
                 let named = bound_value_latent_from_row(scrut, &row, &rows, &scope);
                 row.join(named)
@@ -1379,7 +1385,9 @@ impl<'e> ElabCtx<'e> {
     fn pending_let_latent(&self, ty_opt: &Option<RType>, rhs: &RExpr) -> crate::effects::RowType {
         let Some(rows) = self.effect_rows else { return crate::effects::RowType::empty() };
         let outer = |index, name: &str| self.surface_latent(index, name);
-        let scope = LatentScope::new(&outer).with_alias(self.alias_latent());
+        let scope = LatentScope::new(&outer)
+            .with_alias(self.alias_latent())
+            .with_cells(&self.cell_latents);
         let_binder_latent(ty_opt, rhs, &rows, &scope)
     }
 
@@ -1480,6 +1488,16 @@ impl<'e> ElabCtx<'e> {
 
     fn install_space_state(&mut self, cell_types: &[Term]) {
         self.space_state = Some((self.ctx.len() - 1, cell_types.to_vec()));
+    }
+
+    /// A match scrutinee releases its checked type's carried rows into the
+    /// innermost match's latent, whatever expression produced it. Its
+    /// syntactic latent alone misses a cell, a projection or a call.
+    fn join_scrutinee_carried_row(&mut self, scrut_ty: &Term) {
+        let carried = type_carried_row(self, scrut_ty);
+        if let Some(entry) = self.match_entry_latents.last_mut() {
+            entry.3 = entry.3.clone().join(carried);
+        }
     }
 }
 
@@ -2198,7 +2216,9 @@ fn prepare_performed_let_rhs(
 ) -> Result<Option<(Term, Term, (Term, Term, Term), Term)>, ElabError> {
     let Some(rows) = cx.effect_rows else { return Ok(None) };
     let outer = |index, name: &str| cx.surface_latent(index, name);
-    let mut scope = LatentScope::new(&outer).with_alias(cx.alias_latent());
+    let mut scope = LatentScope::new(&outer)
+        .with_alias(cx.alias_latent())
+        .with_cells(&cx.cell_latents);
     if cx.numeric_env.effect_sequencing_ids().is_none()
         || let_rhs_row(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
     {
@@ -2251,7 +2271,9 @@ fn bind_let_core(
 fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bool {
     let Some(rows) = cx.effect_rows else { return false };
     let outer = |index, name: &str| cx.surface_latent(index, name);
-    let mut scope = LatentScope::new(&outer).with_alias(cx.alias_latent());
+    let mut scope = LatentScope::new(&outer)
+        .with_alias(cx.alias_latent())
+        .with_cells(&cx.cell_latents);
     cx.numeric_env.effect_sequencing_ids().is_some()
         && let_rhs_row(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
         && expected.map_or(true, |expected| let_itree_parts(cx, expected).is_some())
@@ -10745,6 +10767,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     let expected_zonked = zonked_dependent_expected(cx, expected);
     let original_expected = expected_zonked.as_ref();
     let (scrut_core, scrut_ty) = infer_dependent_match_scrutinee(cx, scrut)?;
+    cx.join_scrutinee_carried_row(&scrut_ty);
 
     let (d_id, family_level_args, scrut_args) = dependent_scrutinee_family(&scrut_ty, span)?;
     let ind = dependent_inductive(cx.env, d_id)?;
@@ -14504,7 +14527,9 @@ fn infer_performed_let(
                 body,
                 &rows,
                 None,
-                &mut LatentScope::new(&outer).with_alias(cx.alias_latent()),
+                &mut LatentScope::new(&outer)
+                    .with_alias(cx.alias_latent())
+                    .with_cells(&cx.cell_latents),
             )
         })
         .unwrap_or_else(crate::effects::RowType::empty);
@@ -17853,6 +17878,8 @@ pub(crate) struct LatentScope<'s> {
     /// What an `as` alias occurrence releases: every enclosing arm's
     /// scrutinee latent. An alias has no de Bruijn slot of its own.
     alias: crate::effects::RowType,
+    /// What each space cell's read releases, by cell index.
+    cells: &'s [crate::effects::RowType],
 }
 
 impl<'s> LatentScope<'s> {
@@ -17861,12 +17888,22 @@ impl<'s> LatentScope<'s> {
             outer,
             entered: Vec::new(),
             alias: crate::effects::RowType::empty(),
+            cells: &[],
         }
     }
 
     fn with_alias(mut self, alias: crate::effects::RowType) -> Self {
         self.alias = alias;
         self
+    }
+
+    fn with_cells(mut self, cells: &'s [crate::effects::RowType]) -> Self {
+        self.cells = cells;
+        self
+    }
+
+    fn cell(&self, index: usize) -> crate::effects::RowType {
+        self.cells.get(index).cloned().unwrap_or_else(crate::effects::RowType::empty)
     }
 
     fn lookup(&self, index: usize, name: &str) -> crate::effects::RowType {
@@ -17947,7 +17984,9 @@ fn bound_value_latent(
                 val,
                 effect_rows,
                 None,
-                &mut LatentScope::new(&outer).with_alias(scope.alias.clone()),
+                &mut LatentScope::new(&outer)
+                    .with_alias(scope.alias.clone())
+                    .with_cells(scope.cells),
             )
         }
         RExpr::RAsc(inner, ty, _) => {
@@ -17961,7 +18000,9 @@ fn bound_value_latent(
                 val,
                 effect_rows,
                 None,
-                &mut LatentScope::new(&outer).with_alias(scope.alias.clone()),
+                &mut LatentScope::new(&outer)
+                    .with_alias(scope.alias.clone())
+                    .with_cells(scope.cells),
             )
         }
     }
@@ -17989,6 +18030,33 @@ fn bound_value_latent_from_row(
     }
 }
 
+/// The carried rows a checked type names, through its head, its arguments
+/// and its Sigma components.
+fn type_carried_row(cx: &ElabCtx<'_>, ty: &Term) -> crate::effects::RowType {
+    let mut carried = crate::effects::RowType::empty();
+    let Some(rows) = cx.effect_rows else { return carried };
+    let mut pending = vec![whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(ty))];
+    while let Some(ty) = pending.pop() {
+        match ty {
+            Term::Sigma(a, b) => {
+                pending.push(*a);
+                pending.push(*b);
+            }
+            Term::App(f, a) => {
+                pending.push(*f);
+                pending.push(*a);
+            }
+            Term::Const { id, .. } | Term::IndFormer { id, .. } => {
+                if let Some(row) = rows.carried_ids.get(&id) {
+                    carried = carried.join(row.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    carried
+}
+
 /// A let binder's latent, read before the binder is pushed. A sequenced
 /// binder whose type is a tree was performed at its bind (`36 §2.4`), so it
 /// releases only its written row. Every binder also releases its checked
@@ -18013,11 +18081,7 @@ fn let_latent(
     } else {
         cx.pending_let_latent(ty_opt, rhs)
     };
-    let head = core_type_head_id(&whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(binder_ty)));
-    match head.and_then(|id| rows.carried_ids.get(&id)) {
-        Some(carried) => latent.join(carried.clone()),
-        None => latent,
-    }
+    latent.join(type_carried_row(cx, binder_ty))
 }
 
 /// A let RHS's own evaluation row (`36 §1.2`: building a closure performs
@@ -18055,8 +18119,8 @@ fn infer_expr_row_type(
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
         RExpr::RPatternAlias(_, _, _) => scope.alias.clone(),
-        RExpr::RCell(_, _, _)
-        | RExpr::RRecursiveResult { .. }
+        RExpr::RCell(index, _, _) => scope.cell(*index),
+        RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
         | RExpr::RStr(_, _)
@@ -21769,6 +21833,13 @@ pub(crate) fn elaborate_space_decl(
     let empty_type = Term::indformer(prelude.empty_id, vec![]);
     let unit_type = Term::indformer(prelude.unit_id, vec![]);
     let resp_empty = Term::lam(empty_type.clone(), unit_type.clone());
+    let cell_latents: Vec<crate::effects::RowType> = {
+        let rows = CheckedEffectRows::new(
+            &elab.effect_rows, &elab.effect_rows_by_id,
+            &elab.type_carried_rows, &elab.type_carried_rows_by_id,
+        );
+        space.cells.iter().map(|cell| written_type_row(&cell.ty, &rows)).collect()
+    };
 
     for operation in &space.operations {
         let visits = operation
@@ -21801,14 +21872,21 @@ pub(crate) fn elaborate_space_decl(
 
         let qualified_name = format!("{}.{}", space.name, operation.name);
         let outer = |_: usize, _: &str| crate::effects::RowType::empty();
-        let mut scope = LatentScope::new(&outer);
+        let mut scope = LatentScope::new(&outer).with_cells(&cell_latents);
         let rows = CheckedEffectRows::new(
             &elab.effect_rows, &elab.effect_rows_by_id,
             &elab.type_carried_rows, &elab.type_carried_rows_by_id,
         );
-        scope.entered = operation.params.iter().map(|(name, ty)| {
-            (Some(name.clone()), written_type_row(ty, &rows))
-        }).collect();
+        // The parameters' written rows, as a top-level proc's are.
+        let param_latents: Vec<(String, crate::effects::RowType)> = operation
+            .params
+            .iter()
+            .map(|(name, ty)| (name.clone(), written_type_row(ty, &rows)))
+            .collect();
+        scope.entered = param_latents
+            .iter()
+            .map(|(name, row)| (Some(name.clone()), row.clone()))
+            .collect();
         let inferred_row = infer_expr_row_type(
             &operation.body, &rows, None, &mut scope,
         )
@@ -21837,9 +21915,10 @@ pub(crate) fn elaborate_space_decl(
             &mut elab.resolution_provenance,
             &elab.standard_operators,
             CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
-            Vec::new(),
+            param_latents,
         )
         .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
+        cx.cell_latents = cell_latents.clone();
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
         for (_, parameter_type) in &operation.params {
             let domain = elab_type(&mut cx, parameter_type)?;
@@ -27487,6 +27566,7 @@ fn infer_tuple_match(
 
     let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
     let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
+    cx.join_scrutinee_carried_row(&scrut_ty);
     if !matches!(scrut_ty, Term::Sigma(_, _)) {
         return Err(ElabError::TypeMismatch {
             span: span.clone(),
@@ -27712,6 +27792,7 @@ fn infer_or_match(
     let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
     let (scrut_core, scrut_ty_raw) = forget_subset_at_elimination_head(cx, scrut_core, scrut_ty_raw);
     let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
+    cx.join_scrutinee_carried_row(&scrut_ty);
     let (head, _) = peel_app(&scrut_ty);
     let inductive = if let Term::IndFormer { id, .. } = head {
         let ind = cx
@@ -27942,6 +28023,7 @@ fn infer_match_with_predicates(
     let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
     let (scrut_core, scrut_ty_raw) = forget_subset_at_elimination_head(cx, scrut_core, scrut_ty_raw);
     let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
+    cx.join_scrutinee_carried_row(&scrut_ty);
 
     // 2. Peel the type-former application: D p₀ … pₘ₋₁.
     let (head, params_terms) = peel_app(&scrut_ty);
