@@ -960,6 +960,11 @@ struct ElabCtx<'e> {
     decl_param_latents: Vec<(String, crate::effects::RowType)>,
     /// Local let rows keyed by stable bottom-relative context position.
     let_latents: Vec<(usize, crate::effects::RowType)>,
+    /// Per entered match: (context base, virtual base, arm-stack base,
+    /// scrutinee latent).
+    match_entry_latents: Vec<(usize, usize, usize, crate::effects::RowType)>,
+    /// Per entered arm body: (lo, hi, vlo, vhi, latent).
+    match_arm_latents: Vec<(usize, usize, usize, usize, crate::effects::RowType)>,
     /// The sink `§6.2` instance search appends its provenance to.
     ///
     /// **Carried beside `class_env`, not inside it.** The registry itself is
@@ -1206,6 +1211,8 @@ impl<'e> ElabCtx<'e> {
             effect_rows: None,
             decl_param_latents: Vec::new(),
             let_latents: Vec::new(),
+            match_entry_latents: Vec::new(),
+            match_arm_latents: Vec::new(),
             provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
@@ -1287,11 +1294,62 @@ impl<'e> ElabCtx<'e> {
         if let Some((bound, latent)) = self.decl_param_latents.get(level) {
             return if bound == name { latent.clone() } else { unknown_local_row(name) };
         }
-        self.surface_binding_position(index)
-            .and_then(|position| {
-                self.let_latents.iter().rev().find(|(at, _)| *at == position)
-            })
-            .map_or_else(crate::effects::RowType::empty, |(_, latent)| latent.clone())
+        let target = self.surface_binding_target(index);
+        if let Some(SurfaceBindingTarget::Context(position)) = target {
+            if let Some((_, latent)) = self.let_latents.iter().rev().find(|(at, _)| *at == position) {
+                return latent.clone();
+            }
+        }
+        self.match_arm_latents.iter().filter(|(lo, hi, vlo, vhi, _)| match target {
+            Some(SurfaceBindingTarget::Context(position)) => *lo <= position && position < *hi,
+            Some(SurfaceBindingTarget::Virtual(slot)) => *vlo <= slot && slot < *vhi,
+            None => false,
+        }).fold(crate::effects::RowType::empty(), |row, (.., latent)| row.join(latent.clone()))
+    }
+
+    /// A match's scrutinee latent, read before any binder is pushed.
+    #[inline(never)]
+    fn enter_match_latent(&mut self, scrut: &RExpr) {
+        let latent = match self.effect_rows {
+            Some(rows) => {
+                let outer = |index, name: &str| self.surface_latent(index, name);
+                let mut scope = LatentScope::new(&outer).with_alias(self.alias_latent());
+                let named = bound_value_latent(scrut, &rows, &scope);
+                infer_expr_row_type(scrut, &rows, None, &mut scope).join(named)
+            }
+            None => crate::effects::RowType::empty(),
+        };
+        self.match_entry_latents.push((
+            self.ctx.len(), self.matrix_virtual_surface_positions.len(),
+            self.match_arm_latents.len(), latent,
+        ));
+    }
+
+    #[inline(never)]
+    fn leave_match_latent(&mut self) {
+        let (.., arm_base, _) =
+            self.match_entry_latents.pop().expect("match latent is balanced with its match");
+        self.match_arm_latents.truncate(arm_base);
+    }
+
+    /// Every binder pushed since the innermost match entry is this arm's.
+    /// The scope lasts until the next arm of its match or the match's exit,
+    /// so the arm-body choke stays a tail call.
+    #[inline(never)]
+    fn enter_arm_latent(&mut self) {
+        let Some((lo, vlo, arm_base, latent)) = self.match_entry_latents.last().cloned() else {
+            return;
+        };
+        self.match_arm_latents.truncate(arm_base);
+        self.match_arm_latents.push((
+            lo, self.ctx.len(), vlo, self.matrix_virtual_surface_positions.len(), latent,
+        ));
+    }
+
+    /// An alias occurrence may name any enclosing arm's matched value.
+    fn alias_latent(&self) -> crate::effects::RowType {
+        self.match_arm_latents.iter()
+            .fold(crate::effects::RowType::empty(), |row, (.., latent)| row.join(latent.clone()))
     }
 
     /// Read a let RHS before its binder is pushed. Resolved RHS indices still
@@ -1299,7 +1357,7 @@ impl<'e> ElabCtx<'e> {
     fn pending_let_latent(&self, ty_opt: &Option<RType>, rhs: &RExpr) -> crate::effects::RowType {
         let Some(rows) = self.effect_rows else { return crate::effects::RowType::empty() };
         let outer = |index, name: &str| self.surface_latent(index, name);
-        let scope = LatentScope::new(&outer);
+        let scope = LatentScope::new(&outer).with_alias(self.alias_latent());
         let_binder_latent(ty_opt, rhs, &rows, &scope)
     }
 
@@ -2118,7 +2176,7 @@ fn prepare_performed_let_rhs(
 ) -> Result<Option<(Term, Term, (Term, Term, Term), Term)>, ElabError> {
     let Some(rows) = cx.effect_rows else { return Ok(None) };
     let outer = |index, name: &str| cx.surface_latent(index, name);
-    let mut scope = LatentScope::new(&outer);
+    let mut scope = LatentScope::new(&outer).with_alias(cx.alias_latent());
     if cx.numeric_env.effect_sequencing_ids().is_none()
         || let_rhs_row(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
     {
@@ -2171,7 +2229,7 @@ fn bind_let_core(
 fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bool {
     let Some(rows) = cx.effect_rows else { return false };
     let outer = |index, name: &str| cx.surface_latent(index, name);
-    let mut scope = LatentScope::new(&outer);
+    let mut scope = LatentScope::new(&outer).with_alias(cx.alias_latent());
     cx.numeric_env.effect_sequencing_ids().is_some()
         && let_rhs_row(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
         && expected.map_or(true, |expected| let_itree_parts(cx, expected).is_some())
@@ -3069,6 +3127,7 @@ fn check_result_position_with_predicates(
 fn check_match_arm_result(
     cx: &mut ElabCtx<'_>, arm: &RMatchArm, expected: &Term, span: &Span,
 ) -> Result<Term, ElabError> {
+    cx.enter_arm_latent();
     if cx.match_frames.last().is_none_or(|frame| frame.result_predicates.is_empty()) {
         check(cx, &arm.body, expected, span)
     } else {
@@ -3413,7 +3472,7 @@ fn check_match_result(
                 })
             } else {
                 let (core, inferred_ty) =
-                    infer_match_with_predicates(cx, scrut, arms, span, Some(expected), predicates)?;
+                    infer_match_entered(cx, scrut, arms, span, Some(expected), predicates)?;
                 unify_types(&mut cx.metas, expected, &inferred_ty);
                 // This is an inferred match, not the checked structural path;
                 // each branch has already been checked against its result.
@@ -10573,11 +10632,13 @@ fn check_match_dependent(
 ) -> Result<Term, ElabError> {
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
+    cx.enter_match_latent(scrut);
     let snapshot = refinement_snapshot::Snapshot::capture_boxed(cx);
     let first = check_match_dependent_once(cx, scrut, equation, arms, expected, span, predicates);
     let result = finish_dependent_match_retry(
         cx, first, snapshot, split_id, scrut, equation, arms, expected, span, predicates,
     );
+    cx.leave_match_latent();
     debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
     cx.recursive_convoy_refused_splits.remove(&split_id);
     result
@@ -14416,7 +14477,9 @@ fn infer_performed_let(
     let body_row = cx.effect_rows
         .map(|rows| {
             let outer = |index, name: &str| cx.surface_latent(index, name);
-            infer_expr_row_type(body, &rows, None, &mut LatentScope::new(&outer))
+            infer_expr_row_type(
+                body, &rows, None, &mut LatentScope::new(&outer).with_alias(cx.alias_latent()),
+            )
         })
         .unwrap_or_else(crate::effects::RowType::empty);
     let body_tree = let_itree_parts(cx, &body_ty);
@@ -17761,11 +17824,19 @@ fn unknown_local_row(name: &str) -> crate::effects::RowType {
 pub(crate) struct LatentScope<'s> {
     outer: &'s dyn Fn(usize, &str) -> crate::effects::RowType,
     entered: Vec<(Option<String>, crate::effects::RowType)>,
+    /// What an `as` alias occurrence releases: every enclosing arm's
+    /// scrutinee latent. An alias has no de Bruijn slot of its own.
+    alias: crate::effects::RowType,
 }
 
 impl<'s> LatentScope<'s> {
     pub(crate) fn new(outer: &'s dyn Fn(usize, &str) -> crate::effects::RowType) -> Self {
-        Self { outer, entered: Vec::new() }
+        Self { outer, entered: Vec::new(), alias: crate::effects::RowType::empty() }
+    }
+
+    fn with_alias(mut self, alias: crate::effects::RowType) -> Self {
+        self.alias = alias;
+        self
     }
 
     fn lookup(&self, index: usize, name: &str) -> crate::effects::RowType {
@@ -17833,6 +17904,7 @@ fn bound_value_latent(
 ) -> crate::effects::RowType {
     match val {
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
+        RExpr::RPatternAlias(..) => scope.alias.clone(),
         RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => infer_expr_row_type(
             val,
             effect_rows,
@@ -17841,7 +17913,9 @@ fn bound_value_latent(
         ),
         RExpr::RLam(..) => {
             let outer = |index, name: &str| scope.lookup(index, name);
-            infer_expr_row_type(val, effect_rows, None, &mut LatentScope::new(&outer))
+            infer_expr_row_type(
+                val, effect_rows, None, &mut LatentScope::new(&outer).with_alias(scope.alias.clone()),
+            )
         }
         RExpr::RAsc(inner, ty, _) => {
             written_type_row(ty, effect_rows).join(bound_value_latent(inner, effect_rows, scope))
@@ -17884,8 +17958,8 @@ fn infer_expr_row_type(
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
-        RExpr::RPatternAlias(_, _, _)
-        | RExpr::RCell(_, _, _)
+        RExpr::RPatternAlias(_, _, _) => scope.alias.clone(),
+        RExpr::RCell(_, _, _)
         | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
@@ -24279,6 +24353,7 @@ fn infer_arm_at_matrix_leaf(
             .map(|guard| elaborate_if_condition(cx, guard))
             .transpose();
         let guard = guard_result?;
+        cx.enter_arm_latent();
         let (body, body_ty) = infer(cx, &arm.body)?;
         Ok((guard, body, body_ty))
     })();
@@ -27711,7 +27786,24 @@ fn infer_match(
     span: &Span,
     expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
-    infer_match_with_predicates(cx, scrut, arms, span, expected, &[])
+    infer_match_entered(cx, scrut, arms, span, expected, &[])
+}
+
+/// The match-latent entry of every match the dependent producer does not
+/// take; `check_match_dependent` enters its own beside its split.
+#[inline(never)]
+fn infer_match_entered(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+    expected: Option<&Term>,
+    predicates: &[ResultPredicate],
+) -> Result<(Term, Term), ElabError> {
+    cx.enter_match_latent(scrut);
+    let result = infer_match_with_predicates(cx, scrut, arms, span, expected, predicates);
+    cx.leave_match_latent();
+    result
 }
 
 #[inline(never)]
