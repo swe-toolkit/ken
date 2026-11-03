@@ -27,7 +27,8 @@ without requiring either interval to contain a member.
 ## 2. Definition
 
 `Interval` holds two rational values and exports `MkInterval` so clients can
-construct boxes directly. The six arithmetic and point laws lead the checked
+construct boxes directly. The six arithmetic and point laws, together with
+membership transport across rational-value equivalence, lead the checked
 source; their operations follow. Enclosure uses both membership premises and
 the checked Rational monotonicity laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
@@ -154,6 +155,52 @@ pub theorem interval_point_sound
       y
       ((proof left for bool_and) (rational_leq x y) (rational_leq y x) h)
       ((proof right for bool_and) (rational_leq x y) (rational_leq y x) h)
+
+pub theorem interval_contains_respects_equiv
+      (i : Interval) (x : Rational) (y : Rational)
+    : rational_equiv x y → IsTrue (interval_contains i x) → IsTrue (interval_contains i y) =
+  match i {
+    MkInterval lo hi ↦
+      λhxy.
+        λhx.
+          (proof intro for bool_and)
+            (rational_leq lo y)
+            (rational_leq y hi)
+            (trans
+              Bool
+              (rational_leq lo y)
+              (rational_leq lo x)
+              True
+              (sym
+                Bool
+                (rational_leq lo x)
+                (rational_leq lo y)
+                ((proof respect for rational_leq)
+                  lo
+                  lo
+                  x
+                  y
+                  ((proof refl for rational_equiv) lo)
+                  hxy))
+              ((proof left for bool_and) (rational_leq lo x) (rational_leq x hi) hx))
+            (trans
+              Bool
+              (rational_leq y hi)
+              (rational_leq x hi)
+              True
+              (sym
+                Bool
+                (rational_leq x hi)
+                (rational_leq y hi)
+                ((proof respect for rational_leq)
+                  x
+                  y
+                  hi
+                  hi
+                  hxy
+                  ((proof refl for rational_equiv) hi)))
+              ((proof right for bool_and) (rational_leq lo x) (rational_leq x hi) hx))
+  }
 
 pub theorem interval_add_point
       (x : Rational) (y : Rational)
@@ -1454,7 +1501,13 @@ and inclusion transitivity; no separate right-zero theorem is exported.
 
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
-so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
+so rational antisymmetry proves value equivalence. Membership in any fixed
+interval respects rational-value equivalence: the checked respect proof for
+`rational_leq` transports each bound through a value-equivalent member, and
+Boolean conjunction introduction joins the two resulting comparisons.
+Public `interval_point_contains` composes with this law to show that every
+value equivalent to a point's stored endpoint belongs to that point interval;
+no separate converse law or new premise is exported. Endpoint-wise arithmetic
 of two point intervals constructs exactly the same interval as the point at
 the arithmetic result; those final equations use structural `Equal Interval`.
 
@@ -1495,7 +1548,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and forty-six checked interval
+   `interval_intersect`, `interval_inside` and forty-seven checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1518,8 +1571,10 @@ API.
    The four point-unit inclusions reuse Rational's left-unit value proofs
    through the existing private `equiv_leq`; the two point-zero absorption
    inclusions reuse Rational's left-zero multiplication proof in the same way.
+   Membership transport uses Rational's checked `rational_leq` respect proof
+   on both endpoints; `interval_point_contains` derives point completeness.
    Neither family adds a helper.
-4. **Trusted-base delta.** Zero: all forty-six laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all forty-seven laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1551,5 +1606,9 @@ API.
    laws, derives the four right-point forms from public exports, and separates
    an accepted one-point product from a false zero-point product using `Proved`
    on the same interval. These closed cases do not execute a §10 conformance
-   seed. These package tests do not establish official conformance-runner execution,
+   seed. The §12 package test checks generic membership transport and derived
+   point completeness, plus accepted half-to-two-quarters membership and
+   same-form `Proved` control before isolating both the false two-sixths
+   membership and its invalid equivalence premise. These package tests do
+   not establish official conformance-runner execution,
    CI, publication or landing.

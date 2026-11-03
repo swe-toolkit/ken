@@ -29,10 +29,12 @@ fn loaded_interval() -> ElabEnv {
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: the exact trusted GlobalId inventory is unchanged after loading
 /// Rational from its explicit providers and then Interval from Rational;
-/// two monotonicity laws and six interval laws resolve with transparent
-/// checked bodies, and six independently stated generic client types check.
-/// CLAIMED: generic Rational monotonicity and interval enclosure add no
-/// new trust and all six interval laws have the specified universal types.
+/// two monotonicity laws and all forty-seven public interval laws import by
+/// their stated names and have package-owned transparent checked bodies;
+/// seven independently stated generic client types plus derived point
+/// completeness check.
+/// CLAIMED: generic Rational monotonicity, interval enclosure and membership
+/// transport add no new trust; every interval law is a public checked export.
 /// THE GAP: identity-set equality preserves inherited assumptions; closed
 /// result behavior is independently tested below, not proved by this census.
 #[test]
@@ -72,14 +74,58 @@ fn generic_interval_laws_and_rational_monotonicity_add_no_trust() {
         after.len()
     );
     assert_eq!(after, before, "Interval may add no trusted GlobalId");
-    for law in [
+    let public_laws = [
         "interval_add_encloses",
         "interval_mul_encloses",
         "interval_point_contains",
         "interval_point_sound",
+        "interval_contains_respects_equiv",
         "interval_add_point",
         "interval_mul_point",
-    ] {
+        "interval_hull_contains_left",
+        "interval_hull_contains_right",
+        "interval_intersect_sound",
+        "interval_intersect_complete",
+        "interval_inside_sound",
+        "interval_inside_refl",
+        "interval_inside_trans",
+        "interval_add_inside",
+        "interval_mul_inside",
+        "interval_inside_hull_left",
+        "interval_inside_hull_right",
+        "interval_intersect_inside_left",
+        "interval_intersect_inside_right",
+        "interval_inside_complete",
+        "interval_distrib_l_inside",
+        "interval_factor_l_inside",
+        "interval_distrib_r_inside",
+        "interval_factor_r_inside",
+        "interval_add_comm_inside",
+        "interval_mul_comm_inside",
+        "interval_hull_comm_inside",
+        "interval_intersect_comm_inside",
+        "interval_add_assoc_inside",
+        "interval_add_assoc_rev_inside",
+        "interval_mul_assoc_inside",
+        "interval_mul_assoc_rev_inside",
+        "interval_hull_least",
+        "interval_intersect_greatest",
+        "interval_inside_intersect_hull_left",
+        "interval_hull_intersect_inside_left",
+        "interval_hull_assoc_inside",
+        "interval_hull_assoc_rev_inside",
+        "interval_intersect_assoc_inside",
+        "interval_intersect_assoc_rev_inside",
+        "interval_add_zero_l_inside",
+        "interval_add_zero_l_rev_inside",
+        "interval_mul_one_l_inside",
+        "interval_mul_one_l_rev_inside",
+        "interval_mul_zero_l_inside",
+        "interval_mul_zero_l_rev_inside",
+    ];
+    env.elaborate_file(&format!("import {INTERVAL} ({})", public_laws.join(", ")))
+        .expect("all named interval laws remain publicly importable");
+    for law in public_laws {
         let id = env.globals[&format!("{INTERVAL}.{law}")];
         assert!(owned.contains(&id), "{law} must belong to Interval");
         assert!(
@@ -88,17 +134,18 @@ fn generic_interval_laws_and_rational_monotonicity_add_no_trust() {
         );
     }
     env.elaborate_file(GENERIC_CLIENT)
-        .expect("six independently restated §1.3 generic client types check");
+        .expect("seven public-law generic types and derived point completeness check");
 }
 
-// Every §1.3 signature is restated at arbitrary intervals and rationals;
+// §1.3 and §12 signatures are restated at arbitrary intervals and rationals;
 // a weaker declaration cannot pass by retaining the same theorem name.
 const GENERIC_CLIENT: &str = r##"
 import Data.Numeric.Rational (Rational, rational_add, rational_mul, rational_equiv)
 import Algorithm.Numeric.RationalInterval
   (Interval, interval_contains, interval_add, interval_mul, interval_point,
    interval_add_encloses, interval_mul_encloses, interval_point_contains,
-   interval_point_sound, interval_add_point, interval_mul_point)
+   interval_point_sound, interval_contains_respects_equiv, interval_add_point,
+   interval_mul_point)
 
 theorem generic_add_encloses
   (i : Interval) (j : Interval) (x : Rational) (y : Rational) :
@@ -115,6 +162,15 @@ theorem generic_point_contains (x : Rational) :
 theorem generic_point_sound (x : Rational) (y : Rational) :
   IsTrue (interval_contains (interval_point x) y) → rational_equiv x y =
   interval_point_sound x y
+theorem generic_contains_respects_equiv
+  (i : Interval) (x : Rational) (y : Rational) :
+  rational_equiv x y → IsTrue (interval_contains i x) →
+  IsTrue (interval_contains i y) =
+  interval_contains_respects_equiv i x y
+theorem generic_point_complete (x : Rational) (y : Rational) :
+  rational_equiv x y → IsTrue (interval_contains (interval_point x) y) =
+  λh. interval_contains_respects_equiv (interval_point x) x y h
+    (interval_point_contains x)
 theorem generic_add_point (x : Rational) (y : Rational) :
   Equal Interval (interval_add (interval_point x) (interval_point y))
     (interval_point (rational_add x y)) = interval_add_point x y
@@ -273,6 +329,140 @@ fn twenty_four_seed_assertions_check_as_a_client() {
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be a checked seed assertion"
         );
+    }
+}
+
+// §12 keeps the existing seed intact while checking the ruled five-row
+// value-equivalence route against the checked interval package.
+const RESPECT_HEADER: &str = r#"
+import Data.Numeric.Rational (Rational, MkRational, rational_one, rational_equiv)
+import Algorithm.Numeric.RationalInterval
+  (Interval, MkInterval, interval_contains, interval_point, interval_point_contains,
+   interval_contains_respects_equiv)
+
+const half : Rational = MkRational (Suc Zero) (Suc Zero)
+const two_quarters : Rational = MkRational (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))
+const two_sixths : Rational =
+  MkRational (Suc (Suc Zero)) (Suc (Suc (Suc (Suc (Suc Zero)))))
+const i : Interval = MkInterval half rational_one
+theorem half_member : IsTrue (interval_contains i half) = Proved
+"#;
+
+const RESPECT_C1: &str = r#"
+theorem point_complete (x : Rational) (y : Rational)
+    : rational_equiv x y → IsTrue (interval_contains (interval_point x) y) =
+  λh. interval_contains_respects_equiv (interval_point x) x y h (interval_point_contains x)
+"#;
+const RESPECT_A1: &str = r#"
+theorem moved : IsTrue (interval_contains i two_quarters) =
+  interval_contains_respects_equiv i half two_quarters Proved half_member
+"#;
+const RESPECT_K1: &str = r#"
+theorem quarters_member : IsTrue (interval_contains i two_quarters) = Proved
+"#;
+const RESPECT_R1: &str = r#"
+theorem sixths_member : IsTrue (interval_contains i two_sixths) = Proved
+"#;
+const RESPECT_R2: &str = r#"
+theorem moved_wrong : IsTrue (interval_contains i two_sixths) =
+  interval_contains_respects_equiv i half two_sixths Proved half_member
+"#;
+const RESPECT_FALSE_EQUIV: &str = r#"
+theorem false_equivalence : rational_equiv half two_sixths = Proved
+"#;
+
+/// SOURCE: spec/50-stdlib/68-numerical.md §12, AC-0 ruled seed rows.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the complete trusted GlobalId identity set is unchanged after
+/// package loading; public generic transport, point completeness, and three
+/// independent closed accepted rows check; two isolated false claims reject
+/// at their own proof with a kernel type mismatch after that same full prefix.
+/// The invalid law premise's expected kernel type matches an independent
+/// attempt to prove the false rational equivalence, not the false membership.
+/// CLAIMED: checked membership transport respects rational-value equivalence
+/// without adding trust, and neither 2/6 membership nor its false equivalence
+/// premise can be manufactured for the fixed interval.
+/// THE GAP: finite closed rows do not establish the universal transport law;
+/// the open generic client and package-owned transparent body do that above.
+#[test]
+fn membership_respects_rational_value_equality_with_isolated_refusals() {
+    let mut env = ElabEnv::new().expect("compiler base");
+    for provider in [
+        "Core.Logic.Transport",
+        "Core.Classes.LawfulClasses",
+        "Data.Numeric.Nat.Arithmetic",
+        "Data.Numeric.Nat.Order",
+        "Data.Numeric.Rational",
+    ] {
+        env.elaborate_module_from_roots(&[root()], provider)
+            .unwrap_or_else(|error| panic!("{provider} roots-load: {error:?}"));
+    }
+    let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    let owned = env
+        .elaborate_module_from_roots(&[root()], INTERVAL)
+        .expect("checked membership-respect law roots-loads");
+    let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "§12 trusted_base() count: before={}, after={}",
+        before.len(),
+        after.len()
+    );
+    assert_eq!(after, before, "§12 adds no trusted GlobalId identity");
+    let id = env.globals[&format!("{INTERVAL}.interval_contains_respects_equiv")];
+    assert!(owned.contains(&id), "§12 law belongs to RationalInterval");
+    assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+
+    let accepted = format!("{RESPECT_HEADER}\n{RESPECT_C1}\n{RESPECT_A1}\n{RESPECT_K1}");
+    for (label, prefix) in [
+        ("C1_converse", format!("{RESPECT_HEADER}\n{RESPECT_C1}")),
+        ("A1_law_route", format!("{RESPECT_HEADER}\n{RESPECT_A1}")),
+        ("K1_control", format!("{RESPECT_HEADER}\n{RESPECT_K1}")),
+    ] {
+        let mut row_env = loaded_interval();
+        let result = row_env.elaborate_file(&prefix);
+        match result {
+            Ok(_) => eprintln!("NIR row={label} result=ok"),
+            Err(error) => panic!("NIR row={label} must check: {error:?}"),
+        }
+    }
+    let mut premise_env = loaded_interval();
+    premise_env
+        .elaborate_file(&accepted)
+        .expect("accepted prefix must precede the independent false-premise probe");
+    let false_equiv_type = match premise_env.elaborate_file(RESPECT_FALSE_EQUIV) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, .. },
+            ..
+        }) => expected,
+        other => panic!("the false rational equivalence must kernel-reject: {other:?}"),
+    };
+    for (label, claim) in [("R1_value", RESPECT_R1), ("R2_law_premise", RESPECT_R2)] {
+        let mut row_env = loaded_interval();
+        row_env
+            .elaborate_file(&accepted)
+            .expect("the full §12 accepted client must check before each refusal");
+        let result = row_env.elaborate_file(claim);
+        eprintln!("NIR row={label} result={result:?}");
+        match result {
+            Err(ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { expected, .. },
+                span,
+            }) => {
+                assert!(
+                    span.start >= claim.find("theorem ").expect("claim theorem")
+                        && span.end <= claim.len()
+                        && span.start < span.end,
+                    "{label} must reject at its own false theorem: {span:?}"
+                );
+                if label == "R2_law_premise" {
+                    assert_eq!(
+                        expected, false_equiv_type,
+                        "the law refusal must target the false equivalence premise"
+                    );
+                }
+            }
+            other => panic!("{label} must kernel-reject its false proof: {other:?}"),
+        }
     }
 }
 

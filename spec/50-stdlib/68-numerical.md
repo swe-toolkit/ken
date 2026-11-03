@@ -1181,3 +1181,70 @@ behavioral discriminator, not a replacement for the two generic
 checked proofs. Seed authorship and official conformance execution
 belong to separate evidence stages; neither is claimed by this
 Spec-only child.
+
+## 12. Membership respects rational value equality
+
+> **Section 12 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT).** Architect AC-0
+> `evt_2crpyyx0fafnw` ruled from Foundation's detached scratch D0 on
+> `e6e13def6b1877bb7b8e33aee64f2e3d5533788d`. The generic law
+> checked in the package's named test (3/3) with no added `Axiom` and
+> unchanged `trusted_base()` identity sets 114 → 114; its package diff
+> was insertion-only. The first seed probe used `Refl` on a
+> `rational_equiv` proposition and therefore did not exercise the
+> law's equivalence premise. AC-0 corrected those two probe terminals
+> to `Proved`; the corrected rows are candidate pins, not D0 results.
+> Neither scratch result checks this Spec-only child or an assembled
+> exact tip, nor establishes official conformance-runner execution, CI,
+> publication, landing or measured landed trust.
+
+`Algorithm.Numeric.RationalInterval` must export one public Transparent
+law directly after `interval_point_sound` and before
+`interval_add_point`, with this exact public type:
+
+```ken
+pub theorem interval_contains_respects_equiv
+      (i : Interval) (x : Rational) (y : Rational)
+    : rational_equiv x y
+      → IsTrue (interval_contains i x)
+      → IsTrue (interval_contains i y)
+```
+
+The two premises say that `x` and `y` denote the same rational value
+and that `x` belongs to the **written** interval `i`; the conclusion
+moves membership to `y` without requiring normalized representations,
+non-inverted bounds or another premise. The law must match on the
+written interval, using Rational's public
+`(proof respect for rational_leq)` to transport both endpoint
+comparisons, then `(proof intro for bool_and)` to rebuild membership.
+For `MkInterval lo hi`, the lower comparison uses `lo`'s reflexive
+rational equivalence and `rational_equiv x y`; the upper comparison
+uses `rational_equiv x y` and `hi`'s reflexive equivalence. The existing
+private `equiv_leq` stays private and unchanged: it establishes a bare
+`rational_leq` fact, whereas this law transports membership in a given
+interval. No new import, helper, axiom, kernel or surface rule is needed;
+no §1–§11 operation or law type changes.
+
+The converse direction of `interval_point_sound` needs no second public
+export. For any `x` and `y`, the following composition derives
+`rational_equiv x y → IsTrue (interval_contains (interval_point x) y)`
+from the new law and the existing public `interval_point_contains`:
+
+```ken
+λh. interval_contains_respects_equiv (interval_point x) x y h
+      (interval_point_contains x)
+```
+
+The separate CV-owned seed should move membership of `1/2` in
+`[1/2,1]` to `2/4` through the law, with a same-form `Proved` control
+for membership of `2/4`. On that same interval, a `Proved` claim that
+`2/6` is a member must refuse: `2/6` denotes `1/3`, below `1/2`.
+A second refused application tries to transport membership from
+`1/2` to `2/6` but lacks `rational_equiv 1/2 2/6`; its refusal
+specifically pins the equivalence premise only if the corresponding
+`2/4` application accepts. The corrected applications were not
+measured in D0; the candidate must check the accepted route and
+separate the two refusals. `Refl` is not a proof of
+`rational_equiv 1/2 2/4`: that predicate is a `Prop`, not an
+`Equal` goal. The seed, its package-owned execution and official
+conformance-runner execution are separate from this Spec-only child.
