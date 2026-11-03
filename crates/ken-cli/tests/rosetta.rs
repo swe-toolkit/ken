@@ -235,14 +235,18 @@ fn collections_prelude() -> String {
     let nat_order_source = catalog_source("catalog/packages/Data/Numeric/Nat/Order.ken.md");
     // This hand-maintained allowlist selects the consumer's operation inventory.
     // New Order exports are excluded instead of entering flat source without dependencies.
-    let nat_order = ["pub fn min", "pub fn sub"]
-        .into_iter()
-        .map(|start| {
-            let declaration = flattened_braced_declaration(&nat_order_source, "Nat.Order", start);
-            &nat_order_source[declaration]
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let nat_order = [
+        "pub fn min",
+        "pub fn sub",
+        "pub theorem leq_nat_weaken_right",
+    ]
+    .into_iter()
+    .map(|start| {
+        let declaration = flattened_braced_declaration(&nat_order_source, "Nat.Order", start);
+        &nat_order_source[declaration]
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
     let arithmetic_source = catalog_source("catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md");
     let nat_arithmetic = [
         "pub fn add",
