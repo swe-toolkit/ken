@@ -10,6 +10,32 @@ const SMOKE: &str = include_str!("../../../ken-cli/tests/fixtures/px10_child_wai
 const ARGV_ENV_PIPE: &str = include_str!("../../../ken-cli/tests/fixtures/px10_argv_env_pipe.ken");
 const LIVE_CHILD: &str = include_str!("../../../ken-cli/tests/fixtures/px10_live_child.ken");
 
+/// The z3 adapter job runs this module as effective root: its container is
+/// created with no `--user` and its image sets no `USER`. Startup admission
+/// refuses root unless the program declares the allowance (ADR 0019 §2), so
+/// the two native-executing rows declare it in their own source.
+fn root_allowed_smoke() -> String {
+    let source = SMOKE.replacen(
+        "program capabilities FS AFull, Process\n",
+        "program capabilities FS AFull, Process, RootExecution Allow\n",
+        1,
+    );
+    assert_ne!(source, SMOKE, "the smoke fixture header moved");
+    source
+}
+
+/// Measured on every runner: an effective-root runner admits this plan.
+fn assert_admitted_as_root(plan: &NativeEntrypointPlanV1) {
+    assert!(
+        ken_host::admit_root_execution(
+            ken_host::EffectiveUidSnapshotV1::scripted(0),
+            plan.allows_root_execution(),
+        )
+        .is_ok(),
+        "an effective-root runner would refuse this row before its first effect"
+    );
+}
+
 fn emit_below_gate(
     name: &str,
     source: &str,
@@ -127,13 +153,14 @@ fn unavailable_process_operation_names_its_host_refusal() {
     in_census_thread("px10-unavailable-native-diagnostic", || {
         let preparation = prepare_native_program_sources(
             "px10_unavailable_native_diagnostic",
-            vec![CompilerSource::new("src/main.ken", SMOKE)],
+            vec![CompilerSource::new("src/main.ken", root_allowed_smoke())],
         )
         .expect("px10 smoke prepares");
         assert!(
             preparation.plan.process_declared,
             "the Process gate still owns admission"
         );
+        assert_admitted_as_root(&preparation.plan);
         let root = tempfile::tempdir().expect("census output root");
         let output = emit_native_program_preparation(
             preparation,
@@ -179,7 +206,7 @@ fn unavailable_process_operation_names_its_host_refusal() {
 /// witness today: emission or the Process gate refuses first.
 #[test]
 fn native_tested_console_write_retains_its_single_event() {
-    const SOURCE: &str = r#"program capabilities FS APartial
+    const SOURCE: &str = r#"program capabilities FS APartial, RootExecution Allow
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program APartial (print_line "unavailable-control")
@@ -194,6 +221,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
             !preparation.plan.process_declared,
             "Console does not use the Process gate"
         );
+        assert_admitted_as_root(&preparation.plan);
         let root = tempfile::tempdir().expect("control output root");
         let output = emit_native_program_preparation(
             preparation,
