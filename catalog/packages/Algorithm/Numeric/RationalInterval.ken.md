@@ -1606,9 +1606,13 @@ API.
    laws, derives the four right-point forms from public exports, and separates
    an accepted one-point product from a false zero-point product using `Proved`
    on the same interval. These closed cases do not execute a §10 conformance
-   seed. The §12 package test checks generic membership transport and derived
-   point completeness, plus accepted half-to-two-quarters membership and
+   seed. The
+   [§12 seed](../../../../conformance/stdlib/numerical/seed-interval-contains-respect.md)
+   states accepted transport and two isolated refusals but has not been
+   officially conformance-run. The §12 package test checks generic membership
+   transport and derived point completeness, plus accepted
+   half-to-two-quarters membership and
    same-form `Proved` control before isolating both the false two-sixths
    membership and its invalid equivalence premise. These package tests do
-   not establish official conformance-runner execution,
-   CI, publication or landing.
+   not establish official conformance-runner execution, CI, publication or
+   landing.
