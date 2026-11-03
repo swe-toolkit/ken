@@ -1296,15 +1296,25 @@ impl<'e> ElabCtx<'e> {
         }
         let target = self.surface_binding_target(index);
         if let Some(SurfaceBindingTarget::Context(position)) = target {
-            if let Some((_, latent)) = self.let_latents.iter().rev().find(|(at, _)| *at == position) {
+            if let Some((_, latent)) = self
+                .let_latents
+                .iter()
+                .rev()
+                .find(|(at, _)| *at == position)
+            {
                 return latent.clone();
             }
         }
-        self.match_arm_latents.iter().filter(|(lo, hi, vlo, vhi, _)| match target {
-            Some(SurfaceBindingTarget::Context(position)) => *lo <= position && position < *hi,
-            Some(SurfaceBindingTarget::Virtual(slot)) => *vlo <= slot && slot < *vhi,
-            None => false,
-        }).fold(crate::effects::RowType::empty(), |row, (.., latent)| row.join(latent.clone()))
+        self.match_arm_latents
+            .iter()
+            .filter(|(lo, hi, vlo, vhi, _)| match target {
+                Some(SurfaceBindingTarget::Context(position)) => *lo <= position && position < *hi,
+                Some(SurfaceBindingTarget::Virtual(slot)) => *vlo <= slot && slot < *vhi,
+                None => false,
+            })
+            .fold(crate::effects::RowType::empty(), |row, (.., latent)| {
+                row.join(latent.clone())
+            })
     }
 
     /// A match's scrutinee latent, read before any binder is pushed.
@@ -1320,15 +1330,19 @@ impl<'e> ElabCtx<'e> {
             None => crate::effects::RowType::empty(),
         };
         self.match_entry_latents.push((
-            self.ctx.len(), self.matrix_virtual_surface_positions.len(),
-            self.match_arm_latents.len(), latent,
+            self.ctx.len(),
+            self.matrix_virtual_surface_positions.len(),
+            self.match_arm_latents.len(),
+            latent,
         ));
     }
 
     #[inline(never)]
     fn leave_match_latent(&mut self) {
-        let (.., arm_base, _) =
-            self.match_entry_latents.pop().expect("match latent is balanced with its match");
+        let (.., arm_base, _) = self
+            .match_entry_latents
+            .pop()
+            .expect("match latent is balanced with its match");
         self.match_arm_latents.truncate(arm_base);
     }
 
@@ -1342,14 +1356,21 @@ impl<'e> ElabCtx<'e> {
         };
         self.match_arm_latents.truncate(arm_base);
         self.match_arm_latents.push((
-            lo, self.ctx.len(), vlo, self.matrix_virtual_surface_positions.len(), latent,
+            lo,
+            self.ctx.len(),
+            vlo,
+            self.matrix_virtual_surface_positions.len(),
+            latent,
         ));
     }
 
     /// An alias occurrence may name any enclosing arm's matched value.
     fn alias_latent(&self) -> crate::effects::RowType {
-        self.match_arm_latents.iter()
-            .fold(crate::effects::RowType::empty(), |row, (.., latent)| row.join(latent.clone()))
+        self.match_arm_latents
+            .iter()
+            .fold(crate::effects::RowType::empty(), |row, (.., latent)| {
+                row.join(latent.clone())
+            })
     }
 
     /// Read a let RHS before its binder is pushed. Resolved RHS indices still
@@ -14474,11 +14495,15 @@ fn infer_performed_let(
             return Err(error);
         }
     };
-    let body_row = cx.effect_rows
+    let body_row = cx
+        .effect_rows
         .map(|rows| {
             let outer = |index, name: &str| cx.surface_latent(index, name);
             infer_expr_row_type(
-                body, &rows, None, &mut LatentScope::new(&outer).with_alias(cx.alias_latent()),
+                body,
+                &rows,
+                None,
+                &mut LatentScope::new(&outer).with_alias(cx.alias_latent()),
             )
         })
         .unwrap_or_else(crate::effects::RowType::empty);
@@ -17831,7 +17856,11 @@ pub(crate) struct LatentScope<'s> {
 
 impl<'s> LatentScope<'s> {
     pub(crate) fn new(outer: &'s dyn Fn(usize, &str) -> crate::effects::RowType) -> Self {
-        Self { outer, entered: Vec::new(), alias: crate::effects::RowType::empty() }
+        Self {
+            outer,
+            entered: Vec::new(),
+            alias: crate::effects::RowType::empty(),
+        }
     }
 
     fn with_alias(mut self, alias: crate::effects::RowType) -> Self {
@@ -17914,7 +17943,10 @@ fn bound_value_latent(
         RExpr::RLam(..) => {
             let outer = |index, name: &str| scope.lookup(index, name);
             infer_expr_row_type(
-                val, effect_rows, None, &mut LatentScope::new(&outer).with_alias(scope.alias.clone()),
+                val,
+                effect_rows,
+                None,
+                &mut LatentScope::new(&outer).with_alias(scope.alias.clone()),
             )
         }
         RExpr::RAsc(inner, ty, _) => {
