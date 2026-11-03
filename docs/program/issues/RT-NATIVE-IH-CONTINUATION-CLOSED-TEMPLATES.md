@@ -75,13 +75,22 @@ reads it next.
   - whether every erasure route that builds a `ComputationalMatch`
     reaches the minting site, enumerated from the erasure sites, not from
     `decode_supported_match_view` alone.
-- **AC-1, census pin.** A named test pins the enumerated set, keyed at
-  the minting site, on argv, null and live: the folds behind relay
-  K 1241 and 682 resolve to identities, and their count matches D0-23's
-  IH-bearing population for those owners.
-- **AC-2, refusal pin.** A fold whose IH-bearing method is not in the
-  set refuses at build time with the named reason. A mutant that
-  falls back to a Carried-callee call reddens a named row.
+- **AC-1, census pin** (amended by AC-0 evt_43j5yn7cc1883). A named
+  ken-cli test enumerates the authority from the backend's plan on argv,
+  null and live at base. Its population is the backend census, not
+  D0-23's checked-core 9, 8, 9, which counts the prelude folds the
+  backend holds only as predeclared owners. Each fixture has 6
+  templates keyed (`main`, match 1 to 6, the host `Vis`, binder 0),
+  each with recursive position 1 and one escaping call. `main#5`, the
+  slot both relay invocations (1245, 686) resolve to, is a member in
+  every fixture. `arm()` refuses `NotEscaping` on the arity-1 calls:
+  `drain_pipe#0` and `main#0` on argv and null, `main#0` on live.
+- **AC-2, refusal pin** (amended by AC-0). A ken-runtime unit test has
+  one row per refusal reason (`NotEscaping`, `NotHostVisMethod`,
+  `NoCheckedCall`, `KeyRepeats`) and one accepted member. Deleting each
+  guard, or giving `arm()` a fallback that returns a member, reddens
+  that guard's own row. The build-level refusal row needs a consumer,
+  so it is PX10 B-closure's.
 - **AC-3.** Every native plan output is unchanged, because no consumer
   reads the authority. The 17 D0-14 binaries run base against candidate
   with identical results.
