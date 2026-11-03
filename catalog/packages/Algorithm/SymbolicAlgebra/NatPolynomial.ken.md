@@ -3005,7 +3005,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–12 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–13 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3017,8 +3017,9 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
-[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md), and
-[congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md)
+[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
+[congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md), and
+[pointwise-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-pointwise-congruence.md)
 specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
