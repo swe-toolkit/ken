@@ -75,12 +75,14 @@ every scrutinee form, or the scrutinee is refused at check time. One
 candidate, `/crates` only.
 
 A binder's carried row is read from its checked type as written, never
-reduced, through the registered identities it names. A type-valued
-declaration (a fn or const whose type ends in a universe) is registered
-at admission with an over-approximate footprint, the join of every
-carried row its body names, and a mutual group takes the join over its
-type-valued members (`elab.rs` `declared_type_carried_row`, `modules.rs`
-mutual registration). Reducing a binder's type is excluded: on CI it
+reduced, through the registered identities it names. Every fn, const
+and top-level let is registered at admission with its body's written
+footprint, an over-approximation: the join of every carried row its body
+names, read unreduced. Only a non-empty footprint is inserted, and a
+mutual group takes the join over its members (`elab.rs`
+`declared_type_carried_row`, `modules.rs` mutual registration). No
+declaration is classified as type-valued, because a result type need not
+be written as a universe (`: AliasType`; Architect evt_5ja3eww6bq4gd). Reducing a binder's type is excluded: on CI it
 cost the type-position guards 3 to 20 seconds, and it lost the alias
 row that k11 carries (Architect evt_11pz35xvkdqgr, Research
 evt_4gw4te9hrn1v9).
@@ -120,8 +122,10 @@ evt_4gw4te9hrn1v9).
   `lang_type_position_sort_nested_domain`. The sweep key is any
   `crates/ken-elaborator/tests` file that asserts on elapsed time or
   frame size. k11 (an arrow alias), c13 (a lambda binder typed by a
-  type-valued fn) and c14 (its let form) refuse with E0038, and deleting
-  the type-valued registration arm makes c13 check again.
+  type-valued fn) and c14 (its let form) refuse with E0038. So do c15 to
+  c18: a type function or const whose result type is an alias
+  (`PickAlias On`, `AliasBox`); its pure control k16 prints `b`. Deleting
+  the registration arm makes c15 to c18 check again.
 - **Open sibling, not pinned.** k11i, a lambda binder whose latent arrow
   is written inline rather than through an alias, still drops its action.
 
