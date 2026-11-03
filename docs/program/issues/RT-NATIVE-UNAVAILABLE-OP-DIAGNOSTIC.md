@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-UNAVAILABLE-OP-DIAGNOSTIC
 title: "When the host refuses an operation as unavailable inside a native process, the emitted code's require_i64 turns the status into -1 and the C starter prints \"malformed borrowed process input\". No product program reaches that refusal today: emission or the Process gate refuses first (Architect evt_59z2v4tgmnvs4). It is reached on the px8-ds-test-support census route, where PX10-NATIVE-SPAWN-PARITY Increment B works and where the BRANCH-ALT stop-11 misread happened. Carry the refusal to the process boundary as its own status and diagnostic naming the operation, without changing which operations are admitted"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T1
