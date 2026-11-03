@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-CLOSURE-BODY
 title: "The row plane gives every lambda the empty row and never walks its body, so a closure that performs an undeclared effect escapes once a higher-order function applies it. `fn sneaky ... = host_bind ... (\\_. action MkUnit)`, with `action` a Console proc and the program declaring only FS, checks with rc 0, and `ken run` prints the Console output. Pay a lambda's body row where the lambda is built, as globals already pay at naming"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
