@@ -3399,12 +3399,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                             depth: position,
                         });
                     }
-                    // A lambda binder releases its checked domain's carried
-                    // row, as a let binder does, so a let RHS read before
-                    // its match is elaborated sees what the binder holds.
-                    let binder_latent = type_carried_row(cx, &domain);
-                    cx.push_match_binder(domain.clone(), MatchBinderOrigin::UserLocal);
-                    cx.push_let_latent(binder_latent);
+                    push_lambda_binder(cx, &domain);
                     let body_result = check(cx, body, &cod, lam_span);
                     cx.pop_let_latent();
                     cx.ctx.pop();
@@ -3446,6 +3441,18 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         }
         _ => check_inferred_with_group_transport(cx, expr, expected),
     }
+}
+
+/// A check-mode lambda binder: push the checked domain as a user local and
+/// release its carried row as that binder's latent, as a let binder does,
+/// so a let RHS read before its match is elaborated sees what the binder
+/// holds. Outlined so `check` pays no new locals (its FRAME BUDGET rule).
+/// The row is read in the outer context, before the binder is pushed.
+#[inline(never)]
+fn push_lambda_binder(cx: &mut ElabCtx<'_>, domain: &Term) {
+    let binder_latent = type_carried_row(cx, domain);
+    cx.push_match_binder(domain.clone(), MatchBinderOrigin::UserLocal);
+    cx.push_let_latent(binder_latent);
 }
 
 /// A lambda checked at a subset of a Pi is a new value of the carrier,
