@@ -114,12 +114,11 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   deletion).
 - **Increment B-closure** is dynamic relay forwarding (Architect
   evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own.
-  - An owner settled `Excluded{Relay}` with an un-admitted relay becomes
-    Protocol. The relay member is numbered by its relay construct's
-    origin (argv and null: 1247, owner 2, context 0). Its ABI is the
-    carried operation word plus the relay K's captures.
-    `PendingVisRecordProtocol`'s "only authority" sentence is amended for
-    this member kind only.
+  - Every relay member of every protocol is numbered by its relay
+    construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
+    is the carried operation word, argument 0 of the relay's own Vis, plus
+    the relay K's captures. `PendingVisRecordProtocol`'s "only authority"
+    sentence is amended for this member kind only.
   - Ken's handler Match is already the operation-keyed, closed dispatch:
     `host_response_routes` keys each arm, a `Let (Effect op ..)` with its
     response call, by the arm's operation constructor, and
@@ -127,27 +126,35 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     (Architect correction evt_mq84ht59na9f). For a relay member, the arm
     is selected at run time from the carried operation word's
     constructor tag, and each arm's Effect keeps its existing seats.
-    There is no new dispatcher table, and the path set is that handler's
-    arms. Every path is unique-or-error, and an unmatched tag takes the
-    deterministic failure edge before any host request is built.
+    There is no new dispatcher table. The path set is the one handler
+    leaf holding every non-relay member effect of the owner: leaf 953 for
+    argv and null and leaf 394 for live, 30 arms each (D0-14). A member
+    set spanning more than one leaf is a planner refusal. Every path is
+    unique-or-error, and an unmatched tag takes the deterministic failure
+    edge before any host request is built.
   - The host response is decoded under the selected arm's operation and
-    passed to the relay's own K. Admitted relays, fusion and their
-    consumers are unchanged.
-  - **Acceptance.** argv's and null's native runs equal the
-    interpreter's operation sequence and terminal; today they return
-    -8500008 through owner 2's `Excluded{Relay}`. Smoke is unchanged. A
-    carried tag outside the handler's arms takes the failure edge, and a
-    mutant that selects the wrong arm for a tag reddens a named row.
-  - **Its D0.** The Architect specifies it and the runtime implementer
-    runs it on the held B ref `928313aa6`. It covers live's trace row,
-    every Vis origin reaching relay 688's scrutinee against {988, 932}:
-    a superset puts live in scope, un-admitting a relay whose source
-    traversal does not close, and an equal set leaves live as its own
-    item, ruled from the trace. It also runs 17 test binaries to measure
-    which fixtures produce an `Excluded{Relay}` owner (three test files
-    read `excluded_by_relay`: `rt_escape_second_resource_native`,
-    `rt_parity_native` and `px7f_resource_native`), and counts the
-    handler-arm population, which is the dispatch's path set.
+    passed to the relay's own K.
+  - No relay member is removed from numbering. Drive pairs remain a
+    fusion optimization: a fused source never builds its Vis, and any
+    Vis that is built reaches the numbered relay and forwards. Admission
+    and its reached-relay guard are deleted, and
+    `ExcludedSettlement::Relay` loses its producer (Architect
+    evt_4151apntyfsmt, after D0-15 showed no plane can prove a source
+    set complete).
+  - **Acceptance.** On argv, null and live, the native result equals the
+    interpreter's (P8 `bound_native == interp`); today they return
+    -8500008, -8500008 and -8004096. A named test pins argv's and null's
+    owners 2 (relay 1247) and 3 (992), and live's owners 2 (688) and 3
+    (433), as Protocol with the relay numbered. The 17 D0-14 binaries run
+    base `928313aa6` against candidate with identical results, except
+    parity changing in the expected direction. Mutations: restoring relay
+    removal for paired owners returns live to -8004096; restoring
+    `Excluded{Relay}` for unpaired owners returns argv to -8500008;
+    fixing dispatch to the first arm turns argv's parity red.
+  - **Unmeasured, named.** Relays that are no owner's protocol member are
+    built unnumbered (1171 in argv specializations 1 to 11, 612 in live
+    specializations 2 to 12). AC-1 parity covers them; a failure there is
+    a stop to the Architect.
 - **Later, not part of parity:** `RT-NATIVE-VIS-MAY-YIELD-SUMMARY`, one
   shared per-function may-yield summary that licenses static fusion.
 
