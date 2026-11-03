@@ -6,7 +6,7 @@ owner: verify
 size: L
 tier: T1
 gate: architect
-depends_on: [LANG-PROC-NON-TREE-LET-SEQUENCING, LANG-EFFECT-ROW-MATCH-BINDER-LATENT, LANG-EFFECT-ROW-LET-BOUND-SCRUTINEE-LATENT]
+depends_on: [LANG-PROC-NON-TREE-LET-SEQUENCING, LANG-EFFECT-ROW-MATCH-BINDER-LATENT, LANG-EFFECT-ROW-LET-BOUND-SCRUTINEE-LATENT, LANG-EFFECT-ROW-CELL-SCRUTINEE-CARRIED-ROW]
 blocks: []
 github: null
 origin: "Architect stop evt_axd6p7yc8d88 on LANG-PROC-NON-TREE-LET-SEQUENCING, option A; Steward ruling evt_j0vvt2xr28c1 filed it as its own node, sequenced after LANG-EFFECT-ROW-MATCH-BINDER-LATENT on the Verify ring. The interim refusal landed in da6146038. Steward-filed per COORDINATION section 2."

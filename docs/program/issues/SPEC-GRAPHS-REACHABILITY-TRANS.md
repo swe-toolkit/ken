@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-TRANS
 title: "Spec 62 §5 carries reachability back along a walk, but states no law that reachability composes: if s reaches the vertex t and t reaches a target, then s reaches that target. A client holding two reachability decisions must extract a witness, transport its endpoint through DecEq and rebuild a walk, using private helpers it cannot import. Rule from a checked D0 at zero trust a public transitivity law, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
