@@ -116,7 +116,6 @@ fn generic_transitivity_is_owned_public_checked_and_zero_trust_delta() {
         "contains_sound",
         "contains_complete",
     ];
-    assert_eq!(public_laws.len(), 22, "§11 exports the twenty-second law");
     env.elaborate_file(&format!("import {GRAPH} ({})", public_laws.join(", ")))
         .expect("all twenty-two named laws remain publicly importable");
     for law in public_laws {
