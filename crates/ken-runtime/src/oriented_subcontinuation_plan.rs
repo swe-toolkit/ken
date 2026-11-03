@@ -1019,6 +1019,142 @@ fn take_bytes<'a>(bytes: &mut &'a [u8]) -> Result<&'a [u8], &'static str> {
     Ok(head)
 }
 
+/// `RT-NATIVE-IH-CONTINUATION-CLOSED-TEMPLATES`: the static identity of one
+/// checked recursive-hypothesis binder of one computational eliminator branch.
+/// It names code, so it is never a specialization, a function, or a Runtime
+/// value.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ClosedIhContinuationKeyV1 {
+    pub declaration: String,
+    pub checked_match_ordinal: u64,
+    pub constructor: String,
+    pub method_binder_ordinal: u64,
+}
+
+/// One member of the closed set: a checked IH slot of a host-spine `Vis`
+/// method from which at least one zero-operand IH call escapes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClosedIhContinuationTemplateV1 {
+    pub key: ClosedIhContinuationKeyV1,
+    pub slot_template_id: u64,
+    pub recursive_position: u64,
+    /// The zero-operand call templates on this slot, ascending.
+    pub escaping_calls: Vec<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClosedIhContinuationRefusalV1 {
+    /// Two checked slots claim one key.
+    KeyRepeats,
+    /// The continuation names no checked computational-IH call template.
+    NoCheckedCall,
+    /// The IH call applies operands, so its value is not the escaping IH.
+    NotEscaping,
+    /// The IH's slot is not a method of the program's host-spine `Vis`.
+    NotHostVisMethod,
+}
+
+impl ClosedIhContinuationRefusalV1 {
+    pub fn reason(self) -> &'static str {
+        match self {
+            Self::KeyRepeats => "closed IH continuation key repeats across checked slots",
+            Self::NoCheckedCall => {
+                "IH continuation outside the closed template set: no checked IH call template"
+            }
+            Self::NotEscaping => {
+                "IH continuation outside the closed template set: the IH call applies operands"
+            }
+            Self::NotHostVisMethod => {
+                "IH continuation outside the closed template set: not a host-spine Vis method"
+            }
+        }
+    }
+}
+
+/// The closed K-identity authority. Membership is enumerated once from the
+/// planner-authored slot and call templates. Every call template gets a
+/// verdict here; there is no fallback arm.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClosedIhContinuationSetV1 {
+    templates: BTreeMap<ClosedIhContinuationKeyV1, ClosedIhContinuationTemplateV1>,
+    verdicts: BTreeMap<u64, Result<ClosedIhContinuationKeyV1, ClosedIhContinuationRefusalV1>>,
+}
+
+impl ClosedIhContinuationSetV1 {
+    pub fn enumerate(
+        plan: &OrientedSubcontinuationPlanV1,
+        host_vis: &str,
+    ) -> Result<Self, ClosedIhContinuationRefusalV1> {
+        let mut keys = BTreeMap::new();
+        for slot in &plan.computational_ih_slots {
+            let key = ClosedIhContinuationKeyV1 {
+                declaration: slot.declaration.clone(),
+                checked_match_ordinal: slot.checked_match_ordinal,
+                constructor: slot.constructor.clone(),
+                method_binder_ordinal: slot.method_binder_ordinal,
+            };
+            if keys.insert(key, slot.slot_template_id).is_some() {
+                return Err(ClosedIhContinuationRefusalV1::KeyRepeats);
+            }
+        }
+        let mut templates = BTreeMap::new();
+        let mut verdicts = BTreeMap::new();
+        for call in &plan.computational_ih_calls {
+            let verdict = match plan.computational_ih_slot(call.slot_template_id) {
+                None => Err(ClosedIhContinuationRefusalV1::NoCheckedCall),
+                Some(_) if call.arity != 0 => Err(ClosedIhContinuationRefusalV1::NotEscaping),
+                Some(slot) if slot.constructor != host_vis => {
+                    Err(ClosedIhContinuationRefusalV1::NotHostVisMethod)
+                }
+                Some(slot) => {
+                    let key = ClosedIhContinuationKeyV1 {
+                        declaration: slot.declaration.clone(),
+                        checked_match_ordinal: slot.checked_match_ordinal,
+                        constructor: slot.constructor.clone(),
+                        method_binder_ordinal: slot.method_binder_ordinal,
+                    };
+                    templates
+                        .entry(key.clone())
+                        .or_insert_with(|| ClosedIhContinuationTemplateV1 {
+                            key: key.clone(),
+                            slot_template_id: slot.slot_template_id,
+                            recursive_position: slot.recursive_position,
+                            escaping_calls: Vec::new(),
+                        })
+                        .escaping_calls
+                        .push(call.call_template_id);
+                    Ok(key)
+                }
+            };
+            verdicts.insert(call.call_template_id, verdict);
+        }
+        for template in templates.values_mut() {
+            template.escaping_calls.sort_unstable();
+        }
+        Ok(Self {
+            templates,
+            verdicts,
+        })
+    }
+
+    pub fn templates(&self) -> impl Iterator<Item = &ClosedIhContinuationTemplateV1> {
+        self.templates.values()
+    }
+
+    /// The arm resume reads, selected by the escaping IH's checked call
+    /// template. Every other continuation refuses with its named reason.
+    pub fn arm(
+        &self,
+        call_template_id: u64,
+    ) -> Result<&ClosedIhContinuationTemplateV1, ClosedIhContinuationRefusalV1> {
+        match self.verdicts.get(&call_template_id) {
+            None => Err(ClosedIhContinuationRefusalV1::NoCheckedCall),
+            Some(Err(refusal)) => Err(*refusal),
+            Some(Ok(key)) => Ok(&self.templates[key]),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1187,6 +1323,89 @@ mod tests {
             plan.validate(),
             Err("oriented subcontinuation parent crosses a prompt region")
         );
+    }
+
+    /// Promise class: durable invariant. An IH application with an operand
+    /// does not name an escaping continuation, even on the host Vis method.
+    /// MEASURED: the arity-1 plan call reaches the closed-set verdict.
+    /// CLAIMED: only zero-operand IH calls can name K. THE GAP: this fixture
+    /// exercises the authority, not a future consumer's use of its arm.
+    #[test]
+    fn closed_ih_arity_one_call_refuses_not_escaping() {
+        let set = ClosedIhContinuationSetV1::enumerate(&computational_ih_plan(), "Ctor0")
+            .expect("the checked slots have distinct keys");
+        assert_eq!(set.templates().count(), 0);
+        assert_eq!(set.arm(30), Err(ClosedIhContinuationRefusalV1::NotEscaping));
+    }
+
+    /// Promise class: durable invariant. A zero-operand IH call from a
+    /// different constructor is not a host-spine Vis continuation.
+    #[test]
+    fn closed_ih_other_constructor_refuses_not_host_vis_method() {
+        let mut plan = computational_ih_plan();
+        plan.computational_ih_calls[0].arity = 0;
+        let set = ClosedIhContinuationSetV1::enumerate(&plan, "OtherVis")
+            .expect("the checked slots have distinct keys");
+        assert_eq!(set.templates().count(), 0);
+        assert_eq!(
+            set.arm(30),
+            Err(ClosedIhContinuationRefusalV1::NotHostVisMethod)
+        );
+    }
+
+    /// Promise class: durable invariant. An unknown call ID must refuse even
+    /// when an unrelated member exists to tempt a fallback.
+    /// MEASURED: a missing call-key refuses in a nonempty closed set.
+    /// CLAIMED: a carried K cannot select an arbitrary member. THE GAP:
+    /// consumers must call arm() on their checked call-template ID.
+    #[test]
+    fn closed_ih_unknown_call_refuses_without_member_fallback() {
+        let mut plan = computational_ih_plan();
+        plan.computational_ih_calls[0].arity = 0;
+        let set = ClosedIhContinuationSetV1::enumerate(&plan, "Ctor0")
+            .expect("the checked slots have distinct keys");
+        assert_eq!(
+            set.templates().count(),
+            1,
+            "fallback must have a real member"
+        );
+        assert_eq!(
+            set.arm(999),
+            Err(ClosedIhContinuationRefusalV1::NoCheckedCall)
+        );
+    }
+
+    /// Promise class: durable invariant. One method key cannot name two
+    /// checked IH slots, even if they carry different numeric slot IDs.
+    #[test]
+    fn closed_ih_repeated_method_key_refuses_before_lowering() {
+        let mut plan = computational_ih_plan();
+        let mut duplicate = plan.computational_ih_slots[0].clone();
+        duplicate.slot_template_id = 99;
+        plan.computational_ih_slots.push(duplicate);
+        assert_eq!(
+            ClosedIhContinuationSetV1::enumerate(&plan, "Ctor0"),
+            Err(ClosedIhContinuationRefusalV1::KeyRepeats),
+        );
+    }
+
+    /// Promise class: durable invariant. The checked zero-operand IH call
+    /// identifies its unique host Vis method and not a specialization.
+    #[test]
+    fn closed_ih_host_vis_call_returns_its_checked_template() {
+        let mut plan = computational_ih_plan();
+        plan.computational_ih_calls[0].arity = 0;
+        let set = ClosedIhContinuationSetV1::enumerate(&plan, "Ctor0")
+            .expect("the checked slots have distinct keys");
+        let template = set.arm(30).expect("zero-operand call selects host Vis");
+        assert_eq!(template.key.declaration, "pkg::main");
+        assert_eq!(template.key.checked_match_ordinal, 0);
+        assert_eq!(template.key.constructor, "Ctor0");
+        assert_eq!(template.key.method_binder_ordinal, 0);
+        assert_eq!(template.slot_template_id, 20);
+        assert_eq!(template.recursive_position, 0);
+        assert_eq!(template.escaping_calls, [30]);
+        assert_eq!(set.templates().count(), 1);
     }
 
     #[test]

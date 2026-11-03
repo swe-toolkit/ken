@@ -2386,6 +2386,17 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_validator(census_row, transport_validated.is_ok());
     transport_validated?;
+    if let Some(plan) = oriented_subcontinuation_plan.as_ref() {
+        crate::ClosedIhContinuationSetV1::enumerate(plan, &process_symbols.itree_vis).map_err(
+            |refusal| {
+                unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "ClosedIhContinuationSetV1",
+                    refusal.reason(),
+                )
+            },
+        )?;
+    }
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_selector(census_row);
     // Boundary A of RT-NATIVE-FNSPLIT: close and validate the factored static
