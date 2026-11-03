@@ -10276,3 +10276,100 @@ mod strict_catalog_home_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod cat_numeric_interval_public_export_tests {
+    use std::collections::BTreeSet;
+    use std::path::PathBuf;
+
+    use crate::ElabEnv;
+
+    const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
+
+    /// SOURCE: spec/50-stdlib/68-numerical.md §§1–12.
+    /// PROMISE CLASS: transition sentinel; a future numerical API extension
+    /// must update this roster with the deliberate new public law or operation.
+    /// MEASURED: the actual root file export table from a roots-loaded package
+    /// has exactly the listed public names, including aliases and reexports.
+    /// CLAIMED: no extra interval law or operation is silently published.
+    /// THE GAP: the table is the provider table used by the real importer;
+    /// the separate client checks importability, owned checked bodies and
+    /// generic law signatures. Private declarations are excluded by the
+    /// module's visibility mechanism, not by a source-text filter.
+    #[test]
+    fn rational_interval_public_export_population_requires_review() {
+        let mut env = ElabEnv::new().expect("compiler base");
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        env.elaborate_module_from_roots(&[root], INTERVAL)
+            .expect("checked interval package roots-loads");
+        let exports = env
+            .module_state
+            .file_export_tables
+            .get(INTERVAL)
+            .and_then(|tables| tables.get(INTERVAL))
+            .expect("owning file's public export table must be captured");
+        let actual = exports.keys().map(String::as_str).collect::<BTreeSet<_>>();
+        let expected = BTreeSet::from([
+            "Interval",
+            "MkInterval",
+            "interval_contains",
+            "interval_add",
+            "interval_mul",
+            "interval_point",
+            "interval_hull",
+            "interval_intersect",
+            "interval_inside",
+            "interval_add_encloses",
+            "interval_mul_encloses",
+            "interval_point_contains",
+            "interval_point_sound",
+            "interval_contains_respects_equiv",
+            "interval_add_point",
+            "interval_mul_point",
+            "interval_hull_contains_left",
+            "interval_hull_contains_right",
+            "interval_intersect_sound",
+            "interval_intersect_complete",
+            "interval_inside_sound",
+            "interval_inside_refl",
+            "interval_inside_trans",
+            "interval_add_inside",
+            "interval_mul_inside",
+            "interval_inside_hull_left",
+            "interval_inside_hull_right",
+            "interval_intersect_inside_left",
+            "interval_intersect_inside_right",
+            "interval_inside_complete",
+            "interval_distrib_l_inside",
+            "interval_factor_l_inside",
+            "interval_distrib_r_inside",
+            "interval_factor_r_inside",
+            "interval_add_comm_inside",
+            "interval_mul_comm_inside",
+            "interval_hull_comm_inside",
+            "interval_intersect_comm_inside",
+            "interval_add_assoc_inside",
+            "interval_add_assoc_rev_inside",
+            "interval_mul_assoc_inside",
+            "interval_mul_assoc_rev_inside",
+            "interval_hull_least",
+            "interval_intersect_greatest",
+            "interval_inside_intersect_hull_left",
+            "interval_hull_intersect_inside_left",
+            "interval_hull_assoc_inside",
+            "interval_hull_assoc_rev_inside",
+            "interval_intersect_assoc_inside",
+            "interval_intersect_assoc_rev_inside",
+            "interval_add_zero_l_inside",
+            "interval_add_zero_l_rev_inside",
+            "interval_mul_one_l_inside",
+            "interval_mul_one_l_rev_inside",
+            "interval_mul_zero_l_inside",
+            "interval_mul_zero_l_rev_inside",
+        ]);
+        assert_eq!(
+            actual, expected,
+            "the entire public interval surface needs review"
+        );
+    }
+}

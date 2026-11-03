@@ -580,7 +580,7 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–9
+**`68-numerical.md`** §§1–12
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
@@ -589,7 +589,10 @@ SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER;
 SPEC-NUMERICAL-INTERVAL-ASSOCIATIVITY-INSIDE §6;
 SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-BOUNDS §7;
 SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
-SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9). The §1–2
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9;
+SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10;
+SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION §11;
+SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT §12). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -663,9 +666,26 @@ passed 2/2 with reported candidate-local trusted identity sets
 114 → 114. CV statically checked the seed but did not run it as Ken or
 through the official conformance runner. D0 remains scratch evidence;
 neither D0 nor candidate-local checks establish official conformance,
-CI, publication, landing or landed trust. Signed
-arithmetic, division, `Float`, rounding, width and structural
-hull/intersection equalities remain deferred.
+CI, publication, landing or landed trust. Section 10's four
+point-zero and point-one left-unit laws and §11's two left-point-zero
+absorption laws are endpoint-value inclusions, including inverted
+intervals. Their checked catalog exports, CV seeds and package-owned
+tests are on the assigned base. Historical scratch and package tests
+are not official conformance-runner execution or a landed trust
+measurement. Section 12 specifies one public membership-respect law:
+`rational_equiv x y` and membership of `x` in `i` imply membership of
+`y` in `i`. The converse of `interval_point_sound` composes the new
+law with `interval_point_contains`; it is not a second public export.
+Architect's detached scratch D0 checked the generic law without a new
+`Axiom` and with unchanged trusted identity sets 114 → 114. The
+corrected seed rows were checked on a QA-blocked assembled tip and
+must be reverified on any replacement candidate. This Spec-only
+child does not deliver a §12 catalog export or seed; that assembled
+tip is not approved. No official
+conformance-runner execution, CI, publication, landing or measured
+landed trust is established for §12. Signed arithmetic, division,
+`Float`, rounding, width and structural hull/intersection equalities
+remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–9 (SPEC-TIME-EVENT-TRACE-CONTRACT;
