@@ -14319,6 +14319,37 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(valid);
     }
 
+    /// A host dispatch status: 0 continues. The host's own refusal of this
+    /// site's `operation` as unavailable returns that exact status, a constant
+    /// (`ken_host::operation_unavailable_status_v1`), so the process starter can
+    /// name the operation; any other nonzero status keeps the existing -1.
+    fn require_host_dispatch_ok(
+        builder: &mut FunctionBuilder<'_>,
+        status: cranelift_codegen::ir::Value,
+        operation: ken_host::HostOpV1,
+    ) {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let valid = builder.create_block();
+        let failed = builder.create_block();
+        let unavailable = builder.create_block();
+        let malformed = builder.create_block();
+        let ok = builder.ins().icmp_imm(IntCC::Equal, status, 0);
+        builder.ins().brif(ok, valid, &[], failed, &[]);
+        builder.switch_to_block(failed);
+        let refused = ken_host::operation_unavailable_status_v1(operation);
+        let is_refusal = builder.ins().icmp_imm(IntCC::Equal, status, refused);
+        builder
+            .ins()
+            .brif(is_refusal, unavailable, &[], malformed, &[]);
+        builder.switch_to_block(unavailable);
+        let refusal = builder.ins().iconst(types::I64, refused);
+        builder.ins().return_(&[refusal]);
+        builder.switch_to_block(malformed);
+        let failure = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[failure]);
+        builder.switch_to_block(valid);
+    }
+
     /// Propagate a boundary helper's capacity status only after the activation
     /// owner records its typed fault. Other mismatches keep the existing -1
     /// trap; a naked -7 is never authority to forge a capacity terminal.

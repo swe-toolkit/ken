@@ -1636,7 +1636,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
         return -3;
     };
     if require_native_operation_v1(op).is_err() {
-        return -(0x1_0000_i64 + i64::from(op as u16));
+        return crate::operation_unavailable_status_v1(op);
     }
     let (capability, resource, request) = match op {
         HostOpV1::ConsoleRead if request_size == std::mem::size_of::<ConsoleReadRequestV1>() => {
@@ -2761,6 +2761,47 @@ mod tests {
             .copied()
             .collect::<Vec<_>>();
         assert_eq!(revoked, vec![("error", "io.Revoked", 11)]);
+    }
+
+    /// No product program reaches this refusal today: emission or the Process
+    /// gate refuses first. This pins the census-route status below reserved
+    /// root statuses and away from planned trap tokens. The inverse formula
+    /// alone cannot exclude a collision with a reserved status.
+    #[test]
+    fn unavailable_operation_status_is_its_own_band() {
+        let base = crate::OPERATION_UNAVAILABLE_STATUS_BASE_V1;
+        // Check collisions first, across the full operation inventory: a bad
+        // base may also produce unrelated positive statuses early in ALL.
+        for operation in HostOpV1::ALL {
+            let status = crate::operation_unavailable_status_v1(operation);
+            for reserved in [
+                -1,
+                -2,
+                -3,
+                -4,
+                crate::CAPACITY_EXHAUSTED_STATUS_V1,
+                crate::SELECTED_CALL_INTEGRITY_STATUS_V1,
+            ] {
+                assert_ne!(status, reserved, "{operation:?} collides with {reserved}");
+            }
+        }
+        for operation in HostOpV1::ALL {
+            let status = crate::operation_unavailable_status_v1(operation);
+            assert!(
+                status < -8,
+                "{operation:?} status {status} overlaps reserved root statuses"
+            );
+            assert_ne!(
+                operation as u16 & 0xff,
+                0xff,
+                "{operation:?} would read as a planned trap token"
+            );
+            assert!(
+                (-(base + 0xffff)..=-base).contains(&status),
+                "{operation:?}"
+            );
+            assert_eq!(-status - base, i64::from(operation as u16));
+        }
     }
 
     #[test]

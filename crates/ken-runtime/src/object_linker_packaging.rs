@@ -105,6 +105,7 @@ pub enum NativeEffectRunErrorV1 {
     MalformedTrace,
     BindingMismatch,
     ObservationBoundaryUnavailable,
+    OperationUnavailable { operation: ken_host::HostOpV1 },
     UnclassifiedRuntimeTrap { terminal_value: i64 },
 }
 
@@ -118,6 +119,10 @@ impl fmt::Display for NativeEffectRunErrorV1 {
             }
             Self::ObservationBoundaryUnavailable => formatter.write_str(
                 "native effect observation sink cannot be placed outside the capability root",
+            ),
+            Self::OperationUnavailable { operation } => write!(
+                formatter,
+                "host operation {operation:?} is unavailable to native code"
             ),
             Self::UnclassifiedRuntimeTrap { terminal_value } => write!(
                 formatter,
@@ -263,6 +268,12 @@ fn decode_signed_root_trap(
     let refuse = || NativeEffectRunErrorV1::UnclassifiedRuntimeTrap { terminal_value };
     if terminal_value >= 0 {
         return Err(refuse());
+    }
+    if let Some(operation) = ken_host::HostOpV1::ALL
+        .into_iter()
+        .find(|operation| ken_host::operation_unavailable_status_v1(*operation) == terminal_value)
+    {
+        return Err(NativeEffectRunErrorV1::OperationUnavailable { operation });
     }
     // Unsigned two's-complement negation is defined even for i64::MIN. The
     // token parser then rejects any magnitude that is malformed or absent from
@@ -2454,6 +2465,12 @@ static int environment(
     return constructor(arena, value, KEN_NIL, 0);
 }
 
+static const char *ken_unavailable_operation_name(unsigned long long operation) {
+    switch (operation) {
+__KEN_UNAVAILABLE_OPERATION_NAMES__    default: return "unrecognized";
+    }
+}
+
 int main(int argc, char **argv, char **envp) {
     size_t argument_count = argc < 0 ? 0 : (size_t)argc;
     size_t environment_count = 0;
@@ -2571,7 +2588,12 @@ int main(int argc, char **argv, char **envp) {
     free(pool);
     if (finish_status != 0) return 1;
     if (ticket_status != 0) return 1;
-    if (value == -1) fputs("ken native trap: malformed borrowed process input\n", stderr);
+    if (value <= -__KEN_UNAVAILABLE_BASE__ && value >= -(__KEN_UNAVAILABLE_BASE__ + 0xffff)) {
+        unsigned long long operation = (unsigned long long)(-value - __KEN_UNAVAILABLE_BASE__);
+        fprintf(stderr, "ken native trap: host operation %s (0x%04llx) is unavailable to native code\n",
+            ken_unavailable_operation_name(operation), operation);
+    }
+    else if (value == -1) fputs("ken native trap: malformed borrowed process input\n", stderr);
     else if (value == -2) fputs("ken native trap: entrypoint returned a malformed ExitCode\n", stderr);
     else if (value == -3) fputs("ken native trap: malformed ExitCode::Failure payload\n", stderr);
     else if (value == -4) fputs("ken native trap: explicit entry trap\n", stderr);
@@ -2623,6 +2645,17 @@ int main(int argc, char **argv, char **envp) {
         &u8::from(allow_root_execution).to_string(),
     )
     .replace("__KEN_PROCESS_DECLARED__", &u8::from(process_declared).to_string())
+    .replace(
+        "__KEN_UNAVAILABLE_BASE__",
+        &ken_host::OPERATION_UNAVAILABLE_STATUS_BASE_V1.to_string(),
+    )
+    .replace(
+        "__KEN_UNAVAILABLE_OPERATION_NAMES__",
+        &ken_host::HostOpV1::ALL
+            .iter()
+            .map(|operation| format!("    case 0x{:04x}: return \"{operation:?}\";\n", *operation as u16))
+            .collect::<String>(),
+    )
     .replace(
         "__KEN_ROOT_DENIED_EXIT_STATUS__",
         &root_denied_exit_status.to_string(),

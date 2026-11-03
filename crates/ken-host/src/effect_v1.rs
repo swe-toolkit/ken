@@ -4586,6 +4586,18 @@ pub struct RuntimeTrapProvenanceV1 {
 /// capacity refusal. The observer must reject this status without its exact
 /// typed terminal record, and must reject that record with any other status.
 pub const CAPACITY_EXHAUSTED_STATUS_V1: i64 = -7;
+
+/// The native dispatch status base for an operation the host refuses as
+/// unavailable: the status is `-(base + op)`. The band lies below every
+/// starter status (-1 to -4), the -7/-8 activation statuses, and, since no
+/// operation code ends in 0xff, every planned trap token.
+pub const OPERATION_UNAVAILABLE_STATUS_BASE_V1: i64 = 0x1_0000;
+
+/// The native dispatch status for `operation` refused as unavailable.
+pub const fn operation_unavailable_status_v1(operation: HostOpV1) -> i64 {
+    -(OPERATION_UNAVAILABLE_STATUS_BASE_V1 + operation as u16 as i64)
+}
+
 /// Reserved generated-root status for an owner-recorded call-ticket integrity
 /// fault. This is not a planner trap or a capacity refusal.
 pub const SELECTED_CALL_INTEGRITY_STATUS_V1: i64 = -8;
