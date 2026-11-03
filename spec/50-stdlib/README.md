@@ -677,7 +677,8 @@ measurement. Section 12 specifies one public membership-respect law:
 `y` in `i`. The converse of `interval_point_sound` composes the new
 law with `interval_point_contains`; it is not a second public export.
 Architect's detached scratch D0 checked the generic law without a new
-`Axiom` and with unchanged trusted identity sets 114 → 114. The §12 catalog export and its seed are present with a targeted
+`Axiom` and with unchanged trusted identity sets 114 → 114.
+The §12 catalog export and its seed are present with a targeted
 package test. No official
 conformance-runner execution, CI, publication, landing or measured
 landed trust is established for §12. Signed arithmetic, division,
