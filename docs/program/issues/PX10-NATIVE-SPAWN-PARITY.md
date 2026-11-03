@@ -114,7 +114,12 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   promotion, the gate deletion and the containment deletion, landing
   with the native parity rows (Architect evt_5vsaybryes08b).
 - **Increment B-closure** is dynamic relay forwarding (Architect
-  evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own.
+  evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own,
+  after `RT-NATIVE-IH-CONTINUATION-CLOSED-TEMPLATES`: a first-order
+  backend resumes a foreign relay's K only from a closed template set,
+  so B-closure forwards by operation tag and resumes from that set
+  (Steward evt_6ppgz0hsqxmm, Research evt_1ebcpy76v1e9a, routing D0-23
+  evt_jc75x84wmcw7). Candidate checkpoint `2ad1b31d0` is held until then.
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus
