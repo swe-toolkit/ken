@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-MATCH-BINDER-LATENT
 title: "A match pattern binder releases nothing in the let consumer, so a callback pulled out of a constructor and applied in a let right-hand side has its action dropped. `match b { MkBox f ↦ let ignored = f MkUnit in host_program (print_line \"b\") }`, with `b = MkBox action` and `action` a Console proc, prints only `b`. Give a pattern binder its scrutinee's latent, read the same way by the gate and the let consumer"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1
