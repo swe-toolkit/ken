@@ -2,7 +2,7 @@
 //! Source: conformance/stdlib/optimization/seed-bounded-search.md.
 //! Promise class: durable invariant. Independent least-hit, missing-hit and
 //! strict-bound fixtures distinguish false search results; generic clients
-//! restate all five public law interfaces.
+//! restate all six public law interfaces.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -40,11 +40,11 @@ fn seed_programs() -> Vec<&'static str> {
 
 /// SOURCE: spec/50-stdlib/72-optimization.md §2.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: the package's six public globals have transparent kernel-checked
+/// MEASURED: the package's seven public globals have transparent kernel-checked
 /// bodies, the exact trusted GlobalId set is unchanged after its imports load,
-/// and arbitrary-argument clients check all five theorem types.
+/// and arbitrary-argument clients check all six theorem types.
 /// Every private operation and proof helper refuses selective import.
-/// CLAIMED: bounded selection's five general contracts add no trust.
+/// CLAIMED: bounded selection's six general contracts add no trust.
 /// THE GAP: existing provider assumptions are inherited; the existing closed
 /// seed fixtures distinguish concrete search results, while the fifth law's
 /// constant-false client does not exhaust all refutable predicates.
@@ -73,13 +73,14 @@ fn generic_laws_check_without_added_trust() {
         "find_below_complete",
         "find_below_stable",
         "find_below_refuted",
+        "find_below_least_hit",
     ] {
         let id = env.globals[&format!("{PACKAGE}.{name}")];
         assert!(package_owned.contains(&id), "{name} must be package-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
     env.elaborate_file(GENERIC_CLIENT)
-        .expect("all five bounded-search generic law interfaces check from a client");
+        .expect("all six bounded-search generic law interfaces check from a client");
     for private in [
         "find_next",
         "found_at",
@@ -88,6 +89,7 @@ fn generic_laws_check_without_added_trust() {
         "found_some_sound",
         "found_some_least",
         "refuted_outcome_none",
+        "hit_outcome_some",
         "find_below_correct",
         "find_next_correct",
         "found_at_correct",
@@ -106,7 +108,7 @@ fn generic_laws_check_without_added_trust() {
 const GENERIC_CLIENT: &str = r#"
 import Algorithm.Optimization.BoundedSearch
   (find_below, find_below_sound, find_below_least, find_below_complete,
-   find_below_stable, find_below_refuted)
+   find_below_stable, find_below_refuted, find_below_least_hit)
 import Data.Numeric.Nat.Order (leq_nat, lt_nat)
 
 theorem client_sound (p : Nat → Bool) (bound : Nat) (n : Nat) :
@@ -134,6 +136,13 @@ theorem client_refuted (p : Nat → Bool) (bound : Nat) :
   ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False) →
   Equal (Option Nat) (find_below p bound) (None Nat) =
   find_below_refuted p bound
+
+theorem client_least_hit (p : Nat → Bool) (bound : Nat) (n : Nat) :
+  Equal Bool (lt_nat n bound) True →
+  Equal Bool (p n) True →
+  ((m : Nat) → Equal Bool (lt_nat m n) True → Equal Bool (p m) False) →
+  Equal (Option Nat) (find_below p bound) (Some Nat n) =
+  find_below_least_hit p bound n
 
 const always_false : Nat → Bool = λm. False
 
