@@ -1334,12 +1334,24 @@ impl SsaInfeasible {
     }
 }
 
-#[derive(Clone, Copy)]
-struct HostResponseRoute {
-    operation: HostOpV1,
-    effect_origin: StaticOriginId,
-    producer_call_origin: StaticOriginId,
-    response_origin: StaticOriginId,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct HostResponseRoute {
+    pub(in crate::cranelift_backend) operation: HostOpV1,
+    pub(in crate::cranelift_backend) effect_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) producer_call_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) response_origin: StaticOriginId,
+}
+
+/// One checked clause of the handler's closed operation dispatch. The
+/// environment maps each free Effect input to a field of the carried op.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RelayHostResponseArm {
+    pub(in crate::cranelift_backend) constructor: RuntimeSymbol,
+    pub(in crate::cranelift_backend) constructor_tag: u64,
+    pub(in crate::cranelift_backend) pattern_fields: usize,
+    pub(in crate::cranelift_backend) source_owner: super::units::PredeclaredFunctionId,
+    pub(in crate::cranelift_backend) route: HostResponseRoute,
+    pub(in crate::cranelift_backend) field_binders: Vec<u32>,
 }
 
 fn checked_host_response_call(
@@ -1774,6 +1786,73 @@ fn host_response_routes(
         }
     }
     Ok(routes)
+}
+
+impl StaticTransitionPlan<'_> {
+    /// Select one leaf from the owner's actually returned non-relay effects,
+    /// and close every arm of that leaf before a relay can enter the owner.
+    pub(in crate::cranelift_backend) fn relay_host_response_arms(
+        &self,
+        non_relay_effects: &BTreeSet<StaticOriginId>,
+    ) -> Result<Vec<RelayHostResponseArm>, CraneliftBackendError> {
+        let routes = host_response_routes(self)?;
+        let leaves = routes.iter().filter(|(_, arms)| {
+            arms.values().any(|route| non_relay_effects.contains(&route.effect_origin))
+        }).collect::<Vec<_>>();
+        if leaves.len() != 1 || non_relay_effects.iter().any(|effect| {
+            !leaves.iter().any(|(_, arms)| arms.values().any(|route| route.effect_origin == *effect))
+        }) {
+            return Err(planner_error(format!("a relay owner's effects do not belong to one handler leaf: effects={non_relay_effects:?}, leaves={:?}", leaves.iter().map(|(leaf, _)| leaf).collect::<Vec<_>>() )));
+        }
+        let (leaf, arms) = leaves[0];
+        let RuntimeExpr::Match { cases, .. } = self.planned_occurrence_expr(*leaf)? else {
+            return Err(planner_error("a relay handler leaf is not a Match"));
+        };
+        arms.iter().map(|(constructor, route)| {
+            let (case_index, case) = cases.iter().enumerate()
+                .find(|(_, case)| case.constructor == *constructor)
+                .ok_or_else(|| planner_error("a relay handler arm has no matching pattern"))?;
+            let constructor_tag = self.case_constructor_identity(*leaf, case_index)?.tag_abi_word()?;
+            let source_owner = self.semantic.function_owner(route.effect_origin)?
+                .ok_or_else(|| planner_error("a relay handler Effect has no source owner"))?;
+            let root = super::continuations::continuation_owner_source_root(self, source_owner)?;
+            let entries = continuation_owner_entry_sources(self, source_owner)?
+                .into_iter().map(ContinuationValueSourceAuthority::source).collect::<Vec<_>>();
+            let (_, reached) = walk_continuation_value_environment(
+                self, root, route.effect_origin, &entries,
+            )?;
+            let reached = reached.ok_or_else(|| planner_error(
+                "a relay handler Effect is outside its source owner subtree",
+            ))?;
+            let mut free = BTreeSet::new();
+            free_environment_indices(self.planned_occurrence_expr(route.effect_origin)?, 0, &mut free)?;
+            let mut field_binders = Vec::new();
+            if let Some(maximum) = free.iter().next_back().copied() {
+                for index in 0..=maximum {
+                    let input = reached.get(index as usize).ok_or_else(|| planner_error(
+                        "a relay handler Effect indexes outside its source environment",
+                    ))?;
+                    let ContinuationValueSourceAuthority::Closed(sources) = input else {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    };
+                    let [source] = sources.as_slice() else {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    };
+                    let ContinuationSourceCoordinate::ProducerLocal { binding, .. } = source.coordinate else {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    };
+                    if binding.binding_owner != source_owner || binding.binding_ordinal as usize >= case.binders {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    }
+                    field_binders.push(binding.binding_ordinal);
+                }
+            }
+            Ok(RelayHostResponseArm {
+                constructor: constructor.clone(), constructor_tag,
+                pattern_fields: case.binders, source_owner, route: *route, field_binders,
+            })
+        }).collect()
+    }
 }
 
 // construction.rs::plan_expr: Match case bodies (:880-899), Let body

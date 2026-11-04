@@ -156,7 +156,8 @@ pub(in crate::cranelift_backend) use responses::{
     CheckedIhPostCallConsumer,
     DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
-    StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseContinuationId, RelayHostResponseArm,
+    StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
     StaticResponsePhaseA, StaticResponseSite,
 };

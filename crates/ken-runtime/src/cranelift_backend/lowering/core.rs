@@ -9735,8 +9735,9 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .aggregate_record_view(transport.source_record())?;
         if record.shape() != PlannedAggregateShape::Constructor
-            || record.declared_children().map(|children| children.len())
-                != Some(worker_capture_count)
+            || record.declared_children().map(|children| children.iter()
+                .take_while(|child| matches!(child, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+                .count()) != Some(worker_capture_count)
         {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",

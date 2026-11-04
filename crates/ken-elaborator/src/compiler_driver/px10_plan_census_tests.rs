@@ -516,6 +516,7 @@ fn px10_argv_and_live_emit_below_process_gate() {
                         })
                     })
                 });
+            eprintln!("PX10_S3_BUILD={:?}", built.as_ref().err()); // temporary diagnostic
             if name == "px10_census_argv_env_pipe" {
                 let contracts = diagnostics
                     .iter()

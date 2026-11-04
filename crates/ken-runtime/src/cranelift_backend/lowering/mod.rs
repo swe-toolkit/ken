@@ -464,7 +464,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
-    StaticResponseContinuation, StaticResponseContinuationId,
+    StaticResponseContinuation, StaticResponseContinuationId, RelayHostResponseArm,
     StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
@@ -1174,6 +1174,7 @@ impl ArtifactHelpers<'_> {
             pending_vis_producer_sites: Vec::new(),
             driven_deferred_response_effect: None,
             defining_abi_operands: Vec::new(),
+            continuation_entry_inputs: Vec::new(),
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
@@ -1471,6 +1472,10 @@ struct FunctionLocalRefs {
     /// ⛔ Reset per function, like every other field here: these are `ir::Value`
     /// operands of one `Function` and mean nothing in another.
     defining_abi_operands: Vec<LoweringOperand>,
+    /// The defining specialization's Capture-slot words in its own function,
+    /// each paired with the checked continuation-input coordinate it carries.
+    /// Never filled from the resuming owner's frame.
+    continuation_entry_inputs: Vec<(ContinuationSourceCoordinate, LoweringOperand)>,
     /// **`RT-SRCBODY-BIND-ORDER` `D3c`** -- the slot KIND at each ABI position
     /// of [`Self::defining_abi_operands`], recorded in the same walk.
     ///
@@ -9314,8 +9319,9 @@ impl<'a> Lowering<'a> {
         }
         let child_schema = self.static_transition_plan.aggregate_record_view(record)?;
         if child_schema.shape() != PlannedAggregateShape::Constructor
-            || child_schema.declared_children().map(|children| children.len())
-                != Some(disposition.worker_captures as usize)
+            || child_schema.declared_children().map(|children| children.iter()
+                .take_while(|child| matches!(child, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+                .count()) != Some(disposition.worker_captures as usize)
         {
             return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the construct Child schema disagrees with its W roles"));
         }

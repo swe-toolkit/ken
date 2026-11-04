@@ -377,8 +377,9 @@ pub(super) fn build_per_emitter_availability(
             Some(transport) => {
                 let record = plan.aggregate_record_view(transport.source_record())?;
                 let worker_ready = record.shape() == PlannedAggregateShape::Constructor
-                    && record.declared_children().map(|children| children.len())
-                        == Some(unit.key.worker.captures.len());
+                    && record.declared_children().map(|children| children.iter()
+                        .take_while(|child| matches!(child, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+                        .count()) == Some(unit.key.worker.captures.len());
                 let context_ready = transport.continuation_input_count()
                     == unit.key.continuation_inputs.len();
                 for capture in &unit.key.worker.captures {

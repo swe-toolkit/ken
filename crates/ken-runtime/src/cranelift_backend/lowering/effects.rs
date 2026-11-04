@@ -430,7 +430,7 @@ impl<'a> Lowering<'a> {
     /// `lower_process_host_effect`. Both consult THIS, so the predicate cannot
     /// drift between them and there is exactly one place it can be wrong
     /// (Architect `evt_4hcny7ae7h9sb`: compute once, consult at each site).
-    fn effect_arm_is_provably_dead(
+    pub(super) fn effect_arm_is_provably_dead(
         &self,
         effect_origin: StaticOriginId,
     ) -> Result<bool, CraneliftBackendError> {

@@ -73,6 +73,9 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
         BTreeMap<StaticOriginId, StaticResponseContinuation>,
     /// Forwarded relays, keyed by relay origin, disjoint from response rows.
     pub(in crate::cranelift_backend) relays: BTreeMap<StaticOriginId, PendingVisRelay>,
+    /// Closed operation clauses of each relay-bearing response owner.
+    pub(in crate::cranelift_backend) relay_arms:
+        BTreeMap<StaticResponseContinuationId, Vec<super::responses::RelayHostResponseArm>>,
     /// Each function's maximum over only the owner protocols whose return
     /// paths pass through that exact generated function. Absent means no tail.
     pub(in crate::cranelift_backend) frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth>,
@@ -241,6 +244,7 @@ impl StaticTransitionPlan<'_> {
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
         let mut relays = BTreeMap::new();
+        let mut relay_arms = BTreeMap::new();
         let mut frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth> = BTreeMap::new();
         for owner in &self.static_response_continuations {
             let protocol = match self.returned_vis_protocol(owner.vis_origin()) {
@@ -300,6 +304,19 @@ impl StaticTransitionPlan<'_> {
                         return Err(planner_error("a pending-Vis occurrence has conflicting response-row identities"));
                     }
                 }
+            }
+            if protocol.contexts.iter().flat_map(|context| &context.members)
+                .any(|member| member.relay)
+            {
+                let mut effects = protocol.contexts.iter()
+                    .flat_map(|context| &context.members)
+                    .filter(|member| !member.relay)
+                    .filter_map(|member| member.successor.as_ref().map(|row| row.effect_origin()))
+                    .collect::<BTreeSet<_>>();
+                // The initial owner is itself a checked Effect of the same
+                // handler leaf, even when every returned member is a relay.
+                effects.insert(owner.effect_origin());
+                relay_arms.insert(owner.id(), self.relay_host_response_arms(&effects)?);
             }
             // The owner calls its K contexts. Source-result Call edges mark
             // exact raw units; detached continuation grafts need their own
@@ -363,6 +380,7 @@ impl StaticTransitionPlan<'_> {
                 owners,
                 members,
                 relays: numbered,
+                relay_arms,
                 frames,
             }),
             owners: settlements,

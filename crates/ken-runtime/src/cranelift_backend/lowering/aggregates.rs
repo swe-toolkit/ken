@@ -692,6 +692,12 @@ pub(super) enum SynthesizedArgument {
         origin: StaticOriginId,
         value: LoweringOperand,
     },
+    CheckedIhEntryInput {
+        seat: StaticOriginId,
+        ordinal: u32,
+        coordinate: ContinuationSourceCoordinate,
+        value: LoweringOperand,
+    },
 }
 
 /// The phase-bearing source that authorized a site-bound projection.
@@ -717,7 +723,7 @@ impl SynthesizedArgument {
             Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => Ok(value),
             Self::SiteOperand { value, .. }
             | Self::HostResponseReferent { value, .. } => Ok(value),
-            Self::WorkerCaptureOperand { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
+            Self::WorkerCaptureOperand { .. } | Self::CheckedIhEntryInput { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhCapturedEnvironment",
                 "a checked-IH capture operand reached an ordinary synthesized constructor; \
                  the checked-IH environment emitter must consume its provenance directly",
@@ -732,7 +738,7 @@ impl SynthesizedArgument {
             }
             Self::SiteOperand { value, .. }
             | Self::HostResponseReferent { value, .. } => lowered_value_kind(value),
-            Self::WorkerCaptureOperand { value, .. } => match value {
+            Self::WorkerCaptureOperand { value, .. } | Self::CheckedIhEntryInput { value, .. } => match value {
                 LoweringOperand::Specialized(value) => lowered_value_kind(value),
                 LoweringOperand::Carried(_) => "carried boundary word",
                 LoweringOperand::Residual(_) => "private recursive residual",
@@ -3771,7 +3777,7 @@ impl<'a> Lowering<'a> {
             owner: ContinuationEmissionOwner,
             seat: StaticOriginId,
             path: &SynthesizedAggregatePath,
-            declared: &'static [SynthesizedAggregateNode],
+            declared: &[SynthesizedAggregateNode],
             args: &[SynthesizedArgument],
             seats: &ClaimedEffectSeats<'_>,
         ) -> Result<(), CraneliftBackendError> {
@@ -4023,6 +4029,31 @@ impl<'a> Lowering<'a> {
                             *origin == planned
                         }
                     }
+                    (
+                        SynthesizedAggregateNode::CheckedIhEntryInput {
+                            ordinal: declared_ordinal,
+                            coordinate: declared_coordinate,
+                        },
+                        SynthesizedArgument::CheckedIhEntryInput {
+                            seat: bound,
+                            ordinal,
+                            coordinate,
+                            value,
+                        },
+                    ) => {
+                        *bound == seat
+                            && ordinal == declared_ordinal
+                            && coordinate == declared_coordinate
+                            && path.root_kind() == SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
+                            && self.function_local.continuation_entry_inputs
+                                .get(*ordinal as usize)
+                                .is_some_and(|(held_coordinate, held_value)| {
+                                    held_coordinate == coordinate
+                                        && matches!((held_value, value),
+                                            (LoweringOperand::Carried(held), LoweringOperand::Carried(actual))
+                                                if held.word == actual.word)
+                                })
+                    }
                     // ⛔ `Absent` marks a host-result arm that builds no aggregate,
                     // so it is never a child of a planned record.
                     (SynthesizedAggregateNode::Absent, _) => {
@@ -4083,24 +4114,25 @@ impl<'a> Lowering<'a> {
                     "the checked-IH captured environment is not planned as a positional aggregate",
                 ));
             }
-            let declared = record.declared_children.ok_or_else(|| {
+            let declared = record.declared_children.as_deref().ok_or_else(|| {
                 unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     "the checked-IH captured environment has no declared positional child model",
                 )
             })?;
-            if declared.len() != worker.captures.len() {
+            if declared.len() != record.children.len()
+                || declared.len() < worker.captures.len()
+                || declared.iter().take(worker.captures.len()).any(|node| {
+                    !matches!(node, SynthesizedAggregateNode::WorkerCaptureOperand(_))
+                })
+            {
                 return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
-                    format!(
-                        "the checked-IH environment declares {} captures but the selected worker carries {}",
-                        declared.len(),
-                        worker.captures.len()
-                    ),
+                    "the checked-IH environment's capture and entry-input child model disagrees with its worker and ownership record",
                 ));
             }
 
-            let mut arguments = Vec::with_capacity(worker.captures.len());
+            let mut arguments = Vec::with_capacity(declared.len());
             for (position, value) in worker.captures.iter().cloned().enumerate() {
                 let ordinal = u32::try_from(position).map_err(|_| {
                     unsupported(LoweringCause::Capacity,
@@ -4118,6 +4150,31 @@ impl<'a> Lowering<'a> {
                     value,
                 });
             }
+            for node in declared.iter().skip(worker.captures.len()) {
+                let SynthesizedAggregateNode::CheckedIhEntryInput { ordinal, coordinate } = node else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "CheckedIhCapturedEnvironment",
+                        "a checked-IH environment entry child is not declared by its coordinate",
+                    ));
+                };
+                let (available_coordinate, value) = self.function_local.continuation_entry_inputs
+                    .get(*ordinal as usize).ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "CheckedIhCapturedEnvironment",
+                        "the constructing owner has no carried entry input at the declared ordinal",
+                    ))?;
+                if available_coordinate != coordinate {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "CheckedIhCapturedEnvironment",
+                        "the constructing owner's entry input differs from the declared coordinate",
+                    ));
+                }
+                arguments.push(SynthesizedArgument::CheckedIhEntryInput {
+                    seat,
+                    ordinal: *ordinal,
+                    coordinate: *coordinate,
+                    value: value.clone(),
+                });
+            }
             let path = SynthesizedAggregatePath::root(
                 SynthesizedAggregateRoot::CheckedIhCapturedEnvironment,
             );
@@ -4133,8 +4190,10 @@ impl<'a> Lowering<'a> {
             // Screen the whole environment before allocating its parent. A
             // refusal on capture i must not leave fields 0..i-1 published.
             for argument in &mut arguments {
-                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
-                    unreachable!("this emitter constructs only worker-capture arguments")
+                let value = match argument {
+                    SynthesizedArgument::WorkerCaptureOperand { value, .. }
+                    | SynthesizedArgument::CheckedIhEntryInput { value, .. } => value,
+                    _ => unreachable!("this emitter constructs only checked-IH environment arguments"),
                 };
                 if let LoweringOperand::Residual(residual) = value {
                     let child = self.decode_residual_child(builder, *residual)?;
@@ -4177,16 +4236,24 @@ impl<'a> Lowering<'a> {
                 arguments.len(),
             )?;
             for (position, argument) in arguments.into_iter().enumerate() {
-                let SynthesizedArgument::WorkerCaptureOperand { origin, value, .. } = argument else {
-                    unreachable!("this emitter constructs only worker-capture arguments")
-                };
-                let child = match value {
-                    LoweringOperand::Carried(word) => word,
-                    // The pre-allocation screen decoded every R into Child K.
-                    LoweringOperand::Residual(_) => unreachable!("R was decoded in preflight"),
-                    LoweringOperand::Specialized(value) => {
-                        self.transfer_into_carrier(builder, origin, &value)?
+                let child = match argument {
+                    SynthesizedArgument::CheckedIhEntryInput {
+                        value: LoweringOperand::Carried(word), ..
+                    } => word,
+                    SynthesizedArgument::CheckedIhEntryInput { .. } => {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "CheckedIhCapturedEnvironment",
+                            "the constructing owner's entry input is not a carried Capture-slot word",
+                        ));
                     }
+                    SynthesizedArgument::WorkerCaptureOperand { origin, value, .. } => match value {
+                        LoweringOperand::Carried(word) => word,
+                        LoweringOperand::Residual(_) => unreachable!("R was decoded in preflight"),
+                        LoweringOperand::Specialized(value) => {
+                            self.transfer_into_carrier(builder, origin, &value)?
+                        }
+                    },
+                    _ => unreachable!("this emitter constructs only checked-IH environment arguments"),
                 };
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
