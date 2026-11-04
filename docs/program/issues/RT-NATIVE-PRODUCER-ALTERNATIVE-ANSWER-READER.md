@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER
-title: "A checked-IH transport's answer is written as a labelled producer-alternative record, but nothing in the native backend reads that label and unwraps its Child: the seat's assertion validates the word and returns it still labelled, and the word travels as an ordinary Carried operand, so an ordinary Result match consumes it and traps at run time (B-closure stop 11, trap 46). Give each causal edge one planner discharge that records whether its answer is labelled, carry a labelled answer as its own operand kind that ordinary consumers refuse at compile time, and issue the one reader that switches on the label"
-status: active
+title: "A checked-IH transport's answer is written as a labelled producer-alternative record, but nothing in the native backend reads that label and unwraps its Child: the seat's assertion validates the word and returns it still labelled, and the word travels as an ordinary Carried operand, so an ordinary Result match consumes it and traps at run time (B-closure stop 11, trap 46). AC-0 measured that no labelled answer is both minted and read, so delete the label: the writer returns the producer's word and the seat passes it through"
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -12,14 +12,14 @@ github: null
 origin: "Architect closure form evt_7xv7216msypg (B-closure D0 round 24, stop 11, inventory entry 15), recommending a separate closure WP; Steward recut. L1 objective: the Linux ABI program. Steward-filed per COORDINATION section 2."
 ---
 
-# A labelled answer has one reader
+# The producer-alternative label is deleted
 
 ## Objective
 
-The native backend reads a checked-IH transport's labelled answer only
-through one issued reader. That reader switches on the label, unwraps
-each member's Child, and joins them. Any other consumer handed a
-labelled answer refuses at compile time.
+No native answer is labelled. A checked-IH transport's writer returns
+the producer's own word for every member of an issued set, and the
+seat's Alternatives arm passes the carried word through. Merged at
+`5dfe23688` (PR #5212).
 
 ## Settled inputs (main `7877abf22`; measured at `7a1158c5d`, evt_7xv7216msypg)
 
@@ -58,61 +58,54 @@ base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-C1 to C3 of the Architect's closure form (evt_7xv7216msypg), in one
-runtime candidate:
+As ruled at AC-0 (Architect D0-2 `evt_6wbcf81pb62p8`; Steward scope
+`evt_1qd1scg5w545h`, replacing `evt_7mftn8rw9srj6`). On the four
+committed builds, 24 records were labelled and none was consumed; the
+12 seats each received an unlabelled word yet asserted a labelled
+record. So the label was a property two planes disagreed about, with no
+consumer.
 
-- **C1.** For each causal edge the planner records one discharge,
-  either the pending-Vis row or the checked-IH transport, never both.
-  It also records whether that transport's answer is labelled. An
-  answer is labelled only if it reaches the issued set's reader,
-  (`set.emission_owner`, `set.result`). The writer, the seat and both
-  Construct arms read that record and decide nothing locally.
-- **C2.** A labelled answer is its own operand kind, holding the word
-  and its set's key. Every exhaustive operand match decides on it. An
-  ordinary consumer refuses it with `PlannerInvariant` naming
-  `ProducerAlternativeSet`.
-- **C3.** One issued reader switches on the label, unwraps each
-  member's Child, and joins them on the shape of the value join at
-  `calls.rs:1059` to `:1082`. `assert_producer_alternative_record` is
-  that reader's precondition.
+- **R1.** `call_checked_ih_environment_transport` returns `returned` for
+  every member.
+- **R2.** The seat's Alternatives arm passes `Carried` through and
+  refuses any other operand with `PlannerInvariant`
+  `ProducerAlternativeSet`. `assert_producer_alternative_record` is
+  deleted.
+- **R3.** `producer_alternative_record` and its planned aggregate are
+  deleted. `ProducerAlternativeSet` stays for membership and reader
+  resolution.
+- **Not built.** `CausalEdgeDischarge`, a labelled operand kind
+  (`LoweringOperand::LabelledAlternative` is reserved) and an issued
+  reader. A measured labelled population would reopen them.
+- **Carried to PX10 entry 15.** The `compiled.rs:119` containment
+  (B-closure deletes it), the dead planned transports, and the routing
+  predicates at `core.rs:3686` and `:3748`.
 
 ## Acceptance
 
-- **AC-0 (D0).** The Architect specifies a development on the landed
-  base: the patch, and the named-binary commands with a bounded timeout.
-  The runtime implementer runs it on scratch and reports. The Architect
-  rules from that report, and does not build or test. It measures:
-  - which set the Spec13 member at `core.rs:9455` belongs to, which
-    tells C1's case (a label written for another owner's reader) from
-    C3's (a missing reader);
-  - a census of every consumer of a labelled word, enumerated from the
-    operand matches, not from the call path in front of the D0.
-
-  It then rules the operand kind's name, the discharge record's home,
-  and the reader's site.
-- **AC-1, refusal pin.** A named ken-runtime unit test hands an ordinary
-  consumer a labelled answer, and it refuses at compile time with the
-  ruled reason. Deleting the refusal, or giving the ordinary consumer a
-  fallback that treats the word as `Carried`, reddens it.
-- **AC-2, reader pin.** A named test drives the issued reader on a
-  labelled answer of each member and reads back that member's Child. A
-  mutant that swaps two members' labels at the writer reddens it, and
-  so does a mutant that writes the bare payload without its label.
-- **AC-3.** Full-workspace CI on the exact candidate SHA is green. No
-  native parity row is claimed; B-closure's AC-1 owns parity.
+- **AC-0 (D0).** Two rounds, both on scratch: the Spec13 member's set
+  (`evt_7deaft1cqphfv`), then the consumer census (D0-2).
+- **AC-1, no labelled mint.** Over argv and live, a writer observation
+  records every answer raw, including the six foreign members. Restoring
+  identity-membership labelling reddens it.
+- **AC-2, seat pass-through.** Over argv, live and smoke, every
+  issued-set seat passes its word through and emits no record
+  assertion. Restoring the assertion reddens it.
+  `px10_issued_set_reader_mismatch_refuses_at_planning` is unchanged.
+- **AC-3.** Full-workspace CI green on `843fccca5` (run 41870493245).
+  No parity is claimed; B-closure's next fact is trap 44.
 
 ## Stop conditions
 
 - A kernel or trust change.
-- A causal edge that needs both discharges.
+- A closure or containment check that still requires the deleted
+  aggregate to be emitted: stop to the Architect.
 - A pin that can be met only by running B-closure's parity rows.
 
-Checks: 2 fired: the reader census is the Architect's measured one (the
-writer, the seat's assertion and the containment count), and AC-0
-re-enumerates it from the operand matches, because the `Carried` plane
-reaches every consumer. 5 fired: labelled-ness moves onto the operand
-plane that consumers read, keyed on the set's (`emission_owner`,
-`result`), not on the writer's local set membership. 8 fired: AC-1's
-fallback mutant is the `Carried` flow that reached the match at 641, and
-AC-2's bare-payload mutant is checked by a reader that unwraps, not by
-the seat's assertion.
+Checks: 6 fired: the labelled population was counted at both seams on
+the committed builds, 24 minted and 0 consumed, so the record, operand
+kind and reader were not built and the label was deleted. 5 fired:
+labelled-ness was decided on the planner's identity plane and needed on
+lowering's discharge plane; after deletion no plane carries it. 8 fired:
+each pin's failing configuration (identity-membership labelling, the
+restored seat assertion) produces a different observation from the fix.
