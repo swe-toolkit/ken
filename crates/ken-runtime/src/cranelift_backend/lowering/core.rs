@@ -17267,27 +17267,6 @@ impl<'a> Lowering<'a> {
         occurrence: SourceOccurrence<'_>,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
-        // A checked-IH transport destination is written only by the producer
-        // dispatcher (`lower_computational_producer_construct`). Every
-        // ordinary path that reaches one is routed there before the
-        // occurrence plan is entered; the dispatcher enters it itself, and its
-        // `InvocationReturn` check sends every other producer back here.
-        if let RuntimeExpr::Construct { .. } = occurrence.expr {
-            if let Some(owner) = self.defining_emission_owner {
-                if self
-                    .static_transition_plan
-                    .checked_ih_environment_transport_at(owner, occurrence.static_origin)?
-                    .is_some()
-                {
-                    return self.lower_computational_producer_expr(
-                        builder,
-                        occurrence,
-                        env,
-                        &[EliminatorFrame::InvocationReturn],
-                    );
-                }
-            }
-        }
         let SourceOccurrence {
             expr,
             static_origin,
