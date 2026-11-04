@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO
 title: "Spec 65 §12 gives the zero matrix its additive unit laws and its matrix-vector action, but no public law says what it does to a matrix product. A client multiplying by `matrix_zero` on either side cannot conclude that the product is the zero matrix without unfolding the private `row_product`, `transpose` and `repeat`. Rule from a checked D0 at zero trust public product-annihilation laws on both sides, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -28,7 +28,8 @@ Equal (Vec (Vec Nat p) m)
   (matrix_product m n p a (matrix_zero n p)) (matrix_zero m p)
 ```
 
-Spec 65 states them by their public types.
+Spec 65 states them by their public types. Merged at `d39f2c2a7`
+(PR #5213).
 
 ## Settled inputs (main `dc9914142`)
 
