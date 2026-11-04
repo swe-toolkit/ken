@@ -548,9 +548,7 @@ landing or measured landed trust.
 > the opening status. It has not been run by the official conformance
 > runner. Candidate-local catalog tests and scratch checks are not
 > official conformance, CI, publication, landing or a landed trust
-> measurement. Section 2.6 specifies the sixth public law; its catalog
-> theorem, package-owned test and CV-authored seed are separate child
-> deliverables for the assembled candidate. Architect's AC-0 scratch
+> measurement. Architect's AC-0 scratch
 > checked the law and its discriminator, not an assembled tip. No
 > candidate-wide test, official conformance, CI, publication, landing
 > or measured landed trust is inferred from that scratch evidence.
@@ -815,8 +813,7 @@ claim was rejected at its own theorem with `KernelRejected
 TypeMismatch`, and its same-form control was accepted. This is
 scratch evidence, not an assembled-candidate gate, official
 conformance execution, CI, publication, landing or a measured landed
-trust result. The catalog theorem, package test and seed remain
-separately owned child deliverables until co-turn.
+trust result.
 
 ## 3. Greatest-cost candidate
 
