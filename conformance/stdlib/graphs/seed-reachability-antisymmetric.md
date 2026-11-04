@@ -4,209 +4,432 @@ Format: `../../README.md`.
 Spec: `spec/50-stdlib/62-graphs.md` §12.
 Frame: `docs/program/issues/SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC.md`.
 
-The cases exercise a finite chain client of the public
-`graph_reachable_antisymmetric` law. The accepted law application uses
-reflexive reachability at `True`; the chain also supplies a positive
-non-reflexive reachability control. The law refusal attempts to supply a
-false reverse-reachability premise while using the same valid chain order.
-The separate order-only refusal attempts to build an order on a two-cycle,
-without applying the law. Refusals pin only `KernelRejected`, never
-diagnostic text. These finite cases do not establish the generic law.
+The three rows follow AC-2 and the Architect's contract ruling
+(`evt_4c72a4g06fk79`). The accepted client builds an order on the
+one-way chain `V0 → V1 → V2`, supplies the real forward leg, and uses
+the law to show that a putative back leg from `V1` to `V0` yields
+Bottom. The law-row refusal restates that claim on a two-cycle. The
+adjacent order-only refusal attempts only the two-cycle order
+construction. Refusals assert `KernelRejected` only; no diagnostic text
+or code is pinned, and no `Refl` appears in a Ken obligation.
 
-The Architect's AC-0 ruling (`evt_5q2nv0x3cp63w`, item 6) requires
-`Proved` for order obligations, `λe. absurd e` for impossible edges, and
-an order-only refusal beside the law refusal. It also records that `Refl`
-is refused on the accepted control, so this seed does not use `Refl` as
-an obligation or a discriminator. Foundation's D0 report and the
-Architect's ruling are not CV execution of this seed. This seed has not
-yet been run against an assembled candidate or the official conformance
-runner.
+The Architect's ruling requires `Proved` for order obligations,
+`λe. absurd e` for absent edges, and `λe. Proved` for actual forward
+edges in the chain order. The cycle order uses `λe. Proved` for both
+cycle edges, making it impossible to place them both forward. The
+Architect/Foundation D0 results are scratch evidence, not CV execution
+of this seed. CV has not run this seed against an assembled candidate
+or the official conformance runner.
 
 ## Shared client: one-way chain and checked order
 
-The graph has the single edge `True → False`. Its order lists `True`
-before `False`; the order's edge obligations use `Proved` for the actual
-edge and `λe. absurd e` for absent edges.
+The graph has exactly the edges `V0 → V1` and `V1 → V2`. The order
+lists `V0`, `V1`, `V2`, in that order. The law application assumes a
+back leg and derives a contradiction from the distinct endpoints.
 
 ```ken
-import Core.Classes.LawfulClasses (DecEq_instance_Bool, bool_eq)
+import Core.Classes.LawfulClasses (DecEq)
 
-import Data.Finite.Finite (bool_finite)
+import Data.Finite.Finite (Finite, MkFinite)
+
+import Data.Collections.Derived (list_elem_head, list_elem_later)
 
 import Algorithm.Graphs.Dependency
   (Graph, MkGraph, TopoOrder, MkTopoOrder, graph_reachable, graph_reachable_antisymmetric)
 
-const chain : Graph Bool =
+data Vertex3 : Type where {
+  V0 : Vertex3;
+  V1 : Vertex3;
+  V2 : Vertex3
+}
+
+fn vertex3_eq (x : Vertex3) (y : Vertex3) : Bool =
+  match x {
+    V0 ↦
+      match y {
+        V0 ↦ True;
+        V1 ↦ False;
+        V2 ↦ False
+      };
+    V1 ↦
+      match y {
+        V0 ↦ False;
+        V1 ↦ True;
+        V2 ↦ False
+      };
+    V2 ↦
+      match y {
+        V0 ↦ False;
+        V1 ↦ False;
+        V2 ↦ True
+      }
+  }
+
+theorem vertex3_eq_sound
+      (x : Vertex3) (y : Vertex3)
+    : Equal Bool (vertex3_eq x y) True → Equal Vertex3 x y =
+  match x {
+    V0 ↦
+      match y {
+        V0 ↦ λsame. Proved;
+        V1 ↦ λsame. absurd same;
+        V2 ↦ λsame. absurd same
+      };
+    V1 ↦
+      match y {
+        V0 ↦ λsame. absurd same;
+        V1 ↦ λsame. Proved;
+        V2 ↦ λsame. absurd same
+      };
+    V2 ↦
+      match y {
+        V0 ↦ λsame. absurd same;
+        V1 ↦ λsame. absurd same;
+        V2 ↦ λsame. Proved
+      }
+  }
+
+theorem vertex3_eq_complete
+      (x : Vertex3) (y : Vertex3)
+    : Equal Vertex3 x y → Equal Bool (vertex3_eq x y) True =
+  match x {
+    V0 ↦
+      match y {
+        V0 ↦ λsame. Proved;
+        V1 ↦ λsame. absurd same;
+        V2 ↦ λsame. absurd same
+      };
+    V1 ↦
+      match y {
+        V0 ↦ λsame. absurd same;
+        V1 ↦ λsame. Proved;
+        V2 ↦ λsame. absurd same
+      };
+    V2 ↦
+      match y {
+        V0 ↦ λsame. absurd same;
+        V1 ↦ λsame. absurd same;
+        V2 ↦ λsame. Proved
+      }
+  }
+
+instance DecEq Vertex3 {
+  eq = vertex3_eq;
+  sound = vertex3_eq_sound;
+  complete = vertex3_eq_complete
+}
+
+const vertex3_finite : Finite Vertex3 =
+  MkFinite
+    Vertex3
+    (Cons Vertex3 V0 (Cons Vertex3 V1 (Cons Vertex3 V2 (Nil Vertex3))))
+    (λv.
+      match v {
+        V0 ↦ list_elem_head Vertex3 V0 (Cons Vertex3 V1 (Cons Vertex3 V2 (Nil Vertex3)));
+        V1 ↦
+          list_elem_later
+            Vertex3
+            V1
+            V0
+            (Cons Vertex3 V1 (Cons Vertex3 V2 (Nil Vertex3)))
+            (list_elem_head Vertex3 V1 (Cons Vertex3 V2 (Nil Vertex3)));
+        V2 ↦
+          list_elem_later
+            Vertex3
+            V2
+            V0
+            (Cons Vertex3 V1 (Cons Vertex3 V2 (Nil Vertex3)))
+            (list_elem_later
+              Vertex3
+              V2
+              V1
+              (Cons Vertex3 V2 (Nil Vertex3))
+              (list_elem_head Vertex3 V2 (Nil Vertex3)))
+      })
+
+const chain : Graph Vertex3 =
   MkGraph
-    Bool
+    Vertex3
     (λu.
       λv.
         match u {
-          True ↦
+          V0 ↦
             match v {
-              True ↦ False;
-              False ↦ True
+              V0 ↦ False;
+              V1 ↦ True;
+              V2 ↦ False
             };
-          False ↦ False
+          V1 ↦
+            match v {
+              V0 ↦ False;
+              V1 ↦ False;
+              V2 ↦ True
+            };
+          V2 ↦
+            match v {
+              V0 ↦ False;
+              V1 ↦ False;
+              V2 ↦ False
+            }
         })
 
-const chain_order : TopoOrder Bool DecEq_instance_Bool chain =
+const ordered_three : List Vertex3 =
+  Cons Vertex3 V0 (Cons Vertex3 V1 (Cons Vertex3 V2 (Nil Vertex3)))
+
+const chain_order : TopoOrder Vertex3 DecEq_instance_Vertex3 chain =
   MkTopoOrder
-    Bool
-    DecEq_instance_Bool
+    Vertex3
+    DecEq_instance_Vertex3
     chain
-    (Cons Bool True (Cons Bool False (Nil Bool)))
+    ordered_three
     Proved
     (λx.
       match x {
-        True ↦ Proved;
-        False ↦ Proved
+        V0 ↦ Proved;
+        V1 ↦ Proved;
+        V2 ↦ Proved
       })
     (λx.
       λy.
         match x {
-          True ↦
+          V0 ↦
             match y {
-              True ↦ λe. absurd e;
-              False ↦ λe. Proved
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. Proved;
+              V2 ↦ λe. absurd e
             };
-          False ↦
+          V1 ↦
             match y {
-              True ↦ λe. absurd e;
-              False ↦ λe. absurd e
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. absurd e;
+              V2 ↦ λe. Proved
+            };
+          V2 ↦
+            match y {
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. absurd e;
+              V2 ↦ λe. absurd e
             }
         })
 
-theorem true_reaches_true
-    : Equal Bool (graph_reachable Bool bool_finite chain True (bool_eq True)) True =
+theorem v0_reaches_v1
+    : Equal Bool (graph_reachable Vertex3 vertex3_finite chain V0 (vertex3_eq V1)) True =
   Proved
 
-theorem true_reaches_false
-    : Equal Bool (graph_reachable Bool bool_finite chain True (bool_eq False)) True =
-  Proved
-
-theorem accepted_chain_antisymmetry : Equal Bool True True =
-  graph_reachable_antisymmetric
-    Bool
-    bool_finite
-    DecEq_instance_Bool
-    chain
-    chain_order
-    True
-    True
-    true_reaches_true
-    true_reaches_true
+theorem v1_does_not_reach_v0
+    : Equal Bool (graph_reachable Vertex3 vertex3_finite chain V1 (vertex3_eq V0)) True
+      → Bottom =
+  λback.
+    absurd
+      (vertex3_eq_complete
+        V0
+        V1
+        (graph_reachable_antisymmetric
+          Vertex3
+          vertex3_finite
+          DecEq_instance_Vertex3
+          chain
+          chain_order
+          V0
+          V1
+          v0_reaches_v1
+          back))
 ```
 
-### stdlib/graphs/reachability-antisymmetric-chain-positive
+### stdlib/graphs/reachability-antisymmetric-chain-back-leg
 
 - spec: §12, `graph_reachable_antisymmetric`.
 - promise class: durable invariant.
-- given: the one-way chain, its checked `chain_order`, and the
-  reflexive reachability proof at `True` for both law premises.
-- expect: the law proves `Equal Bool True True`.
-- control: `true_reaches_false` separately establishes the real forward
-  edge's non-reflexive reachability on this chain.
-- claimed: a concrete client can apply the public law with a checked
-  order and both required reachability premises.
-- the gap: this diagonal instance does not establish the generic law or
-  its behavior on arbitrary carriers and graphs.
+- given: the one-way chain, its checked order, and the real forward
+  reachability proof from `V0` to `V1`.
+- expect: assuming `V1` reaches `V0` lets the law equate `V0` and
+  `V1`; `vertex3_eq_complete` turns that equality into the impossible
+  `Equal Bool False True`, proving Bottom.
+- control: `v0_reaches_v1` is a real forward reachability proof with
+  the same `Proved` form used by the back-leg premise.
+- claimed: under a valid order, the law refutes the putative back leg;
+  the accepted witness exercises the law's force, not only its diagonal.
+- the gap: this finite chain does not establish the generic law.
 
-### stdlib/graphs/reachability-antisymmetric-forward-control
+## Law-row refusal on the two-cycle
 
-- spec: §1.2, reachability semantics.
-- promise class: durable invariant.
-- given: the same carrier, finite certificate, graph, and checked order.
-- expect: `True` reaches `False` along the graph's actual edge.
-- claimed: the chain fixture exercises non-reflexive reachability.
-- the gap: this closed edge does not establish generic completeness.
-
-## Isolated law refusal on the valid chain
-
-Append only this theorem to the shared client. Its proposed order is the
-accepted `chain_order`; the second reachability premise is the accepted
-forward control. The first premise falsely claims that `False` reaches
-`True`. Refusal is asserted only as `KernelRejected`; no diagnostic text
-or code is part of the oracle.
+Append only this graph, order attempt, forward leg, and law-derived
+claim to the shared client. The cycle has both edges between `V0` and
+`V1`; there is no edge incident to `V2`. The proposed order uses the
+same list and obligations as `chain_order`, with both cycle edges
+claimed forward. The block is expected to be refused with
+`KernelRejected`; no diagnostic text or code is pinned.
 
 ```ken
-theorem refuse_false_reverse_premise : Equal Bool False True =
-  graph_reachable_antisymmetric
-    Bool
-    bool_finite
-    DecEq_instance_Bool
-    chain
-    chain_order
-    False
-    True
-    Proved
-    true_reaches_false
-```
-
-### stdlib/graphs/reachability-antisymmetric-refuses-false-premise
-
-- spec: §12 and §1.2, reachability semantics.
-- promise class: durable invariant.
-- given: the shared client and its valid chain order.
-- expect: the isolated law application is refused with error class
-  `KernelRejected`.
-- control: `true_reaches_false` proves the forward leg on the same
-  chain; the order is independently accepted by the positive client.
-- claimed: the law cannot be applied with a fabricated reverse
-  reachability proof, even when its order premise is valid.
-- the gap: this one false premise does not establish every invalid law
-  application is refused.
-
-## Isolated order-only refusal on a two-cycle
-
-Append only this graph and attempted certificate to the shared client.
-This block constructs no law application. The cycle has both opposite
-edges, so the proposed `[True, False]` order fails its forward-edge
-obligation for `False → True`. Refusal pins only `KernelRejected`.
-
-```ken
-const two_cycle : Graph Bool =
+const cycle2 : Graph Vertex3 =
   MkGraph
-    Bool
+    Vertex3
     (λu.
       λv.
         match u {
-          True ↦
+          V0 ↦
             match v {
-              True ↦ False;
-              False ↦ True
+              V0 ↦ False;
+              V1 ↦ True;
+              V2 ↦ False
             };
-          False ↦
+          V1 ↦
             match v {
-              True ↦ True;
-              False ↦ False
+              V0 ↦ True;
+              V1 ↦ False;
+              V2 ↦ False
+            };
+          V2 ↦
+            match v {
+              V0 ↦ False;
+              V1 ↦ False;
+              V2 ↦ False
             }
         })
 
-const refuse_order_on_two_cycle : TopoOrder Bool DecEq_instance_Bool two_cycle =
+const cycle2_order : TopoOrder Vertex3 DecEq_instance_Vertex3 cycle2 =
   MkTopoOrder
-    Bool
-    DecEq_instance_Bool
-    two_cycle
-    (Cons Bool True (Cons Bool False (Nil Bool)))
+    Vertex3
+    DecEq_instance_Vertex3
+    cycle2
+    ordered_three
     Proved
     (λx.
       match x {
-        True ↦ Proved;
-        False ↦ Proved
+        V0 ↦ Proved;
+        V1 ↦ Proved;
+        V2 ↦ Proved
       })
     (λx.
       λy.
         match x {
-          True ↦
+          V0 ↦
             match y {
-              True ↦ λe. absurd e;
-              False ↦ λe. Proved
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. Proved;
+              V2 ↦ λe. absurd e
             };
-          False ↦
+          V1 ↦
             match y {
-              True ↦ λe. Proved;
-              False ↦ λe. absurd e
+              V0 ↦ λe. Proved;
+              V1 ↦ λe. absurd e;
+              V2 ↦ λe. absurd e
+            };
+          V2 ↦
+            match y {
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. absurd e;
+              V2 ↦ λe. absurd e
+            }
+        })
+
+theorem v0_reaches_v1_cycle2
+    : Equal Bool (graph_reachable Vertex3 vertex3_finite cycle2 V0 (vertex3_eq V1)) True =
+  Proved
+
+theorem v1_does_not_reach_v0_cycle2
+    : Equal Bool (graph_reachable Vertex3 vertex3_finite cycle2 V1 (vertex3_eq V0)) True
+      → Bottom =
+  λback.
+    absurd
+      (vertex3_eq_complete
+        V0
+        V1
+        (graph_reachable_antisymmetric
+          Vertex3
+          vertex3_finite
+          DecEq_instance_Vertex3
+          cycle2
+          cycle2_order
+          V0
+          V1
+          v0_reaches_v1_cycle2
+          back))
+```
+
+### stdlib/graphs/reachability-antisymmetric-cycle2-law-refusal
+
+- spec: §12, `graph_reachable_antisymmetric`.
+- promise class: durable invariant.
+- given: the same proposed `cycle2_order` as the order-only row,
+  plus the forward leg and the law-derived claim that the back leg is
+  impossible.
+- expect: the isolated law-row block is refused with error class
+  `KernelRejected`.
+- control: the accepted chain client has the same order fields and law
+  application shape on a graph with no cycle.
+- claimed: the refused row matches the accepted chain's law-derived
+  claim except that the two-cycle has no valid forward-edge order.
+- the gap: this fixed cycle does not establish the generic law or order
+  theorem.
+
+## Order-only refusal on the same two-cycle
+
+Append only the `cycle2` graph and `cycle2_order` construction to the
+shared client. Do not include a reachability law application. This
+isolates refusal of the order certificate itself. It pins only refusal
+with error class `KernelRejected`, never diagnostic text or code.
+
+```ken
+const cycle2 : Graph Vertex3 =
+  MkGraph
+    Vertex3
+    (λu.
+      λv.
+        match u {
+          V0 ↦
+            match v {
+              V0 ↦ False;
+              V1 ↦ True;
+              V2 ↦ False
+            };
+          V1 ↦
+            match v {
+              V0 ↦ True;
+              V1 ↦ False;
+              V2 ↦ False
+            };
+          V2 ↦
+            match v {
+              V0 ↦ False;
+              V1 ↦ False;
+              V2 ↦ False
+            }
+        })
+
+const cycle2_order : TopoOrder Vertex3 DecEq_instance_Vertex3 cycle2 =
+  MkTopoOrder
+    Vertex3
+    DecEq_instance_Vertex3
+    cycle2
+    ordered_three
+    Proved
+    (λx.
+      match x {
+        V0 ↦ Proved;
+        V1 ↦ Proved;
+        V2 ↦ Proved
+      })
+    (λx.
+      λy.
+        match x {
+          V0 ↦
+            match y {
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. Proved;
+              V2 ↦ λe. absurd e
+            };
+          V1 ↦
+            match y {
+              V0 ↦ λe. Proved;
+              V1 ↦ λe. absurd e;
+              V2 ↦ λe. absurd e
+            };
+          V2 ↦
+            match y {
+              V0 ↦ λe. absurd e;
+              V1 ↦ λe. absurd e;
+              V2 ↦ λe. absurd e
             }
         })
 ```
@@ -216,24 +439,22 @@ const refuse_order_on_two_cycle : TopoOrder Bool DecEq_instance_Bool two_cycle =
 - spec: §1.3, dependency-order certificate; §12,
   `graph_reachable_antisymmetric`.
 - promise class: durable invariant.
-- given: the two-cycle and a proposed order with the same list as the
-  accepted chain order.
+- given: the two-cycle and the proposed order on
+  `[V0, V1, V2]`.
 - expect: the isolated order construction is refused with error class
   `KernelRejected`.
-- control: the shared client constructs an order with the same list on
-  the one-way chain, where the only actual edge points forward.
-- claimed: the order failure is independently observable without
-  invoking the antisymmetry law.
-- the gap: this fixed two-cycle and list do not establish the generic
-  order theorem.
+- control: `chain_order` accepts the same ordered list and obligations
+  on the one-way chain.
+- claimed: the law-row refusal is attributable to the order premise,
+  not to a failure to build the shared vertex and equality fixtures.
+- the gap: this fixed cycle and order attempt do not establish the
+  generic order theorem.
 
 ## Evidence boundary
 
-The Architect's AC-0 ruling reports the generic law's D0 proof rows,
-including accepted and refused cases and unchanged trusted identities;
-Foundation reports the scratch D0 harness and regression results. Those
-are attributed reports, not CV runs. CV has authored these seed cases but
-has not run them against an assembled candidate, run package tests, or
-executed the official conformance runner. The finite examples do not
-replace the generic checked law, establish a landed trust result, or
-imply CI, publication, or landing.
+The Architect's AC-0 and seed-contract rulings and Foundation's D0
+report are attributed scratch results, not CV execution of these rows.
+CV has not run the seed against an assembled candidate, run package
+tests, or executed the official conformance runner. The finite cases
+do not replace the checked generic proof, establish a landed trust
+result, or imply CI, publication, or landing.
