@@ -2441,17 +2441,19 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_validator(census_row, transport_validated.is_ok());
     transport_validated?;
-    if let Some(plan) = oriented_subcontinuation_plan.as_ref() {
-        crate::ClosedIhContinuationSetV1::enumerate(plan, &process_symbols.itree_vis).map_err(
-            |refusal| {
-                unsupported(
-                    LoweringCause::PlannerInvariant,
-                    "ClosedIhContinuationSetV1",
-                    refusal.reason(),
-                )
-            },
-        )?;
-    }
+    let closed_ih_continuations = oriented_subcontinuation_plan
+        .as_ref()
+        .map(|plan| {
+            crate::ClosedIhContinuationSetV1::enumerate(plan, &process_symbols.itree_vis)
+                .map_err(|refusal| {
+                    unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "ClosedIhContinuationSetV1",
+                        refusal.reason(),
+                    )
+                })
+        })
+        .transpose()?;
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_selector(census_row);
     // Boundary A of RT-NATIVE-FNSPLIT: close and validate the factored static
@@ -2519,6 +2521,33 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             "CheckedIhFunctionalRepresentation",
             "an IH-force slot child names a slot the oriented plan does not hold",
         ))?;
+    }
+    // The static planner settled each relay. Confirm that every resolved IH
+    // call arms a closed template that actually contains that escaping call.
+    if let Some(protocol) = static_transition_plan.pending_vis_settlements.protocol.as_ref() {
+        for relay in protocol.relays.values() {
+            let super::PendingVisRelayResume::Row { call_template_id, .. } = &relay.resume else {
+                continue;
+            };
+            let template = closed_ih_continuations
+                .as_ref()
+                .ok_or(crate::ClosedIhContinuationRefusalV1::NoCheckedCall)
+                .and_then(|closed| closed.arm(*call_template_id))
+                .map_err(|refusal| {
+                    unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "ClosedIhContinuationSetV1",
+                        refusal.reason(),
+                    )
+                })?;
+            if !template.escaping_calls.contains(call_template_id) {
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "ClosedIhContinuationSetV1",
+                    "a relay's IH call is not an escaping call of its closed template",
+                ));
+            }
+        }
     }
     // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the fusion identity plane is
     // built HERE, and this is the first production compile that has ever built

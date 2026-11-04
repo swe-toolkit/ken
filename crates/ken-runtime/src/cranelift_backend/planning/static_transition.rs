@@ -50,7 +50,7 @@ pub(in crate::cranelift_backend) use resumptions::{
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement,
+    PendingVisRelay, PendingVisRelayResume, ResponseOwnerSettlement,
 };
 use crate::cranelift_backend::surface::LoweringCause;
 use returned_vis::PendingVisSettlements;
@@ -901,6 +901,17 @@ fn emission_owners_containing(
         }
     }
     Ok(owners)
+}
+
+impl StaticTransitionPlan<'_> {
+    /// Emission contexts that can materialize a returned relay at its own
+    /// construct origin. Frame issuance and the producer share this census.
+    pub(in crate::cranelift_backend) fn relay_emission_owners(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
+        emission_owners_containing(self, origin)
+    }
 }
 
 fn inline_synthesized_seat_emission_owners(

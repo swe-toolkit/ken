@@ -71,10 +71,33 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
         BTreeMap<StaticResponseContinuationId, ReturnedVisProtocol>,
     pub(in crate::cranelift_backend) members:
         BTreeMap<StaticOriginId, StaticResponseContinuation>,
+    /// Forwarded relays, keyed by relay origin, disjoint from response rows.
+    pub(in crate::cranelift_backend) relays: BTreeMap<StaticOriginId, PendingVisRelay>,
     /// Each function's maximum over only the owner protocols whose return
     /// paths pass through that exact generated function. Absent means no tail.
     pub(in crate::cranelift_backend) frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth>,
 }
+
+/// A forwarded relay, numbered by its own construct origin rather than a
+/// response row. A resolved row is only the relay's resume target.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct PendingVisRelay {
+    pub(in crate::cranelift_backend) discriminant: u32,
+    pub(in crate::cranelift_backend) resume: PendingVisRelayResume,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum PendingVisRelayResume {
+    Row {
+        seat: StaticOriginId,
+        call_template_id: u64,
+        row: StaticResponseContinuation,
+    },
+    Trap(String),
+}
+
+/// The relay's carried operation and K environment, not the target's captures.
+const RELAY_PAYLOAD_WORDS: u32 = 2;
 
 /// Every installed response owner's settlement route, built once from the
 /// final plan. No owner is absent; no consumer reads it through a `_` arm.
@@ -161,6 +184,53 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
+    /// Determine a relay's resume from static planes fixed before settlement.
+    /// Every issuing owner must agree; the oriented plane confirms the result
+    /// after this plan is built, but does not rewrite it.
+    pub(in crate::cranelift_backend) fn relay_resume_verdict(
+        &self,
+        relay: StaticOriginId,
+    ) -> Result<PendingVisRelayResume, CraneliftBackendError> {
+        let k = self.child_static_origin(relay, 1)?;
+        let seats = self.recursive_residual_dispositions.iter().filter_map(|entry| {
+            match entry.child {
+                super::aggregates::RecursiveResidualChildKind::CheckedIhForce {
+                    child, seat, call_template_id,
+                } if child == k => Some((seat, call_template_id)),
+                _ => None,
+            }
+        }).collect::<Vec<_>>();
+        if seats.is_empty() {
+            return Ok(PendingVisRelayResume::Trap(
+                "relay continuation has no checked IH-force seat".to_owned(),
+            ));
+        }
+        let rows = self.return_protocol_candidate_rows()?;
+        let mut resolved = Vec::new();
+        for (seat, call_template_id) in seats {
+            let at_seat = rows.iter()
+                .filter(|row| row.k_closure_origin() == seat)
+                .collect::<Vec<_>>();
+            match at_seat.as_slice() {
+                [] => resolved.push(None),
+                [row] => resolved.push(Some((seat, call_template_id, (*row).clone()))),
+                _ => return Err(planner_error("relay IH seat has ambiguous response rows")),
+            }
+        }
+        match resolved.first().cloned().flatten() {
+            None if resolved.iter().all(Option::is_none) => Ok(PendingVisRelayResume::Trap(
+                "no response row at the IH seat".to_owned(),
+            )),
+            Some((seat, call_template_id, row)) if resolved.iter().all(|other| {
+                other.as_ref().is_some_and(|(other_seat, other_call, other_row)| {
+                    *other_seat == seat && *other_call == call_template_id
+                        && other_row.id() == row.id()
+                })
+            }) => Ok(PendingVisRelayResume::Row { seat, call_template_id, row }),
+            _ => Err(planner_error("one relay member resumes two closed continuations")),
+        }
+    }
+
     /// Classify every installed response owner, retaining every returned relay
     /// as a protocol member even when a source-fusion pair was planned.
     pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
@@ -170,6 +240,7 @@ impl StaticTransitionPlan<'_> {
         let mut bracket_exits = BTreeMap::new();
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
+        let mut relays = BTreeMap::new();
         let mut frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth> = BTreeMap::new();
         for owner in &self.static_response_continuations {
             let protocol = match self.returned_vis_protocol(owner.vis_origin()) {
@@ -200,12 +271,21 @@ impl StaticTransitionPlan<'_> {
                 continuation_inputs: 0,
             };
             for member in protocol.contexts.iter().flat_map(|context| &context.members) {
+                if member.relay {
+                    let resume = self.relay_resume_verdict(member.origin)?;
+                    if let Some(previous) = relays.insert(member.origin, resume.clone()) {
+                        if previous != resume {
+                            return Err(planner_error(
+                                "one relay member resumes two closed continuations",
+                            ));
+                        }
+                    }
+                    width.captures = width.captures.max(RELAY_PAYLOAD_WORDS);
+                    continue;
+                }
                 let row = member.successor.as_ref().ok_or_else(|| {
                     planner_error("a pending-Vis member has no exact successor response row")
                 })?;
-                if member.relay {
-                    return Err(planner_error("a relay entered a non-relay pending-Vis protocol"));
-                }
                 if row.id().ordinal() == u32::MAX {
                     return Err(planner_capacity_error("pending-Vis discriminant exhausted"));
                 }
@@ -231,11 +311,28 @@ impl StaticTransitionPlan<'_> {
                 .flat_map(|context| &context.members)
                 .map(|member| member.origin)
                 .collect::<BTreeSet<_>>();
-            let graft_frames = self.prefusion_continuation_result_edges()?
+            let mut graft_frames = self.prefusion_continuation_result_edges()?
                 .into_iter()
                 .filter(|edge| member_origins.contains(&edge.producer_construct_origin))
                 .map(|edge| PendingVisFrameOwner::Continuation(edge.identity.target()))
                 .collect::<BTreeSet<_>>();
+            // A relay can be minted in an emitted specialization body even
+            // when no prefusion result edge points at its construct. The
+            // producer, not its eventual response row, needs the record tail.
+            for relay in protocol.contexts.iter().flat_map(|context| &context.members)
+                .filter(|member| member.relay)
+            {
+                for owner in super::emission_owners_containing(self, relay.origin)? {
+                    graft_frames.insert(match owner {
+                        super::ContinuationEmissionOwner::Predeclared(unit) =>
+                            PendingVisFrameOwner::Unit(unit),
+                        super::ContinuationEmissionOwner::Specialization(unit) =>
+                            PendingVisFrameOwner::Continuation(unit),
+                        super::ContinuationEmissionOwner::Fusion(unit) =>
+                            PendingVisFrameOwner::Fusion(unit),
+                    });
+                }
+            }
             let chain = std::iter::once(PendingVisFrameOwner::ResponseOwner(owner.id()))
                 .chain(protocol.contexts.iter().map(|context|
                     PendingVisFrameOwner::Context(context.context)))
@@ -250,10 +347,22 @@ impl StaticTransitionPlan<'_> {
             settlements.insert(owner.id(), ResponseOwnerSettlement::Protocol);
             owners.insert(owner.id(), protocol);
         }
+        // Rows occupy ordinal + 1. Relays follow all rows in origin order.
+        let exhausted = || planner_capacity_error("pending-Vis discriminant exhausted");
+        let mut next = match members.values().map(|row| row.id().ordinal()).max() {
+            Some(ordinal) => ordinal.checked_add(2).ok_or_else(exhausted)?,
+            None => 1,
+        };
+        let mut numbered = BTreeMap::new();
+        for (origin, resume) in relays {
+            numbered.insert(origin, PendingVisRelay { discriminant: next, resume });
+            next = next.checked_add(1).ok_or_else(exhausted)?;
+        }
         Ok(PendingVisSettlements {
             protocol: (!owners.is_empty()).then_some(PendingVisRecordProtocol {
                 owners,
                 members,
+                relays: numbered,
                 frames,
             }),
             owners: settlements,
@@ -577,6 +686,7 @@ mod tests {
             let protocol = PendingVisRecordProtocol {
                 owners: BTreeMap::new(),
                 members: BTreeMap::new(),
+                relays: BTreeMap::new(),
                 frames: BTreeMap::from([(
                     frame,
                     PendingVisFrameWidth {

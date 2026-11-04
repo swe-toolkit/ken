@@ -569,6 +569,21 @@ impl Lowering<'_> {
                                 return Err(error("a member is not its producer's exact row"));
                             }
                         }
+                        PendingVisStoreSource::Relay(origin) => {
+                            let relay = self.pending_vis_record_protocol.as_ref()
+                                .and_then(|protocol| protocol.relays.get(&origin))
+                                .ok_or_else(|| error("a relay store has no planned origin"))?;
+                            let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
+                                return Err(error("a relay was not minted at its producer"));
+                            };
+                            if offset != frame.region.discriminant
+                                || !matches!(func.dfg.insts[mint],
+                                    InstructionData::UnaryImm { opcode: Opcode::Iconst, imm }
+                                    if imm.bits() == i64::from(relay.discriminant))
+                            {
+                                return Err(error("a relay is not its producer's exact discriminant"));
+                            }
+                        }
                         PendingVisStoreSource::Cleared => {
                             let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
                                 return Err(error("the consumed member was not cleared"));
@@ -748,43 +763,42 @@ impl Lowering<'_> {
             if !seen_members.insert(site.member) {
                 return Err(error("a producer's member store was recorded twice"));
             }
-            let mut rows = protocol.members.values().filter(|row| row.id() == site.row);
-            let row = rows
-                .next()
-                .ok_or_else(|| error("a producer has no exact successor row"))?;
-            if rows.next().is_some() {
-                return Err(error("a producer's successor row is ambiguous"));
-            }
-            let member = facts
-                .iter()
-                .find(|fact| fact.inst == site.member)
+            let member = facts.iter().find(|fact| fact.inst == site.member)
                 .ok_or_else(|| error("a producer omitted its member store"))?;
-            if member.offset != frame.region.discriminant
-                || !matches!(member.source, PendingVisStoreSource::Member(id) if id == site.row)
-            {
+            if member.offset != frame.region.discriminant {
                 return Err(error("a producer changed its member store"));
             }
-            let capture_offsets = row
-                .captures()
-                .iter()
-                .enumerate()
-                .map(|(index, _)| (frame.region.captures, index))
-                .chain(
-                    row.continuation_inputs()
-                        .iter()
-                        .enumerate()
-                        .map(|(index, _)| (frame.region.continuation_inputs, index)),
-                )
-                .map(|(start, index)| {
-                    let delta = index
-                        .checked_mul(8)
-                        .and_then(|value| i32::try_from(value).ok())
-                        .ok_or_else(|| error("a producer capture offset exhausted"))?;
-                    start
-                        .checked_add(delta)
-                        .ok_or_else(|| error("a producer capture offset exhausted"))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let capture_offsets = match site.identity {
+                PendingVisProducerIdentity::Row(id) => {
+                    let mut rows = protocol.members.values().filter(|row| row.id() == id);
+                    let row = rows.next()
+                        .ok_or_else(|| error("a producer has no exact successor row"))?;
+                    if rows.next().is_some()
+                        || !matches!(member.source, PendingVisStoreSource::Member(actual) if actual == id)
+                    {
+                        return Err(error("a producer's successor row is ambiguous or changed"));
+                    }
+                    row.captures().iter().enumerate()
+                        .map(|(index, _)| (frame.region.captures, index))
+                        .chain(row.continuation_inputs().iter().enumerate()
+                            .map(|(index, _)| (frame.region.continuation_inputs, index)))
+                        .collect::<Vec<_>>()
+                }
+                PendingVisProducerIdentity::Relay(origin) => {
+                    if !protocol.relays.contains_key(&origin)
+                        || !matches!(member.source, PendingVisStoreSource::Relay(actual) if actual == origin)
+                    {
+                        return Err(error("a producer changed its relay discriminant"));
+                    }
+                    (0..2).map(|index| (frame.region.captures, index)).collect()
+                }
+            }.into_iter().map(|(start, index)| {
+                let delta = index.checked_mul(8)
+                    .and_then(|value| i32::try_from(value).ok())
+                    .ok_or_else(|| error("a producer capture offset exhausted"))?;
+                start.checked_add(delta)
+                    .ok_or_else(|| error("a producer capture offset exhausted"))
+            }).collect::<Result<Vec<_>, _>>()?;
             if site.capture_stores.len() != capture_offsets.len() {
                 return Err(error("a producer omitted a planned record field"));
             }
