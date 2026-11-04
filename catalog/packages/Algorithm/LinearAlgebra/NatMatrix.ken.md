@@ -3192,8 +3192,10 @@ same-form `Refl` claim. The [zero-matrix
 seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-zero-unit.md)
 is authored, not officially conformance-run; its package-owned test checks
 all six public-law applications, the closed zero-matrix value, a same-form
-accepted control and an isolated false-result refusal. The product-zero
-package test checks three open law types and closed product and transpose
+accepted control and an isolated false-result refusal. The [product-zero
+seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-product-zero.md)
+is authored, not officially conformance-run. Its package test checks three
+open law types and closed product and transpose
 applications, then accepts a same-form zero-factor control before refusing
 a false identity-factor result. These tests use root-loaded exports. They
 are not official conformance-runner runs or claims of CI, publication or
