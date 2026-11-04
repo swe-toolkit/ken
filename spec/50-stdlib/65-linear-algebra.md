@@ -11,7 +11,8 @@
 > SPEC-LINEAR-ALGEBRA-VECTOR-SCALE-ACTION §9;
 > SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT §10;
 > SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION §11;
-> SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT §12).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT §12;
+> SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO §13).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1150,3 +1151,70 @@ the control and refused the false claim; `Proved` refused both
 `Equal (Vec …)` claims, so it cannot distinguish their values.
 These closed rows delimit the unit laws and proof-form boundary;
 they do not replace the checked generic proofs.
+
+## 13. The zero matrix absorbs matrix products
+
+> **Section 13 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO).** Architect's final AC-0
+> `evt_8b7cdkzcb58c` followed Foundation's scratch probe on exact
+> base `165a98ace`: the probe passed 2/2, with equal trusted-base
+> `GlobalId` identity sets 109 → 109 and no added `Axiom` line. The
+> initially named regression set reddened at its exact public-name
+> inventory (46 instead of the ruled 49); the unpatched base passed
+> that test 7/7. The final ruling requires the catalog child to
+> advance the inventory pin. This scratch evidence is not a check of
+> this Spec child or an assembled candidate, nor official conformance,
+> CI, publication, landing or measured landed trust.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export three public
+Transparent checked laws immediately after `matrix_vector_zero_matrix`
+(§12.1), before `matrix_vector_additive`, in the following order.
+They require no premises, including when any dimension is zero:
+
+```ken
+pub theorem matrix_product_zero_left
+      (m : Nat) (n : Nat) (p : Nat) (b : Vec (Vec Nat p) n)
+    : Equal (Vec (Vec Nat p) m) (matrix_product m n p (matrix_zero m n) b) (matrix_zero m p) =
+
+pub theorem matrix_product_zero_right
+      (m : Nat) (n : Nat) (p : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat p) m) (matrix_product m n p a (matrix_zero n p)) (matrix_zero m p) =
+
+pub theorem transpose_zero
+      (m : Nat) (n : Nat)
+    : Equal (Vec (Vec Nat m) n) (transpose m n (matrix_zero m n)) (matrix_zero n m) =
+```
+
+The left law fixes the **left factor** to `matrix_zero m n`,
+leaving the indexed right factor `b` arbitrary. The right law
+fixes the **right factor** to `matrix_zero n p`, leaving `a`
+arbitrary. Both produce the `m × p` zero matrix; neither assumes
+a square product or a nonzero dimension. The third law exchanges
+the two dimensions when transposing the zero matrix. It is public:
+clients can state the transpose/zero equation without unfolding
+private vector repetition or transpose steps. The checked proofs
+reuse the existing private `columns_zero_row` on the left and
+`zero_width_repeat` for the zero-row transpose case. The new
+`map_repeat` and `zero_columns_row` remain private proof helpers.
+No §1–§12 operation or law type, kernel rule, surface form or
+trusted assumption changes.
+
+The §13 roster has **ten operations and thirty-nine laws,
+forty-nine public names**: these three laws add to §12's thirty-six
+without adding an operation. The exact public-inventory test must
+name all three new exports; a 46-name exact pin rejects them even
+when their proofs check.
+
+The closed seed applies each product law to a nonzero `2 × 2`
+matrix and to a zero-row matrix, and `transpose_zero` at dimensions
+`(two, two)` and `(Zero, two)`. Its isolated false row claims that
+`matrix_product two two two a (identity two)` equals
+`matrix_zero two two` by `Refl`; the accepted same-form control
+replaces only `identity two` with `matrix_zero two two`. The
+identity product retains the nonzero `a`, so this refusal separates
+the factor from the zero-factor case. Architect's scratch D0
+measured `Refl` refusing the false row and accepting the control;
+`Proved` refused both, so it is not a discriminator for this
+structural vector equality. These closed cases bound the claim;
+they do not substitute for checked generic proofs or establish
+execution of the separate conformance seed.

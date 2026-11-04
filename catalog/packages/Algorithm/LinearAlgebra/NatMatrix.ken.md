@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and thirty-six algebraic laws have checked proofs.
+all arithmetic is exact, and thirty-nine algebraic laws have checked proofs.
 
 ## Contents
 
@@ -29,8 +29,10 @@ matrix addition and its six public laws follow those operations and laws,
 alongside two vector sum laws, four vector-scaling laws, four zero-vector
 unit laws and three zero-annihilation laws, followed by the zero matrix,
 its two unit laws for matrix addition and its action on every vector.
-The named private stages build columns and row products; no second matrix
-carrier or numeric primitive is needed.
+Three further laws establish that the zero matrix absorbs products on
+both sides and that its transpose is zero. The named private stages build
+columns and row products; no second matrix carrier or numeric primitive
+is needed.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
@@ -1046,6 +1048,118 @@ pub theorem matrix_vector_zero_matrix
         (matrix_vector_zero_matrix k n v)
   }
 
+pub theorem matrix_product_zero_left
+      (m : Nat) (n : Nat) (p : Nat) (b : Vec (Vec Nat p) n)
+    : Equal (Vec (Vec Nat p) m) (matrix_product m n p (matrix_zero m n) b) (matrix_zero m p) =
+  match m {
+    Zero ↦ Proved;
+    Suc k ↦
+      let
+        old_head = row_product n p b (vector_zero n);
+        old_tail = matrix_product k n p (matrix_zero k n) b
+      in
+        trans
+          (Vec (Vec Nat p) (Suc k))
+          (VCons (Vec Nat p) k old_head old_tail)
+          (VCons (Vec Nat p) k (vector_zero p) old_tail)
+          (VCons (Vec Nat p) k (vector_zero p) (matrix_zero k p))
+          (cong
+            (Vec Nat p)
+            (Vec (Vec Nat p) (Suc k))
+            old_head
+            (vector_zero p)
+            (λr. VCons (Vec Nat p) k r old_tail)
+            (columns_zero_row n p (transpose n p b)))
+          (cong
+            (Vec (Vec Nat p) k)
+            (Vec (Vec Nat p) (Suc k))
+            old_tail
+            (matrix_zero k p)
+            (VCons (Vec Nat p) k (vector_zero p))
+            (matrix_product_zero_left k n p b))
+  }
+
+pub theorem matrix_product_zero_right
+      (m : Nat) (n : Nat) (p : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat p) m) (matrix_product m n p a (matrix_zero n p)) (matrix_zero m p) =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        old_head = row_product n p (matrix_zero n p) row;
+        old_tail = matrix_product k n p rest (matrix_zero n p)
+      in
+        trans
+          (Vec (Vec Nat p) (Suc k))
+          (VCons (Vec Nat p) k old_head old_tail)
+          (VCons (Vec Nat p) k (vector_zero p) old_tail)
+          (VCons (Vec Nat p) k (vector_zero p) (matrix_zero k p))
+          (cong
+            (Vec Nat p)
+            (Vec (Vec Nat p) (Suc k))
+            old_head
+            (vector_zero p)
+            (λr. VCons (Vec Nat p) k r old_tail)
+            (trans
+              (Vec Nat p)
+              old_head
+              (row_product_columns n p row (matrix_zero p n))
+              (vector_zero p)
+              (cong
+                (Vec (Vec Nat n) p)
+                (Vec Nat p)
+                (transpose n p (matrix_zero n p))
+                (matrix_zero p n)
+                (row_product_columns n p row)
+                (transpose_zero n p))
+              (zero_columns_row n p row)))
+          (cong
+            (Vec (Vec Nat p) k)
+            (Vec (Vec Nat p) (Suc k))
+            old_tail
+            (matrix_zero k p)
+            (VCons (Vec Nat p) k (vector_zero p))
+            (matrix_product_zero_right k n p rest))
+  }
+
+pub theorem transpose_zero
+      (m : Nat) (n : Nat)
+    : Equal (Vec (Vec Nat m) n) (transpose m n (matrix_zero m n)) (matrix_zero n m) =
+  match m {
+    Zero ↦ zero_width_repeat n (matrix_zero n Zero);
+    Suc k ↦
+      let
+        tail_columns = transpose k n (matrix_zero k n);
+        zeros = matrix_zero n k
+      in
+        trans
+          (Vec (Vec Nat (Suc k)) n)
+          (zip_with
+            Nat
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            n
+            (prepend k)
+            (vector_zero n)
+            tail_columns)
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) (vector_zero n) zeros)
+          (matrix_zero n (Suc k))
+          (cong
+            (Vec (Vec Nat k) n)
+            (Vec (Vec Nat (Suc k)) n)
+            tail_columns
+            zeros
+            (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) (vector_zero n))
+            (transpose_zero k n))
+          (trans
+            (Vec (Vec Nat (Suc k)) n)
+            (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) (vector_zero n) zeros)
+            (map (Vec Nat k) (Vec Nat (Suc k)) n (prepend_zero k) zeros)
+            (matrix_zero n (Suc k))
+            (zip_zero_map n k zeros)
+            (map_repeat (Vec Nat k) (Vec Nat (Suc k)) n (prepend_zero k) (vector_zero k)))
+  }
+
 pub theorem matrix_vector_additive
       (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n) (y : Vec Nat n)
     : Equal
@@ -1858,6 +1972,21 @@ theorem map_cong
             (map_cong a b k f g agree tail))
   }
 
+theorem map_repeat
+      (a : Type) (b : Type) (n : Nat) (f : a → b) (x : a)
+    : Equal (Vec b n) (map a b n f (repeat a n x)) (repeat b n (f x)) =
+  match n {
+    Zero ↦ Proved;
+    Suc k ↦
+      cong
+        (Vec b k)
+        (Vec b (Suc k))
+        (map a b k f (repeat a k x))
+        (repeat b k (f x))
+        (VCons b k (f x))
+        (map_repeat a b k f x)
+  }
+
 theorem row_right_identity
       (n : Nat) (row : Vec Nat n)
     : Equal (Vec Nat n) (row_product n n (identity n) row) row =
@@ -2129,6 +2258,22 @@ theorem columns_zero_row
             zeros
             (VCons Nat j Zero)
             (columns_zero_row n j rest))
+  }
+
+theorem zero_columns_row
+      (n : Nat) (p : Nat) (row : Vec Nat n)
+    : Equal (Vec Nat p) (row_product_columns n p row (matrix_zero p n)) (vector_zero p) =
+  match p {
+    Zero ↦ Proved;
+    Suc j ↦
+      vector_cons_eq
+        j
+        (dot n row (vector_zero n))
+        Zero
+        (row_product_columns n j row (matrix_zero j n))
+        (vector_zero j)
+        (dot_zero_right n row)
+        (zero_columns_row n j row)
   }
 
 theorem columns_cons
@@ -2950,7 +3095,13 @@ dimensions. These three zero-annihilation laws need no new helper or premise.
 `matrix_add_zero_right` composes `matrix_add_comm` with it, and
 `matrix_vector_zero_matrix` inducts on the written row count with
 `dot_zero_left` at each row. These laws include zero dimensions and need
-no new helper or premise.
+no new helper or premise. The left product-zero law recurses over the
+zero rows, using the existing private `columns_zero_row` to show that
+each row product is zero. The right law recurses over the left matrix,
+using the private `zero_columns_row` after `transpose_zero` has shown
+that the zero right factor has zero columns. `transpose_zero` handles
+zero rows with `zero_width_repeat` and the successor with `zip_zero_map`
+and the private `map_repeat`; every dimension, including zero, is covered.
 
 `matrix_vector_additive` uses the private right-argument dot-distribution
 lemma to transport each row's head, then transports the tail by induction.
@@ -2976,7 +3127,10 @@ factors and leaves a vector unchanged when its factor is one. The zero
 vector is the additive unit on either side, and scaling by zero or dotting
 with a zero vector gives zero. Dotting on either side by the zero vector,
 scaling the zero vector, and applying any matrix to a zero input all
-return the corresponding zero. The named `dot_with` helper passes the row's
+return the corresponding zero. Multiplication by a zero matrix likewise
+returns a zero matrix on either side, and transposing the zero matrix
+preserves zero entries while exchanging its dimensions. The named
+`dot_with` helper passes the row's
 dot product to `map` without a lambda-headed application in a proof goal.
 A rational-valued or approximate matrix would require a different statement
 of equality and is
@@ -2991,8 +3145,8 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–12 owns
-forty-six public names across ten operations and thirty-six laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–13 owns
+forty-nine public names across ten operations and thirty-nine laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -3006,7 +3160,8 @@ Ken-checked or officially conformance-run. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
 prepending, row products and proof bridges remain private. The new
 `dot_zero_columns` and `transpose_cons_image` helpers, like
-`dot_scale_right` and `dot_distrib_right`, are not public. The scaling
+`dot_scale_right` and `dot_distrib_right`, are not public. The
+`map_repeat` and `zero_columns_row` steps also remain private. The scaling
 proof's `vector_cons_eq` also remains private. `vector_zero`,
 `vector_add_zero_left`, `vector_add_zero_right`, `vector_scale_zero` and
 `dot_zero_left` are public in source order. The three §11 laws
@@ -3014,7 +3169,9 @@ proof's `vector_cons_eq` also remains private. `vector_zero`,
 follow in that order. `matrix_zero` follows `matrix_add`, and the §12 laws
 `matrix_add_zero_left`, `matrix_add_zero_right` and
 `matrix_vector_zero_matrix` follow `matrix_vector_zero` in that order.
-All thirty-six laws have checked bodies. This
+The three §13 laws `matrix_product_zero_left`,
+`matrix_product_zero_right`, and `transpose_zero` follow
+`matrix_vector_zero_matrix`. All thirty-nine laws have checked bodies. This
 package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -3035,6 +3192,9 @@ same-form `Refl` claim. The [zero-matrix
 seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-zero-unit.md)
 is authored, not officially conformance-run; its package-owned test checks
 all six public-law applications, the closed zero-matrix value, a same-form
-accepted control and an isolated false-result refusal. These tests use
-root-loaded exports. They are not official conformance-runner runs or claims
-of CI, publication or landing.
+accepted control and an isolated false-result refusal. The product-zero
+package test checks three open law types and closed product and transpose
+applications, then accepts a same-form zero-factor control before refusing
+a false identity-factor result. These tests use root-loaded exports. They
+are not official conformance-runner runs or claims of CI, publication or
+landing.
