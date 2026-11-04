@@ -5307,22 +5307,27 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             Ok(SuccessorEffect { row, effect, operation_arguments })
         }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let relays = relay_members.into_iter().map(|(origin, relay)| {
-            let arms = relay_arms.iter().map(|arm| {
-                let effect = compiler.retained_body_occurrence(arm.route.effect_origin)?.expr.clone();
-                if !matches!(&effect, RuntimeExpr::Effect { operation, .. }
-                    if *operation == arm.route.operation)
-                {
-                    return Err(backend_module(LoweringCause::PlannerInvariant,
-                        "a relay handler arm has no exact Effect occurrence".to_string()));
-                }
-                let provably_dead = compiler.effect_arm_is_provably_dead(arm.route.effect_origin)?;
-                let dead_body = compiler.provably_dead_arm_body_for_relay(arm.route.effect_origin)?;
-                if provably_dead != dead_body.is_some() {
-                    return Err(backend_module(LoweringCause::PlannerInvariant,
-                        "a relay arm's deadness and disposition body disagree".to_string()));
-                }
-                Ok(RelayArmEffect { arm: arm.clone(), effect, provably_dead, dead_body })
-            }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+            // A Trap resume traps before dispatch, so its function lowers no
+            // arm and owns none of the arms' source joins.
+            let arms = match &relay.resume {
+                PendingVisRelayResume::Trap(_) => Vec::new(),
+                PendingVisRelayResume::Row { .. } => relay_arms.iter().map(|arm| {
+                    let effect = compiler.retained_body_occurrence(arm.route.effect_origin)?.expr.clone();
+                    if !matches!(&effect, RuntimeExpr::Effect { operation, .. }
+                        if *operation == arm.route.operation)
+                    {
+                        return Err(backend_module(LoweringCause::PlannerInvariant,
+                            "a relay handler arm has no exact Effect occurrence".to_string()));
+                    }
+                    let provably_dead = compiler.effect_arm_is_provably_dead(arm.route.effect_origin)?;
+                    let dead_body = compiler.provably_dead_arm_body_for_relay(arm.route.effect_origin)?;
+                    if provably_dead != dead_body.is_some() {
+                        return Err(backend_module(LoweringCause::PlannerInvariant,
+                            "a relay arm's deadness and disposition body disagree".to_string()));
+                    }
+                    Ok(RelayArmEffect { arm: arm.clone(), effect, provably_dead, dead_body })
+                }).collect::<Result<Vec<_>, CraneliftBackendError>>()?,
+            };
             Ok(RelayEffect { origin, relay, arms })
         }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let (offsets, frame_bytes) = owner.slot_offsets()?;
