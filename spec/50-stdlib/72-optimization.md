@@ -8,6 +8,7 @@
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT §2.6;
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
 > SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
@@ -532,7 +533,9 @@ landing or measured landed trust.
 ## 2. Least witness below a finite bound
 
 > **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
-> SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4).** The
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT §2.6).** The
 > original three general laws, catalog module and seed are present on
 > main. Section 2.4's fourth law was checked in Architect D0; its
 > catalog export and package-owned test are on main. The roots-loaded
@@ -545,7 +548,10 @@ landing or measured landed trust.
 > the opening status. It has not been run by the official conformance
 > runner. Candidate-local catalog tests and scratch checks are not
 > official conformance, CI, publication, landing or a landed trust
-> measurement.
+> measurement. Architect's AC-0 scratch
+> checked the law and its discriminator, not an assembled tip. No
+> candidate-wide test, official conformance, CI, publication, landing
+> or measured landed trust is inferred from that scratch evidence.
 
 ### 2.1 Carrier and result
 
@@ -759,6 +765,55 @@ with the appended false claim was rejected at its theorem
 candidate-local scratch evidence is not an official conformance run.
 Component-local checks and scratch evidence do not establish official
 conformance-runner execution, CI, publication, landing or landed trust.
+
+### 2.6 The least in-range hit is returned
+
+`Algorithm.Optimization.BoundedSearch` must export a public Transparent
+theorem with a checked body, immediately after `find_below_refuted`.
+Its exact public type takes the predicate, bound and candidate `n`
+first, then an in-range premise, a hit premise and a refutation of
+every earlier hit, in that order:
+
+```ken
+pub theorem find_below_least_hit
+      (p : Nat → Bool) (bound : Nat) (n : Nat)
+    : Equal Bool (lt_nat n bound) True
+      → Equal Bool (p n) True
+      → ((m : Nat) → Equal Bool (lt_nat m n) True → Equal Bool (p m) False)
+      → Equal (Option Nat) (find_below p bound) (Some Nat n)
+```
+
+The law complements §2.2's `find_below_sound` and
+`find_below_least`: if `n` is within the bound, `p n` is `True`
+and every `m < n` is refuted, the actual result is `Some n`. The
+premises are sufficient without a supplied search outcome, a
+positive bound beyond `n < bound`, or an order on arbitrary
+predicates. A `None` result under these premises contradicts
+`find_below_complete` at `n`; an observed `Some k` with `k < n`
+contradicts the refuted prefix, and `n < k` contradicts
+`find_below_least` using the hit at `n`. The remaining natural-number
+order case yields `k = n`. The private `hit_outcome_some` case helper
+carries the observed result equation; it is not a seventh public law.
+No new Nat-order theorem, trichotomy helper, function extensionality,
+`Axiom`, kernel rule or surface feature is required. Sections 1–3
+retain all their prior operation and law types.
+
+For a closed discriminator, let `above_two m` be true exactly when
+`two < m`. At bound `ten`, its least hit is `three`; an accepted
+client applies this law to an in-range hit and the refuted prefix,
+then a same-form `Proved` control claims the result `Some four` for
+`above_three` at bound `ten`. In a fresh copy of that accepted client,
+the claim `find_below above_two ten = Some Nat four` by `Proved` is
+refused: `three` is an earlier hit. `Refl` refuses both forms and is
+not evidence of this distinction. Architect's exact-base AC-0 D0
+reported a 2/2 scratch test, identical `trusted_base()` GlobalId sets
+114 → 114, unchanged `Axiom` grep, two existing bounded-search
+package targets 3/3 each, and strict census 1/1. Its false `Proved`
+claim was rejected at its own theorem with `KernelRejected
+TypeMismatch`, and its same-form control was accepted. This is
+scratch evidence, not an assembled-candidate gate, official
+conformance execution, CI, publication, landing or a measured landed
+trust result.
 
 ## 3. Greatest-cost candidate
 

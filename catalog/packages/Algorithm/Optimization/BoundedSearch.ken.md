@@ -23,7 +23,7 @@ arbitrary predicates or an unbounded search mechanism.
 
 ## Definition
 
-The public operation and its five laws lead. The private outcome invariant
+The public operation and its six laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
@@ -31,7 +31,9 @@ import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Numeric.Nat.Order (leq_nat, lt_nat)
+import Core.Classes.LawfulClasses (leq_nat)
+
+import Data.Numeric.Nat.Order (lt_nat)
 
 pub fn find_below (p : Nat → Bool) (bound : Nat) : Option Nat =
   match bound {
@@ -76,6 +78,14 @@ pub theorem find_below_refuted
     : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False)
       → Equal (Option Nat) (find_below p bound) (None Nat) =
   refuted_outcome_none p bound (find_below p bound) Refl
+
+pub theorem find_below_least_hit
+      (p : Nat → Bool) (bound : Nat) (n : Nat)
+    : Equal Bool (lt_nat n bound) True
+      → Equal Bool (p n) True
+      → ((m : Nat) → Equal Bool (lt_nat m n) True → Equal Bool (p m) False)
+      → Equal (Option Nat) (find_below p bound) (Some Nat n) =
+  hit_outcome_some p bound n (find_below p bound) Refl
 
 pub theorem find_below_stable
       (p : Nat → Bool) (bound : Nat) (larger : Nat) (n : Nat)
@@ -203,6 +213,82 @@ theorem refuted_outcome_none
                   (find_below_sound p bound n observed))))
   }
 
+theorem hit_outcome_some
+      (p : Nat → Bool) (bound : Nat) (n : Nat) (outcome : Option Nat)
+    : Equal (Option Nat) (find_below p bound) outcome
+      → Equal Bool (lt_nat n bound) True
+      → Equal Bool (p n) True
+      → none_below p n
+      → Equal (Option Nat) (find_below p bound) (Some Nat n) =
+  match outcome {
+    None ↦
+      λobserved.
+        λwithin.
+          λhit.
+            λprefix.
+              absurd
+                (trans
+                  Bool
+                  True
+                  (p n)
+                  False
+                  (sym Bool (p n) True hit)
+                  (find_below_complete p bound observed n within));
+    Some k ↦
+      λobserved.
+        λwithin.
+          λhit.
+            λprefix.
+              match lt_nat k n eqn : before {
+                True ↦
+                  absurd
+                    (trans
+                      Bool
+                      True
+                      (p k)
+                      False
+                      (sym
+                        Bool
+                        (p k)
+                        True
+                        (and_snd
+                          (Equal Bool (lt_nat k bound) True)
+                          (Equal Bool (p k) True)
+                          (find_below_sound p bound k observed)))
+                      (prefix k before));
+                False ↦
+                  match lt_nat n k eqn : after {
+                    True ↦
+                      absurd
+                        (trans
+                          Bool
+                          True
+                          (p n)
+                          False
+                          (sym Bool (p n) True hit)
+                          (find_below_least p bound k observed n after));
+                    False ↦
+                      trans
+                        (Option Nat)
+                        (find_below p bound)
+                        (Some Nat k)
+                        (Some Nat n)
+                        observed
+                        (cong
+                          Nat
+                          (Option Nat)
+                          k
+                          n
+                          (λx. Some Nat x)
+                          ((proof antisym for leq_nat)
+                            k
+                            n
+                            ((proof false_reverse_leq for lt_nat) n k after)
+                            ((proof false_reverse_leq for lt_nat) k n before)))
+                  }
+              }
+  }
+
 theorem find_below_correct
       (p : Nat → Bool) (bound : Nat)
     : found_spec p bound (find_below p bound) =
@@ -324,7 +410,11 @@ range. See the checked examples and refusals in the
   ../../../../conformance/stdlib/optimization/seed-bounded-search.md).
 The authored [refuted-range seed](
   ../../../../conformance/stdlib/optimization/seed-bounded-search-refuted-range.md)
-exercises the converse with a closed client. On a tree byte-identical to
+exercises the converse with a closed client. The
+[least-hit seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-least-hit.md)
+checks an in-range hit with a refuted prefix against a later-hit refusal and
+its same-form control. On a tree byte-identical to
 prior candidate `aaf1759d6`, Architect extracted both Ken blocks. The
 accepted client checked successfully; a fresh client copy with the appended
 false claim was rejected at its theorem (`KernelRejected TypeMismatch`,
@@ -338,7 +428,9 @@ bound and satisfies the predicate. `find_below_least` establishes that no
 smaller number is a hit. `find_below_complete` establishes that an absent
 answer entails no hit anywhere below the bound. Conversely,
 `find_below_refuted` establishes `None` from a proof that every number strictly
-below the bound fails the predicate.
+below the bound fails the predicate. In the other direction,
+`find_below_least_hit` establishes `Some n` from an in-range hit at `n` and
+refutation of every earlier candidate. It takes no observed-outcome premise.
 The first three checked proof bodies transport `find_below_correct` across
 the actual result equality.
 `find_below_stable` proves that an observed `Some n` persists when the bound
@@ -350,7 +442,14 @@ larger range can contain a new hit.
 `refuted_outcome_none` matches the observed result through an explicit outcome
 equality. The `None` case returns that equality; the `Some n` case combines
 `find_below_sound`'s in-range hit with the premise refuting all in-range hits,
-yielding a contradiction.
+yielding a contradiction. The private `hit_outcome_some` likewise binds the
+observed result with its equality. A `None` result contradicts
+`find_below_complete` at the given hit. For `Some k`, a hit before `n`
+contradicts the refuted prefix, and a hit after `n` contradicts
+`find_below_least`. If neither strict comparison holds,
+`false_reverse_leq` supplies both non-strict comparisons and `leq_nat`'s
+`antisym` identifies `k` with `n`; congruence transports the observed
+`Some k` to `Some n`. No trichotomy helper or additional trust is needed.
 
 `find_below_correct` inducts over the bound. Its private `found_spec` states
 the stronger outcome invariant: `None` entails `none_below`, while `Some n`
@@ -367,8 +466,9 @@ new-bound branch without adding a public order law.
 The public contract fixes the least result or its absence, not an iteration
 order or a number of predicate calls. A bound controls the domain without
 introducing an equality operation on predicates. The outcome invariant,
-`refuted_outcome_none`, `lt_suc_not_lt_same` and `leq_suc_not_leq_same`
-are private proof scaffolding, not additional public laws.
+`refuted_outcome_none`, `hit_outcome_some`, `lt_suc_not_lt_same` and
+`leq_suc_not_leq_same` are private proof scaffolding, not additional
+public laws.
 Unlike `argmin` over an existing nonempty list, this package searches a numeric
 range and can return `None`.
 
@@ -376,7 +476,16 @@ range and can return `None`.
 
 - [Finite bounded-search contract](
   ../../../../spec/50-stdlib/72-optimization.md#2-least-witness-below-a-finite-bound)
-  — the five public laws and scope.
+  — the original laws and scope.
+- [Least in-range hit](
+  ../../../../spec/50-stdlib/72-optimization.md#26-the-least-in-range-hit-is-returned)
+  — §2.6's public converse and its premises.
+- [Least-hit conformance seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-least-hit.md)
+  — an accepted law client and a false later-hit claim.
+- [Least-hit package test](
+  ../../../../crates/ken-elaborator/tests/cat_optimization_bounded_search_least_hit.rs)
+  — generic checked law, exact trust identities, and seed controls.
 - [Argmin](Argmin.ken.md) — least-cost selection from a nonempty input,
   with a different carrier.
 - [Brute-force search](https://en.wikipedia.org/wiki/Brute-force_search) —
@@ -386,7 +495,7 @@ range and can return `None`.
 ## Trust & derivation
 
 The source implements the contract in `spec/50-stdlib/72-optimization.md` §2.
-Its public interface consists of `find_below` and the five named laws above;
+Its public interface consists of `find_below` and the six named laws above;
 all invariant and proof helpers are private. For the operation and its proof
 family, read Definition; for a closed client, follow Using it; for proof
 structure and scope, read Laws & proofs and Design notes.
@@ -404,5 +513,16 @@ The generic client checks the fifth law over open predicates and bounds. The
 [refuted-range seed](
   ../../../../conformance/stdlib/optimization/seed-bounded-search-refuted-range.md)
 is authored; its two Ken blocks received the focused scratch check described
-in Using it. The seed has not been run by the official conformance runner. No
-time, space, or predicate-call-count guarantee is claimed.
+in Using it. For the sixth law, the
+[least-hit seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-least-hit.md)
+pairs an accepted law application and exact-result control with a same-form
+later-hit control and a false later-hit refusal. The
+[least-hit package test](
+  ../../../../crates/ken-elaborator/tests/cat_optimization_bounded_search_least_hit.rs)
+checks that seed and the generic §2.6 interface under a selective import,
+including package ownership, a private-helper refusal, and unchanged trusted
+`GlobalId` identities. The [§2.6 contract](
+  ../../../../spec/50-stdlib/72-optimization.md#26-the-least-in-range-hit-is-returned)
+states the public law. The seeds have not been run by the official conformance
+runner. No time, space, or predicate-call-count guarantee is claimed.
