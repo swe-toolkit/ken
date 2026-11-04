@@ -5,7 +5,7 @@ geometry operations. Six box-and-distance laws, ten structural
 commutativity, associativity, absorption, idempotence and distribution laws,
 three metric
 laws, two corner-membership laws, seven corner-wise containment laws, four
-inclusion-order laws, three area laws, and two point-box laws carry
+inclusion-order laws, three area laws, and three point-box laws carry
 kernel-checked generic proofs.
 
 ## Contents
@@ -33,8 +33,9 @@ client can build a point and a box. Five original operations and six
 box-and-distance laws lead the definition; ten structural commutativity,
 associativity, absorption, idempotence and distribution laws follow
 intersection and hull, ahead of the three metric laws. The two corner-membership laws
-follow the three metric laws, and `contains_point_box` follows them. The
-corner-wise `inside` operation and its seven laws come next, then the four
+follow the three metric laws, and `contains_point_box` and
+`contains_point_box_equal` follow them. The corner-wise `inside` operation
+and its seven laws come next, then the four
 inclusion-order laws, followed by `area`, its three laws and `area_point_box`.
 Per-axis proof helpers and distance helpers stay private.
 
@@ -1180,6 +1181,38 @@ pub theorem contains_point_box (p : Point) : IsTrue (contains (MkBox p p) p) =
           ((proof refl for leq_nat) y)
           ((proof refl for leq_nat) y))
   }
+
+pub theorem contains_point_box_equal
+      (p : Point) (q : Point)
+    : IsTrue (contains (MkBox p p) q) → Equal Point q p =
+  match p {
+    MkPoint x y ↦
+      match q {
+        MkPoint qx qy ↦
+          λhq.
+            point_equal
+              qx
+              x
+              qy
+              y
+              (axis_point_equal
+                x
+                qx
+                ((proof left for bool_and) (axis_contains x x qx) (axis_contains y y qy) hq))
+              (axis_point_equal
+                y
+                qy
+                ((proof right for bool_and) (axis_contains x x qx) (axis_contains y y qy) hq))
+      }
+  }
+
+theorem axis_point_equal (c : Nat) (x : Nat) : IsTrue (axis_contains c c x) → Equal Nat x c =
+  λh.
+    (proof antisym for leq_nat)
+      x
+      c
+      ((proof right for bool_and) (leq_nat c x) (leq_nat x c) h)
+      ((proof left for bool_and) (leq_nat c x) (leq_nat x c) h)
 
 theorem axis_distance_triangle
       (a : Nat) (b : Nat) (c : Nat)
@@ -2585,7 +2618,12 @@ per-axis corner lemmas, then reassemble the corner memberships with `bool_and`.
 Together with `manhattan_box_diameter`, they show the distance bound is attained
 by the two stored corners whenever the box contains a point.
 `contains_point_box` needs no witness: each axis of `MkBox p p` contains its
-own coordinate by `leq_nat` reflexivity.
+own coordinate by `leq_nat` reflexivity. Conversely, from a member `q` of
+that point box, `contains_point_box_equal` projects both axis memberships.
+The private `axis_point_equal` uses checked `leq_nat` antisymmetry on the two
+comparisons from each axis, and the existing private `point_equal` assembles
+`Equal Point q p`. The premise is membership in the point box, not merely
+membership in a wider box.
 
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
@@ -2609,6 +2647,12 @@ bounds, while the hull laws use the opposite extrema. `inside_complete`
 requires a point in the inner box before deriving its two corner witnesses;
 pointwise inclusion alone would be vacuous for an inverted inner box. The
 private `axis_within` and per-axis lemmas keep these distinctions explicit.
+A client with `contains c p` can derive `inside (MkBox p p) c` by taking `p`
+as the witness for `inside_complete`: every member of the point box equals
+`p`, so `cong` transports membership in `c` to that member. `area_inside`
+and `area_point_box` then give a positive lower bound on `area c`.
+These derived uses are checked by a generic package client rather than
+exported as two further laws.
 
 `inside_trans` composes lower and upper comparisons along each axis, including
 for inverted boxes. `inside_antisym` applies checked Nat antisymmetry to both
@@ -2662,7 +2706,9 @@ operations distribute over each other by structural equality, not by
 identifying point-set equivalents.
 Different inverted boxes can have the same zero area without being structurally
 equal.
-Signed orientation remains outside this interface.
+A point box contains only its point, without identifying boxes merely
+because they have the same members. Signed orientation remains outside
+this interface.
 
 ## 6. References
 
@@ -2675,10 +2721,10 @@ Signed orientation remains outside this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–14](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and thirty-seven public checked law types,
+1. **Contract.** [Exact geometry, §§1–15](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and thirty-eight public checked law types,
    including the two structural distribution, two corner-membership,
-   inside-antisymmetry and two point-box laws.
+   inside-antisymmetry and three point-box laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
@@ -2688,14 +2734,14 @@ Signed orientation remains outside this interface.
    `hull_intersect_distrib`, `manhattan_symm`,
    `manhattan_self`, `manhattan_triangle`, `manhattan_zero_equal`,
    `manhattan_box_diameter`, `contains_lo_corner`, `contains_hi_corner`,
-   `contains_point_box`, `inside`, `inside_sound`, `inside_refl`,
-   `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`, `inside_hull_right`,
-   `inside_complete`, `inside_trans`, `inside_antisym`,
-   `intersect_greatest`, `hull_least`, `area`, `area_inside`, `area_inverted_x`,
-   `area_inverted_y`, and `area_point_box`. `axis_within`, `axis_span`,
-   `box_with_lo`, `box_with_hi`, `box_equal`, generic subtraction and
-   multiplication bounds, per-axis lemmas and proof transport helpers
-   remain private.
+   `contains_point_box`, `contains_point_box_equal`, `inside`, `inside_sound`,
+   `inside_refl`, `intersect_inside_left`, `intersect_inside_right`,
+   `inside_hull_left`, `inside_hull_right`, `inside_complete`, `inside_trans`,
+   `inside_antisym`, `intersect_greatest`, `hull_least`, `area`, `area_inside`,
+   `area_inverted_x`, `area_inverted_y`, and `area_point_box`.
+   `axis_point_equal`, `axis_within`, `axis_span`, `box_with_lo`,
+   `box_with_hi`, `box_equal`, generic subtraction and multiplication bounds,
+   per-axis lemmas and proof transport helpers remain private.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
    closed examples and generic metric, containment, inclusion order and area
@@ -2705,7 +2751,9 @@ Signed orientation remains outside this interface.
    `Data.Numeric.Nat.Arithmetic` addition and multiplication, and checked
    `Data.Numeric.Nat.Order` bounds and saturating subtraction. The metric
    and area proofs also use existing checked equality transport. The
-   source declares no `Axiom` or new primitive.
+   source declares no `Axiom` or new primitive. The new singleton proof
+   composes inherited checked natural-order antisymmetry with existing
+   equality transport and introduces no further trusted authority.
 5. **Trust.** Loading this package adds zero trusted `GlobalId`s beyond the
    already-loaded provider closure; that closure may itself carry inherited
    trust. A targeted roots-loader test measures the before/after identity sets.
@@ -2725,7 +2773,10 @@ Signed orientation remains outside this interface.
    applies both checked laws at the origin and a point with distinct nonzero
    coordinates, accepts direct area and membership controls, and isolates false
    zero-area and distinct-point membership claims in its package-owned test.
-   The source-shaped checks are not official conformance-runner execution. The
+   The source-shaped checks are not official conformance-runner execution.
+   The [point-box singleton seed](../../../../conformance/stdlib/geometry/seed-box-point-singleton.md)
+   applies `contains_point_box_equal` to a generic member and pairs an
+   accepted point-box `Refl` with a refused two-point-box `Refl`. The
    [order seed](../../../../conformance/stdlib/geometry/seed-box-inside-order.md)
    checks an inverted transitive chain, an overlapping meet and a hull with an
    inverted operand, followed by three isolated false reverse inclusions.
@@ -2764,7 +2815,7 @@ Signed orientation remains outside this interface.
    The [idempotence seed][id]
    applies both public proofs to regular and inverted boxes and refuses a
    false same-form box equality in its package-owned roots-loader test.
-   All fourteen authored seeds supplement rather than replace the checked
+   All fifteen authored seeds supplement rather than replace the checked
    generic law bodies.
 
 [id]: ../../../../conformance/stdlib/geometry/seed-box-intersect-hull-idempotence.md
