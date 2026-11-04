@@ -2773,7 +2773,10 @@ this interface.
    applies both checked laws at the origin and a point with distinct nonzero
    coordinates, accepts direct area and membership controls, and isolates false
    zero-area and distinct-point membership claims in its package-owned test.
-   The source-shaped checks are not official conformance-runner execution. The
+   The source-shaped checks are not official conformance-runner execution.
+   The [point-box singleton seed](../../../../conformance/stdlib/geometry/seed-box-point-singleton.md)
+   applies `contains_point_box_equal` to a generic member and pairs an
+   accepted point-box `Refl` with a refused two-point-box `Refl`. The
    [order seed](../../../../conformance/stdlib/geometry/seed-box-inside-order.md)
    checks an inverted transitive chain, an overlapping meet and a hull with an
    inverted operand, followed by three isolated false reverse inclusions.
@@ -2812,7 +2815,7 @@ this interface.
    The [idempotence seed][id]
    applies both public proofs to regular and inverted boxes and refuses a
    false same-form box equality in its package-owned roots-loader test.
-   All fourteen authored seeds supplement rather than replace the checked
+   All fifteen authored seeds supplement rather than replace the checked
    generic law bodies.
 
 [id]: ../../../../conformance/stdlib/geometry/seed-box-intersect-hull-idempotence.md
