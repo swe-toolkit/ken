@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-IH-CONTINUATION-CLOSED-TEMPLATES
 title: "A relay that forwards an operation out of a recursive ITree fold re-yields the fold's induction hypothesis as its continuation, and in the native backend that K is a carried runtime word with no planner-typed identity: core.rs refuses a call on a Carried callee, and five D0s found no planned route from a foreign relay back to its row's continuation inputs. Ken's backend is first-order, so a non-code-known K is resumable only from a closed template set. Give each IH-bearing method of a data-motive ITree fold one K identity, enumerated at the backend's K-minting site, resumed by applying that eliminator's own method; an eliminator outside the set refuses closed"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

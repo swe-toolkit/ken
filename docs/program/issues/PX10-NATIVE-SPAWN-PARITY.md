@@ -119,7 +119,8 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   backend resumes a foreign relay's K only from a closed template set,
   so B-closure forwards by operation tag and resumes from that set
   (Steward evt_6ppgz0hsqxmm, Research evt_1ebcpy76v1e9a, routing D0-23
-  evt_jc75x84wmcw7). Candidate checkpoint `2ad1b31d0` is held until then.
+  evt_jc75x84wmcw7). That WP merged at `45074052a`; checkpoint
+  `2ad1b31d0` resumed on it (evt_47r0prwyrhxb1).
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus
@@ -138,16 +139,16 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     set spanning more than one leaf is a planner refusal. Every path is
     unique-or-error, and an unmatched tag takes the deterministic failure
     edge before any host request is built.
-  - The host response is decoded under the selected arm's operation and
-    passed to the relay's own K. That K is the IH of a recursive fold,
-    carried as an escaping checked-IH environment word, so it is resumed
-    as a defunctionalized frame, never by a call on the word
-    (`core.rs:18337` stays a refusal). The successor is the unique
-    validated response row whose K closure is
-    `recursive_ih_force_site_seat(E, k)`, with the environment's declared
-    children equal to the row's captures. A relay with no such seat or
-    row is still numbered, and its resume is a planned, named trap
-    (Architect evt_ht75yt85jteg, after D0-16).
+  - The resume reads no value and no effect from a response row
+    (Architect evt_7cm821pbn97vt, evt_7r0mddesaz38j, on Research
+    evt_szf6w3793fx4). A relay is its own member kind, numbered by its
+    origin, never a `members` row. The planner's verdict names a row only
+    as the code, its K context function, and the slot order; a relay with
+    no seat or row resumes to a planned, named trap. Each handler arm
+    runs its own Effect, chosen by the carried operation's tag. The K is
+    a flat closure: its record holds the captures and then the K body's
+    entry inputs, and the K word is never called (`core.rs` Carried
+    refusal stays).
   - No relay member is removed from numbering. Drive pairs remain a
     fusion optimization: a fused source never builds its Vis, and any
     Vis that is built reaches the numbered relay and forwards. Admission
@@ -167,9 +168,10 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
       and 688's successors are the rows whose Vis are 1484 and 932.
       Base `928313aa6` is red on it, with the reason recorded; a green
       base is a stop.
-    - Landed evidence: the 17 D0-14 binaries run base against candidate
-      on the committed tree, with identical results or a pre-stated
-      direction; px10's stack overflow is reported as base or new.
+    - Landed evidence: full-workspace CI green on the exact candidate
+      SHA, which runs the 17 D0-14 binaries (recut evt_47r0prwyrhxb1,
+      Architect concurrence evt_3pwc46wwjpyma); px10's stack overflow is
+      reported from its named target as base or new.
     - Scratch evidence, never committed: under the Architect's overlay
       (`unit-b-overlay.patch`, md5 629a493c) and the D0 harness
       `arch_spawnb_d0.rs`, the native result equals the interpreter's on
@@ -188,7 +190,8 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
 The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
 evt_5kjjy0w0gzma, evt_p37pc6dwdk3h, evt_qkp7qcj87b3q and
-evt_3nvw9veeqa274) has ten entries:
+evt_3nvw9veeqa274; entries 11 to 13, evt_6ap56syy0smt6,
+evt_7cm821pbn97vt and evt_1339kvspms2zv) has thirteen entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -227,13 +230,27 @@ evt_3nvw9veeqa274) has ten entries:
     fold, carried as a runtime word. Keyed on the K being statically
     known: an identity read off the lexical template for a value the
     runtime boundary carries.
+11. The relay resume read its row's continuation inputs in the relay's
+    own construct context, where D0-17 measured 0 of 20. Keyed on the
+    response row's context as the relay's.
+12. The relay's resume verdict was placed after the static planner,
+    although the planner's settlement consumes it, and the verdict was
+    installed as a `members` row. Keyed on the construct-place
+    response-row plane.
+13. The relay resume took its host effect and its K context's
+    continuation inputs from the resolved response row, but the relay
+    carries only its operation word and its K environment word. Keyed on
+    the response row as resume authority.
 
-Entries 1, 3, 4, 5 and 6 share one predicate: an identity read from one
-plane and checked or consumed under another key, such as the emitting
-unit rather than the static owner. Entries 7, 8 and 9 carry entry 6's
-predicate. B-closure sidesteps it for parity by forwarding on the
-operation's identity, and `RT-NATIVE-VIS-MAY-YIELD-SUMMARY` replaces the
-per-plane walks.
+Entries 10 to 13 share one predicate: the relay's resume state is located
+through the response-row plane, but its identity is the runtime-carried K.
+The closure is a resume that reads nothing from any row
+(evt_7r0mddesaz38j). Entries 1, 3, 4, 5 and 6 share one predicate: an
+identity read from one plane and checked or consumed under another key,
+such as the emitting unit rather than the static owner. Entries 7, 8 and 9
+carry entry 6's predicate. B-closure sidesteps it for parity by forwarding
+on the operation's identity, and `RT-NATIVE-VIS-MAY-YIELD-SUMMARY`
+replaces the per-plane walks.
 
 ## Stop conditions
 

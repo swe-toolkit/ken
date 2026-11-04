@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE
 title: "NatPolynomial's poly_eq_substitute says one substitution preserves canonical equality of the expression it is applied to, but no law covers the substitution itself: two substitutions whose images are canonically equal at every variable are not known to give canonically equal results. A client that rewrites `x := (a + b)` to `x := (b + a)` inside a substituted expression must re-prove the whole result from evaluation. Rule from a checked D0 at zero trust a public pointwise congruence law for substitute, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
