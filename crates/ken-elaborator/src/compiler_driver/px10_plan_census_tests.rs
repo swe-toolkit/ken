@@ -260,6 +260,143 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     });
 }
 
+/// Promise class: durable invariant over these committed source fixtures.
+/// MEASURED: the actual writer compares the emitted answer with its returned
+/// operand, including SSA-word identity for carried values. Each foreign
+/// issued member is reached and its answer stays raw.
+/// CLAIMED: no alternative member mints a [Child, Label] answer.
+/// THE GAP: a specialized-to-specialized substitution cannot be distinguished
+/// by the operand-kind comparison; the foreign-member mutation must wrap a
+/// value and therefore changes that kind or the carried SSA word.
+#[test]
+fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
+    assert_alternative_writer_raw(
+        "px10_answer_argv",
+        ARGV_ENV_PIPE,
+        "Predeclared(PredeclaredFunctionId(25))",
+        1970,
+        &[1, 2, 3],
+    );
+}
+
+#[test]
+fn px10_live_alternative_writer_keeps_foreign_members_raw() {
+    assert_alternative_writer_raw(
+        "px10_answer_live",
+        LIVE_CHILD,
+        "Predeclared(PredeclaredFunctionId(23))",
+        1474,
+        &[2, 3, 4],
+    );
+}
+
+fn assert_alternative_writer_raw(
+    name: &'static str,
+    source: &'static str,
+    foreign_owner: &'static str,
+    foreign_result: u32,
+    targets: &'static [u32],
+) {
+    use ken_runtime::ProducerAlternativeAnswerObservation as Answer;
+    in_census_thread(name, move || {
+        let (built, observed) = ken_runtime::with_producer_alternative_answer_observations(|| {
+            emit_below_gate(name, source)
+        });
+        built.expect("the committed fixture emits beneath its Process gate");
+        let writers: Vec<_> = observed
+            .iter()
+            .filter_map(|row| match row {
+                Answer::Writer {
+                    owner,
+                    result,
+                    target,
+                    issued_member,
+                    raw_answer,
+                    returned_carried,
+                } => Some((
+                    owner,
+                    *result,
+                    *target,
+                    *issued_member,
+                    *raw_answer,
+                    *returned_carried,
+                )),
+                Answer::Seat { .. } => None,
+            })
+            .collect();
+        assert!(!writers.is_empty(), "{name}: writer observation must fire");
+        assert!(
+            writers.iter().all(|row| row.4),
+            "{name}: a writer wrapped its answer: {writers:?}"
+        );
+        let mut foreign: Vec<_> = writers
+            .iter()
+            .filter(|row| row.0 == foreign_owner && row.1 == foreign_result && row.3)
+            .map(|row| row.2)
+            .collect();
+        foreign.sort_unstable();
+        assert_eq!(
+            foreign, targets,
+            "{name}: each foreign issued member must reach the writer raw: {writers:?}"
+        );
+    });
+}
+
+/// Promise class: durable invariant over these committed source fixtures.
+/// MEASURED: each issued-set seat receives a carried SSA word, returns that
+/// same word and adds no IR instruction while selecting its Alternatives arm.
+/// CLAIMED: the detached seat cannot assert a private labelled-record schema.
+/// THE GAP: unrelated instructions outside this arm are not in this window;
+/// the pin covers assertions emitted at the exact seat being observed.
+#[test]
+fn px10_alternative_seats_pass_carried_words_without_assertion() {
+    use ken_runtime::ProducerAlternativeAnswerObservation as Answer;
+    for (name, source) in [
+        ("px10_answer_smoke", SMOKE),
+        ("px10_answer_argv", ARGV_ENV_PIPE),
+        ("px10_answer_live", LIVE_CHILD),
+    ] {
+        in_census_thread(name, move || {
+            let (built, observed) =
+                ken_runtime::with_producer_alternative_answer_observations(|| {
+                    emit_below_gate(name, source)
+                });
+            built.expect("the committed fixture emits beneath its Process gate");
+            let seats: Vec<_> = observed
+                .iter()
+                .filter_map(|row| match row {
+                    Answer::Seat {
+                        owner,
+                        result,
+                        members,
+                        carried,
+                        same_word,
+                        instructions_emitted,
+                    } => Some((
+                        owner,
+                        result,
+                        members,
+                        carried,
+                        same_word,
+                        instructions_emitted,
+                    )),
+                    Answer::Writer { .. } => None,
+                })
+                .collect();
+            assert_eq!(
+                seats.len(),
+                3,
+                "{name}: all three issued-set seats must lower: {seats:?}"
+            );
+            for seat in seats {
+                assert_eq!(*seat.2, 2, "{name}: {seat:?}");
+                assert!(*seat.3 && *seat.4 && *seat.5 == 0,
+                    "{name}: issued-set seat must return its carried word with no schema assertion: {seat:?}");
+            }
+        });
+    }
+}
+
 fn in_census_thread(name: &str, run: impl FnOnce() + Send + 'static) {
     std::thread::Builder::new()
         .name(name.to_owned())

@@ -9,30 +9,12 @@ use crate::RuntimeExpr;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The closed set of producer transports that can reach one result. Members
-/// are sorted by target specialization and a member's label is its index. A
-/// singleton has no set and keeps its existing unlabelled transport word.
+/// are sorted by target specialization. A singleton has no alternative set.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ProducerAlternativeSet {
     pub(in crate::cranelift_backend) emission_owner: ContinuationEmissionOwner,
     pub(in crate::cranelift_backend) result: StaticOriginId,
     pub(in crate::cranelift_backend) members: Vec<ContinuationCallIdentity>,
-}
-
-impl ProducerAlternativeSet {
-    pub(in crate::cranelift_backend) fn label(
-        &self,
-        member: &ContinuationCallIdentity,
-    ) -> Result<u32, CraneliftBackendError> {
-        let index = self
-            .members
-            .iter()
-            .position(|candidate| candidate == member)
-            .ok_or_else(|| {
-                planner_error("a producer is not a member of its result's alternative set")
-            })?;
-        u32::try_from(index)
-            .map_err(|_| planner_error("an alternative label exceeds the carrier ABI"))
-    }
 }
 
 /// A reader either has the one original static producer or exactly the

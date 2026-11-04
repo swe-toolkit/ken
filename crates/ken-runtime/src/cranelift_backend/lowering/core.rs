@@ -67,6 +67,61 @@ pub fn with_exit_code_case_of_case_route_count<T>(operation: impl FnOnce() -> T)
     (result, count)
 }
 
+/// Observe the emitted answer relation and detached seat on real program builds.
+/// No event is recorded without an explicit test-support observation window.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProducerAlternativeAnswerObservation {
+    Writer {
+        owner: String,
+        result: u32,
+        target: u32,
+        issued_member: bool,
+        raw_answer: bool,
+        returned_carried: bool,
+    },
+    Seat {
+        owner: String,
+        result: u32,
+        members: usize,
+        carried: bool,
+        same_word: bool,
+        instructions_emitted: usize,
+    },
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static PRODUCER_ALTERNATIVE_ANSWERS:
+        std::cell::RefCell<Option<Vec<ProducerAlternativeAnswerObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[doc(hidden)]
+pub fn with_producer_alternative_answer_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<ProducerAlternativeAnswerObservation>) {
+    PRODUCER_ALTERNATIVE_ANSWERS.with(|slot| {
+        assert!(slot.borrow().is_none(), "answer observation windows cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let rows = PRODUCER_ALTERNATIVE_ANSWERS.with(|slot| {
+        slot.borrow_mut().take().expect("answer observation window")
+    });
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_producer_alternative_answer(row: ProducerAlternativeAnswerObservation) {
+    PRODUCER_ALTERNATIVE_ANSWERS.with(|slot| {
+        if let Some(rows) = slot.borrow_mut().as_mut() {
+            rows.push(row);
+        }
+    });
+}
+
 /// Test-only observation at the actual multi-edge detached-result refusal.
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -9399,43 +9454,29 @@ impl<'a> Lowering<'a> {
                 super::units::CandidateDisposition::InlineNoCall,
             )?;
         }
-        // Every arm of an issued set writes the same planner-owned Record.
-        // Only its label is selected by this arm's member identity.
-        let answer = match self.static_transition_plan.producer_alternative_set_of(&identity)? {
-            None => returned,
-            Some(set) => {
-                let label = i64::from(set.label(&identity)?);
-                let result = set.result;
-                let record = self.static_transition_plan.producer_alternative_record(set)?;
-                let child = match &returned {
-                    LoweringOperand::Carried(word) => *word,
-                    LoweringOperand::Specialized(value) => {
-                        if value.contains_boundary_closure_environment()? {
-                            self.transfer_represented_boundary_value(builder, result, value)?
-                        } else {
-                            self.transfer_into_carrier(builder, result, value)?
-                        }
-                    }
-                    LoweringOperand::Residual(_) => {
-                        return Err(unsupported(LoweringCause::PlannerInvariant,
-                            "ProducerAlternativeSet",
-                            "an alternative member returned a recursive residual, which [Child, Label] does not carry",
-                        ));
-                    }
-                };
-                let label_value = builder.ins().iconst(types::I64, label);
-                let label_word = self.transfer_into_carrier(builder, result,
-                    &Lowered::Int { value: label_value, known: Some(label) })?;
-                let wrapped = self.emit_checked_aggregate_alloc(
-                    builder, GovernedAllocationSite::CarriedConstructor,
-                    record, PlannedAggregateShape::Record, BoundaryClass::Record, 2,
-                )?;
-                self.emit_carrier_store_tag_id(builder, wrapped, 1)?;
-                self.emit_carrier_store_field(builder, wrapped, 0, child)?;
-                self.emit_carrier_store_field(builder, wrapped, 1, label_word)?;
-                LoweringOperand::Carried(wrapped)
-            }
-        };
+        #[cfg(feature = "px8-ds-test-support")]
+        let original = returned.clone();
+        // No issued set reads a labelled member answer: every answer, in a
+        // set or not, is the producer's own word.
+        let answer = returned;
+        #[cfg(feature = "px8-ds-test-support")]
+        if PRODUCER_ALTERNATIVE_ANSWERS.with(|slot| slot.borrow().is_some()) {
+            let raw_answer = match (&original, &answer) {
+                (LoweringOperand::Carried(before), LoweringOperand::Carried(after)) =>
+                    before.word == after.word,
+                (LoweringOperand::Specialized(_), LoweringOperand::Specialized(_)) => true,
+                (LoweringOperand::Residual(_), LoweringOperand::Residual(_)) => true,
+                _ => false,
+            };
+            record_producer_alternative_answer(ProducerAlternativeAnswerObservation::Writer {
+                owner: format!("{:?}", identity.emission_owner()),
+                result: identity.producer_result_origin().observation_ordinal(),
+                target: identity.target().observation_ordinal(),
+                issued_member: self.static_transition_plan.producer_alternative_set_of(&identity)?.is_some(),
+                raw_answer,
+                returned_carried: matches!(original, LoweringOperand::Carried(_)),
+            });
+        }
         Ok(ClaimedContinuationResult {
             identity,
             recursive_position: transport.recursive_position(),
@@ -12896,19 +12937,34 @@ impl<'a> Lowering<'a> {
             None => return Ok(lowered),
             Some(ProducerResultResolution::Single) => residual[0],
             Some(ProducerResultResolution::Alternatives(set)) => {
-                // R4: each selected member has already discharged its causal
-                // edge at its own transport writer. Preserve the labelled
-                // word for the caller's R3 reader; it cannot be projected as
-                // any one of these source constructors at this seat.
-                let set = set.clone();
-                let LoweringOperand::Carried(wrapped) = lowered else {
+                // Each member's answer reaches this seat as its producer's
+                // own carried word. No writer labels it, so the seat passes
+                // it through unchanged.
+                #[cfg(feature = "px8-ds-test-support")]
+                let before = builder.func.dfg.num_insts();
+                #[cfg(feature = "px8-ds-test-support")]
+                let input_word = match &lowered {
+                    LoweringOperand::Carried(word) => Some(word.word),
+                    _ => None,
+                };
+                let LoweringOperand::Carried(word) = lowered else {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ProducerAlternativeSet",
-                        "an issued alternative result has no labelled carried word at its detached seat",
+                        "an issued alternative result has no carried word at its detached seat",
                     ));
                 };
-                self.assert_producer_alternative_record(builder, &set, wrapped)?;
-                return Ok(LoweringOperand::Carried(wrapped));
+                #[cfg(feature = "px8-ds-test-support")]
+                if PRODUCER_ALTERNATIVE_ANSWERS.with(|slot| slot.borrow().is_some()) {
+                    record_producer_alternative_answer(ProducerAlternativeAnswerObservation::Seat {
+                        owner: format!("{:?}", set.emission_owner),
+                        result: set.result.observation_ordinal(),
+                        members: set.members.len(),
+                        carried: true,
+                        same_word: input_word == Some(word.word),
+                        instructions_emitted: builder.func.dfg.num_insts() - before,
+                    });
+                }
+                return Ok(LoweringOperand::Carried(word));
             }
         };
         #[cfg(test)]
@@ -13080,34 +13136,6 @@ impl<'a> Lowering<'a> {
                 builder, &identity, &field_run, position, unit_env, &[],
             )?
             .value)
-    }
-
-    /// Validate the private boundary schema before any reader projects a
-    /// field. The seat also invokes this before returning a multi-edge word.
-    fn assert_producer_alternative_record(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        set: &ProducerAlternativeSet,
-        wrapped: CarriedBoundaryWord,
-    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
-        let class = self.emit_carrier_class(builder, wrapped)?;
-        Self::require_i64(builder, class, BoundaryClass::Record as i64);
-        let tag = self.emit_carrier_tag(builder, wrapped)?;
-        Self::require_i64(builder, tag, 1);
-        let count = self.emit_carrier_field_count(builder, wrapped)?;
-        Self::require_i64(builder, count, 2);
-        let label_word = self.emit_carrier_field(builder, wrapped, 1)?;
-        let ordinal = Self::emit_carrier_label_ordinal(builder, label_word);
-        let in_range = builder.ins().icmp_imm(
-            cranelift_codegen::ir::condcodes::IntCC::UnsignedLessThan,
-            ordinal,
-            i64::try_from(set.members.len()).map_err(|_| unsupported(
-                LoweringCause::Capacity, "ProducerAlternativeSet",
-                "an alternative set exceeds the carrier ABI",
-            ))?,
-        );
-        Self::require_i64(builder, in_range, 1);
-        Ok(ordinal)
     }
 
     /// **`D3` -- the callee-only consumer.**
