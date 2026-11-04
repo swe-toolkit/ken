@@ -2941,6 +2941,12 @@ impl NativeProgramPreparationV1 {
         &self.runtime_program
     }
 
+    /// The checked host-spine `Vis` identity the backend receives as
+    /// `process_symbols.itree_vis`.
+    pub fn host_spine_vis(&self) -> String {
+        self.host_spine.vis.to_string()
+    }
+
     /// The canonical entrypoint plan bytes embedded by this transaction.
     pub fn plan_bytes(&self) -> &[u8] {
         &self.plan_bytes
