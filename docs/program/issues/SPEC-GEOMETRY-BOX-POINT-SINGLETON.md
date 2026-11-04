@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-POINT-SINGLETON
 title: "Spec 67 §14 says every point box contains its own point, but no public law says it contains only that point. A client holding `contains (MkBox p p) q` cannot conclude `q = p`, so it cannot derive from public laws that a box containing a point includes that point's box, or that such a box has positive area. Rule from a checked D0 at zero trust a public singleton law, with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1

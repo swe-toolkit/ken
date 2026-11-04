@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT
 title: "Spec 72 §2 states that a Some n from find_below is an in-range hit with no earlier hit, and §2.5 gave None its converse, but Some has none: a client that holds an in-range hit n with every earlier m refuted cannot conclude that find_below p bound is Some n without casing on the result itself. Rule from a checked D0 at zero trust a public least-hit law, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
