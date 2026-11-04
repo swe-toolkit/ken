@@ -262,75 +262,84 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 
 /// Promise class: durable invariant over these committed source fixtures.
 /// MEASURED: the actual writer compares the emitted answer with its returned
-/// operand, including SSA-word identity for carried values. The six foreign
-/// issued members are each reached and their answers stay raw.
+/// operand, including SSA-word identity for carried values. Each foreign
+/// issued member is reached and its answer stays raw.
 /// CLAIMED: no alternative member mints a [Child, Label] answer.
 /// THE GAP: a specialized-to-specialized substitution cannot be distinguished
 /// by the operand-kind comparison; the foreign-member mutation must wrap a
 /// value and therefore changes that kind or the carried SSA word.
 #[test]
-fn px10_alternative_writer_keeps_foreign_members_raw() {
+fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
+    assert_alternative_writer_raw(
+        "px10_answer_argv",
+        ARGV_ENV_PIPE,
+        "Predeclared(PredeclaredFunctionId(25))",
+        1970,
+        &[1, 2, 3],
+    );
+}
+
+#[test]
+fn px10_live_alternative_writer_keeps_foreign_members_raw() {
+    assert_alternative_writer_raw(
+        "px10_answer_live",
+        LIVE_CHILD,
+        "Predeclared(PredeclaredFunctionId(23))",
+        1474,
+        &[2, 3, 4],
+    );
+}
+
+fn assert_alternative_writer_raw(
+    name: &'static str,
+    source: &'static str,
+    foreign_owner: &'static str,
+    foreign_result: u32,
+    targets: &'static [u32],
+) {
     use ken_runtime::ProducerAlternativeAnswerObservation as Answer;
-    for (name, source, foreign_owner, foreign_result, targets) in [
-        (
-            "px10_answer_argv",
-            ARGV_ENV_PIPE,
-            "Predeclared(PredeclaredFunctionId(25))",
-            1970,
-            &[1, 2, 3][..],
-        ),
-        (
-            "px10_answer_live",
-            LIVE_CHILD,
-            "Predeclared(PredeclaredFunctionId(23))",
-            1474,
-            &[2, 3, 4][..],
-        ),
-    ] {
-        in_census_thread(name, move || {
-            let (built, observed) =
-                ken_runtime::with_producer_alternative_answer_observations(|| {
-                    emit_below_gate(name, source)
-                });
-            built.expect("the committed fixture emits beneath its Process gate");
-            let writers: Vec<_> = observed
-                .iter()
-                .filter_map(|row| match row {
-                    Answer::Writer {
-                        owner,
-                        result,
-                        target,
-                        issued_member,
-                        raw_answer,
-                        returned_carried,
-                    } => Some((
-                        owner,
-                        *result,
-                        *target,
-                        *issued_member,
-                        *raw_answer,
-                        *returned_carried,
-                    )),
-                    Answer::Seat { .. } => None,
-                })
-                .collect();
-            assert!(!writers.is_empty(), "{name}: writer observation must fire");
-            assert!(
-                writers.iter().all(|row| row.4),
-                "{name}: a writer wrapped its answer: {writers:?}"
-            );
-            let mut foreign: Vec<_> = writers
-                .iter()
-                .filter(|row| row.0 == foreign_owner && row.1 == foreign_result && row.3)
-                .map(|row| row.2)
-                .collect();
-            foreign.sort_unstable();
-            assert_eq!(
-                foreign, targets,
-                "{name}: each foreign issued member must reach the writer raw: {writers:?}"
-            );
+    in_census_thread(name, move || {
+        let (built, observed) = ken_runtime::with_producer_alternative_answer_observations(|| {
+            emit_below_gate(name, source)
         });
-    }
+        built.expect("the committed fixture emits beneath its Process gate");
+        let writers: Vec<_> = observed
+            .iter()
+            .filter_map(|row| match row {
+                Answer::Writer {
+                    owner,
+                    result,
+                    target,
+                    issued_member,
+                    raw_answer,
+                    returned_carried,
+                } => Some((
+                    owner,
+                    *result,
+                    *target,
+                    *issued_member,
+                    *raw_answer,
+                    *returned_carried,
+                )),
+                Answer::Seat { .. } => None,
+            })
+            .collect();
+        assert!(!writers.is_empty(), "{name}: writer observation must fire");
+        assert!(
+            writers.iter().all(|row| row.4),
+            "{name}: a writer wrapped its answer: {writers:?}"
+        );
+        let mut foreign: Vec<_> = writers
+            .iter()
+            .filter(|row| row.0 == foreign_owner && row.1 == foreign_result && row.3)
+            .map(|row| row.2)
+            .collect();
+        foreign.sort_unstable();
+        assert_eq!(
+            foreign, targets,
+            "{name}: each foreign issued member must reach the writer raw: {writers:?}"
+        );
+    });
 }
 
 /// Promise class: durable invariant over these committed source fixtures.
