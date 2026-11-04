@@ -1157,7 +1157,8 @@ they do not replace the checked generic proofs.
 > **Section 13 status: DRAFT v0
 > (SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO).** Architect's final AC-0
 > `evt_8b7cdkzcb58c` followed Foundation's scratch probe on exact
-> base `165a98ace`: the probe passed 2/2, with equal trusted-base
+> base `165a98acec79d5e367bfeaa5472e0fd9149313fb`: the probe
+> passed 2/2, with equal trusted-base
 > `GlobalId` identity sets 109 → 109 and no added `Axiom` line. The
 > initially named regression set reddened at its exact public-name
 > inventory (46 instead of the ruled 49); the unpatched base passed
