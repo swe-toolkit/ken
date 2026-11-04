@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER
 title: "A checked-IH transport's answer is written as a labelled producer-alternative record, but nothing in the native backend reads that label and unwraps its Child: the seat's assertion validates the word and returns it still labelled, and the word travels as an ordinary Carried operand, so an ordinary Result match consumes it and traps at run time (B-closure stop 11, trap 46). Give each causal edge one planner discharge that records whether its answer is labelled, carry a labelled answer as its own operand kind that ordinary consumers refuse at compile time, and issue the one reader that switches on the label"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
