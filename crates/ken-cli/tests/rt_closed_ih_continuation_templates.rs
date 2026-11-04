@@ -44,7 +44,7 @@ fn assert_fixture_census_on_thread(package: &str, raw: &str, arity_one: usize) {
             "PX10_CHILD_PROBE_PATH",
             env!("CARGO_BIN_EXE_px10-child-probe"),
         )
-        .replace("PX10_READY_FILE", "/workspaces/ken/tmp/rt-closedk-ready");
+        .replace("PX10_READY_FILE", "closed-ih-census-ready");
     let preparation =
         prepare_native_program_sources(package, vec![CompilerSource::new("main.ken", &source)])
             .expect("checked Process preparation precedes the unavailable native gate");
@@ -95,6 +95,11 @@ fn assert_fixture_census_on_thread(package: &str, raw: &str, arity_one: usize) {
         .filter(|call| call.arity == 1)
         .collect::<Vec<_>>();
     assert_eq!(refused.len(), arity_one);
+    assert_eq!(
+        plan.computational_ih_calls.len(),
+        6 + arity_one,
+        "every checked IH call is a member's escaping call or a NotEscaping refusal",
+    );
     for call in refused {
         assert_eq!(
             set.arm(call.call_template_id),
