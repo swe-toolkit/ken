@@ -22,7 +22,7 @@ use super::continuations::{
     ContinuationFrameIdentity, ContinuationInputProjection, ContinuationUnitView,
     ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
-    ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
+    ProducerLocalBinding, ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
     RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
 };
 use super::occurrences::{occurrence_authority, StaticOriginId};
@@ -1349,9 +1349,54 @@ pub(in crate::cranelift_backend) struct RelayHostResponseArm {
     pub(in crate::cranelift_backend) constructor: RuntimeSymbol,
     pub(in crate::cranelift_backend) constructor_tag: u64,
     pub(in crate::cranelift_backend) pattern_fields: usize,
+    pub(in crate::cranelift_backend) case_body: StaticOriginId,
     pub(in crate::cranelift_backend) source_owner: super::units::PredeclaredFunctionId,
     pub(in crate::cranelift_backend) route: HostResponseRoute,
     pub(in crate::cranelift_backend) field_binders: Vec<u32>,
+}
+
+fn relay_pattern_field_ordinal(
+    binding: ProducerLocalBinding,
+    source_owner: super::units::PredeclaredFunctionId,
+    case_body: StaticOriginId,
+    binders: usize,
+) -> Result<u32, CraneliftBackendError> {
+    if binding.binding_owner != source_owner
+        || binding.binding_origin != case_body
+        || binding.binding_ordinal as usize >= binders
+    {
+        return Err(planner_error(
+            "an arm's Effect reads a binder that is not a field of its pattern",
+        ));
+    }
+    Ok(binding.binding_ordinal)
+}
+
+#[cfg(test)]
+mod relay_pattern_field_tests {
+    use super::*;
+
+    /// Promise class: durable invariant. An enclosing binding with ordinal
+    /// zero is not this pattern's field zero, even under the same owner.
+    #[test]
+    fn relay_arm_enclosing_ordinal_below_arity_refuses() {
+        let owner = super::super::units::PredeclaredFunctionId::for_test(0);
+        let case_body = StaticOriginId(5);
+        let binding = ProducerLocalBinding {
+            binding_owner: owner,
+            binding_origin: StaticOriginId(4),
+            binding_ordinal: 0,
+        };
+        let error = relay_pattern_field_ordinal(binding, owner, case_body, 2)
+            .expect_err("a different binding origin is not a field of this pattern");
+        assert!(format!("{error:?}").contains(
+            "an arm's Effect reads a binder that is not a field of its pattern"
+        ));
+        assert_eq!(relay_pattern_field_ordinal(
+            ProducerLocalBinding { binding_origin: case_body, ..binding },
+            owner, case_body, 2,
+        ).expect("the actual field of this pattern"), 0);
+    }
 }
 
 fn checked_host_response_call(
@@ -1813,6 +1858,7 @@ impl StaticTransitionPlan<'_> {
                 .find(|(_, case)| case.constructor == *constructor)
                 .ok_or_else(|| planner_error("a relay handler arm has no matching pattern"))?;
             let constructor_tag = self.case_constructor_identity(*leaf, case_index)?.tag_abi_word()?;
+            let case_body = self.child_static_origin(*leaf, 1 + case_index)?;
             let source_owner = self.semantic.function_owner(route.effect_origin)?
                 .ok_or_else(|| planner_error("a relay handler Effect has no source owner"))?;
             let root = super::continuations::continuation_owner_source_root(self, source_owner)?;
@@ -1841,15 +1887,15 @@ impl StaticTransitionPlan<'_> {
                     let ContinuationSourceCoordinate::ProducerLocal { binding, .. } = source.coordinate else {
                         return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
                     };
-                    if binding.binding_owner != source_owner || binding.binding_ordinal as usize >= case.binders {
-                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
-                    }
-                    field_binders.push(binding.binding_ordinal);
+                    field_binders.push(relay_pattern_field_ordinal(
+                        binding, source_owner, case_body, case.binders,
+                    )?);
                 }
             }
             Ok(RelayHostResponseArm {
                 constructor: constructor.clone(), constructor_tag,
-                pattern_fields: case.binders, source_owner, route: *route, field_binders,
+                pattern_fields: case.binders, case_body, source_owner,
+                route: *route, field_binders,
             })
         }).collect()
     }

@@ -467,17 +467,20 @@ impl<'a> Lowering<'a> {
     /// runs afterwards -- it additionally requires the emitted and dispositioned
     /// sets to be DISJOINT, so dispositioning a join that was in fact emitted
     /// refuses rather than passing.
+    pub(super) fn provably_dead_arm_body_for_relay(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        self.static_transition_plan.provably_dead_arm_body_containing(
+            effect_origin, &runtime_producible_constructors(&self.process_symbols),
+        )
+    }
+
     fn disposition_dead_arm_joins(
         &mut self,
         effect_origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
-        let Some(arm_body) = self
-            .static_transition_plan
-            .provably_dead_arm_body_containing(
-                effect_origin,
-                &runtime_producible_constructors(&self.process_symbols),
-            )?
-        else {
+        let Some(arm_body) = self.provably_dead_arm_body_for_relay(effect_origin)? else {
             return Ok(());
         };
         let joins = self

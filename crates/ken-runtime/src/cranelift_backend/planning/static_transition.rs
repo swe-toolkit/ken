@@ -979,6 +979,20 @@ fn inline_synthesized_seat_emission_owners(
                     .filter(|row| row.effect_origin() == seat)
                     .map(|row| row.base_owner()),
             );
+            // A relay's operation arm is emitted by its response owner even
+            // when no statically known successor row names that arm's Effect.
+            // The closed table, not every global handler Match, supplies the
+            // exact newly reaching emission population.
+            for (id, arms) in &protocol.relay_arms {
+                if arms.iter().any(|arm| arm.route.effect_origin == seat) {
+                    let response = plan.static_response_continuations.iter()
+                        .find(|row| row.id() == *id)
+                        .ok_or_else(|| planner_error(
+                            "a relay arm names a response owner without an initial row",
+                        ))?;
+                    owners.push(response.base_owner());
+                }
+            }
         }
     }
     owners.sort();

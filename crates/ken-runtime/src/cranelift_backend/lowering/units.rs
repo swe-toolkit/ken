@@ -3647,6 +3647,7 @@ struct RelayArmEffect {
     arm: RelayHostResponseArm,
     effect: RuntimeExpr,
     provably_dead: bool,
+    dead_body: Option<StaticOriginId>,
 }
 
 struct RelayEffect {
@@ -4317,9 +4318,13 @@ fn verify_pending_vis_finished_body(
         PendingVisRelayResume::Row { .. } => relay.arms.iter().filter(|arm| !arm.provably_dead).count(),
         PendingVisRelayResume::Trap(_) => 0,
     }).sum::<usize>();
+    let relay_arm_count = relays.iter().map(|relay| match &relay.relay.resume {
+        PendingVisRelayResume::Row { .. } => relay.arms.len(),
+        PendingVisRelayResume::Trap(_) => 0,
+    }).sum::<usize>();
     if facts.calls.len() != successors.len() + relay_call_count + 1
         || facts.relay_members.len() != relays.len()
-        || facts.relay_arm_branches.len() != relay_call_count
+        || facts.relay_arm_branches.len() != relay_arm_count
         || facts.member_branches.len() != successors.len()
         || facts.member_ids.len() != successors.len()
         || facts.selected_blocks.len() != successors.len()
@@ -4327,9 +4332,13 @@ fn verify_pending_vis_finished_body(
         || facts.calls[0].row != initial.id()
         || facts.calls[0].ret_identity != initial.k_ret_identity().tag_abi_word()?
     {
-        return Err(error(
-            "the returned successor set or initial K call is incomplete",
-        ));
+        return Err(error(&format!(
+            "the returned successor set or initial K call is incomplete: calls={} successors={} live_relay_arms={} relay_members={} expected_relays={} arm_branches={} member_branches={} member_ids={} selected_blocks={} payload_loads={} initial={:?}",
+            facts.calls.len(), successors.len(), relay_call_count,
+            facts.relay_members.len(), relays.len(), facts.relay_arm_branches.len(),
+            facts.member_branches.len(), facts.member_ids.len(), facts.selected_blocks.len(),
+            facts.payload_loads.len(), facts.calls.first().map(|call| (call.row, call.ret_identity)),
+        )));
     }
     for inst in func
         .layout
@@ -5306,10 +5315,13 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     return Err(backend_module(LoweringCause::PlannerInvariant,
                         "a relay handler arm has no exact Effect occurrence".to_string()));
                 }
-                Ok(RelayArmEffect {
-                    arm: arm.clone(), effect,
-                    provably_dead: compiler.effect_arm_is_provably_dead(arm.route.effect_origin)?,
-                })
+                let provably_dead = compiler.effect_arm_is_provably_dead(arm.route.effect_origin)?;
+                let dead_body = compiler.provably_dead_arm_body_for_relay(arm.route.effect_origin)?;
+                if provably_dead != dead_body.is_some() {
+                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                        "a relay arm's deadness and disposition body disagree".to_string()));
+                }
+                Ok(RelayArmEffect { arm: arm.clone(), effect, provably_dead, dead_body })
             }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
             Ok(RelayEffect { origin, relay, arms })
         }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
@@ -5344,7 +5356,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     .chain(successor.operation_arguments.keys().copied())
             }))
             .chain(emission.relays.iter().flat_map(|relay| relay.arms.iter()
-                .map(|arm| arm.arm.route.effect_origin)))
+                .flat_map(|arm| std::iter::once(arm.arm.route.effect_origin)
+                    .chain(arm.dead_body))))
         {
             required.extend(
                 compiler

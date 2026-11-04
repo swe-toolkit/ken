@@ -705,6 +705,7 @@ mod tests {
                 owners: BTreeMap::new(),
                 members: BTreeMap::new(),
                 relays: BTreeMap::new(),
+                relay_arms: BTreeMap::new(),
                 frames: BTreeMap::from([(
                     frame,
                     PendingVisFrameWidth {
