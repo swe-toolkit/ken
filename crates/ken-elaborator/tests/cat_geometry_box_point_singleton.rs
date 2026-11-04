@@ -33,7 +33,7 @@ import Core.Classes.LawfulClasses (leq_nat)
 import Core.Logic.Transport (cong, sym, trans)
 
 import Algorithm.Geometry.NatBox
-  (Point, MkBox, contains, inside, area, contains_point_box, contains_point_box_equal, inside_complete, area_inside, area_point_box)
+  (Point, Box, MkBox, contains, inside, area, contains_point_box, contains_point_box_equal, inside_complete, area_inside, area_point_box)
 
 theorem client_singleton (p : Point) (q : Point) : IsTrue (contains (MkBox p p) q) → Equal Point q p =
   contains_point_box_equal p q
