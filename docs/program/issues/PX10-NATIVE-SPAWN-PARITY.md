@@ -127,11 +127,13 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   resumed on `wp/PX10-NATIVE-SPAWN-PARITY-incB-unit-b-r2`, rebased tip
   `8b5744bd2` (the parked `5cd38e8b5` is unmoved). Stop 12: live AC-1
   matches all 17 effects, then takes planned trap 44
-  (evt_51k698amn93ah); B-closure is held on a Research advisory
-  (evt_3wx1c54nq5fxd). Argv and null on the standard profile still
-  record `CapacityExhausted{Invocation, Words, 256, 269}`; the Architect
-  rules raising the AC-1 rows' profile against reducing the demand
-  together with trap 44.
+  (evt_51k698amn93ah). The Architect located it as entry 16 and recut
+  (evt_zbd2e5wv721d, on Research evt_2v4hdh6wpzk5s): B-closure is held
+  on `RT-NATIVE-BRACKET-RETURN-CLAUSE` and resumes on r2 after it
+  lands. Argv and null on the standard profile still record
+  `CapacityExhausted{Invocation, Words, 256, 269}`, deferred until that
+  WP's AC-3 holds. Argv's trap 53 after ReadEof is a separate symptom;
+  if it survives the clause, it becomes entry 17.
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus
@@ -202,7 +204,8 @@ The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
 evt_5kjjy0w0gzma, evt_p37pc6dwdk3h, evt_qkp7qcj87b3q and
 evt_3nvw9veeqa274; entries 11 to 13, evt_6ap56syy0smt6,
-evt_7cm821pbn97vt and evt_1339kvspms2zv) has thirteen entries:
+evt_7cm821pbn97vt and evt_1339kvspms2zv; entry 16, evt_zbd2e5wv721d)
+has sixteen entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -264,17 +267,18 @@ evt_7cm821pbn97vt and evt_1339kvspms2zv) has thirteen entries:
     match with no label reader, because the operand plane does not
     carry labelled-ness. This shares entries 1 and 3-6's predicate.
     The closure deleted the label (`5dfe23688`).
-16. After the producer-alternative label was deleted, live AC-1 matches
-    all 17 effects and then takes the default arm of a checked HostIO
-    match (planned trap 44). Keyed on: UNLOCATED. Neither the trapping
-    match (buffer_body's or main's bracket-outcome match) nor its
-    producing word is measured. Hypothesis: a body answer transported
-    past its bracket's settlement, which is entry 15's predicate.
+16. Region 0's body outcome reaches the bracket's resume K without its
+    return clause running: no release and no outcome_merge. This is
+    measured at live 420 and null 979. The settlement is planned InPlace
+    at response row 3's source, which no runtime body exit passed
+    through. Keyed on the existence of a response owner. The path that
+    carries the body outcome to 420 is unmeasured.
 
-Entries 10 to 13 share one predicate: the relay's resume state is located
-through the response-row plane, but its identity is the runtime-carried K.
-The closure is a resume that reads nothing from any row
-(evt_7r0mddesaz38j). Entries 1, 3, 4, 5 and 6 share one predicate: an
+Entries 10 to 13 and 16 share one predicate: a continuation's work is
+located on the response-row plane, while the runtime control transfer
+runs on the K. The closure is a resume that reads nothing from any row
+(evt_7r0mddesaz38j), and a bracket return clause on the frame
+(`RT-NATIVE-BRACKET-RETURN-CLAUSE`). Entries 1, 3, 4, 5 and 6 share one predicate: an
 identity read from one plane and checked or consumed under another key,
 such as the emitting unit rather than the static owner. Entries 7, 8 and 9
 carry entry 6's predicate. B-closure sidesteps it for parity by forwarding
