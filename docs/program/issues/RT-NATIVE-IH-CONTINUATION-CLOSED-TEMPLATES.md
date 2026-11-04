@@ -91,9 +91,12 @@ reads it next.
   guard, or giving `arm()` a fallback that returns a member, reddens
   that guard's own row. The build-level refusal row needs a consumer,
   so it is PX10 B-closure's.
-- **AC-3.** Every native plan output is unchanged, because no consumer
-  reads the authority. The 17 D0-14 binaries run base against candidate
-  with identical results.
+- **AC-3** (recut evt_20k2v4z3ev0pg). Every native plan output is
+  unchanged, because no consumer reads the authority: full-workspace CI
+  on the exact candidate SHA is green, and it runs the 17 D0-14
+  binaries. The authority's only output effect is enumerate's
+  `KeyRepeats` refusal, which would redden a binary in CI. No local
+  base-against-candidate sweep is required.
 
 ## Stop conditions
 
