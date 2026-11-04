@@ -628,6 +628,47 @@ pub theorem ordered_walk_forward
     rest
     (ordered_forward q d g order s next first)
 
+pub theorem graph_reachable_antisymmetric
+      (q : Type)
+      (fq : Finite q)
+      (d : DecEq q)
+      (g : Graph q)
+      (order : TopoOrder q d g)
+      (s : q)
+      (t : q)
+    : Equal Bool (graph_reachable q fq g s (d.eq t)) True
+      → Equal Bool (graph_reachable q fq g t (d.eq s)) True
+      → Equal q s t =
+  λreach_st.
+    λreach_ts.
+      let
+        forth_witness =
+          require_some
+            (ReachWitness q g s (d.eq t))
+            (graph_find_walk q fq g s (d.eq t))
+            (graph_find_walk_some q fq g s (d.eq t) reach_st);
+        back_witness =
+          require_some
+            (ReachWitness q g t (d.eq s))
+            (graph_find_walk q fq g t (d.eq s))
+            (graph_find_walk_some q fq g t (d.eq s) reach_ts)
+      in
+        match forth_witness {
+          MkReach u hit_u forth ↦
+            match back_witness {
+              MkReach w hit_w back ↦
+                walks_antisymmetric
+                  q
+                  d
+                  g
+                  order
+                  s
+                  t
+                  (walk_transport_end q g s u t (sym q t u (d.sound t u hit_u)) forth)
+                  (walk_transport_end q g t w s (sym q s w (d.sound s w hit_w)) back)
+            }
+        }
+
 pub data OrderOrCycle (q : Type) (d : DecEq q) (g : Graph q) : Type where {
   HasOrder : TopoOrder q d g → OrderOrCycle q d g;
   HasCycle : Cycle q g → OrderOrCycle q d g
@@ -1083,6 +1124,28 @@ fn walk_transport_end
       (walk : Walk q g s t)
     : Walk q g s u =
   J (λpoint _. Walk q g s point) walk same
+
+theorem walks_antisymmetric
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (order : TopoOrder q d g)
+      (s : q)
+      (t : q)
+      (forth : Walk q g s t)
+    : Walk q g t s → Equal q s t =
+  match forth {
+    WalkHere ↦ λback. Refl;
+    WalkStep u v e prefix ↦
+      λback.
+        absurd
+          (cycle_refutes_order
+            q
+            d
+            g
+            order
+            (MkCycle q g u v e (walk_append q g v s u back prefix)))
+  }
 
 fn walk_lift
       (q : Type)
