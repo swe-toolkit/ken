@@ -25,6 +25,7 @@ import Data.Vector.Vector (Vec, VNil, VCons)
 import Algorithm.LinearAlgebra.NatMatrix
   (matrix_product,
     matrix_zero,
+    transpose,
     identity,
     matrix_product_zero_left,
     matrix_product_zero_right,
