@@ -686,12 +686,7 @@ impl<'a> Lowering<'a> {
                         Some(suffix) if !suffix.is_empty() => {
                             self.lower_computational_producer_expr(builder, body, &case_env, suffix)?
                         }
-                        Some(_) | None => self.lower_computational_producer_expr(
-                            builder,
-                            body,
-                            &case_env,
-                            &[EliminatorFrame::InvocationReturn],
-                        )?,
+                        Some(_) | None => self.lower_expr(builder, body, &case_env)?,
                     };
                     if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
                         terminal_trap.get_or_insert_with(|| trap.clone());
@@ -969,12 +964,7 @@ impl<'a> Lowering<'a> {
                     Some(suffix) if !suffix.is_empty() => {
                         self.lower_computational_producer_expr(builder, body, &case_env, suffix)?
                     }
-                    Some(_) | None => self.lower_computational_producer_expr(
-                        builder,
-                        body,
-                        &case_env,
-                        &[EliminatorFrame::InvocationReturn],
-                    )?,
+                    Some(_) | None => self.lower_expr(builder, body, &case_env)?,
                 };
                     if self.seal_source_trap_branch(builder, &lowered)? {
                         continue;
@@ -1100,12 +1090,7 @@ impl<'a> Lowering<'a> {
                 Some(suffix) if !suffix.is_empty() => {
                     self.lower_computational_producer_expr(builder, body, env, suffix)?
                 }
-                Some(_) | None => self.lower_computational_producer_expr(
-                    builder,
-                    body,
-                    env,
-                    &[EliminatorFrame::InvocationReturn],
-                )?,
+                Some(_) | None => self.lower_expr(builder, body, env)?,
             };
             if self.seal_source_trap_branch(builder, &lowered)? {
                 continue;
@@ -1273,12 +1258,7 @@ impl<'a> Lowering<'a> {
                 Some(suffix) if !suffix.is_empty() => {
                     self.lower_computational_producer_expr(builder, body, &case_env, suffix)?
                 }
-                Some(_) | None => self.lower_computational_producer_expr(
-                    builder,
-                    body,
-                    &case_env,
-                    &[EliminatorFrame::InvocationReturn],
-                )?,
+                Some(_) | None => self.lower_expr(builder, body, &case_env)?,
             };
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     builder.switch_to_block(next);
@@ -1775,12 +1755,7 @@ impl<'a> Lowering<'a> {
                     Some(suffix) if !suffix.is_empty() => {
                         self.lower_computational_producer_expr(builder, body, &arm_env, suffix)?
                     }
-                    Some(_) | None => self.lower_computational_producer_expr(
-                        builder,
-                        body,
-                        &arm_env,
-                        &[EliminatorFrame::InvocationReturn],
-                    )?,
+                    Some(_) | None => self.lower_expr(builder, body, &arm_env)?,
                 };
                 match &lowered {
                     LoweringOperand::Specialized(Lowered::Trap(trap)) => {
