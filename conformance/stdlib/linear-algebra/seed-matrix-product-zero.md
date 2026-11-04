@@ -7,10 +7,14 @@ Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO.md`.
 
 Status: authored on the prestated seed child. The six accepted law
 applications and the isolated Refl refusal/control pair follow final
-AC-0. They are not a substitute for the generic checked laws. The seed
-has not been run against an assembled candidate or by the official
-conformance runner. Foundation's scratch D0 results are attributed to
-Foundation and Architect; CV ran no package tests or official runner.
+AC-0. They are not a substitute for the generic checked laws. Foundation
+QA reports that, at candidate
+`512b3d1e25ea0043877cb375450fa5243b42dc29`, a temporary roots-loaded
+harness extracted the exact seed fences. The original import failed at
+`transpose`; adding only the missing import made the accepted and
+refused fences pass the temporary harness 1/1. This is not official
+conformance-runner execution. Foundation's and Architect's scratch D0
+results are attributed; CV ran no package tests or official runner.
 
 ## Accepted shared client
 
@@ -25,10 +29,10 @@ import Data.Vector.Vector (Vec, VNil, VCons)
 import Algorithm.LinearAlgebra.NatMatrix
   (matrix_product,
     matrix_zero,
-    transpose,
     identity,
     matrix_product_zero_left,
     matrix_product_zero_right,
+    transpose,
     transpose_zero)
 
 const one : Nat = Suc Zero
@@ -141,15 +145,16 @@ theorem reject_identity_as_zero_product
 
 ## Evidence and originality boundary
 
-Final AC-0's scratch measurements are Architect-reported D0 evidence,
-not execution of this seed. They report the identity-factor `Refl` row
-refused and the zero-factor `Refl` control accepted. Foundation's
-implementer ran the D0 probe at base
-`165a98acec79d5e367bfeaa5472e0fd9149313fb`; Foundation reported it
-passed 2/2 with equal trusted identity sets (109 → 109) and no added
-`Axiom`. These reports do not establish that CV ran this seed, an
-assembled candidate, the package tests, or the official conformance
-runner.
+Final AC-0's scratch measurements are Architect-reported D0 evidence.
+They report the identity-factor `Refl` row refused and the zero-factor
+`Refl` control accepted. Foundation's implementer ran the D0 probe at
+base `165a98acec79d5e367bfeaa5472e0fd9149313fb`; Foundation reported
+it passed 2/2 with equal trusted identity sets (109 → 109) and no added
+`Axiom`. Foundation QA separately reports that the unmodified exact
+candidate seed failed on the missing `transpose` import, and that its
+import-only temporary control passed the accepted and refused fences
+1/1. That is QA-reported scratch evidence, not an official conformance
+run; CV ran no package tests or official runner.
 
 No `local/refs` or external reference source was consulted. This seed
 is based on the Ken spec, the frame, and the final AC-0 ruling.
