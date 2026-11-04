@@ -48,7 +48,9 @@ Substitution is a simultaneous single pass: an inserted expression is not
 substituted again. `compose_env` evaluates each
 variable's replacement under the original environment, and two laws relate
 that operation to evaluation
-and the forward direction of polynomial equality. These laws do not claim
+and the forward direction of polynomial equality. A further checked law says
+that two substitutions whose images are canonically equal at every variable
+give canonically equal results on the same expression. These laws do not claim
 that substitution preserves a `False` answer. `compose_subst` applies its
 second argument first and then its first argument to each inserted expression.
 Two checked laws establish structural composition and constructor identity;
@@ -890,6 +892,33 @@ pub theorem poly_eq_substitute
               (eval env (substitute s e2))
               (eval composed e2)
               (eval_substitute env s e2))))
+
+pub theorem poly_eq_substitute_pointwise
+      (s : Nat → Expr)
+      (t : Nat → Expr)
+      (e : Expr)
+      (h : (v : Nat) → IsTrue (poly_eq (s v) (t v)))
+    : IsTrue (poly_eq (substitute s e) (substitute t e)) =
+  match e {
+    EConst c ↦ poly_eq_refl (EConst c);
+    EVar v ↦ h v;
+    EAdd a b ↦
+      poly_eq_add
+        (substitute s a)
+        (substitute t a)
+        (substitute s b)
+        (substitute t b)
+        (poly_eq_substitute_pointwise s t a h)
+        (poly_eq_substitute_pointwise s t b h);
+    EMul a b ↦
+      poly_eq_mul
+        (substitute s a)
+        (substitute t a)
+        (substitute s b)
+        (substitute t b)
+        (poly_eq_substitute_pointwise s t a h)
+        (poly_eq_substitute_pointwise s t b h)
+  }
 
 pub fn compose_subst (s : Nat → Expr) (t : Nat → Expr) (v : Nat) : Expr = substitute s (t v)
 
@@ -2890,10 +2919,18 @@ hypotheses with private addition and multiplication congruence. In
 `poly_eq_substitute`, `poly_eq_sound` supplies equality under the composed
 environment; `eval_substitute` transports each side to the substituted
 expression, and `poly_eq_complete` yields the `True` decision. No proof of a
-reverse implication is used or claimed. `substitute_compose` inducts over the
-original expression and lifts the induction hypotheses through `EAdd` and
-`EMul` with private congruence proofs. `substitute_var` uses the same structural
-steps with `EVar` as the identity map; neither theorem equates functions.
+reverse implication is used or claimed.
+
+`poly_eq_substitute_pointwise` inducts on the expression: a constant uses
+`poly_eq_refl`, a variable returns the pointwise premise at that index, and
+the sum and product cases combine the two induction hypotheses with
+`poly_eq_add` or `poly_eq_mul`. It adds no hypothesis beyond the pointwise
+premise and does not equate the two substitution maps.
+
+`substitute_compose` inducts over the original expression and lifts the
+induction hypotheses through `EAdd` and `EMul` with private congruence
+proofs. `substitute_var` uses the same structural steps with `EVar` as the
+identity map; neither theorem equates functions.
 
 `deriv_respects_eval` proves a Taylor expansion by structural induction on an
 expression, with a private natural-valued remainder. The arithmetic in its
@@ -2976,7 +3013,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–12 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–13 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -2988,13 +3025,14 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
-[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md), and
-[congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md)
+[normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
+[congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md), and
+[pointwise-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-pointwise-congruence.md)
 specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and twenty-eight checked theorems; Horner, substitution and differentiation
+and twenty-nine checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3015,7 +3053,14 @@ premise-free generic law under a selective import, checks its owner, checked
 body and unchanged trusted-`GlobalId` identities, then checks the actual
 constant-factor seed's complete accepted client before its isolated
 `Proved` refusal. The accepted control retains the derivative on the right;
-the refused claim drops it. Package tests are not official conformance-runner
-execution or CI. The extension adds no Axiom, postulate, primitive or foreign
-operation; inherited trust from the prelude and dependencies remains distinct
-from local trust.
+the refused claim drops it.
+
+The §13 package test applies the pointwise law under a selective import at
+arbitrary substitutions and expression, checks its owner and unchanged
+trusted-`GlobalId` identities, then accepts the law and a direct `Proved`
+control under two pointwise-equal images and refuses a wrong-image claim and
+its false image premise at their own proof sites.
+
+Package tests are not official conformance-runner execution or CI. The
+extension adds no Axiom, postulate, primitive or foreign operation; inherited
+trust from the prelude and dependencies remains distinct from local trust.
