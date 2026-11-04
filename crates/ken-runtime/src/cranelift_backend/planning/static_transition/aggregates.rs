@@ -153,9 +153,6 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// A defunctionalized recursive-position residual: forwarded child,
     /// worker Parameter tail, then the complete context Capture run.
     RecursivePositionResidual,
-    /// The [Child, Label] Record one issued producer alternative set returns;
-    /// keyed on the set and written by every member in its own arm.
-    ProducerAlternative,
 }
 
 /// One parent-field disposition shared by the producer and both consumers.
@@ -3348,7 +3345,6 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     /// closure whose body is selected statically.
     BoundaryClosureEnvironment,
     RecursivePositionResidual,
-    ProducerAlternative,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -3951,8 +3947,7 @@ impl SynthesizedHostResultTree {
             SynthesizedAggregateRoot::UnitBoundaryEnvironment
             | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
             | SynthesizedAggregateRoot::BoundaryClosureEnvironment
-            | SynthesizedAggregateRoot::RecursivePositionResidual
-            | SynthesizedAggregateRoot::ProducerAlternative => {
+            | SynthesizedAggregateRoot::RecursivePositionResidual => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -6111,60 +6106,6 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             shape: PlannedAggregateShape::Record,
             declared_children: Some(positional_capture_declared_children(2)?),
             children, meet, allocation,
-        });
-    }
-    // One governed [Child, Label] Record per set, shared by every member's
-    // writing arm. Child is the same result occurrence for every member.
-    for set in &plan.producer_alternative_sets {
-        let authority = occurrence_authority(plan, set.result)?;
-        let child = PlannedOccurrenceChildAuthority {
-            origin: set.result,
-            position: 0,
-            owner: authority.owner,
-            lifetime: authority.lifetime,
-        };
-        let owners = aggregate_child_referent_owners(plan, &child)?;
-        if owners.is_empty() {
-            return Err(planner_error("producer alternative Child has no referent owner"));
-        }
-        let children = vec![
-            PlannedAggregateChild {
-                position: 0,
-                origin: Some(set.result),
-                field_identity: None,
-                lifetime: authority.lifetime,
-                owners,
-            },
-            PlannedAggregateChild {
-                position: 1,
-                origin: None,
-                field_identity: None,
-                lifetime: PlannedReferentLifetime::Persistent,
-                owners: lifetime_referent_affinity(PlannedReferentLifetime::Persistent),
-            },
-        ];
-        let escapes = children.iter().any(|field| {
-            field.owners.contains(&BoundaryReferentOwner::InvocationArena)
-        });
-        let (meet, allocation) = if escapes {
-            (PlannedReferentLifetime::ActivationOwned, PlannedAggregateAllocation::InvocationAggregate)
-        } else {
-            (PlannedReferentLifetime::Persistent, PlannedAggregateAllocation::PersistentGround)
-        };
-        records.push(PlannedAggregateOwnership {
-            id: AggregateOccurrenceId(0),
-            producer: AggregateOccurrenceProducer::SynthesizedUse {
-                owner: set.emission_owner,
-                seat: set.result,
-                path: SynthesizedAggregatePath::root(SynthesizedAggregateRoot::ProducerAlternative),
-                role: SynthesizedAggregateRole::ProducerAlternative,
-            },
-            owner: plan.semantic.function_owner(set.result)?,
-            shape: PlannedAggregateShape::Record,
-            declared_children: Some(positional_capture_declared_children(2)?),
-            children,
-            meet,
-            allocation,
         });
     }
     records.sort_by(|left, right| left.producer.cmp(&right.producer));
@@ -10655,32 +10596,6 @@ impl<'src> StaticTransitionPlan<'src> {
         }
         Ok(record.id)
     }
-    /// The one aggregate allocation issued for a whole result alternative set.
-    /// This is resolved from current ownership (which may have been rebuilt),
-    /// not cached in the set or derived from an emitting member.
-    pub(in crate::cranelift_backend) fn producer_alternative_record(
-        &self,
-        set: &super::ProducerAlternativeSet,
-    ) -> Result<AggregateOccurrenceId, CraneliftBackendError> {
-        let producer = AggregateOccurrenceProducer::SynthesizedUse {
-            owner: set.emission_owner,
-            seat: set.result,
-            path: SynthesizedAggregatePath::root(SynthesizedAggregateRoot::ProducerAlternative),
-            role: SynthesizedAggregateRole::ProducerAlternative,
-        };
-        let mut matching = self.aggregate_ownership.iter().filter(|record| record.producer == producer);
-        let record = matching.next().ok_or_else(|| planner_error(
-            "a producer alternative set has no governed Record allocation",
-        ))?;
-        if matching.next().is_some()
-            || record.shape != PlannedAggregateShape::Record
-            || record.children.len() != 2
-        {
-            return Err(planner_error("a producer alternative Record is duplicated or is not [Child, Label]"));
-        }
-        Ok(record.id)
-    }
-
     /// The occurrence identity of one **compiler-synthesized** aggregate use.
     ///
     /// ⛔ The key is `owner + seat + path + full role`, never the role alone. A
