@@ -84,8 +84,10 @@ base, stop and report the mismatch; do not build around it.
   producer alternative sets, so these rows are also the labelled
   transport's execution parity (evt_573z7twxznjt9). A mutant that swaps
   two members' labels at the writer reddens one of them, and a mutant
-  that writes the bare payload without its label is caught at run time
-  by the reader assertion.
+  that writes the bare payload without its label is caught by the issued
+  reader of `RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER` (C3), not by
+  the seat's assertion, which only validates (evt_7xv7216msypg). An
+  ordinary consumer handed a labelled answer is refused at compile time.
 - **AC-1b (settlement).** For a `withChild` body that takes stdout and
   waits, the trace settles the `PipeRead` and the `SpawnPlan` exactly
   once each, before the child, in reverse acquisition order, on both
@@ -120,7 +122,14 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   so B-closure forwards by operation tag and resumes from that set
   (Steward evt_6ppgz0hsqxmm, Research evt_1ebcpy76v1e9a, routing D0-23
   evt_jc75x84wmcw7). That WP merged at `45074052a`; checkpoint
-  `2ad1b31d0` resumed on it (evt_47r0prwyrhxb1).
+  `2ad1b31d0` resumed on it (evt_47r0prwyrhxb1). Stop 11 found that a
+  labelled transport answer has no reader (evt_7xv7216msypg), so
+  B-closure is parked at `5cd38e8b5` on
+  `RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER` and reruns AC-1 after
+  it lands. With compose, argv, live and null on the standard profile,
+  the run records `CapacityExhausted{Invocation, Words, 256, 269}`.
+  Remeasure after the closure; if demand still exceeds 256, choose
+  between raising the AC-1 rows' profile and reducing the demand.
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus
@@ -241,6 +250,18 @@ evt_7cm821pbn97vt and evt_1339kvspms2zv) has thirteen entries:
     continuation inputs from the resolved response row, but the relay
     carries only its operation word and its K environment word. Keyed on
     the response row as resume authority.
+14. The closeout's required set was keyed on the row's effect and
+    argument roots, making the row the lowering authority. This shares
+    entries 10-13's predicate.
+15. A returned Vis that is both a pending-Vis successor row and a
+    checked-IH transport destination is lowered by whichever arm runs,
+    honouring only that arm's plan. Two planner planes claim one causal
+    edge, with no arbitration (withdrawn at D0 round 14, reinstated at
+    round 19 after a check-8 miss). Measured from the transport side,
+    the labelled answer from core.rs:9455 reaches an ordinary Result
+    match with no label reader, because the operand plane does not
+    carry labelled-ness. This shares entries 1 and 3-6's predicate.
+    The closure is C1-C3.
 
 Entries 10 to 13 share one predicate: the relay's resume state is located
 through the response-row plane, but its identity is the runtime-carried K.
