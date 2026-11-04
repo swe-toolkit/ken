@@ -2919,10 +2919,18 @@ hypotheses with private addition and multiplication congruence. In
 `poly_eq_substitute`, `poly_eq_sound` supplies equality under the composed
 environment; `eval_substitute` transports each side to the substituted
 expression, and `poly_eq_complete` yields the `True` decision. No proof of a
-reverse implication is used or claimed. `substitute_compose` inducts over the
-original expression and lifts the induction hypotheses through `EAdd` and
-`EMul` with private congruence proofs. `substitute_var` uses the same structural
-steps with `EVar` as the identity map; neither theorem equates functions.
+reverse implication is used or claimed.
+
+`poly_eq_substitute_pointwise` inducts on the expression: a constant uses
+`poly_eq_refl`, a variable returns the pointwise premise at that index, and
+the sum and product cases combine the two induction hypotheses with
+`poly_eq_add` or `poly_eq_mul`. It adds no hypothesis beyond the pointwise
+premise and does not equate the two substitution maps.
+
+`substitute_compose` inducts over the original expression and lifts the
+induction hypotheses through `EAdd` and `EMul` with private congruence
+proofs. `substitute_var` uses the same structural steps with `EVar` as the
+identity map; neither theorem equates functions.
 
 `deriv_respects_eval` proves a Taylor expansion by structural induction on an
 expression, with a private natural-valued remainder. The arithmetic in its
@@ -3045,7 +3053,14 @@ premise-free generic law under a selective import, checks its owner, checked
 body and unchanged trusted-`GlobalId` identities, then checks the actual
 constant-factor seed's complete accepted client before its isolated
 `Proved` refusal. The accepted control retains the derivative on the right;
-the refused claim drops it. Package tests are not official conformance-runner
-execution or CI. The extension adds no Axiom, postulate, primitive or foreign
-operation; inherited trust from the prelude and dependencies remains distinct
-from local trust.
+the refused claim drops it.
+
+The §13 package test applies the pointwise law under a selective import at
+arbitrary substitutions and expression, checks its owner and unchanged
+trusted-`GlobalId` identities, then accepts the law and a direct `Proved`
+control under two pointwise-equal images and refuses a wrong-image claim and
+its false image premise at their own proof sites.
+
+Package tests are not official conformance-runner execution or CI. The
+extension adds no Axiom, postulate, primitive or foreign operation; inherited
+trust from the prelude and dependencies remains distinct from local trust.
