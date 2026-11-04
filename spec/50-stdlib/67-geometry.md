@@ -12,7 +12,9 @@
 > SPEC-GEOMETRY-MANHATTAN-BOX-DIAMETER §10;
 > SPEC-GEOMETRY-BOX-CORNER-MEMBERSHIP §11;
 > SPEC-GEOMETRY-BOX-INSIDE-ANTISYMMETRY §12;
-> SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE §13).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE §13;
+> SPEC-GEOMETRY-BOX-POINT-AREA §14;
+> SPEC-GEOMETRY-BOX-POINT-SINGLETON §15).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1276,3 +1278,58 @@ uses `IsTrue (contains (MkBox off off) off) = Proved`; its isolated
 false twin uses the same point box but a distinct point outside it,
 again with `Proved`. The controls establish the proof forms and
 refusal boundaries, not the two checked generic laws.
+
+## 15. A point box holds only its point
+
+> **Section 15 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-POINT-SINGLETON).** Architect's AC-0 on base
+> `dc9914142` checked the generic proof and public-client derivations
+> in scratch. The probe and named package/census targets passed; the
+> scratch `trusted_base()` identity sets matched at 114 → 114. This
+> is design evidence, not an assembled-tip check, official conformance
+> run, CI, publication, landing or measured landed trust.
+
+`Algorithm.Geometry.NatBox` must export one public Transparent checked
+proof immediately after `contains_point_box`. Its exact public type
+holds for all points `p` and `q`, with one membership premise:
+
+```ken
+pub theorem contains_point_box_equal
+      (p : Point) (q : Point)
+    : IsTrue (contains (MkBox p p) q) → Equal Point q p =
+```
+
+Together with §14's `contains_point_box`, this says a point box has
+exactly its named point as a member. The conclusion equates points,
+not boxes: it does not identify different empty-box representations
+or alter §1.1's structural box equality. No equality or validity
+premise is required. Each axis of `contains (MkBox p p) q` supplies
+both directions of `leq_nat` between the coordinates of `q` and
+`p`; checked antisymmetry gives equality of each coordinate, and
+the existing private `point_equal` assembles `Equal Point q p`.
+The new `axis_point_equal` helper follows this law and remains
+private. No §1–§14 operation or law type changes.
+
+Two consequences are derived by clients, **not** exported as further
+laws. Given `contains c p`, §3's `inside_complete` at witness `p`
+proves `inside (MkBox p p) c`: each member `q` of the point box
+equals `p` by this law and therefore belongs to `c` by equality
+transport. Then §4's `area_inside`, together with §14's
+`area_point_box`, shows `IsTrue (leq_nat (Suc Zero) (area c))`.
+These compositions add neither a point-set quotient nor an area premise
+to the public singleton theorem.
+
+The discriminating closed points are `off=(3,5)` and `other=(3,4)`.
+`other` belongs to the two-point box `MkBox other off` but is not
+`off`. A claim that its membership implies `Equal Point other off`
+by `Refl` is refused, while the same-form claim for `off` in
+`MkBox off off` is accepted. `Proved` refuses both forms and would
+not discriminate the false claim; applying the singleton law to the
+two-point box fails at its mismatched box premise instead. The
+closed pair delimits the law, not its generic proof. Architect's
+corrected-probe D0 reported 2/2, the three named geometry package
+binaries 2/2, 2/2 and 6/6, and the ambient-name census 1/1.
+The `Axiom` grep had only its unchanged prose hit before and after
+and the exact trusted identity sets matched. These are scratch
+results, not execution of the separate CV seed or an official
+conformance, CI or landed-trust verdict.
