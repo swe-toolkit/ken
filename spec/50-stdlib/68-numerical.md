@@ -10,7 +10,9 @@
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9;
 > SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10;
-> SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION §11).** The §1–2
+> SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION §11;
+> SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT §12;
+> SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY §13).** The §1–2
 > operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
@@ -1248,3 +1250,77 @@ separate the two refusals. `Refl` is not a proof of
 `rational_equiv 1/2 2/4`: that predicate is a `Prop`, not an
 `Equal` goal. The seed, its package-owned execution and official
 conformance-runner execution are separate from this Spec-only child.
+
+## 13. Inverted intervals have no members; ordered endpoints are members
+
+> **Section 13 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY).** Architect AC-0
+> `evt_7p5m1mn4fjmha` ruled D0-CLEAN on isolated scratch at
+> `c66722ce385e8759f10d5ac2ffe1d4e900a599f2`. Its harness
+> passed 2/2, twelve named regressions passed 36/36, no `Axiom`
+> declaration was added, and the 114-element `trusted_base()`
+> identity sets were equal before and after. The scratch checked a
+> fourth, `_eq`-named law only as a probe; it is not exported here.
+> These measurements do not check this Spec-only child or an
+> assembled candidate. They establish no official conformance-runner
+> execution, CI, publication, landing or measured landed trust. CV
+> owns the separate closed seed; Foundation owns the catalog and
+> package-owned test.
+
+`Algorithm.Numeric.RationalInterval` must export exactly these three
+new public Transparent checked laws, in order immediately after
+`interval_contains_respects_equiv` (§12) and before
+`interval_add_point`:
+
+```ken
+pub theorem interval_inverted_empty
+      (lo : Rational) (hi : Rational) (x : Rational)
+    : Equal Bool (rational_leq lo hi) False
+      → IsTrue (interval_contains (MkInterval lo hi) x)
+      → Bottom
+
+pub theorem interval_ordered_contains_lo
+      (lo : Rational) (hi : Rational)
+    : IsTrue (rational_leq lo hi)
+      → IsTrue (interval_contains (MkInterval lo hi) lo)
+
+pub theorem interval_ordered_contains_hi
+      (lo : Rational) (hi : Rational)
+    : IsTrue (rational_leq lo hi)
+      → IsTrue (interval_contains (MkInterval lo hi) hi)
+```
+
+The first law takes an inverted-endpoint decision and purported
+membership at **any** `x`, and derives `Bottom`. Membership supplies
+both `rational_leq lo x` and `rational_leq x hi`; transitivity would
+make `rational_leq lo hi` true, contradicting the first premise.
+The order premise alone proves each endpoint is a member: combine
+reflexivity of `rational_leq` at that endpoint with the supplied
+comparison using `bool_and` introduction. Each statement concerns
+rational **values** under §64's order, not syntactic equality of
+endpoint representations. In particular, §1.1's claim that an
+inverted interval has no member now has a checked law; when the
+endpoints are ordered, `lo` (and `hi`) supplies a member. The two
+Boolean outcomes make emptiness equivalent to inverted endpoint
+order for this representation, without changing `MkInterval` or
+requiring a proof field at construction.
+
+The contradiction is `Bottom`, not a second exported
+`interval_inverted_empty_eq` law. The high-endpoint claim is its
+own theorem, not a conjunction or a private corollary. The checked
+bodies use the existing `(proof trans for rational_leq)`,
+`(proof refl for rational_leq)` and `bool_and` projection and
+introduction proofs; no new axiom, helper, kernel form or surface
+rule is part of the contract. No §1–§12 operation or law type changes.
+
+The CV-owned closed seed must use `interval_inverted_empty` to refute
+membership of `rational_zero` in
+`MkInterval rational_one rational_zero`, supplying `Proved` for its
+inverted-order premise. Both endpoint laws apply to
+`MkInterval rational_zero rational_one`. A direct `Proved` claim that
+`rational_zero` belongs to the inverted interval refuses; the same
+form of claim on the ordered interval accepts. The scratch D0
+observed the refused row as `KernelRejected TypeMismatch` and the
+control as accepted; a refused claim without the accepted same-form
+control cannot pin inversion as the cause. These are scratch
+measurements, not execution or acceptance of the separate CV seed.

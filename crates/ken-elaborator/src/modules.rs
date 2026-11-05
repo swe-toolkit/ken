@@ -10286,7 +10286,7 @@ mod cat_numeric_interval_public_export_tests {
 
     const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 
-    /// SOURCE: spec/50-stdlib/68-numerical.md §§1–12.
+    /// SOURCE: spec/50-stdlib/68-numerical.md §§1–13.
     /// PROMISE CLASS: transition sentinel; a future numerical API extension
     /// must update this roster with the deliberate new public law or operation.
     /// MEASURED: the actual root file export table from a roots-loaded package
@@ -10331,6 +10331,9 @@ mod cat_numeric_interval_public_export_tests {
             "interval_point_contains",
             "interval_point_sound",
             "interval_contains_respects_equiv",
+            "interval_inverted_empty",
+            "interval_ordered_contains_lo",
+            "interval_ordered_contains_hi",
             "interval_add_point",
             "interval_mul_point",
             "interval_hull_contains_left",
