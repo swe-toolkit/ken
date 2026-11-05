@@ -11,7 +11,8 @@
 > SPEC-TIME-INVERTED-WINDOW-EMPTY §9;
 > SPEC-TIME-WINDOW-ALL-IDENTITY §10;
 > SPEC-TIME-WINDOW-COMMUTATION §11;
-> SPEC-TIME-WINDOW-LENGTH-BOUND §12).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-LENGTH-BOUND §12;
+> SPEC-TIME-MERGE-SEPARATED-APPEND §13).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -1124,3 +1125,74 @@ refused both and cannot distinguish them. The seed must explicitly
 import `IsTrue` and `leq_nat` in its catalog-addressed client.
 These observations do not constitute official conformance execution
 or substitute for the generic proof or a committed-tip package test.
+
+## 13. A separated merge is an append
+
+> **Section 13 status: DRAFT v0
+> (SPEC-TIME-MERGE-SEPARATED-APPEND).** Architect AC-0
+> `evt_7nw2d96tvqzv1` ruled D0-CLEAN on isolated scratch at
+> `a3f9b487b2abdf3768214e88c3d548545ce74a13`. Its generic
+> harness passed 2/2; the before/after `trusted_base()` identity
+> sets contained the same 114 GlobalIds, with none added or removed.
+> Eleven named time suites passed 28/28, and strict resolution passed
+> 7/7 with the scratch-only reject fixtures removed from its census
+> population; the original unexcluded run was 6/7. No `Axiom`
+> declaration was added. These are scratch design results, not a
+> Spec-child or assembled-candidate gate, official conformance
+> execution, CI, publication, landing or measured landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent checked law
+immediately after `trace_merge_nil_right` and before the existing
+private `trace_merge_cons_left`. Its exact public type is:
+
+```ken
+pub theorem trace_merge_separated
+      (p : Type) (xs : List (Event p)) (ys : List (Event p))
+    : ((x : Event p)
+        → list_elem (Event p) x xs
+        → (y : Event p)
+        → list_elem (Event p) y ys
+        → Equal Bool (event_before p x y) True)
+      → Equal (List (Event p)) (trace_merge p xs ys) (list_append (Event p) xs ys)
+```
+
+Separation is a **membership-quantified function**: for every member
+`x` of `xs` and every member `y` of `ys`, `event_before p x y`
+returns `True`. By §1.1, this compares event times with `leq_nat`;
+equal timestamps are permitted and §1.2's left tie rule retains the
+left event first. The premise does not say either input trace is
+`time_ordered`, and the theorem holds for unordered traces as well.
+If a side is empty, the separation function is vacuously supplied.
+The result is structural equality of lists, not mere membership or
+an equality up to event permutation.
+
+This refines §4's statement that merge is not append *in general*:
+when all left events precede or tie all right events, the merge takes
+the left trace in its original order before the right trace, so it
+**is** append. Section 4's text and its three membership laws stay
+unchanged. Neither the converse of the separation law nor a
+`trace_merge_starts_before` head-form law is specified; the latter
+was a scratch probe, not a public export or a retained private law.
+
+The checked body inducts on `xs`, using private
+`trace_merge_cons_left` and a new private
+`trace_separated_starts_after` to supply the comparison between the
+left head and each right member. The helper follows the public
+`trace_merge_separated` declaration and precedes
+`trace_merge_cons_left`. The recursive call restricts the separation
+premise to the left tail via `list_elem_later`. The body changes no
+§1–§12 operation or law type, adds no `Axiom`, kernel rule or surface
+form, and requires no `time_ordered` premise or `list_all` bridge.
+
+For an ordered trace split into adjacent windows by §7's
+`trace_window_split`, the separated-merge law can rejoin the windows.
+A client can establish the quantified premise from
+`trace_window_member_sound` and the shared split bound; the checked
+D0 client did so over open `p`, `lo`, `mid`, `hi` and `tr`. The CV-owned
+closed seed must pair an interleaved append-equation refusal with an
+accepted same-form separated control, both using `Refl`. Scratch D0
+refused the interleaved claim with E0038 but accepted the separated
+control. `Proved` refused even the true separated equation with
+K0004, so it cannot distinguish interleaving. The seed and its
+package-owned execution are separate deliveries; this Spec-only
+section claims neither their execution nor official conformance.
