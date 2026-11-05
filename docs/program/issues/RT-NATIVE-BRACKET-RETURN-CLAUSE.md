@@ -134,8 +134,9 @@ rebases onto the candidate.
 
 ## §1a and §1b
 
-§1a is 1 (Step 1 stop, evt_11htjzqy83kvj). Step 1 passed on candidate
-`06dc75fce` (evt_7xb5rse5pv5by). The §1b symptom inventory:
+§1a is 2 (Step 1 stop, evt_11htjzqy83kvj; Step 2 fix v1 stop,
+evt_4j8qezfw9mahd). Step 1 passed on candidate `06dc75fce`
+(evt_7xb5rse5pv5by). The §1b symptom inventory:
 
 1. The return-clause check was keyed on S's lexical parent, a case-0
    ComputationalMatch, and on the local eliminator stack: lexical shape
@@ -146,6 +147,10 @@ rebases onto the candidate.
    population: every live and null line has no Active frame and no
    region's clause on the stack, and every pin line has one of them, so
    the check was narrowed to that pair.
+2. The dropped return clause was composed after the carried match
+   returned its answer, while the claims inside that match still lowered
+   without it. That is keyed on the call's returned answer, not on the
+   stack the match's continuations inherit.
 
 The Step 1 rerun measured the four AC-2 exceptions on r2 alone, and each
 fails there identically.

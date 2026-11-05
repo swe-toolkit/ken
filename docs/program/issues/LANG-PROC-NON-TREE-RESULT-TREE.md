@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-NON-TREE-RESULT-TREE
 title: "Spec 36 §2.5 elaborates `proc f (x : A) : B visits ρ` to `f↓ : caps → ⟦A⟧ → ITree ⟦ρ⟧ ⟦B⟧`, but a proc whose declared result is a non-tree type such as Int elaborates to plain B, so its body has no tree to sequence a performing let into. LANG-PROC-NON-TREE-LET-SEQUENCING refuses that let at check time as an elaboration gap. Make a non-empty-row proc's result the §2.5 tree, with callers splicing it by §2.4's incl, and lift the interim refusal"
-status: ready
+status: active
 owner: verify
 size: L
 tier: T1
