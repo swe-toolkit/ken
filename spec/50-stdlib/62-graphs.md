@@ -10,7 +10,8 @@
 > SPEC-GRAPHS-REVERSE-REACHABILITY §8;
 > SPEC-GRAPHS-WALK-REVERSE-APPEND §9;
 > SPEC-GRAPHS-REVERSE-INVOLUTION §10;
-> SPEC-GRAPHS-REACHABILITY-TRANS §11).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REACHABILITY-TRANS §11;
+> SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC §12).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1095,3 +1096,76 @@ forms, so it cannot distinguish these values. These closed rows do
 not replace the generic checked proof or establish that the separate
 seed was authored, run as Ken or executed through the official
 conformance runner.
+
+## 12. Reachability is antisymmetric under a dependency order
+
+> **Section 12 status: DRAFT v0
+> (SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC).** Architect AC-0
+> `evt_5q2nv0x3cp63w` ruled from Foundation's isolated scratch D0
+> on base `d39f2c2a7163a7a3c52f6cc79e5f31d5e88e37b6`. The
+> scratch harness passed 2/2, with identical 114-element trusted
+> `GlobalId` sets before and after, one existing `Axiom` before and
+> after, and the prescribed named regressions green. These checks
+> establish feasibility on the patched scratch tree, not a check
+> of this Spec-only child or an assembled candidate. They establish
+> no official conformance-runner execution, CI, publication, landing
+> or measured landed trust. CV owns the separate seed; Foundation
+> owns the catalog export and package test.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent
+checked theorem after `ordered_walk_forward` (§3) and before
+`OrderOrCycle` (§1.3). Its public type is exactly:
+
+```ken
+pub theorem graph_reachable_antisymmetric
+      (q : Type)
+      (fq : Finite q)
+      (d : DecEq q)
+      (g : Graph q)
+      (order : TopoOrder q d g)
+      (s : q)
+      (t : q)
+    : Equal Bool (graph_reachable q fq g s (d.eq t)) True
+      → Equal Bool (graph_reachable q fq g t (d.eq s)) True
+      → Equal q s t
+```
+
+The `TopoOrder q d g` and both reachability legs refer to the same
+`g`. Each leg is a checked Boolean decision that its starting vertex
+reaches the vertex named by the partially applied `d.eq`; neither
+leg alone proves equality. With the order and both legs, the
+endpoints coincide. No nonzero-path premise, new graph representation,
+first-edge recovery operation or additional public law is required.
+In particular, this law joins §11's reachability preorder with §1.3's
+order certificate without treating reachability on an arbitrary
+cyclic graph as antisymmetric.
+
+The checked generic proof extracts the two reachability witnesses
+with the existing `graph_find_walk_some` and private `require_some`,
+then transports each witness endpoint through `d.sound` using private
+`walk_transport_end`. The private `walks_antisymmetric` handles the
+resulting walks: `WalkHere` gives equality directly; for a forward
+`WalkStep`, append the return walk to the forward prefix to close a
+`Cycle`, then apply the existing public `cycle_refutes_order` to the
+supplied order. This uses the last-step shape of `Walk` without
+recovering its first edge or invoking `ordered_walk_forward`. The
+helper stays private, placed after `walk_transport_end` and before
+`walk_lift`; no §1–§11 operation or law type, `Axiom`, kernel rule,
+surface form or trusted assumption changes.
+
+The separate closed seed builds a `TopoOrder` on a one-way chain
+`V0 → V1 → V2`, using `Proved` for its order obligations and
+`λe. absurd e` for impossible edges. It supplies the forward leg to
+the public law and refutes a putative backward leg from `V1` to `V0`:
+together those legs would equate the distinct vertices `V0` and `V1`.
+An order-only refusal on the two-cycle `V0 ⇄ V1` sits next to the
+law-row refusal on that same graph:
+without the order-only row, the law-row refusal cannot be attributed
+to the unconstructible order rather than to the law. The accepted
+chain client is the same-form control. Architect's scratch D0 accepted
+the chain with `Proved` and refused its `Refl` variant; `Refl` is not
+a discriminator for these `Equal Bool` obligations. The two-cycle
+refusals pin only refusal and the `KernelRejected` error class, never
+the diagnostic string, which was truncated in the scratch log. Closed
+rows do not replace the checked generic proof or establish that the
+separate CV seed ran as Ken or through the official conformance runner.
