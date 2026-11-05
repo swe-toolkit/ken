@@ -97,7 +97,14 @@ rebases onto the candidate.
   region and clause. Its pin is a `px8-ds-test-support` mutation that
   drops H at the step the fix names. Deleting the check lets the
   mutation compile, and the pin reds.
-- **AC-2.** The nine listed bracket pins stay green, with the check on.
+- **AC-2.** The nine listed bracket pins pass with the check on, in the
+  AC-3 configuration (the candidate merged with r2). The only exception
+  is a row that fails identically on r2 `8b5744bd2` alone, named here
+  and carried to PX10 B-closure (Steward scope evt_1cvwy3qh0aj1f):
+  - `rt_escape_second_resource_native`
+    `r2_relay_owners_settle_authenticated_successors_without_returning_them`,
+    "settled owner 1353 retained a returned successor after consumption"
+    (evt_5gyhca0xt0by5).
 - **AC-3, measured with B-closure.** On a scratch merge of the
   candidate and r2, live and null reach the interpreter's exit. D0FIN
   begin and end print the same trace_len, so there is no finalize-time

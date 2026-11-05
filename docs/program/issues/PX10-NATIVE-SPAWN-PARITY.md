@@ -135,7 +135,11 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   null on the standard profile still record
   `CapacityExhausted{Invocation, Words, 256, 269}`, deferred until that
   WP's AC-3 holds. Argv's trap 53 after ReadEof is a separate symptom;
-  if it survives the clause, it becomes entry 17.
+  if it survives the clause, it becomes entry 17. Carried into the resumed
+  B-closure scope: r2 alone fails `rt_escape_second_resource_native`
+  `r2_relay_owners_settle_authenticated_successors_without_returning_them`
+  with "settled owner 1353 retained a returned successor after
+  consumption" (evt_5gyhca0xt0by5, scope evt_1cvwy3qh0aj1f).
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus

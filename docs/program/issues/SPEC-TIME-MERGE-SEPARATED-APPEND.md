@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-SEPARATED-APPEND
 title: "Spec 69 says merge is not append, and no checked law says when it is: when every event of the left trace is at or before every event of the right one, the left-biased merge takes the whole left trace first, so trace_merge is list_append. Rule from a checked D0 at zero trust a public separated-merge law, with a conformance seed whose client joins two adjacent windows of an ordered trace back into one"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
