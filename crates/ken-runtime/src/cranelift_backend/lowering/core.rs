@@ -9291,12 +9291,22 @@ impl<'a> Lowering<'a> {
             EliminatorFrame::Computational(computational) => Some(computational.static_origin),
             _ => None,
         }) else { return Ok(()) };
+        // An answer inside a return clause's scrutinee must still reach a
+        // settlement: the clause itself, the clause of a region nested in that
+        // scrutinee (which settles through its own S), or an Active
+        // continuation that carries the rest of the stack.
+        if eliminators.iter().any(|frame| matches!(frame, EliminatorFrame::Active(_))) {
+            return Ok(());
+        }
         for region in self.bracket_view.clauses_inside(body) {
-            let clause = region.clause_origin();
+            let Some(clause) = region.clause_origin() else { continue };
             if region.clause_scrutinee_contains(head)
                 && !eliminators.iter().any(|frame| matches!(frame,
                     EliminatorFrame::Computational(computational)
-                        if computational.static_origin == clause))
+                        if computational.static_origin == clause
+                            || (region.clause_scrutinee_contains(computational.static_origin)
+                                && self.bracket_view.regions().any(|nested|
+                                    nested.clause_origin() == Some(computational.static_origin)))))
             {
                 return Err(unsupported(LoweringCause::PlannerInvariant,
                     "BracketReturnClause",
