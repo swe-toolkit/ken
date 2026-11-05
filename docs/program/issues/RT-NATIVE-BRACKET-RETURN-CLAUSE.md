@@ -66,14 +66,18 @@ base, stop and report the mismatch; do not build around it.
 
 One candidate on main, built in this order:
 
-1. **The check, `BracketClauseOnStack`.** The planner's
-   `BracketSettlementControlView` gives each region its `clause_origin`
-   H and `clause_scrutinee` (the origins in H's child-0 subtree). It
-   also gives each continuation context and unit body its
-   `clauses_inside`. At both lowering seats, take the first
-   Computational frame's origin as the head. For each region in the
-   body's `clauses_inside`, if the head is in that region's scrutinee
-   and H is not on the stack, refuse with `PlannerInvariant`
+1. **The check, `BracketClauseOnStack`** (narrowed on the census,
+   `evt_4ekw1nza9sfjy`). A region's return clause H is the
+   ComputationalMatch whose case 0 is S. A region whose S sits in a
+   plain Match arm or a closure body settles in line, has no return
+   clause, and is exempt. The planner's `BracketSettlementControlView`
+   gives each region its optional `clause_origin` H and
+   `clause_scrutinee` (H's child-0 subtree), and each continuation
+   context and unit body its `clauses_inside`. At both lowering seats,
+   the head is the first Computational frame's origin. If the head is in
+   a region's scrutinee, the answer must reach a settlement: H itself,
+   the clause of a region nested in that scrutinee, or an Active frame
+   anywhere on the stack. Otherwise refuse with `PlannerInvariant`
    `"BracketReturnClause"`, naming the region and clause.
 2. **The fix.** Keep H on the eliminator stack at the producer step
    that loses it, as named by the refusal's backtrace.
@@ -114,6 +118,26 @@ rebases onto the candidate.
   PX10 entry 17, reserved.
 - The `CapacityExhausted{Invocation, Words, 256, 269}` question stays
   deferred until AC-3 holds.
+
+## §1a and §1b
+
+§1a is 1 (Step 1 stop, evt_11htjzqy83kvj). The §1b symptom inventory:
+
+1. The return-clause check was keyed on S's lexical parent, a case-0
+   ComputationalMatch, and on the local eliminator stack: lexical shape
+   and per-function stack contents. px7f and px8ta have no case-0
+   clause, and lawful px8f delivers inside clause 657's scrutinee with
+   657 off the local stack. Control leaves through region 2's S or an
+   Active continuation. The census (`evt_4ekw1nza9sfjy`) split the
+   population: every live and null line has no Active frame and no
+   region's clause on the stack, and every pin line has one of them, so
+   the check was narrowed to that pair.
+
+AC-2 carries one item from the census: on the merge with r2,
+`rt_escape_second_resource_native`
+`r2_relay_owners_settle_authenticated_successors_without_returning_them`
+fails with a planner-record assertion. The Step 1 rerun measures it on
+r2 alone.
 
 Checks: 5 fired: the property "the clause is on the stack" lives on the
 lowering plane, and three planner planes measured cannot carry it, so

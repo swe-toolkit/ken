@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY
 title: "Spec 68 §1.1 says an interval whose low endpoint exceeds its high one has no member, the ordinary empty-interval representation, but no checked law proves it, and none proves the converse that an ordered interval holds its endpoints. Rule from a checked D0 at zero trust a public emptiness law and an endpoint-membership law, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
