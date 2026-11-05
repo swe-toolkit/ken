@@ -21,8 +21,6 @@ the three public laws are available.
 Check the entire client before appending the isolated refusal below.
 
 ```ken
-import Core.Classes.LawfulClasses (IsTrue)
-
 import Data.Numeric.Rational (Rational, rational_zero, rational_one)
 
 import Algorithm.Numeric.RationalInterval
