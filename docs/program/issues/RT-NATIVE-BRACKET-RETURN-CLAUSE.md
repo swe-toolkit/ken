@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-BRACKET-RETURN-CLAUSE
 title: "Native bracket settlement is placed on the response-row plane, InPlace when a response owner exists and Deferred otherwise, while the body's control transfer runs on the runtime K. So a body outcome can reach the bracket's resume K with no release and no outcome_merge (PX10 B-closure stop 12, live origin 420, null 979). Give the bracket's frame one return clause that every body exit returns into, and refuse at planning any edge that carries a body outcome past the bracket's delimiter"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1

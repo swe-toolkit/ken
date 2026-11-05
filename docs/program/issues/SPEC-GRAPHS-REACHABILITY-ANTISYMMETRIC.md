@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC
 title: "Spec 62 §11 makes reachability to a vertex a preorder, and §1.3 gives a dependency order whose walks run forward, but no public law joins them: a client holding a TopoOrder and reachability both ways between two vertices cannot conclude they are equal without the private walk extraction. Rule from a checked D0 at zero trust a public antisymmetry law under a dependency order, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -28,6 +28,7 @@ Equal Bool (graph_reachable q fq g s (d.eq t)) True
 
 With §11, reachability to a vertex is then a partial order on a graph
 that has a dependency order. Spec 62 states the law by its public type.
+Merged at `c66722ce3`.
 
 ## Settled inputs (main `a892501a7`)
 
