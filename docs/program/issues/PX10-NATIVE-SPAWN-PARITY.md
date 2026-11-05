@@ -139,7 +139,9 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   B-closure scope: r2 alone fails `rt_escape_second_resource_native`
   `r2_relay_owners_settle_authenticated_successors_without_returning_them`
   with "settled owner 1353 retained a returned successor after
-  consumption" (evt_5gyhca0xt0by5, scope evt_1cvwy3qh0aj1f).
+  consumption" (evt_5gyhca0xt0by5, scope evt_1cvwy3qh0aj1f), and
+  `rt_parity_native` fails three rows (rs:1308, rs:1758, rs:6506) the same
+  way with or without RETURN-CLAUSE (evt_7xb5rse5pv5by).
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus

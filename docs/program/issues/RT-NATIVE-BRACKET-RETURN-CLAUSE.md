@@ -105,6 +105,12 @@ rebases onto the candidate.
     `r2_relay_owners_settle_authenticated_successors_without_returning_them`,
     "settled owner 1353 retained a returned successor after consumption"
     (evt_5gyhca0xt0by5).
+  - `rt_parity_native`
+    `static_response_context_demand_ledger_closes_fixed_products` (rs:1308),
+    `static_response_full_demand_fan_out_population_is_distinct` (rs:1758)
+    and `suppressing_both_materialization_authorities_refuses_at_the_relay_edge`
+    (rs:6506), each failing identically on r2 alone (Step 1,
+    evt_7xb5rse5pv5by).
 - **AC-3, measured with B-closure.** On a scratch merge of the
   candidate and r2, live and null reach the interpreter's exit. D0FIN
   begin and end print the same trace_len, so there is no finalize-time
@@ -128,7 +134,8 @@ rebases onto the candidate.
 
 ## §1a and §1b
 
-§1a is 1 (Step 1 stop, evt_11htjzqy83kvj). The §1b symptom inventory:
+§1a is 1 (Step 1 stop, evt_11htjzqy83kvj). Step 1 passed on candidate
+`06dc75fce` (evt_7xb5rse5pv5by). The §1b symptom inventory:
 
 1. The return-clause check was keyed on S's lexical parent, a case-0
    ComputationalMatch, and on the local eliminator stack: lexical shape
@@ -140,11 +147,8 @@ rebases onto the candidate.
    region's clause on the stack, and every pin line has one of them, so
    the check was narrowed to that pair.
 
-AC-2 carries one item from the census: on the merge with r2,
-`rt_escape_second_resource_native`
-`r2_relay_owners_settle_authenticated_successors_without_returning_them`
-fails with a planner-record assertion. The Step 1 rerun measures it on
-r2 alone.
+The Step 1 rerun measured the four AC-2 exceptions on r2 alone, and each
+fails there identically.
 
 Checks: 5 fired: the property "the clause is on the stack" lives on the
 lowering plane, and three planner planes measured cannot carry it, so
