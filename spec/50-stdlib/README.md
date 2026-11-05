@@ -686,12 +686,16 @@ landed trust is established for §12. Signed arithmetic, division,
 remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–9 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–13 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
 SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION;
 SPEC-TIME-MERGE-ASSOCIATIVITY; SPEC-TIME-WINDOW-ADJACENT-SPLIT;
 SPEC-TIME-WINDOW-APPEND-DISTRIBUTION §8;
-SPEC-TIME-INVERTED-WINDOW-EMPTY §9).
+SPEC-TIME-INVERTED-WINDOW-EMPTY §9;
+SPEC-TIME-WINDOW-ALL-IDENTITY §10;
+SPEC-TIME-WINDOW-COMMUTATION §11;
+SPEC-TIME-WINDOW-LENGTH-BOUND §12;
+SPEC-TIME-MERGE-SEPARATED-APPEND §13).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -728,14 +732,12 @@ Transparent structural split law: a time-ordered trace window
 provided `lo ≤ mid ≤ hi`. Each of its three premises is necessary;
 without any one, a closed counterexample refutes the equality.
 The bound equalities use `leq_nat`, and the result uses the existing
-`list_append`, which the catalog must add to EventTrace's named
-Derived import. Architect's isolated D0 on `d94af9ee5` checked the
-generic proof with no new `Axiom` and unchanged scratch trusted
-identities 114 → 114. The §7 export was absent on the spec author's
-base; this assembled candidate adds the checked law and a package test
-for the complete accepted seed and isolated refusal. These candidate-
-local checks are not official conformance-runner execution, CI,
-publication, landing or landed trust. Section 8 states premise-free
+`list_append` on EventTrace's named Derived import. Architect's isolated
+D0 on `d94af9ee5` checked the generic proof with no new `Axiom` and
+unchanged scratch trusted identities 114 → 114. The §7 checked export,
+seed and package-owned test are present on this base. Historical
+candidate-local checks are not official conformance-runner execution,
+CI, publication, landing or landed trust. Section 8 states premise-free
 `trace_window_append` distribution over arbitrary traces and bounds;
 its catalog export, seed and package test are present on this base.
 Section 9 specifies `trace_window_inverted_empty p lo hi tr`: under
@@ -745,11 +747,23 @@ private `event_in_window_inverted` helper and the existing private
 `event_in_window_past` and `window_keep`; no ordering premise enters.
 Architect's isolated AC-0 on `f97544426` checked the generic proof
 without an `Axiom` and with equal scratch trusted GlobalId sets
-114 → 114. Its catalog export, seed and package test are present in the
-assembled candidate; they establish no official conformance-runner
-execution, CI, publication, landing or landed trust. Clock effects, durations,
-causality, infinite streams, premise-free structural window/merge
-distribution and k-way merge remain deferred.
+114 → 114. Its checked catalog export, seed and package-owned test are
+present on this base; historical scratch and package checks do not
+establish official conformance-runner execution or landed trust.
+Sections 10–12 specify a covering-window identity, window commutation
+and a window-length bound; their checked exports, seeds and package-owned
+tests are present on this base, without official conformance or
+landed-trust claims.
+Section 13 specifies public `trace_merge_separated p xs ys`: when every
+left member precedes or ties every right member by `event_before`,
+merge is structurally equal to append without requiring ordered traces.
+Architect's isolated D0 on `a3f9b487b2abdf3768214e88c3d548545ce74a13`
+checked the generic proof with identical 114-element trusted identity
+sets. The §13 Spec-only child does not add a catalog export, seed or
+package test, nor does it establish candidate execution, official
+conformance, CI, publication, landing or measured landed trust. Clock
+effects, durations, causality, infinite streams, premise-free structural
+window/merge distribution and k-way merge remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
