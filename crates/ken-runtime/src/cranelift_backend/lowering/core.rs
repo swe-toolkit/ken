@@ -252,13 +252,15 @@ thread_local! {
 }
 
 /// Compile-preserving controls for the two consumption seats of the
-/// handler-owned Deferred-response decomposition, and for the in-place bracket
-/// settlement that now consumes a marked S's K at its handler.
+/// handler-owned Deferred-response decomposition, for the in-place bracket
+/// settlement that now consumes a marked S's K at its handler, and for the
+/// carried stack that keeps a bracket's return clause.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HandlerOwnedDeferredResponseMutation {
     SuppressUnitlessDrive,
     SuppressLocalContinuationDrive,
     SuppressBracketInPlaceContinuation,
+    DropBracketReturnClause,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -6700,7 +6702,12 @@ impl<'a> Lowering<'a> {
                         || remaining_origins[..prefix_len].iter().copied().any(is_clause);
                     let outer_holds_clause =
                         remaining_origins[prefix_len..].iter().copied().any(is_clause);
-                    let carried_remaining = if kept_holds_clause || !outer_holds_clause {
+                    let carried_remaining = if kept_holds_clause
+                        || !outer_holds_clause
+                        || handler_owned_deferred_response_mutation_applies(
+                            HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
+                        )
+                    {
                         local_remaining
                     } else {
                         remaining
