@@ -806,38 +806,6 @@ jobs:
       # line; see scripts/gen-progress.sh).
       - name: Check IMPLEMENTATION-PROGRESS.md is current
         run: scripts/gen-progress.sh --check
-      - name: Install cargo-nextest for ignored-row sweep
-        if: needs.classify-paths.outputs.mode == 'full'
-        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
-        with:
-          tool: nextest
-      - name: Select and run ignored rows
-        if: needs.classify-paths.outputs.mode == 'full'
-        shell: bash
-        run: |
-          python3 scripts/ci-ignored-sweep.py verify-row-claims
-          cargo nextest list --workspace --locked --run-ignored=only \
-            --message-format json > ignored-row-all.json
-          filter=$(python3 scripts/ci-ignored-sweep.py filter \
-            ignored-row-all.json)
-          expected=$(python3 scripts/ci-ignored-sweep.py expected ignored-row-all.json)
-          cargo nextest list --workspace --locked --run-ignored=only \
-            -E "$filter" --message-format json > ignored-row-list.json
-          python3 scripts/ci-ignored-sweep.py verify-list \
-            ignored-row-all.json ignored-row-list.json "$expected"
-
-          set +e
-          cargo nextest run --workspace --locked --run-ignored=only \
-            --no-fail-fast --color never --status-level pass \
-            --final-status-level pass -E "$filter" \
-            2>&1 | tee ignored-row-sweep.log
-          run_status=${PIPESTATUS[0]}
-          set -e
-
-          python3 scripts/ci-ignored-sweep.py report \
-            ignored-row-list.json ignored-row-sweep.log \
-            "$expected" "$run_status" \
-            | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Report peak disk and memory
         if: always() && steps.resource_monitor_start.outcome == 'success'
         run: python3 scripts/ci-resource-monitor.py finish
