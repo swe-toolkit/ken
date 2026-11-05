@@ -6687,13 +6687,33 @@ impl<'a> Lowering<'a> {
                             "a handler-owned response prefix exceeds its eliminator stack",
                         )
                     })?;
-                    return self.lower_carried_computational_match_with_control(
+                    // A bracket return clause past the handler's prefix is applied
+                    // here unless the kept prefix holds a clause of its own, whose
+                    // settlement carries the outer frames.
+                    let is_clause = |origin: StaticOriginId| {
+                        self.bracket_view
+                            .regions()
+                            .any(|region| region.clause_origin() == Some(origin))
+                    };
+                    let kept_holds_clause = is_clause(first.static_origin)
+                        || remaining_origins[..prefix_len].iter().copied().any(is_clause);
+                    let outer_holds_clause =
+                        remaining_origins[prefix_len..].iter().copied().any(is_clause);
+                    let answer = self.lower_carried_computational_match_with_control(
                         builder,
                         returned,
                         route_control,
                         *first,
                         local_remaining,
                         CarriedRetSinkAuthority::DriveFedCheckedAnswer,
+                    )?;
+                    if kept_holds_clause || !outer_holds_clause {
+                        return Ok(answer);
+                    }
+                    return self.lower_computational_match_value_composed(
+                        builder,
+                        RoutedAnswer::direct(answer),
+                        &remaining[prefix_len..],
                     );
                 }
                 self.lower_computational_match_value_composed(
