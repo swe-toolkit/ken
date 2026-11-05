@@ -153,6 +153,8 @@ pub struct NumericEnv {
     /// Checked ITree, Ret and bind identities, installed together after bind
     /// registration; absent while the prelude itself is still being built.
     effect_sequencing_ids: Option<(GlobalId, GlobalId, GlobalId)>,
+    /// Closed effect-signature table, captured before source may shadow names.
+    effect_tree_ids: Option<EffectTreeIds>,
     /// Bytes registrar's two carrier IDs, available before prelude source is
     /// elaborated (which itself contains string literal values).
     literal_carriers: Option<(GlobalId, GlobalId)>,
@@ -191,6 +193,31 @@ pub(crate) struct LiteralPlanIds {
     pub list_id: GlobalId,
     pub nil_id: GlobalId,
     pub cons_id: GlobalId,
+}
+
+/// Checked prelude identities used to form and inject the closed ambient
+/// effect signatures. Never reconstruct these from the mutable name map.
+#[derive(Clone, Copy)]
+pub(crate) struct EffectTreeIds {
+    pub console_op: GlobalId,
+    pub console_resp: GlobalId,
+    pub clock_op: GlobalId,
+    pub clock_resp: GlobalId,
+    pub entropy_op: GlobalId,
+    pub entropy_resp: GlobalId,
+    pub ambient_op: GlobalId,
+    pub ambient_resp: GlobalId,
+    pub fs_op: GlobalId,
+    pub fs_resp: GlobalId,
+    pub coproduct: GlobalId,
+    pub resp_coproduct: GlobalId,
+    pub ambient_console: GlobalId,
+    pub ambient_clock: GlobalId,
+    pub ambient_entropy: GlobalId,
+    pub host_console: GlobalId,
+    pub host_clock: GlobalId,
+    pub host_entropy: GlobalId,
+    pub host_fs: GlobalId,
 }
 
 impl NumericEnv {
@@ -275,6 +302,14 @@ impl NumericEnv {
 
     pub(crate) fn effect_sequencing_ids(&self) -> Option<(GlobalId, GlobalId, GlobalId)> {
         self.effect_sequencing_ids
+    }
+
+    pub(crate) fn install_effect_tree_ids(&mut self, ids: EffectTreeIds) {
+        assert!(self.effect_tree_ids.replace(ids).is_none(), "effect tree IDs are captured once");
+    }
+
+    pub(crate) fn effect_tree_ids(&self) -> Option<EffectTreeIds> {
+        self.effect_tree_ids
     }
 
     /// Register (or replace) the `+` dispatch entry for `ty_id` — used by
@@ -756,6 +791,7 @@ pub fn register_numeric_env(
         fixed_int_literal_descriptors,
         literal_plan_ids: None,
         effect_sequencing_ids: None,
+        effect_tree_ids: None,
         literal_carriers: None,
         add_table,
         eq_table,

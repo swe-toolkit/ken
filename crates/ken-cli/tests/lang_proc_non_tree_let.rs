@@ -1,11 +1,10 @@
-//! Spec 36 §2.4: an action in a non-tree-result let cannot be dropped.
-//! Promise class: transition sentinel. Retire the check-time refusal when
-//! §2.5's non-empty-row proc result becomes an ITree and its callers splice
-//! that tree; until then the elaboration gap must refuse, not erase, an action.
-//! MEASURED: check-time E0038, no run output for action-valued RHSs, and
-//! accepted type/row/proof controls. CLAIMED: a performing ordinary let cannot
-//! silently discard an action. THE GAP: other, non-let binders and the infer
-//! guard's unreachable arm belong to the later §2.5 conformance work.
+//! Spec 36 §§2.4–2.5: a closed ambient-row proc returns a tree, so its
+//! performing lets run in source order and its pure result is returned once.
+//! Promise class: durable invariant. MEASURED: output `ab\n` from a performed
+//! write and a spliced caller, two performed writes in order, and an E0038
+//! result mismatch. CLAIMED: the action is neither dropped nor stored as an
+//! ordinary value. THE GAP: FS, open rows and arrow-valued results keep the
+//! narrowed refusal until their distinct denotations are settled.
 
 use std::process::{Command, Output};
 
@@ -40,53 +39,46 @@ fn assert_checks(name: &str, source: &str) {
     );
 }
 
-fn assert_gap_refusal(name: &str, source: &str) {
+fn assert_result_type_mismatch(name: &str, source: &str) {
     let output = cli(name, "check", source);
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "{name}: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        output.stdout.is_empty(),
-        "{name}: check must not run actions"
-    );
+    assert_eq!(output.status.code(), Some(1), "{name}: {output:?}");
+    assert!(output.stdout.is_empty(), "{name}: check cannot run actions");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("error[E0038]"), "{name}: {stderr}");
     assert!(
-        stderr.contains("cannot be sequenced (36 §2.4)"),
+        stderr.contains("returned value does not inhabit the declared result"),
         "{name}: {stderr}"
     );
-    assert!(stderr.contains("§2.5"), "{name}: {stderr}");
 }
 
 #[test]
-fn unused_performed_let_is_refused_before_running() {
-    // AC-1 probe verbatim; on the fcc816c65 base it checked and printed b\n.
+fn performed_non_tree_proc_sequences_before_spliced_caller() {
+    // AC-1 R1: the body write and the caller write execute once, in order.
     let source = "program capabilities FS APartial\n\
         proc read : Int visits [Console] =\n\
           let r = write ConsoleStream.Stdout (bytes_encode \"a\") in 1\n\
         proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
           : HostIO APartial ExitCode visits [Console] =\n\
           let n : Int = read in host_program APartial (print_line \"b\")\n";
-    assert_gap_refusal("frame-probe", source);
+    assert_checks("frame-probe", source);
     let run = cli("frame-probe-run", "run", source);
-    assert_ne!(run.status.code(), Some(0));
-    assert!(
-        run.stdout.is_empty(),
-        "refused program must not run any action"
-    );
+    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
+    assert_eq!(run.stdout, b"ab\n", "the returned tree splices into HostIO");
 }
 
 #[test]
-fn two_unconsumed_actions_are_refused_at_the_first_let() {
-    let source = with_main(
-        "proc pair : Int visits [Console] =\n\
-           let r = write ConsoleStream.Stdout (bytes_encode \"a\") in\n\
-           let s = write ConsoleStream.Stdout (bytes_encode \"a\") in 1",
-    );
-    assert_gap_refusal("two-lets", &source);
+fn two_performed_lets_run_once_each_in_order() {
+    let source = "program capabilities FS APartial\n\
+        proc pair : Int visits [Console] =\n\
+          let r = write ConsoleStream.Stdout (bytes_encode \"a\") in\n\
+          let s = write ConsoleStream.Stdout (bytes_encode \"b\") in 1\n\
+        proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+          : HostIO APartial ExitCode visits [Console] =\n\
+          let n : Int = pair in host_program APartial (print_line \"c\")\n";
+    assert_checks("two-lets", source);
+    let run = cli("two-lets-run", "run", source);
+    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
+    assert_eq!(run.stdout, b"abc\n", "both lets execute once, left to right");
 }
 
 #[test]
@@ -96,11 +88,37 @@ fn let_binds_the_result_not_a_held_action_value() {
          proc held : Held visits [Console] =\n\
            let r = write ConsoleStream.Stdout (bytes_encode \"a\") in MkHeld r",
     );
-    assert_gap_refusal("held-action-let", &source);
+    assert_result_type_mismatch("held-action-let", &source);
+}
+
+/// Promise class: durable fail-closed boundary (36 §§2.4–2.5). An
+/// arrow-valued declared result is not wrapped by this increment. Its
+/// outer performing let must refuse, while the same let *inside* the
+/// returned action's lambda remains a valid checked tree.
+#[test]
+fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
+    let outer = with_main(
+        "proc outer : Unit -> IO Unit visits [Console] =\n\
+         let w = print_line \"x\" in\n\
+         \\_. ITree.Ret ConsoleOp console_resp Unit MkUnit",
+    );
+    let output = cli("function-result-outer", "check", &outer);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error[E0038]"), "{stderr}");
+    assert!(stderr.contains("whose declared result is a function"), "{stderr}");
+    assert!(stderr.contains("cannot be sequenced (36 §2.4)"), "{stderr}");
+
+    let inner = with_main(
+        "proc inner : Unit -> IO Unit visits [Console] =\n\
+         \\_. let w = print_line \"x\" in ITree.Ret ConsoleOp console_resp Unit MkUnit",
+    );
+    assert_checks("function-result-inner", &inner);
 }
 
 #[test]
-fn pure_non_tree_proc_keeps_its_value_and_run_output() {
+fn pure_non_tree_proc_returns_its_value_and_keeps_run_output() {
     let source = with_main("proc direct_value : Int visits [Console] = 1");
     assert_checks("direct-value", &source);
     let run = cli("direct-value-run", "run", &source);

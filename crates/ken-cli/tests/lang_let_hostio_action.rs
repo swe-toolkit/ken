@@ -153,27 +153,18 @@ fn performed_let_result_is_available_to_match_in_the_continuation() {
     expect_stdout("matched-result", body, b"ab\n");
 }
 
-/// Promise class: transition sentinel. Retire this unsupported-code check
-/// when spec 36 §2.4 signature inclusion is built; until then a valid
-/// cross-signature let must refuse as unsupported, never as ill-typed.
+/// Promise class: durable invariant. The checked IO→HostIO inclusion
+/// executes both the write and the continuation once in source order.
 #[test]
-fn valid_cross_signature_let_fails_closed_until_inclusion_is_built() {
+fn valid_console_cross_signature_let_runs_before_continuation() {
     let body = r#"  let x = write ConsoleStream.Stdout (bytes_encode "a") in
     host_program APartial (print_line "b")"#;
     let output = run("inclusion-limitation", body);
     assert_eq!(
         output.status.code(),
-        Some(1),
+        Some(0),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(output.stdout.is_empty());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("error[E0087]"), "{stderr}");
-    assert!(stderr.contains("UnsupportedEffectInclusion"), "{stderr}");
-    let registered = ken_diagnostic::ledger()
-        .into_iter()
-        .find(|row| row.code == "E0087")
-        .expect("the public diagnostic code is registered");
-    assert_eq!(registered.label, "elab.unsupported_effect_inclusion");
+    assert_eq!(output.stdout, b"ab\n");
 }
