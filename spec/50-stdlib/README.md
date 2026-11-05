@@ -404,7 +404,7 @@ CI, publication, landing or landed trust. No rational or `Float`
 tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–10 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–14 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
@@ -413,7 +413,11 @@ SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-COMMUTATION;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-INDEPENDENT-VARIABLE;
 SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-TRANSPARENT;
-SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE). The §1
+SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10;
+SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11;
+SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12;
+SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE §13;
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE §14). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -488,18 +492,23 @@ public soundness/completeness laws and Nat congruence; they do not add
 symmetry, transitivity, reflexivity or a new logical capability.
 Architect's isolated AC-0 on `b557bac0a` checked both generic bodies
 with no new `Axiom` and equal scratch trusted identity sets 114 → 114.
-This assembled candidate contains both checked §10 catalog laws, a
-package-owned test and CV's authored closed seed. Foundation's named
-package test passed 2/2 on implementation parent `b5cd7a0`, with equal
-candidate-local trusted GlobalId identity sets 114 → 114 and three
-red/restored fixture mutations. QA independently ran the named target
-2/2, measured equal trusted identity sets 114 → 114, and reddened and
-restored three refusal-control mutations on assembled tip `073725e`.
-Those checks were not rerun on catalog-prose-only child `dd6f1`.
-CV has not Ken-checked or officially conformance-run the seed;
-Architect's AC-0 remains separate scratch evidence. No CI,
-publication, landing or landed trust is claimed. A sorted-list normal form and
-signed/field arithmetic remain deferred.
+The §10 checked exports, seed and package-owned test are present on
+this base. Historical candidate-local tests at `b5cd7a0` and
+`073725e` and Architect's scratch AC-0 remain distinct from official
+conformance and landed-trust measurements. Sections 11–13 state
+canonical-equality equivalence, a constant-factor derivative law,
+and substitution congruence under pointwise canonical agreement;
+their checked exports, seeds and package-owned tests are present on
+this base. Section 14 adds the syntactic `occurs v e` decision and
+the checked `deriv_absent v e env` law, giving zero derivative value
+when `v` is absent without §7's semantic agreement premise. In the
+isolated D0 at `145405e2f1d4d4ee078eccf3ff88aef8c4ecf0c0`,
+Architect ruled the generic law D0-CLEAN after a fixture-only import
+correction; scratch trusted identity sets remained equal at 114.
+This Spec-only §14 child does not add the catalog export, seed or
+package test, and makes no candidate, official conformance, CI,
+publication, landing or measured landed-trust claim. A sorted-list
+normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–9 (SPEC-GEOMETRY-EXACT-CONTRACT;
