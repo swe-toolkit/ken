@@ -1,7 +1,7 @@
 ---
 id: CI-REMOVE-IGNORED-ROW-SWEEP
 title: "Remove the ignored-row sweep from CI. The issue-tracker job compiles every workspace test binary on one standard runner to run the ignored rows, and it filled that runner's disk twice on PR #5196. Keep the job's work-item tracker checks and its check name; delete the sweep steps, the sweep script, its test and the exemption registry"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T2
