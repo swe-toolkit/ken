@@ -3045,6 +3045,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         response_owner_settlements,
         response_bracket_exits,
         bracket_view,
+        bracket_clause_body: None,
         bracket_ledger,
         bracket_effect_claim: None,
         continuation_claims: None,
@@ -4529,6 +4530,7 @@ impl<'a> Lowering<'a> {
         scrutinee: RoutedAnswer,
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        self.require_bracket_clause_on_stack(eliminators, None)?;
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ANSWER DISPOSITION,
         // ---- processed BEFORE phase classification and head selection.
         // ---- Architect `evt_43ng4f578mdvv`.
@@ -9277,6 +9279,38 @@ impl<'a> Lowering<'a> {
         Ok(Some(lowered))
     }
 
+    /// Refuse a delivery inside a bracket return clause's scrutinee when the
+    /// exact clause frame has disappeared from this function's stack.
+    fn require_bracket_clause_on_stack(
+        &self,
+        eliminators: &[EliminatorFrame<'_>],
+        claim_origin: Option<StaticOriginId>,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(body) = self.bracket_clause_body else { return Ok(()) };
+        let Some(head) = eliminators.iter().find_map(|frame| match frame {
+            EliminatorFrame::Computational(computational) => Some(computational.static_origin),
+            _ => None,
+        }) else { return Ok(()) };
+        for region in self.bracket_view.clauses_inside(body) {
+            let clause = region.clause_origin();
+            if region.clause_scrutinee_contains(head)
+                && !eliminators.iter().any(|frame| matches!(frame,
+                    EliminatorFrame::Computational(computational)
+                        if computational.static_origin == clause))
+            {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "BracketReturnClause",
+                    format!(
+                        "a claim inside region {}'s body runs without its return clause {:?} \
+                         (claim origin {:?}, stack head {:?}, body {:?})",
+                        region.id().ordinal(), clause, claim_origin.unwrap_or(head), head, body,
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn claim_and_call_continuation(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -9290,6 +9324,7 @@ impl<'a> Lowering<'a> {
         // closes against the real head rather than a remembered origin.
         eliminators: &[EliminatorFrame<'_>],
     ) -> Result<Option<ClaimedContinuationResult>, CraneliftBackendError> {
+        self.require_bracket_clause_on_stack(eliminators, Some(producer_construct_origin))?;
         let alternative = u32::try_from(producer_alternative).map_err(|_| {
             unsupported(LoweringCause::Capacity, "ComputationalMatch", "case index exceeds addressable range")
         })?;

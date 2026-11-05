@@ -160,6 +160,7 @@ pub(in crate::cranelift_backend) struct BracketSettlementPlan {
 pub(in crate::cranelift_backend) struct BracketSettlementControlView {
     regions: BTreeMap<BracketSettlementId, BracketSettlement>,
     by_settlement: BTreeMap<StaticOriginId, Vec<BracketSettlementId>>,
+    clauses_inside: BTreeMap<StaticOriginId, BTreeSet<BracketSettlementId>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -172,6 +173,8 @@ pub(in crate::cranelift_backend) enum BracketSettlementMode {
 pub(in crate::cranelift_backend) struct BracketSettlement {
     id: BracketSettlementId,
     settlement: StaticOriginId,
+    clause_origin: StaticOriginId,
+    clause_scrutinee: BTreeSet<StaticOriginId>,
     body_exit: StaticOriginId,
     outcome_merge: StaticOriginId,
     resume: StaticOriginId,
@@ -184,6 +187,10 @@ pub(in crate::cranelift_backend) struct BracketSettlement {
 impl BracketSettlement {
     pub(in crate::cranelift_backend) fn id(&self) -> BracketSettlementId { self.id }
     pub(in crate::cranelift_backend) fn settlement(&self) -> StaticOriginId { self.settlement }
+    pub(in crate::cranelift_backend) fn clause_origin(&self) -> StaticOriginId { self.clause_origin }
+    pub(in crate::cranelift_backend) fn clause_scrutinee_contains(&self, head: StaticOriginId) -> bool {
+        self.clause_scrutinee.contains(&head)
+    }
     pub(in crate::cranelift_backend) fn body_exit(&self) -> StaticOriginId { self.body_exit }
     pub(in crate::cranelift_backend) fn outcome_merge(&self) -> StaticOriginId { self.outcome_merge }
     pub(in crate::cranelift_backend) fn resume(&self) -> StaticOriginId { self.resume }
@@ -200,7 +207,44 @@ impl BracketSettlementControlView {
         plan: &StaticTransitionPlan<'_>,
     ) -> Result<Self, CraneliftBackendError> {
         let mut view = Self::default();
+        let parents = if plan.bracket_settlements.regions.is_empty() {
+            ParentMap::new()
+        } else {
+            parents(plan)?
+        };
+        let mut bodies = if plan.bracket_settlements.regions.is_empty() {
+            BTreeSet::new()
+        } else {
+            plan.emittable_units()?.into_iter()
+                .map(|unit| unit.body_occurrence()).collect::<BTreeSet<_>>()
+        };
+        bodies.extend(plan.continuation_contexts.iter().map(|context| context.worker_body_origin));
         for region in &plan.bracket_settlements.regions {
+            let Some(&(clause_origin, 1)) = parents.get(&region.settlement) else {
+                return Err(planner_error("a bracket settlement is not in return clause case 0"));
+            };
+            if !matches!(expr(plan, clause_origin)?, RuntimeExpr::ComputationalMatch { cases, .. }
+                if !cases.is_empty()) || child(plan, clause_origin, 1)? != region.settlement {
+                return Err(planner_error("a bracket settlement has no computational return clause"));
+            }
+            let scrutinee_root = child(plan, clause_origin, 0)?;
+            let mut clause_scrutinee = BTreeSet::new();
+            let mut pending = vec![scrutinee_root];
+            while let Some(origin) = pending.pop() {
+                if clause_scrutinee.insert(origin) {
+                    pending.extend(plan.semantic.child_origins(origin)?.iter().copied());
+                }
+            }
+            for &body in &bodies {
+                let mut cursor = Some(clause_origin);
+                while let Some(origin) = cursor {
+                    if origin == body {
+                        view.clauses_inside.entry(body).or_default().insert(region.id);
+                        break;
+                    }
+                    cursor = parents.get(&origin).map(|(parent, _)| *parent);
+                }
+            }
             let mut cursor = Some(region.id);
             let mut owner = None;
             while let Some(id) = cursor {
@@ -247,6 +291,7 @@ impl BracketSettlementControlView {
             }
             if view.regions.insert(region.id, BracketSettlement {
                 id: region.id, settlement: region.settlement,
+                clause_origin, clause_scrutinee,
                 body_exit: region.body_exit, outcome_merge: region.outcome_merge,
                 resume: region.resume, mode, row, response_owner: owner,
             }).is_some() {
@@ -266,6 +311,14 @@ impl BracketSettlementControlView {
 
     pub(in crate::cranelift_backend) fn region(&self, id: BracketSettlementId)
         -> Option<&BracketSettlement> { self.regions.get(&id) }
+
+    /// Regions whose return clause is contained in the exact body now lowered.
+    pub(in crate::cranelift_backend) fn clauses_inside(
+        &self, body: StaticOriginId,
+    ) -> impl Iterator<Item = &BracketSettlement> {
+        self.clauses_inside.get(&body).into_iter().flatten()
+            .filter_map(|id| self.regions.get(id))
+    }
 
     pub(in crate::cranelift_backend) fn settlement_at(
         &self, origin: StaticOriginId,

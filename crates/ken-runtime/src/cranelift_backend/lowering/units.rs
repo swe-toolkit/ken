@@ -7328,7 +7328,10 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             });
 
             let body = compiler.retained_body_occurrence(context.worker_body_origin)?;
-            let lowered = compiler.lower_expr(&mut builder, body, &env)?;
+            let previous_clause_body = compiler.bracket_clause_body.replace(context.worker_body_origin);
+            let lowered = compiler.lower_expr(&mut builder, body, &env);
+            compiler.bracket_clause_body = previous_clause_body;
+            let lowered = lowered?;
             // The detached-result seat, live in this context. Every operand its
             // capture projection names is reachable from `env` above.
             let lowered = compiler.eliminate_detached_producer_continuation(
@@ -11114,7 +11117,10 @@ fn define_unit_body<M: Module>(
         });
         let body = compiler.retained_body_occurrence(body_origin)?;
         compiler.select_terminal_result_origins(body_origin, body.expr)?;
-        let lowered = compiler.lower_expr(&mut builder, body, &env)?;
+        let previous_clause_body = compiler.bracket_clause_body.replace(body_origin);
+        let lowered = compiler.lower_expr(&mut builder, body, &env);
+        compiler.bracket_clause_body = previous_clause_body;
+        let lowered = lowered?;
         compiler.validate_join_plan_consumption(unit.function, unit.body_occurrence)?;
         let (result, outcome) = if is_root {
             let lowered = match lowered {
