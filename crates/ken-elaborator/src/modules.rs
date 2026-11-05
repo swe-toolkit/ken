@@ -4262,6 +4262,26 @@ fn register_effect_row(
     }
 }
 
+/// Footprinted members of a mutual group can name each other, and each was
+/// registered before the later ones. Each takes the group's join, which
+/// over-approximates its footprint.
+fn join_mutual_carried_rows(elab: &mut ElabEnv, members: &[(String, ken_kernel::GlobalId)]) {
+    let group = members
+        .iter()
+        .filter_map(|(_, id)| elab.type_carried_rows_by_id.get(id).cloned())
+        .fold(
+            crate::effects::RowType::empty(),
+            crate::effects::RowType::join,
+        );
+    if group == crate::effects::RowType::empty() {
+        return;
+    }
+    for (name, id) in members {
+        elab.type_carried_rows.insert(name.clone(), group.clone());
+        elab.type_carried_rows_by_id.insert(*id, group.clone());
+    }
+}
+
 fn register_declared_effect_row(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
@@ -6063,9 +6083,13 @@ fn expand_scope(
                                 elab, &members, &declared_fixities,
                             ),
                         )?;
+                        let mut footprinted = Vec::new();
                         for (rdecl, result) in members.iter().zip(results) {
                             register_obligation_holes(elab, &result);
                             register_effect_row(elab, rdecl, &result);
+                            if crate::elab::registers_body_footprint(rdecl) {
+                                footprinted.push((result.name.clone(), result.def_id));
+                            }
                             register_declared_effect_row(elab, rdecl)?;
                             record_checked_local(
                                 scope,
@@ -6075,6 +6099,7 @@ fn expand_scope(
                             );
                             ids.push(result);
                         }
+                        join_mutual_carried_rows(elab, &footprinted);
                     }
                 }
                 // Export in textual order after every segment node has a
