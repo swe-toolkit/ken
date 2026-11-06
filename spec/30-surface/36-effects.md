@@ -670,6 +670,10 @@ normalization**. The following are denotations, not new kernel forms:
   outside the function or at its leaves. For a non-tree-final result,
   the row's applicable signature wraps that final result, not the
   function as a whole. The function binders remain ordinary Π binders.
+  An action at the outer level, before the last arrow, is refused: the
+  outer level returns a function, not a tree, so there is nothing to
+  sequence it into, and moving it under a binder would change how many
+  times it runs.
   For example, a declared `Unit → HostIO APartial ExitCode` remains a
   function returning `HostIO APartial ExitCode`, not a tree of functions.
 - Otherwise, for a non-tree result `B`, the result denotes to one
