@@ -191,6 +191,32 @@ does. Examples name `FsOpen`; they do not replace the full alphabet rule.
   the declared result type. The same tree with the opposite post is the
   discriminating refusal control.
 
+### surface/effects/non-tree-result-ensures-keeps-payload
+- spec: `36 §2.5` (non-tree `B` with a nonempty row)
+- given: the same caller with two versions of a non-tree-result proc:
+
+  ```ken
+  proc one : Int ensures Equal Int result 1 visits [Console] = 1
+  proc caller : Int visits [Console] =
+    let n : Int = one in n
+  ```
+
+  The control changes only `one`'s postcondition to
+  `ensures Equal Int result 2`.
+- expect: the first denotes to `IO Int`, with obligation
+  `AllRet (λ r. Equal Int r 1) (Ret 1)`, which is discharged. `caller`
+  binds `n : Int`. The control's `AllRet (λ r. Equal Int r 2) (Ret 1)`
+  reduces to `Equal Int 1 2` and is not discharged; the caller's binding
+  still has type `Int`.
+- why: this distinguishes a tree whose leaf has type `⟦B⟧` from
+  `Σ ⟦B⟧ ψ`: a caller binds the result at its declared `Int`, not a
+  proof-carrying pair. Architect reports a prior payload-refinement build
+  refused this accepted caller with E0038 (`evt_7x0p31v0tkkvj`); that
+  evidence was not rerun for this seed. Architect reports the current-main
+  sentinel `ensured_changed_proc_refuses_until_tree_post_is_specified` refuses
+  both rows by name; CV did not rerun it. The expected outputs are contract
+  targets, not CV measurements.
+
 ### surface/effects/tree-result-ensures-bind-cut
 - spec: `36 §2.5`, `§4.3` (`all_ret_bind`)
 - given: `t : ITree E X`, a checked premise `AllRet P t`, a continuation
