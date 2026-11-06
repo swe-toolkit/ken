@@ -5705,6 +5705,12 @@ fn expand_scope(
                 operations,
                 span,
             } => {
+                if crate::export::is_host_effect_label(name) {
+                    return Err(ElabError::SpaceNameIsEffectLabel {
+                        name: name.clone(),
+                        span: span.clone(),
+                    });
+                }
                 let qualified_name = qualify(prefix, name);
                 resolve::check_no_definition_collision(
                     name,

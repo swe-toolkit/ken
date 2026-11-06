@@ -649,6 +649,14 @@ fn host_operation_family(operation: ken_host::HostOpV1) -> (&'static str, &'stat
     }
 }
 
+/// Every row label the host inventory gives a meaning: each operation's family
+/// label and its per-operation label. A `space` may not take one (36 §4.1).
+pub(crate) fn is_host_effect_label(label: &str) -> bool {
+    ken_host::HostOpV1::ALL.iter().any(|&operation| {
+        host_operation_family(operation).1 == label
+            || canonical_host_perform_signature_v1(operation) == label
+    })
+}
 
 /// Injective canonical wire spelling for one typed perform identity.
 ///

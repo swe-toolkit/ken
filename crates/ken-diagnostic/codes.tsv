@@ -146,3 +146,4 @@ H0001	host.root_execution_denied	active	TerminalErrorV1::RootExecutionDenied
 H0002	host.home_root_resolution_failed	active	TerminalErrorV1::HomeRootResolutionFailed
 H0003	host.malformed_host_abi_field	active	TerminalErrorV1::MalformedHostAbiField
 E0087	elab.unsupported_effect_inclusion	active	ElabError::UnsupportedEffectInclusion
+E0088	elab.space_name_is_effect_label	active	ElabError::SpaceNameIsEffectLabel

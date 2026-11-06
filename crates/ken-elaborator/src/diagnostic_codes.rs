@@ -54,6 +54,7 @@ ken_diagnostic::define_error_codes! {
     Self::MutationOutsideSpace { .. } => ("E0025", "elab.mutation_outside_space"),
     Self::UnsupportedSpacePlacement { .. } => ("E0026", "elab.unsupported_space_placement"),
     Self::UnsupportedEffectInclusion { .. } => ("E0087", "elab.unsupported_effect_inclusion"),
+    Self::SpaceNameIsEffectLabel { .. } => ("E0088", "elab.space_name_is_effect_label"),
     Self::UnresolvedCon { .. } => ("E0027", "elab.unresolved_con"),
     Self::DeclarationIdentityCollision { .. } => ("E0028", "elab.declaration_identity_collision"),
     Self::ModuleOwnerClash { .. } => ("E0086", "elab.module_owner_clash"),
