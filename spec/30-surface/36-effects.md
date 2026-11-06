@@ -715,9 +715,13 @@ Spec child. The authority
 and result rules use ordinary Π and the existing `ITree` eliminator;
 they add neither a kernel form nor a trusted declaration.
 
-For a proc whose declared result is a tree and whose source has
-`ensures ψ`, the result remains the same tree with the same Ret-leaf
-type. The post is a **separate checked obligation** on that tree:
+For a proc whose result denotes to a tree, whether a declared tree (the
+first case above) or a non-tree `B` with a non-empty applicable
+signature (the third case), and whose source has `ensures ψ`, the result
+remains that tree with the same Ret-leaf type: `⟦B⟧` in the non-tree
+case, never `Σ ⟦B⟧ ψ`. When the signature is empty and the result
+collapses to `⟦B⟧`, `ensures` keeps the meaning it has on a declaration
+with no row. The post is a **separate checked obligation** on that tree:
 `Π p̄. AllRet (λ r. ψ(p̄, r)) (f↓ p̄)`, with written precondition proof
 arguments included where present. `AllRet` is the Ω-valued predicate
 of §4.3: it checks `ψ` at each `Ret r` and requires it for every
