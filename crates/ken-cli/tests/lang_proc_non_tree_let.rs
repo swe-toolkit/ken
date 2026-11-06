@@ -244,9 +244,13 @@ fn assert_refuses_with(name: &str, source: &str, code: &str) {
     );
 }
 
-/// AC-1: returned-tree mode is read only at the proc's own result positions.
-/// A plain value checked at a written tree type in a let RHS, a lambda body or
-/// an argument is refused inside a changed proc exactly as in a const.
+/// AC-1, durable invariant (Spec 36 §2.4): returned-tree mode is read only at
+/// the proc's own result positions. A plain value checked at a written tree
+/// type in a let RHS, a lambda body or an argument is refused inside a changed
+/// proc exactly as in a const. MEASURED: four forms in two changed-proc shapes
+/// and const controls refuse K0004. CLAIMED: no written tree annotation gains
+/// a Ret coercion from a changed proc. THE GAP: other subterm forms rely on the
+/// same `check` entry and are independently reviewed against its caller graph.
 #[test]
 fn written_tree_type_inside_changed_proc_is_not_a_result_position() {
     let apply = "fn apply_unit (k : Unit -> IO Int) : IO Int = k MkUnit\n";
@@ -285,9 +289,12 @@ fn written_tree_type_inside_changed_proc_is_not_a_result_position() {
     }
 }
 
-/// AC-2: the proc's own if, match and let tails are still result positions,
-/// and an ordinary RHS at a value type, or an explicit tree in a lambda, is
-/// unaffected.
+/// AC-2, durable invariant (Spec 36 §§2.4–2.5): the proc's own if, match and
+/// let tails are still result positions, and an ordinary RHS at a value type,
+/// or an explicit tree in a lambda, is unaffected. MEASURED: split tails in
+/// one- and two-parameter procs and an explicit-tree lambda check. CLAIMED:
+/// hiding the mode at subterm entries preserves returned-tree sequencing.
+/// THE GAP: other split paths remain covered by the named regression suites.
 #[test]
 fn changed_proc_result_splits_still_return_their_tree() {
     for (name, body) in [
