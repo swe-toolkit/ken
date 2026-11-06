@@ -136,6 +136,10 @@ pub(crate) fn map_formatter_error_spans(
                 span: map(span),
             }
         }
+        ElabError::SpaceNameIsEffectLabel { name, span } => ElabError::SpaceNameIsEffectLabel {
+            name,
+            span: map(span),
+        },
         ElabError::InvalidFixityPrecedence { written, span } => {
             ElabError::InvalidFixityPrecedence {
                 written,

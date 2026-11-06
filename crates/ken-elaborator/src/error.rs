@@ -190,6 +190,10 @@ pub enum ElabError {
     /// A block-form `space` appeared in a placement whose qualification and
     /// export contract is not part of the top-level P1 subset.
     UnsupportedSpacePlacement { placement: String, span: Span },
+    /// A `space` named with a label the host inventory already gives a
+    /// meaning (`36 §4.1`). Rows compare labels by name, so the space would
+    /// be charged and discharged as that host effect.
+    SpaceNameIsEffectLabel { name: String, span: Span },
     /// A `let` RHS whose effect signature differs from the enclosing one,
     /// where the `36 §2.4` signature inclusion is not built yet. An
     /// ill-typed RHS stays `TypeMismatch`.
@@ -677,6 +681,13 @@ impl fmt::Display for ElabError {
                 f,
                 "{placement} space block at {}-{} is unsupported; \
                  P1 admits top-level private spaces only",
+                span.start, span.end,
+            ),
+            ElabError::SpaceNameIsEffectLabel { name, span } => write!(
+                f,
+                "space `{name}` at {}-{} takes the host effect label `{name}`; \
+                 a `visits` row would read it as that host effect (36 §4.1), \
+                 so give the space another name",
                 span.start, span.end,
             ),
             ElabError::UnsupportedEffectInclusion { from, to, span } => write!(

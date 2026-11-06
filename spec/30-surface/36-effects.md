@@ -796,6 +796,13 @@ A `space` with cells `(c₁ : T₁) … (c_m : T_m)` desugars to:
 - **one effect label** for the space; every operation `visits [<space>]` uses
   `State S`.
 
+A space name must not be a host effect label, whether a host-family label
+(`Console`, `Clock`, `Entropy`, `FS`, `Process`) or a host-operation label
+(such as `FsOpen`). Because rows compare labels by name, such a space
+would be charged or discharged as that host effect; the declaration is
+refused, keeping §1.1's declared effects and space labels disjoint by
+construction.
+
 Cell access elaborates (cell `cᵢ` is component `i` of `S`):
 
 ```

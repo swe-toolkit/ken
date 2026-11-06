@@ -545,3 +545,126 @@ fn ac_s7_old_in_pure_code_remains_unbound() {
         ElabError::UnboundName { ref name, .. } if name == "old"
     ));
 }
+
+const LABEL_ALIAS_MAIN: &str = "proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] =
+  host_program APartial (print_line \"b\")
+";
+
+fn label_program(body: &str) -> String {
+    format!("program capabilities FS APartial\n{body}{LABEL_ALIAS_MAIN}")
+}
+
+fn assert_space_label_refused(source: &str, label: &str) {
+    let mut env = ElabEnv::new().expect("prelude");
+    match env.elaborate_file(source) {
+        Err(ElabError::SpaceNameIsEffectLabel { name, span }) => {
+            assert_eq!(name, label);
+            assert!(
+                span.start < span.end && source[span.start..span.end].starts_with("space "),
+                "{label}: the refusal spans the space declaration: {span:?}"
+            );
+        }
+        other => panic!("space {label} must refuse as a host effect label: {other:?}"),
+    }
+}
+
+/// SOURCE: spec/30-surface/36-effects.md §1.1 and §4.1.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the measured alias program (a user `space Console` whose
+/// operation a `visits [Console]` proc calls) and a space operation that
+/// performs ambient Console output both refuse at the space declaration.
+/// CLAIMED: a user space is never charged or discharged as the host label.
+/// THE GAP: written row labels are not resolved (`visits [Bogus]` checks),
+/// and cross-file spaces wait on public placement.
+#[test]
+fn console_space_alias_refuses_at_the_space_declaration() {
+    let measured = label_program(
+        "space Console {
+  mut cell : Int = 0
+  proc call () : Int visits [Console] = 1
+}
+proc user_console (n : Int) : Int visits [Console] = let m : Int = Console.call in m
+",
+    );
+    assert_space_label_refused(&measured, "Console");
+    let performs_ambient = label_program(
+        "space Console {
+  mut cell : Int = 0
+  proc call () : Unit visits [Console] = print_line \"x\"
+}
+",
+    );
+    assert_space_label_refused(&performs_ambient, "Console");
+}
+
+/// SOURCE: spec/30-surface/36-effects.md §4.1.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: a space named with each host family label, and with a host
+/// operation label, refuses even when nothing calls it.
+/// CLAIMED: the reserved set is every label the host inventory gives a
+/// meaning, not only the ambient three.
+/// THE GAP: six representative names, not all of HostOpV1::ALL.
+#[test]
+fn space_named_as_any_host_effect_label_refuses() {
+    for label in ["Console", "Clock", "Entropy", "FS", "Process", "FsOpen"] {
+        let source = label_program(&format!(
+            "space {label} {{
+  mut cell : Int = 0
+  proc call () : Int visits [{label}] = cell
+}}
+"
+        ));
+        assert_space_label_refused(&source, label);
+    }
+}
+
+/// SOURCE: spec/30-surface/36-effects.md §1.4.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the same-form programs with the space named Other keep their
+/// EffectEscapes refusals, and ambient Console use with no space checks.
+/// CLAIMED: the reservation refuses only the spelling collision.
+/// THE GAP: none beyond the two tests above.
+#[test]
+fn other_space_controls_and_ambient_console_keep_their_results() {
+    let control = label_program(
+        "space Other {
+  mut cell : Int = 0
+  proc call () : Int visits [Other] = 1
+}
+proc user_console (n : Int) : Int visits [Console] = let m : Int = Other.call in m
+",
+    );
+    let error = ElabEnv::new()
+        .expect("prelude")
+        .elaborate_file(&control)
+        .expect_err("an Other charge escapes a Console row");
+    assert!(
+        error
+            .to_string()
+            .contains("EffectEscapes in 'user_console': Other"),
+        "{error}"
+    );
+    let performs_ambient = label_program(
+        "space Other {
+  mut cell : Int = 0
+  proc call () : Unit visits [Other] = print_line \"x\"
+}
+",
+    );
+    let error = ElabEnv::new()
+        .expect("prelude")
+        .elaborate_file(&performs_ambient)
+        .expect_err("ambient Console escapes an Other row");
+    assert!(
+        error
+            .to_string()
+            .contains("EffectEscapes in 'Other.call': Console"),
+        "{error}"
+    );
+    ElabEnv::new()
+        .expect("prelude")
+        .elaborate_file(&label_program(
+            "proc greet (n : Int) : Unit visits [Console] = print_line \"x\"\n",
+        ))
+        .expect("ambient Console with no user space checks");
+}
