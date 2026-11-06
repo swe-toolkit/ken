@@ -196,7 +196,7 @@ does. Examples name `FsOpen`; they do not replace the full alphabet rule.
 - given: the same caller with two versions of a non-tree-result proc:
 
   ```ken
-  proc one : Int ensures Equal Int result 1 visits [Console] = 1
+  proc one : Int visits [Console] ensures Equal Int result 1 = 1
   proc caller : Int visits [Console] =
     let n : Int = one in n
   ```
