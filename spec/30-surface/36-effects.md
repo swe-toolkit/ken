@@ -641,23 +641,112 @@ scope:
 Cap : Effect → Type ℓ_op           -- the authority to perform E's operations
 ```
 
-`Cap E` is an authority value — minted by a handler (§5) and threaded by
-ordinary Π/λ; its internals (attenuation, revocation) live in
-`../60-security/62`. The elaboration is a **capability-passing translation**: a
-function of row `ρ` takes one capability per **un-handled** effect of `ρ` as an
-extra leading parameter —
+`Cap E` is an authority value supplied through a written parameter or an
+enclosing handler (§5), then threaded by ordinary Π/λ. Its internals
+(attenuation, revocation) live in `../60-security/62`. A declared `visits`
+row is a bound on effects, **not** a source of capability values: elaboration
+does not insert a `Cap` parameter or infer an authority index from a caller.
+The source `using c : Cap E` (§3), or another written capability parameter,
+names the authority; an effect action without authority in scope is refused
+(§7.3). The elaborated telescope retains the written parameter order.
+
+The result translation distinguishes the declared result type **after weak-head
+normalization**. The following are denotations, not new kernel forms:
+
+- If the declared result has head `ITree S R`, that tree is **its own**
+  denotation: `f↓` returns `ITree S R`, not `ITree ⟦ρ⟧ (ITree S R)`.
+  Every label in the declared row must inject into `S`; a label with no
+  summand in `S` is refused, even if the body uses only other labels.
+  Injection includes the host-operation alphabet as well as host-family
+  names: an operation label injects wherever its family does. In
+  particular, FS and Process operation labels inject into `FSOp a` and
+  `HostIO a`. This preserves the core types of existing declared-tree
+  programs, including `HostIO` programs with operation labels in a row.
+  The tree's declared type supplies its `Auth` index, if any; only
+  capabilities actually written in the source telescope are parameters.
+- If the declared result is a function, retain its arrows and apply this
+  rule at the final result **after all arrows**. A tree-final function
+  returns its declared tree at that final result, without a second tree
+  outside the function or at its leaves. For a non-tree-final result,
+  the row's applicable signature wraps that final result, not the
+  function as a whole. The function binders remain ordinary Π binders.
+  An action at the outer level, before the last arrow, is refused: the
+  outer level returns a function, not a tree, so there is nothing to
+  sequence it into, and moving it under a binder would change how many
+  times it runs.
+  For example, a declared `Unit → HostIO APartial ExitCode` remains a
+  function returning `HostIO APartial ExitCode`, not a tree of functions.
+- Otherwise, for a non-tree result `B`, the result denotes to one
+  `ITree` over the applicable row signature with leaves of type `⟦B⟧`,
+  as in §2.4. If that signature is empty, §2.4 collapses
+  `ITree 𝟘 ⟦B⟧` to `⟦B⟧` at elaboration; this is not a kernel
+  conversion. A row may over-approximate effects actually available.
+
+For FS, the concrete prelude authority is `Cap a` indexed by `Auth`;
+the schematic `Cap E` above describes its role, not another parameter.
+For a non-tree result with an FS-family action, its tree's `Auth` index
+comes from a **written** parameter `c : Cap a`, where `a` is either a
+closed `Auth` such as `APartial` or `AFull`, or an earlier bound
+`(a : Auth)`. For example:
 
 ```
-proc f (x:A) : B visits ρ
-  ⤳  f↓ : (caps : Π_{E ∈ ρ_open} Cap E) → ⟦A⟧ → ITree ⟦ρ⟧ ⟦B⟧
+proc f (a : Auth) (c : Cap a) (x : A) : B visits [FS]
+  ⤳  f↓ : (a : Auth) → Cap a → ⟦A⟧ → FS a ⟦B⟧
 ```
 
-where `ρ_open` are the effects **not** provided by an enclosing handler (§5). A
-`perform_E op` is well-formed only if `Cap E` is in scope; otherwise it is a
-**missing-capability** error (§7.3). At the kernel level this is **ordinary Π/λ
-over the `Cap E` values** — no new construct, exactly the small-TCB invariant
-(`12`, ADR 0001/0004). The surface `using c : Cap E` (§3) names a capability
-parameter explicitly; the row machinery threads the rest.
+With ambient effects in the row, the result is `HostIO a ⟦B⟧`.
+Written FS capabilities with different `Auth` indices are refused:
+one result tree carries one index. Neither a hidden `(a : Auth)` nor
+an index inferred from a caller supplies it. A free non-tree proc with
+`visits [FS]` and **no** written FS capability has no FS-family node
+to perform; the FS label contributes no summand to its result signature:
+
+```
+proc f (x : A) : B visits [FS]          ⤳  f↓ : ⟦A⟧ → ⟦B⟧
+proc g (x : A) : B visits [FS, Console] ⤳  g↓ : ⟦A⟧ → IO ⟦B⟧
+```
+
+Both rows remain declared upper bounds. In a free proc without that
+capability, returning or sequencing an FS-family action is refused; the
+row alone cannot license it. This leaves the measured `[FS]`-only
+non-tree procs' core types unchanged. The mixed `[FS, Clock]` `setup`
+gains a Clock tree in the separate FS-row-and-arrow build, not in this
+Spec child. The authority
+and result rules use ordinary Π and the existing `ITree` eliminator;
+they add neither a kernel form nor a trusted declaration.
+
+For a proc whose result denotes to a tree, whether a declared tree (the
+first case above) or a non-tree `B` with a non-empty applicable
+signature (the third case), and whose source has `ensures ψ`, the result
+remains that tree with the same Ret-leaf type: `⟦B⟧` in the non-tree
+case, never `Σ ⟦B⟧ ψ`. When the signature is empty and the result
+collapses to `⟦B⟧`, `ensures` keeps the meaning it has on a declaration
+with no row. The post is a **separate checked obligation** on that tree:
+`Π p̄. AllRet (λ r. ψ(p̄, r)) (f↓ p̄)`, with written precondition proof
+arguments included where present. `AllRet` is the Ω-valued predicate
+of §4.3: it checks `ψ` at each `Ret r` and requires it for every
+response continuation at a `Vis`. A caller binds `r` at the declared
+return type, not a proof-carrying Σ payload; the post supplies `ψ(r)`
+as an obligation hypothesis through §4.3's `all_ret_bind` cut rule.
+For an opaque callee with post `P` and a caller requiring `Q`, the
+continuation proves `Π r. P r → Q r`; without a callee post, no such
+fact is invented. Neither `f↓` nor the payload is refined, and no
+tree is run twice or given an elaborator-inserted proof beneath its
+`ITree` former.
+This paragraph governs a declaration whose row names no space label.
+A declaration whose row names a space label is a space operation (§4.1):
+its `requires`/`ensures` contract is §4.3's state-transformer pair over
+`R × S`, and this paragraph adds no second post to it.
+
+`AllRet` and `all_ret_bind` must be kernel-checked **prelude declarations**
+built over the delivered `ITree` eliminator, with an Ω-valued motive;
+they are not surface-recursive Ken definitions. In particular, direct
+surface recursion through a `Vis` continuation `k resp` fails the
+termination check, so §4.3's fold and cut cannot be implemented by
+that spelling. This is a specification of their checked construction,
+not a claim that the prelude declarations or acceptance of tree-result
+`ensures` have landed. They introduce no new `Axiom`, trusted-base
+entry, kernel rule or surface form.
 
 This is where the layers meet: the **row** is the static type-level manifest
 (§1), the **capability** is the value-level authority (§2.5/§3), the **tree** is
@@ -880,8 +969,9 @@ contract (suppressing the clause-wise Π telescope) is:
   `ensures ψⱼ`, the one outer pair holds the Ω conjunction
   `∧ⱼ AllRet (λ rs.ψⱼ(s,rs)) t`, one recorded obligation and proof
   component per clause (`21 §6.4`, `22 §2.2`). The provable
-  `all_ret_bind` sequencing lemma is ordinary Ken in W5, with no new
-  trusted rule (`21 §6.4`):
+  `all_ret_bind` sequencing lemma must be a kernel-checked prelude
+  declaration built over the `ITree` eliminator, with no new trusted
+  rule (`21 §6.4`):
 
 ```
 all_ret_bind : AllRet P t →
@@ -889,8 +979,9 @@ all_ret_bind : AllRet P t →
 -- t : ITree F X; k : X → ITree F Y; P : X → Ω; Q : Y → Ω
 ```
 
-Both `AllRet` and `all_ret_bind` are checked Ken declarations for W5,
-not an elaborator coercion, primitive, or new `trusted_base()` entry.
+Both `AllRet` and `all_ret_bind` must be kernel-checked prelude
+declarations built over `elim_ITree`, not ordinary surface-recursive Ken,
+an elaborator coercion, a primitive, or a new `trusted_base()` entry.
 
 When `F = 𝟘`, **elaboration collapses the whole result type** by the
 `ITree 𝟘 X ≅ X` equivalence (§2.4), yielding
