@@ -274,7 +274,7 @@ fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_argv",
         ARGV_ENV_PIPE,
         "Predeclared(PredeclaredFunctionId(25))",
-        1970,
+        1971,
         &[1, 2, 3],
     );
 }
@@ -490,8 +490,8 @@ fn px10_argv_and_live_emit_below_process_gate() {
             &[
                 (ReturnFold, 1160, 571),
                 (ReturnFold, 1429, 1165),
-                (ReturnedVisSettlement, 1160, 1984),
-                (ReturnedVisSettlement, 1429, 1537),
+                (ReturnedVisSettlement, 1160, 1985),
+                (ReturnedVisSettlement, 1429, 1538),
             ][..],
             None,
         ),
@@ -544,9 +544,11 @@ fn px10_argv_and_live_emit_below_process_gate() {
 /// their owners' returned-Vis protocols, numbered by their own origin with a
 /// nonzero discriminant rather than by a response row, and kept in the
 /// settled member set. 1247 and 688 resume at the rows whose Vis are 1484 and
-/// 932; 992 and 433 resume at a row. CLAIMED: no relay Vis is removed from
-/// numbering, and no relay resumes by trap. THE GAP: the artifact is not run
-/// here, and the resume seat is read from the plane that chose it.
+/// 932; 992 and 433 have no resolving issuer and resume by their planned
+/// named trap. CLAIMED: no relay Vis is removed from numbering, and each
+/// relay resumes in the form its issuers resolve. THE GAP: the artifact is not
+/// run here, the resume seat is read from the plane that chose it, and a
+/// trap's reason text is not projected.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
@@ -615,14 +617,11 @@ fn px10_relays_are_numbered_protocol_members() {
                     discriminants.insert(discriminant),
                     "{name}: relay {relay} shares discriminant {discriminant}"
                 );
-                let (_, row_vis) =
-                    resume.unwrap_or_else(|| panic!("{name}: relay {relay} resumes by trap"));
-                if let Some(expected) = resume_vis {
-                    assert_eq!(
-                        row_vis, expected,
-                        "{name}: relay {relay} resumes at the row whose Vis is {expected}"
-                    );
-                }
+                assert_eq!(
+                    resume.map(|(_, row_vis)| row_vis),
+                    resume_vis,
+                    "{name}: relay {relay} resume row Vis (None is its planned named trap)"
+                );
             }
         });
     }
