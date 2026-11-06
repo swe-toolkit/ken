@@ -582,5 +582,14 @@ checks that seed and the generic §2.6 interface under a selective import,
 including package ownership, a private-helper refusal, and unchanged trusted
 `GlobalId` identities. The [§2.6 contract](
   ../../../../spec/50-stdlib/72-optimization.md#26-the-least-in-range-hit-is-returned)
-states the public law. The seeds have not been run by the official conformance
-runner. No time, space, or predicate-call-count guarantee is claimed.
+states the public law. For the seventh law, the
+[agreement seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-agree.md)
+pairs a bound-three application of `find_below_ext` with a direct same-form
+control and a bound-ten refusal where the predicates disagree. The
+[agreement package test](
+  ../../../../crates/ken-elaborator/tests/cat_optimization_bounded_search_agree.rs)
+checks the generic §2.7 public type, package ownership, private-helper
+visibility, unchanged trusted `GlobalId` identities, and both seed clients.
+The seeds have not been run by the official conformance runner. No time, space,
+or predicate-call-count guarantee is claimed.
