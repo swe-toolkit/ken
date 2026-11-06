@@ -12,7 +12,11 @@ prove its generic quantifiers.
 
 ## Accepted client
 
-Let `e1` be the §7 expression. The accepted control applies
+The open theorem `scaled_absent` is generic in the expression `x`,
+variable `v`, coefficient `k` and environment `env`. Its premise is
+syntactic absence from `x`; the constant factor adds no occurrence, so
+the public law proves the scaled expression's derivative evaluates to
+zero. Let `e1` be the §7 expression. The accepted closed control applies
 `deriv_absent` to an index absent from `e1`; its `occurs` premise
 reduces to false. The two refused claims use that same theorem
 application and proof form, changing only the index. In both refused
@@ -22,7 +26,12 @@ syntactic absence from §7's semantic independence.
 
 ```ken
 import Algorithm.SymbolicAlgebra.NatPolynomial
-  (Expr, EConst, EVar, EAdd, EMul, eval, deriv, deriv_absent)
+  (Expr, EConst, EVar, EAdd, EMul, eval, occurs, deriv, deriv_absent)
+
+theorem scaled_absent
+      (v : Nat) (k : Nat) (x : Expr) (env : Nat → Nat)
+    : Equal Bool (occurs v x) False → Equal Nat (eval env (deriv v (EMul (EConst k) x))) Zero =
+  λabsent. deriv_absent v (EMul (EConst k) x) env absent
 
 const e1 : Expr = EAdd (EVar Zero) (EMul (EVar (Suc Zero)) (EConst Zero))
 
@@ -31,6 +40,25 @@ fn env23 (v : Nat) : Nat = Suc (Suc v)
 theorem absent_variable_zero : Equal Nat (eval env23 (deriv (Suc (Suc Zero)) e1)) Zero =
   deriv_absent (Suc (Suc Zero)) e1 env23 Proved
 ```
+
+### stdlib/symbolic-algebra/derivative-absent-variable-generic
+
+- spec: §14's generic syntactic-absence law and §5's structural
+  derivative.
+- promise class: durable invariant.
+- given: arbitrary `x : Expr`, `v : Nat`, `k : Nat` and
+  `env : Nat → Nat`, with `Equal Bool (occurs v x) False`.
+- expect: the generic client is accepted for the derivative of the
+  scaled expression.
+- measured: `scaled_absent` retains open binders and applies the public
+  theorem to `EMul (EConst k) x` without specializing the inputs.
+- claimed: absence from `x` suffices for the derivative of a constant
+  multiple of `x` to evaluate to zero under every environment.
+- gap: this client uses the public theorem; it does not prove its
+  generic implementation or establish official runner execution.
+- why: an open expression and explicit absence premise ensure this
+  seed itself exercises the generic interface, rather than relying on
+  a Rust-side client.
 
 ### stdlib/symbolic-algebra/derivative-absent-variable
 
