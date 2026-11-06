@@ -589,5 +589,9 @@ fn assert_dropped_return_clause_refuses(name: &'static str, source: String) {
         );
         assert!(error.reason.contains("BracketReturnClause"), "{error:?}");
         assert!(error.reason.contains("region 0's body"), "{error:?}");
+        assert!(
+            error.reason.contains("return clause StaticOriginId("),
+            "refusal must name the missing return clause: {error:?}"
+        );
     });
 }
