@@ -505,9 +505,9 @@ when `v` is absent without §7's semantic agreement premise. In the
 isolated D0 at `145405e2f1d4d4ee078eccf3ff88aef8c4ecf0c0`,
 Architect ruled the generic law D0-CLEAN after a fixture-only import
 correction; scratch trusted identity sets remained equal at 114.
-This Spec-only §14 child does not add the catalog export, seed or
-package test, and makes no candidate, official conformance, CI,
-publication, landing or measured landed-trust claim. A sorted-list
+The §14 checked exports, seed and package-owned test are present on
+this base; candidate-local tests do not establish official
+conformance, CI or measured landed trust. A sorted-list
 normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
