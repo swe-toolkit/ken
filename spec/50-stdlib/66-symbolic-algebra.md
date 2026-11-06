@@ -12,7 +12,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10;
 > SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11;
 > SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12;
-> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE §13).**
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE §13;
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE §14).**
 > The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
@@ -23,34 +24,14 @@
 > checked exports, seed and package-owned test are present on this base.
 > Architect's §9 D0 on `757b2bd12` checked the generic compositions
 > with no new `Axiom` and equal scratch trusted identities 114 → 114.
-> Section 10's two public congruence contracts under `EAdd` and `EMul`
-> now have checked catalog exports, a package-owned test and an authored
-> seed in this assembled candidate. Architect's isolated AC-0 on
-> `b557bac0a` checked both generic proofs with no new `Axiom` and
-> equal scratch trusted identity sets 114 → 114. Foundation's named
-> package test passed 2/2 with equal trusted GlobalId identity sets
-> 114 → 114 on parent `b5cd7a0`; its three fixture mutations reddened
-> and were restored. QA independently ran the named test 2/2 with equal
-> trusted identity sets 114 → 114 and three refusal-control mutations
-> red/restored on assembled tip `073725e`. No test or mutation reran
-> on the subsequent catalog-prose-only `dd6f1` child. CV authored the
-> seed but did not Ken-check or officially conformance-run it. No CI,
-> publication, landing or landed trust is claimed. Section 11's three
-> checked equivalence theorems, seed and package-owned test are on this
-> base; candidate-local evidence is not official conformance-runner
-> execution or measured landed trust. Section 12 states one premise-free
-> constant-factor derivative law. Architect AC-0 on `bddc92ad3` checked
-> the generic proof and closed discriminator in scratch with rc 0,
-> no `Axiom` and identical trusted GlobalId sets 114 → 114; its probe
-> test passed 2/2. The historical Spec-only child `a45b84e43` lacked
-> the §12 catalog export, package test and CV seed. Foundation reports
-> in `evt_62fdfyzp5r2nn` that its assembled working tree has all three:
-> `ken fmt --check` and `ken check` rc 0, the named package test 2/2
-> against the actual CV seed fences, unchanged full preloaded-provider
-> trusted GlobalId sets 114 → 114, an owner-local Transparent check and
-> a selective-import generic client. These are Foundation's working-tree
-> results, not an exact committed-tip gate, official conformance-runner
-> execution, CI, publication, landing or measured landed trust.
+> Sections 10–13's checked catalog exports, authored seeds and
+> package-owned tests are present on this base. Architect's isolated
+> §10 AC-0 on `b557bac0a` and §12 AC-0 on `bddc92ad3` each measured
+> identical scratch trusted GlobalId identity sets 114 → 114 with no
+> new `Axiom`; the earlier candidate-local and assembled-working-tree
+> checks remain distinct from official conformance or landed trust.
+> Section 14 specifies the syntactic absence decision and its checked
+> derivative-zero law; its isolated D0 status is stated in §14.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -1200,3 +1181,71 @@ at its own declaration while accepting the control; a false
 pointwise-image claim was separately refused. These observations
 select the distinguishing form but neither replace the generic proof
 nor establish official conformance execution.
+
+## 14. A derivative in an absent variable is zero
+
+> **Section 14 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE).** Architect AC-0
+> `evt_3qykdakw6g7gj` ruled D0-CLEAN on isolated scratch at
+> `145405e2f1d4d4ee078eccf3ff88aef8c4ecf0c0` after correcting an
+> `IsTrue` import in the client fixture only. The generic harness
+> passed 2/2; 13/13 named regressions completed; before/after scratch
+> `trusted_base()` identity sets were equal (114 → 114), and the
+> `Axiom` grep stayed 1 → 1 (prose only). These are scratch design
+> observations, not a Spec-child or assembled-candidate test,
+> official conformance execution, CI, publication, landing or
+> measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+operation and one public Transparent checked theorem, with these exact
+names, argument orders and types:
+
+```ken
+pub fn occurs (v : Nat) (e : Expr) : Bool
+
+pub theorem deriv_absent
+      (v : Nat) (e : Expr) (env : Nat → Nat)
+    : Equal Bool (occurs v e) False → Equal Nat (eval env (deriv v e)) Zero
+```
+
+`occurs` decides **syntactic** occurrence of `EVar v` in `e`. It
+returns `False` for `EConst`, compares indices with `nat_same` for
+`EVar`, and combines recursive decisions for `EAdd` and `EMul`
+using imported `bool_or` from `Core.Classes.LawfulClasses`. It is
+not a test of whether an expression's value depends on `v`. When
+`occurs v e` is `False`, the theorem says that `deriv v e` evaluates
+to zero for the supplied total `env`, regardless of its values;
+clients may apply it at every environment. The result is `Equal Nat`
+of evaluations, not structural equality of derivative expressions or
+an additional exported `poly_eq` law. A client can derive the
+canonical `IsTrue (poly_eq (deriv v e) (EConst Zero))` form using
+public `poly_eq_complete`, without a second export.
+
+The relationship to §7's `deriv_independent` is one-way. Syntactic
+absence supplies §7's semantic environment-agreement premise, but
+semantic independence need not imply syntactic absence. In §7's
+example `e1 = EAdd (EVar Zero) (EMul (EVar (Suc Zero))
+(EConst Zero))`, the variable `Suc Zero` occurs, yet its product
+contributes zero at every environment. Section 7 can prove the
+`Suc Zero` derivative zero; `deriv_absent` cannot be applied there.
+The scratch discriminator refused the `Suc Zero` absent-variable
+claim with K0004, while a same-form claim at `Suc (Suc Zero)`
+accepted. A claim at `Zero`, which also occurs, was separately
+refused. All three rows used `Proved`; `Refl` also refused the true
+control with E0038 and does not discriminate the property. This
+section does not amend §7's contract or its statement that no
+syntactic-occurrence law follows **from §7 alone**.
+
+The checked body descends on `e`. In the variable case it uses the
+absence premise to transport through `var_deriv`; in sums it
+restricts a false `bool_or` result to both operands, applies the
+inductive results and combines them with `add_cong`. Products use
+the same two restrictions, `cong`, `trans`, and the public
+`(proof zero_l for mul)` to discharge the zero-left factor. Two new
+private helpers, `bool_or_false_left` and `bool_or_false_right`,
+perform the Boolean restrictions. The operation and law go in §2
+Definition immediately after `deriv_independent` and before
+`deriv_substitute`; the helpers go after private
+`deriv_var_deriv_eval` and before `bump_at`. The public type needs
+no environment-agreement premise and changes no §§1–13 operation
+or law type. No new `Axiom`, kernel form or surface rule is needed.
