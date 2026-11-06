@@ -151,6 +151,12 @@ evt_4j8qezfw9mahd). Step 1 passed on candidate `06dc75fce`
    returned its answer, while the claims inside that match still lowered
    without it. That is keyed on the call's returned answer, not on the
    stack the match's continuations inherit.
+3. The AC-1 pin identified the clause by the diagnostic's string shape,
+   not by the frame actually dropped. Keyed on the format of the refusal
+   text.
+
+Entry 3 is the pin oracle's §1a 1 (Architect `evt_2cpgqs3r3ry4g`). It
+shares entry 1's predicate, and its closure is this consumer.
 
 The Step 1 rerun measured the four AC-2 exceptions on r2 alone, and each
 fails there identically.

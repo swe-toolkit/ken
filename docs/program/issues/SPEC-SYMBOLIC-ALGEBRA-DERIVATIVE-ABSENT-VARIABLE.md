@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE
 title: "Spec 66 §7 proves a derivative zero when its variable is semantically unused, under a premise quantified over every environment that agrees off the variable, and says independence is not syntactic absence; but no checked law gives the case a rewriting client can discharge structurally, a variable that does not occur in the expression. Rule from a checked D0 at zero trust a public occurrence decision and an absent-variable derivative law, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
