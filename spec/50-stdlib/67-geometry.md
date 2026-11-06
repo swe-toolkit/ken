@@ -14,7 +14,8 @@
 > SPEC-GEOMETRY-BOX-INSIDE-ANTISYMMETRY §12;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE §13;
 > SPEC-GEOMETRY-BOX-POINT-AREA §14;
-> SPEC-GEOMETRY-BOX-POINT-SINGLETON §15).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-POINT-SINGLETON §15;
+> SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL §16).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1333,3 +1334,53 @@ The `Axiom` grep had only its unchanged prose hit before and after
 and the exact trusted identity sets matched. These are scratch
 results, not execution of the separate CV seed or an official
 conformance, CI or landed-trust verdict.
+
+## 16. Nested boxes: intersection and hull
+
+> **Section 16 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL).** Architect's AC-0 on
+> landed base `afdb3da35` measured the two generic proofs in disposable
+> scratch: the trusted `GlobalId` sets were 109 before providers, 114
+> after providers and 114 after `NatBox`, with the last two sets equal.
+> The insertion added no `Axiom` (source diff count zero); the one
+> existing `NatBox` axiom remained. These are scratch observations,
+> not this Spec child's tests, official conformance, CI, publication,
+> landing or a measured landed-trust result for §16.
+
+`Algorithm.Geometry.NatBox` must export exactly two public Transparent
+checked proofs directly after `hull_least` and before `area`:
+
+```ken
+pub theorem intersect_eq_of_inside
+      (b : Box) (c : Box)
+    : IsTrue (inside b c) → Equal Box (intersect b c) b
+
+pub theorem hull_eq_of_inside
+      (b : Box) (c : Box)
+    : IsTrue (inside b c) → Equal Box (hull b c) c
+```
+
+Both laws concern structural equality of stored box corners, not equality
+of point sets. They hold for every pair of boxes satisfying corner-wise
+`inside b c`, including inverted boxes; neither needs a validity or
+point-membership premise. For the intersection, §5's
+`intersect_greatest b b c` combines `inside_refl b` and the given
+`inside b c` to show `inside b (intersect b c)`. Section 3's
+`intersect_inside_left b c` supplies the opposite bound; §12's
+`inside_antisym` yields `Equal Box (intersect b c) b`. Dually, §5's
+`hull_least b c c` combines the given premise and `inside_refl c`
+to show `inside (hull b c) c`; §3's `inside_hull_right b c` supplies
+the reverse bound, and §12's `inside_antisym` yields
+`Equal Box (hull b c) c`. These are checked compositions of public
+laws, not new reduction rules for `inside`, `intersect` or `hull`.
+No Nat Order selector law, private helper, new axiom, operation change
+or §1–§15 law-type change is required.
+
+The closed distinction uses `small=(1,1)–(2,2)` inside
+`big=(0,0)–(3,3)` to apply both laws. `tall=(0,0)–(3,2)` also contains
+`small`, while `short=(0,0)–(3,1)` fails only at its upper y bound.
+The claim `Equal Box (intersect small short) small = Refl` must be
+refused, paired with the same-form accepted `tall` claim, so refusal
+tracks the failed containment rather than an invalid proof form.
+These closed cases delimit the contract; they do not replace the
+checked generic proofs. The CV seed and its execution are separate.
