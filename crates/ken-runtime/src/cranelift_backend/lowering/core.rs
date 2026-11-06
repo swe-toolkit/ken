@@ -15556,7 +15556,7 @@ impl<'a> Lowering<'a> {
         selected_constructor: &RuntimeSymbol,
     ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
         let source = self.retained_body_occurrence(source_origin)?;
-        let RuntimeExpr::Construct { args, .. } = source.expr else {
+        let RuntimeExpr::Construct { constructor, args } = source.expr else {
             if let RuntimeExpr::Match { cases, .. } = source.expr {
                 #[cfg(any(test, feature = "px8-ds-test-support"))]
                 if BRANCHED_SCRUTINEE_UNIT_BODY_SKIP_MATCH_BRANCH_ENTRY.with(std::cell::Cell::get) {
@@ -15606,6 +15606,13 @@ impl<'a> Lowering<'a> {
             record_branched_scrutinee_unit_body_route1(source_origin, source.expr);
             return Ok(None);
         };
+        // `D1` for a direct source. A literal Construct of another constructor
+        // cannot produce the child the selected case eliminates, so that case
+        // has no unit here: the Match arm's answer for an empty bucket, never a
+        // projection of the other constructor's argument.
+        if constructor != selected_constructor {
+            return Ok(None);
+        }
         let Some(argument) = recursive_position_construct_argument(args, position, false)? else {
             return Ok(None);
         };

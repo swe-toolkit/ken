@@ -129,6 +129,7 @@ fn erase_checked_package_with_host_root(
             })
             .collect::<Vec<_>>();
         prelowered.insert(root.clone(), root_kind);
+        let mut performing = BTreeSet::new();
         while let Some(symbol) = queue.pop() {
             if !executable.insert(symbol.clone()) {
                 continue;
@@ -140,7 +141,10 @@ fn erase_checked_package_with_host_root(
                 spine,
                 native_plans.as_deref_mut(),
             ) {
-                Ok(declaration) => declaration,
+                Ok(declaration) => {
+                    performing.insert(symbol.to_string());
+                    declaration
+                }
                 Err(error)
                     if matches!(
                         &error,
@@ -166,6 +170,12 @@ fn erase_checked_package_with_host_root(
                     }),
             );
             prelowered.insert(symbol, declaration.kind);
+        }
+        let ret = spine.ret.to_string();
+        for (owner, kind) in prelowered.iter_mut() {
+            if let RuntimeDeclarationKind::Transparent { body } = kind {
+                wrap_performed_call_scrutinees(owner, body, &performing, &ret)?;
+            }
         }
         targets = executable.into_iter().collect();
     } else if let Some(root) = planned_root {
@@ -454,6 +464,142 @@ fn admitted_recursive_member(
                 | checked_core::RecursionAdmission::AcceptedSizeChange
         ) && metadata.group_members.contains(symbol)
     })
+}
+
+/// A declaration lowered by lower_checked_host_declaration performs its effects
+/// when called and returns its bare Ret payload, not a tree. A computational
+/// match dispatches on a tree, so where a call to such a declaration is a
+/// match's direct scrutinee it is given back its tree as `Ret(call)`: the call
+/// still runs when the match is reached, and its payload enters the Ret case.
+/// `ret` is the host spine's checked Ret constructor, never a case's spelling.
+/// A performed call reached as a case body (a continuation's result) is not a
+/// scrutinee and is left as it is.
+fn wrap_performed_call_scrutinees(
+    owner: &StableSymbol,
+    expression: &mut RuntimeExpr,
+    performing: &BTreeSet<String>,
+    ret: &str,
+) -> Result<(), ErasureError> {
+    if let RuntimeExpr::ComputationalMatch {
+        scrutinee, cases, ..
+    } = expression
+    {
+        let performed = matches!(
+            scrutinee.as_ref(),
+            RuntimeExpr::Call { callee, .. }
+                if matches!(
+                    callee.as_ref(),
+                    RuntimeExpr::DeclarationRef { symbol } if performing.contains(symbol)
+                )
+        );
+        if performed {
+            if !cases.iter().any(|case| {
+                case.constructor == ret
+                    && case.argument_binders == 1
+                    && case.recursive_positions.is_empty()
+            }) {
+                return Err(expression_lowering_error(
+                    owner,
+                    "performed_call_scrutinee_without_ret_case",
+                    "a performed call is a computational match's scrutinee, but the match \
+                     has no one-argument case for the checked Ret constructor",
+                ));
+            }
+            let call = std::mem::replace(
+                scrutinee.as_mut(),
+                RuntimeExpr::Value(RuntimeValue::Unknown),
+            );
+            **scrutinee = RuntimeExpr::Construct {
+                constructor: ret.to_string(),
+                args: vec![call],
+            };
+        }
+    }
+
+    match expression {
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. }
+        | RuntimeExpr::Project { record: body, .. }
+        | RuntimeExpr::Closure { body, .. } => {
+            wrap_performed_call_scrutinees(owner, body, performing, ret)
+        }
+        RuntimeExpr::LexicalClosure { captures, body, .. } => {
+            for capture in captures {
+                wrap_performed_call_scrutinees(owner, capture, performing, ret)?;
+            }
+            wrap_performed_call_scrutinees(owner, body, performing, ret)
+        }
+        RuntimeExpr::Let { value, body } => {
+            wrap_performed_call_scrutinees(owner, value, performing, ret)?;
+            wrap_performed_call_scrutinees(owner, body, performing, ret)
+        }
+        RuntimeExpr::If {
+            scrutinee,
+            then_expr,
+            else_expr,
+        } => {
+            wrap_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
+            wrap_performed_call_scrutinees(owner, then_expr, performing, ret)?;
+            wrap_performed_call_scrutinees(owner, else_expr, performing, ret)
+        }
+        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
+            for argument in args {
+                wrap_performed_call_scrutinees(owner, argument, performing, ret)?;
+            }
+            Ok(())
+        }
+        RuntimeExpr::Match {
+            scrutinee, cases, ..
+        } => {
+            wrap_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
+            for case in cases {
+                wrap_performed_call_scrutinees(owner, &mut case.body, performing, ret)?;
+            }
+            Ok(())
+        }
+        RuntimeExpr::ComputationalMatch {
+            scrutinee, cases, ..
+        } => {
+            wrap_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
+            for case in cases {
+                wrap_performed_call_scrutinees(owner, &mut case.body, performing, ret)?;
+            }
+            Ok(())
+        }
+        RuntimeExpr::Record { fields } => {
+            for (_, field) in fields {
+                wrap_performed_call_scrutinees(owner, field, performing, ret)?;
+            }
+            Ok(())
+        }
+        RuntimeExpr::Call { callee, args } => {
+            wrap_performed_call_scrutinees(owner, callee, performing, ret)?;
+            for argument in args {
+                wrap_performed_call_scrutinees(owner, argument, performing, ret)?;
+            }
+            Ok(())
+        }
+        RuntimeExpr::Effect {
+            capability, args, ..
+        } => {
+            if let Some(capability) = capability {
+                wrap_performed_call_scrutinees(owner, &mut capability.value, performing, ret)?;
+            }
+            for argument in args {
+                wrap_performed_call_scrutinees(owner, argument, performing, ret)?;
+            }
+            Ok(())
+        }
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::Var(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Trap(_) => Ok(()),
+    }
 }
 
 fn runtime_declaration_refs_in_kind(kind: &RuntimeDeclarationKind) -> Vec<String> {
@@ -8074,6 +8220,10 @@ mod bracket_marker_tests;
 #[cfg(test)]
 #[path = "erasure/selected_host_binder_depth_tests.rs"]
 mod selected_host_binder_depth_tests;
+
+#[cfg(test)]
+#[path = "erasure/performed_call_scrutinee_tests.rs"]
+mod performed_call_scrutinee_tests;
 
 #[cfg(test)]
 mod px7l_tests {
