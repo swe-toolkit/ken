@@ -325,10 +325,10 @@ fn changed_proc_result_splits_still_return_their_tree() {
 
 /// AC-2, durable invariant (Spec 36 §§2.4–2.5): the returned tree preserves
 /// the selected value and performs a preceding action exactly once.
-/// MEASURED: each side of four result splits reaches the CLI's output in
-/// source order. CLAIMED: a successful check has not silently substituted a
-/// wrong branch or dropped the result. THE GAP: this observes two branches
-/// per shape, not every possible nested split or operation.
+/// MEASURED: each side of four result splits and both crossed two-parameter
+/// inputs reach the CLI's output in source order. CLAIMED: a successful check
+/// has not silently substituted a wrong branch, binder, or dropped the result.
+/// THE GAP: this observes paired branches, not every nested split or operation.
 #[test]
 fn changed_proc_result_splits_preserve_selected_output_and_order() {
     for (name, body, prefix) in [
@@ -365,5 +365,34 @@ fn changed_proc_result_splits_preserve_selected_output_and_order() {
             let expected = format!("{prefix}{value}");
             assert_eq!(run.stdout, expected.as_bytes(), "{name}/{choice}");
         }
+    }
+
+    // Cross the parameter values: reading the first binder instead of the
+    // scrutinee `c` returns the opposite, still well-typed String.
+    for (first, second, expected) in [
+        ("False", "True", b"one\n".as_slice()),
+        ("True", "False", b"two\n".as_slice()),
+    ] {
+        let source = format!(
+            "program capabilities FS APartial\n\
+             proc choose2 (b : Bool) (c : Bool) : String visits [Console] =\n\
+               if c then \"one\" else \"two\"\n\
+             proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+               : HostIO APartial ExitCode visits [Console] =\n\
+               let selected : String = choose2 {first} {second} in\n\
+               host_program APartial (print_line selected)\n"
+        );
+        let run = cli(
+            &format!("result-two-param-{first}-{second}"),
+            "run",
+            &source,
+        );
+        assert_eq!(
+            run.status.code(),
+            Some(0),
+            "two-param/{first}/{second}: {}",
+            String::from_utf8_lossy(&run.stderr)
+        );
+        assert_eq!(run.stdout, expected, "two-param/{first}/{second}");
     }
 }
