@@ -3031,7 +3031,8 @@ environment, not structural equality of derivatives.
 
 For derivative after substitution, induction on the expression uses the two
 pointwise derivative premises on a variable. The product case reuses
-`eval_substitute` for its underived factors, then lifts the induction hypotheses through multiplication and addition
+`eval_substitute` for its underived factors, then lifts the induction
+hypotheses through multiplication and addition
 congruence. Both new comparison helpers remain private; no equality of
 expression trees or every-environment substitution claim follows.
 
