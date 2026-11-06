@@ -271,6 +271,13 @@ fn written_tree_type_inside_changed_proc_is_not_a_result_position() {
             "K0004",
         );
         assert_refuses_with(
+            &format!("changed-param-{name}"),
+            &with_main(&format!(
+                "{apply}proc q (b : Bool) : Int visits [Console] =\n  {form}"
+            )),
+            "K0004",
+        );
+        assert_refuses_with(
             &format!("const-{name}"),
             &with_main(&format!("{apply}const c : {const_ty} =\n  {form}")),
             "K0004",
@@ -303,4 +310,8 @@ fn changed_proc_result_splits_still_return_their_tree() {
             )),
         );
     }
+    assert_checks(
+        "two-parameter-if-tail",
+        &with_main("proc p2 (b : Bool) (c : Bool) : Int visits [Console] =\n  if c then 1 else 2"),
+    );
 }
