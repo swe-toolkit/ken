@@ -252,13 +252,15 @@ thread_local! {
 }
 
 /// Compile-preserving controls for the two consumption seats of the
-/// handler-owned Deferred-response decomposition, and for the in-place bracket
-/// settlement that now consumes a marked S's K at its handler.
+/// handler-owned Deferred-response decomposition, for the in-place bracket
+/// settlement that now consumes a marked S's K at its handler, and for the
+/// carried stack that keeps a bracket's return clause.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HandlerOwnedDeferredResponseMutation {
     SuppressUnitlessDrive,
     SuppressLocalContinuationDrive,
     SuppressBracketInPlaceContinuation,
+    DropBracketReturnClause,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -268,6 +270,8 @@ thread_local! {
         const { std::cell::Cell::new(None) };
     static HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS:
         std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static DROPPED_BRACKET_RETURN_CLAUSES: std::cell::RefCell<Vec<(u32, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -289,6 +293,7 @@ pub fn with_handler_owned_deferred_response_mutation<T>(
         );
     });
     HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    DROPPED_BRACKET_RETURN_CLAUSES.with(|clauses| clauses.borrow_mut().clear());
     let _restore = Restore;
     let result = operation();
     let applications =
@@ -300,6 +305,26 @@ pub fn with_handler_owned_deferred_response_mutation<T>(
 pub fn handler_owned_deferred_response_mutation_is_exact() -> bool {
     HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION.with(|slot| slot.get().is_none())
 }
+
+/// The (region ordinal, clause origin) pairs the current
+/// DropBracketReturnClause scope removed from a carried stack, recorded at
+/// the seat that drops them rather than read back from the refusal.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn dropped_bracket_return_clauses() -> Vec<(u32, String)> {
+    DROPPED_BRACKET_RETURN_CLAUSES.with(|clauses| clauses.borrow().clone())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_dropped_bracket_return_clauses(clauses: impl Iterator<Item = (u32, StaticOriginId)>) {
+    DROPPED_BRACKET_RETURN_CLAUSES.with(|dropped| {
+        dropped
+            .borrow_mut()
+            .extend(clauses.map(|(region, clause)| (region, format!("{clause:?}"))));
+    });
+}
+
+#[cfg(not(feature = "px8-ds-test-support"))]
+fn record_dropped_bracket_return_clauses(_: impl Iterator<Item = (u32, StaticOriginId)>) {}
 
 #[cfg(feature = "px8-ds-test-support")]
 fn handler_owned_deferred_response_mutation_applies(
@@ -3074,6 +3099,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         response_owner_settlements,
         response_bracket_exits,
         bracket_view,
+        bracket_clause_body: None,
         bracket_ledger,
         bracket_effect_claim: None,
         continuation_claims: None,
@@ -4558,6 +4584,7 @@ impl<'a> Lowering<'a> {
         scrutinee: RoutedAnswer,
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        self.require_bracket_clause_on_stack(eliminators, None)?;
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ANSWER DISPOSITION,
         // ---- processed BEFORE phase classification and head selection.
         // ---- Architect `evt_43ng4f578mdvv`.
@@ -6714,12 +6741,43 @@ impl<'a> Lowering<'a> {
                             "a handler-owned response prefix exceeds its eliminator stack",
                         )
                     })?;
+                    // A bracket return clause past the handler's prefix stays on the
+                    // stack the carried match lowers under, unless the kept prefix
+                    // holds a clause of its own, whose settlement carries the outer
+                    // frames.
+                    let is_clause = |origin: StaticOriginId| {
+                        self.bracket_view
+                            .regions()
+                            .any(|region| region.clause_origin() == Some(origin))
+                    };
+                    let kept_holds_clause = is_clause(first.static_origin)
+                        || remaining_origins[..prefix_len].iter().copied().any(is_clause);
+                    let outer_holds_clause =
+                        remaining_origins[prefix_len..].iter().copied().any(is_clause);
+                    let carried_remaining = if kept_holds_clause || !outer_holds_clause {
+                        local_remaining
+                    } else if handler_owned_deferred_response_mutation_applies(
+                        HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
+                    ) {
+                        let dropped = &remaining_origins[prefix_len..];
+                        record_dropped_bracket_return_clauses(
+                            self.bracket_view.regions().filter_map(|region| {
+                                let clause = region.clause_origin()?;
+                                dropped
+                                    .contains(&clause)
+                                    .then(|| (region.id().ordinal(), clause))
+                            }),
+                        );
+                        local_remaining
+                    } else {
+                        remaining
+                    };
                     return self.lower_carried_computational_match_with_control(
                         builder,
                         returned,
                         route_control,
                         *first,
-                        local_remaining,
+                        carried_remaining,
                         CarriedRetSinkAuthority::DriveFedCheckedAnswer,
                     );
                 }
@@ -9303,6 +9361,48 @@ impl<'a> Lowering<'a> {
         Ok(Some(lowered))
     }
 
+    /// Refuse a delivery inside a bracket return clause's scrutinee when the
+    /// exact clause frame has disappeared from this function's stack.
+    fn require_bracket_clause_on_stack(
+        &self,
+        eliminators: &[EliminatorFrame<'_>],
+        claim_origin: Option<StaticOriginId>,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(body) = self.bracket_clause_body else { return Ok(()) };
+        let Some(head) = eliminators.iter().find_map(|frame| match frame {
+            EliminatorFrame::Computational(computational) => Some(computational.static_origin),
+            _ => None,
+        }) else { return Ok(()) };
+        // An answer inside a return clause's scrutinee must still reach a
+        // settlement: the clause itself, the clause of a region nested in that
+        // scrutinee (which settles through its own S), or an Active
+        // continuation that carries the rest of the stack.
+        if eliminators.iter().any(|frame| matches!(frame, EliminatorFrame::Active(_))) {
+            return Ok(());
+        }
+        for region in self.bracket_view.clauses_inside(body) {
+            let Some(clause) = region.clause_origin() else { continue };
+            if region.clause_scrutinee_contains(head)
+                && !eliminators.iter().any(|frame| matches!(frame,
+                    EliminatorFrame::Computational(computational)
+                        if computational.static_origin == clause
+                            || (region.clause_scrutinee_contains(computational.static_origin)
+                                && self.bracket_view.regions().any(|nested|
+                                    nested.clause_origin() == Some(computational.static_origin)))))
+            {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "BracketReturnClause",
+                    format!(
+                        "a claim inside region {}'s body runs without its return clause {:?} \
+                         (claim origin {:?}, stack head {:?}, body {:?})",
+                        region.id().ordinal(), clause, claim_origin.unwrap_or(head), head, body,
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn claim_and_call_continuation(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -9316,6 +9416,7 @@ impl<'a> Lowering<'a> {
         // closes against the real head rather than a remembered origin.
         eliminators: &[EliminatorFrame<'_>],
     ) -> Result<Option<ClaimedContinuationResult>, CraneliftBackendError> {
+        self.require_bracket_clause_on_stack(eliminators, Some(producer_construct_origin))?;
         let alternative = u32::try_from(producer_alternative).map_err(|_| {
             unsupported(LoweringCause::Capacity, "ComputationalMatch", "case index exceeds addressable range")
         })?;

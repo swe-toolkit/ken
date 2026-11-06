@@ -5,8 +5,9 @@
 //! CLAIMED: a let-bound value releases its carried latent once, including
 //! constructor applications and other value forms, but not a performed tree's
 //! already-paid evaluation row. THE GAP: these rows cover the named value
-//! forms, not the separate direct-cell scrutinee (q16) or an application
-//! returning a closure, which remains a declared MATCH-BINDER residual.
+//! forms, not an RCell read directly or nested under an operand-joining
+//! form; CELL-SCRUTINEE-CARRIED-ROW pins both. An application returning a
+//! closure remains a declared MATCH-BINDER residual.
 //! Inline Ken sources keep the strict-isolated .ken fixture census unchanged.
 
 use std::process::{Command, Output};

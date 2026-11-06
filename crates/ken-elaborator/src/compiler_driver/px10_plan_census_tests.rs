@@ -538,3 +538,70 @@ fn px10_argv_and_live_emit_below_process_gate() {
         });
     }
 }
+
+/// Promise class: durable invariant (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1).
+/// MEASURED: on the live child and the null-stdout argv program, dropping
+/// region 0's return clause from the stack a carried match lowers under is
+/// refused at lowering as BracketReturnClause, and the unmutated build emits.
+/// CLAIMED: a claim inside a bracket body whose return clause is absent from
+/// the eliminator stack cannot pass as an ordinary native build.
+/// THE GAP: one mutation seat, the carried-remaining choice, and the planner's
+/// region-to-clause map is read on both sides. Other ways of losing the
+/// clause reach the same check but are not exercised here.
+#[test]
+fn live_child_dropped_return_clause_refuses_at_lowering() {
+    assert_dropped_return_clause_refuses("px10_return_clause_live_child", LIVE_CHILD.to_owned());
+}
+
+/// Promise class: durable invariant; the null-stdout row of the pin above.
+#[test]
+fn null_stdout_dropped_return_clause_refuses_at_lowering() {
+    let null = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
+    assert_ne!(
+        null, ARGV_ENV_PIPE,
+        "the argv fixture's stdout disposition moved"
+    );
+    assert_dropped_return_clause_refuses("px10_return_clause_null_stdout", null);
+}
+
+fn assert_dropped_return_clause_refuses(name: &'static str, source: String) {
+    in_census_thread(name, move || {
+        emit_below_gate(name, &source)
+            .expect("the unmutated program emits beneath the Process gate");
+        let (built, applications) = ken_runtime::with_handler_owned_deferred_response_mutation(
+            ken_runtime::HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
+            || emit_below_gate(name, &source),
+        );
+        assert!(
+            applications >= 1,
+            "{name}: the mutation must reach the carried stack"
+        );
+        let dropped = ken_runtime::dropped_bracket_return_clauses();
+        assert!(
+            !dropped.is_empty(),
+            "{name}: the mutation must record the clause frames it drops"
+        );
+        let error = built.expect_err("a dropped return clause cannot emit an artifact");
+        let NativeProgramBuildError::Packaging(error) = error else {
+            panic!("expected a packaging refusal, got {error:?}");
+        };
+        assert_eq!(
+            error.stage,
+            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
+        );
+        assert_eq!(
+            error.source_cause,
+            Some(ken_runtime::LoweringCause::PlannerInvariant)
+        );
+        assert!(error.reason.contains("BracketReturnClause"), "{error:?}");
+        assert!(
+            dropped
+                .iter()
+                .any(|(region, clause)| error.reason.contains(&format!(
+                    "a claim inside region {region}'s body runs without its return clause {clause} ("
+                ))),
+            "{name}: the refusal must name a region and clause the mutation dropped, \
+             {dropped:?}: {error:?}"
+        );
+    });
+}

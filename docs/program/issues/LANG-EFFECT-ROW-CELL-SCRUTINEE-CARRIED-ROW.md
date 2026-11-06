@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-CELL-SCRUTINEE-CARRIED-ROW
 title: "A space cell whose type carries an effect row releases nothing to a match binder when it is the scrutinee directly or sits under an operand-joining form: inside `space Holder { mut held : Box = MkBox action ... }`, `match held { MkBox f ↦ let ignored = f MkUnit in MkUnit }` and `let p = (held, MkUnit)` then `match p { (MkBox f, _) ↦ ... }` both check and discard the callback, while `let b = held` and `let b : Box = held` refuse with E0038. RCell reads as pure on the evaluation row, and the checked type's carried row is joined only at a let binder with a named head. Give a cell its type's carried row on the latent plane, and pin both forms"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1

@@ -29,8 +29,10 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. Enclosure uses both membership premises and
-the checked Rational monotonicity laws. Hull and intersection select stored
+source; their operations follow. The checked inverted-emptiness and two
+ordered-endpoint membership laws make the endpoint boundary explicit.
+Enclosure uses both membership premises and the checked Rational monotonicity
+laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
 establish containment without assuming either input has ordered endpoints.
 The endpoint-inclusion operation and its nine checked laws follow the §1–2
@@ -201,6 +203,46 @@ pub theorem interval_contains_respects_equiv
                   ((proof refl for rational_equiv) hi)))
               ((proof right for bool_and) (rational_leq lo x) (rational_leq x hi) hx))
   }
+
+pub theorem interval_inverted_empty
+      (lo : Rational) (hi : Rational) (x : Rational)
+    : Equal Bool (rational_leq lo hi) False
+      → IsTrue (interval_contains (MkInterval lo hi) x)
+      → Bottom =
+  λinverted.
+    λmember.
+      trans
+        Bool
+        False
+        (rational_leq lo hi)
+        True
+        (sym Bool (rational_leq lo hi) False inverted)
+        ((proof trans for rational_leq)
+          lo
+          x
+          hi
+          ((proof left for bool_and) (rational_leq lo x) (rational_leq x hi) member)
+          ((proof right for bool_and) (rational_leq lo x) (rational_leq x hi) member))
+
+pub theorem interval_ordered_contains_lo
+      (lo : Rational) (hi : Rational)
+    : IsTrue (rational_leq lo hi) → IsTrue (interval_contains (MkInterval lo hi) lo) =
+  λordered.
+    (proof intro for bool_and)
+      (rational_leq lo lo)
+      (rational_leq lo hi)
+      ((proof refl for rational_leq) lo)
+      ordered
+
+pub theorem interval_ordered_contains_hi
+      (lo : Rational) (hi : Rational)
+    : IsTrue (rational_leq lo hi) → IsTrue (interval_contains (MkInterval lo hi) hi) =
+  λordered.
+    (proof intro for bool_and)
+      (rational_leq lo hi)
+      (rational_leq hi hi)
+      ordered
+      ((proof refl for rational_leq) hi)
 
 pub theorem interval_add_point
       (x : Rational) (y : Rational)
@@ -1505,6 +1547,11 @@ so rational antisymmetry proves value equivalence. Membership in any fixed
 interval respects rational-value equivalence: the checked respect proof for
 `rational_leq` transports each bound through a value-equivalent member, and
 Boolean conjunction introduction joins the two resulting comparisons.
+An inverted endpoint comparison rules out any member: projecting the two
+membership comparisons and composing them gives the ordered comparison, a
+contradiction. Conversely, an ordered interval contains both endpoints by
+reflexivity and conjunction introduction. These three laws add no premise
+beyond the stated endpoint order.
 Public `interval_point_contains` composes with this law to show that every
 value equivalent to a point's stored endpoint belongs to that point interval;
 no separate converse law or new premise is exported. Endpoint-wise arithmetic
@@ -1548,7 +1595,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and forty-seven checked interval
+   `interval_intersect`, `interval_inside` and fifty checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1573,14 +1620,17 @@ API.
    inclusions reuse Rational's left-zero multiplication proof in the same way.
    Membership transport uses Rational's checked `rational_leq` respect proof
    on both endpoints; `interval_point_contains` derives point completeness.
-   Neither family adds a helper.
-4. **Trusted-base delta.** Zero: all forty-seven laws have checked proof bodies,
+   Inverted emptiness composes the member's two checked comparisons against
+   the false endpoint order; each ordered endpoint uses reflexivity and
+   conjunction introduction. Neither family adds a helper.
+4. **Trusted-base delta.** Zero: all fifty laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
    [arithmetic seed](../../../../conformance/stdlib/numerical/seed-rational-interval.md)
    [hull/intersection seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersection.md)
    [inclusion seed](../../../../conformance/stdlib/numerical/seed-interval-inclusion.md)
+   [inverted-emptiness seed](../../../../conformance/stdlib/numerical/seed-interval-inverted-empty.md)
    [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
    [inclusion-order seed](../../../../conformance/stdlib/numerical/seed-interval-inside-order.md)
    [associativity seed](../../../../conformance/stdlib/numerical/seed-interval-associativity-inside.md)

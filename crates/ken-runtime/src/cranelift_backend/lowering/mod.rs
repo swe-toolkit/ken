@@ -3345,6 +3345,10 @@ struct Lowering<'a> {
     response_owner_settlements: BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
     response_bracket_exits: BTreeMap<StaticResponseContinuationId, BTreeSet<BracketSettlementId>>,
     bracket_view: BracketSettlementControlView,
+    /// Exact source body currently being lowered into this function. The
+    /// return-clause check must not infer it from an emission owner: one raw
+    /// unit can also be emitted inside a generated continuation context.
+    bracket_clause_body: Option<StaticOriginId>,
     bracket_ledger: BracketSettlementLedger,
     /// Exactly one validated S effect may run under the in-place release call.
     bracket_effect_claim: Option<(BracketSettlementId, StaticOriginId)>,

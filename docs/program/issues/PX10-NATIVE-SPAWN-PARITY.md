@@ -81,13 +81,12 @@ base, stop and report the mismatch; do not build around it.
   argv_env_pipe and live_child fixtures, which
   `PX10-NATIVE-BRANCH-ALTERNATIVES` brings only to native build
   (Architect evt_4qb22p4991jmm). Those fixtures issue 3, 4 and 4
-  producer alternative sets, so these rows are also the labelled
-  transport's execution parity (evt_573z7twxznjt9). A mutant that swaps
-  two members' labels at the writer reddens one of them, and a mutant
-  that writes the bare payload without its label is caught by the issued
-  reader of `RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER` (C3), not by
-  the seat's assertion, which only validates (evt_7xv7216msypg). An
-  ordinary consumer handed a labelled answer is refused at compile time.
+  producer alternative sets, so these rows are also the transport's
+  execution parity (evt_573z7twxznjt9). Since
+  `RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER` (`5dfe23688`) no answer
+  is labelled: each member's answer is the producer's raw word, and its
+  pins redden if identity-membership labelling or the seat's record
+  assertion returns.
 - **AC-1b (settlement).** For a `withChild` body that takes stdout and
   waits, the trace settles the `PipeRead` and the `SpawnPlan` exactly
   once each, before the child, in reverse acquisition order, on both
@@ -123,13 +122,26 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   (Steward evt_6ppgz0hsqxmm, Research evt_1ebcpy76v1e9a, routing D0-23
   evt_jc75x84wmcw7). That WP merged at `45074052a`; checkpoint
   `2ad1b31d0` resumed on it (evt_47r0prwyrhxb1). Stop 11 found that a
-  labelled transport answer has no reader (evt_7xv7216msypg), so
-  B-closure is parked at `5cd38e8b5` on
-  `RT-NATIVE-PRODUCER-ALTERNATIVE-ANSWER-READER` and reruns AC-1 after
-  it lands. With compose, argv, live and null on the standard profile,
-  the run records `CapacityExhausted{Invocation, Words, 256, 269}`.
-  Remeasure after the closure; if demand still exceeds 256, choose
-  between raising the AC-1 rows' profile and reducing the demand.
+  labelled transport answer has no reader (evt_7xv7216msypg). Its
+  closure WP deleted the label and merged at `5dfe23688`; B-closure
+  resumed on `wp/PX10-NATIVE-SPAWN-PARITY-incB-unit-b-r2`, rebased tip
+  `8b5744bd2` (the parked `5cd38e8b5` is unmoved). Stop 12: live AC-1
+  matches all 17 effects, then takes planned trap 44
+  (evt_51k698amn93ah). The Architect located it as entry 16 and recut
+  (evt_zbd2e5wv721d, on Research evt_2v4hdh6wpzk5s): B-closure is held
+  on `RT-NATIVE-BRACKET-RETURN-CLAUSE`, whose AC-0 located the cause
+  at the bracket's return clause dropping off the lowering stack
+  (evt_59x9w96jsgxzk). B-closure resumes on r2 after it lands. Argv and
+  null on the standard profile still record
+  `CapacityExhausted{Invocation, Words, 256, 269}`, deferred until that
+  WP's AC-3 holds. Argv's trap 53 after ReadEof is a separate symptom;
+  if it survives the clause, it becomes entry 17. Carried into the resumed
+  B-closure scope: r2 alone fails `rt_escape_second_resource_native`
+  `r2_relay_owners_settle_authenticated_successors_without_returning_them`
+  with "settled owner 1353 retained a returned successor after
+  consumption" (evt_5gyhca0xt0by5, scope evt_1cvwy3qh0aj1f), and
+  `rt_parity_native` fails three rows (rs:1308, rs:1758, rs:6506) the same
+  way with or without RETURN-CLAUSE (evt_7xb5rse5pv5by).
   - Every relay member of every protocol is numbered by its relay
     construct's origin (argv and null: 1247, owner 2, context 0). Its ABI
     is the carried operation word, argument 0 of the relay's own Vis, plus
@@ -200,7 +212,8 @@ The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
 evt_5kjjy0w0gzma, evt_p37pc6dwdk3h, evt_qkp7qcj87b3q and
 evt_3nvw9veeqa274; entries 11 to 13, evt_6ap56syy0smt6,
-evt_7cm821pbn97vt and evt_1339kvspms2zv) has thirteen entries:
+evt_7cm821pbn97vt and evt_1339kvspms2zv; entry 16, evt_zbd2e5wv721d)
+has sixteen entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -261,7 +274,13 @@ evt_7cm821pbn97vt and evt_1339kvspms2zv) has thirteen entries:
     the labelled answer from core.rs:9455 reaches an ordinary Result
     match with no label reader, because the operand plane does not
     carry labelled-ness. This shares entries 1 and 3-6's predicate.
-    The closure is C1-C3.
+    The closure deleted the label (`5dfe23688`).
+16. Region 0's body outcome reaches the bracket's resume K without its
+    return clause running: no release and no outcome_merge. This is
+    measured at live 420 and null 979. Claims inside region 0's
+    return-clause scrutinee are lowered without the clause frame, in the
+    function that opened it (evt_59x9w96jsgxzk). This shares entry 15's
+    predicate on one edge; `RT-NATIVE-BRACKET-RETURN-CLAUSE` closes it.
 
 Entries 10 to 13 share one predicate: the relay's resume state is located
 through the response-row plane, but its identity is the runtime-carried K.

@@ -28,10 +28,12 @@ Neither operation reads a clock or sorts unordered input.
 
 The public carrier, operations and the first five generic laws lead the
 checked source, followed by their private recursive merge helper and proof
-lemmas. The window/merge distribution, composition and commutation laws, the three
-merge membership laws, merge associativity and adjacent-window split lead
-their private lemmas later in the source. The inverted-window law follows
-window append; its private decision lemma sits beside the split's bound lemmas.
+lemmas. The window/merge distribution, composition and commutation laws, the
+three merge membership laws, merge associativity and adjacent-window split
+lead their private lemmas later in the source. The separated-merge law
+follows the right empty-merge unit and leads its private head-comparison
+helper. The inverted-window law follows window append; its private decision
+lemma sits beside the split's bound lemmas.
 The all-in-window identity follows it and reuses the existing private
 `window_keep` and public list membership lemmas without a new helper.
 Windowing includes the lower bound
@@ -1136,6 +1138,80 @@ pub theorem trace_merge_nil_right
   match xs {
     Nil ↦ Proved;
     Cons x xt ↦ Refl
+  }
+
+pub theorem trace_merge_separated
+      (p : Type) (xs : List (Event p)) (ys : List (Event p))
+    : ((x : Event p)
+        → list_elem
+        (Event p)
+        x
+        xs
+        → (y : Event p)
+        → list_elem
+        (Event p)
+        y
+        ys
+        → Equal
+        Bool
+        (event_before p x y)
+        True)
+      → Equal (List (Event p)) (trace_merge p xs ys) (list_append (Event p) xs ys) =
+  match xs {
+    Nil ↦ λseparated. Refl;
+    Cons x xt ↦
+      λseparated.
+        trans
+          (List (Event p))
+          (trace_merge p (Cons (Event p) x xt) ys)
+          (Cons (Event p) x (trace_merge p xt ys))
+          (Cons (Event p) x (list_append (Event p) xt ys))
+          (trace_merge_cons_left
+            p
+            x
+            xt
+            ys
+            (trace_separated_starts_after
+              p
+              x
+              (Cons (Event p) x xt)
+              ys
+              (list_elem_head (Event p) x xt)
+              separated))
+          (cong
+            (List (Event p))
+            (List (Event p))
+            (trace_merge p xt ys)
+            (list_append (Event p) xt ys)
+            (λtail. Cons (Event p) x tail)
+            (trace_merge_separated
+              p
+              xt
+              ys
+              (λa. λmember. separated a (list_elem_later (Event p) a x xt member))))
+  }
+
+theorem trace_separated_starts_after
+      (p : Type) (x : Event p) (xs : List (Event p)) (ys : List (Event p))
+    : list_elem (Event p) x xs
+      → ((a : Event p)
+          → list_elem
+          (Event p)
+          a
+          xs
+          → (b : Event p)
+          → list_elem
+          (Event p)
+          b
+          ys
+          → Equal
+          Bool
+          (event_before p a b)
+          True)
+      → starts_after (Event p) (event_before p) x ys =
+  match ys {
+    Nil ↦ λmember. λseparated. Proved;
+    Cons y yt ↦ λmember. λseparated. separated x member y (list_elem_head (Event p) y yt)
   }
 
 theorem trace_merge_cons_left
@@ -3122,7 +3198,7 @@ either input remains in the merge. Their private recursive helpers follow the
 head-insertion branch for each input; a named comparison decision transports
 membership through both Boolean outcomes. The proofs reuse the collections
 provider's `list_elem_later` for a member behind a retained head, rather than
-append laws for a merge that is not append. A private consequence combines
+append laws for a merge that is not append in general. A private consequence combines
 window-membership soundness with merge-membership soundness: a windowed-merge
 member came from at least one input. It does not equate windowed lists for
 unordered inputs or count duplicate occurrences.
@@ -3147,6 +3223,14 @@ For the cases in which neither of two heads leads, natural-time totality
 and transitivity determine the same first event under either grouping.
 A timestamp tie is taken from the left input in both groupings, so
 the final list retains the same stored events in the same order.
+
+When every left event is at or before every right event, merge equals
+append, even if the individual traces are unordered. The checked
+`trace_merge_separated` proof inducts on the left trace, using
+`trace_merge_cons_left` to retain each head and `list_elem_later` to
+restrict separation to the tail. A private helper obtains the head's
+comparison with the first right event from the membership premise. Equal
+timestamps satisfy separation; no `time_ordered` premise is needed.
 
 The adjacent-window proof inducts on the ordered trace and splits on whether
 the head time is below the midpoint. A head below it is kept by the whole
@@ -3198,7 +3282,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and eighteen checked law contracts.
+  — the carrier, half-open boundary, left-bias and twenty checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -3207,7 +3291,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the eighteen laws form the package surface.
+   `trace_merge`, and the twenty laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -3227,16 +3311,19 @@ merging, not window multiplicity.
    original merge operation; the right unit reuses its existing
    induction, now public under the same name. Merge associativity uses that
    public right unit and the three private head-selection lemmas, with seven
-   new private support theorems; it needs no ordered-input premise. The
-   adjacent-window split reuses the checked `list_append` provider and nine
-   new private proof helpers under ordered-trace and bound-order premises.
+   new private support theorems; it needs no ordered-input premise. A
+   separated merge reuses `list_elem_head` and `list_elem_later` for its
+   quantified cross-trace premise and private head-comparison helper; it
+   needs no ordered-input premise. The adjacent-window split reuses the
+   checked `list_append` provider and nine new private proof helpers under
+   ordered-trace and bound-order premises.
    Window append reuses the public `filter::append` proof from Derived with
    the existing event predicate, without a new helper or import. The
    inverted-window proof reuses `event_in_window_past`, `window_keep` and
    checked natural-order transitivity. Its decision helper stays private.
    The all-in-window identity reuses `window_keep` and public Derived
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
-4. **Trusted-base delta.** Zero: all eighteen exported laws have checked proof
+4. **Trusted-base delta.** Zero: all twenty exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3247,6 +3334,7 @@ merging, not window multiplicity.
    [composition seed](../../../../conformance/stdlib/time-and-events/seed-window-composition.md),
    [associativity seed](../../../../conformance/stdlib/time-and-events/seed-merge-associativity.md),
    [adjacent-split seed](../../../../conformance/stdlib/time-and-events/seed-window-adjacent-split.md),
+   [separated-merge seed](../../../../conformance/stdlib/time-and-events/seed-merge-separated-append.md),
    [window-append seed](../../../../conformance/stdlib/time-and-events/seed-window-append-distribution.md)
    and [commutation seed](../../../../conformance/stdlib/time-and-events/seed-window-commutation.md)
    supply independent closed values and refused claims; these clients
@@ -3271,4 +3359,8 @@ merging, not window multiplicity.
    `cat_time_window_commutation` test imports the generic §11 law, measures
    trusted GlobalId identities, checks the complete accepted commutation seed
    and refuses its isolated dropped-inner-window claim at its own `Refl`.
-   These tests are not official conformance-runner execution or CI.
+   The `cat_time_merge_separated_append` package test checks the generic
+   separated-merge law, its private helper and complete accepted seed; a
+   same-form separated `Refl` control accepts while an isolated interleaved
+   `Refl` claim refuses. These tests are not official conformance-runner
+   execution or CI.

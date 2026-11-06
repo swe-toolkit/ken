@@ -29,13 +29,14 @@ fn loaded_interval() -> ElabEnv {
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: the exact trusted GlobalId inventory is unchanged after loading
 /// Rational from its explicit providers and then Interval from Rational;
-/// two monotonicity laws and all forty-seven public interval laws import by
+/// two monotonicity laws and all fifty public interval laws import by
 /// their stated names and have package-owned transparent checked bodies;
 /// seven independently stated generic client types plus derived point
 /// completeness check.
 /// CLAIMED: generic Rational monotonicity, interval enclosure and membership
-/// transport add no new trust; every interval law is a public checked export.
-/// THE GAP: identity-set equality preserves inherited assumptions; closed
+/// transport add no new trust; the exact export-table pin separately guards
+/// the full fifty-law public surface. THE GAP: identity-set equality preserves
+/// inherited assumptions; closed
 /// result behavior is independently tested below, not proved by this census.
 #[test]
 fn generic_interval_laws_and_rational_monotonicity_add_no_trust() {
@@ -80,6 +81,9 @@ fn generic_interval_laws_and_rational_monotonicity_add_no_trust() {
         "interval_point_contains",
         "interval_point_sound",
         "interval_contains_respects_equiv",
+        "interval_inverted_empty",
+        "interval_ordered_contains_lo",
+        "interval_ordered_contains_hi",
         "interval_add_point",
         "interval_mul_point",
         "interval_hull_contains_left",

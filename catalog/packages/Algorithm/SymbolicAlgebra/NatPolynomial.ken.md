@@ -71,7 +71,7 @@ and to substitution. The latter two follow from the first and the existing
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, leq_nat)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
 
@@ -1161,6 +1161,58 @@ pub theorem deriv_independent
         a
         (sym Nat (eval bumped e) (add a (mul t (add d (mul t r)))) (deriv_taylor v t env e))
         (h bumped (λw. λhw. bump_env_off v t env w hw)))
+
+pub fn occurs (v : Nat) (e : Expr) : Bool =
+  match e {
+    EConst c ↦ False;
+    EVar w ↦ nat_same v w;
+    EAdd a b ↦ bool_or (occurs v a) (occurs v b);
+    EMul a b ↦ bool_or (occurs v a) (occurs v b)
+  }
+
+pub theorem deriv_absent
+      (v : Nat) (e : Expr) (env : Nat → Nat)
+    : Equal Bool (occurs v e) False → Equal Nat (eval env (deriv v e)) Zero =
+  match e {
+    EConst c ↦ λabsent. Proved;
+    EVar w ↦ λabsent. cong Bool Nat (nat_same v w) False (λb. eval env (var_deriv b)) absent;
+    EAdd a b ↦
+      λabsent.
+        add_cong
+          (eval env (deriv v a))
+          Zero
+          (eval env (deriv v b))
+          Zero
+          (deriv_absent v a env (bool_or_false_left (occurs v a) (occurs v b) absent))
+          (deriv_absent v b env (bool_or_false_right (occurs v a) (occurs v b) absent));
+    EMul a b ↦
+      λabsent.
+        add_cong
+          (mul (eval env (deriv v a)) (eval env b))
+          Zero
+          (mul (eval env a) (eval env (deriv v b)))
+          Zero
+          (trans
+            Nat
+            (mul (eval env (deriv v a)) (eval env b))
+            (mul Zero (eval env b))
+            Zero
+            (cong
+              Nat
+              Nat
+              (eval env (deriv v a))
+              Zero
+              (λt. mul t (eval env b))
+              (deriv_absent v a env (bool_or_false_left (occurs v a) (occurs v b) absent)))
+            ((proof zero_l for mul) (eval env b)))
+          (cong
+            Nat
+            Nat
+            (eval env (deriv v b))
+            Zero
+            (λt. mul (eval env a) t)
+            (deriv_absent v b env (bool_or_false_right (occurs v a) (occurs v b) absent)))
+  }
 
 pub theorem deriv_substitute
       (v : Nat)
@@ -2564,6 +2616,22 @@ theorem deriv_var_deriv_eval
     False ↦ Proved
   }
 
+theorem bool_or_false_left
+      (a : Bool) (b : Bool)
+    : Equal Bool (bool_or a b) False → Equal Bool a False =
+  match a {
+    True ↦ λnone. absurd none;
+    False ↦ λnone. Proved
+  }
+
+theorem bool_or_false_right
+      (a : Bool) (b : Bool)
+    : Equal Bool (bool_or a b) False → Equal Bool b False =
+  match a {
+    True ↦ λnone. absurd none;
+    False ↦ λnone. none
+  }
+
 fn bump_at (b : Bool) (x : Nat) (t : Nat) : Nat =
   match b {
     True ↦ add x t;
@@ -2949,10 +3017,22 @@ equates derivative expression trees or uses `canonicalize_complete` as a
 derivative theorem.
 
 The independent-variable law reduces a semantic invariance premise to a
-zero derivative at the chosen environment. For derivative after substitution,
-induction on the expression uses the two pointwise derivative premises on a
-variable. The product case reuses `eval_substitute` for its underived factors,
-then lifts the induction hypotheses through multiplication and addition
+zero derivative at the chosen environment. The separate `occurs` decision
+recurses over expression constructors and joins each child's syntactic
+occurrence with `bool_or`. For `deriv_absent`, the variable case transports
+its false decision through `var_deriv` without matching on a computed
+`nat_same`; sums use both private false-`bool_or` eliminations with
+`add_cong`. Products lift the recursive zero results through `cong` and
+`trans`, using `zero_l for mul` for the left zero factor. Syntactic
+absence is sufficient, not necessary: a variable can occur in a factor
+multiplied by zero and be semantically unused. Both Boolean eliminations
+stay private; the checked conclusion concerns evaluation at each supplied
+environment, not structural equality of derivatives.
+
+For derivative after substitution, induction on the expression uses the two
+pointwise derivative premises on a variable. The product case reuses
+`eval_substitute` for its underived factors, then lifts the induction
+hypotheses through multiplication and addition
 congruence. Both new comparison helpers remain private; no equality of
 expression trees or every-environment substitution claim follows.
 
@@ -3013,7 +3093,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–13 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–14 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3021,6 +3101,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md),
 [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
 [independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md),
+[absent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-absent-variable.md),
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [equivalence seed](
@@ -3031,8 +3112,8 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
-`Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
-and twenty-nine checked theorems; Horner, substitution and differentiation
+`Expr`, `Monomial`, `Poly`, their exported constructors, fourteen operations,
+and thirty checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3059,7 +3140,12 @@ The §13 package test applies the pointwise law under a selective import at
 arbitrary substitutions and expression, checks its owner and unchanged
 trusted-`GlobalId` identities, then accepts the law and a direct `Proved`
 control under two pointwise-equal images and refuses a wrong-image claim and
-its false image premise at their own proof sites.
+its false image premise at their own proof sites. The §14 package test
+selectively imports `occurs` and `deriv_absent`, checks owner-local Transparent
+bodies and exact trusted identities, and applies the open law under a
+syntactic-absence premise. The actual seed's absent-index `Proved` control
+accepts; its occurring-index and occurring-but-unused-index claims refuse
+at their own premise, with the rest of the expression held fixed.
 
 Package tests are not official conformance-runner execution or CI. The
 extension adds no Axiom, postulate, primitive or foreign operation; inherited

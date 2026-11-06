@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-NON-TREE-RESULT-TREE
 title: "Spec 36 §2.5 elaborates `proc f (x : A) : B visits ρ` to `f↓ : caps → ⟦A⟧ → ITree ⟦ρ⟧ ⟦B⟧`, but a proc whose declared result is a non-tree type such as Int elaborates to plain B, so its body has no tree to sequence a performing let into. LANG-PROC-NON-TREE-LET-SEQUENCING refuses that let at check time as an elaboration gap. Make a non-empty-row proc's result the §2.5 tree, with callers splicing it by §2.4's incl, and lift the interim refusal"
-status: ready
+status: merged
 owner: verify
 size: L
 tier: T1
@@ -19,8 +19,13 @@ origin: "Architect stop evt_axd6p7yc8d88 on LANG-PROC-NON-TREE-LET-SEQUENCING, o
 A `visits` proc with a non-empty row and a non-tree declared result
 denotes `ITree ⟦ρ⟧ ⟦B⟧` as §2.5 states, and its callers splice it in by
 §2.4's call rule. A performing let in its body then runs: the
-NON-TREE-LET probe prints `ab` and a newline, and the interim refusal is
-deleted.
+NON-TREE-LET probe prints `ab` and a newline. The interim refusal is
+narrowed to procs with an `FS` label, an open row, or a function-valued
+declared result (Steward `evt_4c6nvqtavtgg8`, Architect
+`evt_46t5492bw0fsm`); LANG-PROC-NON-TREE-RESULT-TREE-FS-ROW-AND-ARROW
+gives those procs their tree. `ensures` on a changed proc is refused by
+name until SPEC-EFFECTS-DECLARED-TREE-RESULT-DENOTATION states its post
+(Architect `evt_1vmhvzqhrv6ak`).
 
 ## Settled inputs (main `f53d7cfb5`)
 
@@ -88,6 +93,30 @@ AC-0 rules.
   That is a language-design change and returns to the Steward.
 - A kernel or trust change, or a raised stack constant.
 - A consumer whose output changes in a way AC-0 did not name.
+
+## §1a and §1b
+
+§1a is 3 (Architect `evt_3dqgtgqp18tbn`, `evt_4hst3c16scmp3`,
+`evt_47k417dva8z9y`). The §1b symptom inventory:
+
+1. A [Console]-row proc that sequences a callback whose declared tree is
+   HostIO meets E0087. Keyed on the callee's declared tree signature
+   being wider than its latent row.
+2. The returned-tree test, placed inside the #[inline(always)]
+   check_result_position, inlines let_itree_parts into every caller.
+   That grows the frames on recursive cycles that Inc 1 leaves
+   unchanged. Keyed on new code placed on a shared inline-always path.
+3. ensures on a changed proc builds ITree E R (Σ B P). A tree tail of
+   type ITree E R B does not map into it, and a caller's B-annotated let
+   does not project out of it. Keyed on the contract's `result` and the
+   caller's annotation being written against B while the core result is
+   T B.
+
+§1b-ii: entries 1 and 3 share a predicate: a consumer of a changed
+proc's result sees T B where it was written against B. Entry 2 is
+independent. Research (`evt_5tetw4wh8cvrd`) favoured a relational post;
+the Architect ruled fail-closed for Inc 1 (`evt_1vmhvzqhrv6ak`), and the
+denotation goes to SPEC-EFFECTS-DECLARED-TREE-RESULT-DENOTATION.
 
 Checks: 4 fired: the obligation is written in the code's own types. The
 bind is `ITree Console Int` against a plain `Int` result, which needs

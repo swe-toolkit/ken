@@ -58,6 +58,7 @@ fn run_checked_bounded_nat_fixture(
         response_owner_settlements: BTreeMap::new(),
         response_bracket_exits: BTreeMap::new(),
         bracket_view: BracketSettlementControlView::default(),
+        bracket_clause_body: None,
         bracket_ledger: BracketSettlementLedger::default(),
         bracket_effect_claim: None,
         result_table: BTreeMap::new(),
