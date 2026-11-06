@@ -158,6 +158,84 @@ fn requires_proposition_let_retains_value_binding_under_checked_rows() {
     assert_value_bound_write(&env, requirement);
 }
 
+/// Promise class: durable invariant (36 §2.5). MEASURED: three nonempty,
+/// closed ambient rows elaborate their written Int result as checked trees,
+/// using the row's registered single-label signature or the shared AmbientOp
+/// signature, and return Int via one Ret. CLAIMED: non-tree result procs
+/// return the appropriate action tree rather than an ordinary Int or a
+/// function. THE GAP: this isolates signatures, not every inclusion or
+/// recursive consumer; separate CLI output and let pins cover those seams.
+#[test]
+fn ambient_non_tree_results_use_clock_entropy_and_multilabel_signatures() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    for (name, row, op, response) in [
+        ("clock_value", "Clock", "ClockOp", "clock_resp"),
+        ("entropy_value", "Entropy", "EntropyOp", "entropy_resp"),
+        ("mixed_value", "Console, Clock", "AmbientOp", "ambient_resp"),
+    ] {
+        let id = env
+            .elaborate_decl(&format!("proc {name} : Int visits [{row}] = 1"))
+            .expect("the returned non-tree value is wrapped in the declared row's tree");
+        let (ty, core) = checked_def(&env, id);
+        let (head, args) = spine(ty);
+        assert!(matches!(head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id),
+            "{name}: the result is one ITree");
+        assert_eq!(args.len(), 3);
+        assert!(matches!(args[0], Term::IndFormer { id, .. } | Term::Const { id, .. }
+            if *id == env.globals[op]), "{name}: selected operation signature");
+        assert_eq!(args[1], &Term::const_(env.globals[response], vec![]),
+            "{name}: selected response signature");
+        assert_eq!(args[2], &Term::const_(env.globals["Int"], vec![]),
+            "{name}: the written result is preserved");
+        let (head, args) = spine(core);
+        assert!(matches!(head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id),
+            "{name}: returned value is wrapped once");
+        assert_eq!(args.len(), 4);
+        assert_eq!(args[2], &Term::const_(env.globals["Int"], vec![]));
+    }
+}
+
+/// Promise class: durable invariant (36 §2.4). MEASURED: a ClockIO,
+/// EntropyIO, or ClockIO-to-ambient RHS appears beneath its checked injection
+/// helper in the bound action's core. CLAIMED: each supported inclusion is
+/// applied before sequencing, without reinterpreting the source signature.
+/// THE GAP: these checked-core trees do not run host observations; the CLI
+/// Console pin separately observes action order through a live host.
+#[test]
+fn clock_entropy_and_multilabel_inclusions_use_checked_helpers() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    for (name, source, inject) in [
+        (
+            "clock_to_host",
+            "proc clock_to_host : HostIO APartial Instant visits [Clock] = \
+             let x = wall_now in host_pure APartial Instant x",
+            "host_clock",
+        ),
+        (
+            "entropy_to_host",
+            "proc entropy_to_host : HostIO APartial (Result IOError Bytes) \
+             visits [Entropy] = let x = random_bytes 1 in \
+             host_pure APartial (Result IOError Bytes) x",
+            "host_entropy",
+        ),
+        (
+            "clock_to_ambient",
+            "proc clock_to_ambient : ITree AmbientOp ambient_resp Instant \
+             visits [Console, Clock] = let x = wall_now in \
+             ITree.Ret AmbientOp ambient_resp Instant x",
+            "ambient_clock",
+        ),
+    ] {
+        let id = env.elaborate_decl(source)
+            .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        let (_, core) = checked_def(&env, id);
+        let args = assert_bind(&env, core);
+        let (head, _) = spine(args[4]);
+        assert!(matches!(head, Term::Const { id, .. } if *id == env.globals[inject]),
+            "{name}: RHS must use checked inclusion helper {inject}");
+    }
+}
+
 /// Promise class: durable invariant for 36 §2.4. A checked IO action
 /// injected into a HostIO caller is sequenced exactly once by bind.
 #[test]

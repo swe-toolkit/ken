@@ -123,6 +123,8 @@ fn source_q18_direct_constructor() -> String {
 enum Observation {
     RefuseNonTree,
     RefuseFalsePurity,
+    RefuseInclusion,
+    RefuseTreeScrutinee,
     PrintsB,
     PrintsAB,
 }
@@ -155,6 +157,22 @@ fn assert_observation(name: &str, source: &str, expected: Observation) {
                 _ => unreachable!(),
             };
             assert!(stderr.contains(reason), "{name}: {stderr}");
+        }
+        Observation::RefuseInclusion => {
+            assert_eq!(output.status.code(), Some(1), "{name}: {stderr}");
+            assert!(output.stdout.is_empty(), "{name}: rejected program ran");
+            assert!(stderr.starts_with("error[E0087]"), "{name}: {stderr}");
+            assert!(stderr.contains("UnsupportedEffectInclusion"), "{name}: {stderr}");
+        }
+        Observation::RefuseTreeScrutinee => {
+            assert_eq!(output.status.code(), Some(1), "{name}: {stderr}");
+            assert!(output.stdout.is_empty(), "{name}: rejected program ran");
+            assert!(stderr.starts_with("error[E0038]"), "{name}: {stderr}");
+            assert!(stderr.contains("TypeMismatch"), "{name}: {stderr}");
+            assert!(
+                stderr.contains("constructor 'MkBox' is not a constructor of type 'ITree'"),
+                "{name}: {stderr}"
+            );
         }
         Observation::PrintsB | Observation::PrintsAB => {
             assert_eq!(output.status.code(), Some(0), "{name}: {stderr}");
@@ -402,7 +420,7 @@ pin!(
         s.push_str(MAIN_B);
         s
     },
-    RefuseNonTree
+    RefuseInclusion
 );
 pin!(
     p4_space_arrow_parameter,
@@ -415,8 +433,25 @@ pin!(
     RefuseNonTree
 );
 
-pin!(r1_recursive_result, top_pick(true), RefuseNonTree);
-pin!(r1k_recursive_constructor, top_pick(false), RefuseNonTree);
+// Transition sentinel: under Inc 1 pick's tree is IO Box, so its recursive
+// result is an action the scrutinee slot does not sequence. The FS row keeps
+// the earlier shape, whose callback let is still refused.
+pin!(r1_recursive_result, top_pick(true), RefuseTreeScrutinee);
+pin!(
+    r1f_recursive_result_fs_row,
+    {
+        let source = top_pick(true);
+        let fs = source.replacen(
+            "visits [Console] = match r",
+            "visits [FS, Console] = match r",
+            1,
+        );
+        assert_ne!(fs, source, "the recursive pick's row moved");
+        fs
+    },
+    RefuseNonTree
+);
+pin!(r1k_recursive_constructor, top_pick(false), RefuseInclusion);
 pin!(
     t1_tree_cell,
     space(

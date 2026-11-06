@@ -314,17 +314,18 @@ fn r10_outer_alias_inside_inner_arm_releases_latent() {
     assert_run("r10-outer-alias", P14, b"ab\n");
 }
 
+/// Transition sentinel, owned by SPEC-EFFECTS-DECLARED-TREE-RESULT-DENOTATION:
+/// count's tree is IO Int and the callback's declared tree is HostIO APartial
+/// Unit, which no inclusion maps into IO, so the let refuses instead of
+/// dropping the action.
 #[test]
 fn r11_non_tree_result_refuses_instead_of_dropping_action() {
     let out = cli("r11-nontree", "check", P9);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "r11: {stderr}");
     assert!(out.stdout.is_empty(), "r11: check cannot perform an action");
-    assert!(stderr.contains("error[E0038]"), "r11: {stderr}");
-    assert!(
-        stderr.contains("cannot be sequenced (36 §2.4)"),
-        "r11: {stderr}"
-    );
+    assert!(stderr.contains("error[E0087]"), "r11: {stderr}");
+    assert!(stderr.contains("UnsupportedEffectInclusion"), "r11: {stderr}");
 }
 
 #[test]
