@@ -2484,6 +2484,17 @@ fn refuse_unsequenced_performed_let(
     })
 }
 
+/// A changed proc returns an action tree, and a postcondition on that tree's
+/// result has no specified denotation yet (36 §2.5). Refuse it rather than
+/// refine the payload type that every consumer reads.
+#[inline(never)]
+fn refuse_returned_tree_ensures(span: &Span) -> ElabError {
+    ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "this proc's row is ambient-only and its declared result is not a tree, so it returns an action tree (36 §2.5); a postcondition on that action's result is not yet specified, so `ensures` cannot be checked here; state the property on a pure function the proc calls".into(),
+    }
+}
+
 /// `check_let_once`'s one post-RHS call: refine the RHS, then refuse it if it
 /// performs unsequenced. One call site keeps that recursive frame at its base
 /// size (`elab_recursive_frame_budget` row M).
@@ -23328,6 +23339,9 @@ fn elaborate_view_with_spec(
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
                 (carrier_ty, assumptions, req_cores, changed)
             };
+            if returned_tree_mode && !all_ensures.is_empty() {
+                return Err(refuse_returned_tree_ensures(&rdecl.span));
+            }
             let (param_types, carrier_result) = split_params(&carrier_ty, param_count)
                 .ok_or_else(|| ElabError::Internal(
                     "declaration parameter telescope is shorter than its source arity".into(),

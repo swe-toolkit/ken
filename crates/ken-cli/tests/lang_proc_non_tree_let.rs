@@ -133,6 +133,38 @@ fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
     assert_checks("function-result-inner", &inner);
 }
 
+/// Transition sentinel, owned by SPEC-EFFECTS-DECLARED-TREE-RESULT-DENOTATION:
+/// a changed proc's `ensures` is refused until its tree-result post is
+/// specified, instead of refining the payload type every caller reads.
+#[test]
+fn ensured_changed_proc_refuses_until_tree_post_is_specified() {
+    let source = r#"program capabilities FS APartial
+proc one : Int visits [Console] = 1
+proc alias : Int ensures Equal Int result 1 visits [Console] = one
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] =
+  let n : Int = alias in host_program APartial (print_line "b")
+"#;
+    let output = cli("ensured-changed-proc", "check", source);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("error[E0038]"), "{stderr}");
+    assert!(
+        stderr.contains("`ensures` cannot be checked here"),
+        "{stderr}"
+    );
+}
+
+/// Durable invariant: `requires` without `ensures` leaves the action's
+/// returned value at the declared result type. MEASURED: an ambient-row
+/// requires-only proc checks. CLAIMED: the postcondition refusal does not
+/// reject preconditions. THE GAP: this fixture does not discharge call-site
+/// preconditions or exercise a call to the declaration.
+#[test]
+fn requires_only_changed_proc_still_checks() {
+    let source = with_main("proc keep (n : Int) : Int requires Equal Int n n visits [Console] = n");
+    assert_checks("requires-only-changed-proc", &source);
+}
+
 #[test]
 fn pure_non_tree_proc_returns_its_value_and_keeps_run_output() {
     let source = with_main("proc direct_value : Int visits [Console] = 1");
