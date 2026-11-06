@@ -1547,6 +1547,11 @@ impl StaticTransitionPlan<'_> {
             {
                 for context in &protocol.contexts {
                     for member in &context.members {
+                        // A relay is numbered by its own origin and has no
+                        // response row; it resumes through the protocol's relays.
+                        if member.relay {
+                            continue;
+                        }
                         let successor = member.successor.as_ref().ok_or_else(||
                             planner_error("a pending-Vis member has no derived response row"))?;
                         if let Some(previous) = members.insert(successor.id(), successor) {

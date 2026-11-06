@@ -1285,33 +1285,45 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
 
         let (read, read_roles) = compile("read", "rt_read_offset_stage");
         let (write, _) = compile("write", "rt_write_writable_stage");
-        // Promise class: durable invariant. MEASURED: a completed response
-        // boundary in the fixed context-demand product actually yields the
-        // declared Ret contract at the lowering query. CLAIMED: a needed
-        // generated-context Result contract cannot silently disappear. THE GAP:
-        // the response row alone does not prove a consumer exists; the separate
-        // completed-boundary and mutation controls establish that consumer.
-        let completed_context_contracts = [&read, &write]
-            .into_iter()
-            .flat_map(|plan| {
-                plan.all_static_response_rows.iter().flat_map(|row| {
-                    plan.generated_context_result_contracts
-                        .iter()
-                        .filter(move |(context, contract)| {
-                            *context == row.k_context
-                                && row.k_context == 0
-                                && contract.as_ref() == Some(&row.k_ret_identity)
-                        })
-                })
-            })
-            .count();
-        assert!(
-            completed_context_contracts > 0,
-            "the fixed response-demand product must retain a completed-boundary Ret contract: \
-             read={:?}, write={:?}",
-            read.generated_context_result_contracts,
-            write.generated_context_result_contracts
-        );
+        // Promise class: durable invariant. MEASURED: each completed response
+        // boundary in the fixed context-demand product either yields the
+        // declared Ret contract at the lowering query, or belongs to a settled
+        // Protocol owner whose returned Vis carries the Ret obligation.
+        // CLAIMED: a needed generated-context Result contract cannot silently
+        // disappear. THE GAP: the settled projection flattens contexts, so the
+        // obligation is joined by owner, not by context; the response row alone
+        // does not prove a consumer exists, and the separate completed-boundary
+        // and mutation controls establish that consumer.
+        for (name, plan) in [("read", &read), ("write", &write)] {
+            let completed = plan
+                .all_static_response_rows
+                .iter()
+                .filter(|row| row.k_context == 0)
+                .collect::<Vec<_>>();
+            assert!(
+                !completed.is_empty(),
+                "{name}: the fixed product has a completed-boundary response row"
+            );
+            for row in completed {
+                let published = plan.generated_context_result_contracts.iter().any(
+                    |(context, contract)| {
+                        *context == row.k_context && contract.as_ref() == Some(&row.k_ret_identity)
+                    },
+                );
+                let owner_drives = plan
+                    .settled_returned_vis_protocols
+                    .iter()
+                    .any(|(owner, members)| *owner == row.vis_origin && !members.is_empty());
+                assert!(
+                    published || owner_drives,
+                    "{name}: completed-boundary row {} lost its Ret contract with no \
+                     Protocol owner to carry it: contracts={:?}, settled={:?}",
+                    row.vis_origin,
+                    plan.generated_context_result_contracts,
+                    plan.settled_returned_vis_protocols
+                );
+            }
+        }
         // Structural totality for both products. The former read P2 population
         // belongs to marked Continuation regions, while the eligible write plane
         // specializes its transport sources. Each Specialized row owns one
@@ -1604,8 +1616,8 @@ static_response_context_demand_test!(
 // measured through distinct Continuation identities in marked bracket rows,
 // not Deferred rows; the write's former fan-out is measured in that same marked
 // plane, while ordinary Specialized rows have no shared-producer group. The
-// write's removed marked-S members are INFERRED because their owners are
-// relay-excluded and absent post-strip; this is a strip-evidence GAP.
+// write's removed marked-S members are OBSERVED: their relay owners settle as
+// Protocol owners, so each removal is seen against the post-strip set.
 // CLAIMED: the former P2 read and write populations belong to the marked
 // Continuation plane; context interning cannot launder a malformed producer/K row or an
 // incomplete explicit input run. THE GAP: exact duplicate context demand reuse
@@ -1638,8 +1650,8 @@ fn static_response_full_demand_fan_out_population_is_distinct() {
     in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
         // The former P2 fan-out now resides in marked bracket rows for both
         // products; ordinary write rows no longer carry a shared-producer group.
-        // The write strip partition retains INFERRED members as a disclosed GAP,
-        // not as direct evidence that the bracket strip alone removed them.
+        // The write strip partition is OBSERVED: each removed member's owner is
+        // in the post-strip set, so the bracket strip is seen removing it.
         // Producers are selected structurally, never by baked native ids.
         let (read_root, (read_result, read)) =
             full_demand_compile!("rt_read_offset_stage", "baseline");
@@ -1756,8 +1768,8 @@ fn static_response_full_demand_fan_out_population_is_distinct() {
             "a marked key cannot have both observed and inferred strip evidence"
         );
         assert!(
-            observed_strip_keys.is_empty(),
-            "write strip members are INFERRED because their owners are relay-excluded: \
+            !observed_strip_keys.is_empty() && inferred_strip_keys.is_empty(),
+            "write strip members are OBSERVED now that their relay owners settle: \
              observed={observed_strip_keys:?}, inferred={inferred_strip_keys:?}"
         );
         let strip_keys = observed_strip_keys

@@ -539,6 +539,95 @@ fn px10_argv_and_live_emit_below_process_gate() {
     }
 }
 
+/// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
+/// relays 1247 and 992 and live's relays 688 and 433 are relay members of
+/// their owners' returned-Vis protocols, numbered by their own origin with a
+/// nonzero discriminant rather than by a response row, and kept in the
+/// settled member set. 1247 and 688 resume at the rows whose Vis are 1484 and
+/// 932; 992 and 433 resume at a row. CLAIMED: no relay Vis is removed from
+/// numbering, and no relay resumes by trap. THE GAP: the artifact is not run
+/// here, and the resume seat is read from the plane that chose it.
+#[test]
+fn px10_relays_are_numbered_protocol_members() {
+    for (name, source, relays) in [
+        (
+            "px10_census_relay_argv_env_pipe",
+            ARGV_ENV_PIPE,
+            [(1247, 1725, Some(1484)), (992, 1985, None)],
+        ),
+        (
+            "px10_census_relay_live_child",
+            LIVE_CHILD,
+            [(688, 1228, Some(932)), (433, 1488, None)],
+        ),
+    ] {
+        in_census_thread(name, move || {
+            let (built, diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    emit_below_gate(name, source)
+                });
+            let _built = built.expect("px10 program emits an artifact beneath the Process gate");
+            assert_eq!(diagnostics.len(), 1, "{name}: one completed plan");
+            let plan = &diagnostics[0];
+            let mut discriminants = std::collections::BTreeSet::new();
+            for (relay, owner, resume_vis) in relays {
+                let protocol = plan
+                    .returned_vis_protocols
+                    .iter()
+                    .find(|protocol| protocol.owner_origin == owner)
+                    .unwrap_or_else(|| panic!("{name}: owner {owner} has a returned-Vis protocol"));
+                assert!(protocol.error.is_none(), "{name}: {protocol:?}");
+                let members = protocol
+                    .contexts
+                    .iter()
+                    .flat_map(|(_, members)| members)
+                    .filter(|member| member.origin == relay)
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    members.len(),
+                    1,
+                    "{name}: relay {relay} is one member of {owner}"
+                );
+                assert!(
+                    members[0].relay,
+                    "{name}: {relay} is a relay member: {:?}",
+                    members[0]
+                );
+                assert_eq!(
+                    members[0].successor_id, None,
+                    "{name}: relay {relay} is numbered by its own origin, not a response row"
+                );
+                assert!(
+                    plan.settled_returned_vis_protocols
+                        .iter()
+                        .any(|(settled, members)| *settled == owner && members.contains(&relay)),
+                    "{name}: relay {relay} stays in owner {owner}'s settled member set"
+                );
+                let numbered = plan
+                    .settled_relays
+                    .iter()
+                    .filter(|(origin, _, _)| *origin == relay)
+                    .collect::<Vec<_>>();
+                assert_eq!(numbered.len(), 1, "{name}: relay {relay} is numbered once");
+                let (_, discriminant, resume) = *numbered[0];
+                assert_ne!(discriminant, 0, "{name}: zero is never a Vis member");
+                assert!(
+                    discriminants.insert(discriminant),
+                    "{name}: relay {relay} shares discriminant {discriminant}"
+                );
+                let (_, row_vis) =
+                    resume.unwrap_or_else(|| panic!("{name}: relay {relay} resumes by trap"));
+                if let Some(expected) = resume_vis {
+                    assert_eq!(
+                        row_vis, expected,
+                        "{name}: relay {relay} resumes at the row whose Vis is {expected}"
+                    );
+                }
+            }
+        });
+    }
+}
+
 /// Promise class: durable invariant (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1).
 /// MEASURED: on the live child and the null-stdout argv program, dropping
 /// region 0's return clause from the stack a carried match lowers under is

@@ -1265,8 +1265,11 @@ pub struct DeferredResponseObservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
     pub returned_vis_protocols: Vec<ReturnedVisProtocolObservation>,
-    /// Only members remaining after admitted relays are projected out.
+    /// Members remaining after bracket-owned exits are projected out; relays stay.
     pub settled_returned_vis_protocols: Vec<(u32, Vec<u32>)>,
+    /// Each numbered relay as `(relay origin, discriminant, resume)`, where
+    /// resume is `Some((IH seat, resumed row's Vis))`, or `None` for a trap.
+    pub settled_relays: Vec<(u32, u32, Option<(u32, u32)>)>,
     /// Exact owner source origins whose returned-Vis settlement is Underived.
     pub underived_owner_origins: Vec<u32>,
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
@@ -1547,6 +1550,14 @@ fn record_static_response_feasibility_diagnostic(
                     .map(|protocol| protocol.owners.values().map(|owner| {
                         (owner.owner.0, owner.contexts.iter().flat_map(|context| &context.members)
                             .map(|member| member.origin.0).collect())
+                    }).collect()).unwrap_or_default(),
+                settled_relays: plan.pending_vis_settlements.protocol.as_ref()
+                    .map(|protocol| protocol.relays.iter().map(|(origin, relay)| {
+                        (origin.0, relay.discriminant, match &relay.resume {
+                            PendingVisRelayResume::Row { seat, row, .. } =>
+                                Some((seat.0, row.vis_origin().0)),
+                            PendingVisRelayResume::Trap(_) => None,
+                        })
                     }).collect()).unwrap_or_default(),
                 underived_owner_origins: plan.pending_vis_settlements.owners.iter()
                     .filter_map(|(owner_id, settlement)| {
