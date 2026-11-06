@@ -3241,7 +3241,24 @@ fn check_result_position(
     cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
     predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
-    if cx.returned_tree_mode && let_itree_parts(cx, expected).is_some() {
+    if cx.returned_tree_mode {
+        return check_returned_position(cx, expr, expected, span, predicates);
+    }
+    if predicates.is_empty() {
+        check(cx, expr, expected, span)
+    } else {
+        check_result_position_with_predicates(cx, expr, expected, span, predicates)
+    }
+}
+
+/// Only a changed proc's body runs in returned-tree mode, so this route is
+/// cold for every other declaration and stays out of their recursive frames.
+#[inline(never)]
+fn check_returned_position(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    if let_itree_parts(cx, expected).is_some() {
         return check_returned_tail(cx, expr, expected, span, predicates);
     }
     if predicates.is_empty() {
@@ -3557,11 +3574,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                         });
                     }
                     push_lambda_binder(cx, &domain);
-                    let body_result = if cx.returned_tree_mode {
-                        check_result_position(cx, body, &cod, lam_span, &[])
-                    } else {
-                        check(cx, body, &cod, lam_span)
-                    };
+                    let body_result = check_result_position(cx, body, &cod, lam_span, &[]);
                     cx.pop_let_latent();
                     cx.ctx.pop();
                     cx.assumptions.truncate(assumption_base);
