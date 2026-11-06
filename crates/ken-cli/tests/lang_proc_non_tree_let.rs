@@ -233,3 +233,74 @@ space T {
 "#;
     assert_checks("omega-proof-let", source);
 }
+
+fn assert_refuses_with(name: &str, source: &str, code: &str) {
+    let output = cli(name, "check", source);
+    assert_eq!(output.status.code(), Some(1), "{name}: {output:?}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("error[{code}]")),
+        "{name}: {stderr}"
+    );
+}
+
+/// AC-1: returned-tree mode is read only at the proc's own result positions.
+/// A plain value checked at a written tree type in a let RHS, a lambda body or
+/// an argument is refused inside a changed proc exactly as in a const.
+#[test]
+fn written_tree_type_inside_changed_proc_is_not_a_result_position() {
+    let apply = "fn apply_unit (k : Unit -> IO Int) : IO Int = k MkUnit\n";
+    let forms = [
+        (
+            "if-rhs",
+            "let r : IO Int = if True then 3 else 4 in r",
+            "IO Int",
+        ),
+        (
+            "match-rhs",
+            "let r : IO Int = match True { True ↦ 3; False ↦ 4 } in r",
+            "IO Int",
+        ),
+        ("lambda-rhs", "let k : Unit -> IO Int = \\_. 3 in 1", "Int"),
+        ("argument", "let r = apply_unit (\\_. 3) in r", "IO Int"),
+    ];
+    for (name, form, const_ty) in forms {
+        assert_refuses_with(
+            &format!("changed-{name}"),
+            &with_main(&format!("{apply}proc p : Int visits [Console] =\n  {form}")),
+            "K0004",
+        );
+        assert_refuses_with(
+            &format!("const-{name}"),
+            &with_main(&format!("{apply}const c : {const_ty} =\n  {form}")),
+            "K0004",
+        );
+    }
+}
+
+/// AC-2: the proc's own if, match and let tails are still result positions,
+/// and an ordinary RHS at a value type, or an explicit tree in a lambda, is
+/// unaffected.
+#[test]
+fn changed_proc_result_splits_still_return_their_tree() {
+    for (name, body) in [
+        ("if-tail", "if b then 1 else 2"),
+        ("match-tail", "match b { True ↦ 1; False ↦ 2 }"),
+        ("let-tail", "let n : Int = if b then 1 else 2 in n"),
+        (
+            "performed-let-tail",
+            "let w = print_line \"x\" in if b then 1 else 2",
+        ),
+        (
+            "explicit-ret-lambda",
+            "let k : Unit -> IO Int = \\_. ITree.Ret ConsoleOp console_resp Int 3 in 1",
+        ),
+    ] {
+        assert_checks(
+            name,
+            &with_main(&format!(
+                "proc p (b : Bool) : Int visits [Console] =\n  {body}"
+            )),
+        );
+    }
+}
