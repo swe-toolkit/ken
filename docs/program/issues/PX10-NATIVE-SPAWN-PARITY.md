@@ -182,7 +182,7 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
     and AC-2g (`compiled.rs:123`) as they are; the run-time refusal in
     `require_native_operation_v1` (`abi_v1.rs:820`) means a native
     Process run needs the promotion.
-    - Landed: `px10_relays_are_numbered_protocol_members` in
+    - To land: `px10_relays_are_numbered_protocol_members` in
       `px10_plan_census_tests.rs`, the Architect's text, pins argv's
       relays 1247 and 992 and live's 688 and 433 as numbered relay
       members kept in the settled member set, and asserts that 1247's

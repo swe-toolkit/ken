@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-NON-TREE-RESULT-TREE-FS-ROW-AND-ARROW
 title: "LANG-PROC-NON-TREE-RESULT-TREE gives a non-tree-result proc its §2.5 tree only for closed ambient rows (Console, Clock, Entropy) and non-function results. Procs with an FS label, an open row, or a function-valued declared result keep plain B, and a performing let at their outer level is refused as an elaboration gap. Give those procs the tree the spec rules and delete the interim refusal"
-status: draft
+status: active
 owner: verify
 size: L
 tier: T1
@@ -81,9 +81,19 @@ the increments AC-0 rules.
   The Architect rules the elaboration per covered case, the argument
   slot, any runtime pin that moves, and the increment split. A runtime
   plan change is a stop to the Steward for placement.
-- **AC-1.** A performing let at the outer level of an [FS] proc and of
-  an arrow-valued proc sequences, where both refuse today (the parent's
-  R4 flips).
+- **AC-1.** A performing let at a proc's outer level sequences in each
+  of these shapes, as spec 36 §2.5 rules them (Architect
+  `evt_6qwshneax61z8`):
+  - `[FS]` with a written `c : Cap a`, an FS action: `FS a B`;
+  - `[FS]` plus an ambient label, with the Cap: `HostIO a B`;
+  - `[FS, Console]` without a Cap, a Console action: `IO B`;
+  - an arrow-valued proc whose final result is a non-tree: inside the
+    last lambda, against the wrapped final result.
+- **AC-1r.** Each of these refuses with a §2.5 message, not the interim
+  gap: the parent's R4 (an outer action before the last arrow); an FS
+  action in a free proc with no written Cap; two written Caps with
+  different Auth indices; and a declared-tree proc with a label that
+  has no summand.
 - **AC-2.** A mutation that restores the narrowed refusal reddens AC-1.
 
 ## Stop conditions

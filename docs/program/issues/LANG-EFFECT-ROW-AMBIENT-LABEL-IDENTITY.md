@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-AMBIENT-LABEL-IDENTITY
 title: "Effect rows compare labels by spelling, so a user `space Console` is the ambient Console label: a top-level proc that calls `Console.call` on that space passes the row check with `visits [Console]`, where the same program with the space named Other refuses EffectEscapes. Base then fails at the kernel with K0004, and LANG-PROC-NON-TREE-RESULT-TREE fails closed at its inclusion table with E0087. Make a row label mean one checked effect, so a user space cannot stand in for an ambient label"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
