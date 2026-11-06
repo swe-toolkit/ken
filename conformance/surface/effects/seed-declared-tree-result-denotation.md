@@ -2,10 +2,11 @@
 
 Format: `../../README.md`. These cases pin the result translation for
 `proc ... visits ρ` in `spec/30-surface/36-effects.md §2.5`, including the
-Architect's rulings `evt_7jtkd0pad55ke`, `evt_rywsrnwtq0rt`, and
-`evt_3c1f42fq76n8p`. They are input-to-behavior expectations, not reports of
-execution. The surface spelling follows existing effect examples; no official
-conformance runner or semantic Ken tests were run for this seed.
+Architect's rulings `evt_7jtkd0pad55ke`, `evt_rywsrnwtq0rt`,
+`evt_3c1f42fq76n8p`, and `evt_1rtqn5ns08yp1`. They are input-to-behavior
+expectations, not reports of execution. The surface spelling follows existing
+effect examples; no official conformance runner or semantic Ken tests were run
+for this seed.
 
 The effects and tree types below are the existing public families. `IO R`
 stands for the Console tree with return type `R`; `HostIO a R` is the host
@@ -222,3 +223,30 @@ does. Examples name `FsOpen`; they do not replace the full alphabet rule.
   surface-recursive form rejects with K0014 NotTerminating; CV did not run
   that probe. No kernel change, new trusted declaration, official runner
   coverage, or candidate approval is claimed here.
+
+## Space-operation ensures
+
+### surface/effects/space-ensures-state-transformer
+- spec: `36 §2.5` (scope boundary), `§4.3`
+- given: a space operation and a control that changes only its postcondition:
+
+  ```ken
+  space Counter {
+    mut n : Int = 0
+    proc bump () : Unit visits [Counter]
+        ensures n == old(n) + 1 = n becomes n + 1
+  }
+  ```
+
+  In the control, replace the postcondition with `ensures n == old(n)`.
+- expect: the first obligation checks through §4.3's outer
+  state-transformer pair, reduces to `s.n + 1 == s.n + 1`, and is discharged
+  by reflexivity. The control reduces to `s.n + 1 == s.n` and is not
+  discharged. The declared result remains `Unit`; ψ observes the pre- and
+  post-state components of the `R × S` pair.
+- why: the row names a space label, so §4.3 governs its `ensures` contract.
+  §2.5's separate `AllRet` post governs declarations whose row names no
+  space label. The existing
+  `surface/effects/tree-result-ensures-all-ret` case pins that no-space side.
+  This case does not settle a space operation whose declared result is itself
+  a tree.
