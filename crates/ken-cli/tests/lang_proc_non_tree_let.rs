@@ -322,3 +322,48 @@ fn changed_proc_result_splits_still_return_their_tree() {
         &with_main("proc p2 (b : Bool) (c : Bool) : Int visits [Console] =\n  if c then 1 else 2"),
     );
 }
+
+/// AC-2, durable invariant (Spec 36 §§2.4–2.5): the returned tree preserves
+/// the selected value and performs a preceding action exactly once.
+/// MEASURED: each side of four result splits reaches the CLI's output in
+/// source order. CLAIMED: a successful check has not silently substituted a
+/// wrong branch or dropped the result. THE GAP: this observes two branches
+/// per shape, not every possible nested split or operation.
+#[test]
+fn changed_proc_result_splits_preserve_selected_output_and_order() {
+    for (name, body, prefix) in [
+        ("if", "if b then \"one\" else \"two\"", ""),
+        ("match", "match b { True ↦ \"one\"; False ↦ \"two\" }", ""),
+        (
+            "let",
+            "let n : String = if b then \"one\" else \"two\" in n",
+            "",
+        ),
+        (
+            "performed-let",
+            "let w = print_line \"x\" in if b then \"one\" else \"two\"",
+            "x\n",
+        ),
+    ] {
+        for (choice, value) in [("True", "one\n"), ("False", "two\n")] {
+            let source = format!(
+                "program capabilities FS APartial\n\
+                 proc choose (b : Bool) : String visits [Console] =\n\
+                   {body}\n\
+                 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+                   : HostIO APartial ExitCode visits [Console] =\n\
+                   let selected : String = choose {choice} in\n\
+                   host_program APartial (print_line selected)\n"
+            );
+            let run = cli(&format!("result-{name}-{choice}"), "run", &source);
+            assert_eq!(
+                run.status.code(),
+                Some(0),
+                "{name}/{choice}: {}",
+                String::from_utf8_lossy(&run.stderr)
+            );
+            let expected = format!("{prefix}{value}");
+            assert_eq!(run.stdout, expected.as_bytes(), "{name}/{choice}");
+        }
+    }
+}
