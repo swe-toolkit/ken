@@ -62,7 +62,12 @@ fn performed_non_tree_proc_sequences_before_spliced_caller() {
           let n : Int = read in host_program APartial (print_line \"b\")\n";
     assert_checks("frame-probe", source);
     let run = cli("frame-probe-run", "run", source);
-    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
+    assert_eq!(
+        run.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
     assert_eq!(run.stdout, b"ab\n", "the returned tree splices into HostIO");
 }
 
@@ -77,8 +82,16 @@ fn two_performed_lets_run_once_each_in_order() {
           let n : Int = pair in host_program APartial (print_line \"c\")\n";
     assert_checks("two-lets", source);
     let run = cli("two-lets-run", "run", source);
-    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
-    assert_eq!(run.stdout, b"abc\n", "both lets execute once, left to right");
+    assert_eq!(
+        run.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(
+        run.stdout, b"abc\n",
+        "both lets execute once, left to right"
+    );
 }
 
 #[test]
@@ -107,7 +120,10 @@ fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("error[E0038]"), "{stderr}");
-    assert!(stderr.contains("whose declared result is a function"), "{stderr}");
+    assert!(
+        stderr.contains("whose declared result is a function"),
+        "{stderr}"
+    );
     assert!(stderr.contains("cannot be sequenced (36 §2.4)"), "{stderr}");
 
     let inner = with_main(

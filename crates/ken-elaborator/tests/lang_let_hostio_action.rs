@@ -178,18 +178,31 @@ fn ambient_non_tree_results_use_clock_entropy_and_multilabel_signatures() {
             .expect("the returned non-tree value is wrapped in the declared row's tree");
         let (ty, core) = checked_def(&env, id);
         let (head, args) = spine(ty);
-        assert!(matches!(head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id),
-            "{name}: the result is one ITree");
+        assert!(
+            matches!(head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id),
+            "{name}: the result is one ITree"
+        );
         assert_eq!(args.len(), 3);
-        assert!(matches!(args[0], Term::IndFormer { id, .. } | Term::Const { id, .. }
-            if *id == env.globals[op]), "{name}: selected operation signature");
-        assert_eq!(args[1], &Term::const_(env.globals[response], vec![]),
-            "{name}: selected response signature");
-        assert_eq!(args[2], &Term::const_(env.globals["Int"], vec![]),
-            "{name}: the written result is preserved");
+        assert!(
+            matches!(args[0], Term::IndFormer { id, .. } | Term::Const { id, .. }
+            if *id == env.globals[op]),
+            "{name}: selected operation signature"
+        );
+        assert_eq!(
+            args[1],
+            &Term::const_(env.globals[response], vec![]),
+            "{name}: selected response signature"
+        );
+        assert_eq!(
+            args[2],
+            &Term::const_(env.globals["Int"], vec![]),
+            "{name}: the written result is preserved"
+        );
         let (head, args) = spine(core);
-        assert!(matches!(head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id),
-            "{name}: returned value is wrapped once");
+        assert!(
+            matches!(head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id),
+            "{name}: returned value is wrapped once"
+        );
         assert_eq!(args.len(), 4);
         assert_eq!(args[2], &Term::const_(env.globals["Int"], vec![]));
     }
@@ -226,13 +239,16 @@ fn clock_entropy_and_multilabel_inclusions_use_checked_helpers() {
             "ambient_clock",
         ),
     ] {
-        let id = env.elaborate_decl(source)
+        let id = env
+            .elaborate_decl(source)
             .unwrap_or_else(|error| panic!("{name}: {error:?}"));
         let (_, core) = checked_def(&env, id);
         let args = assert_bind(&env, core);
         let (head, _) = spine(args[4]);
-        assert!(matches!(head, Term::Const { id, .. } if *id == env.globals[inject]),
-            "{name}: RHS must use checked inclusion helper {inject}");
+        assert!(
+            matches!(head, Term::Const { id, .. } if *id == env.globals[inject]),
+            "{name}: RHS must use checked inclusion helper {inject}"
+        );
     }
 }
 
@@ -251,8 +267,10 @@ fn valid_console_inclusion_injects_into_host_before_binding() {
     let (_, core) = checked_def(&env, id);
     let args = assert_bind(&env, core);
     let (head, _) = spine(args[4]);
-    assert!(matches!(head, Term::Const { id, .. } if *id == env.globals["host_console"]),
-        "the action is injected at the caller's checked prelude identity");
+    assert!(
+        matches!(head, Term::Const { id, .. } if *id == env.globals["host_console"]),
+        "the action is injected at the caller's checked prelude identity"
+    );
 }
 
 /// Promise class: durable fail-closed boundary. FS a has no injection into
@@ -268,8 +286,12 @@ fn unavailable_fs_into_io_inclusion_still_reports_e0087() {
                ITree.Ret ConsoleOp console_resp (Result FileError Bytes) x",
         )
         .expect_err("FS a cannot enter IO");
-    assert!(error.to_string().starts_with("unsupported: 36 §2.4 inclusion of effect signature"),
-        "{error}");
+    assert!(
+        error
+            .to_string()
+            .starts_with("unsupported: 36 §2.4 inclusion of effect signature"),
+        "{error}"
+    );
     let ElabError::UnsupportedEffectInclusion { from, to, .. } = error else {
         panic!("a distinct FS->IO signature must take E0087, got {error:?}")
     };
@@ -402,7 +424,11 @@ fn annotated_non_tree_proc_result_binds_the_returned_value() {
     };
     let (head, ret) = spine(continuation);
     assert!(matches!(head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id));
-    assert_eq!(ret[3], &Term::var(0), "the returned Int is the annotated binder");
+    assert_eq!(
+        ret[3],
+        &Term::var(0),
+        "the returned Int is the annotated binder"
+    );
 }
 
 #[test]

@@ -325,7 +325,10 @@ fn r11_non_tree_result_refuses_instead_of_dropping_action() {
     assert_eq!(out.status.code(), Some(1), "r11: {stderr}");
     assert!(out.stdout.is_empty(), "r11: check cannot perform an action");
     assert!(stderr.contains("error[E0087]"), "r11: {stderr}");
-    assert!(stderr.contains("UnsupportedEffectInclusion"), "r11: {stderr}");
+    assert!(
+        stderr.contains("UnsupportedEffectInclusion"),
+        "r11: {stderr}"
+    );
 }
 
 #[test]

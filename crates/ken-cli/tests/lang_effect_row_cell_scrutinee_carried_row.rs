@@ -162,7 +162,10 @@ fn assert_observation(name: &str, source: &str, expected: Observation) {
             assert_eq!(output.status.code(), Some(1), "{name}: {stderr}");
             assert!(output.stdout.is_empty(), "{name}: rejected program ran");
             assert!(stderr.starts_with("error[E0087]"), "{name}: {stderr}");
-            assert!(stderr.contains("UnsupportedEffectInclusion"), "{name}: {stderr}");
+            assert!(
+                stderr.contains("UnsupportedEffectInclusion"),
+                "{name}: {stderr}"
+            );
         }
         Observation::RefuseTreeScrutinee => {
             assert_eq!(output.status.code(), Some(1), "{name}: {stderr}");
