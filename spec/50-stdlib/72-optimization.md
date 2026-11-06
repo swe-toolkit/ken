@@ -535,7 +535,8 @@ landing or measured landed trust.
 > **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
-> SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT §2.6).** The
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT §2.6;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-AGREE §2.7).** The
 > original three general laws, catalog module and seed are present on
 > main. Section 2.4's fourth law was checked in Architect D0; its
 > catalog export and package-owned test are on main. The roots-loaded
@@ -552,6 +553,14 @@ landing or measured landed trust.
 > checked the law and its discriminator, not an assembled tip. No
 > candidate-wide test, official conformance, CI, publication, landing
 > or measured landed trust is inferred from that scratch evidence.
+> Section 2.7 specifies the seventh public law, for predicates agreeing
+> strictly below a bound. Architect AC-0 `evt_3y46rz605bx8m` ruled
+> the isolated D0 on `aae4ffa6f1d884148d63cc437d777d2a72ff84e8`
+> CLEAN: generic harness 2/2, equal 114-element scratch trusted
+> GlobalId sets, no added `Axiom` or `postulate`, and the bound-ten
+> false claim refused at its own theorem. This does not test the §2.7
+> Spec child, an assembled candidate or official conformance, CI,
+> publication, landing or measured landed trust.
 
 ### 2.1 Carrier and result
 
@@ -814,6 +823,54 @@ TypeMismatch`, and its same-form control was accepted. This is
 scratch evidence, not an assembled-candidate gate, official
 conformance execution, CI, publication, landing or a measured landed
 trust result.
+
+### 2.7 Predicates agreeing below the bound search alike
+
+`Algorithm.Optimization.BoundedSearch` must export one further public
+Transparent theorem with a checked proof body, immediately after
+`find_below_stable` and before the private `find_next`. Its exact
+public name, argument order and type are:
+
+```ken
+pub theorem find_below_ext
+      (p : Nat → Bool) (q : Nat → Bool) (bound : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) (q m))
+      → Equal (Option Nat) (find_below p bound) (find_below q bound)
+```
+
+For every `m` strictly below `bound`, the premise equates the Boolean
+results of `p m` and `q m`. That is sufficient for both searches to
+return the same `Option Nat`, including `None` when neither finds a
+hit. No equality of predicate functions, function extensionality,
+pointwise premise at or above the bound, or new search operation is
+required. This law compares two predicates; the preceding six public
+laws each constrain a search for one predicate. It does not prescribe
+search direction, evaluation count or runtime cost.
+
+A checked proof inducts over `bound`. In the successor case, public
+`lt_nat::trans` and `lt_nat::self_suc` restrict the pointwise premise
+to the predecessor's range for the induction hypothesis. Congruence
+transports the equal recursive results through `find_next`; a new
+private `find_next_ext` compares that step when the two predicate
+values at the predecessor agree. This helper goes immediately after
+private `find_next_correct` and before `found_at_correct`, and does
+not become an eighth public law. No `Axiom`, postulate, new kernel
+form or surface rule is needed. The operation and the six earlier
+public law types of §§1–3 remain unchanged; §2.7 adds only this
+seventh bounded-search law.
+
+The closed discriminator takes `above_two m` to mean `two < m` and
+`never m` to be `False`. Both predicates agree below `three`, so the
+bound-three equality follows by the law; the same-form `Proved`
+control also checks. At bound `ten`, the predicates disagree at
+`three`, so the same `Option Nat` equality claimed by `Proved` is
+refused at its own theorem (`KernelRejected TypeMismatch`, span
+1147..1273 in the appended D0 client). This refusal and its accepted
+control differ only in the bound. Architect's isolated D0 reported
+2/2 and identical before/after 114-element `trusted_base()` identity
+sets with zero added `Axiom` or `postulate`; this is scratch design
+evidence, not a Spec-child test, official conformance execution,
+CI, publication, landing or measured landed trust.
 
 ## 3. Greatest-cost candidate
 
