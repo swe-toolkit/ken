@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-BRACKET-RETURN-CLAUSE
 title: "A native bracket's return clause H, the bind's Ret case that releases and merges, drops off the eliminator stack for claims inside the bracket body's scrutinee, in the very function that opened H. So the body's raw answer finishes the region with nothing below to settle it, and reaches the resume (PX10 B-closure stop 12, live origin 420, null 979). Refuse at lowering any such claim lowered without H, and keep H on the stack at the step that loses it"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
