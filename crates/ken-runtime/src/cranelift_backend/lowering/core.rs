@@ -270,6 +270,8 @@ thread_local! {
         const { std::cell::Cell::new(None) };
     static HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS:
         std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static DROPPED_BRACKET_RETURN_CLAUSES: std::cell::RefCell<Vec<(u32, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -291,6 +293,7 @@ pub fn with_handler_owned_deferred_response_mutation<T>(
         );
     });
     HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    DROPPED_BRACKET_RETURN_CLAUSES.with(|clauses| clauses.borrow_mut().clear());
     let _restore = Restore;
     let result = operation();
     let applications =
@@ -302,6 +305,26 @@ pub fn with_handler_owned_deferred_response_mutation<T>(
 pub fn handler_owned_deferred_response_mutation_is_exact() -> bool {
     HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION.with(|slot| slot.get().is_none())
 }
+
+/// The (region ordinal, clause origin) pairs the current
+/// DropBracketReturnClause scope removed from a carried stack, recorded at
+/// the seat that drops them rather than read back from the refusal.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn dropped_bracket_return_clauses() -> Vec<(u32, String)> {
+    DROPPED_BRACKET_RETURN_CLAUSES.with(|clauses| clauses.borrow().clone())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_dropped_bracket_return_clauses(clauses: impl Iterator<Item = (u32, StaticOriginId)>) {
+    DROPPED_BRACKET_RETURN_CLAUSES.with(|dropped| {
+        dropped
+            .borrow_mut()
+            .extend(clauses.map(|(region, clause)| (region, format!("{clause:?}"))));
+    });
+}
+
+#[cfg(not(feature = "px8-ds-test-support"))]
+fn record_dropped_bracket_return_clauses(_: impl Iterator<Item = (u32, StaticOriginId)>) {}
 
 #[cfg(feature = "px8-ds-test-support")]
 fn handler_owned_deferred_response_mutation_applies(
@@ -6702,12 +6725,20 @@ impl<'a> Lowering<'a> {
                         || remaining_origins[..prefix_len].iter().copied().any(is_clause);
                     let outer_holds_clause =
                         remaining_origins[prefix_len..].iter().copied().any(is_clause);
-                    let carried_remaining = if kept_holds_clause
-                        || !outer_holds_clause
-                        || handler_owned_deferred_response_mutation_applies(
-                            HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
-                        )
-                    {
+                    let carried_remaining = if kept_holds_clause || !outer_holds_clause {
+                        local_remaining
+                    } else if handler_owned_deferred_response_mutation_applies(
+                        HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
+                    ) {
+                        let dropped = &remaining_origins[prefix_len..];
+                        record_dropped_bracket_return_clauses(
+                            self.bracket_view.regions().filter_map(|region| {
+                                let clause = region.clause_origin()?;
+                                dropped
+                                    .contains(&clause)
+                                    .then(|| (region.id().ordinal(), clause))
+                            }),
+                        );
                         local_remaining
                     } else {
                         remaining
