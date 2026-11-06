@@ -23,7 +23,7 @@ arbitrary predicates or an unbounded search mechanism.
 
 ## Definition
 
-The public operation and its six laws lead. The private outcome invariant
+The public operation and its seven laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
@@ -125,6 +125,47 @@ pub theorem find_below_stable
                   (sym Nat bound (Suc below) (leq_suc_not_leq_same bound below within earlier)))
                 found
           }
+  }
+
+pub theorem find_below_ext
+      (p : Nat → Bool) (q : Nat → Bool) (bound : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) (q m))
+      → Equal (Option Nat) (find_below p bound) (find_below q bound) =
+  match bound {
+    Zero ↦ λagree. Proved;
+    Suc below ↦
+      λagree.
+        trans
+          (Option Nat)
+          (find_next p below (find_below p below))
+          (find_next p below (find_below q below))
+          (find_next q below (find_below q below))
+          (cong
+            (Option Nat)
+            (Option Nat)
+            (find_below p below)
+            (find_below q below)
+            (find_next p below)
+            (find_below_ext
+              p
+              q
+              below
+              (λm.
+                λearlier.
+                  agree
+                    m
+                    ((proof trans for lt_nat)
+                      m
+                      below
+                      (Suc below)
+                      earlier
+                      ((proof self_suc for lt_nat) below)))))
+          (find_next_ext
+            p
+            q
+            below
+            (find_below q below)
+            (agree below ((proof self_suc for lt_nat) below)))
   }
 
 fn find_next (p : Nat → Bool) (below : Nat) (prior : Option Nat) : Option Nat =
@@ -322,6 +363,15 @@ theorem find_next_correct
             spec)
   }
 
+theorem find_next_ext
+      (p : Nat → Bool) (q : Nat → Bool) (below : Nat) (prior : Option Nat)
+    : Equal Bool (p below) (q below)
+      → Equal (Option Nat) (find_next p below prior) (find_next q below prior) =
+  match prior {
+    None ↦ λsame. cong Bool (Option Nat) (p below) (q below) (found_at below) same;
+    Some n ↦ λsame. cong Bool (Option Nat) (p below) (q below) (λ_. Some Nat n) same
+  }
+
 theorem found_at_correct
       (p : Nat → Bool) (below : Nat) (hit : Bool)
     : Equal Bool (p below) hit
@@ -439,6 +489,14 @@ the predecessor and reuses the induction hypothesis, or equals the new bound
 and transports the observed result. No corresponding `None` law holds: a
 larger range can contain a new hit.
 
+`find_below_ext` proves that two predicates agreeing at every candidate strictly
+below the bound yield the same result. It inducts over the bound, restricting
+agreement to the predecessor with `lt_nat` transitivity and `self_suc` before
+applying the induction hypothesis. The private `find_next_ext` transports
+agreement at the new candidate through the step. No agreement at or above the
+bound, equality of predicates as functions, or predicate-call-count guarantee
+is needed.
+
 `refuted_outcome_none` matches the observed result through an explicit outcome
 equality. The `None` case returns that equality; the `Some n` case combines
 `find_below_sound`'s in-range hit with the premise refuting all in-range hits,
@@ -466,9 +524,9 @@ new-bound branch without adding a public order law.
 The public contract fixes the least result or its absence, not an iteration
 order or a number of predicate calls. A bound controls the domain without
 introducing an equality operation on predicates. The outcome invariant,
-`refuted_outcome_none`, `hit_outcome_some`, `lt_suc_not_lt_same` and
-`leq_suc_not_leq_same` are private proof scaffolding, not additional
-public laws.
+`refuted_outcome_none`, `hit_outcome_some`, `lt_suc_not_lt_same`,
+`leq_suc_not_leq_same` and `find_next_ext` are private proof scaffolding, not
+additional public laws.
 Unlike `argmin` over an existing nonempty list, this package searches a numeric
 range and can return `None`.
 
@@ -495,7 +553,7 @@ range and can return `None`.
 ## Trust & derivation
 
 The source implements the contract in `spec/50-stdlib/72-optimization.md` §2.
-Its public interface consists of `find_below` and the six named laws above;
+Its public interface consists of `find_below` and the seven named laws above;
 all invariant and proof helpers are private. For the operation and its proof
 family, read Definition; for a closed client, follow Using it; for proof
 structure and scope, read Laws & proofs and Design notes.
