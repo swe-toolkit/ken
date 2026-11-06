@@ -733,6 +733,10 @@ continuation proves `Π r. P r → Q r`; without a callee post, no such
 fact is invented. Neither `f↓` nor the payload is refined, and no
 tree is run twice or given an elaborator-inserted proof beneath its
 `ITree` former.
+This paragraph governs a declaration whose row names no space label.
+A declaration whose row names a space label is a space operation (§4.1):
+its `requires`/`ensures` contract is §4.3's state-transformer pair over
+`R × S`, and this paragraph adds no second post to it.
 
 `AllRet` and `all_ret_bind` must be kernel-checked **prelude declarations**
 built over the delivered `ITree` eliminator, with an Ω-valued motive;
