@@ -233,3 +233,166 @@ space T {
 "#;
     assert_checks("omega-proof-let", source);
 }
+
+fn assert_refuses_with(name: &str, source: &str, code: &str) {
+    let output = cli(name, "check", source);
+    assert_eq!(output.status.code(), Some(1), "{name}: {output:?}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("error[{code}]")),
+        "{name}: {stderr}"
+    );
+}
+
+/// AC-1, durable invariant (Spec 36 §2.4): returned-tree mode is read only at
+/// the proc's own result positions. A plain value checked at a written tree
+/// type in a let RHS, a lambda body or an argument is refused inside a changed
+/// proc exactly as in a const. MEASURED: four forms in two changed-proc shapes
+/// and const controls refuse K0004. CLAIMED: no written tree annotation gains
+/// a Ret coercion from a changed proc. THE GAP: other subterm forms rely on the
+/// same `check` entry and are independently reviewed against its caller graph.
+#[test]
+fn written_tree_type_inside_changed_proc_is_not_a_result_position() {
+    let apply = "fn apply_unit (k : Unit -> IO Int) : IO Int = k MkUnit\n";
+    let forms = [
+        (
+            "if-rhs",
+            "let r : IO Int = if True then 3 else 4 in r",
+            "IO Int",
+        ),
+        (
+            "match-rhs",
+            "let r : IO Int = match True { True ↦ 3; False ↦ 4 } in r",
+            "IO Int",
+        ),
+        ("lambda-rhs", "let k : Unit -> IO Int = \\_. 3 in 1", "Int"),
+        ("argument", "let r = apply_unit (\\_. 3) in r", "IO Int"),
+    ];
+    for (name, form, const_ty) in forms {
+        assert_refuses_with(
+            &format!("changed-{name}"),
+            &with_main(&format!("{apply}proc p : Int visits [Console] =\n  {form}")),
+            "K0004",
+        );
+        assert_refuses_with(
+            &format!("changed-param-{name}"),
+            &with_main(&format!(
+                "{apply}proc q (b : Bool) : Int visits [Console] =\n  {form}"
+            )),
+            "K0004",
+        );
+        assert_refuses_with(
+            &format!("const-{name}"),
+            &with_main(&format!("{apply}const c : {const_ty} =\n  {form}")),
+            "K0004",
+        );
+    }
+}
+
+/// AC-2, durable invariant (Spec 36 §§2.4–2.5): the proc's own if, match and
+/// let tails are still result positions, and an ordinary RHS at a value type,
+/// or an explicit tree in a lambda, is unaffected. MEASURED: split tails in
+/// one- and two-parameter procs and an explicit-tree lambda check. CLAIMED:
+/// hiding the mode at subterm entries preserves returned-tree sequencing.
+/// THE GAP: other split paths remain covered by the named regression suites.
+#[test]
+fn changed_proc_result_splits_still_return_their_tree() {
+    for (name, body) in [
+        ("if-tail", "if b then 1 else 2"),
+        ("match-tail", "match b { True ↦ 1; False ↦ 2 }"),
+        ("let-tail", "let n : Int = if b then 1 else 2 in n"),
+        (
+            "performed-let-tail",
+            "let w = print_line \"x\" in if b then 1 else 2",
+        ),
+        (
+            "explicit-ret-lambda",
+            "let k : Unit -> IO Int = \\_. ITree.Ret ConsoleOp console_resp Int 3 in 1",
+        ),
+    ] {
+        assert_checks(
+            name,
+            &with_main(&format!(
+                "proc p (b : Bool) : Int visits [Console] =\n  {body}"
+            )),
+        );
+    }
+    assert_checks(
+        "two-parameter-if-tail",
+        &with_main("proc p2 (b : Bool) (c : Bool) : Int visits [Console] =\n  if c then 1 else 2"),
+    );
+}
+
+/// AC-2, durable invariant (Spec 36 §§2.4–2.5): the returned tree preserves
+/// the selected value and performs a preceding action exactly once.
+/// MEASURED: each side of four result splits and both crossed two-parameter
+/// inputs reach the CLI's output in source order. CLAIMED: a successful check
+/// has not silently substituted a wrong branch, binder, or dropped the result.
+/// THE GAP: this observes paired branches, not every nested split or operation.
+#[test]
+fn changed_proc_result_splits_preserve_selected_output_and_order() {
+    for (name, body, prefix) in [
+        ("if", "if b then \"one\" else \"two\"", ""),
+        ("match", "match b { True ↦ \"one\"; False ↦ \"two\" }", ""),
+        (
+            "let",
+            "let n : String = if b then \"one\" else \"two\" in n",
+            "",
+        ),
+        (
+            "performed-let",
+            "let w = print_line \"x\" in if b then \"one\" else \"two\"",
+            "x\n",
+        ),
+    ] {
+        for (choice, value) in [("True", "one\n"), ("False", "two\n")] {
+            let source = format!(
+                "program capabilities FS APartial\n\
+                 proc choose (b : Bool) : String visits [Console] =\n\
+                   {body}\n\
+                 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+                   : HostIO APartial ExitCode visits [Console] =\n\
+                   let selected : String = choose {choice} in\n\
+                   host_program APartial (print_line selected)\n"
+            );
+            let run = cli(&format!("result-{name}-{choice}"), "run", &source);
+            assert_eq!(
+                run.status.code(),
+                Some(0),
+                "{name}/{choice}: {}",
+                String::from_utf8_lossy(&run.stderr)
+            );
+            let expected = format!("{prefix}{value}");
+            assert_eq!(run.stdout, expected.as_bytes(), "{name}/{choice}");
+        }
+    }
+
+    // Cross the parameter values: reading the first binder instead of the
+    // scrutinee `c` returns the opposite, still well-typed String.
+    for (first, second, expected) in [
+        ("False", "True", b"one\n".as_slice()),
+        ("True", "False", b"two\n".as_slice()),
+    ] {
+        let source = format!(
+            "program capabilities FS APartial\n\
+             proc choose2 (b : Bool) (c : Bool) : String visits [Console] =\n\
+               if c then \"one\" else \"two\"\n\
+             proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+               : HostIO APartial ExitCode visits [Console] =\n\
+               let selected : String = choose2 {first} {second} in\n\
+               host_program APartial (print_line selected)\n"
+        );
+        let run = cli(
+            &format!("result-two-param-{first}-{second}"),
+            "run",
+            &source,
+        );
+        assert_eq!(
+            run.status.code(),
+            Some(0),
+            "two-param/{first}/{second}: {}",
+            String::from_utf8_lossy(&run.stderr)
+        );
+        assert_eq!(run.stdout, expected, "two-param/{first}/{second}");
+    }
+}

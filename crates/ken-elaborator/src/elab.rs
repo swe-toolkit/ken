@@ -935,7 +935,8 @@ struct ElabCtx<'e> {
     /// One-shot result-position channel. Never visible to a subterm check.
     result_predicates: Vec<ResultPredicate>,
     /// A changed proc's result position returns its checked tree. Only result
-    /// positions consult this bit; argument, RHS and type subchecks do not.
+    /// positions consult this bit; argument, RHS and type subchecks do not:
+    /// `check` hides it from every subterm (check_outside_result_position).
     returned_tree_mode: bool,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
@@ -3264,6 +3265,9 @@ fn check_result_position(
 
 /// Only a changed proc's body runs in returned-tree mode, so this route is
 /// cold for every other declaration and stays out of their recursive frames.
+/// The proc's own parameter binders arrive here as lambdas at a Pi; their
+/// bodies stay result positions, so they do not go through `check`, which
+/// hides the bit.
 #[inline(never)]
 fn check_returned_position(
     cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
@@ -3271,6 +3275,13 @@ fn check_returned_position(
 ) -> Result<Term, ElabError> {
     if let_itree_parts(cx, expected).is_some() {
         return check_returned_tail(cx, expr, expected, span, predicates);
+    }
+    if let RExpr::RLam(_, body, lam_span) = expr {
+        if predicates.is_empty() && cx.result_predicates.is_empty() {
+            if let Term::Pi(dom, cod) = whnf(cx.env, &cx.ctx, expected) {
+                return check_lambda_at_pi(cx, *dom, &cod, body, lam_span);
+            }
+        }
     }
     if predicates.is_empty() {
         check(cx, expr, expected, span)
@@ -3412,9 +3423,28 @@ fn check_with_result_predicates(
     }
 }
 
+/// `check` is the subterm entry: a let RHS, an argument, a condition, a
+/// scrutinee and a lambda written as a subterm all arrive here, and none of
+/// them is the proc's result position. Result positions reach their splits
+/// through check_returned_tail, which calls check_let, check_if and
+/// check_match_result directly, and the proc's own parameter binders through
+/// check_returned_position, so hiding the bit here confines it to them.
+#[inline(never)]
+fn check_outside_result_position(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+) -> Result<Term, ElabError> {
+    let old_mode = std::mem::replace(&mut cx.returned_tree_mode, false);
+    let result = check(cx, expr, expected, span);
+    cx.returned_tree_mode = old_mode;
+    result
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     if !cx.result_predicates.is_empty() {
         return check_with_result_predicates(cx, expr, expected, _span);
+    }
+    if cx.returned_tree_mode {
+        return check_outside_result_position(cx, expr, expected, _span);
     }
     // FRAME BUDGET: this match is reached by every checked expression in
     // every compile, and in an unoptimized build a new arm's locals are paid
@@ -3568,32 +3598,10 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         RExpr::RApp(f, arg, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => {
             check_trunc_intro(cx, arg, expected, rspan)
         }
-        RExpr::RLam(_, body, lam_span) => {
-            let exp_wh = whnf(cx.env, &cx.ctx, expected);
-            match exp_wh {
-                Term::Pi(dom, cod) => {
-                    let domain = *dom;
-                    let position = cx.ctx.len();
-                    let is_proposition = kernel_infer_current(cx, &domain)
-                        .ok()
-                        .is_some_and(|sort| matches!(whnf(cx.env, &cx.ctx, &sort), Term::Omega(_)));
-                    let assumption_base = cx.assumptions.len();
-                    if is_proposition {
-                        cx.assumptions.push(Assumption {
-                            prop: domain.clone(),
-                            depth: position,
-                        });
-                    }
-                    push_lambda_binder(cx, &domain);
-                    let body_result = check_result_position(cx, body, &cod, lam_span, &[]);
-                    cx.pop_let_latent();
-                    cx.ctx.pop();
-                    cx.assumptions.truncate(assumption_base);
-                    body_result.map(|body_core| Term::lam(domain, body_core))
-                }
-                _ => check_lambda_at_subset(cx, expr, expected, lam_span),
-            }
-        }
+        RExpr::RLam(_, body, lam_span) => match whnf(cx.env, &cx.ctx, expected) {
+            Term::Pi(dom, cod) => check_lambda_at_pi(cx, *dom, &cod, body, lam_span),
+            _ => check_lambda_at_subset(cx, expr, expected, lam_span),
+        },
         RExpr::RLet(_name, ty_opt, rhs, body, span) => {
             check_let(cx, ty_opt, rhs, body, expected, span, &[])
         }
@@ -3638,6 +3646,32 @@ fn push_lambda_binder(cx: &mut ElabCtx<'_>, domain: &Term) {
     let binder_latent = type_carried_row(cx, domain);
     cx.push_match_binder(domain.clone(), MatchBinderOrigin::UserLocal);
     cx.push_let_latent(binder_latent);
+}
+
+/// A check-mode lambda at a Pi: its body is a result position under the
+/// binder. Shared by `check` and by a changed proc's own parameter binders,
+/// which check_returned_position keeps in result position.
+#[inline(never)]
+fn check_lambda_at_pi(
+    cx: &mut ElabCtx<'_>, domain: Term, cod: &Term, body: &RExpr, lam_span: &Span,
+) -> Result<Term, ElabError> {
+    let position = cx.ctx.len();
+    let is_proposition = kernel_infer_current(cx, &domain)
+        .ok()
+        .is_some_and(|sort| matches!(whnf(cx.env, &cx.ctx, &sort), Term::Omega(_)));
+    let assumption_base = cx.assumptions.len();
+    if is_proposition {
+        cx.assumptions.push(Assumption {
+            prop: domain.clone(),
+            depth: position,
+        });
+    }
+    push_lambda_binder(cx, &domain);
+    let body_result = check_result_position(cx, body, cod, lam_span, &[]);
+    cx.pop_let_latent();
+    cx.ctx.pop();
+    cx.assumptions.truncate(assumption_base);
+    body_result.map(|body_core| Term::lam(domain, body_core))
 }
 
 /// A lambda checked at a subset of a Pi is a new value of the carrier,
