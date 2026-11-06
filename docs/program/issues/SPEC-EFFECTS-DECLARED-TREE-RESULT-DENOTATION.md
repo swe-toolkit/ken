@@ -1,7 +1,7 @@
 ---
 id: SPEC-EFFECTS-DECLARED-TREE-RESULT-DENOTATION
 title: "Spec 36 §2.5 elaborates `proc f (x : A) : B visits ρ` to a result `ITree ⟦ρ⟧ ⟦B⟧` with no exception for a declared B that is already a tree or a function, so read literally every runtime program's `main : HostIO … visits [Console]` denotes a tree nested in a row tree, which no elaborator, runner or handler builds; and an [FS] proc has no stated Auth index for its tree. State what a declared tree result and a declared function result denote, and which Auth index a non-tree [FS] proc's tree carries"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

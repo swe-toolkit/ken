@@ -67,6 +67,13 @@ as refusals with their accepted controls, in one candidate.
 - A kernel or `trusted_base()` change: an operator question.
 - A change to an accepted program's core type outside the four forms.
 
+## §1a and §1b
+
+§1a is 1 (Architect `evt_hm0x0ez0ne4b`). The §1b symptom inventory:
+
+1. Hiding the bit at `check` also hid the proc's parameter-lambda body.
+   Keyed on a result position whose only entry is check's RLam arm.
+
 Checks: 4 fired: `returned_tree_mode`, `check_result_position`,
 `check_returned_position`'s `RLet` arm, the lambda body check and the
 tail-application clear were read at `f00ff23bb` at their lines. 8 fired:
