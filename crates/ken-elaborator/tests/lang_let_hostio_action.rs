@@ -3,10 +3,10 @@
 //! occur at the elaborated term, with one Ret inside an inferred pure-body
 //! continuation. CLAIMED: a performed RHS is not lowered as ordinary Let.
 //! THE GAP: these declarations do not exhaust all effect rows; CLI tests
-//! independently observe execution order. A performing RHS inside a
-//! non-tree-result proc with a non-empty row is elaborated by the unmodified
-//! ordinary-let fallback and is not sequenced; pre-existing on the exact
-//! base; filed separately. An RHS whose effect comes only from a local
+//! independently observe execution order. A closed ambient-row proc with a
+//! non-tree written result now returns a tree; FS, open rows and arrow-valued
+//! results retain the narrowed non-tree refusal. An RHS whose effect comes
+//! only from a local
 //! binder's latent row (for example a callback parameter `f : A ->[E] B`
 //! applied as `f a`) is not classified as performing, because the shared
 //! row plane (`infer_expr_row_type`) does not yet carry local latent rows
@@ -158,18 +158,134 @@ fn requires_proposition_let_retains_value_binding_under_checked_rows() {
     assert_value_bound_write(&env, requirement);
 }
 
-/// Promise class: transition sentinel for 36 §2.4 inclusion. A valid
-/// different signature is unsupported until `incl` is built.
+/// Promise class: durable invariant (36 §2.5). MEASURED: three nonempty,
+/// closed ambient rows elaborate their written Int result as checked trees,
+/// using the row's registered single-label signature or the shared AmbientOp
+/// signature, and return Int via one Ret. CLAIMED: non-tree result procs
+/// return the appropriate action tree rather than an ordinary Int or a
+/// function. THE GAP: this isolates signatures, not every inclusion or
+/// recursive consumer; separate CLI output and let pins cover those seams.
 #[test]
-fn valid_inclusion_reports_unsupported_variant() {
+fn ambient_non_tree_results_use_clock_entropy_and_multilabel_signatures() {
     let mut env = ElabEnv::new().expect("checked prelude");
-    let error = env
+    for (name, row, op, response) in [
+        ("clock_value", "Clock", "ClockOp", "clock_resp"),
+        ("entropy_value", "Entropy", "EntropyOp", "entropy_resp"),
+        ("mixed_value", "Console, Clock", "AmbientOp", "ambient_resp"),
+    ] {
+        let id = env
+            .elaborate_decl(&format!("proc {name} : Int visits [{row}] = 1"))
+            .expect("the returned non-tree value is wrapped in the declared row's tree");
+        let (ty, core) = checked_def(&env, id);
+        let (head, args) = spine(ty);
+        assert!(
+            matches!(head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id),
+            "{name}: the result is one ITree"
+        );
+        assert_eq!(args.len(), 3);
+        assert!(
+            matches!(args[0], Term::IndFormer { id, .. } | Term::Const { id, .. }
+            if *id == env.globals[op]),
+            "{name}: selected operation signature"
+        );
+        assert_eq!(
+            args[1],
+            &Term::const_(env.globals[response], vec![]),
+            "{name}: selected response signature"
+        );
+        assert_eq!(
+            args[2],
+            &Term::const_(env.globals["Int"], vec![]),
+            "{name}: the written result is preserved"
+        );
+        let (head, args) = spine(core);
+        assert!(
+            matches!(head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id),
+            "{name}: returned value is wrapped once"
+        );
+        assert_eq!(args.len(), 4);
+        assert_eq!(args[2], &Term::const_(env.globals["Int"], vec![]));
+    }
+}
+
+/// Promise class: durable invariant (36 §2.4). MEASURED: a ClockIO,
+/// EntropyIO, or ClockIO-to-ambient RHS appears beneath its checked injection
+/// helper in the bound action's core. CLAIMED: each supported inclusion is
+/// applied before sequencing, without reinterpreting the source signature.
+/// THE GAP: these checked-core trees do not run host observations; the CLI
+/// Console pin separately observes action order through a live host.
+#[test]
+fn clock_entropy_and_multilabel_inclusions_use_checked_helpers() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    for (name, source, inject) in [
+        (
+            "clock_to_host",
+            "proc clock_to_host : HostIO APartial Instant visits [Clock] = \
+             let x = wall_now in host_pure APartial Instant x",
+            "host_clock",
+        ),
+        (
+            "entropy_to_host",
+            "proc entropy_to_host : HostIO APartial (Result IOError Bytes) \
+             visits [Entropy] = let x = random_bytes 1 in \
+             host_pure APartial (Result IOError Bytes) x",
+            "host_entropy",
+        ),
+        (
+            "clock_to_ambient",
+            "proc clock_to_ambient : ITree AmbientOp ambient_resp Instant \
+             visits [Console, Clock] = let x = wall_now in \
+             ITree.Ret AmbientOp ambient_resp Instant x",
+            "ambient_clock",
+        ),
+    ] {
+        let id = env
+            .elaborate_decl(source)
+            .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        let (_, core) = checked_def(&env, id);
+        let args = assert_bind(&env, core);
+        let (head, _) = spine(args[4]);
+        assert!(
+            matches!(head, Term::Const { id, .. } if *id == env.globals[inject]),
+            "{name}: RHS must use checked inclusion helper {inject}"
+        );
+    }
+}
+
+/// Promise class: durable invariant for 36 §2.4. A checked IO action
+/// injected into a HostIO caller is sequenced exactly once by bind.
+#[test]
+fn valid_console_inclusion_injects_into_host_before_binding() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let id = env
         .elaborate_decl(
             "proc cross : HostIO APartial ExitCode visits [Console] = \
          let x = write ConsoleStream.Stdout (bytes_encode \"a\") in \
            host_program APartial (print_line \"b\")",
         )
-        .expect_err("signature inclusion is not built");
+        .expect("checked IO->HostIO inclusion");
+    let (_, core) = checked_def(&env, id);
+    let args = assert_bind(&env, core);
+    let (head, _) = spine(args[4]);
+    assert!(
+        matches!(head, Term::Const { id, .. } if *id == env.globals["host_console"]),
+        "the action is injected at the caller's checked prelude identity"
+    );
+}
+
+/// Promise class: durable fail-closed boundary. FS a has no injection into
+/// IO; the closed table must report E0087 rather than mis-tag the FS action.
+#[test]
+fn unavailable_fs_into_io_inclusion_still_reports_e0087() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let error = env
+        .elaborate_decl(
+            "proc cross (cap : Cap APartial) : IO (Result FileError Bytes) \
+               visits [FS, Console] = \
+             let x = readFile APartial cap (bytes_encode \"p\") in \
+               ITree.Ret ConsoleOp console_resp (Result FileError Bytes) x",
+        )
+        .expect_err("FS a cannot enter IO");
     assert!(
         error
             .to_string()
@@ -177,9 +293,9 @@ fn valid_inclusion_reports_unsupported_variant() {
         "{error}"
     );
     let ElabError::UnsupportedEffectInclusion { from, to, .. } = error else {
-        panic!("a valid cross-signature call is not an ill-typed RHS: {error:?}")
+        panic!("a distinct FS->IO signature must take E0087, got {error:?}")
     };
-    assert_ne!(from, to, "the signatures really differ");
+    assert_ne!(from, to);
 }
 
 /// Promise class: durable invariant. An annotation naming an action instead
@@ -291,21 +407,28 @@ fn pure_space_cells_retain_literal_and_ordinary_let_core_shapes() {
 }
 
 #[test]
-fn annotated_non_tree_proc_result_remains_an_ordinary_let() {
+fn annotated_non_tree_proc_result_binds_the_returned_value() {
     let mut env = ElabEnv::new().expect("checked prelude");
     let direct = env
         .elaborate_decl("proc direct_value : Int visits [Console] = 1")
-        .expect("a proc may declare a row while returning a non-tree value");
+        .expect("a proc with Console returns an IO tree holding its value");
     let id = env
         .elaborate_decl("proc read : Int visits [Console] = let n : Int = direct_value in n")
-        .expect("row-declared non-tree RHS stays on the ordinary annotated path");
+        .expect("annotated returned value is sequenced from the IO action");
     let (_, core) = checked_def(&env, id);
-    let Term::Let { ty, val, body } = core else {
-        panic!("a non-tree proc result retains the kernel's ordinary Let")
+    let args = assert_bind(&env, core);
+    assert_eq!(args[2], &Term::const_(env.globals["Int"], vec![]));
+    assert_eq!(args[4], &Term::const_(direct, vec![]));
+    let Term::Lam(_, continuation) = args[5] else {
+        panic!("the Int result is bound once in a continuation")
     };
-    assert_eq!(ty.as_ref(), &Term::const_(env.globals["Int"], vec![]));
-    assert_eq!(val.as_ref(), &Term::const_(direct, vec![]));
-    assert_eq!(body.as_ref(), &Term::var(0));
+    let (head, ret) = spine(continuation);
+    assert!(matches!(head, Term::Constructor { id, .. } if *id == env.prelude_env.ret_id));
+    assert_eq!(
+        ret[3],
+        &Term::var(0),
+        "the returned Int is the annotated binder"
+    );
 }
 
 #[test]

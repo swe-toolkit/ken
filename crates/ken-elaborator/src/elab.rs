@@ -934,6 +934,9 @@ struct ElabCtx<'e> {
     recursive_convoy_refused_splits: HashSet<u64>,
     /// One-shot result-position channel. Never visible to a subterm check.
     result_predicates: Vec<ResultPredicate>,
+    /// A changed proc's result position returns its checked tree. Only result
+    /// positions consult this bit; argument, RHS and type subchecks do not.
+    returned_tree_mode: bool,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
     /// elaboration path that predates class support and never projects
@@ -1209,6 +1212,7 @@ impl<'e> ElabCtx<'e> {
             convoy_splits: HashSet::new(),
             recursive_convoy_refused_splits: HashSet::new(),
             result_predicates: Vec::new(),
+            returned_tree_mode: false,
             class_env: None,
             standard_operators: None,
             effect_rows: None,
@@ -2197,6 +2201,103 @@ fn let_signature_matches(cx: &ElabCtx<'_>, lhs: &(Term, Term, Term), rhs: &(Term
         && convert_type(cx.env, &cx.ctx, lhs_response, rhs_response)
 }
 
+fn checked_effect_head(cx: &ElabCtx<'_>, id: GlobalId) -> Term {
+    if cx.env.inductive(id).is_some() {
+        Term::indformer(id, vec![])
+    } else {
+        Term::const_(id, vec![])
+    }
+}
+
+fn effect_signature_is(
+    cx: &ElabCtx<'_>, signature: &(Term, Term, Term), effect: Term, response: Term,
+) -> bool {
+    convert_type(cx.env, &cx.ctx, &signature.0, &effect)
+        && convert_type(cx.env, &cx.ctx, &signature.1, &response)
+}
+
+/// Read the checked Auth index from a HostIO signature. Deconstruct only the
+/// prelude's checked coproduct and FSOp formers, then verify the full signature
+/// (including its response) by conversion; no mutable name lookup is used.
+#[inline(never)]
+fn host_signature_auth(cx: &ElabCtx<'_>, target: &(Term, Term, Term)) -> Option<Term> {
+    let ids = cx.numeric_env.effect_tree_ids()?;
+    let effect = whnf(cx.env, &cx.ctx, &target.0);
+    let Term::App(left, _ambient) = effect else { return None };
+    let Term::App(coproduct, fs) = *left else { return None };
+    if !matches!(*coproduct, Term::IndFormer { id, .. } if id == ids.coproduct) {
+        return None;
+    }
+    let Term::App(fs_head, auth) = *fs else { return None };
+    if !matches!(*fs_head, Term::IndFormer { id, .. } if id == ids.fs_op) {
+        return None;
+    }
+    let auth = *auth;
+    let fs = Term::app(checked_effect_head(cx, ids.fs_op), auth.clone());
+    let op = Term::app(Term::app(checked_effect_head(cx, ids.coproduct), fs.clone()),
+        checked_effect_head(cx, ids.ambient_op));
+    let resp = [fs, checked_effect_head(cx, ids.ambient_op),
+        Term::app(Term::const_(ids.fs_resp, vec![]), auth.clone()),
+        Term::const_(ids.ambient_resp, vec![])]
+        .into_iter().fold(Term::const_(ids.resp_coproduct, vec![]), Term::app);
+    effect_signature_is(cx, target, op, resp).then_some(auth)
+}
+
+/// The sole closed §2.4 inclusion table, shared by checked/inferred lets and
+/// returned-tree tails. A same-signature action requires no injection. A
+/// non-table pair refuses E0087 instead of silently erasing an action.
+#[inline(never)]
+fn include_effect_tree(
+    cx: &ElabCtx<'_>, core: Term, core_ty: &Term,
+    from: &(Term, Term, Term), to: &(Term, Term, Term), span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let_signature_matches(cx, from, to) {
+        return Ok((core, core_ty.clone()));
+    }
+    let Some(ids) = cx.numeric_env.effect_tree_ids() else {
+        return Err(let_inclusion_unavailable(span, from, to));
+    };
+    let ambient = effect_signature_is(cx, to,
+        checked_effect_head(cx, ids.ambient_op), Term::const_(ids.ambient_resp, vec![]));
+    let auth = host_signature_auth(cx, to);
+    let sources = [
+        (ids.console_op, ids.console_resp, ids.ambient_console, ids.host_console),
+        (ids.clock_op, ids.clock_resp, ids.ambient_clock, ids.host_clock),
+        (ids.entropy_op, ids.entropy_resp, ids.ambient_entropy, ids.host_entropy),
+    ];
+    let mut injection = None;
+    for (op, resp, ambient_id, host_id) in sources {
+        if effect_signature_is(cx, from, checked_effect_head(cx, op), Term::const_(resp, vec![])) {
+            injection = ambient.then_some((ambient_id, None))
+                .or_else(|| auth.clone().map(|a| (host_id, Some(a))));
+            break;
+        }
+    }
+    if injection.is_none() {
+        if let Some(a) = &auth {
+            let fs_op = Term::app(checked_effect_head(cx, ids.fs_op), a.clone());
+            let fs_resp = Term::app(Term::const_(ids.fs_resp, vec![]), a.clone());
+            if effect_signature_is(cx, from, fs_op, fs_resp) {
+                injection = Some((ids.host_fs, Some(a.clone())));
+            }
+        }
+    }
+    let Some((inject_id, auth)) = injection else {
+        return Err(let_inclusion_unavailable(span, from, to));
+    };
+    let original = ascribe_introduction_let_value(core, core_ty);
+    let mut args = Vec::with_capacity(3);
+    if let Some(auth) = auth { args.push(auth); }
+    args.push(from.2.clone());
+    args.push(original);
+    let injected = args.into_iter().fold(Term::const_(inject_id, vec![]), Term::app);
+    let (itree_id, _, _) = cx.numeric_env.effect_sequencing_ids()
+        .expect("a registered effect inclusion requires ITree");
+    let injected_ty = [to.0.clone(), to.1.clone(), from.2.clone()]
+        .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app);
+    Ok((injected, injected_ty))
+}
+
 fn let_inclusion_unavailable(
     span: &Span, from: &(Term, Term, Term), to: &(Term, Term, Term),
 ) -> ElabError {
@@ -2296,9 +2397,9 @@ fn check_performed_let(
     else {
         return check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, false);
     };
-    if !let_signature_matches(cx, &rhs_tree, &expected_tree) {
-        return Err(let_inclusion_unavailable(span, &rhs_tree, &expected_tree));
-    }
+    let (rhs_core, rhs_ty) = include_effect_tree(
+        cx, rhs_core, &rhs_ty, &rhs_tree, &expected_tree, span,
+    )?;
     if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
         return Err(ElabError::TypeMismatch {
             span: span.clone(),
@@ -2318,8 +2419,9 @@ fn check_performed_let(
     cx.ctx.pop();
     cx.pop_let_latent();
     let body_core = checked?;
+    let bound_tree = (expected_tree.0, expected_tree.1, rhs_tree.2);
     bind_let_core(
-        cx, &rhs_tree, expected_tree.2, rhs_core, &rhs_ty, binder_ty, body_core,
+        cx, &bound_tree, expected_tree.2, rhs_core, &rhs_ty, binder_ty, body_core,
     )
 }
 
@@ -2353,10 +2455,9 @@ fn check_let(
     result
 }
 
-/// `36 §2.4` sequences a performed let RHS, but a non-tree expected type has
-/// no tree to bind it into while a non-tree proc result elaborates directly
-/// (`§2.5` makes it a tree). Refuse at check time rather than drop the action:
-/// an elaboration gap, lifted when proc results conform.
+/// A performing let cannot be bound into a non-tree result. Rows with no
+/// ambient tree and function-valued declared results still elaborate as B;
+/// refuse rather than silently erase their action (36 §§2.4–2.5).
 #[inline(never)]
 fn refuse_unsequenced_performed_let(
     cx: &ElabCtx<'_>,
@@ -2379,8 +2480,19 @@ fn refuse_unsequenced_performed_let(
     }
     Err(ElabError::TypeMismatch {
         span: span.clone(),
-        reason: "this let's right-hand side performs an action, but its result type is not an action tree, so the action cannot be sequenced (36 §2.4); §2.5 makes a proc with a non-empty row return a tree, and this refusal lifts when proc results conform; perform the action in a tree-result proc, or hold it as a value without `let`".into(),
+        reason: "this let's right-hand side performs an action, but its result type is not an action tree, so the action cannot be sequenced (36 §2.4): a proc whose row has no ambient tree, or whose declared result is a function, does not yet return a tree (36 §2.5); perform the action in a tree-result proc, or hold it as a value without `let`".into(),
     })
+}
+
+/// A changed proc returns an action tree, and a postcondition on that tree's
+/// result has no specified denotation yet (36 §2.5). Refuse it rather than
+/// refine the payload type that every consumer reads.
+#[inline(never)]
+fn refuse_returned_tree_ensures(span: &Span) -> ElabError {
+    ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "this proc's row is ambient-only and its declared result is not a tree, so it returns an action tree (36 §2.5); a postcondition on that action's result is not yet specified, so `ensures` cannot be checked here; state the property on a pure function the proc calls".into(),
+    }
 }
 
 /// `check_let_once`'s one post-RHS call: refine the RHS, then refuse it if it
@@ -3140,11 +3252,84 @@ fn check_result_position(
     cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
     predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
+    if cx.returned_tree_mode {
+        return check_returned_position(cx, expr, expected, span, predicates);
+    }
     if predicates.is_empty() {
         check(cx, expr, expected, span)
     } else {
         check_result_position_with_predicates(cx, expr, expected, span, predicates)
     }
+}
+
+/// Only a changed proc's body runs in returned-tree mode, so this route is
+/// cold for every other declaration and stays out of their recursive frames.
+#[inline(never)]
+fn check_returned_position(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    if let_itree_parts(cx, expected).is_some() {
+        return check_returned_tail(cx, expr, expected, span, predicates);
+    }
+    if predicates.is_empty() {
+        check(cx, expr, expected, span)
+    } else {
+        check_result_position_with_predicates(cx, expr, expected, span, predicates)
+    }
+}
+
+/// A changed proc's result-position leaf is an action tree. Splits continue
+/// checking their own result leaves; an ordinary value is checked at the
+/// written B and wrapped in Ret. Inference is speculative because a value
+/// may be an introduction that only checks against B.
+#[inline(never)]
+fn check_returned_tail(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    match expr {
+        RExpr::RLet(_, ty, rhs, body, where_) =>
+            return check_let(cx, ty, rhs, body, expected, where_, predicates),
+        RExpr::RIf { condition, then_branch, else_branch, span: where_ } =>
+            return check_if(cx, condition, then_branch, else_branch, expected, where_, predicates),
+        RExpr::RMatch { scrut, equation, arms, span: where_ } =>
+            return check_match_result(cx, scrut, equation.as_deref(), arms, expected, where_, predicates),
+        _ => {}
+    }
+    let tree = let_itree_parts(cx, expected)
+        .expect("returned-tree result position has a checked ITree type");
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let old_mode = std::mem::replace(&mut cx.returned_tree_mode, false);
+    let inferred = infer(cx, expr);
+    let result = match inferred {
+        Ok((core, ty)) if convert_type(cx.env, &cx.ctx, &ty, expected) => Ok(core),
+        Ok((core, ty)) if let_itree_parts(cx, &ty).is_some() => {
+            let from = let_itree_parts(cx, &ty).expect("inferred ITree");
+            include_effect_tree(cx, core, &ty, &from, &tree, span).map(|(tree, _)| tree)
+        }
+        _ => {
+            snapshot.rollback(cx)?;
+            let value = if predicates.is_empty() {
+                check(cx, expr, &tree.2, span)?
+            } else {
+                check_result_position_with_predicates(cx, expr, &tree.2, span, predicates)?
+            };
+            kernel_check_current(cx, &value, &tree.2).map_err(|error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: format!("returned value does not inhabit the declared result: {error}"),
+                },
+            })?;
+            let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
+                .expect("returned tree has a checked Ret identity");
+            Ok([tree.0, tree.1, tree.2, value]
+                .into_iter().fold(Term::constructor(ret_id, vec![]), Term::app))
+        }
+    };
+    cx.returned_tree_mode = old_mode;
+    result
 }
 
 #[inline(never)]
@@ -3173,7 +3358,7 @@ fn check_match_arm_result(
 ) -> Result<Term, ElabError> {
     cx.enter_arm_latent();
     if cx.match_frames.last().is_none_or(|frame| frame.result_predicates.is_empty()) {
-        check(cx, &arm.body, expected, span)
+        check_result_position(cx, &arm.body, expected, span, &[])
     } else {
         check_match_arm_result_with_predicates(cx, arm, expected, span)
     }
@@ -3400,7 +3585,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                         });
                     }
                     push_lambda_binder(cx, &domain);
-                    let body_result = check(cx, body, &cod, lam_span);
+                    let body_result = check_result_position(cx, body, &cod, lam_span, &[]);
                     cx.pop_let_latent();
                     cx.ctx.pop();
                     cx.assumptions.truncate(assumption_base);
@@ -14553,11 +14738,17 @@ fn infer_performed_let(
             let outer_signature = (
                 weaken(&rhs_tree.0, 1), weaken(&rhs_tree.1, 1), rhs_tree.2.clone(),
             );
-            if !let_signature_matches(cx, &outer_signature, &body_tree) {
-                cx.ctx.pop();
-                cx.pop_let_latent();
-                return Err(let_inclusion_unavailable(span, &rhs_tree, &body_tree));
-            }
+            let included = include_effect_tree(
+                cx, body_core, &body_ty, &body_tree, &outer_signature, span,
+            );
+            let (body_core, _) = match included {
+                Ok(included) => included,
+                Err(error) => {
+                    cx.ctx.pop();
+                    cx.pop_let_latent();
+                    return Err(error);
+                }
+            };
             (body_core, body_tree.2)
         } else {
             let (_, ret_id, _) = cx.numeric_env.effect_sequencing_ids()
@@ -15912,6 +16103,27 @@ fn ensured_result_type(carrier: &Term, predicates: &[ResultPredicate]) -> Term {
         })
     });
     conjunction.map_or_else(|| carrier.clone(), |proof| Term::sigma(carrier.clone(), proof))
+}
+
+fn literal_returned_tree_parts(
+    ty: &Term, sequencing: &NumericEnv,
+) -> Result<(Term, Term, Term), ElabError> {
+    let Some((itree_id, _, _)) = sequencing.effect_sequencing_ids() else {
+        return Err(ElabError::Internal("returned contract tree has no ITree registrar".into()));
+    };
+    let Term::App(response_result, payload) = ty else {
+        return Err(ElabError::Internal("returned contract result is not a checked tree".into()));
+    };
+    let Term::App(effect_result, response) = response_result.as_ref() else {
+        return Err(ElabError::Internal("returned contract tree lacks response".into()));
+    };
+    let Term::App(head, effect) = effect_result.as_ref() else {
+        return Err(ElabError::Internal("returned contract tree lacks operation".into()));
+    };
+    if !matches!(head.as_ref(), Term::IndFormer { id, .. } if *id == itree_id) {
+        return Err(ElabError::Internal("returned contract tree has a foreign former".into()));
+    }
+    Ok((effect.as_ref().clone(), response.as_ref().clone(), payload.as_ref().clone()))
 }
 
 fn build_contract_type(
@@ -22286,6 +22498,66 @@ fn elab_signature(cx: &mut ElabCtx<'_>, ty: &RType, result: bool) -> Result<Term
     elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })
 }
 
+/// The checked signature of a proc whose written result B is a non-tree,
+/// non-function value. Walk only its written parameter telescope: a Pi *in*
+/// B is excluded, not mistaken for another declaration parameter.
+#[inline(never)]
+fn returned_tree_signature(
+    cx: &mut ElabCtx<'_>, rdecl: &RDecl, ty: Term,
+) -> Result<(Term, bool), ElabError> {
+    if !matches!(rdecl.kind, RDeclKind::View { keyword: DefKeyword::Proc, .. }) {
+        return Ok((ty, false));
+    }
+    let Some(crate::effects::RowType::Concrete(row)) = surface_declared_row_type(rdecl)? else {
+        return Ok((ty, false));
+    };
+    if row.is_empty() || !row.effects().all(|effect| {
+        matches!(effect.as_str(), "Console" | "Clock" | "Entropy")
+    }) {
+        return Ok((ty, false));
+    }
+    let Some(ids) = cx.numeric_env.effect_tree_ids() else {
+        // Prelude construction has not captured the closed signature table.
+        return Ok((ty, false));
+    };
+    let (effect, response) = if row.len() == 1 {
+        let (op, resp) = match row.effects().next().expect("nonempty row").as_str() {
+            "Console" => (ids.console_op, ids.console_resp),
+            "Clock" => (ids.clock_op, ids.clock_resp),
+            "Entropy" => (ids.entropy_op, ids.entropy_resp),
+            _ => unreachable!("row checked for ambient labels"),
+        };
+        (checked_effect_head(cx, op), Term::const_(resp, vec![]))
+    } else {
+        (checked_effect_head(cx, ids.ambient_op), Term::const_(ids.ambient_resp, vec![]))
+    };
+    fn replace_result(
+        cx: &mut ElabCtx<'_>, ty: Term, params: usize, effect: &Term, response: &Term,
+    ) -> Result<(Term, bool), ElabError> {
+        if params != 0 {
+            let Term::Pi(domain, result) = ty else {
+                return Err(ElabError::Internal(
+                    "proc parameter telescope is shorter than written arity".into(),
+                ));
+            };
+            cx.ctx.push((*domain).clone());
+            let new_result = replace_result(cx, *result, params - 1, effect, response);
+            cx.ctx.pop();
+            return new_result.map(|(tail, changed)| (Term::pi(*domain, tail), changed));
+        }
+        let head = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(&ty));
+        if matches!(head, Term::Pi(..)) || let_itree_parts(cx, &ty).is_some() {
+            return Ok((ty, false));
+        }
+        let itree = cx.numeric_env.effect_sequencing_ids()
+            .expect("effect tree registrar preceded signature capture").0;
+        let tree = [effect.clone(), response.clone(), ty]
+            .into_iter().fold(Term::indformer(itree, vec![]), Term::app);
+        Ok((tree, true))
+    }
+    replace_result(cx, ty, view_param_count(rdecl), &effect, &response)
+}
+
 fn elaborate_v0(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -22333,7 +22605,9 @@ fn elaborate_v0(
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_signature(&mut cx, ty, false)?;
-            let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
+            let (ty_c, changed) = returned_tree_signature(&mut cx, rdecl, ty_c)?;
+            cx.returned_tree_mode = changed;
+            let body_c = check_result_position(&mut cx, &rdecl.body, &ty_c, &rdecl.span, &[])?;
             (body_c, ty_c)
         } else {
             infer(&mut cx, &rdecl.body)?
@@ -22444,7 +22718,7 @@ fn elaborate_recursive_view(
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     // 1. Elaborate the declared type (recursive views are annotated).
-    let (ty_core, type_obligations) = {
+    let (ty_core, type_obligations, returned_tree_mode) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
@@ -22453,7 +22727,8 @@ fn elaborate_recursive_view(
             ElabError::Internal("recursive declaration requires a type annotation".into())
         })?;
         let ty_c = elab_signature(&mut cx, ty, false)?;
-        (cx.metas.zonk_term(&ty_c), std::mem::take(&mut cx.obligations))
+        let (ty_c, returned_tree_mode) = returned_tree_signature(&mut cx, rdecl, ty_c)?;
+        (cx.metas.zonk_term(&ty_c), std::mem::take(&mut cx.obligations), returned_tree_mode)
     };
 
     // The actual, checked signature is the sort gate for recursive views;
@@ -22498,7 +22773,8 @@ fn elaborate_recursive_view(
             .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
             .with_preconditions(preconditions, PremiseHoles::Reported);
-        let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
+        cx.returned_tree_mode = returned_tree_mode;
+        let body_c = check_result_position(&mut cx, &associated.body, &ty_core, &rdecl.span, &[])?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
     })();
@@ -22577,6 +22853,7 @@ pub(crate) fn elaborate_mutual_group(
 ) -> Result<Vec<ElabResult>, ElabError> {
     // 1. Elaborate every member's declared type before staging siblings.
     let mut ty_cores: Vec<Term> = Vec::with_capacity(members.len());
+    let mut returned_modes: Vec<bool> = Vec::with_capacity(members.len());
     for rdecl in members {
         let before = env.decls().count();
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
@@ -22588,7 +22865,9 @@ pub(crate) fn elaborate_mutual_group(
             ))
         })?;
         let ty_c = elab_signature(&mut cx, ty, false)?;
+        let (ty_c, changed) = returned_tree_signature(&mut cx, rdecl, ty_c)?;
         ty_cores.push(cx.metas.zonk_term(&ty_c));
+        returned_modes.push(changed);
         record_member(cx.env, before, &rdecl.name);
     }
 
@@ -22699,14 +22978,15 @@ pub(crate) fn elaborate_mutual_group(
     let mut bodies: Vec<Term> = Vec::with_capacity(members.len());
     let mut all_obligations: Vec<Vec<Obligation>> = Vec::with_capacity(members.len());
     let elab_err = (|| -> Result<(), ElabError> {
-        for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
+        for ((rdecl, ty_core), changed) in members.iter().zip(&ty_cores).zip(&returned_modes) {
             let before = env.decls().count();
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
 
                 .with_preconditions(preconditions, PremiseHoles::Reported)
                 .with_recursive_group(&recursive_group);
-            let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
+            cx.returned_tree_mode = *changed;
+            let body_c = check_result_position(&mut cx, &rdecl.body, ty_core, &rdecl.span, &[])?;
             let obligations = std::mem::take(&mut cx.obligations);
             bodies.push(cx.metas.zonk_term(&body_c));
             all_obligations.push(obligations);
@@ -23023,7 +23303,7 @@ fn elaborate_view_with_spec(
             pre_admit_id,
             req_cores,
         ) = if is_recursive || rdecl.ty.is_some() {
-            let (carrier_ty, assumptions, req_cores) = {
+            let (carrier_ty, assumptions, req_cores, returned_tree_mode) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
                         .with_classes(class_env, provenance, standard_operators, *effect_rows, declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, effect_rows))
@@ -23036,6 +23316,7 @@ fn elaborate_view_with_spec(
                     )
                 })?;
                 let carrier_ty = elab_signature(&mut cx, ty, literal_return)?;
+                let (carrier_ty, changed) = returned_tree_signature(&mut cx, rdecl, carrier_ty)?;
                 let req_cores = install_requires_assumptions(
                     &mut cx,
                     &carrier_ty,
@@ -23056,13 +23337,22 @@ fn elaborate_view_with_spec(
                     })
                     .collect::<Vec<_>>();
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
-                (carrier_ty, assumptions, req_cores)
+                (carrier_ty, assumptions, req_cores, changed)
             };
+            if returned_tree_mode && !all_ensures.is_empty() {
+                return Err(refuse_returned_tree_ensures(&rdecl.span));
+            }
             let (param_types, carrier_result) = split_params(&carrier_ty, param_count)
                 .ok_or_else(|| ElabError::Internal(
                     "declaration parameter telescope is shorter than its source arity".into(),
                 ))?;
-            let source_result = weaken(&carrier_result, req_cores.len() as i64);
+            let returned_parts = if returned_tree_mode {
+                Some(literal_returned_tree_parts(&carrier_result, numeric_env)?)
+            } else {
+                None
+            };
+            let source_result = weaken(returned_parts.as_ref().map_or(&carrier_result, |parts| &parts.2),
+                req_cores.len() as i64);
             // The result predicate is checked before staging the self name:
             // recursive calls in the body must see the *final* Σ result type.
             let (predicates, psi_obligations) = prepare_contract_ensures(
@@ -23072,6 +23362,15 @@ fn elaborate_view_with_spec(
             )?;
             absorb_obligations(&mut decl_obligations, psi_obligations);
             let result_ty_under_requires = ensured_result_type(&source_result, &predicates);
+            let result_ty_under_requires = if let Some((effect, response, _)) = returned_parts {
+                let itree_id = numeric_env.effect_sequencing_ids()
+                    .expect("returned contract tree has ITree").0;
+                [weaken(&effect, req_cores.len() as i64),
+                    weaken(&response, req_cores.len() as i64), result_ty_under_requires]
+                    .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app)
+            } else {
+                result_ty_under_requires
+            };
             let (_, _, full_ty) = build_contract_type(
                 &carrier_ty, param_count, &req_cores, &result_ty_under_requires,
             )?;
@@ -23099,6 +23398,7 @@ fn elaborate_view_with_spec(
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
                 cx.assumptions = assumptions;
+                cx.returned_tree_mode = returned_tree_mode;
                 let (full_body, body_inner) = check_contract_body(
                     &mut cx,
                     &rdecl.body,

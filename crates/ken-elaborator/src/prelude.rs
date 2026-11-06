@@ -3576,12 +3576,35 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
 /// captured later by `ElabEnv::empty`. Inspect this entry's and the stage
 /// frames in the debug binary before growing their locals: the depth path
 /// also pays the recursive elaborator frames.
+#[inline(never)]
+fn capture_effect_tree_ids(elab: &mut ElabEnv) -> Result<(), ElabError> {
+    use crate::numbers::EffectTreeIds;
+    // All names are still compiler-owned here. Source rebinding cannot change
+    // any signature or inclusion selected by these checked identities.
+    let id = |name| prelude_registered_id(elab, name);
+    let ids = EffectTreeIds {
+        console_op: id("ConsoleOp")?, console_resp: id("console_resp")?,
+        clock_op: id("ClockOp")?, clock_resp: id("clock_resp")?,
+        entropy_op: id("EntropyOp")?, entropy_resp: id("entropy_resp")?,
+        ambient_op: id("AmbientOp")?, ambient_resp: id("ambient_resp")?,
+        fs_op: id("FSOp")?, fs_resp: id("fs_resp")?,
+        coproduct: id("Coproduct")?, resp_coproduct: id("resp_coproduct")?,
+        ambient_console: id("ambient_console")?, ambient_clock: id("ambient_clock")?,
+        ambient_entropy: id("ambient_entropy")?,
+        host_console: id("host_console")?, host_clock: id("host_clock")?,
+        host_entropy: id("host_entropy")?, host_fs: id("host_fs")?,
+    };
+    elab.numeric_env.install_effect_tree_ids(ids);
+    Ok(())
+}
+
 pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let core = register_prelude_core(elab)?;
     let type0 = Term::ty(Level::Zero);
     let fs_ids = register_prelude_resource_shapes(elab, &type0)?;
 
     register_prelude_resource_protocol(elab, &fs_ids.auth_t, fs_ids.cap_id)?;
+    capture_effect_tree_ids(elab)?;
 
     // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Capture the canonical role
     // roster HERE — every prelude declaration is registered and no package
