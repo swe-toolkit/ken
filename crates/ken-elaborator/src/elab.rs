@@ -22597,13 +22597,35 @@ fn check_declared_tree_row(
     labels: &[(String, Option<RowSummand>)], effect: &Term, span: &Span,
 ) -> Result<(), ElabError> {
     let admitted = declared_tree_summands(cx, ids, effect);
-    match labels.iter().find(|(_, s)| !s.is_some_and(|s| admitted.contains(&s))) {
+    match labels.iter().find(|(label, summand)| match summand {
+        Some(summand) => !admitted.contains(summand),
+        None => !label_names_tree_family(cx, label, effect),
+    }) {
         Some((label, _)) => Err(ElabError::TypeMismatch {
             span: span.clone(),
             reason: format!("row label `{label}` has no summand in the declared result tree's signature, so the row cannot bound it (36 §2.5)"),
         }),
         None => Ok(()),
     }
+}
+
+/// A label with no host summand injects into a declared tree whose signature
+/// is a user operation family exactly when it is that family's effect label,
+/// as export.rs effect_label_for_family names it for an L5 perform: the
+/// family's name without its `Op` suffix. The name only proposes a candidate;
+/// the checked family identity decides. A composed user signature admits no
+/// such label (its population is zero).
+fn label_names_tree_family(cx: &ElabCtx<'_>, label: &str, effect: &Term) -> bool {
+    let normal = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(effect));
+    let mut head = &normal;
+    while let Term::App(function, _) = head {
+        head = &**function;
+    }
+    let Term::IndFormer { id, .. } = head else {
+        return false;
+    };
+    let names = |name: &str| cx.globals.get(name) == Some(id);
+    names(format!("{label}Op").as_str()) || (!label.ends_with("Op") && names(label))
 }
 
 /// The summands a declared tree's signature admits, recognized by conversion

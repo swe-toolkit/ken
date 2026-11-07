@@ -844,8 +844,8 @@ fn non_host_trace_event_uses_exact_b1_signature_and_rejects_sibling() {
             r#"
 data LocalOp = Ping | Pong
 fn local_resp (_op : LocalOp) : Type = Unit
-fn target (_value : Unit)
-  : ITree LocalOp local_resp Unit =
+proc target (_value : Unit)
+  : ITree LocalOp local_resp Unit visits [Local] =
   ITree.Vis LocalOp local_resp Unit Ping
     (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#,

@@ -120,8 +120,8 @@ data LocalOp = Ping | Pong
 
 fn local_resp (_op : LocalOp) : Type = Unit
 
-fn target (_value : Unit)
-  : ITree LocalOp local_resp Unit =
+proc target (_value : Unit)
+  : ITree LocalOp local_resp Unit visits [Local] =
   ITree.Vis LocalOp local_resp Unit Ping
     (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#;
@@ -178,8 +178,8 @@ data LocalOp = Ping
 
 fn local_resp (_op : LocalOp) : Type = Unit
 
-fn target (operation : LocalOp)
-  : ITree LocalOp local_resp Unit =
+proc target (operation : LocalOp)
+  : ITree LocalOp local_resp Unit visits [Local] =
   ITree.Vis LocalOp local_resp Unit operation
     (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#,
@@ -205,8 +205,8 @@ fn wrapped_operation_tree_and_callback_inputs_fail_closed_transitively() {
 data LocalOp = Ping
 data OperationBox = Wrap LocalOp
 fn local_resp (_op : LocalOp) : Type = Unit
-fn target (boxed : OperationBox)
-  : ITree LocalOp local_resp Unit =
+proc target (boxed : OperationBox)
+  : ITree LocalOp local_resp Unit visits [Local] =
   match boxed {
     Wrap operation |-> ITree.Vis LocalOp local_resp Unit operation
       (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
@@ -219,8 +219,8 @@ fn target (boxed : OperationBox)
 data LocalOp = Ping
 fn local_resp (_op : LocalOp) : Type = Unit
 data TreeBox = WrapTree (ITree LocalOp local_resp Unit)
-fn target (boxed : TreeBox)
-  : ITree LocalOp local_resp Unit =
+proc target (boxed : TreeBox)
+  : ITree LocalOp local_resp Unit visits [Local] =
   match boxed { WrapTree tree |-> tree }
 "#,
     );
@@ -230,8 +230,8 @@ fn target (boxed : TreeBox)
 data LocalOp = Ping
 fn local_resp (_op : LocalOp) : Type = Unit
 data CallbackBox = WrapCallback (Unit -> ITree LocalOp local_resp Unit)
-fn target (boxed : CallbackBox)
-  : ITree LocalOp local_resp Unit =
+proc target (boxed : CallbackBox)
+  : ITree LocalOp local_resp Unit visits [Local] =
   match boxed { WrapCallback callback |-> callback MkUnit }
 "#,
     );

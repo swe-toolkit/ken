@@ -101,25 +101,37 @@ fn r5_tree_final_arrow_checks_the_signature_at_the_leaf() {
     );
 }
 
-const LOCAL_PREFIX: &str = "data LocalOp = Ping | Pong\n\
-    fn local_resp (_op : LocalOp) : Type = Unit\n";
-const LOCAL_BODY: &str = "ITree.Vis LocalOp local_resp Unit Ping \
-    (\\_response. ITree.Ret LocalOp local_resp Unit MkUnit)";
+const LOCAL_PING: &str = r#"
+data LocalOp = Ping | Pong
+
+fn local_resp (_op : LocalOp) : Type = Unit
+
+proc target (_value : Unit)
+  : ITree LocalOp local_resp Unit visits [Local] =
+  ITree.Vis LocalOp local_resp Unit Ping
+    (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
+"#;
 
 #[test]
-fn r6_undeclared_local_label_refuses_but_explicit_tree_function_checks() {
+fn r6a_family_label_injects_into_its_own_tree() {
+    // Identical to the b1 Ping source: the row is required by L5 export.
+    accepts("R6 own family", LOCAL_PING);
+}
+
+#[test]
+fn r6b_unrelated_label_cannot_inject_into_user_tree() {
+    let wrong_label = LOCAL_PING.replacen("visits [Local]", "visits [Other]", 1);
+    assert_ne!(wrong_label, LOCAL_PING, "R6 must move the row label");
+    refuses_label("R6 other family", &wrong_label, "Other");
+}
+
+#[test]
+fn r6c_local_label_cannot_inject_into_host_tree() {
     refuses_label(
-        "R6 Local",
-        &format!(
-            "{LOCAL_PREFIX}proc target (_value : Unit) : ITree LocalOp local_resp Unit \
-             visits [Local] = {LOCAL_BODY}"
-        ),
+        "R6 user label in HostIO",
+        "proc target (_value : Unit) : HostIO AFull (Result IOError Unit) \
+         visits [Console, Local] = host_console AFull (Result IOError Unit) \
+         (flush ConsoleStream.Stdout)",
         "Local",
-    );
-    accepts(
-        "R6 migrated function",
-        &format!(
-            "{LOCAL_PREFIX}fn target (_value : Unit) : ITree LocalOp local_resp Unit = {LOCAL_BODY}"
-        ),
     );
 }
