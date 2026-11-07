@@ -10374,6 +10374,8 @@ mod cat_numeric_interval_public_export_tests {
             "interval_inside_sound",
             "interval_inside_refl",
             "interval_inside_trans",
+            "interval_inside_antisym_lo",
+            "interval_inside_antisym_hi",
             "interval_add_inside",
             "interval_mul_inside",
             "interval_inside_hull_left",
