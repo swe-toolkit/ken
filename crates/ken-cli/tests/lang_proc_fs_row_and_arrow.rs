@@ -1,17 +1,20 @@
 //! Spec 36 §2.5, FSRA Increment 1: a non-space proc's final non-tree
 //! result carries the applicable effect signature, indexed by a *written*
 //! checked Cap. Promise class: durable invariant. MEASURED: core-type
-//! conversion on seven discriminating shapes, exact CLI diagnostics, and
+//! conversion on seven discriminating shapes, a checked FS bind with
+//! read_bytes as its computation argument, exact CLI diagnostics, and
 //! executed output for FS-plus-Console and arrow-final lets. CLAIMED: the
-//! returned tree has the right signature, authority index and placement.
-//! THE GAP: these examples do not enumerate every nested arrow or host op;
-//! the summand classifier's HostOpV1 match is exhaustive.
+//! returned tree has the right signature, authority index and placement,
+//! with the FS action sequenced into that tree. THE GAP: the FS bind pin
+//! relies on the separately checked bind/read_bytes definitions; these
+//! examples do not enumerate every nested arrow or host op, though the
+//! summand classifier's HostOpV1 match is exhaustive.
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{convert_type, Context, Decl};
+use ken_kernel::{convert_type, Context, Decl, Term};
 use std::process::{Command, Output};
 
-fn assert_core_type(case: &str, source: &str, name: &str, expected: &str) {
+fn assert_core_type(case: &str, source: &str, name: &str, expected: &str) -> ElabEnv {
     let mut env = ElabEnv::new().expect("checked prelude");
     let source = format!("{source}\ndef Expected = {expected}\n");
     env.elaborate_file(&source)
@@ -28,6 +31,17 @@ fn assert_core_type(case: &str, source: &str, name: &str, expected: &str) {
         convert_type(&env.env, &Context::new(), actual, expected),
         "{case}: emitted core type {actual:?} differs from separately checked {expected:?}"
     );
+    env
+}
+
+fn app_spine(mut term: &Term) -> (&Term, Vec<&Term>) {
+    let mut arguments = Vec::new();
+    while let Term::App(function, argument) = term {
+        arguments.push(argument.as_ref());
+        term = function;
+    }
+    arguments.reverse();
+    (term, arguments)
 }
 
 fn cli(case: &str, subcommand: &str, source: &str) -> Output {
@@ -65,12 +79,47 @@ fn written_cap_binds_fs_tree_at_final_value() {
 fn fs_action_with_written_cap_sequences_in_returned_tree() {
     // A real FS action, not merely a row label: the let must bind its
     // Result payload into the returned FS tree, not hold or erase the action.
-    assert_core_type(
+    let source = "proc f (c : Cap AFull) : Nat visits [FS] =\n\
+                  let r = read_bytes AFull c (bytes_encode \"missing\") in Suc Zero";
+    let env = assert_core_type(
         "P1 performed FS let",
-        "proc f (c : Cap AFull) : Nat visits [FS] =\n\
-           let r = read_bytes AFull c (bytes_encode \"missing\") in Suc Zero",
+        source,
         "f",
         "Cap AFull -> FS AFull Nat",
+    );
+    let Some(Decl::Transparent {
+        body: Term::Lam(_, body),
+        ..
+    }) = env.env.lookup(env.globals["f"])
+    else {
+        panic!("P1: expected checked parameter lambda");
+    };
+    // Inspect the emitted tree, not its declared type: read_bytes must be
+    // the computation argument of the checked FS bind, with a continuation.
+    let (head, arguments) = app_spine(body);
+    assert!(
+        matches!(head, Term::Const { id, .. } if *id == env.globals["bind"]),
+        "P1: the returned body must sequence via checked bind, got {body:?}"
+    );
+    assert_eq!(
+        arguments.len(),
+        6,
+        "P1: bind's signature arguments and continuation"
+    );
+    let (action, action_args) = app_spine(arguments[4]);
+    assert!(
+        matches!(action, Term::Const { id, .. } if *id == env.globals["read_bytes"]),
+        "P1: read_bytes must be the bound FS action, got {:?}",
+        arguments[4]
+    );
+    assert_eq!(
+        action_args.len(),
+        3,
+        "P1: read_bytes receives Auth, Cap and path"
+    );
+    assert!(
+        matches!(arguments[5], Term::Lam(..)),
+        "P1: bind must carry its continuation"
     );
 }
 
