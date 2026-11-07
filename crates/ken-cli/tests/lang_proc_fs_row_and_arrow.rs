@@ -59,6 +59,10 @@ fn written_cap_binds_fs_tree_at_final_value() {
         "f",
         "(a : Auth) -> Cap a -> Nat -> FS a Nat",
     );
+}
+
+#[test]
+fn fs_action_with_written_cap_sequences_in_returned_tree() {
     // A real FS action, not merely a row label: the let must bind its
     // Result payload into the returned FS tree, not hold or erase the action.
     assert_core_type(
