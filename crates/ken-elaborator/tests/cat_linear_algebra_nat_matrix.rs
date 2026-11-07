@@ -153,12 +153,15 @@ fn matrix_env() -> ElabEnv {
     env
 }
 
-/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2. The generic
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14. The generic
 /// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2;
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
-/// PROMISE CLASS: durable invariant.
+/// PROMISE CLASS: transition sentinel for the exact published API: the next
+/// approved public declaration requires a reviewed inventory update. The
+/// trust, ownership and generic-law checks are durable invariants.
 /// MEASURED: exact owned, transparent law identities, selective imports of
-/// all forty-nine names and generic clients for seventeen specified propositions.
+/// all fifty names and generic clients for seventeen earlier propositions;
+/// the §14 law has a separate exact generic client in its named test.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -225,6 +228,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "vector_scale_zero",
         "dot_zero_left",
         "dot_zero_right",
+        "vector_zero_of_dot_self_zero",
         "vector_scale_zero_vector",
         "matrix_vector_zero",
         "matrix_add_zero_left",
@@ -249,7 +253,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         .collect::<BTreeSet<_>>();
     assert!(
         expected.is_subset(&owned_names),
-        "all forty-nine public names are owned"
+        "all fifty public names are owned"
     );
     for name in &expected {
         let id = env.globals[&format!("{MATRIX}.{name}")];

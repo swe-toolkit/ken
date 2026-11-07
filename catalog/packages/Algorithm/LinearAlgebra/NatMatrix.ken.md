@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and thirty-nine algebraic laws have checked proofs.
+all arithmetic is exact, and forty algebraic laws have checked proofs.
 
 ## Contents
 
@@ -30,9 +30,10 @@ alongside two vector sum laws, four vector-scaling laws, four zero-vector
 unit laws and three zero-annihilation laws, followed by the zero matrix,
 its two unit laws for matrix addition and its action on every vector.
 Three further laws establish that the zero matrix absorbs products on
-both sides and that its transpose is zero. The named private stages build
-columns and row products; no second matrix carrier or numeric primitive
-is needed.
+both sides and that its transpose is zero. A zero self-dot conversely
+identifies the vector as zero, using private natural zero-inversion steps.
+The named private stages build columns and row products; no second matrix
+carrier or numeric primitive is needed.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
@@ -948,6 +949,26 @@ pub theorem dot_zero_right
     (dot_comm n xs (vector_zero n))
     (dot_zero_left n xs)
 
+pub theorem vector_zero_of_dot_self_zero
+      (n : Nat) (v : Vec Nat n)
+    : Equal Nat (dot n v v) Zero → Equal (Vec Nat n) v (vector_zero n) =
+  match v {
+    VNil ↦ λself_zero. Proved;
+    VCons k x tail ↦
+      λself_zero.
+        vector_cons_eq
+          k
+          x
+          Zero
+          tail
+          (vector_zero k)
+          (mul_self_eq_zero x (add_eq_zero_left (mul x x) (dot k tail tail) self_zero))
+          (vector_zero_of_dot_self_zero
+            k
+            tail
+            (add_eq_zero_right (mul x x) (dot k tail tail) self_zero))
+  }
+
 pub theorem vector_scale_zero_vector
       (n : Nat) (factor : Nat)
     : Equal (Vec Nat n) (vector_scale n factor (vector_zero n)) (vector_zero n) =
@@ -1742,6 +1763,24 @@ theorem add_shuffle
         (add (add a c) (add b d))
         (add (add (add a c) b) d)
         ((proof assoc for add) (add a c) b d)))
+
+theorem add_eq_zero_left (a : Nat) (b : Nat) : Equal Nat (add a b) Zero → Equal Nat a Zero =
+  match b {
+    Zero ↦ λsum_zero. sum_zero;
+    Suc b2 ↦ λsum_zero. absurd sum_zero
+  }
+
+theorem add_eq_zero_right (a : Nat) (b : Nat) : Equal Nat (add a b) Zero → Equal Nat b Zero =
+  match b {
+    Zero ↦ λsum_zero. Proved;
+    Suc b2 ↦ λsum_zero. absurd sum_zero
+  }
+
+theorem mul_self_eq_zero (x : Nat) : Equal Nat (mul x x) Zero → Equal Nat x Zero =
+  match x {
+    Zero ↦ λsquare_zero. Proved;
+    Suc j ↦ λsquare_zero. absurd square_zero
+  }
 
 theorem transpose_zip_cons_empty
       (k : Nat)
@@ -3086,7 +3125,10 @@ checked natural multiplication left-zero law. The dot-zero law uses the same
 checked recursive proof as the zero-row stages, with the new zero-vector name
 in its public statement. All four unit laws include empty vectors and
 introduce no premise. `dot_zero_right` composes dot commutativity and the
-left dot-zero law. `vector_scale_zero_vector` inducts on the written length;
+left dot-zero law. Conversely, a vector whose self-dot is zero must be the
+zero vector: private natural zero-inversion proofs isolate the squared head
+and the tail self-dot, and `vector_cons_eq` assembles the inductive result.
+`vector_scale_zero_vector` inducts on the written length;
 the multiplication head reduces to zero. `matrix_vector_zero` transports
 the zero input through `matrix_vector_homogeneous` and zero scaling at both
 dimensions. These three zero-annihilation laws need no new helper or premise.
@@ -3127,14 +3169,15 @@ factors and leaves a vector unchanged when its factor is one. The zero
 vector is the additive unit on either side, and scaling by zero or dotting
 with a zero vector gives zero. Dotting on either side by the zero vector,
 scaling the zero vector, and applying any matrix to a zero input all
-return the corresponding zero. Multiplication by a zero matrix likewise
-returns a zero matrix on either side, and transposing the zero matrix
-preserves zero entries while exchanging its dimensions. The named
-`dot_with` helper passes the row's
-dot product to `map` without a lambda-headed application in a proof goal.
-A rational-valued or approximate matrix would require a different statement
-of equality and is
-not implied by natural-number arithmetic.
+return the corresponding zero. No nonzero natural component can have a
+zero square, so a zero self-dot characterizes the zero vector rather than
+merely following from it. Multiplication by a zero matrix likewise returns
+a zero matrix on either side, and transposing the zero matrix preserves
+zero entries while exchanging its dimensions. The named
+`dot_with` helper passes the row's dot product to `map` without a
+lambda-headed application in a proof goal. A rational-valued or approximate
+matrix would require a different statement of equality and is not implied
+by natural-number arithmetic.
 
 ## 6. References
 
@@ -3145,8 +3188,8 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–13 owns
-forty-nine public names across ten operations and thirty-nine laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–14 owns
+fifty public names across ten operations and forty laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -3164,15 +3207,18 @@ prepending, row products and proof bridges remain private. The new
 `map_repeat` and `zero_columns_row` steps also remain private. The scaling
 proof's `vector_cons_eq` also remains private. `vector_zero`,
 `vector_add_zero_left`, `vector_add_zero_right`, `vector_scale_zero` and
-`dot_zero_left` are public in source order. The three §11 laws
-`dot_zero_right`, `vector_scale_zero_vector` and `matrix_vector_zero`
-follow in that order. `matrix_zero` follows `matrix_add`, and the §12 laws
-`matrix_add_zero_left`, `matrix_add_zero_right` and
+`dot_zero_left` are public in source order. The §11 laws `dot_zero_right`,
+`vector_scale_zero_vector` and `matrix_vector_zero` retain their relative
+order. The converse `vector_zero_of_dot_self_zero` follows
+`dot_zero_right` directly. `matrix_zero` follows `matrix_add`. The §12
+laws `matrix_add_zero_left`, `matrix_add_zero_right` and
 `matrix_vector_zero_matrix` follow `matrix_vector_zero` in that order.
 The three §13 laws `matrix_product_zero_left`,
 `matrix_product_zero_right`, and `transpose_zero` follow
-`matrix_vector_zero_matrix`. All thirty-nine laws have checked bodies. This
-package adds no Axiom, postulate, primitive, `Float` or trusted-base
+`matrix_vector_zero_matrix`. The three natural zero-inversion steps
+`add_eq_zero_left`, `add_eq_zero_right` and `mul_self_eq_zero` are private,
+as is the reused `vector_cons_eq`. All forty laws have checked bodies.
+This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
 isolated refused claims, and the exact trusted-identity set. The
@@ -3195,8 +3241,10 @@ all six public-law applications, the closed zero-matrix value, a same-form
 accepted control and an isolated false-result refusal. The [product-zero
 seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-product-zero.md)
 is authored, not officially conformance-run. Its package test checks three
-open law types and closed product and transpose
-applications, then accepts a same-form zero-factor control before refusing
-a false identity-factor result. These tests use root-loaded exports. They
-are not official conformance-runner runs or claims of CI, publication or
-landing.
+open law types and closed product and transpose applications, then accepts
+a same-form zero-factor control before refusing a false identity-factor
+result. The [dot-self-zero package test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_dot_self_zero.rs)
+checks the public generic law, the zero and nonzero closed controls, two
+isolated false Nat premises and the three private import boundaries. These
+tests use root-loaded exports; they are not official conformance-runner
+runs or claims of CI, publication or landing.
