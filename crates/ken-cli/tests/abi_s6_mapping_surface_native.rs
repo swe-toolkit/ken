@@ -298,8 +298,10 @@ fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
     let source = SOURCE
         .replace("__ENTRY__", "matrix_stage")
         .replace("__MATRIX_BODY__", "read_write_read_body");
-    // The established Mapping matrix provisions 32 MiB for this deep native
-    // build. Reuse that stated size rather than libtest's ambient 2 MiB.
+    // On cfbbd43e1, a disposable pagemap probe after this native build
+    // measured 1,992 KiB of touched stack (1,992 KiB present, zero swapped;
+    // 4 KiB pages). The stated 32,768 KiB grants 30,776 KiB of headroom,
+    // 16.4 times the measured depth, independent of libtest's ambient stack.
     let relays = std::thread::Builder::new()
         .name("abi-s6-relay-copy-census".to_owned())
         .stack_size(32 * 1024 * 1024)
