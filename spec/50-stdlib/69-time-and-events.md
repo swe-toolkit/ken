@@ -1196,3 +1196,54 @@ control. `Proved` refused even the true separated equation with
 K0004, so it cannot distinguish interleaving. The seed and its
 package-owned execution are separate deliveries; this Spec-only
 section claims neither their execution nor official conformance.
+
+## 14. A window missing every event selects the empty trace
+
+> **Section 14 status: DRAFT v0 (SPEC-TIME-WINDOW-NONE-EMPTY).**
+> Architect AC-0 `evt_5z26g2mqnc9p` ruled FEASIBLE from Foundation's isolated
+> scratch run on `f3c016f898139a6ab7af0faf6b72bc8ff82ede54`. The generic
+> proof and a closed accepted client passed 2/2; the `trusted_base()` GlobalId
+> identity sets were equal before and after, 114 → 114. The new law was owned
+> and Transparent; the `Axiom` grep found only existing prose, and seven
+> neighbouring package tests passed. These are scratch design findings, not
+> Spec-child or assembled-candidate tests, official conformance execution,
+> CI, publication, landing or measured landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent theorem directly
+behind `trace_window_all_identity` and before `trace_window_length_bound`.
+The argument order follows `trace_window`. Its sole premise says that **every
+member of the original trace** misses the half-open window:
+
+```ken
+pub theorem trace_window_none_empty
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : ((e : Event p) → list_elem (Event p) e tr → Equal Bool (event_in_window p lo hi e) False)
+      → Equal (List (Event p)) (trace_window p lo hi tr) (Nil (Event p))
+```
+
+The result is structural equality of lists, not merely absence of a selected
+member. The law holds for any payload type, trace and bounds, including an
+empty trace, unordered or repeated events, and a non-inverted window whose
+bounds enclose no event of `tr`. It requires neither `time_ordered`, an order
+relation between `lo` and `hi`, uniqueness, nor an additional premise. It is
+the miss counterpart of §10's all-members-kept law; unlike §9's inverted-window
+law, it does not require the window itself to be empty.
+
+The checked proof inducts on the written `tr`. `list_elem_head` supplies the
+head's membership, so the premise makes its `event_in_window` decision
+`False`. Congruence through the existing private `window_keep` drops the
+head. `list_elem_later` lifts tail membership to the original trace for the
+recursive call; the empty tail result then establishes the list equality.
+These membership lemmas are existing `Data.Collections.Derived` imports; the
+law adds no helper, import, `Axiom`, kernel rule or surface form. No §1–§13
+operation or law type changes.
+
+The CV-owned closed seed may use events at times 1 and 5. A membership-quantified
+miss for `[2,5)` permits the law to conclude `Nil`, even though the window is
+non-inverted. Changing only the lower bound to `[1,5)` makes the time-1 event
+fall inside, so that miss premise must refuse; the accepted `[2,5)` application
+is the same-form control. Architect's scratch D0 localized the refusal to the
+premise theorem, then attributed its failing event through the expected type
+and control; it did not show an arm-local diagnostic. The CV seed can separate
+per-member miss lemmas to make the time-1 refusal local. Seed authoring and
+execution belong to CV and the package owner, not this Spec-only child.
