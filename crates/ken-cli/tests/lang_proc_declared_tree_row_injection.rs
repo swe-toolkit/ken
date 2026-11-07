@@ -29,6 +29,46 @@ fn refuses_label(case: &str, source: &str, label: &str) {
     );
 }
 
+/// 36 §2.5: distinct written Cap indices matter only if this declaration
+/// chooses an FS signature for a non-tree final result. These four controls
+/// are independently named so a premature comparison cannot hide behind a
+/// prior failure. MEASURED: each checks against the same checked prelude.
+/// CLAIMED: unused Caps cannot restrict ambient or declared-tree results.
+/// THE GAP: P5 in lang_proc_fs_row_and_arrow guards the non-tree FS refusal.
+#[test]
+fn auth_index_a_two_caps_ambient_console_is_accepted() {
+    accepts(
+        "A ambient Console",
+        "proc p (src : Cap APartial) (dst : Cap AFull) : Nat visits [Console] = Suc Zero",
+    );
+}
+
+#[test]
+fn auth_index_b_two_caps_declared_host_tree_is_accepted() {
+    accepts(
+        "B declared HostIO",
+        "proc copy (src : Cap AFull) (dst : Cap APartial) : HostIO AFull Unit \
+         visits [FS, Console] = host_pure AFull Unit MkUnit",
+    );
+}
+
+#[test]
+fn auth_index_c_two_caps_declared_fs_tree_is_accepted() {
+    accepts(
+        "C declared FS",
+        "proc copy (src : Cap AFull) (dst : Cap APartial) : FS AFull Unit \
+         visits [FS] = ITree.Ret (FSOp AFull) (fs_resp AFull) Unit MkUnit",
+    );
+}
+
+#[test]
+fn auth_index_d_two_caps_ambient_clock_is_accepted() {
+    accepts(
+        "D ambient Clock",
+        "proc p (src : Cap APartial) (dst : Cap AFull) : Nat visits [Clock] = Suc Zero",
+    );
+}
+
 #[test]
 fn r1_clock_cannot_inject_into_console_tree() {
     accepts(

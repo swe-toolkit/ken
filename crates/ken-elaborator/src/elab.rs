@@ -22710,7 +22710,7 @@ fn returned_tree_signature(
     fn replace_result(
         cx: &mut ElabCtx<'_>, ty: Term, params: usize,
         labels: &[(String, Option<RowSummand>)],
-        ids: crate::numbers::EffectTreeIds, first_cap: &mut Option<(Term, usize)>,
+        ids: crate::numbers::EffectTreeIds, caps: &mut Vec<(Term, usize)>,
         span: &Span,
     ) -> Result<(Term, bool), ElabError> {
         let head = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(&ty));
@@ -22718,25 +22718,15 @@ fn returned_tree_signature(
             if params != 0 {
                 if let Term::App(cap, auth) = whnf(cx.env, &cx.ctx, &domain) {
                     if matches!(*cap, Term::Const { id, .. } if id == ids.cap) {
-                        if let Some((first, depth)) = first_cap {
-                            let first_here = weaken(first, (cx.ctx.len() - *depth) as i64);
-                            if labels.iter().all(|(_, s)| s.is_some())
-                                && !convert_type(cx.env, &cx.ctx, &first_here, &auth)
-                            {
-                                return Err(ElabError::TypeMismatch {
-                                    span: span.clone(),
-                                    reason: "written FS capabilities with different Auth indices; one result tree carries one index (36 §2.5)".into(),
-                                });
-                            }
-                        } else {
-                            *first_cap = Some(((*auth).clone(), cx.ctx.len()));
-                        }
+                        // Only the non-tree FS-family result chooses an Auth
+                        // index. Merely having two written Caps is permitted.
+                        caps.push(((*auth).clone(), cx.ctx.len()));
                     }
                 }
             }
             cx.ctx.push((*domain).clone());
             let tail = replace_result(
-                cx, *result, params.saturating_sub(1), labels, ids, first_cap, span,
+                cx, *result, params.saturating_sub(1), labels, ids, caps, span,
             );
             cx.ctx.pop();
             return tail.map(|(result, changed)| {
@@ -22759,10 +22749,26 @@ fn returned_tree_signature(
         };
         let ambient = [RowSummand::Console, RowSummand::Clock, RowSummand::Entropy]
             .into_iter().filter(|summand| summands.contains(summand)).collect::<Vec<_>>();
-        let host_auth = summands.contains(&RowSummand::HostAuth)
-            .then(|| first_cap.as_ref())
-            .flatten()
-            .map(|(auth, depth)| weaken(auth, (cx.ctx.len() - *depth) as i64));
+        // The only place an Auth index is chosen: a non-tree result whose row
+        // names an FS-family action. Every written Cap must agree with the
+        // first, since one result tree carries one index (36 §2.5). A declared
+        // tree supplies its own index, and an ambient tree has none.
+        let host_auth = match caps.split_first() {
+            Some(((first, first_depth), rest)) if summands.contains(&RowSummand::HostAuth) => {
+                let first_here = weaken(first, (cx.ctx.len() - *first_depth) as i64);
+                for (auth, depth) in rest {
+                    let auth_here = weaken(auth, (cx.ctx.len() - *depth) as i64);
+                    if !convert_type(cx.env, &cx.ctx, &first_here, &auth_here) {
+                        return Err(ElabError::TypeMismatch {
+                            span: span.clone(),
+                            reason: "written FS capabilities with different Auth indices; one result tree carries one index (36 §2.5)".into(),
+                        });
+                    }
+                }
+                Some(first_here)
+            }
+            _ => None,
+        };
         let (effect, response) = if let Some(auth) = host_auth {
             let fs = Term::app(checked_effect_head(cx, ids.fs_op), auth.clone());
             let fs_response = Term::app(Term::const_(ids.fs_resp, vec![]), auth);
@@ -22802,7 +22808,7 @@ fn returned_tree_signature(
         Ok((tree, true))
     }
     replace_result(
-        cx, ty, view_param_count(rdecl), &labels, ids, &mut None, &rdecl.span,
+        cx, ty, view_param_count(rdecl), &labels, ids, &mut Vec::new(), &rdecl.span,
     )
 }
 
