@@ -10,6 +10,7 @@
 
 const SOURCE: &str = include_str!("fixtures/d0_abi_mapping_source.ken");
 
+#[derive(Debug)]
 struct Differential {
     interpreted: ken_runtime::EffectObservation,
     native: ken_runtime::EffectObservation,
