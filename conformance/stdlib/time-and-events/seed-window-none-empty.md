@@ -52,7 +52,7 @@ theorem two_member_misses
       (Equal Bool (event_in_window p lo hi e) False)
       (λhead_or_tail.
         match head_or_tail {
-          Inl same =>
+          Inl same ↦
             trans
               Bool
               (event_in_window p lo hi e)
@@ -66,12 +66,12 @@ theorem two_member_misses
                 (λx. event_in_window p lo hi x)
                 same)
               first_misses;
-          Inr later =>
+          Inr later ↦
             elim_trunc
               (Equal Bool (event_in_window p lo hi e) False)
               (λtail_or_empty.
                 match tail_or_empty {
-                  Inl same =>
+                  Inl same ↦
                     trans
                       Bool
                       (event_in_window p lo hi e)
@@ -85,7 +85,7 @@ theorem two_member_misses
                         (λx. event_in_window p lo hi x)
                         same)
                       last_misses;
-                  Inr impossible => absurd impossible
+                  Inr impossible ↦ absurd impossible
                 })
               later
         })
