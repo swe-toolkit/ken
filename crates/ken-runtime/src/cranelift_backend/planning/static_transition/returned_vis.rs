@@ -1,9 +1,8 @@
 //! Returned-Vis provenance and settlement for generated response owners.
 //!
 //! This analysis reads planned source occurrences and generated call edges. It
-//! does not install a response row: an admitted relay consumed by static
-//! producer fusion leaves the returned set, while independent static
-//! successors retain their rows.
+//! does not install a response row: every returned relay remains a numbered
+//! member, while independent static successors retain their rows.
 //! A constructor tag is not an occurrence identity, and a locally emitted Vis
 //! is not necessarily a returned Vis.
 
@@ -59,31 +58,63 @@ pub(in crate::cranelift_backend) struct ReturnedVisContext {
 pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
     pub(in crate::cranelift_backend) owner: StaticOriginId,
     pub(in crate::cranelift_backend) contexts: Vec<ReturnedVisContext>,
-    /// No owner may use a partial protocol when any returned member is a relay.
+    /// Whether at least one returned member carries a relay operation.
     pub(in crate::cranelift_backend) excluded_by_relay: bool,
 }
 
 /// A checked, program-local pending-return domain. Each member uses the
-/// *existing response row* as its only identity/ABI/effect authority. The
-/// discriminant is the row id plus one; zero is never a Vis member. No record
-/// exists for an unadmitted relay or an unknown returned-result endpoint.
+/// existing response row or a planned relay origin as its identity. Zero is
+/// never a Vis member. An unknown returned-result endpoint has no record.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) owners:
         BTreeMap<StaticResponseContinuationId, ReturnedVisProtocol>,
     pub(in crate::cranelift_backend) members:
         BTreeMap<StaticOriginId, StaticResponseContinuation>,
+    /// Forwarded relay copies, keyed by construct origin and emitting owner.
+    pub(in crate::cranelift_backend) relays: BTreeMap<PendingVisRelayKey, PendingVisRelay>,
+    /// Closed operation clauses of each relay-bearing response owner.
+    pub(in crate::cranelift_backend) relay_arms:
+        BTreeMap<StaticResponseContinuationId, Vec<super::responses::RelayHostResponseArm>>,
     /// Each function's maximum over only the owner protocols whose return
     /// paths pass through that exact generated function. Absent means no tail.
     pub(in crate::cranelift_backend) frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth>,
 }
 
+/// One emitted copy of a returned relay: the construct origin and generated
+/// owner that mints it. Copies have independent resumes and discriminants.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct PendingVisRelayKey {
+    pub(in crate::cranelift_backend) origin: StaticOriginId,
+    pub(in crate::cranelift_backend) owner: super::ContinuationEmissionOwner,
+}
+
+/// A forwarded relay, numbered by its emitted copy rather than a response
+/// row. A resolved row is only the relay's resume target.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct PendingVisRelay {
+    pub(in crate::cranelift_backend) discriminant: u32,
+    pub(in crate::cranelift_backend) resume: PendingVisRelayResume,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum PendingVisRelayResume {
+    Row {
+        seat: StaticOriginId,
+        call_template_id: u64,
+        row: StaticResponseContinuation,
+    },
+    Trap(String),
+}
+
+/// The relay's carried operation and K environment, not the target's captures.
+const RELAY_PAYLOAD_WORDS: u32 = 2;
+
 /// Every installed response owner's settlement route, built once from the
 /// final plan. No owner is absent; no consumer reads it through a `_` arm.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
-    /// A member of the pending-Vis record protocol after admitted relays
-    /// are projected out of its returned set.
+    /// A member of the pending-Vis record protocol, including forwarded relays.
     Protocol,
     /// The K route returns no Vis member, so a Ret-only body is exact.
     RetOnly,
@@ -93,8 +124,6 @@ pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ExcludedSettlement {
-    /// At least one unsettled returned member forwards a pattern-bound operation.
-    Relay,
     /// The census errored while deriving a returned member (its text).
     Underived(String),
 }
@@ -166,56 +195,74 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
-    /// An admitted owner's forwarded relay is consumed by source fusion. Its
-    /// K must never construct that relay in the same emission owner.
-    pub(in crate::cranelift_backend) fn reject_reached_admitted_relay(
+    /// Determine one emitting owner's relay resume from static planes fixed
+    /// before settlement. The oriented plane confirms, but never rewrites it.
+    pub(in crate::cranelift_backend) fn relay_resume_verdict(
         &self,
-        origin: StaticOriginId,
-        constructor: &str,
-        args: &[RuntimeExpr],
-        emission_owner: Option<super::continuations::ContinuationEmissionOwner>,
-    ) -> Result<(), CraneliftBackendError> {
-        let Some(emission_owner) = emission_owner else { return Ok(()); };
-        // The reached Construct and its arguments are already the lowering
-        // operand. Do not re-resolve its source occurrence behind the single
-        // origin-to-expression route merely to inspect this shape.
-        if constructor != self.process_symbols.itree_vis.as_str()
-            || args.len() != 2
-            || !matches!(args.first(), Some(RuntimeExpr::Var(_)))
-        {
-            return Ok(());
+        relay: StaticOriginId,
+        owner: super::ContinuationEmissionOwner,
+    ) -> Result<PendingVisRelayResume, CraneliftBackendError> {
+        let k = self.child_static_origin(relay, 1)?;
+        let issuing = self.relay_emission_owners(relay)?;
+        if self.recursive_residual_dispositions.iter().any(|entry| {
+            matches!(entry.child,
+                super::aggregates::RecursiveResidualChildKind::CheckedIhForce { child, .. }
+                    if child == k && !issuing.contains(&entry.owner))
+        }) {
+            return Err(planner_error(
+                "a relay continuation is forced in an owner that does not mint the relay",
+            ));
         }
-        for owner in &self.static_response_continuations {
-            if owner.base_owner() != emission_owner
-                || !matches!(self.pending_vis_settlements.owners.get(&owner.id()),
-                    Some(ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly))
-            {
-                continue;
+        let seats = self.recursive_residual_dispositions.iter().filter_map(|entry| {
+            match entry.child {
+                super::aggregates::RecursiveResidualChildKind::CheckedIhForce {
+                    child, seat, call_template_id,
+                } if child == k && entry.owner == owner => Some((seat, call_template_id)),
+                _ => None,
             }
-            let protocol = self.returned_vis_protocol(owner.vis_origin())?;
-            if protocol.contexts.iter().flat_map(|context| &context.members)
-                .any(|member| member.relay && member.origin == origin)
-            {
-                return Err(planner_error(format!(
-                    "an admitted response owner {:?} reached relay construct {origin:?} despite source fusion",
-                    owner.id(),
-                )));
+        }).collect::<Vec<_>>();
+        if seats.is_empty() {
+            return Ok(PendingVisRelayResume::Trap(
+                "relay continuation has no checked IH-force seat".to_owned(),
+            ));
+        }
+        let rows = self.return_protocol_candidate_rows()?;
+        let mut resolved = Vec::new();
+        for (seat, call_template_id) in seats {
+            let at_seat = rows.iter()
+                .filter(|row| row.k_closure_origin() == seat)
+                .collect::<Vec<_>>();
+            match at_seat.as_slice() {
+                [] => resolved.push(None),
+                [row] => resolved.push(Some((seat, call_template_id, (*row).clone()))),
+                _ => return Err(planner_error("relay IH seat has ambiguous response rows")),
             }
         }
-        Ok(())
+        match resolved.first().cloned().flatten() {
+            None if resolved.iter().all(Option::is_none) => Ok(PendingVisRelayResume::Trap(
+                "no response row at the IH seat".to_owned(),
+            )),
+            Some((seat, call_template_id, row)) if resolved.iter().all(|other| {
+                other.as_ref().is_some_and(|(other_seat, other_call, other_row)| {
+                    *other_seat == seat && *other_call == call_template_id
+                        && other_row.id() == row.id()
+                })
+            }) => Ok(PendingVisRelayResume::Row { seat, call_template_id, row }),
+            _ => Err(planner_error("one relay member resumes two closed continuations")),
+        }
     }
 
-    /// Classify every installed response owner. A complete relay-bearing
-    /// fixpoint may activate the record only after the shared source-pair
-    /// authority admits it; a missing or unsettled relay stays excluded.
+    /// Classify every installed response owner, retaining every returned relay
+    /// as a protocol member even when a source-fusion pair was planned.
     pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
         &self,
     ) -> Result<PendingVisSettlements, CraneliftBackendError> {
-        let admitted_relays = super::responses::settled_relay_owners(self);
         let mut settlements = BTreeMap::new();
         let mut bracket_exits = BTreeMap::new();
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
+        let mut relays = BTreeMap::new();
+        let mut relay_arms = BTreeMap::new();
         let mut frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth> = BTreeMap::new();
         for owner in &self.static_response_continuations {
             let protocol = match self.returned_vis_protocol(owner.vis_origin()) {
@@ -237,23 +284,8 @@ impl StaticTransitionPlan<'_> {
                 }
                 bracket_exits.insert(owner.id(), exits);
             }
-            // Source fusion consumes an admitted relay before this K returns.
-            // Retain every non-relay successor and its existing exact row;
-            // only an admitted owner's relay members leave the returned set.
-            if protocol.excluded_by_relay && admitted_relays.contains(&owner.id()) {
-                for context in &mut protocol.contexts {
-                    context.members.retain(|member| !member.relay);
-                }
-                protocol.excluded_by_relay = false;
-            }
             if protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
                 settlements.insert(owner.id(), ResponseOwnerSettlement::RetOnly);
-                continue;
-            }
-            if protocol.excluded_by_relay {
-                settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
-                    reason: ExcludedSettlement::Relay,
-                });
                 continue;
             }
             let mut width = PendingVisFrameWidth {
@@ -261,12 +293,28 @@ impl StaticTransitionPlan<'_> {
                 continuation_inputs: 0,
             };
             for member in protocol.contexts.iter().flat_map(|context| &context.members) {
+                if member.relay {
+                    let emitters = self.relay_emission_owners(member.origin)?;
+                    if emitters.is_empty() {
+                        return Err(planner_error("a returned relay has no emitting owner"));
+                    }
+                    for emitter in emitters {
+                        let key = PendingVisRelayKey { origin: member.origin, owner: emitter };
+                        let resume = self.relay_resume_verdict(member.origin, emitter)?;
+                        if let Some(previous) = relays.insert(key, resume.clone()) {
+                            if previous != resume {
+                                return Err(planner_error(
+                                    "one relay member resumes two closed continuations",
+                                ));
+                            }
+                        }
+                    }
+                    width.captures = width.captures.max(RELAY_PAYLOAD_WORDS);
+                    continue;
+                }
                 let row = member.successor.as_ref().ok_or_else(|| {
                     planner_error("a pending-Vis member has no exact successor response row")
                 })?;
-                if member.relay {
-                    return Err(planner_error("a relay entered a non-relay pending-Vis protocol"));
-                }
                 if row.id().ordinal() == u32::MAX {
                     return Err(planner_capacity_error("pending-Vis discriminant exhausted"));
                 }
@@ -282,6 +330,19 @@ impl StaticTransitionPlan<'_> {
                     }
                 }
             }
+            if protocol.contexts.iter().flat_map(|context| &context.members)
+                .any(|member| member.relay)
+            {
+                let mut effects = protocol.contexts.iter()
+                    .flat_map(|context| &context.members)
+                    .filter(|member| !member.relay)
+                    .filter_map(|member| member.successor.as_ref().map(|row| row.effect_origin()))
+                    .collect::<BTreeSet<_>>();
+                // The initial owner is itself a checked Effect of the same
+                // handler leaf, even when every returned member is a relay.
+                effects.insert(owner.effect_origin());
+                relay_arms.insert(owner.id(), self.relay_host_response_arms(&effects)?);
+            }
             // The owner calls its K contexts. Source-result Call edges mark
             // exact raw units; detached continuation grafts need their own
             // continuation frame to carry a member minted below the worker
@@ -292,11 +353,28 @@ impl StaticTransitionPlan<'_> {
                 .flat_map(|context| &context.members)
                 .map(|member| member.origin)
                 .collect::<BTreeSet<_>>();
-            let graft_frames = self.prefusion_continuation_result_edges()?
+            let mut graft_frames = self.prefusion_continuation_result_edges()?
                 .into_iter()
                 .filter(|edge| member_origins.contains(&edge.producer_construct_origin))
                 .map(|edge| PendingVisFrameOwner::Continuation(edge.identity.target()))
                 .collect::<BTreeSet<_>>();
+            // A relay can be minted in an emitted specialization body even
+            // when no prefusion result edge points at its construct. The
+            // producer, not its eventual response row, needs the record tail.
+            for relay in protocol.contexts.iter().flat_map(|context| &context.members)
+                .filter(|member| member.relay)
+            {
+                for owner in super::emission_owners_containing(self, relay.origin)? {
+                    graft_frames.insert(match owner {
+                        super::ContinuationEmissionOwner::Predeclared(unit) =>
+                            PendingVisFrameOwner::Unit(unit),
+                        super::ContinuationEmissionOwner::Specialization(unit) =>
+                            PendingVisFrameOwner::Continuation(unit),
+                        super::ContinuationEmissionOwner::Fusion(unit) =>
+                            PendingVisFrameOwner::Fusion(unit),
+                    });
+                }
+            }
             let chain = std::iter::once(PendingVisFrameOwner::ResponseOwner(owner.id()))
                 .chain(protocol.contexts.iter().map(|context|
                     PendingVisFrameOwner::Context(context.context)))
@@ -311,10 +389,23 @@ impl StaticTransitionPlan<'_> {
             settlements.insert(owner.id(), ResponseOwnerSettlement::Protocol);
             owners.insert(owner.id(), protocol);
         }
+        // Rows occupy ordinal + 1. Relays follow all rows in (origin, owner) order.
+        let exhausted = || planner_capacity_error("pending-Vis discriminant exhausted");
+        let mut next = match members.values().map(|row| row.id().ordinal()).max() {
+            Some(ordinal) => ordinal.checked_add(2).ok_or_else(exhausted)?,
+            None => 1,
+        };
+        let mut numbered = BTreeMap::new();
+        for (key, resume) in relays {
+            numbered.insert(key, PendingVisRelay { discriminant: next, resume });
+            next = next.checked_add(1).ok_or_else(exhausted)?;
+        }
         Ok(PendingVisSettlements {
             protocol: (!owners.is_empty()).then_some(PendingVisRecordProtocol {
                 owners,
                 members,
+                relays: numbered,
+                relay_arms,
                 frames,
             }),
             owners: settlements,
@@ -498,9 +589,8 @@ impl StaticTransitionPlan<'_> {
     }
 
     /// Resolve a response owner's complete returned-Vis K-context fixpoint.
-    /// A relay makes the WHOLE owner ineligible; there is no partial route.
-    /// Derived successors have the existing response-row type and are not
-    /// installed into the planner's live row population in this increment.
+    /// Relay and derived successors remain members of the same protocol;
+    /// derived successors keep their existing response-row identities.
     pub(in crate::cranelift_backend) fn returned_vis_protocol(
         &self,
         owner_vis: StaticOriginId,
@@ -639,6 +729,8 @@ mod tests {
             let protocol = PendingVisRecordProtocol {
                 owners: BTreeMap::new(),
                 members: BTreeMap::new(),
+                relays: BTreeMap::new(),
+                relay_arms: BTreeMap::new(),
                 frames: BTreeMap::from([(
                     frame,
                     PendingVisFrameWidth {

@@ -2466,17 +2466,19 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_validator(census_row, transport_validated.is_ok());
     transport_validated?;
-    if let Some(plan) = oriented_subcontinuation_plan.as_ref() {
-        crate::ClosedIhContinuationSetV1::enumerate(plan, &process_symbols.itree_vis).map_err(
-            |refusal| {
-                unsupported(
-                    LoweringCause::PlannerInvariant,
-                    "ClosedIhContinuationSetV1",
-                    refusal.reason(),
-                )
-            },
-        )?;
-    }
+    let closed_ih_continuations = oriented_subcontinuation_plan
+        .as_ref()
+        .map(|plan| {
+            crate::ClosedIhContinuationSetV1::enumerate(plan, &process_symbols.itree_vis)
+                .map_err(|refusal| {
+                    unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "ClosedIhContinuationSetV1",
+                        refusal.reason(),
+                    )
+                })
+        })
+        .transpose()?;
     #[cfg(any(test, feature = "px8-ds-test-support"))]
     mrc_census_selector(census_row);
     // Boundary A of RT-NATIVE-FNSPLIT: close and validate the factored static
@@ -2544,6 +2546,33 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             "CheckedIhFunctionalRepresentation",
             "an IH-force slot child names a slot the oriented plan does not hold",
         ))?;
+    }
+    // The static planner settled each relay. Confirm that every resolved IH
+    // call arms a closed template that actually contains that escaping call.
+    if let Some(protocol) = static_transition_plan.pending_vis_settlements.protocol.as_ref() {
+        for relay in protocol.relays.values() {
+            let super::PendingVisRelayResume::Row { call_template_id, .. } = &relay.resume else {
+                continue;
+            };
+            let template = closed_ih_continuations
+                .as_ref()
+                .ok_or(crate::ClosedIhContinuationRefusalV1::NoCheckedCall)
+                .and_then(|closed| closed.arm(*call_template_id))
+                .map_err(|refusal| {
+                    unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "ClosedIhContinuationSetV1",
+                        refusal.reason(),
+                    )
+                })?;
+            if !template.escaping_calls.contains(call_template_id) {
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "ClosedIhContinuationSetV1",
+                    "a relay's IH call is not an escaping call of its closed template",
+                ));
+            }
+        }
     }
     // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the fusion identity plane is
     // built HERE, and this is the first production compile that has ever built
@@ -7394,9 +7423,6 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
-        self.static_transition_plan.reject_reached_admitted_relay(
-            static_origin, constructor, args, self.defining_emission_owner,
-        )?;
         if let Some(region) = self.bracket_view.settlement_at(static_origin)?.cloned() {
             match region.mode() {
                 BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
@@ -9810,8 +9836,9 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .aggregate_record_view(transport.source_record())?;
         if record.shape() != PlannedAggregateShape::Constructor
-            || record.declared_children().map(|children| children.len())
-                != Some(worker_capture_count)
+            || record.declared_children().map(|children| children.iter()
+                .take_while(|child| matches!(child, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+                .count()) != Some(worker_capture_count)
         {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
@@ -15529,7 +15556,7 @@ impl<'a> Lowering<'a> {
         selected_constructor: &RuntimeSymbol,
     ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
         let source = self.retained_body_occurrence(source_origin)?;
-        let RuntimeExpr::Construct { args, .. } = source.expr else {
+        let RuntimeExpr::Construct { constructor, args } = source.expr else {
             if let RuntimeExpr::Match { cases, .. } = source.expr {
                 #[cfg(any(test, feature = "px8-ds-test-support"))]
                 if BRANCHED_SCRUTINEE_UNIT_BODY_SKIP_MATCH_BRANCH_ENTRY.with(std::cell::Cell::get) {
@@ -15579,6 +15606,13 @@ impl<'a> Lowering<'a> {
             record_branched_scrutinee_unit_body_route1(source_origin, source.expr);
             return Ok(None);
         };
+        // `D1` for a direct source. A literal Construct of another constructor
+        // cannot produce the child the selected case eliminates, so that case
+        // has no unit here: the Match arm's answer for an empty bucket, never a
+        // projection of the other constructor's argument.
+        if constructor != selected_constructor {
+            return Ok(None);
+        }
         let Some(argument) = recursive_position_construct_argument(args, position, false)? else {
             return Ok(None);
         };
@@ -17587,9 +17621,6 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::Construct { constructor, args } => {
                 self.lowered_construct_origins.insert(static_origin);
-                self.static_transition_plan.reject_reached_admitted_relay(
-                    static_origin, constructor, args, self.defining_emission_owner,
-                )?;
                 // Kept out of this recursive frame: only a claimed Deferred
                 // settlement's Copy id stays live across the arm below.
                 let bracket = match self.lower_construct_bracket_entry(

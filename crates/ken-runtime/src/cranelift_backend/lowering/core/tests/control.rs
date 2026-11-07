@@ -481,6 +481,7 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             grafted_spine_terminals: Vec::new(),
             grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
+            continuation_entry_inputs: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,
@@ -680,6 +681,7 @@ fn run_px8j_malformed_recursor_consumer(
             grafted_spine_terminals: Vec::new(),
             grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
+            continuation_entry_inputs: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,
@@ -2742,6 +2744,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             grafted_spine_terminals: Vec::new(),
             grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
+            continuation_entry_inputs: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,
@@ -4063,6 +4066,51 @@ fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
         minted.is_none(),
         "a capture-bearing LexicalClosure must still refuse — the partition is a \
          bucket cut, never a relaxation of the capture condition"
+    );
+}
+
+/// A direct `Ret` source under a `Ret`/`Vis` eliminator, the shape erasure
+/// emits for a performed-call scrutinee. The `Vis` case's recursive position is
+/// outside the `Ret` source's bucket, so the resolver answers `None`, as for an
+/// empty bucket, rather than reading position 1 off a one-argument `Ret`.
+#[test]
+fn a_direct_source_of_another_constructor_is_outside_the_selected_bucket() {
+    let fixture = RuntimeExpr::ComputationalMatch {
+        scrutinee: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:fixture::ITree::Ret".to_string(),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Int(0.into()))],
+        }),
+        cases: vec![
+            crate::RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::ITree::Ret".to_string(),
+                argument_binders: 1,
+                recursive_positions: Vec::new(),
+                body: RuntimeExpr::Var(0),
+            },
+            crate::RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::ITree::Vis".to_string(),
+                argument_binders: 2,
+                recursive_positions: vec![1],
+                body: RuntimeExpr::Var(0),
+            },
+        ],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "direct bucket eliminator default".to_string(),
+        },
+    };
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let (plan, root) = d1_ret_vis_plan(&fixture);
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.static_transition_plan = plan;
+    lowering.process_symbols = d1_ret_vis_symbols();
+
+    let selected = lowering
+        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string(), 0)
+        .expect("a direct Ret source is outside the Vis bucket, not a planner invariant");
+    assert!(
+        selected.is_none(),
+        "a Ret source must not resolve a unit for the Vis case: {selected:?}"
     );
 }
 

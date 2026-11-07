@@ -274,7 +274,7 @@ fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_argv",
         ARGV_ENV_PIPE,
         "Predeclared(PredeclaredFunctionId(25))",
-        1970,
+        1971,
         &[1, 2, 3],
     );
 }
@@ -490,8 +490,8 @@ fn px10_argv_and_live_emit_below_process_gate() {
             &[
                 (ReturnFold, 1160, 571),
                 (ReturnFold, 1429, 1165),
-                (ReturnedVisSettlement, 1160, 1984),
-                (ReturnedVisSettlement, 1429, 1537),
+                (ReturnedVisSettlement, 1160, 1985),
+                (ReturnedVisSettlement, 1429, 1538),
             ][..],
             None,
         ),
@@ -535,6 +535,98 @@ fn px10_argv_and_live_emit_below_process_gate() {
                 "{name}: exact downstream detached-result seat"
             );
             assert_region_exit_owners(name, &owners, expected);
+        });
+    }
+}
+
+/// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
+/// relays 1247 and 992 and live's relays 688 and 433 are relay members of
+/// their owners' returned-Vis protocols, numbered once per emitting copy
+/// with distinct nonzero discriminants rather than by a response row, and
+/// kept in the settled member set. Copies of 1247 and 688 resume at the rows
+/// whose Vis are 1484 and 932; copies of 992 and 433 resume by their planned
+/// named trap. CLAIMED: each named relay has a numbered copy with the
+/// expected resume, and copies retain separate discriminants. THE GAP: this
+/// census does not prove that every emitting owner minted a copy or that
+/// other copies' resumes agree with their issuers; the artifact is not run,
+/// the expected seat is read from the plane that chose it, and a trap's
+/// reason text is not projected.
+#[test]
+fn px10_relays_are_numbered_protocol_members() {
+    for (name, source, relays) in [
+        (
+            "px10_census_relay_argv_env_pipe",
+            ARGV_ENV_PIPE,
+            [(1247, 1725, Some(1484)), (992, 1985, None)],
+        ),
+        (
+            "px10_census_relay_live_child",
+            LIVE_CHILD,
+            [(688, 1228, Some(932)), (433, 1488, None)],
+        ),
+    ] {
+        in_census_thread(name, move || {
+            let (built, diagnostics) =
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    emit_below_gate(name, source)
+                });
+            let _built = built.expect("px10 program emits an artifact beneath the Process gate");
+            assert_eq!(diagnostics.len(), 1, "{name}: one completed plan");
+            let plan = &diagnostics[0];
+            let mut discriminants = std::collections::BTreeSet::new();
+            for (relay, owner, resume_vis) in relays {
+                let protocol = plan
+                    .returned_vis_protocols
+                    .iter()
+                    .find(|protocol| protocol.owner_origin == owner)
+                    .unwrap_or_else(|| panic!("{name}: owner {owner} has a returned-Vis protocol"));
+                assert!(protocol.error.is_none(), "{name}: {protocol:?}");
+                let members = protocol
+                    .contexts
+                    .iter()
+                    .flat_map(|(_, members)| members)
+                    .filter(|member| member.origin == relay)
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    members.len(),
+                    1,
+                    "{name}: relay {relay} is one member of {owner}"
+                );
+                assert!(
+                    members[0].relay,
+                    "{name}: {relay} is a relay member: {:?}",
+                    members[0]
+                );
+                assert_eq!(
+                    members[0].successor_id, None,
+                    "{name}: relay {relay} is numbered by its own origin, not a response row"
+                );
+                assert!(
+                    plan.settled_returned_vis_protocols
+                        .iter()
+                        .any(|(settled, members)| *settled == owner && members.contains(&relay)),
+                    "{name}: relay {relay} stays in owner {owner}'s settled member set"
+                );
+                let numbered = plan
+                    .settled_relays
+                    .iter()
+                    .filter(|(origin, _, _)| *origin == relay)
+                    .collect::<Vec<_>>();
+                assert!(!numbered.is_empty(), "{name}: relay {relay} is numbered");
+                for (_, discriminant, _) in &numbered {
+                    assert_ne!(*discriminant, 0, "{name}: zero is never a Vis member");
+                    assert!(
+                        discriminants.insert(*discriminant),
+                        "{name}: relay {relay} shares discriminant {discriminant}"
+                    );
+                }
+                assert!(
+                    numbered
+                        .iter()
+                        .any(|(_, _, resume)| resume.map(|(_, row_vis)| row_vis) == resume_vis),
+                    "{name}: relay {relay} has a copy resuming at {resume_vis:?} (None is a planned named trap): {numbered:?}"
+                );
+            }
         });
     }
 }

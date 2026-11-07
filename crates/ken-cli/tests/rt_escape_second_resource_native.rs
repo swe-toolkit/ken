@@ -1365,7 +1365,8 @@ fn buffer_freeze_outcome(
 // are settlement-owned and leave the projected returned set before emission.
 /// Promise class: durable invariant over the two source-context owner roles.
 /// MEASURED: each raw context owner retains one relay and one bracket-owned
-/// successor with no ordinary successor edge; neither survives projection. CLAIMED: no owner emits a second returned
+/// successor with no ordinary successor edge; after projection the owner keeps
+/// only its numbered relay. CLAIMED: no owner emits a second returned
 /// edge for a continuation consumed by its bracket. THE GAP: this plan-only
 /// relation does not prove source drive; native parity separately observes it.
 #[test]
@@ -1408,9 +1409,13 @@ fn r2_relay_owners_settle_authenticated_successors_without_returning_them() {
             let successor = successors[0].origin;
             assert!(plan.bracket_settlement_vis_origins.contains(&successor),
                 "r2 successor {successor} must be an authenticated bracket settlement");
-            assert!(plan.settled_returned_vis_protocols.iter()
-                .all(|(projected_owner, _)| *projected_owner != owner),
-                "settled owner {owner} retained a returned successor after consumption");
+            let settled = plan.settled_returned_vis_protocols.iter()
+                .filter(|(projected_owner, _)| *projected_owner == owner)
+                .map(|(_, settled)| settled.clone())
+                .collect::<Vec<_>>();
+            assert_eq!(settled, vec![vec![relays[0].origin]],
+                "settled owner {owner} must keep only its numbered relay, never the \
+                 bracket-consumed successor {successor}");
         }
         assert_eq!(observed_owners.len(), 2, "both raw context owners must be distinct");
         eprintln!("RT-OWNER-VIS SOURCE-DRIVEN R2 owners={observed_owners:?}");

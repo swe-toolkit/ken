@@ -22,7 +22,7 @@ use super::continuations::{
     ContinuationFrameIdentity, ContinuationInputProjection, ContinuationUnitView,
     ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
-    ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
+    ProducerLocalBinding, ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
     RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
 };
 use super::occurrences::{occurrence_authority, StaticOriginId};
@@ -1334,12 +1334,69 @@ impl SsaInfeasible {
     }
 }
 
-#[derive(Clone, Copy)]
-struct HostResponseRoute {
-    operation: HostOpV1,
-    effect_origin: StaticOriginId,
-    producer_call_origin: StaticOriginId,
-    response_origin: StaticOriginId,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct HostResponseRoute {
+    pub(in crate::cranelift_backend) operation: HostOpV1,
+    pub(in crate::cranelift_backend) effect_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) producer_call_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) response_origin: StaticOriginId,
+}
+
+/// One checked clause of the handler's closed operation dispatch. The
+/// environment maps each free Effect input to a field of the carried op.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RelayHostResponseArm {
+    pub(in crate::cranelift_backend) constructor: RuntimeSymbol,
+    pub(in crate::cranelift_backend) constructor_tag: u64,
+    pub(in crate::cranelift_backend) pattern_fields: usize,
+    pub(in crate::cranelift_backend) case_body: StaticOriginId,
+    pub(in crate::cranelift_backend) source_owner: super::units::PredeclaredFunctionId,
+    pub(in crate::cranelift_backend) route: HostResponseRoute,
+    pub(in crate::cranelift_backend) field_binders: Vec<u32>,
+}
+
+fn relay_pattern_field_ordinal(
+    binding: ProducerLocalBinding,
+    source_owner: super::units::PredeclaredFunctionId,
+    case_body: StaticOriginId,
+    binders: usize,
+) -> Result<u32, CraneliftBackendError> {
+    if binding.binding_owner != source_owner
+        || binding.binding_origin != case_body
+        || binding.binding_ordinal as usize >= binders
+    {
+        return Err(planner_error(
+            "an arm's Effect reads a binder that is not a field of its pattern",
+        ));
+    }
+    Ok(binding.binding_ordinal)
+}
+
+#[cfg(test)]
+mod relay_pattern_field_tests {
+    use super::*;
+
+    /// Promise class: durable invariant. An enclosing binding with ordinal
+    /// zero is not this pattern's field zero, even under the same owner.
+    #[test]
+    fn relay_arm_enclosing_ordinal_below_arity_refuses() {
+        let owner = super::super::units::PredeclaredFunctionId::for_test(0);
+        let case_body = StaticOriginId(5);
+        let binding = ProducerLocalBinding {
+            binding_owner: owner,
+            binding_origin: StaticOriginId(4),
+            binding_ordinal: 0,
+        };
+        let error = relay_pattern_field_ordinal(binding, owner, case_body, 2)
+            .expect_err("a different binding origin is not a field of this pattern");
+        assert!(format!("{error:?}").contains(
+            "an arm's Effect reads a binder that is not a field of its pattern"
+        ));
+        assert_eq!(relay_pattern_field_ordinal(
+            ProducerLocalBinding { binding_origin: case_body, ..binding },
+            owner, case_body, 2,
+        ).expect("the actual field of this pattern"), 0);
+    }
 }
 
 fn checked_host_response_call(
@@ -1490,6 +1547,11 @@ impl StaticTransitionPlan<'_> {
             {
                 for context in &protocol.contexts {
                     for member in &context.members {
+                        // A relay is numbered by its own origin and has no
+                        // response row; it resumes through the protocol's relays.
+                        if member.relay {
+                            continue;
+                        }
                         let successor = member.successor.as_ref().ok_or_else(||
                             planner_error("a pending-Vis member has no derived response row"))?;
                         if let Some(previous) = members.insert(successor.id(), successor) {
@@ -1688,14 +1750,6 @@ impl StaticTransitionPlan<'_> {
     }
 }
 
-/// The same classifier supplies pending-Vis projection before emission:
-/// admitted relay members are consumed by source fusion, not returned.
-pub(in crate::cranelift_backend) fn settled_relay_owners(
-    plan: &StaticTransitionPlan<'_>,
-) -> BTreeSet<StaticResponseContinuationId> {
-    relay_settlement::settled_relay_owners(plan)
-}
-
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
     let mut parents = BTreeMap::new();
     for occurrence in plan.source_occurrences.iter().flatten() {
@@ -1782,6 +1836,74 @@ fn host_response_routes(
         }
     }
     Ok(routes)
+}
+
+impl StaticTransitionPlan<'_> {
+    /// Select one leaf from the owner's actually returned non-relay effects,
+    /// and close every arm of that leaf before a relay can enter the owner.
+    pub(in crate::cranelift_backend) fn relay_host_response_arms(
+        &self,
+        non_relay_effects: &BTreeSet<StaticOriginId>,
+    ) -> Result<Vec<RelayHostResponseArm>, CraneliftBackendError> {
+        let routes = host_response_routes(self)?;
+        let leaves = routes.iter().filter(|(_, arms)| {
+            arms.values().any(|route| non_relay_effects.contains(&route.effect_origin))
+        }).collect::<Vec<_>>();
+        if leaves.len() != 1 || non_relay_effects.iter().any(|effect| {
+            !leaves.iter().any(|(_, arms)| arms.values().any(|route| route.effect_origin == *effect))
+        }) {
+            return Err(planner_error(format!("a relay owner's effects do not belong to one handler leaf: effects={non_relay_effects:?}, leaves={:?}", leaves.iter().map(|(leaf, _)| leaf).collect::<Vec<_>>() )));
+        }
+        let (leaf, arms) = leaves[0];
+        let RuntimeExpr::Match { cases, .. } = self.planned_occurrence_expr(*leaf)? else {
+            return Err(planner_error("a relay handler leaf is not a Match"));
+        };
+        arms.iter().map(|(constructor, route)| {
+            let (case_index, case) = cases.iter().enumerate()
+                .find(|(_, case)| case.constructor == *constructor)
+                .ok_or_else(|| planner_error("a relay handler arm has no matching pattern"))?;
+            let constructor_tag = self.case_constructor_identity(*leaf, case_index)?.tag_abi_word()?;
+            let case_body = self.child_static_origin(*leaf, 1 + case_index)?;
+            let source_owner = self.semantic.function_owner(route.effect_origin)?
+                .ok_or_else(|| planner_error("a relay handler Effect has no source owner"))?;
+            let root = super::continuations::continuation_owner_source_root(self, source_owner)?;
+            let entries = continuation_owner_entry_sources(self, source_owner)?
+                .into_iter().map(ContinuationValueSourceAuthority::source).collect::<Vec<_>>();
+            let (_, reached) = walk_continuation_value_environment(
+                self, root, route.effect_origin, &entries,
+            )?;
+            let reached = reached.ok_or_else(|| planner_error(
+                "a relay handler Effect is outside its source owner subtree",
+            ))?;
+            let mut free = BTreeSet::new();
+            free_environment_indices(self.planned_occurrence_expr(route.effect_origin)?, 0, &mut free)?;
+            let mut field_binders = Vec::new();
+            if let Some(maximum) = free.iter().next_back().copied() {
+                for index in 0..=maximum {
+                    let input = reached.get(index as usize).ok_or_else(|| planner_error(
+                        "a relay handler Effect indexes outside its source environment",
+                    ))?;
+                    let ContinuationValueSourceAuthority::Closed(sources) = input else {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    };
+                    let [source] = sources.as_slice() else {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    };
+                    let ContinuationSourceCoordinate::ProducerLocal { binding, .. } = source.coordinate else {
+                        return Err(planner_error("an arm's Effect reads a binder that is not a field of its pattern"));
+                    };
+                    field_binders.push(relay_pattern_field_ordinal(
+                        binding, source_owner, case_body, case.binders,
+                    )?);
+                }
+            }
+            Ok(RelayHostResponseArm {
+                constructor: constructor.clone(), constructor_tag,
+                pattern_fields: case.binders, case_body, source_owner,
+                route: *route, field_binders,
+            })
+        }).collect()
+    }
 }
 
 // construction.rs::plan_expr: Match case bodies (:880-899), Let body
@@ -5541,19 +5663,6 @@ impl StaticTransitionPlan<'_> {
                 .any(|returned| {
                     returned.context == owner.k_context() && !returned.members.is_empty()
                 }),
-            // An Excluded owner has no protocol record, but its K context may
-            // still return an ordinary successor Vis: that member, like a
-            // Protocol member, is not a Ret publication of K. Relay and
-            // bracket-settlement members keep their baseline treatment.
-            Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
-                reason: super::returned_vis::ExcludedSettlement::Relay,
-            }) => self
-                .returned_vis_protocol(row.vis_origin())?
-                .contexts
-                .iter()
-                .filter(|returned| returned.context == owner.k_context())
-                .flat_map(|returned| &returned.members)
-                .any(|member| !member.relay && member.bracket.is_none()),
             Some(super::returned_vis::ResponseOwnerSettlement::RetOnly) => false,
             Some(super::returned_vis::ResponseOwnerSettlement::Excluded {
                 reason: super::returned_vis::ExcludedSettlement::Underived(_),

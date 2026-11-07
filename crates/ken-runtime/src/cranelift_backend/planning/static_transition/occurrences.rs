@@ -1482,7 +1482,7 @@ mod tests {
                 },
                 owner: None,
                 shape: PlannedAggregateShape::Constructor,
-                declared_children: Some(&[]),
+                declared_children: Some(std::borrow::Cow::Borrowed(&[])),
                 children: Vec::new(),
                 meet: PlannedReferentLifetime::Persistent,
                 allocation: PlannedAggregateAllocation::PersistentGround,
@@ -1662,7 +1662,7 @@ mod tests {
         );
         let environment = environment_records[0];
         assert_eq!(environment.shape, PlannedAggregateShape::Record);
-        assert_eq!(environment.declared_children, Some(&[][..]));
+        assert_eq!(environment.declared_children.as_deref(), Some(&[][..]));
         assert!(environment.children.is_empty());
         assert_eq!(environment.meet, PlannedReferentLifetime::Persistent);
         assert_eq!(

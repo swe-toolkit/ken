@@ -118,6 +118,7 @@ fn run_checked_bounded_nat_fixture(
             grafted_spine_terminals: Vec::new(),
             grafted_spine_call_source: None,
             defining_abi_operands: Vec::new(),
+            continuation_entry_inputs: Vec::new(),
             defining_abi_slot_kinds: Vec::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,

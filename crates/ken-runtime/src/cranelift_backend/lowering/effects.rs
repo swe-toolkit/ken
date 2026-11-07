@@ -430,7 +430,7 @@ impl<'a> Lowering<'a> {
     /// `lower_process_host_effect`. Both consult THIS, so the predicate cannot
     /// drift between them and there is exactly one place it can be wrong
     /// (Architect `evt_4hcny7ae7h9sb`: compute once, consult at each site).
-    fn effect_arm_is_provably_dead(
+    pub(super) fn effect_arm_is_provably_dead(
         &self,
         effect_origin: StaticOriginId,
     ) -> Result<bool, CraneliftBackendError> {
@@ -467,17 +467,20 @@ impl<'a> Lowering<'a> {
     /// runs afterwards -- it additionally requires the emitted and dispositioned
     /// sets to be DISJOINT, so dispositioning a join that was in fact emitted
     /// refuses rather than passing.
+    pub(super) fn provably_dead_arm_body_for_relay(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        self.static_transition_plan.provably_dead_arm_body_containing(
+            effect_origin, &runtime_producible_constructors(&self.process_symbols),
+        )
+    }
+
     fn disposition_dead_arm_joins(
         &mut self,
         effect_origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
-        let Some(arm_body) = self
-            .static_transition_plan
-            .provably_dead_arm_body_containing(
-                effect_origin,
-                &runtime_producible_constructors(&self.process_symbols),
-            )?
-        else {
+        let Some(arm_body) = self.provably_dead_arm_body_for_relay(effect_origin)? else {
             return Ok(());
         };
         let joins = self

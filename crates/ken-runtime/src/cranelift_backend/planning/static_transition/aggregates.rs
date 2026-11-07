@@ -15,6 +15,7 @@
 //! ledger's boundary proposal in
 //! `docs/program/issues/RT-PLANNER-AGGREGATES-SPLIT.md`.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "px8-ds-test-support")]
 use std::cell::{Cell, RefCell};
@@ -1522,8 +1523,8 @@ impl<'plan> PlannedAggregateView<'plan> {
     /// aggregate. Source aggregates have no such recipe.
     pub(in crate::cranelift_backend) fn declared_children(
         &self,
-    ) -> Option<&'static [SynthesizedAggregateNode]> {
-        self.record.declared_children
+    ) -> Option<&[SynthesizedAggregateNode]> {
+        self.record.declared_children.as_deref()
     }
 }
 /// Test-only, closure-free observation of one issued continuation-inheritance
@@ -3266,7 +3267,7 @@ pub(in crate::cranelift_backend) struct PlannedAggregateOwnership {
     /// `None` for a source producer, whose children are occurrences in the
     /// program rather than nodes in a tree.
     pub(in crate::cranelift_backend) declared_children:
-        Option<&'static [SynthesizedAggregateNode]>,
+        Option<Cow<'static, [SynthesizedAggregateNode]>>,
     pub(in crate::cranelift_backend) children: Vec<PlannedAggregateChild>,
     /// The meet itself, retained beside the lane it selects so a reader can
     /// see the derivation rather than only its verdict.
@@ -3528,6 +3529,11 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateNode {
     /// the record it governs, and every count downstream would agree with
     /// itself while describing fewer captures than exist.
     WorkerCaptureOperand(u32),
+    /// An entry input carried by a relay-resumable checked-IH closure.
+    CheckedIhEntryInput {
+        ordinal: u32,
+        coordinate: ContinuationSourceCoordinate,
+    },
     /// This arm of the host result synthesizes no aggregate at all.
     ///
     /// `FsReadFile`'s `ResponseBytes`, `FsOpen`'s `ResourceToken`,
@@ -3980,6 +3986,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn collect_site_op
         // population that indexes the seat's arguments. Folding it in here
         // would claim the seat supplies an argument it does not have.
         SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
         | SynthesizedAggregateNode::HostResponseReferent { .. }
         | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
         | SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
@@ -4145,6 +4152,7 @@ fn collect_reachable_uses(
         // The checked-IH child model is built by the issuance site from the
         // unit's own ci<->oi run, not flattened out of an operation tree.
         | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
         | SynthesizedAggregateNode::Absent => {}
     }
 }
@@ -4228,7 +4236,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn node_referent_o
         // authority directly. Reaching here means something walked a captured
         // environment down the host-recipe owner path, where the answer would be
         // an invention.
-        SynthesizedAggregateNode::WorkerCaptureOperand(_) => Err(planner_error(
+        SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::CheckedIhEntryInput { .. } => Err(planner_error(
             "a worker-capture operand's referent owners come from its capture occurrence, \
              not from the shape node, so they cannot be derived on the host-recipe path",
         )),
@@ -4345,6 +4354,7 @@ fn fixed_node_selected_owner_of(
         | SynthesizedAggregateNode::HostResponseReferent { .. }
         | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
         | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
         | SynthesizedAggregateNode::Absent => Err(planner_error(
             "a dynamic aggregate alternative is not a constructor, so it \
              allocates nothing",
@@ -4964,6 +4974,13 @@ impl StaticTransitionPlan<'_> {
                      seat, so a capture operand cannot be reconciled against its ruled run",
                 )
             })?;
+        let capture_count = record.declared_children.as_deref()
+            .ok_or_else(|| planner_error("a checked-IH environment has no declared children"))?
+            .iter().take_while(|node| matches!(node, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+            .count();
+        if ordinal as usize >= capture_count {
+            return Err(planner_error("a checked-IH capture ordinal names an entry input, not a worker capture"));
+        }
         let child = record
             .children
             .iter()
@@ -5007,9 +5024,13 @@ impl StaticTransitionPlan<'_> {
         }) else {
             return Ok(false);
         };
+        let capture_count = record.declared_children.as_deref()
+            .ok_or_else(|| planner_error("a checked-IH environment has no declared children"))?
+            .iter().take_while(|node| matches!(node, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+            .count();
         let planned = record
             .children
-            .iter()
+            .iter().take(capture_count)
             .map(|child| {
                 child
                     .origin
@@ -5074,6 +5095,21 @@ fn positional_capture_declared_children(
         )));
     }
     Ok(&CHECKED_IH_CAPTURE_OPERANDS[..arity])
+}
+
+/// Match the verdict row's entry coordinates against this exact force owner.
+/// The returned ordinals index only this owner's Capture-slot run.
+fn checked_ih_relay_input_ordinals(
+    required: &[(u32, ContinuationSourceCoordinate, u32)],
+    available: &[(u32, ContinuationSourceCoordinate)],
+) -> Result<Vec<u32>, CraneliftBackendError> {
+    required.iter().map(|(_, coordinate, _)| {
+        available.iter().find(|(_, held)| held == coordinate)
+            .map(|(ordinal, _)| *ordinal)
+            .ok_or_else(|| planner_error(
+                "a relay-resumable checked-IH environment cannot hold its continuation's entry input in this owner",
+            ))
+    }).collect()
 }
 
 fn checked_ih_coordinate_run(
@@ -5857,7 +5893,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                     // confers authority is in the key above.
                     owner: plan.semantic.function_owner(seat)?,
                     shape: PlannedAggregateShape::Constructor,
-                    declared_children: Some(semantic_use.children),
+                    declared_children: Some(Cow::Borrowed(semantic_use.children)),
                     children,
                     meet,
                     allocation,
@@ -5885,7 +5921,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 },
                 owner: plan.semantic.function_owner(seat)?,
                 shape: PlannedAggregateShape::Record,
-                declared_children: Some(&[]),
+                declared_children: Some(Cow::Borrowed(&[])),
                 children: Vec::new(),
                 meet: PlannedReferentLifetime::Persistent,
                 allocation: PlannedAggregateAllocation::PersistentGround,
@@ -5969,7 +6005,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 },
                 owner: plan.semantic.function_owner(seat)?,
                 shape: PlannedAggregateShape::Constructor,
-                declared_children: Some(declared),
+                declared_children: Some(Cow::Borrowed(declared)),
                 children: children.clone(),
                 meet,
                 allocation,
@@ -6013,21 +6049,81 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 owners,
             });
         }
-        let escapes = children
-            .iter()
-            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
-        let (meet, allocation) = if escapes {
-            (
-                PlannedReferentLifetime::ActivationOwned,
-                PlannedAggregateAllocation::InvocationAggregate,
-            )
-        } else {
-            (
-                PlannedReferentLifetime::Persistent,
-                PlannedAggregateAllocation::PersistentGround,
-            )
-        };
+        // A resolved relay resumes outside the constructing activation. Its
+        // continuation record must therefore own every entry input the K body
+        // reads, in addition to the worker captures. The response row supplies
+        // their coordinate order, not their values.
+        let relay_inputs = plan.pending_vis_settlements.protocol.as_ref()
+            .into_iter()
+            .flat_map(|protocol| protocol.relays.values())
+            .filter_map(|relay| match &relay.resume {
+                super::PendingVisRelayResume::Row { seat: target, row, .. }
+                    if *target == seat => Some(row.continuation_inputs()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if relay_inputs.windows(2).any(|pair| pair[0] != pair[1]) {
+            return Err(planner_error(
+                "two relay continuations at one checked-IH seat disagree on their entry inputs",
+            ));
+        }
         for owner in force_owners {
+            let mut owner_children = children.clone();
+            let mut owner_declared = Cow::Borrowed(declared);
+            if let Some(inputs) = relay_inputs.first() {
+                let ContinuationEmissionOwner::Specialization(id) = owner else {
+                    return Err(planner_error(
+                        "a relay-resumable checked-IH environment cannot hold its continuation's entry input in this owner",
+                    ));
+                };
+                let unit = plan.continuation_units()?.into_iter().find(|unit| unit.id() == id)
+                    .ok_or_else(|| planner_error(
+                        "a relay-resumable checked-IH environment cannot hold its continuation's entry input in this owner",
+                    ))?;
+                let available = unit.continuation_inputs()?;
+                if available.iter().enumerate().any(|(index, input)| input.ordinal as usize != index) {
+                    return Err(planner_error("checked-IH force owner entry inputs are not dense by ordinal"));
+                }
+                let coordinates = available.iter().map(|input| (input.ordinal, input.coordinate))
+                    .collect::<Vec<_>>();
+                let matched = checked_ih_relay_input_ordinals(inputs, &coordinates)?;
+                let mut declared = declared.to_vec();
+                for ((_, coordinate, _), ordinal) in inputs.iter().zip(matched) {
+                    let entry = &available[ordinal as usize];
+                    if entry.referent_affinity.is_empty() {
+                        return Err(planner_error(
+                            "a relay-resumable checked-IH entry input has no derived referent owners",
+                        ));
+                    }
+                    declared.push(SynthesizedAggregateNode::CheckedIhEntryInput {
+                        ordinal: entry.ordinal,
+                        coordinate: *coordinate,
+                    });
+                    let owners = entry.referent_affinity.clone();
+                    owner_children.push(PlannedAggregateChild {
+                        position: u32::try_from(owner_children.len()).map_err(|_| {
+                            planner_capacity_error("checked-IH environment entry position exceeds the position space")
+                        })?,
+                        origin: None,
+                        field_identity: None,
+                        lifetime: if owners.contains(&BoundaryReferentOwner::InvocationArena) {
+                            PlannedReferentLifetime::ActivationOwned
+                        } else {
+                            PlannedReferentLifetime::Persistent
+                        },
+                        owners,
+                    });
+                }
+                owner_declared = Cow::Owned(declared);
+            }
+            let escapes = owner_children.iter().any(|child| {
+                child.owners.contains(&BoundaryReferentOwner::InvocationArena)
+            });
+            let (meet, allocation) = if escapes {
+                (PlannedReferentLifetime::ActivationOwned, PlannedAggregateAllocation::InvocationAggregate)
+            } else {
+                (PlannedReferentLifetime::Persistent, PlannedAggregateAllocation::PersistentGround)
+            };
             records.push(PlannedAggregateOwnership {
                 id: AggregateOccurrenceId(0),
                 producer: AggregateOccurrenceProducer::SynthesizedUse {
@@ -6051,8 +6147,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 // role is what preserves the separation from every other
                 // synthesized use.
                 shape: PlannedAggregateShape::Constructor,
-                declared_children: Some(declared),
-                children: children.clone(),
+                declared_children: Some(owner_declared),
+                children: owner_children,
                 meet,
                 allocation,
             });
@@ -6081,7 +6177,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             },
             owner: plan.semantic.function_owner(disposition.parent)?,
             shape: PlannedAggregateShape::Record,
-            declared_children: Some(declared_children),
+            declared_children: Some(Cow::Borrowed(declared_children)),
             children, meet, allocation,
         });
     }
@@ -6104,7 +6200,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             },
             owner: plan.semantic.function_owner(store.parent)?,
             shape: PlannedAggregateShape::Record,
-            declared_children: Some(positional_capture_declared_children(2)?),
+            declared_children: Some(Cow::Borrowed(positional_capture_declared_children(2)?)),
             children, meet, allocation,
         });
     }
@@ -10747,6 +10843,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | SynthesizedAggregateNode::HostResponseReferent { .. }
                 | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
                 | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+                | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
                 | SynthesizedAggregateNode::Absent,
             ) => Err(planner_error(
                 "synthesized aggregate path does not name a constructor node",
@@ -10827,6 +10924,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | (SynthesizedAggregateNode::HostResponseReferent { .. }, _)
                 | (SynthesizedAggregateNode::RepeatedAggregateLink { .. }, _)
                 | (SynthesizedAggregateNode::WorkerCaptureOperand(_), _)
+                | (SynthesizedAggregateNode::CheckedIhEntryInput { .. }, _)
                 | (SynthesizedAggregateNode::Absent, _) => {
                     return Err(planner_error(
                         "synthesized aggregate path takes a step the node it is at cannot take",
@@ -11085,16 +11183,22 @@ impl<'src> StaticTransitionPlan<'src> {
                         return Err(planner_error("checked-IH force Child has a foreign owner"));
                     }
                     let record = self.checked_ih_captured_environment_record(disposition.owner, seat)?;
+                    let declared = record.declared_children.as_deref()
+                        .ok_or_else(|| planner_error("checked-IH force Child has no declared model"))?;
+                    let capture_count = declared.iter().take_while(|node| {
+                        matches!(node, SynthesizedAggregateNode::WorkerCaptureOperand(_))
+                    }).count();
                     if record.shape != PlannedAggregateShape::Constructor
-                        || record.children.len() != unit.worker_capture_count() {
+                        || record.children.len() != declared.len()
+                        || capture_count != unit.worker_capture_count() {
                         return Err(planner_error("checked-IH force Child differs from its worker or record"));
                     }
                     let roles = variant.roles.iter().filter_map(|role| match role {
                         RecursiveCarrierRole::WorkerCapture { seat, ordinal } => Some((*seat, *ordinal)),
                         _ => None,
                     }).collect::<Vec<_>>();
-                    if roles.len() != record.children.len()
-                        || roles.iter().zip(&record.children).enumerate().any(|(index, ((role_seat, ordinal), child))| {
+                    if roles.len() != capture_count
+                        || roles.iter().zip(record.children.iter().take(capture_count)).enumerate().any(|(index, ((role_seat, ordinal), child))| {
                             let expected_source = unit.worker_captures().get(index).map(|capture| capture.source());
                             *role_seat != seat || *ordinal as usize != index
                                 || child.position as usize != index
@@ -11647,6 +11751,7 @@ impl<'src> StaticTransitionPlan<'src> {
                         | SynthesizedAggregateNode::HostResponseReferent { .. }
                         | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
                         | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+                        | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
                         | SynthesizedAggregateNode::Absent => Err(planner_error(
                             "a dynamic aggregate alternative is not a constructor, so it \
                              allocates nothing",
@@ -11671,6 +11776,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
                 // A capture word is a leaf, never a dynamic alternative set.
                 | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+                | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
                 | SynthesizedAggregateNode::Absent => Ok(None),
             },
             // An alternative is a member of a set, not a set. A path that names
@@ -11702,14 +11808,14 @@ impl<'src> StaticTransitionPlan<'src> {
         seat: StaticOriginId,
         path: &SynthesizedAggregatePath,
         role: SynthesizedConstructorRole,
-    ) -> Result<&'static [SynthesizedAggregateNode], CraneliftBackendError> {
+    ) -> Result<&[SynthesizedAggregateNode], CraneliftBackendError> {
         self.synthesized_aggregate_record(
             owner,
             seat,
             path,
             SynthesizedAggregateRole::Constructor(role),
         )?
-            .declared_children
+            .declared_children.as_deref()
             .ok_or_else(|| {
                 planner_error("synthesized aggregate use has a record but no child model")
             })
@@ -11746,6 +11852,31 @@ mod tests {
     use super::super::*;
     use super::super::tests::unit;
     use crate::RuntimeValue;
+
+    /// Promise class: durable invariant. The row orders coordinates; the
+    /// building owner's input ordinals may be in a different order. A missing
+    /// coordinate refuses rather than borrowing another owner's frame input.
+    #[test]
+    fn relay_checked_ih_entry_inputs_match_owner_coordinates_or_refuse() {
+        use super::super::continuations::ContinuationInputSource;
+        let entry = |position| ContinuationSourceCoordinate::EntryAbi {
+            source_owner: PredeclaredFunctionId(0),
+            source_abi_position: position,
+            source: ContinuationInputSource::Parameter,
+        };
+        let a = entry(7);
+        let b = entry(8);
+        let required = [(0, a, 2), (1, b, 3)];
+        assert_eq!(super::checked_ih_relay_input_ordinals(
+            &required, &[(0, b), (1, a)],
+        ).expect("both inputs are in this owner"), vec![1, 0]);
+        let error = super::checked_ih_relay_input_ordinals(
+            &required, &[(0, a)],
+        ).expect_err("the second coordinate has no owner input");
+        assert!(format!("{error:?}").contains(
+            "a relay-resumable checked-IH environment cannot hold its continuation's entry input in this owner"
+        ));
+    }
 
     /// Promise class: durable invariant. MEASURED: every operation in
     /// `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` has a non-Absent error root in
@@ -11967,7 +12098,7 @@ mod tests {
                 ),
             )
             .expect("ConsoleRead Chunk has a governed ownership record");
-        assert_eq!(record.declared_children, Some(&[response][..]));
+        assert_eq!(record.declared_children.as_deref(), Some(&[response][..]));
         assert_eq!(
             record.children[0].owners,
             vec![BoundaryReferentOwner::PersistentStore]
@@ -13356,6 +13487,7 @@ mod tests {
             // A leaf, and never in a host-effect recipe tree, which is what
             // this walker is pointed at.
             | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+            | SynthesizedAggregateNode::CheckedIhEntryInput { .. }
             | SynthesizedAggregateNode::Absent => {}
         }
     }
@@ -13848,7 +13980,7 @@ mod checked_ih_captured_env_schema {
             "the captured environment takes the POSITIONAL downstream path"
         );
         let declared = record
-            .declared_children
+            .declared_children.as_deref()
             .expect("a checked-IH record declares its child model");
         assert_eq!(
             declared.len(),

@@ -50,7 +50,7 @@ pub(in crate::cranelift_backend) use resumptions::{
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement,
+    PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume, ResponseOwnerSettlement,
 };
 use crate::cranelift_backend::surface::LoweringCause;
 use returned_vis::PendingVisSettlements;
@@ -156,7 +156,8 @@ pub(in crate::cranelift_backend) use responses::{
     CheckedIhPostCallConsumer,
     DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
-    StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseContinuationId, RelayHostResponseArm,
+    StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
     StaticResponsePhaseA, StaticResponseSite,
 };
@@ -903,6 +904,17 @@ fn emission_owners_containing(
     Ok(owners)
 }
 
+impl StaticTransitionPlan<'_> {
+    /// Emission contexts that can materialize a returned relay at its own
+    /// construct origin. Frame issuance and the producer share this census.
+    pub(in crate::cranelift_backend) fn relay_emission_owners(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
+        emission_owners_containing(self, origin)
+    }
+}
+
 fn inline_synthesized_seat_emission_owners(
     plan: &StaticTransitionPlan<'_>,
     seat: StaticOriginId,
@@ -967,6 +979,20 @@ fn inline_synthesized_seat_emission_owners(
                     .filter(|row| row.effect_origin() == seat)
                     .map(|row| row.base_owner()),
             );
+            // A relay's operation arm is emitted by its response owner even
+            // when no statically known successor row names that arm's Effect.
+            // The closed table, not every global handler Match, supplies the
+            // exact newly reaching emission population.
+            for (id, arms) in &protocol.relay_arms {
+                if arms.iter().any(|arm| arm.route.effect_origin == seat) {
+                    let response = plan.static_response_continuations.iter()
+                        .find(|row| row.id() == *id)
+                        .ok_or_else(|| planner_error(
+                            "a relay arm names a response owner without an initial row",
+                        ))?;
+                    owners.push(response.base_owner());
+                }
+            }
         }
     }
     owners.sort();
@@ -1239,8 +1265,11 @@ pub struct DeferredResponseObservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
     pub returned_vis_protocols: Vec<ReturnedVisProtocolObservation>,
-    /// Only members remaining after admitted relays are projected out.
+    /// Members remaining after bracket-owned exits are projected out; relays stay.
     pub settled_returned_vis_protocols: Vec<(u32, Vec<u32>)>,
+    /// Each numbered relay as `(relay origin, discriminant, resume)`, where
+    /// resume is `Some((IH seat, resumed row's Vis))`, or `None` for a trap.
+    pub settled_relays: Vec<(u32, u32, Option<(u32, u32)>)>,
     /// Exact owner source origins whose returned-Vis settlement is Underived.
     pub underived_owner_origins: Vec<u32>,
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
@@ -1521,6 +1550,14 @@ fn record_static_response_feasibility_diagnostic(
                     .map(|protocol| protocol.owners.values().map(|owner| {
                         (owner.owner.0, owner.contexts.iter().flat_map(|context| &context.members)
                             .map(|member| member.origin.0).collect())
+                    }).collect()).unwrap_or_default(),
+                settled_relays: plan.pending_vis_settlements.protocol.as_ref()
+                    .map(|protocol| protocol.relays.iter().map(|(key, relay)| {
+                        (key.origin.0, relay.discriminant, match &relay.resume {
+                            PendingVisRelayResume::Row { seat, row, .. } =>
+                                Some((seat.0, row.vis_origin().0)),
+                            PendingVisRelayResume::Trap(_) => None,
+                        })
                     }).collect()).unwrap_or_default(),
                 underived_owner_origins: plan.pending_vis_settlements.owners.iter()
                     .filter_map(|(owner_id, settlement)| {

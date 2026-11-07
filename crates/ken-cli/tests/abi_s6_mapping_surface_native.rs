@@ -10,6 +10,7 @@
 
 const SOURCE: &str = include_str!("fixtures/d0_abi_mapping_source.ken");
 
+#[derive(Debug)]
 struct Differential {
     interpreted: ken_runtime::EffectObservation,
     native: ken_runtime::EffectObservation,
@@ -285,17 +286,71 @@ fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
     );
 }
 
-/// Promise class: transition sentinel for the fixed read-write-read route.
-/// MEASURED: the ordinary route has full native/interpreter parity; suppressing
-/// only the local owner drive reaches that seat, stops after the first read,
-/// and exhausts the starter profile's invocation words with a typed fault.
-/// CLAIMED: the local drive is needed for effects two and three, and the
-/// region-limit failure cannot masquerade as a pending-Vis -1 trap.
-/// THE GAP: this one suppressed route does not prove boundedness of every
-/// deferred response; the earlier -1 was a capacity-status collapse, not
-/// evidence that a pending-Vis runtime trap fired.
+/// Promise class: durable invariant. MEASURED: the compiled
+/// read-write-read body emits three copies of one relay origin: one Trap and
+/// two Row resumes at distinct rows, all with distinct discriminants.
+/// CLAIMED: each emitting owner resumes its own numbered relay copy, not an
+/// origin-wide verdict. THE GAP: this tests the plan's emitted-copy census;
+/// the matrix parity test checks native behavior through the compiled route.
+/// Further owners or trap copies may be lawful, so the assertion is relational.
 #[test]
-fn suppressing_bounded_response_owner_drive_reports_typed_capacity_exhaustion() {
+fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
+    let source = SOURCE
+        .replace("__ENTRY__", "matrix_stage")
+        .replace("__MATRIX_BODY__", "read_write_read_body");
+    // On cfbbd43e1, a disposable pagemap probe after this native build
+    // measured 1,992 KiB of touched stack (1,992 KiB present, zero swapped;
+    // 4 KiB pages). The stated 32,768 KiB grants 30,776 KiB of headroom;
+    // that headroom is 15.4 times the measured depth, independent of libtest's
+    // ambient stack.
+    let relays = std::thread::Builder::new()
+        .name("abi-s6-relay-copy-census".to_owned())
+        .stack_size(32 * 1024 * 1024)
+        .spawn(move || {
+            let root = tempfile::tempdir().expect("relay-copy output directory");
+            let (built, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(
+                || ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "abi_s6_relay_copy_census",
+                    root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                ),
+            );
+            built.expect("read-write-read native build with distinct relay copies");
+            assert_eq!(diagnostics.len(), 1, "one installed native plan");
+            diagnostics.into_iter().next().unwrap().settled_relays
+        })
+        .expect("start stated-stack relay census worker")
+        .join()
+        .expect("relay census worker completes");
+    let mut by_origin = std::collections::BTreeMap::<_, Vec<_>>::new();
+    for (origin, discriminant, resume) in &relays {
+        by_origin.entry(*origin).or_default().push((*discriminant, *resume));
+    }
+    assert!(
+        by_origin.values().any(|copies| {
+            let discriminants = copies.iter().map(|(discriminant, _)| *discriminant)
+                .collect::<std::collections::BTreeSet<_>>();
+            let rows = copies.iter().filter_map(|(_, resume)| resume.map(|(_, row)| row))
+                .collect::<std::collections::BTreeSet<_>>();
+            discriminants.len() == copies.len() && rows.len() >= 2
+        }),
+        "read-write-read needs one relay origin whose copies have distinct discriminants and at least two distinct resume rows: {relays:?}"
+    );
+}
+
+/// MEASURED: the ordinary route has full native/interpreter parity. The
+/// suppression switch removes only the response owner's local drive in
+/// lowering while the plan still schedules it, so the suppressed artifact is
+/// outside its own plan; its native run fails closed before completing.
+/// CLAIMED: the local drive is needed for the owner's later effects; without
+/// it the native run cannot reach the interpreter's result.
+/// THE GAP: the native failure is an unclassified -1, so this row does not
+/// say which guard fired. A plan-coherent suppression is refused by the
+/// planner instead (PX10 D0-8), which this row does not exercise.
+#[test]
+fn suppressing_bounded_response_owner_drive_fails_closed_natively() {
     let baseline =
         differential_matrix_body("read-write-read-drive-baseline", "read_write_read_body")
             .expect("the exact bounded response-owner path executes");
@@ -306,47 +361,12 @@ fn suppressing_bounded_response_owner_drive_reports_typed_capacity_exhaustion() 
         "read_write_read_body",
     );
     assert!(applications > 0, "the local-drive mutation did not reach");
-    let observed = mutated.expect("the suppressed artifact reports its typed terminal");
-    assert_eq!(observed.native.exit_status, 1, "{:?}", observed.native);
-    assert_eq!(
-        observed.interpreted.exit_status, 0,
-        "{:?}",
-        observed.interpreted
-    );
-    let Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) =
-        observed.native.terminal_error.as_ref()
-    else {
-        panic!(
-            "suppression did not report typed region exhaustion: {:?}",
-            observed.native
-        );
-    };
-    assert_eq!(fault.scope, ken_runtime::CapacityScopeV1::Invocation);
-    assert_eq!(fault.resource, ken_runtime::CapacityResourceV1::Words);
-    assert_eq!(
-        fault.limit,
-        ken_runtime::boundary_resource_profile::starter_smoke_profile()
-            .invocation
-            .words as u128
-    );
-    assert!(
-        fault.requested > fault.limit,
-        "a full region must be exhausted"
-    );
-    assert_eq!(
-        observed
-            .native
-            .effect_trace
-            .iter()
-            .map(|event| event.operation)
-            .collect::<Vec<_>>(),
-        vec![
-            ken_runtime::HostOpV1::MappingAllocate,
-            ken_runtime::HostOpV1::MappingReadView,
-            ken_runtime::HostOpV1::ResourceRelease,
-        ]
-    );
     assert!(restored, "the local-drive mutation leaked past its worker");
+    let error = mutated.expect_err("the suppressed artifact must not complete natively");
+    assert!(
+        error.contains("native execution: UnclassifiedRuntimeTrap { terminal_value: -1 }"),
+        "suppression must fail closed at native execution: {error}"
+    );
 }
 
 /// Promise class: durable behavioral invariant. MEASURED: an honest checked

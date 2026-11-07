@@ -464,12 +464,12 @@ pub(in crate::cranelift_backend) use super::planning::{
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
-    StaticResponseContinuation, StaticResponseContinuationId,
+    StaticResponseContinuation, StaticResponseContinuationId, RelayHostResponseArm,
     StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
+    PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume, ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
     BracketSettlementId,
     BracketSettlementMode, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
@@ -1174,6 +1174,7 @@ impl ArtifactHelpers<'_> {
             pending_vis_producer_sites: Vec::new(),
             driven_deferred_response_effect: None,
             defining_abi_operands: Vec::new(),
+            continuation_entry_inputs: Vec::new(),
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
@@ -1268,6 +1269,8 @@ enum PendingVisStoreSource {
     Captured(cranelift_codegen::ir::Value),
     /// The producer-minted exact, nonzero successor-row discriminant.
     Member(StaticResponseContinuationId),
+    /// A relay discriminant minted by its own emitting owner.
+    Relay(PendingVisRelayKey),
     /// A word loaded from the just-called unit's checked caller-owned frame.
     Copied {
         load: cranelift_codegen::ir::Inst,
@@ -1302,9 +1305,15 @@ struct PendingVisCopySite {
     destination: PendingVisFrameRegion,
 }
 
+#[derive(Clone, Copy)]
+enum PendingVisProducerIdentity {
+    Row(StaticResponseContinuationId),
+    Relay(PendingVisRelayKey),
+}
+
 struct PendingVisProducerSite {
     member: cranelift_codegen::ir::Inst,
-    row: StaticResponseContinuationId,
+    identity: PendingVisProducerIdentity,
     capture_stores: Vec<cranelift_codegen::ir::Inst>,
 }
 
@@ -1463,6 +1472,10 @@ struct FunctionLocalRefs {
     /// ⛔ Reset per function, like every other field here: these are `ir::Value`
     /// operands of one `Function` and mean nothing in another.
     defining_abi_operands: Vec<LoweringOperand>,
+    /// The defining specialization's Capture-slot words in its own function,
+    /// each paired with the checked continuation-input coordinate it carries.
+    /// Never filled from the resuming owner's frame.
+    continuation_entry_inputs: Vec<(ContinuationSourceCoordinate, LoweringOperand)>,
     /// **`RT-SRCBODY-BIND-ORDER` `D3c`** -- the slot KIND at each ABI position
     /// of [`Self::defining_abi_operands`], recorded in the same walk.
     ///
@@ -7942,9 +7955,9 @@ impl<'a> Lowering<'a> {
         }
     }
 
-    /// Mint one producer-origin member and its bounded capture payload. The
-    /// constructor's lowered K operand is the authority for capture *class*;
-    /// the existing successor response row supplies identity, order and ABI.
+    /// Mint one producer-origin member and its bounded payload. A non-relay
+    /// uses its exact successor row; a relay stores its own operation and K
+    /// environment words under a distinct, emitting-owner-keyed discriminant.
     fn record_pending_vis_construct(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -7952,14 +7965,82 @@ impl<'a> Lowering<'a> {
         constructor: &str,
         lowered: &[LoweringOperand],
     ) -> Result<(), CraneliftBackendError> {
-        let Some(row) = self.pending_vis_record_protocol.as_ref()
-            .and_then(|protocol| protocol.members.get(&origin)).cloned() else {
+        let (row, has_relay, in_owner) = self.pending_vis_record_protocol.as_ref().map_or(
+            (None, false, false), |protocol| {
+                (
+                    protocol.members.get(&origin).cloned(),
+                    protocol.relays.keys().any(|key| key.origin == origin),
+                    protocol.owners.values().any(|owner| owner.contexts.iter().any(|context| {
+                        context.members.iter().any(|member| member.origin == origin)
+                    })),
+                )
+            },
+        );
+        if !in_owner {
             return Ok(());
-        };
-        if constructor != self.process_symbols.itree_vis.as_str()
-            || lowered.len() != 2
-            || row.vis_origin() != origin
-        {
+        }
+        if row.is_some() == has_relay {
+            return Err(backend_module(LoweringCause::PlannerInvariant,
+                "a returned-Vis member has no unique planned row or relay".to_string()));
+        }
+        if constructor != self.process_symbols.itree_vis.as_str() || lowered.len() != 2 {
+            return Err(backend_module(LoweringCause::PlannerInvariant,
+                "a pending-Vis member is not its planned binary Vis occurrence".to_string()));
+        }
+        if has_relay {
+            // The same source construct may be visited by several generated
+            // functions. Only a planner-listed emission owner mints this copy.
+            let issuing = self.static_transition_plan
+                .relay_emission_owners(origin)?;
+            if !self.defining_emission_owner.is_some_and(|owner| issuing.contains(&owner)) {
+                return Ok(());
+            }
+            let key = PendingVisRelayKey {
+                origin,
+                owner: self.defining_emission_owner.expect("the mint gate checked this owner"),
+            };
+            let relay = self.pending_vis_record_protocol.as_ref()
+                .and_then(|protocol| protocol.relays.get(&key))
+                .cloned().ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                    "a minting owner has no numbered relay copy".to_string()))?;
+            let Some(frame) = self.function_local.pending_vis_frame else {
+                return Err(backend_module(LoweringCause::PlannerInvariant,
+                    "a pending-Vis relay has no caller-owned activation record".to_string()));
+            };
+            let mut capture_stores = Vec::new();
+            for (position, input) in lowered.iter().cloned().enumerate() {
+                let child = self.static_transition_plan.child_static_origin(origin, position)?;
+                let seat = match &relay.resume {
+                    PendingVisRelayResume::Row { seat, .. } => *seat,
+                    PendingVisRelayResume::Trap(_) => origin,
+                };
+                let word = self.carry_pending_vis_capture(
+                    builder, child, input, origin, seat, position,
+                )?;
+                let offset = frame.region.captures.checked_add((position as i32) * 8)
+                    .ok_or_else(|| backend_module(LoweringCause::Capacity,
+                        "pending-Vis relay capture offset exhausted".to_string()))?;
+                let inst = builder.ins().store(MemFlags::trusted(), word.word, frame.slots, offset);
+                capture_stores.push(inst);
+                self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+                    inst, offset, source: PendingVisStoreSource::Captured(word.word),
+                });
+            }
+            let word = builder.ins().iconst(types::I64, i64::from(relay.discriminant));
+            let inst = builder.ins().store(
+                MemFlags::trusted(), word, frame.slots, frame.region.discriminant,
+            );
+            self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+                inst, offset: frame.region.discriminant, source: PendingVisStoreSource::Relay(key),
+            });
+            self.function_local.pending_vis_producer_sites.push(PendingVisProducerSite {
+                member: inst, identity: PendingVisProducerIdentity::Relay(key), capture_stores,
+            });
+            return Ok(());
+        }
+        let row = row.expect("a uniquely planned non-relay member has a row");
+        if row.vis_origin() != origin {
+
             return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis member is not its planned binary Vis occurrence".to_string(),
             ));
@@ -8071,7 +8152,7 @@ impl<'a> Lowering<'a> {
             source: PendingVisStoreSource::Member(row.id()),
         });
         self.function_local.pending_vis_producer_sites.push(PendingVisProducerSite {
-            member: inst, row: row.id(), capture_stores,
+            member: inst, identity: PendingVisProducerIdentity::Row(row.id()), capture_stores,
         });
         Ok(())
     }
@@ -9250,8 +9331,9 @@ impl<'a> Lowering<'a> {
         }
         let child_schema = self.static_transition_plan.aggregate_record_view(record)?;
         if child_schema.shape() != PlannedAggregateShape::Constructor
-            || child_schema.declared_children().map(|children| children.len())
-                != Some(disposition.worker_captures as usize)
+            || child_schema.declared_children().map(|children| children.iter()
+                .take_while(|child| matches!(child, SynthesizedAggregateNode::WorkerCaptureOperand(_)))
+                .count()) != Some(disposition.worker_captures as usize)
         {
             return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the construct Child schema disagrees with its W roles"));
         }
