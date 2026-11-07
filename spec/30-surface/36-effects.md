@@ -664,6 +664,13 @@ normalization**. The following are denotations, not new kernel forms:
   programs, including `HostIO` programs with operation labels in a row.
   The tree's declared type supplies its `Auth` index, if any; only
   capabilities actually written in the source telescope are parameters.
+  A `visits` row label matching a host-family or host-operation label
+  always names that host effect (as with reserved space names in §4.1),
+  even if `S` carries a user-family summand with the same spelling.
+  A user family whose derived effect label collides with a host label
+  cannot be named in a row (for example, `FsOpenOp` is not bounded by
+  `visits [FsOpen]`), though its `data` declaration remains valid for
+  non-effect uses.
 - If the declared result is a function, retain its arrows and apply this
   rule at the final result **after all arrows**. A tree-final function
   returns its declared tree at that final result, without a second tree
