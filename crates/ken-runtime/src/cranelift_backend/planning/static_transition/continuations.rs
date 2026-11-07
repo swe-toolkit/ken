@@ -1422,6 +1422,7 @@ pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumerStep {
     occurrence: ContinuationConsumingOccurrence,
     demanded_body_origin: StaticOriginId,
     checked_frame_id: Option<u64>,
+    placement: ContinuationEmissionOwner,
 }
 
 impl CheckedIhPostCallConsumerStep {
@@ -1435,6 +1436,10 @@ impl CheckedIhPostCallConsumerStep {
 
     pub(in crate::cranelift_backend) fn checked_frame_id(self) -> Option<u64> {
         self.checked_frame_id
+    }
+
+    pub(in crate::cranelift_backend) fn placement(self) -> ContinuationEmissionOwner {
+        self.placement
     }
 }
 
@@ -11318,7 +11323,7 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
 pub(super) fn derive_checked_ih_post_call_consumer_chain(
     plan: &StaticTransitionPlan<'_>,
     identity: &ContinuationCallIdentity,
-    frame_origins: &[StaticOriginId],
+    frames: &[(StaticOriginId, ContinuationEmissionOwner)],
     actual: ConstructorIdentity,
     demanded: ConstructorIdentity,
 ) -> Result<Option<Vec<CheckedIhPostCallConsumerStep>>, CraneliftBackendError> {
@@ -11348,11 +11353,11 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
         return Ok(Some(Vec::new()));
     }
 
-    if frame_origins.is_empty() {
+    if frames.is_empty() {
         return Ok(None);
     }
-    let mut consumers = Vec::with_capacity(frame_origins.len());
-    for frame_origin in frame_origins {
+    let mut consumers = Vec::with_capacity(frames.len());
+    for (frame_origin, placement) in frames {
         let Some(consumer) = post_call_consumer_in_frame(plan, *frame_origin, actual)? else {
             return Ok(None);
         };
@@ -11364,6 +11369,7 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
             occurrence: consumer,
             demanded_body_origin: demanded_case.body_origin,
             checked_frame_id: checked_frame_for_consumer(plan, *frame_origin)?,
+            placement: *placement,
         });
     }
     Ok(Some(consumers))

@@ -411,14 +411,14 @@ pub(in crate::cranelift_backend) enum CheckedIhTransportResolution<'p> {
 /// remains unchanged; this discriminator is carried beside it.
 mod required_consumer_destination {
     use super::super::continuations::{
-        checked_frame_for_consumer, SourceReturnContextRole,
+        checked_frame_for_consumer,
     };
     use super::*;
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub(in crate::cranelift_backend) struct RequiredConsumerDestination {
         defining_transport: CheckedIhEnvironmentTransport,
-        consumer_occurrence: (StaticOriginId, Option<u64>),
+        consumer_occurrence: (StaticOriginId, Option<u64>, ContinuationEmissionOwner),
     }
 
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -426,59 +426,23 @@ mod required_consumer_destination {
         destination: RequiredConsumerDestination,
     }
 
-    /// The first computational consumer this exact result reaches on return.
-    ///
-    /// Template steps run root-to-result; reversing selects the first
-    /// computational consumer reached by this exact result on return.
-    ///
-    /// A worker's result returns through the exact call that selected it
-    /// before it reaches the caller-owned suffix, so a generated worker's own
-    /// template can carry no steps at all while the consumer sits in the
-    /// caller context behind `worker_return`. Searching `steps` alone reports
-    /// "no computational occurrence" for a projection that has one.
-    /// `responses::detached_post_call_consumer_frames` already treats this
-    /// template as reaching past `steps` into `worker_return` for the same
-    /// detached post-call consumer subject; this agrees with it about **where
-    /// to look**, and deliberately not about what to collect -- that function
-    /// accumulates a frame list, this one selects the single origin paired
-    /// with `checked_frame_for_consumer`.
-    ///
-    /// The role predicate is unchanged. `MatchCase` is the non-computational
-    /// case and is still not matched.
-    fn first_computational_consumer(
-        projection: &super::super::continuations::SourceReturnContextTemplate,
-    ) -> Option<StaticOriginId> {
-        let here = projection.steps().iter().rev().find_map(|step| {
-            matches!(
-                step.role(),
-                SourceReturnContextRole::ComputationalMatchCase(_)
-            )
-            .then_some(step.parent_origin())
-        });
-        if here.is_some() {
-            return here;
-        }
-        projection
-            .worker_return()
-            .and_then(|boundary| first_computational_consumer(boundary.caller_context()))
-    }
-
     pub(in crate::cranelift_backend::planning::static_transition) fn
     pair_detached_required_consumer(
         plan: &StaticTransitionPlan<'_>,
         transport: &CheckedIhEnvironmentTransport,
-        projection: &super::super::continuations::SourceReturnContextTemplate,
+        frames: &[super::super::responses::DetachedPostCallFrame],
     ) -> Result<RequiredConsumerCall, CraneliftBackendError> {
         #[cfg(feature = "px8-ds-test-support")]
         let transport = required_consumer_defining_transport(plan, transport)?;
-        let consumer_origin = first_computational_consumer(projection).ok_or_else(|| {
+        let consumer = frames.iter().find(|frame| frame.computational_match).ok_or_else(|| {
             planner_error(
                 "an exact detached required consumer has no computational occurrence",
             )
         })?;
         let consumer_occurrence = (
-            consumer_origin,
-            checked_frame_for_consumer(plan, consumer_origin)?,
+            consumer.origin,
+            checked_frame_for_consumer(plan, consumer.origin)?,
+            consumer.placement,
         );
         let destination = RequiredConsumerDestination {
             defining_transport: transport.clone(),
@@ -524,7 +488,7 @@ mod required_consumer_destination {
 
         pub(in crate::cranelift_backend) fn consumer_occurrence(
             &self,
-        ) -> (StaticOriginId, Option<u64>) {
+        ) -> (StaticOriginId, Option<u64>, ContinuationEmissionOwner) {
             self.consumer_occurrence
         }
     }

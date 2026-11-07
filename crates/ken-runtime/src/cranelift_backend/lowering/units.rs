@@ -6103,7 +6103,10 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 .response_bracket_exits
                 .contains_key(&emission.row.id())
             {
-                compiler.bracket_ledger.close_owner(emission.row.id())?;
+                compiler.bracket_ledger.close_owner(
+                    emission.row.id(),
+                    ContinuationEmissionOwner::Specialization(emission.row.k_specialization()),
+                )?;
             }
             let pending_vis_owner = match compiler
                 .response_owner_settlements

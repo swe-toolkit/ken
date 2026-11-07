@@ -6,8 +6,8 @@
 use std::collections::BTreeMap;
 
 use super::super::planning::{
-    BracketSettlementControlView, BracketSettlementId, BracketSettlementMode, StaticOriginId,
-    StaticResponseContinuationId,
+    BracketSettlementControlView, BracketSettlementKey, BracketSettlementMode,
+    ContinuationEmissionOwner, StaticOriginId, StaticResponseContinuationId,
 };
 use super::{backend_module, CraneliftBackendError, LoweringCause};
 
@@ -26,17 +26,17 @@ struct Claim {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct BracketSettlementLedger {
-    claims: BTreeMap<BracketSettlementId, Claim>,
+    claims: BTreeMap<BracketSettlementKey, Claim>,
 }
 
 impl BracketSettlementLedger {
     pub(super) fn open(view: &BracketSettlementControlView) -> Self {
         Self {
             claims: view
-                .regions()
+                .all_regions()
                 .map(|region| {
                     (
-                        region.id(),
+                        region.key(),
                         Claim {
                             mode: region.mode(),
                             response_owner: region.response_owner(),
@@ -56,14 +56,14 @@ impl BracketSettlementLedger {
 
     pub(super) fn consume_settlement(
         &mut self,
-        id: BracketSettlementId,
+        key: BracketSettlementKey,
         mode: BracketSettlementMode,
         body_exit_origin: StaticOriginId,
         settlement_origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
         let claim = self
             .claims
-            .get_mut(&id)
+            .get_mut(&key)
             .ok_or_else(|| Self::error("an unplanned bracket settlement edge was consumed"))?;
         if claim.mode != mode
             || claim.body_exit_origin != body_exit_origin
@@ -82,12 +82,12 @@ impl BracketSettlementLedger {
 
     pub(super) fn consume_outcome_merge(
         &mut self,
-        id: BracketSettlementId,
+        key: BracketSettlementKey,
         origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
         let claim = self
             .claims
-            .get_mut(&id)
+            .get_mut(&key)
             .ok_or_else(|| Self::error("an unplanned bracket outcome merge was consumed"))?;
         if claim.outcome_merge_origin != origin || claim.outcome_merge >= claim.settlement {
             return Err(Self::error(
@@ -103,12 +103,12 @@ impl BracketSettlementLedger {
 
     pub(super) fn consume_resume(
         &mut self,
-        id: BracketSettlementId,
+        key: BracketSettlementKey,
         origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
         let claim = self
             .claims
-            .get_mut(&id)
+            .get_mut(&key)
             .ok_or_else(|| Self::error("an unplanned bracket Resume edge was consumed"))?;
         if claim.resume_origin != origin || claim.resume >= claim.outcome_merge {
             return Err(Self::error(
@@ -125,9 +125,11 @@ impl BracketSettlementLedger {
     pub(super) fn close_owner(
         &self,
         owner: StaticResponseContinuationId,
+        placement: ContinuationEmissionOwner,
     ) -> Result<(), CraneliftBackendError> {
-        if let Some((id, claim)) = self.claims.iter().find(|(_, claim)| {
+        if let Some((id, claim)) = self.claims.iter().find(|(key, claim)| {
             claim.response_owner == Some(owner)
+                && key.placement() == Some(placement)
                 && claim.mode == BracketSettlementMode::InPlace
                 && (claim.settlement == 0
                     || claim.settlement != claim.outcome_merge
