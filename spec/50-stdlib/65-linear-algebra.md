@@ -12,7 +12,8 @@
 > SPEC-LINEAR-ALGEBRA-VECTOR-ZERO-UNIT §10;
 > SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION §11;
 > SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT §12;
-> SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO §13).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO §13;
+> SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO §14).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1219,3 +1220,67 @@ measured `Refl` refusing the false row and accepting the control;
 structural vector equality. These closed cases bound the claim;
 they do not substitute for checked generic proofs or establish
 execution of the separate conformance seed.
+
+## 14. A zero self-dot characterizes the zero vector
+
+> **Section 14 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO).** Architect's final AC-0
+> `evt_6dh0j23ng4qg7` ruled from two disposable scratch runs on
+> exact base `4090b2b45`. The public law and a generic client checked;
+> the trusted `GlobalId` sets were 109 at compiler, providers and
+> `NatMatrix`, with `NatMatrix` equal to providers. The scratch Axiom
+> and postulate counts stayed at base (1 → 1 and 0 → 0). The second
+> run corrected the proof-form harness against the same package source,
+> not an independent implementation. These observations are not tests
+> of this Spec child or an assembled candidate, official conformance,
+> CI, publication, landing or measured landed trust.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export one public Transparent
+checked theorem immediately after `dot_zero_right` in the dot section:
+
+```ken
+pub theorem vector_zero_of_dot_self_zero
+      (n : Nat) (v : Vec Nat n)
+    : Equal Nat (dot n v v) Zero → Equal (Vec Nat n) v (vector_zero n)
+```
+
+The curried premise is an equality of the natural self-dot with `Zero`;
+the conclusion is structural equality of the indexed vectors for
+**every** length `n`, including `Zero`. No nonzero-length, component
+positivity, validity or additional arithmetic premise is required.
+The conclusion does not identify vectors of different lengths. Along
+with §10's left-zero and §11's right-zero dot laws, this gives the
+zero vector's self-dot characterization without changing the earlier
+laws or the definition of `dot`.
+
+The generic proof matches on the written vector. The empty case
+returns equality of two empty vectors. In the successor case,
+`dot (Suc k) (VCons Nat k x tail) (VCons Nat k x tail)` reduces to
+`add (mul x x) (dot k tail tail)`. The private NatMatrix theorems
+`add_eq_zero_left` and `add_eq_zero_right` extract zero equalities
+for its two summands; `mul_self_eq_zero` turns the first into
+`Equal Nat x Zero`. Recursion on `tail` uses the second to show
+`Equal (Vec Nat k) tail (vector_zero k)`. The existing private
+`vector_cons_eq` combines the head and tail equalities. The three
+zero-inversion theorems are **private NatMatrix helpers** after its
+private `add_shuffle`, not public Nat Arithmetic exports. Their
+constructor splits are on written Nat binders, not a computed dot;
+`add` and `mul` recurse on their second argument, so a successor
+summand or a successor square cannot equal `Zero`. No Nat package
+law, new kernel rule, surface form, public helper, trusted assumption
+or §1–§13 operation/law-type change is needed.
+
+The §14 roster is **ten operations and forty laws, fifty public
+names**: this one law adds no operation to §13's ten operations and
+thirty-nine laws. A closed control uses two zero entries `zeros`,
+whose self-dot equals `Zero` by `Proved`, then applies the theorem to
+obtain vector equality. For `bumped`, with a nonzero second entry,
+its self-dot equals `Suc Zero` by the same Nat-goal proof form
+`Proved`. An isolated application of the theorem with a false
+zero-self-dot premise must refuse; a separate claim that the
+self-dot of `bumped` equals `Zero` must also refuse. The true
+`bumped` self-dot is the accepted control for these Nat-goal
+refusals. Scratch D0 found `Proved` unsuitable for a vector equality
+control, so no vector-goal refusal is claimed here. These finite
+cases delimit the checked generic law, not execution of the
+CV-owned seed or a candidate gate.
