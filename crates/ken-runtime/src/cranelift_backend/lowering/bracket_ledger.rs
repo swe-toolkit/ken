@@ -3,22 +3,22 @@
 //! Closure of this ledger establishes representation closure, not semantic
 //! equivalence. Interpreter/native D0 observes the latter independently.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::super::planning::{
-    BracketSettlementControlView, BracketSettlementKey, BracketSettlementMode,
-    ContinuationEmissionOwner, StaticOriginId, StaticResponseContinuationId,
+    BracketSettlementControlView, BracketSettlementId, BracketSettlementMode, StaticOriginId,
+    StaticResponseContinuationId,
 };
 use super::{backend_module, CraneliftBackendError, LoweringCause};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Claim {
     mode: BracketSettlementMode,
     body_exit_origin: StaticOriginId,
     settlement_origin: StaticOriginId,
     outcome_merge_origin: StaticOriginId,
     resume_origin: StaticOriginId,
-    response_owner: Option<StaticResponseContinuationId>,
+    response_owners: BTreeSet<StaticResponseContinuationId>,
     settlement: u32,
     outcome_merge: u32,
     resume: u32,
@@ -26,20 +26,20 @@ struct Claim {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct BracketSettlementLedger {
-    claims: BTreeMap<BracketSettlementKey, Claim>,
+    claims: BTreeMap<BracketSettlementId, Claim>,
 }
 
 impl BracketSettlementLedger {
     pub(super) fn open(view: &BracketSettlementControlView) -> Self {
         Self {
             claims: view
-                .all_regions()
+                .regions()
                 .map(|region| {
                     (
-                        region.key(),
+                        region.id(),
                         Claim {
                             mode: region.mode(),
-                            response_owner: region.response_owner(),
+                            response_owners: region.response_owners().clone(),
                             body_exit_origin: region.body_exit(),
                             settlement_origin: region.settlement(),
                             outcome_merge_origin: region.outcome_merge(),
@@ -56,14 +56,14 @@ impl BracketSettlementLedger {
 
     pub(super) fn consume_settlement(
         &mut self,
-        key: BracketSettlementKey,
+        id: BracketSettlementId,
         mode: BracketSettlementMode,
         body_exit_origin: StaticOriginId,
         settlement_origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
         let claim = self
             .claims
-            .get_mut(&key)
+            .get_mut(&id)
             .ok_or_else(|| Self::error("an unplanned bracket settlement edge was consumed"))?;
         if claim.mode != mode
             || claim.body_exit_origin != body_exit_origin
@@ -82,12 +82,12 @@ impl BracketSettlementLedger {
 
     pub(super) fn consume_outcome_merge(
         &mut self,
-        key: BracketSettlementKey,
+        id: BracketSettlementId,
         origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
         let claim = self
             .claims
-            .get_mut(&key)
+            .get_mut(&id)
             .ok_or_else(|| Self::error("an unplanned bracket outcome merge was consumed"))?;
         if claim.outcome_merge_origin != origin || claim.outcome_merge >= claim.settlement {
             return Err(Self::error(
@@ -103,12 +103,12 @@ impl BracketSettlementLedger {
 
     pub(super) fn consume_resume(
         &mut self,
-        key: BracketSettlementKey,
+        id: BracketSettlementId,
         origin: StaticOriginId,
     ) -> Result<(), CraneliftBackendError> {
         let claim = self
             .claims
-            .get_mut(&key)
+            .get_mut(&id)
             .ok_or_else(|| Self::error("an unplanned bracket Resume edge was consumed"))?;
         if claim.resume_origin != origin || claim.resume >= claim.outcome_merge {
             return Err(Self::error(
@@ -125,11 +125,9 @@ impl BracketSettlementLedger {
     pub(super) fn close_owner(
         &self,
         owner: StaticResponseContinuationId,
-        placement: ContinuationEmissionOwner,
     ) -> Result<(), CraneliftBackendError> {
-        if let Some((id, claim)) = self.claims.iter().find(|(key, claim)| {
-            claim.response_owner == Some(owner)
-                && key.placement() == Some(placement)
+        if let Some((id, claim)) = self.claims.iter().find(|(_, claim)| {
+            claim.response_owners.contains(&owner)
                 && claim.mode == BracketSettlementMode::InPlace
                 && (claim.settlement == 0
                     || claim.settlement != claim.outcome_merge

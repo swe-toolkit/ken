@@ -2884,7 +2884,7 @@ impl<'a> Lowering<'a> {
         use crate::cranelift_backend::planning::{ResponseDisposition, StaticResponseSite};
         let bracket_claim = if let Some((id, origin)) = self.bracket_effect_claim {
             if origin == static_origin {
-                let matches = self.bracket_view.region(id, self.defining_emission_owner).is_some_and(|region|
+                let matches = self.bracket_view.region(id).is_some_and(|region|
                     region.mode() == BracketSettlementMode::InPlace
                     && region.row().is_some_and(|row| row.effect_origin() == origin));
                 if !matches {

@@ -7073,13 +7073,25 @@ fn attach_required_consumer_incoming_edges(
 }
 
 /// One member of the single detached-return walk used for both the exit chain
-/// and the required consumer. Only source ComputationalMatch steps qualify as
-/// the required consumer; the selecting continuation is an exit, not a match.
+/// and the required consumer. A source ComputationalMatch step qualifies as
+/// the required consumer, and so does the worker boundary's selecting
+/// continuation when its occurrence is a ComputationalMatch: a worker's result
+/// returns through that continuation before it reaches the caller's steps.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct DetachedPostCallFrame {
     pub(super) origin: StaticOriginId,
     pub(super) placement: ContinuationEmissionOwner,
     pub(super) computational_match: bool,
+}
+
+fn is_computational_match(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    Ok(matches!(
+        plan.planned_occurrence_expr(origin)?,
+        RuntimeExpr::ComputationalMatch { .. }
+    ))
 }
 
 pub(super) fn detached_post_call_consumer_frames(
@@ -7117,7 +7129,9 @@ pub(super) fn detached_post_call_consumer_frames(
             frames.push(DetachedPostCallFrame {
                 origin: target.key.continuation_origin,
                 placement: ContinuationEmissionOwner::Specialization(selecting.target()),
-                computational_match: false,
+                computational_match: is_computational_match(
+                    plan, target.key.continuation_origin,
+                )?,
             });
             let caller_placement = selecting.emission_owner();
             if let Some(source) = target.key.consuming_occurrence {

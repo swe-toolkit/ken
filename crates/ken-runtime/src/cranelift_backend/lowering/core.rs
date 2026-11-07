@@ -6745,10 +6745,9 @@ impl<'a> Lowering<'a> {
                     // stack the carried match lowers under, unless the kept prefix
                     // holds a clause of its own, whose settlement carries the outer
                     // frames.
-                    let placement = self.bracket_placement()?;
                     let is_clause = |origin: StaticOriginId| {
                         self.bracket_view
-                            .regions(placement)
+                            .regions()
                             .any(|region| region.clause_origin() == Some(origin))
                     };
                     let kept_holds_clause = is_clause(first.static_origin)
@@ -6762,7 +6761,7 @@ impl<'a> Lowering<'a> {
                     ) {
                         let dropped = &remaining_origins[prefix_len..];
                         record_dropped_bracket_return_clauses(
-                            self.bracket_view.regions(placement).filter_map(|region| {
+                            self.bracket_view.regions().filter_map(|region| {
                                 let clause = region.clause_origin()?;
                                 dropped
                                     .contains(&clause)
@@ -7449,10 +7448,10 @@ impl<'a> Lowering<'a> {
                     )));
                 }
                 BracketSettlementMode::Deferred => {
-                    self.bracket_ledger.consume_settlement(region.key(), region.mode(),
+                    self.bracket_ledger.consume_settlement(region.id(), region.mode(),
                         region.body_exit(), static_origin)?;
-                    self.bracket_ledger.consume_outcome_merge(region.key(), region.outcome_merge())?;
-                    self.bracket_ledger.consume_resume(region.key(), region.resume())?;
+                    self.bracket_ledger.consume_outcome_merge(region.id(), region.outcome_merge())?;
+                    self.bracket_ledger.consume_resume(region.id(), region.resume())?;
                     // The existing producer deforestation continues below this claim.
                 }
             }
@@ -9364,16 +9363,6 @@ impl<'a> Lowering<'a> {
         Ok(Some(lowered))
     }
 
-    /// A marked region cannot be selected outside the unit's scoped emission
-    /// authority. Empty test views remain usable without binding a unit.
-    fn bracket_placement(&self) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
-        if self.bracket_view.has_regions() && self.defining_emission_owner.is_none() {
-            return Err(backend_module(LoweringCause::PlannerInvariant,
-                "a bracket region has no defining emission placement".to_string()));
-        }
-        Ok(self.defining_emission_owner)
-    }
-
     /// Refuse a delivery inside a bracket return clause's scrutinee when the
     /// exact clause frame has disappeared from this function's stack.
     fn require_bracket_clause_on_stack(
@@ -9393,15 +9382,14 @@ impl<'a> Lowering<'a> {
         if eliminators.iter().any(|frame| matches!(frame, EliminatorFrame::Active(_))) {
             return Ok(());
         }
-        let placement = self.bracket_placement()?;
-        for region in self.bracket_view.clauses_inside(body, placement) {
+        for region in self.bracket_view.clauses_inside(body) {
             let Some(clause) = region.clause_origin() else { continue };
             if region.clause_scrutinee_contains(head)
                 && !eliminators.iter().any(|frame| matches!(frame,
                     EliminatorFrame::Computational(computational)
                         if computational.static_origin == clause
                             || (region.clause_scrutinee_contains(computational.static_origin)
-                                && self.bracket_view.regions(placement).any(|nested|
+                                && self.bracket_view.regions().any(|nested|
                                     nested.clause_origin() == Some(computational.static_origin)))))
             {
                 return Err(unsupported(LoweringCause::PlannerInvariant,
@@ -17235,7 +17223,7 @@ impl<'a> Lowering<'a> {
                 self.lower_expr(builder, k_body, &k_env)
             })())),
             BracketSettlementMode::Deferred => match self.bracket_ledger.consume_settlement(
-                region.key(), region.mode(), region.body_exit(), static_origin,
+                region.id(), region.mode(), region.body_exit(), static_origin,
             ) {
                 Ok(()) => ConstructBracketEntry::Claimed(region.id()),
                 Err(error) => ConstructBracketEntry::Done(Box::new(Err(error))),
@@ -17252,13 +17240,13 @@ impl<'a> Lowering<'a> {
         constructed: LoweringOperand,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let Some(id) = bracket else { return Ok(constructed) };
-        let region = self.bracket_view.region(id, self.bracket_placement()?).ok_or_else(|| backend_module(
+        let region = self.bracket_view.region(id).ok_or_else(|| backend_module(
             LoweringCause::PlannerInvariant,
             "a claimed bracket settlement has no validated region".to_string(),
         ))?;
-        let (key, outcome_merge, resume) = (region.key(), region.outcome_merge(), region.resume());
-        self.bracket_ledger.consume_outcome_merge(key, outcome_merge)?;
-        self.bracket_ledger.consume_resume(key, resume)?;
+        let (outcome_merge, resume) = (region.outcome_merge(), region.resume());
+        self.bracket_ledger.consume_outcome_merge(id, outcome_merge)?;
+        self.bracket_ledger.consume_resume(id, resume)?;
         Ok(constructed)
     }
 

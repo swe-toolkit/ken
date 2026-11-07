@@ -56,7 +56,7 @@ impl Lowering<'_> {
             ));
         }
         self.bracket_ledger.consume_settlement(
-            region.key(),
+            region.id(),
             region.mode(),
             region.body_exit(),
             region.settlement(),
@@ -87,9 +87,9 @@ impl Lowering<'_> {
             ));
         }
         self.bracket_ledger
-            .consume_outcome_merge(region.key(), region.outcome_merge())?;
+            .consume_outcome_merge(region.id(), region.outcome_merge())?;
         self.bracket_ledger
-            .consume_resume(region.key(), region.resume())?;
+            .consume_resume(region.id(), region.resume())?;
         Ok(settled)
     }
 
