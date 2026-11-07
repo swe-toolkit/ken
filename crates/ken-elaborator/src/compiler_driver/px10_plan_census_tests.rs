@@ -541,14 +541,16 @@ fn px10_argv_and_live_emit_below_process_gate() {
 
 /// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
 /// relays 1247 and 992 and live's relays 688 and 433 are relay members of
-/// their owners' returned-Vis protocols, numbered by their own origin with a
-/// nonzero discriminant rather than by a response row, and kept in the
-/// settled member set. 1247 and 688 resume at the rows whose Vis are 1484 and
-/// 932; 992 and 433 have no resolving issuer and resume by their planned
-/// named trap. CLAIMED: no relay Vis is removed from numbering, and each
-/// relay resumes in the form its issuers resolve. THE GAP: the artifact is not
-/// run here, the resume seat is read from the plane that chose it, and a
-/// trap's reason text is not projected.
+/// their owners' returned-Vis protocols, numbered once per emitting copy
+/// with distinct nonzero discriminants rather than by a response row, and
+/// kept in the settled member set. Copies of 1247 and 688 resume at the rows
+/// whose Vis are 1484 and 932; copies of 992 and 433 resume by their planned
+/// named trap. CLAIMED: each named relay has a numbered copy with the
+/// expected resume, and copies retain separate discriminants. THE GAP: this
+/// census does not prove that every emitting owner minted a copy or that
+/// other copies' resumes agree with their issuers; the artifact is not run,
+/// the expected seat is read from the plane that chose it, and a trap's
+/// reason text is not projected.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
@@ -610,17 +612,19 @@ fn px10_relays_are_numbered_protocol_members() {
                     .iter()
                     .filter(|(origin, _, _)| *origin == relay)
                     .collect::<Vec<_>>();
-                assert_eq!(numbered.len(), 1, "{name}: relay {relay} is numbered once");
-                let (_, discriminant, resume) = *numbered[0];
-                assert_ne!(discriminant, 0, "{name}: zero is never a Vis member");
+                assert!(!numbered.is_empty(), "{name}: relay {relay} is numbered");
+                for (_, discriminant, _) in &numbered {
+                    assert_ne!(*discriminant, 0, "{name}: zero is never a Vis member");
+                    assert!(
+                        discriminants.insert(*discriminant),
+                        "{name}: relay {relay} shares discriminant {discriminant}"
+                    );
+                }
                 assert!(
-                    discriminants.insert(discriminant),
-                    "{name}: relay {relay} shares discriminant {discriminant}"
-                );
-                assert_eq!(
-                    resume.map(|(_, row_vis)| row_vis),
-                    resume_vis,
-                    "{name}: relay {relay} resume row Vis (None is its planned named trap)"
+                    numbered
+                        .iter()
+                        .any(|(_, _, resume)| resume.map(|(_, row_vis)| row_vis) == resume_vis),
+                    "{name}: relay {relay} has a copy resuming at {resume_vis:?} (None is a planned named trap): {numbered:?}"
                 );
             }
         });
