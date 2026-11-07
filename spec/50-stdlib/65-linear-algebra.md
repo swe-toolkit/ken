@@ -1256,19 +1256,23 @@ laws or the definition of `dot`.
 The generic proof matches on the written vector. The empty case
 returns equality of two empty vectors. In the successor case,
 `dot (Suc k) (VCons Nat k x tail) (VCons Nat k x tail)` reduces to
-`add (mul x x) (dot k tail tail)`. The private NatMatrix theorems
-`add_eq_zero_left` and `add_eq_zero_right` extract zero equalities
-for its two summands; `mul_self_eq_zero` turns the first into
-`Equal Nat x Zero`. Recursion on `tail` uses the second to show
+`add (mul x x) (dot k tail tail)`. The public Nat Arithmetic laws
+`add::eq_zero_l` and `add::eq_zero_r` extract zero equalities for
+its two summands through `(proof eq_zero_l for add)` and
+`(proof eq_zero_r for add)`; the private NatMatrix theorem
+`mul_self_eq_zero` turns the first into `Equal Nat x Zero`.
+Recursion on `tail` uses the second to show
 `Equal (Vec Nat k) tail (vector_zero k)`. The existing private
-`vector_cons_eq` combines the head and tail equalities. The three
-zero-inversion theorems are **private NatMatrix helpers** after its
-private `add_shuffle`, not public Nat Arithmetic exports. Their
-constructor splits are on written Nat binders, not a computed dot;
-`add` and `mul` recurse on their second argument, so a successor
-summand or a successor square cannot equal `Zero`. No Nat package
-law, new kernel rule, surface form, public helper, trusted assumption
-or §1–§13 operation/law-type change is needed.
+`vector_cons_eq` combines the head and tail equalities. `mul_self_eq_zero` remains a private
+NatMatrix zero-inversion helper after its private `add_shuffle`;
+the two add-zero inversion laws are public attached proofs from
+`Data.Numeric.Nat.Arithmetic`, not private NatMatrix helpers.
+Their constructor splits are on written Nat binders, not a computed
+dot; `add` and `mul` recurse on their second argument, so a
+successor summand or a successor square cannot equal `Zero`. Beyond
+the two attached Nat exports, no new kernel rule, surface form,
+public NatMatrix helper, trusted assumption or §1–§13
+operation/law-type change is needed.
 
 The §14 roster is **ten operations and forty laws, fifty public
 names**: this one law adds no operation to §13's ten operations and
