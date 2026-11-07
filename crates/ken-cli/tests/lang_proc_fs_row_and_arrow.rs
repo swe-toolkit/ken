@@ -59,6 +59,15 @@ fn written_cap_binds_fs_tree_at_final_value() {
         "f",
         "(a : Auth) -> Cap a -> Nat -> FS a Nat",
     );
+    // A real FS action, not merely a row label: the let must bind its
+    // Result payload into the returned FS tree, not hold or erase the action.
+    assert_core_type(
+        "P1 performed FS let",
+        "proc f (c : Cap AFull) : Nat visits [FS] =\n\
+           let r = read_bytes AFull c (bytes_encode \"missing\") in Suc Zero",
+        "f",
+        "Cap AFull -> FS AFull Nat",
+    );
 }
 
 #[test]
@@ -98,12 +107,14 @@ fn host_operation_labels_select_their_family_summand() {
         "p",
         "Cap APartial -> HostIO APartial Nat",
     );
-    assert_core_type(
-        "P3 FsOpen",
-        "proc p (c : Cap AFull) : Nat visits [FsOpen] = Suc Zero",
-        "p",
-        "Cap AFull -> FS AFull Nat",
-    );
+    for label in ["FsOpen", "MappingAllocate", "ResourceRelease"] {
+        assert_core_type(
+            &format!("P3 {label}"),
+            &format!("proc p (c : Cap AFull) : Nat visits [{label}] = Suc Zero"),
+            "p",
+            "Cap AFull -> FS AFull Nat",
+        );
+    }
 }
 
 #[test]
@@ -119,6 +130,16 @@ fn fs_label_without_written_cap_contributes_no_host_summand() {
         "proc p (x : Nat) : Nat visits [FS, Console] = x",
         "p",
         "Nat -> IO Nat",
+    );
+    // An authority extracted inside the body is not a written Cap parameter.
+    // It cannot retrofit an FS signature onto the declaration's plain result.
+    assert_check_error(
+        "P4 FS action without written Cap",
+        "proc p (caps : ProgramCaps AFull) : Nat visits [FS] =\n\
+           match caps { ProgramCaps.MkProgramCaps cap |->\n\
+             let r = read_bytes AFull cap (bytes_encode \"missing\") in Suc Zero }",
+        "error[E0038]",
+        "cannot be sequenced (36 §2.4)",
     );
 }
 
@@ -153,6 +174,13 @@ fn arrow_final_result_wraps_only_inside_the_last_lambda() {
            \\_. let r = print_line \"x\" in Suc Zero",
         "h",
         "Unit -> IO Nat",
+    );
+    assert_core_type(
+        "P6 two final arrows",
+        "proc h : Unit -> Unit -> Nat visits [Console] =\n\
+           \\_. \\_. let r = print_line \"x\" in Suc Zero",
+        "h",
+        "Unit -> Unit -> IO Nat",
     );
     let source = "program capabilities FS APartial\n\
         proc h : Unit -> Nat visits [Console] =\n\
