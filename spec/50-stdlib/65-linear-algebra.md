@@ -1263,8 +1263,9 @@ its two summands through `(proof eq_zero_l for add)` and
 `mul_self_eq_zero` turns the first into `Equal Nat x Zero`.
 Recursion on `tail` uses the second to show
 `Equal (Vec Nat k) tail (vector_zero k)`. The existing private
-`vector_cons_eq` combines the head and tail equalities. `mul_self_eq_zero` remains a private
-NatMatrix zero-inversion helper after its private `add_shuffle`;
+`vector_cons_eq` combines the head and tail equalities.
+`mul_self_eq_zero` remains a private NatMatrix zero-inversion helper
+after its private `add_shuffle`;
 the two add-zero inversion laws are public attached proofs from
 `Data.Numeric.Nat.Arithmetic`, not private NatMatrix helpers.
 Their constructor splits are on written Nat binders, not a computed
