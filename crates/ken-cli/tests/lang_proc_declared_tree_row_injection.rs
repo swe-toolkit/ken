@@ -3,9 +3,9 @@
 //! MEASURED: each mismatched label is refused by name and a matched sibling
 //! is admitted, across ambient, host, alias, arrow-final and local signatures.
 //! CLAIMED: row labels cannot promise effects absent from the declared tree.
-//! THE GAP: these cases do not enumerate every host op; the source classifier
-//! matches HostOpV1 exhaustively, and the separate prelude pin covers the
-//! compiler-owned declarations before signature ids are captured.
+//! THE GAP: the independently enumerated HostOpV1 family relation uses the
+//! canonical operation spelling; the producer's spelling contract is pinned
+//! separately. The prelude pin covers declarations before ids are captured.
 
 use ken_elaborator::{ElabEnv, ElabError};
 
@@ -100,6 +100,81 @@ fn r2_host_operation_labels_inject_only_into_their_family() {
     );
 }
 
+/// The expected family is an exhaustive, test-owned relation over HostOpV1,
+/// independent of the elaborator's row_label_summand match. A new host op
+/// must receive a family here before this test builds. Promise class:
+/// durable invariant under additions that classify their label correctly.
+/// MEASURED: each operation label admits its own family's declared tree and
+/// refuses another family's declared tree with the exact offending label.
+/// CLAIMED: the entire host-operation alphabet injects only into its family.
+/// THE GAP: the label comes from the canonical host spelling producer; its
+/// ABI spelling is independently pinned by the host/export tests.
+#[derive(Clone, Copy)]
+enum HostTree {
+    Console,
+    Clock,
+    Entropy,
+    Fs,
+}
+
+fn expected_host_trees(op: ken_host::HostOpV1) -> (HostTree, HostTree) {
+    use ken_host::HostOpV1::*;
+    match op {
+        ConsoleRead | ConsoleWrite | ConsoleFlush | ConsoleIsTerminal => {
+            (HostTree::Console, HostTree::Clock)
+        }
+        ClockWallNow | ClockMonotonicNow | ClockSleepUntil => (HostTree::Clock, HostTree::Console),
+        EntropyRandomBytes => (HostTree::Entropy, HostTree::Console),
+        FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsReadDirectory
+        | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
+        | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSeek | FsSetLength | FsSync
+        | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease | BufferAllocate
+        | BufferFreeze | MappingAllocate | MappingReadView | MappingWriteView
+        | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite | ProcessPlanOpen
+        | ProcessPlanPush | ProcessSpawn | ProcessTakePipe | ProcessWait => {
+            (HostTree::Fs, HostTree::Console)
+        }
+    }
+}
+
+fn host_tree_source(tree: HostTree, label: &str) -> String {
+    let (operation, response) = match tree {
+        HostTree::Console => ("ConsoleOp", "console_resp"),
+        HostTree::Clock => ("ClockOp", "clock_resp"),
+        HostTree::Entropy => ("EntropyOp", "entropy_resp"),
+        HostTree::Fs => ("(FSOp APartial)", "(fs_resp APartial)"),
+    };
+    format!(
+        "proc p : ITree {operation} {response} Unit visits [{label}] = \
+         ITree.Ret {operation} {response} Unit MkUnit"
+    )
+}
+
+#[test]
+fn r2_all_host_operation_labels_inject_into_their_own_family() {
+    for operation in ken_host::HostOpV1::ALL {
+        let label = ken_elaborator::canonical_host_perform_signature_v1(operation);
+        let (correct, _) = expected_host_trees(operation);
+        accepts(
+            &format!("R2 {operation:?} correct family"),
+            &host_tree_source(correct, label),
+        );
+    }
+}
+
+#[test]
+fn r2_all_host_operation_labels_refuse_a_different_family() {
+    for operation in ken_host::HostOpV1::ALL {
+        let label = ken_elaborator::canonical_host_perform_signature_v1(operation);
+        let (_, wrong) = expected_host_trees(operation);
+        refuses_label(
+            &format!("R2 {operation:?} wrong family"),
+            &host_tree_source(wrong, label),
+            label,
+        );
+    }
+}
+
 #[test]
 fn r3_transparent_tree_head_is_classified_by_checked_identity() {
     accepts(
@@ -163,6 +238,25 @@ fn r6b_unrelated_label_cannot_inject_into_user_tree() {
     let wrong_label = LOCAL_PING.replacen("visits [Local]", "visits [Other]", 1);
     assert_ne!(wrong_label, LOCAL_PING, "R6 must move the row label");
     refuses_label("R6 other family", &wrong_label, "Other");
+}
+
+/// R6's identity discriminator: OtherOp has the right spelling to propose
+/// the Other label but is only an alias of LocalOp. Its presence in globals
+/// must not grant the alias a distinct checked operation-family identity.
+/// Promise class: durable invariant. MEASURED: [Local] accepts and [Other]
+/// refuses on the same declared LocalOp tree, with OtherOp also in scope.
+/// CLAIMED: only the checked family identity, not a name's presence, injects.
+/// THE GAP: this covers the alias form; the producer's L5 Op-stripping rule
+/// is separately pinned by b1/b2/b3 agreement tests.
+#[test]
+fn r6d_alias_name_cannot_impersonate_checked_tree_family() {
+    let with_alias =
+        LOCAL_PING.replacen("fn local_resp", "def OtherOp = LocalOp\n\nfn local_resp", 1);
+    assert_ne!(with_alias, LOCAL_PING, "R6d must add an alias");
+    accepts("R6d original Local label with alias in scope", &with_alias);
+    let wrong_label = with_alias.replacen("visits [Local]", "visits [Other]", 1);
+    assert_ne!(wrong_label, with_alias, "R6d must move the row label");
+    refuses_label("R6d alias is not the family", &wrong_label, "Other");
 }
 
 #[test]
