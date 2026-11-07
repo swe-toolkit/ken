@@ -2307,6 +2307,56 @@ pub(crate) fn process_starter_c_stub(
     process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), false, profile)
 }
 
+fn starter_status_report_c() -> String {
+    r#"static const char *ken_unavailable_operation_name(unsigned long long operation) {
+    switch (operation) {
+__KEN_UNAVAILABLE_OPERATION_NAMES__    default: return "unrecognized";
+    }
+}
+
+static int ken_unavailable_operation(long long value, unsigned long long *operation) {
+    switch (value) {
+__KEN_UNAVAILABLE_OPERATION_STATUSES__    default: return 0;
+    }
+}
+
+static void ken_report_process_status(long long value) {
+    unsigned long long operation = 0;
+    if (ken_unavailable_operation(value, &operation)) {
+        fprintf(stderr, "ken native trap: host operation %s (0x%04llx) is unavailable to native code\n",
+            ken_unavailable_operation_name(operation), operation);
+    }
+    else if (value == -1) fputs("ken native trap: malformed borrowed process input\n", stderr);
+    else if (value == -2) fputs("ken native trap: entrypoint returned a malformed ExitCode\n", stderr);
+    else if (value == -3) fputs("ken native trap: malformed ExitCode::Failure payload\n", stderr);
+    else if (value == -4) fputs("ken native trap: explicit entry trap\n", stderr);
+    else if (value < 0 && ((0 - (uint64_t)value) & 0xffu) == 0xffu)
+        fputs("ken native trap: planned runtime trap token\n", stderr);
+    else if (value < 0) fputs("ken native trap: unclassified negative process status\n", stderr);
+}
+"#
+    .replace(
+        "__KEN_UNAVAILABLE_OPERATION_NAMES__",
+        &ken_host::HostOpV1::ALL
+            .iter()
+            .map(|operation| format!("    case 0x{:04x}: return \"{operation:?}\";\n", *operation as u16))
+            .collect::<String>(),
+    )
+    .replace(
+        "__KEN_UNAVAILABLE_OPERATION_STATUSES__",
+        &ken_host::HostOpV1::ALL
+            .iter()
+            .map(|operation| {
+                format!(
+                    "    case {}LL: *operation = 0x{:04x}; return 1;\n",
+                    ken_host::operation_unavailable_status_v1(*operation),
+                    *operation as u16,
+                )
+            })
+            .collect::<String>(),
+    )
+}
+
 fn process_starter_c_stub_for_authority(
     authority: u8,
     plan_hash: u64,
@@ -2465,11 +2515,7 @@ static int environment(
     return constructor(arena, value, KEN_NIL, 0);
 }
 
-static const char *ken_unavailable_operation_name(unsigned long long operation) {
-    switch (operation) {
-__KEN_UNAVAILABLE_OPERATION_NAMES__    default: return "unrecognized";
-    }
-}
+__KEN_STATUS_REPORT__
 
 int main(int argc, char **argv, char **envp) {
     size_t argument_count = argc < 0 ? 0 : (size_t)argc;
@@ -2588,18 +2634,7 @@ int main(int argc, char **argv, char **envp) {
     free(pool);
     if (finish_status != 0) return 1;
     if (ticket_status != 0) return 1;
-    if (value <= -__KEN_UNAVAILABLE_BASE__ && value >= -(__KEN_UNAVAILABLE_BASE__ + 0xffff)) {
-        unsigned long long operation = (unsigned long long)(-value - __KEN_UNAVAILABLE_BASE__);
-        fprintf(stderr, "ken native trap: host operation %s (0x%04llx) is unavailable to native code\n",
-            ken_unavailable_operation_name(operation), operation);
-    }
-    else if (value == -1) fputs("ken native trap: malformed borrowed process input\n", stderr);
-    else if (value == -2) fputs("ken native trap: entrypoint returned a malformed ExitCode\n", stderr);
-    else if (value == -3) fputs("ken native trap: malformed ExitCode::Failure payload\n", stderr);
-    else if (value == -4) fputs("ken native trap: explicit entry trap\n", stderr);
-    else if (value < 0 && ((0 - (uint64_t)value) & 0xffu) == 0xffu)
-        fputs("ken native trap: planned runtime trap token\n", stderr);
-    else if (value < 0) fputs("ken native trap: unclassified negative process status\n", stderr);
+    ken_report_process_status(value);
     if (value < 0) return 1;
     return (int)value;
 }
@@ -2645,17 +2680,7 @@ int main(int argc, char **argv, char **envp) {
         &u8::from(allow_root_execution).to_string(),
     )
     .replace("__KEN_PROCESS_DECLARED__", &u8::from(process_declared).to_string())
-    .replace(
-        "__KEN_UNAVAILABLE_BASE__",
-        &ken_host::OPERATION_UNAVAILABLE_STATUS_BASE_V1.to_string(),
-    )
-    .replace(
-        "__KEN_UNAVAILABLE_OPERATION_NAMES__",
-        &ken_host::HostOpV1::ALL
-            .iter()
-            .map(|operation| format!("    case 0x{:04x}: return \"{operation:?}\";\n", *operation as u16))
-            .collect::<String>(),
-    )
+    .replace("__KEN_STATUS_REPORT__", &starter_status_report_c())
     .replace(
         "__KEN_ROOT_DENIED_EXIT_STATUS__",
         &root_denied_exit_status.to_string(),
@@ -2967,6 +2992,98 @@ mod tests {
         assert!(err.capacity_failure.is_none());
         assert!(err.selected_call_integrity.is_none());
         assert_eq!(err.code().as_str(), "N0007");
+    }
+
+    /// Promise class: durable invariant. MEASURED: the linked generated-C
+    /// reporter identifies only registered unavailable statuses and reports
+    /// planned tokens at both ends of the old overlapping range. CLAIMED:
+    /// root trap tokens never masquerade as unavailable host operations.
+    /// THE GAP: this runs the shipped diagnostic chain with a standalone
+    /// entrypoint; the linked starter's status and trap catalog are guarded
+    /// by their separate integration tests.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn starter_status_report_distinguishes_registered_operations_from_trap_tokens() {
+        let report = starter_status_report_c();
+        let stub =
+            process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile());
+        assert_eq!(
+            stub.matches(&report).count(),
+            1,
+            "product uses the tested reporter once"
+        );
+        assert_eq!(
+            stub.matches("ken_report_process_status(value);").count(),
+            1,
+            "the process main calls the tested reporter once"
+        );
+        assert_eq!(
+            stub.matches("ken native trap").count(),
+            report.matches("ken native trap").count(),
+            "every process diagnostic belongs to the tested reporter"
+        );
+
+        let dir = tempfile::tempdir().expect("temporary linked reporter directory");
+        let source = dir.path().join("ken-status-report.c");
+        let executable = dir.path().join("ken-status-report");
+        let standalone = format!(
+            "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\n\n{report}\n\
+             int main(int argc, char **argv) {{\n\
+                 if (argc != 2) return 2;\n\
+                 ken_report_process_status(strtoll(argv[1], NULL, 10));\n\
+                 return 0;\n\
+             }}\n"
+        );
+        fs::write(&source, standalone).expect("write generated C reporter");
+        let linked = Command::new(ObjectLinkerPackagingOptions::starter_host().linker_command)
+            .arg(&source)
+            .arg("-o")
+            .arg(&executable)
+            .output()
+            .expect("run the starter host's C linker");
+        assert!(
+            linked.status.success(),
+            "generated C link failed: {linked:?}"
+        );
+
+        let run = |value: i64, stderr: &str| {
+            let output = Command::new(&executable)
+                .arg(value.to_string())
+                .output()
+                .expect("run the generated C reporter");
+            assert_eq!(output.status.code(), Some(0), "status {value}: {output:?}");
+            assert!(output.stdout.is_empty(), "status {value}: {output:?}");
+            assert_eq!(output.stderr, stderr.as_bytes(), "status {value}");
+        };
+        for identity in [256, 511] {
+            let token = signed_root_token(identity);
+            assert!(
+                ken_host::HostOpV1::ALL
+                    .into_iter()
+                    .all(|operation| ken_host::operation_unavailable_status_v1(operation) != token),
+                "a registered operation must not use planned token {token}"
+            );
+            run(token, "ken native trap: planned runtime trap token\n");
+        }
+        for operation in ken_host::HostOpV1::ALL {
+            let status = ken_host::operation_unavailable_status_v1(operation);
+            run(
+                status,
+                &format!(
+                    "ken native trap: host operation {operation:?} (0x{:04x}) is unavailable to native code\n",
+                    operation as u16
+                ),
+            );
+        }
+        for (value, message) in [
+            (-1, "malformed borrowed process input"),
+            (-2, "entrypoint returned a malformed ExitCode"),
+            (-3, "malformed ExitCode::Failure payload"),
+            (-4, "explicit entry trap"),
+        ] {
+            run(value, &format!("ken native trap: {message}\n"));
+        }
+        run(0, "");
     }
 
     fn signed_root_token(identity: u64) -> i64 {
