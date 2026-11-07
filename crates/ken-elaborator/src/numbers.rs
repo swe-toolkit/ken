@@ -199,6 +199,7 @@ pub(crate) struct LiteralPlanIds {
 /// effect signatures. Never reconstruct these from the mutable name map.
 #[derive(Clone, Copy)]
 pub(crate) struct EffectTreeIds {
+    pub cap: GlobalId,
     pub console_op: GlobalId,
     pub console_resp: GlobalId,
     pub clock_op: GlobalId,

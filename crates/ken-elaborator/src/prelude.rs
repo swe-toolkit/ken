@@ -3569,13 +3569,7 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
     }
 }
 
-/// Register the L3 prelude in `elab` (called from `ElabEnv::empty`).
-///
-/// Every stage is outlined before it elaborates a declaration. The role roster
-/// is captured only after all stages finish; the trusted-base roster is still
-/// captured later by `ElabEnv::empty`. Inspect this entry's and the stage
-/// frames in the debug binary before growing their locals: the depth path
-/// also pays the recursive elaborator frames.
+/// Capture the compiler-owned effect signatures and capability identity.
 #[inline(never)]
 fn capture_effect_tree_ids(elab: &mut ElabEnv) -> Result<(), ElabError> {
     use crate::numbers::EffectTreeIds;
@@ -3583,6 +3577,7 @@ fn capture_effect_tree_ids(elab: &mut ElabEnv) -> Result<(), ElabError> {
     // any signature or inclusion selected by these checked identities.
     let id = |name| prelude_registered_id(elab, name);
     let ids = EffectTreeIds {
+        cap: id("Cap")?,
         console_op: id("ConsoleOp")?, console_resp: id("console_resp")?,
         clock_op: id("ClockOp")?, clock_resp: id("clock_resp")?,
         entropy_op: id("EntropyOp")?, entropy_resp: id("entropy_resp")?,
@@ -3598,6 +3593,13 @@ fn capture_effect_tree_ids(elab: &mut ElabEnv) -> Result<(), ElabError> {
     Ok(())
 }
 
+/// Register the L3 prelude in `elab` (called from `ElabEnv::empty`).
+///
+/// Every stage is outlined before it elaborates a declaration. The role roster
+/// is captured only after all stages finish; the trusted-base roster is still
+/// captured later by `ElabEnv::empty`. Inspect this entry's and the stage
+/// frames in the debug binary before growing their locals: the depth path
+/// also pays the recursive elaborator frames.
 pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let core = register_prelude_core(elab)?;
     let type0 = Term::ty(Level::Zero);
