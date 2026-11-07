@@ -36,10 +36,12 @@ laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
 establish containment without assuming either input has ordered endpoints.
 The endpoint-inclusion operation and its nine checked laws follow the §1–2
-proofs; neither the operation nor its laws assumes sorted endpoints. Four
-further checked laws establish distributivity and factoring by endpoint-value
-inclusion on both sides of multiplication. Five more checked laws establish
-transitivity of inclusion and operand-swap inclusion for addition,
+proofs; neither the operation nor its laws assumes sorted endpoints. Two
+endpoint antisymmetry laws turn mutual inclusion into rational-value
+equivalence at both stored endpoints, without requiring sorted intervals.
+Four further checked laws establish distributivity and factoring by
+endpoint-value inclusion on both sides of multiplication. Five more checked
+laws establish transitivity of inclusion and operand-swap inclusion for addition,
 multiplication, hull and intersection. Four further checked laws establish
 both regroupings of addition and multiplication by mutual inclusion. Two
 more checked laws give the least outer bound of a hull and the greatest
@@ -511,6 +513,32 @@ pub theorem interval_inside_trans
           }
       }
   }
+
+pub theorem interval_inside_antisym_lo
+      (a : Rational) (b : Rational) (c : Rational) (d : Rational)
+    : IsTrue (interval_inside (MkInterval a b) (MkInterval c d))
+      → IsTrue (interval_inside (MkInterval c d) (MkInterval a b))
+      → rational_equiv a c =
+  λoutward.
+    λinward.
+      (proof antisym for rational_leq)
+        a
+        c
+        ((proof left for bool_and) (rational_leq a c) (rational_leq d b) inward)
+        ((proof left for bool_and) (rational_leq c a) (rational_leq b d) outward)
+
+pub theorem interval_inside_antisym_hi
+      (a : Rational) (b : Rational) (c : Rational) (d : Rational)
+    : IsTrue (interval_inside (MkInterval a b) (MkInterval c d))
+      → IsTrue (interval_inside (MkInterval c d) (MkInterval a b))
+      → rational_equiv b d =
+  λoutward.
+    λinward.
+      (proof antisym for rational_leq)
+        b
+        d
+        ((proof right for bool_and) (rational_leq c a) (rational_leq b d) outward)
+        ((proof right for bool_and) (rational_leq a c) (rational_leq d b) inward)
 
 pub theorem interval_add_inside
       (i : Interval) (i2 : Interval) (j : Interval) (j2 : Interval)
@@ -1498,6 +1526,10 @@ Rational value commutativity into endpoint comparisons using the existing
 private `equiv_leq` proof. Hull and intersection swaps use the checked Rational
 min/max bounds. Applying a swap law in each argument order gives mutual
 endpoint-value inclusion, not structural equality of stored intervals.
+Mutual inclusion supplies both orders on each stored endpoint; the left
+and right conjunction projections feed Rational's checked antisymmetry law.
+The two resulting proofs establish `rational_equiv` for the lower and upper
+pairs separately, not structural equality of rational spellings.
 
 The associativity laws split three intervals, then use Rational's checked
 addition or multiplication associativity in opposite directions for the low
@@ -1595,7 +1627,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and fifty checked interval
+   `interval_intersect`, `interval_inside` and fifty-two checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1612,7 +1644,9 @@ API.
    monotonicity, and its four bound laws reuse those min/max proofs. The
    four distributive inclusions reuse Rational's checked `distrib_l` and
    `comm` laws through two private proof stages. Inclusion transitivity reuses
-   Rational order transitivity; the four swap inclusions reuse Rational
+   Rational order transitivity; endpoint antisymmetry projects the two
+   comparisons from each inclusion and applies Rational's checked
+   `rational_leq::antisym`. The four swap inclusions reuse Rational
    commutativity or public min/max bounds without a new helper. Hull and
    intersection regrouping reuse only the public bound and transitivity laws.
    The four point-unit inclusions reuse Rational's left-unit value proofs
@@ -1623,7 +1657,7 @@ API.
    Inverted emptiness composes the member's two checked comparisons against
    the false endpoint order; each ordered endpoint uses reflexivity and
    conjunction introduction. Neither family adds a helper.
-4. **Trusted-base delta.** Zero: all fifty laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all fifty-two laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1663,6 +1697,9 @@ API.
    transport and derived point completeness, plus accepted
    half-to-two-quarters membership and
    same-form `Proved` control before isolating both the false two-sixths
-   membership and its invalid equivalence premise. These package tests do
-   not establish official conformance-runner execution, CI, publication or
-   landing.
+   membership and its invalid equivalence premise. The interval-inside
+   antisymmetry package test checks both open endpoint-value results and a
+   closed equal-value pair, then rejects a one-way enclosure and a structural
+   equality ascription. Its local fixtures do not execute a separately
+   authored conformance seed. These package tests do not establish official
+   conformance-runner execution, CI, publication or landing.

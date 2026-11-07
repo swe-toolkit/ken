@@ -1324,3 +1324,65 @@ observed the refused row as `KernelRejected TypeMismatch` and the
 control as accepted; a refused claim without the accepted same-form
 control cannot pin inversion as the cause. These are scratch
 measurements, not execution or acceptance of the separate CV seed.
+
+## 14. Mutual inclusion fixes both endpoint values
+
+> **Section 14 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-INSIDE-ANTISYMMETRY).** Architect AC-0
+> `evt_4w1k09rrv4f8z` ruled the two laws from disposable scratch at
+> `bc1d29fa2501bd9b946d2e2c051417074687a6b7`. The two checked
+> proofs and an accepted closed client passed; two false clients refused
+> with `KernelRejected TypeMismatch`. The measured 114-element
+> `trusted_base()` identity sets were equal, and no `Axiom` was added.
+> Thirteen named scratch regressions passed 39/39. The first
+> independently loaded generic client refused `AmbiguousReference`:
+> its harness duplicated an `IsTrue` import after the law checks.
+> A corrected harness-only scratch rerun (`evt_yez73k5m74zs`) passed
+> 2/2, including `D0 generic client ok`, with the same 114-element
+> trusted identity sets. Foundation's package test separately checks
+> the generic client on the candidate, not on this Spec child.
+> No scratch result checks this Spec child or an assembled candidate;
+> none establishes official conformance, CI, publication, landing or
+> measured landed trust. CV owns the separate closed seed.
+
+`Algorithm.Numeric.RationalInterval` must export exactly these two
+public Transparent checked theorems immediately after
+`interval_inside_trans` (§5) and before `interval_add_inside`:
+
+```ken
+pub theorem interval_inside_antisym_lo
+      (a : Rational) (b : Rational) (c : Rational) (d : Rational)
+    : IsTrue (interval_inside (MkInterval a b) (MkInterval c d))
+      → IsTrue (interval_inside (MkInterval c d) (MkInterval a b))
+      → rational_equiv a c
+
+pub theorem interval_inside_antisym_hi
+      (a : Rational) (b : Rational) (c : Rational) (d : Rational)
+    : IsTrue (interval_inside (MkInterval a b) (MkInterval c d))
+      → IsTrue (interval_inside (MkInterval c d) (MkInterval a b))
+      → rational_equiv b d
+```
+
+The premises give both directions of the §3.1 endpoint comparison:
+`c ≤ a`, `b ≤ d`, `a ≤ c`, and `d ≤ b`, with `≤` read as
+`rational_leq`. Applying `(proof antisym for rational_leq)` to the
+corresponding lower and upper pairs yields `rational_equiv a c` and
+`rational_equiv b d`, respectively. The checked proofs project the
+left and right conjuncts using the existing `bool_and` laws. Neither
+conclusion asserts `Equal Rational` or structural `Equal Interval`:
+different stored fractions can denote the same value. Inverted
+intervals need no exception because `interval_inside` compares stored
+endpoints rather than membership. Each endpoint has its own theorem;
+no public conjunction, helper, axiom, kernel form, surface rule or
+change to any §1–§13 operation or law type is part of this section.
+
+The separate CV-owned closed seed compares `[1/2, 2]` with
+`[2/4, 4/2]`: the spellings differ, while the endpoints are
+rationally equivalent. With both inclusion premises it obtains the
+lower and upper conclusions by applying the corresponding theorems.
+An isolated refused application uses `[0, 1]` and `[0, 2]`;
+its reverse-inclusion premise fails even though the lower-endpoint
+conclusion is true. The accepted equal-value application is the
+same-form control, so refusal tests the missing premise rather than
+rejecting the theorem form. The scratch refusal does not establish
+execution of the separate seed as Ken or by the official runner.
