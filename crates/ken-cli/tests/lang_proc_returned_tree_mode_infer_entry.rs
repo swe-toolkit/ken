@@ -92,17 +92,20 @@ fn if_condition_does_not_inherit_returned_tree_mode() {
     assert_inferred_subterm(3);
 }
 
-#[test]
-fn inferred_match_cannot_execute_after_coercing_a_plain_arm() {
-    let body =
-        "let r = match b { True ↦ (print_line \"t\" : IO Unit); False ↦ MkUnit } in \"done\"";
-    let changed = format!(
+fn run_form(choice: &str) -> String {
+    format!(
         "program capabilities FS APartial\n\
-         proc p (b : Bool) : String visits [Console] = {body}\n\
+         proc p (b : Bool) : String visits [Console] =\n\
+           let r = match b {{ True ↦ (print_line \"t\" : IO Unit); \
+           False ↦ MkUnit }} in \"done\"\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode visits [Console] =\n\
-           let s : String = p True in host_program APartial (print_line s)\n"
-    );
+           let s : String = p {choice} in host_program APartial (print_line s)\n"
+    )
+}
+
+#[test]
+fn pure_ret_arm_controls_run_form_type_mismatch() {
     // The pure const controls the same arm-type mismatch using a Ret; the
     // literal print_line action would instead fail its purity gate (E0038)
     // before the mismatched arm is checked, so it cannot control K0004.
@@ -112,12 +115,19 @@ fn inferred_match_cannot_execute_after_coercing_a_plain_arm() {
          False ↦ MkUnit } in \"done\"",
     );
     assert_refusal("const-run-control", "check", &control, "K0004");
-    assert_refusal("proc-run-check", "check", &changed, "K0004");
-    assert_refusal("proc-run-true", "run", &changed, "K0004");
-    assert_refusal(
-        "proc-run-false",
-        "run",
-        &changed.replace("p True in", "p False in"),
-        "K0004",
-    );
+}
+
+#[test]
+fn inferred_match_in_changed_proc_refuses_plain_arm() {
+    assert_refusal("proc-run-check", "check", &run_form("True"), "K0004");
+}
+
+#[test]
+fn inferred_match_true_arm_cannot_execute_after_plain_arm_coercion() {
+    assert_refusal("proc-run-true", "run", &run_form("True"), "K0004");
+}
+
+#[test]
+fn inferred_match_false_arm_cannot_execute_after_plain_arm_coercion() {
+    assert_refusal("proc-run-false", "run", &run_form("False"), "K0004");
 }
