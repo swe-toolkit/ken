@@ -1224,6 +1224,11 @@ pub unsafe fn ken_host_invocation_v1_finish_with_integrity(
 
 impl ProcessContext {
     fn finalize_resources(&mut self, terminal_error: bool) {
+        // The starter's C main returns without Rust's runtime cleanup, so
+        // console bytes std still buffers (an unterminated line) are
+        // delivered here, as process exit delivers them to the interpreter.
+        let _ = io::stdout().lock().flush();
+        let _ = io::stderr().lock().flush();
         let settlements = {
             let host = &mut self.host;
             self.resources.finalize_all_with_mode(host, terminal_error)
