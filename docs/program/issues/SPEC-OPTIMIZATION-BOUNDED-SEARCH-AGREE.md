@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-BOUNDED-SEARCH-AGREE
 title: "Spec 72 §2 says the bounded-search contract is extensional and that its laws determine the result, but every BoundedSearch law speaks of one predicate, so no checked law says two predicates that agree below the bound give the same search result. Rule from a checked D0 at zero trust a public agreement law for find_below, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
