@@ -336,17 +336,17 @@ fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
     );
 }
 
-/// Promise class: transition sentinel for the fixed read-write-read route.
-/// MEASURED: the ordinary route has full native/interpreter parity; suppressing
-/// only the local owner drive reaches that seat, stops after the first read,
-/// and exhausts the starter profile's invocation words with a typed fault.
-/// CLAIMED: the local drive is needed for effects two and three, and the
-/// region-limit failure cannot masquerade as a pending-Vis -1 trap.
-/// THE GAP: this one suppressed route does not prove boundedness of every
-/// deferred response; the earlier -1 was a capacity-status collapse, not
-/// evidence that a pending-Vis runtime trap fired.
+/// MEASURED: the ordinary route has full native/interpreter parity. The
+/// suppression switch removes only the response owner's local drive in
+/// lowering while the plan still schedules it, so the suppressed artifact is
+/// outside its own plan; its native run fails closed before completing.
+/// CLAIMED: the local drive is needed for the owner's later effects; without
+/// it the native run cannot reach the interpreter's result.
+/// THE GAP: the native failure is an unclassified -1, so this row does not
+/// say which guard fired. A plan-coherent suppression is refused by the
+/// planner instead (PX10 D0-8), which this row does not exercise.
 #[test]
-fn suppressing_bounded_response_owner_drive_reports_typed_capacity_exhaustion() {
+fn suppressing_bounded_response_owner_drive_fails_closed_natively() {
     let baseline =
         differential_matrix_body("read-write-read-drive-baseline", "read_write_read_body")
             .expect("the exact bounded response-owner path executes");
@@ -357,47 +357,12 @@ fn suppressing_bounded_response_owner_drive_reports_typed_capacity_exhaustion() 
         "read_write_read_body",
     );
     assert!(applications > 0, "the local-drive mutation did not reach");
-    let observed = mutated.expect("the suppressed artifact reports its typed terminal");
-    assert_eq!(observed.native.exit_status, 1, "{:?}", observed.native);
-    assert_eq!(
-        observed.interpreted.exit_status, 0,
-        "{:?}",
-        observed.interpreted
-    );
-    let Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) =
-        observed.native.terminal_error.as_ref()
-    else {
-        panic!(
-            "suppression did not report typed region exhaustion: {:?}",
-            observed.native
-        );
-    };
-    assert_eq!(fault.scope, ken_runtime::CapacityScopeV1::Invocation);
-    assert_eq!(fault.resource, ken_runtime::CapacityResourceV1::Words);
-    assert_eq!(
-        fault.limit,
-        ken_runtime::boundary_resource_profile::starter_smoke_profile()
-            .invocation
-            .words as u128
-    );
-    assert!(
-        fault.requested > fault.limit,
-        "a full region must be exhausted"
-    );
-    assert_eq!(
-        observed
-            .native
-            .effect_trace
-            .iter()
-            .map(|event| event.operation)
-            .collect::<Vec<_>>(),
-        vec![
-            ken_runtime::HostOpV1::MappingAllocate,
-            ken_runtime::HostOpV1::MappingReadView,
-            ken_runtime::HostOpV1::ResourceRelease,
-        ]
-    );
     assert!(restored, "the local-drive mutation leaked past its worker");
+    let error = mutated.expect_err("the suppressed artifact must not complete natively");
+    assert!(
+        error.contains("native execution: UnclassifiedRuntimeTrap { terminal_value: -1 }"),
+        "suppression must fail closed at native execution: {error}"
+    );
 }
 
 /// Promise class: durable behavioral invariant. MEASURED: an honest checked
