@@ -214,7 +214,8 @@ evt_5kjjy0w0gzma, evt_p37pc6dwdk3h, evt_qkp7qcj87b3q and
 evt_3nvw9veeqa274; entries 11 to 13, evt_6ap56syy0smt6,
 evt_7cm821pbn97vt and evt_1339kvspms2zv; entry 16, evt_zbd2e5wv721d;
 entries 17 and 18, evt_6xjn4g9m3kbd7 and evt_5bdq0a4bwxvb4; entries 19
-and 20, evt_78er3jeajgbje and evt_213k68h5rb1ey) has twenty entries:
+and 20, evt_78er3jeajgbje and evt_213k68h5rb1ey; entries 21 and 22,
+evt_3hga1jvpa0r8 and evt_7e72htft8f0ve) has twenty-two entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -302,6 +303,15 @@ and 20, evt_78er3jeajgbje and evt_213k68h5rb1ey) has twenty entries:
     successor chain, which leaves owner 0 (Wait) nested and unentered,
     with disposition None. Keyed on the syntactic arm that lowers the
     call.
+21. B1a direct style: the planner's synthesized-seat gate refuses an
+    installed plane with bracket regions but no bracket rows. Keyed on
+    `bracket_rows` emptiness as a stand-in for phase-B resolution; D0-1
+    measured it infeasible, a Let-bound call payload reaching the K
+    capture walk as Open.
+22. B1a direct style: F2 rows refuse at `first_computational_consumer`.
+    A detached required consumer is identified only by a
+    ComputationalMatchCase step on the return path, keyed on the
+    eliminator frame that left identity removes (LetBody not accepted).
 
 Entries 10 to 13 share one predicate: the relay's resume state is located
 through the response-row plane, but its identity is the runtime-carried K.
@@ -317,6 +327,12 @@ activation it settles (evt_5bdq0a4bwxvb4). Entries 13, 15, 19 and 20
 share one predicate: a callee's runtime representation, performing or
 pure, is decided after its callers are lowered and per syntactic arm,
 not once before any caller (evt_213k68h5rb1ey). B1a closes it.
+Entries 21 and 22 share one predicate: planner planes name a bind's
+consumer by a form that B1a's lowering changed. B1a keeps the Let form
+(Architect evt_706fb41bc2scs). A one-case Ret frame was refuted by D0-3:
+the bracket plane keys on the two-case Ret/Vis shape. The
+detached-consumer search is closed under the Architect's D0 series
+(evt_axggp4bvrs50).
 Entry 18 is reclassified as an artifact of the suppression switch, which
 builds a program outside its own plan: no coherent plan exists without
 the local drive (D0-8, Architect evt_58avnxxk6khhr), and the row is
