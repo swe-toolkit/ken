@@ -65,6 +65,18 @@ pub proof comm for add (a : Nat) (b : Nat) : Equal Nat (add a b) (add b a) =
         (sym Nat (add (Suc b2) a) (Suc (add b2 a)) ((proof suc_l for add) b2 a))
   }
 
+pub proof eq_zero_l for add (a : Nat) (b : Nat) : Equal Nat (add a b) Zero → Equal Nat a Zero =
+  match b {
+    Zero ↦ λsum_zero. sum_zero;
+    Suc b2 ↦ λsum_zero. absurd sum_zero
+  }
+
+pub proof eq_zero_r for add (a : Nat) (b : Nat) : Equal Nat (add a b) Zero → Equal Nat b Zero =
+  match b {
+    Zero ↦ λsum_zero. Proved;
+    Suc b2 ↦ λsum_zero. absurd sum_zero
+  }
+
 proof zero_r for mul (a : Nat) : Equal Nat (mul a Zero) Zero = Proved
 
 pub proof zero_l for mul (a : Nat) : Equal Nat (mul Zero a) Zero =
@@ -319,9 +331,12 @@ fn pred_nat (n : Nat) : Nat =
 `add` and `mul` recurse on their second argument and remain the only
 value-producing definitions. Their checked laws carry exactly the structural
 recursion they need and are discoverable as members of `add::…` or `mul::…`.
-Both distributivity laws are checked: `mul_add_distrib_r` follows the
-recursion of `mul` on its right argument, while `mul_add_distrib_l`
-uses commutativity to transport that result to a left-hand sum. The
+The zero-sum inversion laws split on the second summand: a `Suc` summand
+refutes the zero equation; they are exported as `add::eq_zero_l` and
+`add::eq_zero_r`. Both distributivity laws are checked:
+`mul_add_distrib_r` follows the recursion of `mul` on its right
+argument, while `mul_add_distrib_l` uses commutativity to transport
+that result to a left-hand sum. The
 multiplicative unit, zero, commutativity, and associativity laws keep their
 attached `mul::…` identities. The successor multiplication helpers and the
 right-zero computation proof remain private.

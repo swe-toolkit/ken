@@ -12,6 +12,7 @@ use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
 const MATRIX: &str = "Algorithm.LinearAlgebra.NatMatrix";
+const ARITH: &str = "Data.Numeric.Nat.Arithmetic";
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -150,17 +151,59 @@ fn zero_and_nonzero_self_dots_distinguish_two_false_nat_premises() {
     }
 }
 
-/// MEASURED: selective imports of each local Nat zero-inversion proof
-/// return its exact UnboundName. CLAIMED: only the finished definiteness
-/// law crosses NatMatrix's public boundary. THE GAP: the exact public
-/// inventory is independently pinned by cat_linear_algebra_nat_matrix.
+/// MEASURED: the deleted NatMatrix names are absent; both new attached
+/// identities are Arithmetic-owned, Transparent, and unchanged when Matrix
+/// loads; importing the remaining private square step returns UnboundName.
+/// CLAIMED: zero-sum inversion is reused from Arithmetic, not re-exported
+/// or privately duplicated by NatMatrix. THE GAP: these identity checks do
+/// not prove every proof body uses that binding; deleting either new law
+/// must also break both downstream package checks (AC-3).
 #[test]
-fn nat_zero_inversion_steps_are_private_to_nat_matrix() {
-    for helper in ["add_eq_zero_left", "add_eq_zero_right", "mul_self_eq_zero"] {
-        let client = format!("import {MATRIX} ({helper})\n");
-        match loaded_matrix().elaborate_file(&client) {
-            Err(ElabError::UnboundName { name, .. }) if name == format!("{MATRIX}.{helper}") => {}
-            other => panic!("private Nat step {helper} was exposed or failed elsewhere: {other:?}"),
-        }
+fn zero_sum_laws_belong_to_arithmetic_and_square_step_stays_private() {
+    let mut env = ElabEnv::new().expect("compiler base");
+    let arithmetic_owned = env
+        .elaborate_module_from_roots(&[root()], ARITH)
+        .expect("Arithmetic root-loads before NatMatrix");
+    let laws = [
+        ("add_eq_zero_left", "eq_zero_l"),
+        ("add_eq_zero_right", "eq_zero_r"),
+    ];
+    let ids = laws.map(|(_, proof)| {
+        let name = format!("{ARITH}.add::{proof}");
+        let id = env.globals[&name];
+        assert!(
+            arithmetic_owned.contains(&id),
+            "{name} belongs to Arithmetic"
+        );
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{name} is a checked proof, not an assumption"
+        );
+        id
+    });
+    let matrix_owned = env
+        .elaborate_module_from_roots(&[root()], MATRIX)
+        .expect("NatMatrix checks with imported Arithmetic proofs");
+    env.elaborate_file(&format!("import {ARITH} (add)\n"))
+        .expect("selective add import also resolves attached proofs");
+    for ((old_name, proof), id) in laws.into_iter().zip(ids) {
+        assert!(
+            !env.globals.contains_key(&format!("{MATRIX}.{old_name}")),
+            "the former NatMatrix helper must be absent"
+        );
+        assert_eq!(
+            env.globals[&format!("{ARITH}.add::{proof}")],
+            id,
+            "the imported proof retains Arithmetic's GlobalId"
+        );
+        assert!(
+            !matrix_owned.contains(&id),
+            "NatMatrix does not own {proof}"
+        );
+    }
+    match env.elaborate_file(&format!("import {MATRIX} (mul_self_eq_zero)\n")) {
+        Err(ElabError::UnboundName { name, .. })
+            if name == format!("{MATRIX}.mul_self_eq_zero") => {}
+        other => panic!("private square step must refuse import: {other:?}"),
     }
 }

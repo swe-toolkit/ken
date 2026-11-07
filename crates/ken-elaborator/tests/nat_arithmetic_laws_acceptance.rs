@@ -8,6 +8,18 @@ const NAT_ARITH_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md");
 const NAT_ARITH_MODULE: &str = "Data.Numeric.Nat.Arithmetic";
 
+const ZERO_SUM_GENERIC_CLIENT: &str = r#"
+import Data.Numeric.Nat.Arithmetic (add)
+
+theorem client_eq_zero_l (a : Nat) (b : Nat)
+    : Equal Nat (add a b) Zero → Equal Nat a Zero =
+  (proof eq_zero_l for add) a b
+
+theorem client_eq_zero_r (a : Nat) (b : Nat)
+    : Equal Nat (add a b) Zero → Equal Nat b Zero =
+  (proof eq_zero_r for add) a b
+"#;
+
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -34,6 +46,8 @@ fn entry_elaborates_and_registers_the_free_laws() {
         "Data.Numeric.Nat.Arithmetic.mul",
         "Data.Numeric.Nat.Arithmetic.add::assoc",
         "Data.Numeric.Nat.Arithmetic.add::comm",
+        "Data.Numeric.Nat.Arithmetic.add::eq_zero_l",
+        "Data.Numeric.Nat.Arithmetic.add::eq_zero_r",
         "Data.Numeric.Nat.Arithmetic.mul::assoc",
         "Data.Numeric.Nat.Arithmetic.mul::comm",
         "Data.Numeric.Nat.Arithmetic.mul_add_distrib_l",
@@ -44,6 +58,20 @@ fn entry_elaborates_and_registers_the_free_laws() {
             "{name} must be a checked global"
         );
     }
+}
+
+/// MEASURED: selective import of `add` checks both attached zero-sum proofs
+/// at their open curried types, including the zero premise.
+/// CLAIMED: consumers can derive either summand's zero equality without
+/// assuming it, using the public Arithmetic identities.
+/// THE GAP: the generic clients test the proof types, not an inhabited
+/// premise; the independent seed owns closed accepted and refused cases.
+#[test]
+fn attached_zero_sum_proofs_check_at_generic_curried_types() {
+    let mut env = ElabEnv::new().expect("base environment");
+    load_arithmetic(&mut env);
+    env.elaborate_file(ZERO_SUM_GENERIC_CLIENT)
+        .expect("both attached proofs apply at exact generic types");
 }
 
 #[test]

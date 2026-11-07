@@ -303,6 +303,25 @@ pub theorem mul_add_distrib_l (a : Nat) (b : Nat) (c : Nat) :
   Equal Nat (mul (add a b) c) (add (mul a c) (mul b c))
 ```
 
+`Data.Numeric.Nat.Arithmetic` also exports two public Transparent
+checked proofs attached to `add`. They follow `pub proof comm for add`
+and precede `proof zero_r for mul`:
+
+```ken
+pub proof eq_zero_l for add (a : Nat) (b : Nat) :
+  Equal Nat (add a b) Zero → Equal Nat a Zero
+
+pub proof eq_zero_r for add (a : Nat) (b : Nat) :
+  Equal Nat (add a b) Zero → Equal Nat b Zero
+```
+
+These are the exported identities `add::eq_zero_l` and
+`add::eq_zero_r`, not top-level theorems. Each curried premise says
+that a sum is zero; the conclusions recover the left and right
+summands respectively. Their proof splits on the written second
+summand: a successor sum cannot equal `Zero`. The laws do not change
+`add` or introduce an axiom, kernel rule or new Nat carrier.
+
 The same Arithmetic package gains a new **checked** cancellation
 law for multiplication by a positive factor. Its actual proof in
 the AC-0b scratch uses Nat case analysis, `Suc` injectivity, and

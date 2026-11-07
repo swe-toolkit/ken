@@ -1042,8 +1042,8 @@ pub theorem manhattan_zero_equal
                 qx
                 py
                 qy
-                (axis_distance_zero px qx (add_zero_left x_distance y_distance h))
-                (axis_distance_zero py qy (add_zero_right x_distance y_distance h))
+                (axis_distance_zero px qx ((proof eq_zero_l for add) x_distance y_distance h))
+                (axis_distance_zero py qy ((proof eq_zero_r for add) x_distance y_distance h))
       }
   }
 
@@ -1363,18 +1363,6 @@ theorem add_medial
             (add (add a c) (add b d))
             (add (add (add a c) b) d)
             ((proof assoc for add) (add a c) b d)))))
-
-theorem add_zero_left (x : Nat) (y : Nat) : Equal Nat (add x y) Zero → Equal Nat x Zero =
-  match y {
-    Zero ↦ λh. h;
-    Suc y2 ↦ λh. absurd h
-  }
-
-theorem add_zero_right (x : Nat) (y : Nat) : Equal Nat (add x y) Zero → Equal Nat y Zero =
-  match y {
-    Zero ↦ λh. Proved;
-    Suc y2 ↦ λh. absurd h
-  }
 
 theorem axis_distance_zero
       (a : Nat)
