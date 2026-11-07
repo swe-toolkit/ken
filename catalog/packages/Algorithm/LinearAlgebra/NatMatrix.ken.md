@@ -31,7 +31,8 @@ unit laws and three zero-annihilation laws, followed by the zero matrix,
 its two unit laws for matrix addition and its action on every vector.
 Three further laws establish that the zero matrix absorbs products on
 both sides and that its transpose is zero. A zero self-dot conversely
-identifies the vector as zero, using private natural zero-inversion steps.
+identifies the vector as zero, using Nat Arithmetic's zero-sum inversion
+laws and a private squared-head step.
 The named private stages build columns and row products; no second matrix
 carrier or numeric primitive is needed.
 
@@ -962,11 +963,11 @@ pub theorem vector_zero_of_dot_self_zero
           Zero
           tail
           (vector_zero k)
-          (mul_self_eq_zero x (add_eq_zero_left (mul x x) (dot k tail tail) self_zero))
+          (mul_self_eq_zero x ((proof eq_zero_l for add) (mul x x) (dot k tail tail) self_zero))
           (vector_zero_of_dot_self_zero
             k
             tail
-            (add_eq_zero_right (mul x x) (dot k tail tail) self_zero))
+            ((proof eq_zero_r for add) (mul x x) (dot k tail tail) self_zero))
   }
 
 pub theorem vector_scale_zero_vector
@@ -1763,18 +1764,6 @@ theorem add_shuffle
         (add (add a c) (add b d))
         (add (add (add a c) b) d)
         ((proof assoc for add) (add a c) b d)))
-
-theorem add_eq_zero_left (a : Nat) (b : Nat) : Equal Nat (add a b) Zero → Equal Nat a Zero =
-  match b {
-    Zero ↦ λsum_zero. sum_zero;
-    Suc b2 ↦ λsum_zero. absurd sum_zero
-  }
-
-theorem add_eq_zero_right (a : Nat) (b : Nat) : Equal Nat (add a b) Zero → Equal Nat b Zero =
-  match b {
-    Zero ↦ λsum_zero. Proved;
-    Suc b2 ↦ λsum_zero. absurd sum_zero
-  }
 
 theorem mul_self_eq_zero (x : Nat) : Equal Nat (mul x x) Zero → Equal Nat x Zero =
   match x {
@@ -3126,8 +3115,10 @@ checked recursive proof as the zero-row stages, with the new zero-vector name
 in its public statement. All four unit laws include empty vectors and
 introduce no premise. `dot_zero_right` composes dot commutativity and the
 left dot-zero law. Conversely, a vector whose self-dot is zero must be the
-zero vector: private natural zero-inversion proofs isolate the squared head
-and the tail self-dot, and `vector_cons_eq` assembles the inductive result.
+zero vector: Nat Arithmetic's `add::eq_zero_l` and `add::eq_zero_r`
+isolate the squared head and the tail self-dot; private `mul_self_eq_zero`
+discharges the squared head, and `vector_cons_eq` assembles the inductive
+result.
 `vector_scale_zero_vector` inducts on the written length;
 the multiplication head reduces to zero. `matrix_vector_zero` transports
 the zero input through `matrix_vector_homogeneous` and zero scaling at both
@@ -3215,9 +3206,10 @@ laws `matrix_add_zero_left`, `matrix_add_zero_right` and
 `matrix_vector_zero_matrix` follow `matrix_vector_zero` in that order.
 The three §13 laws `matrix_product_zero_left`,
 `matrix_product_zero_right`, and `transpose_zero` follow
-`matrix_vector_zero_matrix`. The three natural zero-inversion steps
-`add_eq_zero_left`, `add_eq_zero_right` and `mul_self_eq_zero` are private,
-as is the reused `vector_cons_eq`. All forty laws have checked bodies.
+`matrix_vector_zero_matrix`. The natural `mul_self_eq_zero` step remains
+private, as does the reused `vector_cons_eq`. The two zero-sum steps
+are imported from Nat Arithmetic as `add::eq_zero_l` and `add::eq_zero_r`.
+All forty laws have checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
