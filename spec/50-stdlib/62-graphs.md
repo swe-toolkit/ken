@@ -1169,3 +1169,82 @@ refusals pin only refusal and the `KernelRejected` error class, never
 the diagnostic string, which was truncated in the scratch log. Closed
 rows do not replace the checked generic proof or establish that the
 separate CV seed ran as Ken or through the official conformance runner.
+
+## 13. An order survives removal of edges
+
+> **Section 13 status: DRAFT v0
+> (SPEC-GRAPHS-ORDER-EDGE-ANTITONE).** Architect AC-0
+> `evt_55fe7ahz18pqb` ruled from a disposable D0 on exact base
+> `766dd3df357117546130098e8c06d6ca033c2882`. The generic
+> application, open same-list `Refl` control, package checks and four
+> named suites passed in scratch; the checked Ken fences added no
+> `Axiom`, and the 114 trusted `GlobalId` identities were unchanged.
+> The initial seed's last list-equality proof used `Proved` and
+> refused; the corrected form uses `Refl`. These are scratch
+> observations, not tests of this Spec child, the separate catalog
+> or seed children, an assembled candidate, official conformance,
+> CI, publication, landing or measured landed trust.
+
+`Algorithm.Graphs.Dependency` must export the following public
+Transparent checked function immediately after `ordered_forward`
+(§1.3) and before `before_irreflexive`:
+
+```ken
+pub fn topo_order_edge_antitone
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (h : Graph q)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q h u v)
+        True
+        → Equal
+        Bool
+        (edge q g u v)
+        True)
+    : TopoOrder q d g → TopoOrder q d h
+```
+
+The pointwise `included` premise says every true edge of `h` is also
+an edge of `g`. Thus any order certified for `g` also orders `h`,
+including when the two graphs coincide. The direction is opposite
+to §7's reachability monotonicity: removing edges preserves an
+existing order, whereas adding edges can introduce a backward edge.
+No `Finite q`, strict-inclusion premise, new graph carrier, axiom,
+kernel rule or surface form is needed; §§1–12 retain their public
+operation and law types.
+
+The checked function rebuilds the `TopoOrder q d h` from the input
+order's public projections. Its vertex list, uniqueness proof and
+coverage proof are unchanged. For the forward-edge field, it first
+uses `included` to obtain a checked `g` edge from a checked `h`
+edge, then applies `ordered_forward` for `g`. Because the result is
+constructed from `ordered_vertices q d g order` rather than by
+matching on an open `order`, the same-list consequence holds by
+**definitional conversion** for every input order:
+
+```ken
+Equal (List q)
+  (ordered_vertices q d h
+    (topo_order_edge_antitone q d g h included order))
+  (ordered_vertices q d g order)
+```
+
+`Refl` inhabits this equality with `order` still open. It needs no
+second public law; `Proved` is not a substitute for `Refl` on this
+list-equality goal. A match-form reconstruction need not reduce on
+an open `order` and is not the specified implementation shape.
+
+The separate CV-owned closed seed uses `tri` with edges
+`V0 → V1`, `V1 → V2` and `V0 → V2`, ordered as `[V0, V1, V2]`.
+It removes `V0 → V2` to form `chain`, supplies the pointwise
+inclusion of `chain` in `tri`, and applies the law to obtain an
+order of `chain` with the same list by `Refl`. Its isolated refusal
+tries to add `V2 → V0` to `tri` while reusing the same order; the
+required inclusion proof fails on that backward edge. The accepted
+edge-removal application is the same-form control. Neither closed
+case replaces the generic checked law or establishes that a separate
+CV seed was authored, run as Ken or executed by the official runner.

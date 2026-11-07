@@ -554,6 +554,32 @@ pub theorem ordered_forward
     MkTopoOrder xs unique complete forward ↦ forward
   }
 
+pub fn topo_order_edge_antitone
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (h : Graph q)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q h u v)
+        True
+        → Equal
+        Bool
+        (edge q g u v)
+        True)
+    : TopoOrder q d g → TopoOrder q d h =
+  λorder.
+    MkTopoOrder
+      q
+      d
+      h
+      (ordered_vertices q d g order)
+      (ordered_unique q d g order)
+      (ordered_complete q d g order)
+      (λx. λy. λhxy. ordered_forward q d g order x y (included x y hxy))
+
 pub theorem before_irreflexive
       (q : Type) (d : DecEq q) (x : q) (xs : List q)
     : Equal Bool (before q d x x xs) False =
@@ -2683,7 +2709,9 @@ whole composed walk, not just its endpoints: a reversed two-part route cannot
 be identified with a different shortcut route having the same endpoints. The
 walk involution law states its equality at a matched graph representation;
 clients with an open graph can transport along the graph law using a named
-family rather than assuming data eta.
+family rather than assuming data eta. An order restricted to fewer edges is
+rebuilt from its projections, so its vertex list remains the input's by
+conversion even for an open order.
 
 ## 6. References
 
@@ -2696,7 +2724,8 @@ family rather than assuming data eta.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–11](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is
+[graphs §§1–13](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2719,10 +2748,17 @@ checks graph and walk reversal on a directed chain. The
 is authored but has not been Ken-checked or officially conformance-run. The
 [§11 seed](../../../../conformance/stdlib/graphs/seed-reachability-trans.md)
 composes reachability through a middle vertex on a one-way chain and refuses
-the reversed claim. The public API is the graph, path and certificate types,
-their constructors, walk composition and reversal, the graph reversal and
-predicate-reachability operations and witness, the dependency-order operation,
-five list/order predicates, and twenty-two kernel-checked laws. Every other
+the reversed claim. The
+[§12 seed](../../../../conformance/stdlib/graphs/seed-reachability-antisymmetric.md)
+uses a one-way chain order to exclude backward reachability and refuses an
+order on a two-cycle. The
+[§13 seed](../../../../conformance/stdlib/graphs/seed-topo-order-edge-antitone.md)
+removes a shortcut edge while keeping the ordered list and refuses inclusion
+of an added backward edge. The public API is the graph, path and certificate
+types, their constructors, walk composition and reversal, the graph reversal
+and predicate-reachability operations and witness, the dependency-order
+operation, five list/order predicates, and twenty-three kernel-checked laws.
+Every other
 helper is private to this package.
 
 | Reader task | Section |
