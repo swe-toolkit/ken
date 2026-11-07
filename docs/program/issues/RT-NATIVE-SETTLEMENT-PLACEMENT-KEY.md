@@ -1,9 +1,9 @@
 ---
 id: RT-NATIVE-SETTLEMENT-PLACEMENT-KEY
 title: "PX10 B1a's direct-style bind moves a recursive worker's consumer across the worker boundary, so one static continuation recurs once per specialization clone, and the native planner refuses the repeat: the detached exit chain's (origin, frame) key is shared by clones 10, 8, 6, 4 and 1 of one worker, and the bracket plane admits one returned-exit owner per static region. Key both settlement planes on (origin, placement), with one shared walk deriving the frame list and the required consumer, so activations of one placement are planned once and kept apart at runtime by their frame"
-status: ready
+status: active
 owner: runtime
-size: M
+size: L
 tier: T1
 gate: architect
 depends_on: []
@@ -58,7 +58,9 @@ frame. Each plane keys on exactly one of these (Research
   so keeping recursive workers tree-form is not a closure (Architect
   `evt_5b1gt2a3cz0f0`).
 - **Plane C, the relay and K key** (§1b entries 17 and 18) carries the
-  same predicate. It is in scope only if AC-0 shows the F2 rows reach it.
+  same predicate. It is in scope: after planes A and B, the F2 rows
+  reach its call-coverage gate (`units.rs:9779`; Steward
+  `evt_1kd86qmt5zw1t`).
   Entry 18's committed row is a must-not-regress control.
 - **Retained, not product here:**
   - B1a's wip2 (three uncommitted files, the Let form) and
@@ -76,7 +78,8 @@ base, stop and report the mismatch.
 ## Deliverable
 
 Planes A and B keyed on (origin, placement), with one shared walk for
-the frame list and the consumer. The F2 rows are committed, and the
+the frame list and the consumer, and plane C repaired as the Architect
+rules. The F2 rows are committed, and the
 mutations below are recorded. All of it goes in one candidate, stacked
 under B1a.
 
@@ -109,6 +112,18 @@ under B1a.
     boundary, with "no exact incoming edge".
 - **AC-4.** Full-workspace CI is green on the exact candidate. Edge
   equality is not evidence; native parity is the gate.
+
+## Inventory (node §1a)
+
+1. Plane B's owner check keyed on `k_specialization`, the response's
+   specialization, not the placement it settles (`evt_yz6rxwdke9f6`).
+2. After planes A and B, F2 argv and v_null refuse at the
+   response-owner call-coverage gate (`units.rs:9779`). Owner
+   `StaticResponseOwnerId(2)`'s selected caller (emission
+   `Specialization(8)`, target `Specialization(10)`) has no recorded
+   verified incoming call and no candidate disposition, although its
+   source Construct was lowered. Keyed on `ContinuationCallIdentity`,
+   the selected caller (`evt_3aax4002wm3yt`).
 
 ## Stop conditions
 
