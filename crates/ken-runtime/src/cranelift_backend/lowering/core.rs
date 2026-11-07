@@ -9577,6 +9577,9 @@ impl<'a> Lowering<'a> {
         self.function_local
             .checked_ih_transport_emissions
             .push((transport.clone(), call));
+        if let Some(ledger) = self.continuation_candidates.as_mut() {
+            ledger.record_relocated_answer(transport.source_call_identity());
+        }
         if !self.continuation_candidate_is_consumed(&identity) {
             self.settle_continuation_candidate(
                 &identity,
@@ -10092,6 +10095,9 @@ impl<'a> Lowering<'a> {
         self.function_local
             .checked_ih_transport_emissions
             .push((transport.clone(), call));
+        if let Some(ledger) = self.continuation_candidates.as_mut() {
+            ledger.record_relocated_answer(transport.source_call_identity());
+        }
         if !self.continuation_candidate_is_consumed(&identity) {
             self.settle_continuation_candidate(
                 &identity,
@@ -10392,6 +10398,9 @@ impl<'a> Lowering<'a> {
         self.function_local
             .checked_ih_transport_emissions
             .push((transport.clone(), call));
+        if let Some(ledger) = self.continuation_candidates.as_mut() {
+            ledger.record_relocated_answer(transport.source_call_identity());
+        }
         if !self.continuation_candidate_is_consumed(&identity) {
             self.settle_continuation_candidate(
                 &identity,
@@ -13105,15 +13114,25 @@ impl<'a> Lowering<'a> {
             edge.recursive_position,
             edge.identity.target()
         ));
+        let placement = self
+            .static_transition_plan
+            .k_emission_placement(&edge.identity)?;
         if self
             .static_transition_plan
             .checked_ih_environment_transport_source(&edge.identity)
             .is_some()
+            && self
+                .defining_emission_owner
+                .is_some_and(|owner| owner != placement)
             && matches!(&lowered, LoweringOperand::Carried(_))
         {
-            // The source specialization's result is the sole materialized
-            // environment. It is the payload the transport call returns, not a
-            // producer constructor to eliminate again at this detached seat.
+            // The call is relocated into another owner, whose destination
+            // constructor emits it; the carried word is the source's result.
+            // A relocation into this same owner is no relocation: the seat
+            // below emits the call.
+            if let Some(ledger) = self.continuation_candidates.as_mut() {
+                ledger.record_relocated_exit(&edge.identity);
+            }
             return Ok(lowered);
         }
         // Contract 4, first clause: validate the specialized result's PLANNED

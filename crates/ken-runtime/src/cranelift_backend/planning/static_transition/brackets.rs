@@ -181,6 +181,9 @@ pub(in crate::cranelift_backend) struct BracketSettlement {
     resume: StaticOriginId,
     mode: BracketSettlementMode,
     row: Option<super::responses::StaticResponseContinuation>,
+    /// Where the row's K call is emitted, read once from the placement
+    /// authority. The settlement gate compares against this alone.
+    k_placement: Option<ContinuationEmissionOwner>,
     /// Every returned-exit owner at the nearest region, own or ancestor, that
     /// has any. Each one returns into this one settlement.
     response_owners: BTreeSet<super::responses::StaticResponseContinuationId>,
@@ -289,11 +292,15 @@ impl BracketSettlementControlView {
                     if mode == BracketSettlementMode::Deferred => {}
                 _ => return Err(planner_error("bracket row disagrees with its checked region")),
             }
+            let k_placement = row
+                .as_ref()
+                .map(|row| plan.k_emission_placement(row.k_identity()))
+                .transpose()?;
             if view.regions.insert(region.id, BracketSettlement {
                 id: region.id, settlement: region.settlement,
                 clause_origin, clause_scrutinee,
                 body_exit: region.body_exit, outcome_merge: region.outcome_merge,
-                resume: region.resume, mode, row, response_owners: owners,
+                resume: region.resume, mode, row, k_placement, response_owners: owners,
             }).is_some() {
                 return Err(planner_error("two bracket regions share one identity"));
             }
@@ -331,12 +338,10 @@ impl BracketSettlementControlView {
             planner_error("a bracket settlement identity has no validated region"))?;
         // A marked S is lowered where its K call is emitted. A lowering
         // anywhere else would claim the settlement from another code identity.
-        if let Some(row) = &region.row {
-            if placement != Some(row.k_identity().emission_owner()) {
-                return Err(planner_error(
-                    "a marked bracket settlement is lowered outside its K call's emission placement",
-                ));
-            }
+        if region.row.is_some() && placement != region.k_placement {
+            return Err(planner_error(
+                "a marked bracket settlement is lowered outside its K call's emission placement",
+            ));
         }
         Ok(Some(region))
     }

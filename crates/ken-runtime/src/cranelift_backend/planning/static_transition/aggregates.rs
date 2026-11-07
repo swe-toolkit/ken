@@ -4720,6 +4720,30 @@ impl StaticTransitionPlan<'_> {
             .collect()
     }
 
+    /// The one owner whose generated code emits this K call. A checked-IH
+    /// environment transport relocates the call into its destination owner;
+    /// every other call is emitted by the owner that planned it. A placement
+    /// consumer reads this and never `emission_owner()` alone.
+    pub(in crate::cranelift_backend) fn k_emission_placement(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<ContinuationEmissionOwner, CraneliftBackendError> {
+        let mut destinations = self
+            .checked_ih_environment_transports
+            .iter()
+            .filter(|transport| &transport.source_call_identity == identity)
+            .map(|transport| transport.destination_owner)
+            .collect::<BTreeSet<_>>()
+            .into_iter();
+        match (destinations.next(), destinations.next()) {
+            (None, _) => Ok(identity.emission_owner()),
+            (Some(owner), None) => Ok(owner),
+            (Some(_), Some(_)) => Err(planner_error(
+                "one K call is relocated into two destination owners; it has no single emission placement",
+            )),
+        }
+    }
+
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source(
         &self,
         identity: &ContinuationCallIdentity,
