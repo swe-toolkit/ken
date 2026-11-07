@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-RETURNED-TREE-MODE-RESULT-POSITION
 title: "LANG-PROC-NON-TREE-RESULT-TREE's returned-tree mode is documented as read only at result positions, but the bit stays set through a let right-hand side and into lambda bodies, so inside a changed proc a plain value checked at a written tree type is wrapped in Ret: `let r : IO Int = if True then 3 else 4 in r` is accepted where the plain `let r : IO Int = 3 in r` and the same if-form in a const or a tree-result proc refuse K0004. Confine the mode to the proc's own result positions"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1
