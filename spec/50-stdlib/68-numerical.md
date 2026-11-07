@@ -1334,10 +1334,13 @@ measurements, not execution or acceptance of the separate CV seed.
 > proofs and an accepted closed client passed; two false clients refused
 > with `KernelRejected TypeMismatch`. The measured 114-element
 > `trusted_base()` identity sets were equal, and no `Axiom` was added.
-> Thirteen named scratch regressions passed 39/39. An independently
-> loaded generic client was not measured: its harness duplicated an
-> `IsTrue` import and refused `AmbiguousReference` after the law checks.
-> The corrected generic client belongs to Foundation's package test.
+> Thirteen named scratch regressions passed 39/39. The first
+> independently loaded generic client refused `AmbiguousReference`:
+> its harness duplicated an `IsTrue` import after the law checks.
+> A corrected harness-only scratch rerun (`evt_yez73k5m74zs`) passed
+> 2/2, including `D0 generic client ok`, with the same 114-element
+> trusted identity sets. Foundation's package test separately checks
+> the generic client on the candidate, not on this Spec child.
 > No scratch result checks this Spec child or an assembled candidate;
 > none establishes official conformance, CI, publication, landing or
 > measured landed trust. CV owns the separate closed seed.
