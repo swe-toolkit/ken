@@ -286,11 +286,12 @@ fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
 }
 
 /// Promise class: durable invariant. MEASURED: the compiled
-/// read-write-read body's emitted relay copies share a source origin but have
-/// two distinct discriminants and response rows. CLAIMED: a generated owner
-/// receives its own numbered relay and resume, rather than an origin-wide
-/// verdict. THE GAP: this tests the plan's emitted-copy census; the matrix
-/// parity test checks the native behavior through the same compiled route.
+/// read-write-read body emits three copies of one relay origin: one Trap and
+/// two Row resumes at distinct rows, all with distinct discriminants.
+/// CLAIMED: each emitting owner resumes its own numbered relay copy, not an
+/// origin-wide verdict. THE GAP: this tests the plan's emitted-copy census;
+/// the matrix parity test checks native behavior through the compiled route.
+/// Further owners or trap copies may be lawful, so the assertion is relational.
 #[test]
 fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
     let source = SOURCE
@@ -312,7 +313,7 @@ fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 ),
             );
-            built.expect("read-write-read native build with two relay copies");
+            built.expect("read-write-read native build with distinct relay copies");
             assert_eq!(diagnostics.len(), 1, "one installed native plan");
             diagnostics.into_iter().next().unwrap().settled_relays
         })
@@ -325,11 +326,13 @@ fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
     }
     assert!(
         by_origin.values().any(|copies| {
-            copies.len() == 2
-                && copies[0].0 != copies[1].0
-                && matches!((copies[0].1, copies[1].1), (Some((_, row_a)), Some((_, row_b))) if row_a != row_b)
+            let discriminants = copies.iter().map(|(discriminant, _)| *discriminant)
+                .collect::<std::collections::BTreeSet<_>>();
+            let rows = copies.iter().filter_map(|(_, resume)| resume.map(|(_, row)| row))
+                .collect::<std::collections::BTreeSet<_>>();
+            discriminants.len() == copies.len() && rows.len() >= 2
         }),
-        "read-write-read needs two copies of one relay origin with distinct discriminants and resume rows: {relays:?}"
+        "read-write-read needs one relay origin whose copies have distinct discriminants and at least two distinct resume rows: {relays:?}"
     );
 }
 
