@@ -1,7 +1,7 @@
 ---
 id: SPEC-NAT-ADD-ZERO-INVERSION-PUBLIC
 title: "Two catalog packages privately re-derive the same Nat facts, that a sum equal to Zero has Zero summands: NatBox's add_zero_left and add_zero_right, and NatMatrix's add_eq_zero_left and add_eq_zero_right. Nat Arithmetic exports neither. Export the pair from Data.Numeric.Nat.Arithmetic as checked laws, state them in spec 64 §4, and replace both private copies with imports"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
