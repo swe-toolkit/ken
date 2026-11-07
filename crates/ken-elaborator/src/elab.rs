@@ -936,7 +936,8 @@ struct ElabCtx<'e> {
     result_predicates: Vec<ResultPredicate>,
     /// A changed proc's result position returns its checked tree. Only result
     /// positions consult this bit; argument, RHS and type subchecks do not:
-    /// `check` hides it from every subterm (check_outside_result_position).
+    /// `check` and `infer` hide it from every subterm
+    /// (check_outside_result_position, infer_outside_result_position).
     returned_tree_mode: bool,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
@@ -3423,18 +3424,33 @@ fn check_with_result_predicates(
     }
 }
 
-/// `check` is the subterm entry: a let RHS, an argument, a condition, a
-/// scrutinee and a lambda written as a subterm all arrive here, and none of
-/// them is the proc's result position. Result positions reach their splits
-/// through check_returned_tail, which calls check_let, check_if and
-/// check_match_result directly, and the proc's own parameter binders through
-/// check_returned_position, so hiding the bit here confines it to them.
+/// `check` is one of the two subterm entries
+/// (infer_outside_result_position is the other): a let RHS, an argument, a
+/// condition, a scrutinee and a lambda written as a subterm all arrive through
+/// one of them, and none is the proc's result position. Result positions reach
+/// their splits through check_returned_tail, which calls check_let, check_if
+/// and check_match_result directly, and the proc's own parameter binders
+/// through check_returned_position, so hiding the bit here confines it to them.
 #[inline(never)]
 fn check_outside_result_position(
     cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
 ) -> Result<Term, ElabError> {
     let old_mode = std::mem::replace(&mut cx.returned_tree_mode, false);
     let result = check(cx, expr, expected, span);
+    cx.returned_tree_mode = old_mode;
+    result
+}
+
+/// `infer` is the other subterm entry: an unannotated let RHS, an if
+/// condition and a match scrutinee arrive here, and none of them is the
+/// proc's result position. A result-position match reaches
+/// infer_match_entered directly from check_match_result, not through here.
+#[inline(never)]
+fn infer_outside_result_position(
+    cx: &mut ElabCtx<'_>, expr: &RExpr,
+) -> Result<(Term, Term), ElabError> {
+    let old_mode = std::mem::replace(&mut cx.returned_tree_mode, false);
+    let result = infer(cx, expr);
     cx.returned_tree_mode = old_mode;
     result
 }
@@ -14947,6 +14963,9 @@ fn infer_becomes_error(span: &Span) -> Result<(Term, Term), ElabError> {
 }
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    if cx.returned_tree_mode {
+        return infer_outside_result_position(cx, expr);
+    }
     match expr {
         RExpr::RIf {
             condition,
