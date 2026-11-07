@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO
 title: "Spec 65 gives `dot` its symmetry, distributivity, scaling and zero-annihilation laws (§§2 to 11), but no checked law concludes anything about a vector from a value of `dot`: nothing says a Nat vector whose dot product with itself is zero is the zero vector. Rule from a checked D0 at zero trust the public definiteness law, with any Nat zero-inversion step it needs and a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1

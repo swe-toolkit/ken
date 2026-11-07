@@ -212,8 +212,9 @@ The §1b inventory (Architect AC-0 rounds 1 and 2, evt_1jd9djf6thfea and
 evt_1jd8yzwewmtf6; Increment B-closure, evt_4z5rz8cs4nw8c,
 evt_5kjjy0w0gzma, evt_p37pc6dwdk3h, evt_qkp7qcj87b3q and
 evt_3nvw9veeqa274; entries 11 to 13, evt_6ap56syy0smt6,
-evt_7cm821pbn97vt and evt_1339kvspms2zv; entry 16, evt_zbd2e5wv721d)
-has sixteen entries:
+evt_7cm821pbn97vt and evt_1339kvspms2zv; entry 16, evt_zbd2e5wv721d;
+entries 17 and 18, evt_6xjn4g9m3kbd7 and evt_5bdq0a4bwxvb4) has
+eighteen entries:
 
 1. W1, the returned-Vis settlement is checked against the protocol's
    root owner. Keyed on the emitting protocol; R3 closes it.
@@ -281,6 +282,18 @@ has sixteen entries:
     return-clause scrutinee are lowered without the clause frame, in the
     function that opened it (evt_59x9w96jsgxzk). This shares entry 15's
     predicate on one edge; `RT-NATIVE-BRACKET-RETURN-CLAUSE` closes it.
+17. B-closure's CI run 42297646395 meets the planner invariant "one relay
+    member resumes two closed continuations" on Mapping's three-access
+    bodies. The relay pooled every IH-force disposition of k across
+    emission owners. Keyed on the relay origin; r4's per-copy relay key
+    makes the key finer.
+18. Suppressed drive, the committed row
+    `suppressing_bounded_response_owner_drive_reports_typed_capacity_exhaustion`
+    (feature `px8-ds-test-support`): relay copy Specialization(0) at
+    origin 433 wraps a carried K as its own static label-0 variant
+    (7-field Child), while runtime flow delivers the 13-field K minted at
+    occurrence 1576. Keyed on (relay origin, emitting owner), not on the
+    activation that minted the K it carries.
 
 Entries 10 to 13 share one predicate: the relay's resume state is located
 through the response-row plane, but its identity is the runtime-carried K.
@@ -290,7 +303,15 @@ identity read from one plane and checked or consumed under another key,
 such as the emitting unit rather than the static owner. Entries 7, 8 and 9
 carry entry 6's predicate. B-closure sidesteps it for parity by forwarding
 on the operation's identity, and `RT-NATIVE-VIS-MAY-YIELD-SUMMARY`
-replaces the per-plane walks.
+replaces the per-plane walks. Entries 16 and 17 share one predicate: a static
+settlement decision keyed on an identity coarser than the runtime
+activation it settles (evt_5bdq0a4bwxvb4).
+Entry 18 is reclassified as an artifact of the suppression
+switch, which builds a program outside its own plan: no coherent plan exists without the local drive (D0-8,
+Architect evt_58avnxxk6khhr), and the row is restated to assert that
+the suppressed artifact fails closed. r4's per-copy (origin, owner)
+relay keys close entries 16 and 17's predicate (Steward
+evt_1chyed3wcanq8).
 
 ## Stop conditions
 

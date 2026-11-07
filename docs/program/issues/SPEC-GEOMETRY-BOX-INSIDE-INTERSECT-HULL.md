@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL
 title: "Spec 67 orders boxes corner-wise by `inside` (§5, §12) and gives intersect and hull their lattice laws (§6 to §9, §13), but no checked law connects the order to the operations: nothing says a box inside another is its own intersection with it, or that the outer box is their hull. Rule from a checked D0 at zero trust the two public consistency laws, with the Nat Order selector laws they need and a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
