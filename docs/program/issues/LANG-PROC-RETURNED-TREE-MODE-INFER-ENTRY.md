@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-RETURNED-TREE-MODE-INFER-ENTRY
 title: "LANG-PROC-RETURNED-TREE-MODE-RESULT-POSITION hides returned-tree mode only on entry to `check`, but an unannotated let right-hand side, an if condition and a match scrutinee enter through `infer`, which leaves the bit set. A match inside them checks its arms as result positions, so inside a changed proc a plain arm at a written tree type is Ret-wrapped: `let r = match True { True ↦ (… : IO Int); False ↦ 4 } in 1` is accepted where the same body in a const refuses K0004, and `ken run` executes it. Hide the mode on every non-result entry"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T1
