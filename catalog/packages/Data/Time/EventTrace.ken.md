@@ -36,6 +36,8 @@ helper. The inverted-window law follows window append; its private decision
 lemma sits beside the split's bound lemmas.
 The all-in-window identity follows it and reuses the existing private
 `window_keep` and public list membership lemmas without a new helper.
+The no-member window law follows the identity with the same membership
+premise shape and an empty-list conclusion, without another helper.
 Windowing includes the lower bound
 but excludes the upper; a merge tie favors the left input without examining
 payloads. Membership uses Ω-valued `list_elem`, so neither a payload equality
@@ -393,6 +395,34 @@ pub theorem trace_window_all_identity
               hi
               t
               (λe. λlater. all e (list_elem_later (Event p) e h t later))))
+  }
+
+pub theorem trace_window_none_empty
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : ((e : Event p) → list_elem (Event p) e tr → Equal Bool (event_in_window p lo hi e) False)
+      → Equal (List (Event p)) (trace_window p lo hi tr) (Nil (Event p)) =
+  match tr {
+    Nil ↦ λnone. Proved;
+    Cons h t ↦
+      λnone.
+        trans
+          (List (Event p))
+          (trace_window p lo hi (Cons (Event p) h t))
+          (trace_window p lo hi t)
+          (Nil (Event p))
+          (cong
+            Bool
+            (List (Event p))
+            (event_in_window p lo hi h)
+            False
+            (λd. window_keep (Event p) h (trace_window p lo hi t) d)
+            (none h (list_elem_head (Event p) h t)))
+          (trace_window_none_empty
+            p
+            lo
+            hi
+            t
+            (λe. λlater. none e (list_elem_later (Event p) e h t later)))
   }
 
 pub theorem trace_window_length_bound
@@ -3261,6 +3291,12 @@ congruence under `Cons` preserves its order and duplicate occurrences. Only
 the public Derived membership lemmas are newly reused; `window_keep` stays
 private and no additional proof helper is needed.
 
+The no-member window law also inducts on the original trace. Its quantified
+premise excludes the head via `list_elem_head`; `cong` through `window_keep`
+removes it. `list_elem_later` restricts the premise to the tail, whose
+induction hypothesis closes the empty-list equality. Neither ordering nor
+inverted bounds are required.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -3282,7 +3318,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and twenty checked law contracts.
+  — the carrier, half-open boundary, left-bias and checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -3291,7 +3327,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the twenty laws form the package surface.
+   `trace_merge`, and the twenty-one laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -3323,7 +3359,9 @@ merging, not window multiplicity.
    checked natural-order transitivity. Its decision helper stays private.
    The all-in-window identity reuses `window_keep` and public Derived
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
-4. **Trusted-base delta.** Zero: all twenty exported laws have checked proof
+   The no-member law reuses those same lemmas and `window_keep` to delete
+   each missed head, without an additional helper or import.
+4. **Trusted-base delta.** Zero: all twenty-one exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3356,6 +3394,10 @@ merging, not window multiplicity.
    trace and refuses the shorter window's false identity claim at its own
    `Refl`. Its fixture is separate from the authored §10 conformance seed and
    does not replace the generic checked proof. The
+   `cat_time_window_none_empty` package test checks the new generic law,
+   exact trusted GlobalId identities, and a closed miss premise that accepts
+   `[2, 5)` but rejects `[1, 5)` at the time-1 event's proof arm. It is not
+   the separately owned conformance seed. The
    `cat_time_window_commutation` test imports the generic §11 law, measures
    trusted GlobalId identities, checks the complete accepted commutation seed
    and refuses its isolated dropped-inner-window claim at its own `Refl`.
