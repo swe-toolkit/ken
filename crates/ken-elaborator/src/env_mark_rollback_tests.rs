@@ -23,16 +23,26 @@ fn prelude_declared_tree_rows_inject_after_signature_capture() {
     let mut env = ElabEnv::new().expect("checked prelude");
     let print_line = env.globals["print_line"];
     let host_console = env.globals["host_console"];
-    let checked = crate::elab::checked_prelude_tree_row_ids(&mut env)
-        .unwrap_or_else(|(id, error)| {
-            let name = if id == print_line { "print_line" }
-                else if id == host_console { "host_console" }
-                else { "other checked prelude declaration" };
+    let checked =
+        crate::elab::checked_prelude_tree_row_ids(&mut env).unwrap_or_else(|(id, error)| {
+            let name = if id == print_line {
+                "print_line"
+            } else if id == host_console {
+                "host_console"
+            } else {
+                "other checked prelude declaration"
+            };
             panic!("R8 prelude {name} ({id:?}) row did not inject: {error:?}");
         });
-    assert!(!checked.is_empty(), "R8 must reach a checked tree declaration");
+    assert!(
+        !checked.is_empty(),
+        "R8 must reach a checked tree declaration"
+    );
     assert!(checked.contains(&print_line), "R8 must inspect print_line");
-    assert!(checked.contains(&host_console), "R8 must inspect host_console");
+    assert!(
+        checked.contains(&host_console),
+        "R8 must inspect host_console"
+    );
     eprintln!("R8 checked {} prelude tree rows", checked.len());
 }
 
