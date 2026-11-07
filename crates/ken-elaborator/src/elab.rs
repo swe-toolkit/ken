@@ -2457,9 +2457,9 @@ fn check_let(
     result
 }
 
-/// A performing let cannot be bound into a non-tree result. Rows with no
-/// ambient tree and function-valued declared results still elaborate as B;
-/// refuse rather than silently erase their action (36 §§2.4–2.5).
+/// A performing let cannot be bound where there is no applicable result tree:
+/// before a function's final arrow, inside a space operation, or with no
+/// summand authorized by the written parameters (36 §§2.4–2.5).
 #[inline(never)]
 fn refuse_unsequenced_performed_let(
     cx: &ElabCtx<'_>,
@@ -2482,7 +2482,7 @@ fn refuse_unsequenced_performed_let(
     }
     Err(ElabError::TypeMismatch {
         span: span.clone(),
-        reason: "this let's right-hand side performs an action, but its result type is not an action tree, so the action cannot be sequenced (36 §2.4): a proc whose row has no ambient tree, or whose declared result is a function, does not yet return a tree (36 §2.5); perform the action in a tree-result proc, or hold it as a value without `let`".into(),
+        reason: "this let's right-hand side performs an action, but its result type is not an action tree, so the action cannot be sequenced (36 §2.4): the expected position has no tree when a proc whose declared result is a function performs outside its final arrow, in a space operation, or when the row has no applicable summand (36 §2.5); perform the action at a tree result, or hold it as a value without `let`".into(),
     })
 }
 
@@ -22551,64 +22551,163 @@ fn elab_signature(cx: &mut ElabCtx<'_>, ty: &RType, result: bool) -> Result<Term
     elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })
 }
 
-/// The checked signature of a proc whose written result B is a non-tree,
-/// non-function value. Walk only its written parameter telescope: a Pi *in*
-/// B is excluded, not mistaken for another declaration parameter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RowSummand {
+    Console,
+    Clock,
+    Entropy,
+    HostAuth,
+}
+
+/// A written family or operation label injects wherever its family does.
+/// In particular MappingAllocate belongs to HostAuth, not to the ambient
+/// signature. The exhaustive host match makes a new operation a compile error
+/// until its summand is chosen (36 §2.5).
+fn row_label_summand(label: &str) -> Option<RowSummand> {
+    match label {
+        "Console" => return Some(RowSummand::Console),
+        "Clock" => return Some(RowSummand::Clock),
+        "Entropy" => return Some(RowSummand::Entropy),
+        "FS" | "Process" => return Some(RowSummand::HostAuth),
+        _ => {}
+    }
+    let op = ken_host::HostOpV1::ALL
+        .into_iter()
+        .find(|op| crate::export::canonical_host_perform_signature_v1(*op) == label)?;
+    use ken_host::HostOpV1::*;
+    Some(match op {
+        ConsoleRead | ConsoleWrite | ConsoleFlush | ConsoleIsTerminal => RowSummand::Console,
+        ClockWallNow | ClockMonotonicNow | ClockSleepUntil => RowSummand::Clock,
+        EntropyRandomBytes => RowSummand::Entropy,
+        FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsReadDirectory
+        | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
+        | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSeek | FsSetLength | FsSync
+        | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease
+        | BufferAllocate | BufferFreeze | MappingAllocate | MappingReadView
+        | MappingWriteView | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite
+        | ProcessPlanOpen | ProcessPlanPush | ProcessSpawn | ProcessTakePipe
+        | ProcessWait => RowSummand::HostAuth,
+    })
+}
+
+/// Give a non-space proc a tree at its final non-tree result, retaining the
+/// written parameter telescope and any arrows in its declared result. The
+/// Auth index must come from a checked, written Cap parameter, never the row
+/// alone or a mutable name lookup (36 §2.5).
 #[inline(never)]
 fn returned_tree_signature(
     cx: &mut ElabCtx<'_>, rdecl: &RDecl, ty: Term,
 ) -> Result<(Term, bool), ElabError> {
-    if !matches!(rdecl.kind, RDeclKind::View { keyword: DefKeyword::Proc, .. }) {
+    if !matches!(
+        rdecl.kind,
+        RDeclKind::View { keyword: DefKeyword::Proc, is_space_op: false, .. }
+    ) {
         return Ok((ty, false));
     }
     let Some(crate::effects::RowType::Concrete(row)) = surface_declared_row_type(rdecl)? else {
         return Ok((ty, false));
     };
-    if row.is_empty() || !row.effects().all(|effect| {
-        matches!(effect.as_str(), "Console" | "Clock" | "Entropy")
-    }) {
+    if row.is_empty() {
         return Ok((ty, false));
     }
-    let Some(ids) = cx.numeric_env.effect_tree_ids() else {
-        // Prelude construction has not captured the closed signature table.
+    let summands = row.effects().map(|label| row_label_summand(label)).collect::<Option<Vec<_>>>();
+    let Some(summands) = summands else {
+        // A space or undeclared label is not a host summand. The declared-
+        // tree injection refusal follows in Increment 2.
         return Ok((ty, false));
     };
-    let (effect, response) = if row.len() == 1 {
-        let (op, resp) = match row.effects().next().expect("nonempty row").as_str() {
-            "Console" => (ids.console_op, ids.console_resp),
-            "Clock" => (ids.clock_op, ids.clock_resp),
-            "Entropy" => (ids.entropy_op, ids.entropy_resp),
-            _ => unreachable!("row checked for ambient labels"),
-        };
-        (checked_effect_head(cx, op), Term::const_(resp, vec![]))
-    } else {
-        (checked_effect_head(cx, ids.ambient_op), Term::const_(ids.ambient_resp, vec![]))
+    let Some(ids) = cx.numeric_env.effect_tree_ids() else {
+        // Prelude construction has not captured the checked signature table.
+        return Ok((ty, false));
     };
     fn replace_result(
-        cx: &mut ElabCtx<'_>, ty: Term, params: usize, effect: &Term, response: &Term,
+        cx: &mut ElabCtx<'_>, ty: Term, params: usize, summands: &[RowSummand],
+        ids: crate::numbers::EffectTreeIds, first_cap: &mut Option<(Term, usize)>,
+        span: &Span,
     ) -> Result<(Term, bool), ElabError> {
-        if params != 0 {
-            let Term::Pi(domain, result) = ty else {
-                return Err(ElabError::Internal(
-                    "proc parameter telescope is shorter than written arity".into(),
-                ));
-            };
-            cx.ctx.push((*domain).clone());
-            let new_result = replace_result(cx, *result, params - 1, effect, response);
-            cx.ctx.pop();
-            return new_result.map(|(tail, changed)| (Term::pi(*domain, tail), changed));
-        }
         let head = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(&ty));
-        if matches!(head, Term::Pi(..)) || let_itree_parts(cx, &ty).is_some() {
+        if let Term::Pi(domain, result) = head {
+            if params != 0 {
+                if let Term::App(cap, auth) = whnf(cx.env, &cx.ctx, &domain) {
+                    if matches!(*cap, Term::Const { id, .. } if id == ids.cap) {
+                        if let Some((first, depth)) = first_cap {
+                            let first_here = weaken(first, (cx.ctx.len() - *depth) as i64);
+                            if !convert_type(cx.env, &cx.ctx, &first_here, &auth) {
+                                return Err(ElabError::TypeMismatch {
+                                    span: span.clone(),
+                                    reason: "written FS capabilities with different Auth indices; one result tree carries one index (36 §2.5)".into(),
+                                });
+                            }
+                        } else {
+                            *first_cap = Some(((*auth).clone(), cx.ctx.len()));
+                        }
+                    }
+                }
+            }
+            cx.ctx.push((*domain).clone());
+            let tail = replace_result(
+                cx, *result, params.saturating_sub(1), summands, ids, first_cap, span,
+            );
+            cx.ctx.pop();
+            return tail.map(|(result, changed)| {
+                if changed { (Term::pi(*domain, result), true) } else { (ty, false) }
+            });
+        }
+        if params != 0 {
+            return Err(ElabError::Internal(
+                "proc parameter telescope is shorter than written arity".into(),
+            ));
+        }
+        if let_itree_parts(cx, &ty).is_some() {
             return Ok((ty, false));
         }
+        let ambient = [RowSummand::Console, RowSummand::Clock, RowSummand::Entropy]
+            .into_iter().filter(|summand| summands.contains(summand)).collect::<Vec<_>>();
+        let host_auth = summands.contains(&RowSummand::HostAuth)
+            .then(|| first_cap.as_ref())
+            .flatten()
+            .map(|(auth, depth)| weaken(auth, (cx.ctx.len() - *depth) as i64));
+        let (effect, response) = if let Some(auth) = host_auth {
+            let fs = Term::app(checked_effect_head(cx, ids.fs_op), auth.clone());
+            let fs_response = Term::app(Term::const_(ids.fs_resp, vec![]), auth);
+            if ambient.is_empty() {
+                (fs, fs_response)
+            } else {
+                let ambient_op = checked_effect_head(cx, ids.ambient_op);
+                let effect = Term::app(
+                    Term::app(checked_effect_head(cx, ids.coproduct), fs.clone()),
+                    ambient_op.clone(),
+                );
+                let response = [fs, ambient_op, fs_response, Term::const_(ids.ambient_resp, vec![])]
+                    .into_iter().fold(Term::const_(ids.resp_coproduct, vec![]), Term::app);
+                (effect, response)
+            }
+        } else {
+            match ambient.as_slice() {
+                [] => return Ok((ty, false)),
+                [RowSummand::Console] => (
+                    checked_effect_head(cx, ids.console_op), Term::const_(ids.console_resp, vec![]),
+                ),
+                [RowSummand::Clock] => (
+                    checked_effect_head(cx, ids.clock_op), Term::const_(ids.clock_resp, vec![]),
+                ),
+                [RowSummand::Entropy] => (
+                    checked_effect_head(cx, ids.entropy_op), Term::const_(ids.entropy_resp, vec![]),
+                ),
+                _ => (
+                    checked_effect_head(cx, ids.ambient_op), Term::const_(ids.ambient_resp, vec![]),
+                ),
+            }
+        };
         let itree = cx.numeric_env.effect_sequencing_ids()
             .expect("effect tree registrar preceded signature capture").0;
-        let tree = [effect.clone(), response.clone(), ty]
+        let tree = [effect, response, ty]
             .into_iter().fold(Term::indformer(itree, vec![]), Term::app);
         Ok((tree, true))
     }
-    replace_result(cx, ty, view_param_count(rdecl), &effect, &response)
+    replace_result(
+        cx, ty, view_param_count(rdecl), &summands, ids, &mut None, &rdecl.span,
+    )
 }
 
 fn elaborate_v0(
