@@ -436,9 +436,9 @@ pin!(
     RefuseNonTree
 );
 
-// Transition sentinel: under Inc 1 pick's tree is IO Box, so its recursive
-// result is an action the scrutinee slot does not sequence. The FS row keeps
-// the earlier shape, whose callback let is still refused.
+// Transition sentinel: pick's returned IO Box is an action, including when
+// its row also names FS without a written Cap (36 §2.5). The recursive result
+// cannot be sequenced by the scrutinee slot in either row shape.
 pin!(r1_recursive_result, top_pick(true), RefuseTreeScrutinee);
 pin!(
     r1f_recursive_result_fs_row,
@@ -452,7 +452,7 @@ pin!(
         assert_ne!(fs, source, "the recursive pick's row moved");
         fs
     },
-    RefuseNonTree
+    RefuseTreeScrutinee
 );
 pin!(r1k_recursive_constructor, top_pick(false), RefuseInclusion);
 pin!(
