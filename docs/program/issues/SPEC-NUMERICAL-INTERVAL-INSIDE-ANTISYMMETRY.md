@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-INSIDE-ANTISYMMETRY
 title: "Spec 68 makes interval inclusion reflexive and transitive, but no law closes the order: two intervals each inside the other are not known to share endpoint values, so a client that brackets one enclosure by another both ways cannot conclude they denote the same interval. NatBox has the analogue (inside_antisym). Rule from a checked D0 at zero trust the public law that mutual inclusion makes both endpoint pairs rational_equiv, and state it with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1

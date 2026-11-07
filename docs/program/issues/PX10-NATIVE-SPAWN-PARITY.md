@@ -330,9 +330,11 @@ not once before any caller (evt_213k68h5rb1ey). B1a closes it.
 Entries 21 and 22 share one predicate: planner planes name a bind's
 consumer by a form that B1a's lowering changed. B1a keeps the Let form
 (Architect evt_706fb41bc2scs). A one-case Ret frame was refuted by D0-3:
-the bracket plane keys on the two-case Ret/Vis shape. The
-detached-consumer search is closed under the Architect's D0 series
-(evt_axggp4bvrs50).
+the bracket plane keys on the two-case Ret/Vis shape. Entries 17, 18
+and 19 share one predicate with the D0-6 and D0-7 walls: a static key
+coarser than the placement it settles. RT-NATIVE-SETTLEMENT-PLACEMENT-KEY
+keys every static settlement point on (origin, placement), and B1a
+resumes on it (Architect evt_5b1gt2a3cz0f0).
 Entry 18 is reclassified as an artifact of the suppression switch, which
 builds a program outside its own plan: no coherent plan exists without
 the local drive (D0-8, Architect evt_58avnxxk6khhr), and the row is
