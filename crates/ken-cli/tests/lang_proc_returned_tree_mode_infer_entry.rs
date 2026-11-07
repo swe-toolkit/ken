@@ -44,8 +44,7 @@ fn assert_refusal(name: &str, command: &str, program: &str, code: &str) {
     );
 }
 
-#[test]
-fn inferred_subterms_refuse_plain_branches_at_a_written_tree_type() {
+fn assert_inferred_subterm(case: usize) {
     const MATCH: &str =
         "match True { True ↦ (ITree.Ret ConsoleOp console_resp Int 3 : IO Int); False ↦ 4 }";
     let cases = [
@@ -66,12 +65,31 @@ fn inferred_subterms_refuse_plain_branches_at_a_written_tree_type() {
             "E0013",
         ),
     ];
-    for (name, body, code) in cases {
-        let changed = source(&format!("proc p : Int visits [Console] = {body}"));
-        let control = source(&format!("const c : Int = {body}"));
-        assert_refusal(&format!("proc-{name}"), "check", &changed, code);
-        assert_refusal(&format!("const-{name}"), "check", &control, code);
-    }
+    let (name, body, code) = &cases[case];
+    let changed = source(&format!("proc p : Int visits [Console] = {body}"));
+    let control = source(&format!("const c : Int = {body}"));
+    assert_refusal(&format!("proc-{name}"), "check", &changed, code);
+    assert_refusal(&format!("const-{name}"), "check", &control, code);
+}
+
+#[test]
+fn unannotated_let_rhs_does_not_inherit_returned_tree_mode() {
+    assert_inferred_subterm(0);
+}
+
+#[test]
+fn nested_unannotated_let_rhs_does_not_inherit_returned_tree_mode() {
+    assert_inferred_subterm(1);
+}
+
+#[test]
+fn match_scrutinee_does_not_inherit_returned_tree_mode() {
+    assert_inferred_subterm(2);
+}
+
+#[test]
+fn if_condition_does_not_inherit_returned_tree_mode() {
+    assert_inferred_subterm(3);
 }
 
 #[test]
