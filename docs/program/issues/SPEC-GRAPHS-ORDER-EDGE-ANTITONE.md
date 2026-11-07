@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-ORDER-EDGE-ANTITONE
 title: "Spec 62 §7 makes reachability monotone when edges are added, but no law moves a dependency order the other way: a TopoOrder of a graph is not known to order a graph with fewer edges, so a client that prunes dependencies must rebuild the order's three proofs by hand. Rule from a checked D0 at zero trust the public law that a TopoOrder of g orders every h whose true edges are true in g, on the same vertex list, and state it with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
