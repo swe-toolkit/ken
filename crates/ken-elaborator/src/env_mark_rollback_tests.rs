@@ -11,6 +11,31 @@ use crate::numbers::{AddEntry, NumericLitVal};
 use crate::standard_operators::StandardOperatorRole;
 use crate::{ast, ElabEnv};
 
+/// Promise class: durable invariant (Spec 36 §2.5). MEASURED: after the
+/// prelude has installed checked signature identities, each nonempty concrete
+/// prelude row with a final declared tree injects into that tree; print_line
+/// and host_console must both be reached. CLAIMED: the ids-None construction
+/// window cannot silently admit a compiler-owned mismatched row. THE GAP:
+/// non-tree results do not need declared-tree injection; user declarations
+/// run the same checker during elaboration rather than in this post-pass.
+#[test]
+fn prelude_declared_tree_rows_inject_after_signature_capture() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let print_line = env.globals["print_line"];
+    let host_console = env.globals["host_console"];
+    let checked = crate::elab::checked_prelude_tree_row_ids(&mut env)
+        .unwrap_or_else(|(id, error)| {
+            let name = if id == print_line { "print_line" }
+                else if id == host_console { "host_console" }
+                else { "other checked prelude declaration" };
+            panic!("R8 prelude {name} ({id:?}) row did not inject: {error:?}");
+        });
+    assert!(!checked.is_empty(), "R8 must reach a checked tree declaration");
+    assert!(checked.contains(&print_line), "R8 must inspect print_line");
+    assert!(checked.contains(&host_console), "R8 must inspect host_console");
+    eprintln!("R8 checked {} prelude tree rows", checked.len());
+}
+
 fn trusted_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
     env.env.trusted_base().into_iter().collect()
 }

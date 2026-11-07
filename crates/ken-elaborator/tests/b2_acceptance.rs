@@ -905,8 +905,8 @@ fn temporal_non_host_signature_rejects_same_family_sibling() {
             r#"
 data LocalOp = Ping | Pong
 fn local_resp (_op : LocalOp) : Type = Unit
-proc target (_value : Unit)
-  : ITree LocalOp local_resp Unit visits [Local] =
+fn target (_value : Unit)
+  : ITree LocalOp local_resp Unit =
   ITree.Vis LocalOp local_resp Unit Ping
     (\_response. ITree.Ret LocalOp local_resp Unit MkUnit)
 "#,

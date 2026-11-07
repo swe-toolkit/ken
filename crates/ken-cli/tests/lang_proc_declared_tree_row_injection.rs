@@ -1,0 +1,125 @@
+//! Spec 36 §2.5: every label in a declared tree result's concrete row
+//! injects into the checked tree signature. Promise class: durable invariant.
+//! MEASURED: each mismatched label is refused by name and a matched sibling
+//! is admitted, across ambient, host, alias, arrow-final and local signatures.
+//! CLAIMED: row labels cannot promise effects absent from the declared tree.
+//! THE GAP: these cases do not enumerate every host op; the source classifier
+//! matches HostOpV1 exhaustively, and the separate prelude pin covers the
+//! compiler-owned declarations before signature ids are captured.
+
+use ken_elaborator::{ElabEnv, ElabError};
+
+fn accepts(case: &str, source: &str) {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    env.elaborate_file(source)
+        .unwrap_or_else(|error| panic!("{case}: expected accepted declaration: {error:?}"));
+}
+
+fn refuses_label(case: &str, source: &str, label: &str) {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    let error = match env.elaborate_file(source) {
+        Ok(_) => panic!("{case}: label `{label}` was accepted"),
+        Err(error) => error,
+    };
+    assert!(
+        matches!(&error, ElabError::TypeMismatch { reason, .. }
+            if reason.contains(&format!("row label `{label}` has no summand"))
+                && reason.contains("36 §2.5")),
+        "{case}: expected declared-tree injection refusal for `{label}`, got {error:?}"
+    );
+}
+
+#[test]
+fn r1_clock_cannot_inject_into_console_tree() {
+    accepts(
+        "R1 Console",
+        "proc p : IO Unit visits [Console] = print_line \"x\"",
+    );
+    refuses_label(
+        "R1 Clock",
+        "proc q : IO Unit visits [Console, Clock] = print_line \"x\"",
+        "Clock",
+    );
+}
+
+const HOST_RET: &str = "ITree.Ret (Coproduct (FSOp APartial) AmbientOp) \
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) Unit MkUnit";
+
+#[test]
+fn r2_host_operation_labels_inject_only_into_their_family() {
+    for (case, row) in [("R2 host family", "FS, FsOpen"), ("R2 FS", "FS")] {
+        accepts(
+            case,
+            &format!("proc h : HostIO APartial Unit visits [{row}] = {HOST_RET}"),
+        );
+    }
+    refuses_label(
+        "R2 FsOpen in IO",
+        "proc i : IO Unit visits [Console, FsOpen] = print_line \"x\"",
+        "FsOpen",
+    );
+}
+
+#[test]
+fn r3_transparent_tree_head_is_classified_by_checked_identity() {
+    accepts(
+        "R3 alias Console",
+        "def ConsoleTree = IO Unit\nproc p : ConsoleTree visits [Console] = print_line \"x\"",
+    );
+    refuses_label(
+        "R3 alias Clock",
+        "def ConsoleTree = IO Unit\nproc p : ConsoleTree visits [Console, Clock] = print_line \"x\"",
+        "Clock",
+    );
+}
+
+#[test]
+fn r4_fs_tree_does_not_admit_an_ambient_label() {
+    accepts(
+        "R4 FS and FsOpen",
+        "proc r (c : Cap AFull) : FS AFull (Result FileError Bytes) \
+         visits [FS, FsOpen] = read_bytes AFull c (bytes_encode \"x\")",
+    );
+    refuses_label(
+        "R4 Console in FS",
+        "proc r (c : Cap AFull) : FS AFull (Result FileError Bytes) \
+         visits [FS, Console] = read_bytes AFull c (bytes_encode \"x\")",
+        "Console",
+    );
+}
+
+#[test]
+fn r5_tree_final_arrow_checks_the_signature_at_the_leaf() {
+    accepts(
+        "R5 arrow Console",
+        "proc tf : Unit -> IO Unit visits [Console] = \\_. print_line \"x\"",
+    );
+    refuses_label(
+        "R5 arrow Clock",
+        "proc tf : Unit -> IO Unit visits [Console, Clock] = \\_. print_line \"x\"",
+        "Clock",
+    );
+}
+
+const LOCAL_PREFIX: &str = "data LocalOp = Ping | Pong\n\
+    fn local_resp (_op : LocalOp) : Type = Unit\n";
+const LOCAL_BODY: &str = "ITree.Vis LocalOp local_resp Unit Ping \
+    (\\_response. ITree.Ret LocalOp local_resp Unit MkUnit)";
+
+#[test]
+fn r6_undeclared_local_label_refuses_but_explicit_tree_function_checks() {
+    refuses_label(
+        "R6 Local",
+        &format!(
+            "{LOCAL_PREFIX}proc target (_value : Unit) : ITree LocalOp local_resp Unit \
+             visits [Local] = {LOCAL_BODY}"
+        ),
+        "Local",
+    );
+    accepts(
+        "R6 migrated function",
+        &format!(
+            "{LOCAL_PREFIX}fn target (_value : Unit) : ITree LocalOp local_resp Unit = {LOCAL_BODY}"
+        ),
+    );
+}

@@ -22590,6 +22590,74 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
     })
 }
 
+/// 36 §2.5: every row label of a declared result tree must inject into its
+/// signature. Shared by returned_tree_signature and the prelude pin.
+fn check_declared_tree_row(
+    cx: &ElabCtx<'_>, ids: crate::numbers::EffectTreeIds,
+    labels: &[(String, Option<RowSummand>)], effect: &Term, span: &Span,
+) -> Result<(), ElabError> {
+    let admitted = declared_tree_summands(cx, ids, effect);
+    match labels.iter().find(|(_, s)| !s.is_some_and(|s| admitted.contains(&s))) {
+        Some((label, _)) => Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: format!("row label `{label}` has no summand in the declared result tree's signature, so the row cannot bound it (36 §2.5)"),
+        }),
+        None => Ok(()),
+    }
+}
+
+/// The summands a declared tree's signature admits, recognized by conversion
+/// against the captured checked heads, never by spelling. Any other signature
+/// (a user operation family) admits none.
+fn declared_tree_summands(
+    cx: &ElabCtx<'_>, ids: crate::numbers::EffectTreeIds, effect: &Term,
+) -> Vec<RowSummand> {
+    use RowSummand::*;
+    let is = |candidate: &Term| convert_type(cx.env, &cx.ctx, effect, candidate);
+    for (op, summand) in [(ids.console_op, Console), (ids.clock_op, Clock), (ids.entropy_op, Entropy)] {
+        if is(&checked_effect_head(cx, op)) {
+            return vec![summand];
+        }
+    }
+    let ambient_op = checked_effect_head(cx, ids.ambient_op);
+    if is(&ambient_op) {
+        return vec![Console, Clock, Entropy];
+    }
+    // FSOp a and Coproduct (FSOp a) AmbientOp carry Auth as the FS head's
+    // argument: read it off the term, then confirm the whole signature.
+    let fs_head = checked_effect_head(cx, ids.fs_op);
+    let fs_auth = |term: &Term| match term {
+        Term::App(head, auth) if convert_type(cx.env, &cx.ctx, head, &fs_head) => {
+            Some((**auth).clone())
+        }
+        _ => None,
+    };
+    let written = cx.metas.zonk_term(effect);
+    let normal = whnf(cx.env, &cx.ctx, &written);
+    for form in [&written, &normal] {
+        if let Some(auth) = fs_auth(form) {
+            if is(&Term::app(fs_head.clone(), auth)) {
+                return vec![HostAuth];
+            }
+        }
+        if let Term::App(left, _) = form {
+            if let Term::App(_, fs) = left.as_ref() {
+                if let Some(auth) = fs_auth(fs) {
+                    let fs = Term::app(fs_head.clone(), auth);
+                    let host = Term::app(
+                        Term::app(checked_effect_head(cx, ids.coproduct), fs),
+                        ambient_op.clone(),
+                    );
+                    if is(&host) {
+                        return vec![Console, Clock, Entropy, HostAuth];
+                    }
+                }
+            }
+        }
+    }
+    Vec::new()
+}
+
 /// Give a non-space proc a tree at its final non-tree result, retaining the
 /// written parameter telescope and any arrows in its declared result. The
 /// Auth index must come from a checked, written Cap parameter, never the row
@@ -22610,18 +22678,16 @@ fn returned_tree_signature(
     if row.is_empty() {
         return Ok((ty, false));
     }
-    let summands = row.effects().map(|label| row_label_summand(label)).collect::<Option<Vec<_>>>();
-    let Some(summands) = summands else {
-        // A space or undeclared label is not a host summand. The declared-
-        // tree injection refusal follows in Increment 2.
-        return Ok((ty, false));
-    };
+    let labels = row.effects()
+        .map(|label| (label.to_string(), row_label_summand(label)))
+        .collect::<Vec<_>>();
     let Some(ids) = cx.numeric_env.effect_tree_ids() else {
         // Prelude construction has not captured the checked signature table.
         return Ok((ty, false));
     };
     fn replace_result(
-        cx: &mut ElabCtx<'_>, ty: Term, params: usize, summands: &[RowSummand],
+        cx: &mut ElabCtx<'_>, ty: Term, params: usize,
+        labels: &[(String, Option<RowSummand>)],
         ids: crate::numbers::EffectTreeIds, first_cap: &mut Option<(Term, usize)>,
         span: &Span,
     ) -> Result<(Term, bool), ElabError> {
@@ -22632,7 +22698,9 @@ fn returned_tree_signature(
                     if matches!(*cap, Term::Const { id, .. } if id == ids.cap) {
                         if let Some((first, depth)) = first_cap {
                             let first_here = weaken(first, (cx.ctx.len() - *depth) as i64);
-                            if !convert_type(cx.env, &cx.ctx, &first_here, &auth) {
+                            if labels.iter().all(|(_, s)| s.is_some())
+                                && !convert_type(cx.env, &cx.ctx, &first_here, &auth)
+                            {
                                 return Err(ElabError::TypeMismatch {
                                     span: span.clone(),
                                     reason: "written FS capabilities with different Auth indices; one result tree carries one index (36 §2.5)".into(),
@@ -22646,7 +22714,7 @@ fn returned_tree_signature(
             }
             cx.ctx.push((*domain).clone());
             let tail = replace_result(
-                cx, *result, params.saturating_sub(1), summands, ids, first_cap, span,
+                cx, *result, params.saturating_sub(1), labels, ids, first_cap, span,
             );
             cx.ctx.pop();
             return tail.map(|(result, changed)| {
@@ -22658,9 +22726,15 @@ fn returned_tree_signature(
                 "proc parameter telescope is shorter than written arity".into(),
             ));
         }
-        if let_itree_parts(cx, &ty).is_some() {
+        if let Some((effect, _, _)) = let_itree_parts(cx, &ty) {
+            check_declared_tree_row(cx, ids, labels, &effect, span)?;
             return Ok((ty, false));
         }
+        let Some(summands) = labels.iter().map(|(_, s)| *s).collect::<Option<Vec<_>>>() else {
+            // An undeclared label on a non-tree result keeps the written type;
+            // refuse_unsequenced_performed_let refuses an action there.
+            return Ok((ty, false));
+        };
         let ambient = [RowSummand::Console, RowSummand::Clock, RowSummand::Entropy]
             .into_iter().filter(|summand| summands.contains(summand)).collect::<Vec<_>>();
         let host_auth = summands.contains(&RowSummand::HostAuth)
@@ -22706,8 +22780,50 @@ fn returned_tree_signature(
         Ok((tree, true))
     }
     replace_result(
-        cx, ty, view_param_count(rdecl), &summands, ids, &mut None, &rdecl.span,
+        cx, ty, view_param_count(rdecl), &labels, ids, &mut None, &rdecl.span,
     )
+}
+
+/// After prelude capture, apply the same declared-tree injection checker to
+/// every compiler-owned concrete, non-empty effect row. Test-only: the prelude
+/// is elaborated before `EffectTreeIds` exists, so this closes that window.
+#[cfg(test)]
+pub(crate) fn checked_prelude_tree_row_ids(
+    elab: &mut crate::ElabEnv,
+) -> Result<Vec<GlobalId>, (GlobalId, ElabError)> {
+    let ids = elab.numeric_env.effect_tree_ids().expect("captured prelude effect ids");
+    let rows = elab.effect_rows_by_id.iter().filter_map(|(id, row)| match row {
+        crate::effects::RowType::Concrete(row) if !row.is_empty() => Some((
+            *id,
+            row.effects()
+                .map(|label| (label.to_string(), row_label_summand(label)))
+                .collect::<Vec<_>>(),
+        )),
+        _ => None,
+    }).collect::<Vec<_>>();
+    let mut checked = Vec::new();
+    for (id, labels) in rows {
+        let (_, mut ty) = elab.env.const_type(id).expect("registered prelude row has a checked type");
+        let mut cx = ElabCtx::new(
+            &mut elab.env, &elab.globals, &mut elab.num_values,
+            &elab.numeric_env, &elab.refinement_facts, "prelude injection pin",
+        );
+        loop {
+            let head = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(&ty));
+            if let Term::Pi(domain, result) = head {
+                cx.ctx.push((*domain).clone());
+                ty = *result;
+                continue;
+            }
+            if let Some((effect, _, _)) = let_itree_parts(&cx, &ty) {
+                check_declared_tree_row(&cx, ids, &labels, &effect, &Span::zero())
+                    .map_err(|error| (id, error))?;
+                checked.push(id);
+            }
+            break;
+        }
+    }
+    Ok(checked)
 }
 
 fn elaborate_v0(
