@@ -285,6 +285,54 @@ fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: the compiled
+/// read-write-read body's emitted relay copies share a source origin but have
+/// two distinct discriminants and response rows. CLAIMED: a generated owner
+/// receives its own numbered relay and resume, rather than an origin-wide
+/// verdict. THE GAP: this tests the plan's emitted-copy census; the matrix
+/// parity test checks the native behavior through the same compiled route.
+#[test]
+fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
+    let source = SOURCE
+        .replace("__ENTRY__", "matrix_stage")
+        .replace("__MATRIX_BODY__", "read_write_read_body");
+    // The established Mapping matrix provisions 32 MiB for this deep native
+    // build. Reuse that stated size rather than libtest's ambient 2 MiB.
+    let relays = std::thread::Builder::new()
+        .name("abi-s6-relay-copy-census".to_owned())
+        .stack_size(32 * 1024 * 1024)
+        .spawn(move || {
+            let root = tempfile::tempdir().expect("relay-copy output directory");
+            let (built, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(
+                || ken_cli::build_native_program(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    "abi_s6_relay_copy_census",
+                    root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                ),
+            );
+            built.expect("read-write-read native build with two relay copies");
+            assert_eq!(diagnostics.len(), 1, "one installed native plan");
+            diagnostics.into_iter().next().unwrap().settled_relays
+        })
+        .expect("start stated-stack relay census worker")
+        .join()
+        .expect("relay census worker completes");
+    let mut by_origin = std::collections::BTreeMap::<_, Vec<_>>::new();
+    for (origin, discriminant, resume) in &relays {
+        by_origin.entry(*origin).or_default().push((*discriminant, *resume));
+    }
+    assert!(
+        by_origin.values().any(|copies| {
+            copies.len() == 2
+                && copies[0].0 != copies[1].0
+                && matches!((copies[0].1, copies[1].1), (Some((_, row_a)), Some((_, row_b))) if row_a != row_b)
+        }),
+        "read-write-read needs two copies of one relay origin with distinct discriminants and resume rows: {relays:?}"
+    );
+}
+
 /// Promise class: transition sentinel for the fixed read-write-read route.
 /// MEASURED: the ordinary route has full native/interpreter parity; suppressing
 /// only the local owner drive reaches that seat, stops after the first read,

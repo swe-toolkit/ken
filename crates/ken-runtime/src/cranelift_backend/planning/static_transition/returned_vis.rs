@@ -71,8 +71,8 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
         BTreeMap<StaticResponseContinuationId, ReturnedVisProtocol>,
     pub(in crate::cranelift_backend) members:
         BTreeMap<StaticOriginId, StaticResponseContinuation>,
-    /// Forwarded relays, keyed by relay origin, disjoint from response rows.
-    pub(in crate::cranelift_backend) relays: BTreeMap<StaticOriginId, PendingVisRelay>,
+    /// Forwarded relay copies, keyed by construct origin and emitting owner.
+    pub(in crate::cranelift_backend) relays: BTreeMap<PendingVisRelayKey, PendingVisRelay>,
     /// Closed operation clauses of each relay-bearing response owner.
     pub(in crate::cranelift_backend) relay_arms:
         BTreeMap<StaticResponseContinuationId, Vec<super::responses::RelayHostResponseArm>>,
@@ -81,8 +81,16 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth>,
 }
 
-/// A forwarded relay, numbered by its own construct origin rather than a
-/// response row. A resolved row is only the relay's resume target.
+/// One emitted copy of a returned relay: the construct origin and generated
+/// owner that mints it. Copies have independent resumes and discriminants.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct PendingVisRelayKey {
+    pub(in crate::cranelift_backend) origin: StaticOriginId,
+    pub(in crate::cranelift_backend) owner: super::ContinuationEmissionOwner,
+}
+
+/// A forwarded relay, numbered by its emitted copy rather than a response
+/// row. A resolved row is only the relay's resume target.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisRelay {
     pub(in crate::cranelift_backend) discriminant: u32,
@@ -187,19 +195,29 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
-    /// Determine a relay's resume from static planes fixed before settlement.
-    /// Every issuing owner must agree; the oriented plane confirms the result
-    /// after this plan is built, but does not rewrite it.
+    /// Determine one emitting owner's relay resume from static planes fixed
+    /// before settlement. The oriented plane confirms, but never rewrites it.
     pub(in crate::cranelift_backend) fn relay_resume_verdict(
         &self,
         relay: StaticOriginId,
+        owner: super::ContinuationEmissionOwner,
     ) -> Result<PendingVisRelayResume, CraneliftBackendError> {
         let k = self.child_static_origin(relay, 1)?;
+        let issuing = self.relay_emission_owners(relay)?;
+        if self.recursive_residual_dispositions.iter().any(|entry| {
+            matches!(entry.child,
+                super::aggregates::RecursiveResidualChildKind::CheckedIhForce { child, .. }
+                    if child == k && !issuing.contains(&entry.owner))
+        }) {
+            return Err(planner_error(
+                "a relay continuation is forced in an owner that does not mint the relay",
+            ));
+        }
         let seats = self.recursive_residual_dispositions.iter().filter_map(|entry| {
             match entry.child {
                 super::aggregates::RecursiveResidualChildKind::CheckedIhForce {
                     child, seat, call_template_id,
-                } if child == k => Some((seat, call_template_id)),
+                } if child == k && entry.owner == owner => Some((seat, call_template_id)),
                 _ => None,
             }
         }).collect::<Vec<_>>();
@@ -276,12 +294,19 @@ impl StaticTransitionPlan<'_> {
             };
             for member in protocol.contexts.iter().flat_map(|context| &context.members) {
                 if member.relay {
-                    let resume = self.relay_resume_verdict(member.origin)?;
-                    if let Some(previous) = relays.insert(member.origin, resume.clone()) {
-                        if previous != resume {
-                            return Err(planner_error(
-                                "one relay member resumes two closed continuations",
-                            ));
+                    let emitters = self.relay_emission_owners(member.origin)?;
+                    if emitters.is_empty() {
+                        return Err(planner_error("a returned relay has no emitting owner"));
+                    }
+                    for emitter in emitters {
+                        let key = PendingVisRelayKey { origin: member.origin, owner: emitter };
+                        let resume = self.relay_resume_verdict(member.origin, emitter)?;
+                        if let Some(previous) = relays.insert(key, resume.clone()) {
+                            if previous != resume {
+                                return Err(planner_error(
+                                    "one relay member resumes two closed continuations",
+                                ));
+                            }
                         }
                     }
                     width.captures = width.captures.max(RELAY_PAYLOAD_WORDS);
@@ -364,15 +389,15 @@ impl StaticTransitionPlan<'_> {
             settlements.insert(owner.id(), ResponseOwnerSettlement::Protocol);
             owners.insert(owner.id(), protocol);
         }
-        // Rows occupy ordinal + 1. Relays follow all rows in origin order.
+        // Rows occupy ordinal + 1. Relays follow all rows in (origin, owner) order.
         let exhausted = || planner_capacity_error("pending-Vis discriminant exhausted");
         let mut next = match members.values().map(|row| row.id().ordinal()).max() {
             Some(ordinal) => ordinal.checked_add(2).ok_or_else(exhausted)?,
             None => 1,
         };
         let mut numbered = BTreeMap::new();
-        for (origin, resume) in relays {
-            numbered.insert(origin, PendingVisRelay { discriminant: next, resume });
+        for (key, resume) in relays {
+            numbered.insert(key, PendingVisRelay { discriminant: next, resume });
             next = next.checked_add(1).ok_or_else(exhausted)?;
         }
         Ok(PendingVisSettlements {

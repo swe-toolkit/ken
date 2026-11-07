@@ -569,9 +569,9 @@ impl Lowering<'_> {
                                 return Err(error("a member is not its producer's exact row"));
                             }
                         }
-                        PendingVisStoreSource::Relay(origin) => {
+                        PendingVisStoreSource::Relay(key) => {
                             let relay = self.pending_vis_record_protocol.as_ref()
-                                .and_then(|protocol| protocol.relays.get(&origin))
+                                .and_then(|protocol| protocol.relays.get(&key))
                                 .ok_or_else(|| error("a relay store has no planned origin"))?;
                             let ValueDef::Result(mint, _) = func.dfg.value_def(stored) else {
                                 return Err(error("a relay was not minted at its producer"));
@@ -784,9 +784,9 @@ impl Lowering<'_> {
                             .map(|(index, _)| (frame.region.continuation_inputs, index)))
                         .collect::<Vec<_>>()
                 }
-                PendingVisProducerIdentity::Relay(origin) => {
-                    if !protocol.relays.contains_key(&origin)
-                        || !matches!(member.source, PendingVisStoreSource::Relay(actual) if actual == origin)
+                PendingVisProducerIdentity::Relay(key) => {
+                    if !protocol.relays.contains_key(&key)
+                        || !matches!(member.source, PendingVisStoreSource::Relay(actual) if actual == key)
                     {
                         return Err(error("a producer changed its relay discriminant"));
                     }
@@ -3651,7 +3651,7 @@ struct RelayArmEffect {
 }
 
 struct RelayEffect {
-    origin: StaticOriginId,
+    key: PendingVisRelayKey,
     relay: PendingVisRelay,
     arms: Vec<RelayArmEffect>,
 }
@@ -3659,7 +3659,7 @@ struct RelayEffect {
 struct PendingVisOwnerCall {
     row: StaticResponseContinuationId,
     /// Distinguishes each relay operation clause from its shared K row.
-    relay_arm: Option<(StaticOriginId, usize)>,
+    relay_arm: Option<(PendingVisRelayKey, usize)>,
     call: cranelift_codegen::ir::Inst,
     expected_context: FuncId,
     host_validation_end: cranelift_codegen::ir::Inst,
@@ -3677,9 +3677,9 @@ struct PendingVisFinishedBody {
     member_load: cranelift_codegen::ir::Inst,
     member_branches: Vec<cranelift_codegen::ir::Inst>,
     member_ids: Vec<StaticResponseContinuationId>,
-    relay_members: Vec<(StaticOriginId, u32, cranelift_codegen::ir::Inst,
+    relay_members: Vec<(PendingVisRelayKey, u32, cranelift_codegen::ir::Inst,
         cranelift_codegen::ir::Block)>,
-    relay_arm_branches: Vec<(StaticOriginId, usize, u64, cranelift_codegen::ir::Inst,
+    relay_arm_branches: Vec<(PendingVisRelayKey, usize, u64, cranelift_codegen::ir::Inst,
         cranelift_codegen::ir::Block)>,
     selected_blocks: Vec<cranelift_codegen::ir::Block>,
     payload_loads: Vec<Vec<cranelift_codegen::ir::Inst>>,
@@ -3826,7 +3826,7 @@ fn emit_pending_vis_owner_loop(
             i64::from(relay.relay.discriminant),
         );
         let branch = builder.ins().brif(matches, selected, &[], next, &[]);
-        relay_members.push((relay.origin, relay.relay.discriminant, branch, selected));
+        relay_members.push((relay.key, relay.relay.discriminant, branch, selected));
         relay_blocks.push(selected);
         builder.switch_to_block(next);
     }
@@ -4072,7 +4072,7 @@ fn emit_pending_vis_owner_loop(
     for (relay, selected) in relays.iter().zip(relay_blocks) {
         builder.switch_to_block(selected);
         let vis_identity = compiler.static_transition_plan
-            .constructor_symbol_identity(relay.origin)?.tag_abi_word()?;
+            .constructor_symbol_identity(relay.key.origin)?.tag_abi_word()?;
         let vis_identity = i64::try_from(vis_identity).map_err(|_| backend_module(
             LoweringCause::Capacity, "relay Vis tag exceeds range".to_string()))?;
         Lowering::require_i64(builder, actual_tag, vis_identity);
@@ -4127,7 +4127,7 @@ fn emit_pending_vis_owner_loop(
                         expected_tag,
                     );
                     let branch = builder.ins().brif(matches, arm_block, &[], next, &[]);
-                    relay_arm_branches.push((relay.origin, arm_index, arm.arm.constructor_tag, branch, arm_block));
+                    relay_arm_branches.push((relay.key, arm_index, arm.arm.constructor_tag, branch, arm_block));
                     arm_blocks.push(arm_block);
                     builder.switch_to_block(next);
                 }
@@ -4226,7 +4226,7 @@ fn emit_pending_vis_owner_loop(
                             "a relay K context has no exact generated target".to_string())
                     })?;
                     calls.push(PendingVisOwnerCall {
-                        row: row.id(), relay_arm: Some((relay.origin, arm_index)), call,
+                        row: row.id(), relay_arm: Some((relay.key, arm_index)), call,
                         expected_context, host_validation_end,
                         ret_identity: row.k_ret_identity().tag_abi_word()?,
                     });
@@ -4627,8 +4627,8 @@ fn verify_pending_vis_finished_body(
         }
     }
     for (index, relay) in relays.iter().enumerate() {
-        let (origin, discriminant, branch, selected) = facts.relay_members[index];
-        if origin != relay.origin || discriminant != relay.relay.discriminant {
+        let (key, discriminant, branch, selected) = facts.relay_members[index];
+        if key != relay.key || discriminant != relay.relay.discriminant {
             return Err(error("a returned relay's member identity changed after settlement"));
         }
         let destinations = func.dfg.insts[branch].branch_destination(&func.dfg.jump_tables);
@@ -4652,14 +4652,14 @@ fn verify_pending_vis_finished_body(
             return Err(error("a relay member branch did not check its own discriminant"));
         }
         let PendingVisRelayResume::Row { row, .. } = &relay.relay.resume else {
-            if facts.relay_arm_branches.iter().any(|(arm_origin, ..)| *arm_origin == origin) {
+            if facts.relay_arm_branches.iter().any(|(arm_key, ..)| *arm_key == key) {
                 return Err(error("a trapped relay emitted an operation arm"));
             }
             continue;
         };
         for (arm_index, arm) in relay.arms.iter().enumerate() {
             let (_, _, tag, arm_branch, arm_block) = facts.relay_arm_branches.iter()
-                .find(|(arm_origin, index, ..)| *arm_origin == origin && *index == arm_index)
+                .find(|(arm_key, index, ..)| *arm_key == key && *index == arm_index)
                 .copied().ok_or_else(|| error("a relay operation arm has no finished branch"))?;
             if tag != arm.arm.constructor_tag || !dom.dominates(selected, arm_branch, &func.layout) {
                 return Err(error("a relay operation arm is not under its selected member"));
@@ -4685,13 +4685,13 @@ fn verify_pending_vis_finished_body(
                 return Err(error("a relay arm did not check its own operation tag"));
             }
             if arm.provably_dead {
-                if facts.calls.iter().any(|call| call.relay_arm == Some((origin, arm_index))) {
+                if facts.calls.iter().any(|call| call.relay_arm == Some((key, arm_index))) {
                     return Err(error("a provably dead relay arm called K"));
                 }
                 continue;
             }
             let call = facts.calls.iter().find(|call| {
-                call.relay_arm == Some((origin, arm_index))
+                call.relay_arm == Some((key, arm_index))
             }).ok_or_else(|| error("a relay operation arm has no checked K call"))?;
             if call.row != row.id() || call.ret_identity != row.k_ret_identity().tag_abi_word()?
                 || !dom.dominates(arm_block, call.call, &func.layout)
@@ -5272,14 +5272,21 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     "a pending-Vis member has no derived response row".to_string(),
                 )))
                 .collect::<Result<Vec<_>, _>>()?;
-            let relays = owner_protocol.contexts.iter()
+            let mut relays = Vec::new();
+            for member in owner_protocol.contexts.iter()
                 .flat_map(|context| &context.members)
                 .filter(|member| member.relay)
-                .map(|member| protocol.relays.get(&member.origin)
-                    .cloned().map(|relay| (member.origin, relay))
-                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                        "a returned relay has no numbered protocol member".to_string())))
-                .collect::<Result<Vec<_>, _>>()?;
+            {
+                let copies = protocol.relays.iter()
+                    .filter(|(key, _)| key.origin == member.origin)
+                    .map(|(key, relay)| (*key, relay.clone()))
+                    .collect::<Vec<_>>();
+                if copies.is_empty() {
+                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                        "a returned relay has no numbered protocol member".to_string()));
+                }
+                relays.extend(copies);
+            }
             let arms = protocol.relay_arms.get(&row.id()).cloned().unwrap_or_default();
             (successors, relays, arms)
         } else {
@@ -5306,7 +5313,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             }
             Ok(SuccessorEffect { row, effect, operation_arguments })
         }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
-        let relays = relay_members.into_iter().map(|(origin, relay)| {
+        let relays = relay_members.into_iter().map(|(key, relay)| {
             // A Trap resume traps before dispatch, so its function lowers no
             // arm and owns none of the arms' source joins.
             let arms = match &relay.resume {
@@ -5328,7 +5335,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     Ok(RelayArmEffect { arm: arm.clone(), effect, provably_dead, dead_body })
                 }).collect::<Result<Vec<_>, CraneliftBackendError>>()?,
             };
-            Ok(RelayEffect { origin, relay, arms })
+            Ok(RelayEffect { key, relay, arms })
         }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let (offsets, frame_bytes) = owner.slot_offsets()?;
         if frame_bytes != owner.header().frame_bytes {

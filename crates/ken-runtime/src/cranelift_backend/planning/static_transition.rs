@@ -50,7 +50,7 @@ pub(in crate::cranelift_backend) use resumptions::{
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    PendingVisRelay, PendingVisRelayResume, ResponseOwnerSettlement,
+    PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume, ResponseOwnerSettlement,
 };
 use crate::cranelift_backend::surface::LoweringCause;
 use returned_vis::PendingVisSettlements;
@@ -1552,8 +1552,8 @@ fn record_static_response_feasibility_diagnostic(
                             .map(|member| member.origin.0).collect())
                     }).collect()).unwrap_or_default(),
                 settled_relays: plan.pending_vis_settlements.protocol.as_ref()
-                    .map(|protocol| protocol.relays.iter().map(|(origin, relay)| {
-                        (origin.0, relay.discriminant, match &relay.resume {
+                    .map(|protocol| protocol.relays.iter().map(|(key, relay)| {
+                        (key.origin.0, relay.discriminant, match &relay.resume {
                             PendingVisRelayResume::Row { seat, row, .. } =>
                                 Some((seat.0, row.vis_origin().0)),
                             PendingVisRelayResume::Trap(_) => None,

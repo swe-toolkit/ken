@@ -469,7 +469,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    PendingVisRelay, PendingVisRelayResume, ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
+    PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume, ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
     BracketSettlementId,
     BracketSettlementMode, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
@@ -1269,8 +1269,8 @@ enum PendingVisStoreSource {
     Captured(cranelift_codegen::ir::Value),
     /// The producer-minted exact, nonzero successor-row discriminant.
     Member(StaticResponseContinuationId),
-    /// A relay discriminant minted at its own construct origin.
-    Relay(StaticOriginId),
+    /// A relay discriminant minted by its own emitting owner.
+    Relay(PendingVisRelayKey),
     /// A word loaded from the just-called unit's checked caller-owned frame.
     Copied {
         load: cranelift_codegen::ir::Inst,
@@ -1308,7 +1308,7 @@ struct PendingVisCopySite {
 #[derive(Clone, Copy)]
 enum PendingVisProducerIdentity {
     Row(StaticResponseContinuationId),
-    Relay(StaticOriginId),
+    Relay(PendingVisRelayKey),
 }
 
 struct PendingVisProducerSite {
@@ -7957,7 +7957,7 @@ impl<'a> Lowering<'a> {
 
     /// Mint one producer-origin member and its bounded payload. A non-relay
     /// uses its exact successor row; a relay stores its own operation and K
-    /// environment words under a distinct, origin-keyed discriminant.
+    /// environment words under a distinct, emitting-owner-keyed discriminant.
     fn record_pending_vis_construct(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -7965,11 +7965,11 @@ impl<'a> Lowering<'a> {
         constructor: &str,
         lowered: &[LoweringOperand],
     ) -> Result<(), CraneliftBackendError> {
-        let (row, relay, in_owner) = self.pending_vis_record_protocol.as_ref().map_or(
-            (None, None, false), |protocol| {
+        let (row, has_relay, in_owner) = self.pending_vis_record_protocol.as_ref().map_or(
+            (None, false, false), |protocol| {
                 (
                     protocol.members.get(&origin).cloned(),
-                    protocol.relays.get(&origin).cloned(),
+                    protocol.relays.keys().any(|key| key.origin == origin),
                     protocol.owners.values().any(|owner| owner.contexts.iter().any(|context| {
                         context.members.iter().any(|member| member.origin == origin)
                     })),
@@ -7979,7 +7979,7 @@ impl<'a> Lowering<'a> {
         if !in_owner {
             return Ok(());
         }
-        if row.is_some() == relay.is_some() {
+        if row.is_some() == has_relay {
             return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a returned-Vis member has no unique planned row or relay".to_string()));
         }
@@ -7987,7 +7987,7 @@ impl<'a> Lowering<'a> {
             return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis member is not its planned binary Vis occurrence".to_string()));
         }
-        if let Some(relay) = relay {
+        if has_relay {
             // The same source construct may be visited by several generated
             // functions. Only a planner-listed emission owner mints this copy.
             let issuing = self.static_transition_plan
@@ -7995,6 +7995,14 @@ impl<'a> Lowering<'a> {
             if !self.defining_emission_owner.is_some_and(|owner| issuing.contains(&owner)) {
                 return Ok(());
             }
+            let key = PendingVisRelayKey {
+                origin,
+                owner: self.defining_emission_owner.expect("the mint gate checked this owner"),
+            };
+            let relay = self.pending_vis_record_protocol.as_ref()
+                .and_then(|protocol| protocol.relays.get(&key))
+                .cloned().ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                    "a minting owner has no numbered relay copy".to_string()))?;
             let Some(frame) = self.function_local.pending_vis_frame else {
                 return Err(backend_module(LoweringCause::PlannerInvariant,
                     "a pending-Vis relay has no caller-owned activation record".to_string()));
@@ -8023,10 +8031,10 @@ impl<'a> Lowering<'a> {
                 MemFlags::trusted(), word, frame.slots, frame.region.discriminant,
             );
             self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
-                inst, offset: frame.region.discriminant, source: PendingVisStoreSource::Relay(origin),
+                inst, offset: frame.region.discriminant, source: PendingVisStoreSource::Relay(key),
             });
             self.function_local.pending_vis_producer_sites.push(PendingVisProducerSite {
-                member: inst, identity: PendingVisProducerIdentity::Relay(origin), capture_stores,
+                member: inst, identity: PendingVisProducerIdentity::Relay(key), capture_stores,
             });
             return Ok(());
         }
