@@ -26,6 +26,48 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (\terminal. delayed (selected_body terminal "captured"))
 "#;
 
+/// Promise class: durable invariant. MEASURED: the real selected-pending
+/// source elaborates at the strict entry with checked Console/HostIO imports;
+/// omitting either flush or is_terminal refuses that exact name. CLAIMED:
+/// these two H homes are required by their actual Console user, without
+/// widening the ambient floor. THE GAP: the original native owner-admission
+/// tests separately observe planner and runtime behavior.
+#[test]
+fn strict_pending_console_source_requires_each_operation_import() {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let body = PX7L
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("source program header");
+    let process = "import Capability.Process.Exit (host_console, host_bind, host_pure)\n";
+    let with_console = |members: &str| {
+        format!(
+            "program capabilities FS APartial\n{process}\
+             import Capability.Console.Text ({members})\n{body}"
+        )
+    };
+    let mut selected = ken_elaborator::ElabEnv::new().expect("prelude");
+    selected
+        .elaborate_isolated_file_strict_v1(
+            &[catalog.clone()],
+            &with_console("print_line, flush, is_terminal"),
+        )
+        .expect("checked Console operations import for the real source");
+    for (missing, members) in [
+        ("flush", "print_line, is_terminal"),
+        ("is_terminal", "print_line, flush"),
+    ] {
+        let mut negative = ken_elaborator::ElabEnv::new().expect("prelude");
+        match negative.elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_console(members)) {
+            Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, missing),
+            Err(error) => panic!("{missing}: wrong missing-import refusal {error:?}"),
+            Ok(_) => panic!("{missing} available without its import"),
+        }
+    }
+}
+
 #[test]
 fn selected_pending_call_admits_validated_owner_without_a_package() {
     let dir = tempfile::tempdir().unwrap();
