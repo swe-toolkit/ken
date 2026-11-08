@@ -3147,6 +3147,7 @@ fn rewrite_rexpr_inner(
         arm @ RExpr::RCon(..) => rewrite_rexpr_inner_rcon(scope, exports, arm, kernel_head),
         leaf @ RExpr::RCheckedGlobal { .. } => rewrite_rexpr_leaf(leaf),
         leaf @ RExpr::RVar(..) => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RSlotLocal { .. } => rewrite_rexpr_leaf(leaf),
         leaf @ RExpr::RPatternAlias(..) => rewrite_rexpr_leaf(leaf),
         leaf @ RExpr::RRecursiveResult { .. } => rewrite_rexpr_leaf(leaf),
         leaf @ RExpr::RUniv(..) => rewrite_rexpr_leaf(leaf),

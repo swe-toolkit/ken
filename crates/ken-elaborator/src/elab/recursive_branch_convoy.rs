@@ -119,6 +119,7 @@ fn contains_recursive_result(expr: &RExpr) -> bool {
             type_contains_recursive_result(domain) || contains_recursive_result(codomain)
         }
         RExpr::RVar(_, _, _)
+        | RExpr::RSlotLocal { .. }
         | RExpr::RPatternAlias(_, _, _)
         | RExpr::RCon(_, _)
         | RExpr::RCheckedGlobal { .. }

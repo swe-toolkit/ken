@@ -418,6 +418,16 @@ pub(crate) enum RExpr {
     /// LANG-TRUNCATION-SURFACE-SYNTAX D1). Scope-resolved sibling of
     /// `Expr::ETrunc`.
     RTrunc(Box<RExpr>, Span),
+    /// The hidden binder a sequenced match scrutinee is bound to (`36 §2.4`),
+    /// at its stable bottom-relative context position. Only the elaborator
+    /// builds it, as the scrutinee of the match it binds before. No surface
+    /// name reaches the binder, so the match's arms resolve as written. It
+    /// carries the binder's let latent, which a surface binder's scope reads.
+    RSlotLocal {
+        position: usize,
+        latent: crate::effects::RowType,
+        span: Span,
+    },
 }
 
 impl RExpr {
@@ -453,7 +463,8 @@ impl RExpr {
             | RExpr::RInfixSpine { span: s, .. } => s,
             RExpr::RMatch { span, .. }
             | RExpr::RIf { span, .. }
-            | RExpr::RCheckedGlobal { span, .. } => span,
+            | RExpr::RCheckedGlobal { span, .. }
+            | RExpr::RSlotLocal { span, .. } => span,
         }
     }
 }
