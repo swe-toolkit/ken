@@ -83,6 +83,21 @@ rules. The F2 rows are committed, and the
 mutations below are recorded. All of it goes in one candidate, stacked
 under B1a.
 
+The candidate also carries nested Deferred settlement (Steward
+`evt_5xqm5nyd0ah7n`; no gated-off partial landing):
+
+- **Plane C's closure edge is E3**, emission containment. A row whose
+  selected caller is emitted in a specialization that is the
+  selected-call target, or the k-context unit, of an R member joins R
+  (Architect `evt_202qekyxt9rdw`).
+- **A nested region settles at its own S.** A region with a parent
+  whose mode is Deferred settles through the InPlace path when it has a
+  validated row matching its checked region. Without that row, it keeps
+  the `brackets.rs:281` refusal. Root regions still defer to the driver
+  (Architect `evt_500h9ww4pam4h`).
+- **The product shape** follows the C-20 D0's LIFO-PARITY branch, as
+  the Architect rules it.
+
 ## Acceptance
 
 - **AC-0 (D0, before any build).** At the `:263` gate on the 3 F2 rows,

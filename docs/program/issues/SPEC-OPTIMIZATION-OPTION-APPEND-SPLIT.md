@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-OPTION-APPEND-SPLIT
 title: "Spec 72 proves append-split laws for argmin and argmax over two non-empty parts (§1.6, §3.6), but not for argmin_option and argmax_option, the selectors over a possibly empty list: a client that appends two non-empty lists and selects with the Option form must unfold to the NonEmpty selector to know which part wins. Rule from a checked D0 at zero trust the four Option append-split laws, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
