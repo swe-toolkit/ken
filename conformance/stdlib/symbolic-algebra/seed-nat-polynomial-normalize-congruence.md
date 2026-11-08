@@ -72,8 +72,8 @@ theorem distinct_variables_poly_eq_false :
 
 ### stdlib/symbolic-algebra/poly-eq-normalize-rejects-false-premise
 
-- promise class: **discriminating** — the failed premise, not an earlier parse,
-  import, or prefix error, causes the refusal
+- promise class: **normative compatibility vector** — the false-premise
+  refusal is a fixed §15 compatibility behavior
 - spec: `66 §15`; the `poly_eq` result also uses §2.1
 - given: in a second fresh environment, repeat the entire shared prefix above
   and append only this law application:
