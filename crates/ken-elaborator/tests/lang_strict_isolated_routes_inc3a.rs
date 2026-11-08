@@ -361,13 +361,42 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
 #[test]
 fn imported_not_is_definitionally_equal_to_the_pre_source_negation() {
     let prelude = ElabEnv::new().expect("checked prelude");
-    let imported = strict("import Core.Logic.Not (Not)\nexport Not\n")
-        .expect("ordinary logic negation import");
+    let mut imported = ElabEnv::new().expect("prelude");
+    let results = imported
+        .elaborate_isolated_file_strict_v1(
+            &[catalog()],
+            "import Core.Logic.Not (Not)\nfn use_not (p : Omega) : Omega = Not p\n",
+        )
+        .expect("ordinary logic negation import and use");
+    let user_id = results
+        .iter()
+        .find(|result| result.name == "use_not")
+        .expect("user declaration")
+        .def_id;
+    let (_, body) = imported
+        .env
+        .transparent_body(user_id)
+        .expect("checked user body");
+    fn used_constants(term: &Term, out: &mut Vec<ken_kernel::GlobalId>) {
+        if let Term::Const { id, .. } = term {
+            out.push(*id);
+        }
+        for child in term.children() {
+            used_constants(child, out);
+        }
+    }
+    let mut calls = Vec::new();
+    used_constants(&body, &mut calls);
+    assert_eq!(
+        calls.len(),
+        1,
+        "use_not calls exactly its imported definition"
+    );
     let old_id = prelude.globals["Not"];
-    let new_id = imported.globals["Not"];
+    let new_id = calls[0];
     assert_ne!(
         old_id, new_id,
-        "the import is a distinct checked definition"
+        "the imported use selects a distinct definition"
     );
     let variable = Term::const_(imported.globals["Top"], vec![]);
     let old = Term::app(Term::const_(old_id, vec![]), variable.clone());
