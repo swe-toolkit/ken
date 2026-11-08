@@ -1093,6 +1093,15 @@ fn register_prelude_state(elab: &mut ElabEnv, unit_id: GlobalId, mkunit_id: Glob
     elab.numeric_env.install_effect_sequencing_ids(itree_id, ret_id, bind_id);
     elab.globals.insert("bind".to_string(), bind_id);
 
+    // 36 §4.3: the fold and its cut rule, internal identities with no source name.
+    let all_ret_id =
+        state_eff::declare_all_ret(&mut elab.env, itree_id).map_err(ElabError::Internal)?;
+    let all_ret_bind_id = state_eff::declare_all_ret_bind(
+        &mut elab.env, itree_id, ret_id, vis_id, bind_id, all_ret_id,
+    )
+    .map_err(ElabError::Internal)?;
+    elab.numeric_env.install_all_ret_ids(all_ret_id, all_ret_bind_id);
+
     let run_state_id = state_eff::declare_run_state(
         &mut elab.env,
         itree_id,
