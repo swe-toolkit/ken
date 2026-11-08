@@ -12,20 +12,14 @@ const RESOURCE_PRODUCER: &str = r#"
 fn px7f_after_metadata (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-    Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+    Err _ |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+    Ok _ |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
   }
 
 proc px7f_export_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [FS, FsHandleMetadata] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
     (resourceMetadata AFull resource) (\outcome. px7f_after_metadata outcome)
 
 proc px7f_export_resource (cap : Cap AFull) (path : Bytes)

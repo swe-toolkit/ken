@@ -10,6 +10,8 @@
 
 use std::process::{Command, Output};
 
+use ken_elaborator::{ElabEnv, ElabError};
+
 const ACTION: &str = r#"program capabilities FS APartial
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
@@ -38,6 +40,35 @@ fn check(name: &str, source: &str) -> Output {
     cli(name, "check", source)
 }
 
+/// The ACTION prefix is the real source each affected test checks. Its
+/// standalone tails are not programs: `action` is declared by this prefix.
+/// MEASURED: the composed source with ephemeral package imports reaches the
+/// same typed Strict accept/refusal; CLAIMED: the seven former DIVERGE tail
+/// rows do not mask the test's actual effect-row boundary. THE GAP: output
+/// bytes are still checked through the unchanged CLI route until 3b.
+fn recheck_composed_under_strict(source: &str) -> Option<Result<(), ElabError>> {
+    if !source.starts_with(ACTION) {
+        return None;
+    }
+    let imported = source.replacen(
+        "program capabilities FS APartial\n",
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (write, print_line)\n\
+         import Capability.Process.Exit
+           (host_bind, host_pure, host_console, host_program)\n",
+        1,
+    );
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut env = ElabEnv::new().expect("prelude");
+    Some(
+        env.elaborate_isolated_file_strict_v1(&[catalog], &imported)
+            .map(|_| ()),
+    )
+}
+
 fn assert_escape(name: &str, source: &str, owner: &str, effect: &str) {
     let out = check(name, source);
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -48,6 +79,17 @@ fn assert_escape(name: &str, source: &str, owner: &str, effect: &str) {
         stderr.contains(&format!("EffectEscapes in '{owner}': {effect}")),
         "{name}: wrong refusal owner or effect: {stderr}"
     );
+    if let Some(result) = recheck_composed_under_strict(source) {
+        let error = result.expect_err("the composed source still refuses under Strict");
+        assert_eq!(error.code().as_str(), "E0038", "{name}: {error:?}");
+        let ElabError::TypeMismatch { reason, .. } = error else {
+            panic!("{name}: wrong Strict refusal class: {error:?}");
+        };
+        assert!(
+            reason.contains(&format!("EffectEscapes in '{owner}': {effect}")),
+            "{name}: wrong Strict owner/effect: {reason}"
+        );
+    }
 }
 
 fn assert_accept(name: &str, source: &str) {
@@ -58,6 +100,9 @@ fn assert_accept(name: &str, source: &str) {
         "{name}: {}",
         String::from_utf8_lossy(&out.stderr)
     );
+    if let Some(result) = recheck_composed_under_strict(source) {
+        result.unwrap_or_else(|error| panic!("{name}: Strict changed acceptance: {error:?}"));
+    }
 }
 
 fn assert_run(name: &str, source: &str, output: &[u8]) {
@@ -69,6 +114,9 @@ fn assert_run(name: &str, source: &str, output: &[u8]) {
         String::from_utf8_lossy(&out.stderr)
     );
     assert_eq!(out.stdout, output, "{name}: wrong action order or output");
+    if let Some(result) = recheck_composed_under_strict(source) {
+        result.unwrap_or_else(|error| panic!("{name}: Strict changed acceptance: {error:?}"));
+    }
 }
 
 const P5: &str = r#"fn sneaky (u : Unit) : HostIO APartial Unit =
@@ -265,28 +313,60 @@ fn named_proc_return_is_still_charged_at_the_pure_boundary() {
 const P8_TREE_VALUE: &str = r#"program capabilities FS APartial
 const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =
   run_state Nat ConsoleOp console_resp Unit Zero
-    (bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
+    (itree_bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
       (state_get Nat ConsoleOp console_resp MkUnit)
       (\n . inject_r (StateOp Nat) ConsoleOp (resp_state Nat) console_resp Unit (print_line "state-console-pairing")))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-       (Pair Unit Nat) ExitCode
+  host_bind APartial (Pair Unit Nat) ExitCode
     (host_console APartial (Pair Unit Nat) prog)
-    (\_ . host_exit APartial ExitCode.Success)
+    (\_ . host_pure APartial ExitCode ExitCode.Success)
 "#;
 
+/// Promise class: durable invariant. MEASURED: the actual P8 source keeps
+/// its pure-const E0038 owner/effect under Strict with only ephemeral H
+/// imports, while its declared-row repair accepts in both modes and the
+/// existing CLI run keeps its output. CLAIMED: the generic ITree floor
+/// vocabulary does not make a charged closure body silently pure.
+/// THE GAP: Strict execution bytes wait on 3b's rooted route switch.
 #[test]
 fn tree_typed_value_closure_requires_a_declared_row() {
     assert_escape("p8-const-tree-value", P8_TREE_VALUE, "prog", "Console");
+    let imports = "import Capability.Console.Text (print_line)\n\
+                   import Capability.Process.Exit (host_bind, host_pure, host_console)\n\
+                   import Core.Effect.Coproduct (inject_r)\n";
+    let with_imports = |source: &str| {
+        source.replacen(
+            "program capabilities FS APartial\n",
+            &format!("program capabilities FS APartial\n{imports}"),
+            1,
+        )
+    };
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut selected = ElabEnv::new().expect("prelude");
+    let error = selected
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_imports(P8_TREE_VALUE))
+        .expect_err("pure P8 tree still escapes its Console row");
+    assert_eq!(error.code().as_str(), "E0038", "{error:?}");
+    assert!(
+        matches!(error, ElabError::TypeMismatch { reason, .. }
+            if reason.contains("EffectEscapes in 'prog': Console")),
+        "the same closure body must be charged"
+    );
     let declared = P8_TREE_VALUE.replacen(
         "const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =",
         "proc prog : ITree ConsoleOp console_resp (Pair Unit Nat) visits [Console] =",
         1,
     );
     assert_accept("p8-declared-tree-value", &declared);
+    let mut repaired = ElabEnv::new().expect("prelude");
+    repaired
+        .elaborate_isolated_file_strict_v1(&[catalog], &with_imports(&declared))
+        .expect("declared P8 effect row remains accepted under Strict");
     assert_run(
         "p8-declared-tree-value",
         &declared,

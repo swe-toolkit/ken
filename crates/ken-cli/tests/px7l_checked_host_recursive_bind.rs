@@ -8,32 +8,22 @@ proc selected_body (terminal : Bool) (message : String)
   : Unit -> HostIO APartial Unit visits [Console] =
   \_. match terminal {
     False |-> host_console APartial Unit (print_line message) ;
-    True |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    True |-> host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit MkUnit)
+      (\_. host_pure APartial Unit MkUnit)
   }
 
 proc delayed (body : Unit -> HostIO APartial Unit)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit ExitCode
+  host_bind APartial Unit ExitCode
     (body MkUnit)
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. host_exit APartial ExitCode.Success))
+      (\_. host_pure APartial ExitCode ExitCode.Success))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Bool ExitCode
+  host_bind APartial Bool ExitCode
     (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. delayed (selected_body terminal "captured"))
 "#;
@@ -55,9 +45,7 @@ proc selected_result (terminal : Bool) (message : String)
 
 proc delayed_result (body : Unit -> HostIO APartial (Result IOError Unit))
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (body MkUnit)
     (\written. match written {
       Err _ |-> host_program APartial (print_line "write-error") ;
@@ -66,9 +54,7 @@ proc delayed_result (body : Unit -> HostIO APartial (Result IOError Unit))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Bool ExitCode
+  host_bind APartial Bool ExitCode
     (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. delayed_result (selected_result terminal "probe"))
 "#;

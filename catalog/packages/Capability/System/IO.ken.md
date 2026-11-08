@@ -36,7 +36,7 @@ import Capability.System.Buffer
     transfer_count_predecessor,
     transfer_count_remaining)
 
-export write_all_exact_prefix_prop, readAt, spanBytes
+export write_all_exact_prefix_prop, readAt, writeAt, writeAll, spanBytes
 
 import Core.Logic.Transport (cong, sym, trans)
 

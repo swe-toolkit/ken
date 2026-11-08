@@ -11,6 +11,8 @@ need that guarantee require the separate session-shaped monotonic-clock design;
 they must not assume it for `wall_now`.
 
 ```ken
+export wall_now
+
 fn instant_nanoseconds (instant : Instant) : Int =
   match instant {
     Instant.MkInstant nanoseconds ↦ nanoseconds

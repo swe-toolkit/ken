@@ -2,33 +2,23 @@ program capabilities FS AFull
 
 fn mapping_body (_mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn after_mapping_body
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
     Ok (ResourceBracketOk _) |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+      host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
     Ok _ |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Err _ |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+      host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
 
 proc file_body (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withMapping AFull Unit Unit (FileBacked file (8 : Int)) MappingProt.ReadOnly mapping_body)
     (\outcome. after_mapping_body outcome)
@@ -36,18 +26,16 @@ proc file_body (file : Resource ResourceKind.FsHandle)
 fn after_file (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Ok (ResourceBracketOk _) |-> host_exit AFull ExitCode.Success;
-    Ok _ |-> host_exit AFull (ExitCode.Failure 92);
-    Err _ |-> host_exit AFull (ExitCode.Failure 91)
+    Ok (ResourceBracketOk _) |-> host_pure AFull ExitCode ExitCode.Success;
+    Ok _ |-> host_pure AFull ExitCode (ExitCode.Failure 92);
+    Err _ |-> host_pure AFull ExitCode (ExitCode.Failure 91)
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "transport.bin")
           ResourceOpenMode.ResourceMetadata file_body)
         (\outcome. after_file outcome)

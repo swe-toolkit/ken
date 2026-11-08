@@ -9,6 +9,8 @@
 
 use std::process::{Command, Output};
 
+use ken_elaborator::ElabEnv;
+
 fn cli(name: &str, command: &str, source: &str) -> Output {
     let root = std::env::temp_dir().join(format!(
         "ken-proc-returned-tree-infer-entry-{}",
@@ -44,6 +46,30 @@ fn assert_refusal(name: &str, command: &str, program: &str, code: &str) {
     );
 }
 
+/// The typed Strict verdict must repeat the existing CLI oracle's kind.
+/// MEASURED: the same generated source with only ephemeral H imports reaches
+/// the stated K0004/E0013 arm; CLAIMED: ConsoleOp's scoped floor entry
+/// preserves each pure-position control; THE GAP: the CLI route stays Legacy
+/// until 3b and is measured by the unchanged `assert_refusal` calls.
+fn assert_strict_refusal(program: &str, expected: &str) {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imported = program.replacen(
+        "program capabilities FS APartial\n",
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (IO, print_line)\n\
+         import Capability.Process.Exit (host_program)\n",
+        1,
+    );
+    let mut env = ElabEnv::new().expect("prelude");
+    let error = env
+        .elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        .expect_err("pure-position Console tree must still refuse");
+    assert_eq!(error.code().as_str(), expected, "{error:?}");
+}
+
 fn assert_inferred_subterm(case: usize) {
     const MATCH: &str =
         "match True { True ↦ (ITree.Ret ConsoleOp console_resp Int 3 : IO Int); False ↦ 4 }";
@@ -70,6 +96,8 @@ fn assert_inferred_subterm(case: usize) {
     let control = source(&format!("const c : Int = {body}"));
     assert_refusal(&format!("proc-{name}"), "check", &changed, code);
     assert_refusal(&format!("const-{name}"), "check", &control, code);
+    assert_strict_refusal(&changed, code);
+    assert_strict_refusal(&control, code);
 }
 
 #[test]
@@ -115,6 +143,7 @@ fn pure_ret_arm_controls_run_form_type_mismatch() {
          False ↦ MkUnit } in \"done\"",
     );
     assert_refusal("const-run-control", "check", &control, "K0004");
+    assert_strict_refusal(&control, "K0004");
 }
 
 #[test]

@@ -4,61 +4,37 @@ proc child_body
       (buffer : BufferHandle) (child : Resource ResourceKind.ChildProcess)
     : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [FS, Process] =
-  bind
-    (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (Resource ResourceKind.PipeRead))
+  host_bind AFull (Result ResourceError (Resource ResourceKind.PipeRead))
     (ResourceBodyResult Unit Unit)
     (take_stdout AFull child)
     (λtaken.
       match taken {
         Err _ ↦
-          ITree.Ret
-            (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit Unit)
+          host_pure AFull (ResourceBodyResult Unit Unit)
             (ResourceBodyErr Unit Unit MkUnit);
         Ok pipe ↦
-          bind
-            (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result ResourceError ReadProgress)
+          host_bind AFull (Result ResourceError ReadProgress)
             (ResourceBodyResult Unit Unit)
             (read_pipe AFull pipe buffer (MkBufferWindow (0 : Int) (256 : Int)))
             (λread_status.
               match read_status {
                 Err _ ↦
-                  ITree.Ret
-                    (Coproduct (FSOp AFull) AmbientOp)
-                    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-                    (ResourceBodyResult Unit Unit)
+                  host_pure AFull (ResourceBodyResult Unit Unit)
                     (ResourceBodyErr Unit Unit MkUnit);
                 Ok ReadProgress.ReadEof ↦
-                  ITree.Ret
-                    (Coproduct (FSOp AFull) AmbientOp)
-                    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-                    (ResourceBodyResult Unit Unit)
+                  host_pure AFull (ResourceBodyResult Unit Unit)
                     (ResourceBodyErr Unit Unit MkUnit);
                 Ok (ReadProgress.ReadSome _ _) ↦
-                  bind
-                    (Coproduct (FSOp AFull) AmbientOp)
-                    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-                    (Result ResourceError ChildExit)
+                  host_bind AFull (Result ResourceError ChildExit)
                     (ResourceBodyResult Unit Unit)
                     (wait_child AFull child)
                     (λwaited.
                       match waited {
                         Err _ ↦
-                          ITree.Ret
-                            (Coproduct (FSOp AFull) AmbientOp)
-                            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-                            (ResourceBodyResult Unit Unit)
+                          host_pure AFull (ResourceBodyResult Unit Unit)
                             (ResourceBodyErr Unit Unit MkUnit);
                         Ok _ ↦
-                          ITree.Ret
-                            (Coproduct (FSOp AFull) AmbientOp)
-                            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-                            (ResourceBodyResult Unit Unit)
+                          host_pure AFull (ResourceBodyResult Unit Unit)
                             (ResourceBodyOk Unit Unit MkUnit)
                       })
               })
@@ -68,10 +44,7 @@ proc buffer_body
       (cap : Cap AFull) (buffer : BufferHandle)
     : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [FS, Process] =
-  bind
-    (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withChild
       AFull
@@ -107,22 +80,13 @@ proc buffer_body
     (λoutcome.
       match outcome {
         Ok (ResourceBracketOk _) ↦
-          ITree.Ret
-            (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit Unit)
+          host_pure AFull (ResourceBodyResult Unit Unit)
             (ResourceBodyOk Unit Unit MkUnit);
         Ok _ ↦
-          ITree.Ret
-            (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit Unit)
+          host_pure AFull (ResourceBodyResult Unit Unit)
             (ResourceBodyErr Unit Unit MkUnit);
         Err _ ↦
-          ITree.Ret
-            (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit Unit)
+          host_pure AFull (ResourceBodyResult Unit Unit)
             (ResourceBodyErr Unit Unit MkUnit)
       })
 
@@ -132,16 +96,13 @@ proc main
     visits [FS, Process] =
   match caps {
     ProgramCaps.MkProgramCaps cap ↦
-      bind
-        (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result ResourceError (ResourceBracketResult Unit Unit))
+      host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
         ExitCode
         (withBuffer AFull Unit Unit (256 : Int) (buffer_body cap))
         (λoutcome.
           match outcome {
-            Ok (ResourceBracketOk _) ↦ host_exit AFull ExitCode.Success;
-            Ok _ ↦ host_exit AFull (ExitCode.Failure 73);
-            Err _ ↦ host_exit AFull (ExitCode.Failure 74)
+            Ok (ResourceBracketOk _) ↦ host_pure AFull ExitCode ExitCode.Success;
+            Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 74)
           })
   }

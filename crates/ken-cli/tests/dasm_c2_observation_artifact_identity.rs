@@ -27,7 +27,7 @@ fn exit_for_input (input : ProcessInput) : ExitCode = match input {
   }
 }
 fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
-  : HostIO APartial ExitCode = host_exit APartial (exit_for_input input)
+  : HostIO APartial ExitCode = host_pure APartial ExitCode (exit_for_input input)
 "#;
 
 fn run_with_big_stack<F: FnOnce() + Send + 'static>(f: F) {

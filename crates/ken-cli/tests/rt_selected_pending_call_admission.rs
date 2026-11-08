@@ -6,35 +6,67 @@ proc selected_body (terminal : Bool) (message : String)
   : Unit -> HostIO APartial Unit visits [Console] =
   \_. match terminal {
     False |-> host_console APartial Unit (print_line message) ;
-    True |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    True |-> host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit MkUnit)
+      (\_. host_pure APartial Unit MkUnit)
   }
 
 proc delayed (body : Unit -> HostIO APartial Unit)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit ExitCode
+  host_bind APartial Unit ExitCode
     (body MkUnit)
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. host_exit APartial ExitCode.Success))
+      (\_. host_pure APartial ExitCode ExitCode.Success))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Bool ExitCode
+  host_bind APartial Bool ExitCode
     (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. delayed (selected_body terminal "captured"))
 "#;
+
+/// Promise class: durable invariant. MEASURED: the real selected-pending
+/// source elaborates at the strict entry with checked Console/HostIO imports;
+/// omitting either flush or is_terminal refuses that exact name. CLAIMED:
+/// these two H homes are required by their actual Console user, without
+/// widening the ambient floor. THE GAP: the original native owner-admission
+/// tests separately observe planner and runtime behavior.
+#[test]
+fn strict_pending_console_source_requires_each_operation_import() {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let body = PX7L
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("source program header");
+    let process = "import Capability.Process.Exit (host_console, host_bind, host_pure)\n";
+    let with_console = |members: &str| {
+        format!(
+            "program capabilities FS APartial\n{process}\
+             import Capability.Console.Text ({members})\n{body}"
+        )
+    };
+    let mut selected = ken_elaborator::ElabEnv::new().expect("prelude");
+    selected
+        .elaborate_isolated_file_strict_v1(
+            &[catalog.clone()],
+            &with_console("print_line, flush, is_terminal"),
+        )
+        .expect("checked Console operations import for the real source");
+    for (missing, members) in [
+        ("flush", "print_line, is_terminal"),
+        ("is_terminal", "print_line, flush"),
+    ] {
+        let mut negative = ken_elaborator::ElabEnv::new().expect("prelude");
+        match negative.elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_console(members)) {
+            Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, missing),
+            Err(error) => panic!("{missing}: wrong missing-import refusal {error:?}"),
+            Ok(_) => panic!("{missing} available without its import"),
+        }
+    }
+}
 
 #[test]
 fn selected_pending_call_admits_validated_owner_without_a_package() {
@@ -132,8 +164,8 @@ fn owner_vis_join_consumption_refuses_before_dead_subtree_disposition() {
 /// was reached, not that it executed correctly.
 #[test]
 fn checked_double_bind_admits_and_runs_with_native_parity() {
-    const ORIGINAL: &str = "  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    (body MkUnit)\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))\n      (\\_. host_exit APartial ExitCode.Success))";
-    const DOUBLE_BIND: &str = "  let p : HostIO APartial Unit = body MkUnit in\n  bind (Coproduct (FSOp APartial) AmbientOp)\n    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n    Unit ExitCode\n    p\n    (\\_. bind (Coproduct (FSOp APartial) AmbientOp)\n      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)\n      Unit ExitCode\n      p\n      (\\_. host_exit APartial ExitCode.Success))";
+    const ORIGINAL: &str = "  host_bind APartial Unit ExitCode\n    (body MkUnit)\n    (\\_. host_bind APartial (Result IOError Unit) ExitCode\n      (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))\n      (\\_. host_pure APartial ExitCode ExitCode.Success))";
+    const DOUBLE_BIND: &str = "  let p : HostIO APartial Unit = body MkUnit in\n  host_bind APartial Unit ExitCode\n    p\n    (\\_. host_bind APartial Unit ExitCode\n      p\n      (\\_. host_pure APartial ExitCode ExitCode.Success))";
     assert_eq!(PX7L.matches(ORIGINAL).count(), 1);
     let source = PX7L.replacen(ORIGINAL, DOUBLE_BIND, 1);
     let dir = tempfile::tempdir().unwrap();
@@ -193,9 +225,7 @@ fn with_selected_body(body: &str) -> String {
 }
 
 const F1_BODY: &str = r#"  \_. match terminal {
-    False |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    False |-> host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_console APartial Unit (print_line "after-flush")) ;
     True |-> host_console APartial Unit (print_line message)
@@ -246,16 +276,12 @@ fn selected_pending_write_arm_runs_its_bind_continuation_natively() {
 // non-selected arm follows the already-lawful ordinary execution path.
 #[test]
 fn selected_pending_write_arm_controls_agree_across_executors() {
-    const NO_MATCH: &str = r#"  \_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    const NO_MATCH: &str = r#"  \_. host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_console APartial Unit (print_line "after-flush"))"#;
     const UNSELECTED: &str = r#"  \_. match terminal {
     False |-> host_console APartial Unit (print_line message) ;
-    True |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    True |-> host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_. host_console APartial Unit (print_line "after-flush"))
   }"#;
@@ -280,9 +306,7 @@ fn selected_pending_write_arm_controls_agree_across_executors() {
 #[test]
 fn selected_pending_two_print_route_has_native_interpreter_parity() {
     const OLD_ARM: &str = "False |-> host_console APartial Unit (print_line message)";
-    const TWO_PRINTS: &str = r#"False |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      Unit Unit
+    const TWO_PRINTS: &str = r#"False |-> host_bind APartial Unit Unit
       (host_console APartial Unit (print_line message))
       (\_. host_console APartial Unit (print_line "second"))"#;
     assert_eq!(PX7L.matches(OLD_ARM).count(), 1);

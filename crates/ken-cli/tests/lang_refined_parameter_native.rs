@@ -26,7 +26,7 @@ fn classify (n : Nat) : ExitCode = match n {
 fn refined_step (n : AnyNat) : Nat = match n { Zero |-> Zero ; Suc m |-> Suc (Suc (refined_step m)) }
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (classify (refined_step (Suc (Suc Zero))))
+  host_pure APartial ExitCode (classify (refined_step (Suc (Suc Zero))))
 "#;
 
 /// Promise class: durable reference-execution observation. MEASURED: `ken run`

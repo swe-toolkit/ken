@@ -7,43 +7,33 @@ use std::os::unix::ffi::OsStringExt;
 #[cfg(target_os = "linux")]
 const SOURCE: &str = r#"program capabilities FS APartial
 proc host_byte (chosen : UInt8) : HostIO APartial UInt8 visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit UInt8
+  host_bind APartial Unit UInt8
     (host_console APartial Unit (print_line "seed"))
-    (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      UInt8 chosen)
+    (\_. host_pure APartial UInt8 chosen)
 
 proc decide (chosen : UInt8) : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    UInt8 ExitCode (host_byte chosen)
+  host_bind APartial UInt8 ExitCode (host_byte chosen)
     (\byte. match (match eq_int (uint8_to_int byte) 1 {
       True |-> ExitCode.Success;
       False |-> ExitCode.Failure 7
     }) {
-      ExitCode.Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode
+      ExitCode.Success |-> host_bind APartial Unit ExitCode
         (host_console APartial Unit (print_line "accepted"))
-        (\_. host_exit APartial ExitCode.Success);
-      ExitCode.Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode
+        (\_. host_pure APartial ExitCode ExitCode.Success);
+      ExitCode.Failure code |-> host_bind APartial Unit ExitCode
         (host_console APartial Unit (print_line "rejected"))
-        (\_. host_exit APartial (ExitCode.Failure code))
+        (\_. host_pure APartial ExitCode (ExitCode.Failure code))
     })
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 90);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 90);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (ExitCode.Failure 91);
+        Nil |-> host_pure APartial ExitCode (ExitCode.Failure 91);
         Cons argument _more |-> match bytes_at argument 0 {
-          None |-> host_exit APartial (ExitCode.Failure 92);
+          None |-> host_pure APartial ExitCode (ExitCode.Failure 92);
           Some byte |-> decide byte
         }
       }
@@ -57,39 +47,29 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 #[cfg(target_os = "linux")]
 const SHARED_BIND_SOURCE: &str = r#"program capabilities FS APartial
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    ExitCode ExitCode
+  host_bind APartial ExitCode ExitCode
     (match (match eq_int (uint8_to_int byte) 1 {
       True |-> ExitCode.Success;
       False |-> ExitCode.Failure 7
     }) {
-      ExitCode.Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode
+      ExitCode.Success |-> host_bind APartial Unit ExitCode
         (host_console APartial Unit (print_line "accepted"))
-        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          ExitCode ExitCode.Success);
-      ExitCode.Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode
+        (\_. host_pure APartial ExitCode ExitCode.Success);
+      ExitCode.Failure code |-> host_bind APartial Unit ExitCode
         (host_console APartial Unit (print_line "rejected"))
-        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          ExitCode (ExitCode.Failure code))
+        (\_. host_pure APartial ExitCode (ExitCode.Failure code))
     })
-    (\code. host_exit APartial code)
+    (\code. host_pure APartial ExitCode code)
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 90);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 90);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (ExitCode.Failure 91);
+        Nil |-> host_pure APartial ExitCode (ExitCode.Failure 91);
         Cons argument _more |-> match bytes_at argument 0 {
-          None |-> host_exit APartial (ExitCode.Failure 92);
+          None |-> host_pure APartial ExitCode (ExitCode.Failure 92);
           Some byte |-> decide byte
         }
       }
@@ -134,39 +114,29 @@ fn root_exit_discriminator_source(runtime_failure: bool) -> String {
 #[cfg(target_os = "linux")]
 const OPTION_OUTER_SOURCE: &str = r#"program capabilities FS APartial
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    ExitCode ExitCode
+  host_bind APartial ExitCode ExitCode
     (match (match eq_int (uint8_to_int byte) 1 {
       True |-> Some UInt8 byte;
       False |-> None UInt8
     }) {
-      Some b |-> bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode
+      Some b |-> host_bind APartial Unit ExitCode
         (host_console APartial Unit (print_line "some"))
-        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          ExitCode (ExitCode.Failure 3));
-      None |-> bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode
+        (\_. host_pure APartial ExitCode (ExitCode.Failure 3));
+      None |-> host_bind APartial Unit ExitCode
         (host_console APartial Unit (print_line "none"))
-        (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          ExitCode (ExitCode.Failure 4))
+        (\_. host_pure APartial ExitCode (ExitCode.Failure 4))
     })
-    (\code. host_exit APartial code)
+    (\code. host_pure APartial ExitCode code)
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 90);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 90);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (ExitCode.Failure 91);
+        Nil |-> host_pure APartial ExitCode (ExitCode.Failure 91);
         Cons argument _more |-> match bytes_at argument 0 {
-          None |-> host_exit APartial (ExitCode.Failure 92);
+          None |-> host_pure APartial ExitCode (ExitCode.Failure 92);
           Some byte |-> decide byte
         }
       }
@@ -184,12 +154,12 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 90);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 90);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (ExitCode.Failure 91);
+        Nil |-> host_pure APartial ExitCode (ExitCode.Failure 91);
         Cons argument _more |-> match bytes_at argument 0 {
-          None |-> host_exit APartial (ExitCode.Failure 92);
-          Some byte |-> host_exit APartial (match (match eq_int (uint8_to_int byte) 1 {
+          None |-> host_pure APartial ExitCode (ExitCode.Failure 92);
+          Some byte |-> host_pure APartial ExitCode (match (match eq_int (uint8_to_int byte) 1 {
             True |-> Hit;
             False |-> Miss
           }) {

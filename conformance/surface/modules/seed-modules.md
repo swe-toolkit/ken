@@ -20,8 +20,9 @@ existing producer already supplies the valid anchor, one-root refusal, lazy
 poison control, and per-run cache used by §D1–§D4. Unsupported `pub`
 placement, Strict-roots rejection of arbitrary-global fallback, and
 catalog-entry front-end routing remain
-**RED UNTIL the module/import repair campaign**. Legacy-roots behavior
-for other bare implementation globals is neither guaranteed nor refused.
+**RED UNTIL the module/import repair campaign**. Legacy-roots behavior for
+bare implementation globals outside the closed prelude floor is neither
+guaranteed nor refused.
 Each new case records its own reachable gate; a direct-loader success is not
 credited for a missing boundary.
 
@@ -573,9 +574,9 @@ unrelated `ElabEnv` does not satisfy them.
 
 ### surface/modules/closed-floor-accepts-arbitrary-global-does-not
 
-- promise class: **normative compatibility vector** — the exact floor is closed
-  in both directions
-- spec: `30-taxonomy §4` (current 32-name floor; this fixture tests the
+- promise class: **normative compatibility vector** — the thirty pre-existing
+  floor members are closed in this fixture's two directions
+- spec: `30-taxonomy §4` (current 51-name floor; this fixture tests the
   thirty pre-existing members), `33 §3.3` (the exact floor, three Pair
   companions, and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
@@ -618,8 +619,9 @@ unrelated `ElabEnv` does not satisfy them.
   resolves `X` through the imported provider declaration, not the bare global.
   Arm 4 rejects `Empty` as unbound; arm 5 accepts and resolves it to the
   imported package identity. None changes `trusted_base()`.
-- why: the positive reaches each floor member through ordinary source and the
-  source-facing contracts for the added types. The eight signature-arm types
+- why: the positive reaches each of the thirty pre-existing members through
+  ordinary source and the source-facing contracts for the tested types. The
+  eight signature-arm types
   are reached through actual built-in primitive signatures. `Bool` and
   `Ambient` are definitionally the same in this fixture, so kernel typing cannot
   distinguish arm 2; only source scope can. `Empty` is compiler-internal, not
@@ -640,7 +642,8 @@ sentinel beside the current contract.
   thirty-name subset and each constructor's scope are contract values; reuse
   of checked identities, allocator accounting, and trust remain durable
   relations
-- spec: `30-taxonomy §4` (both membership arms), `33 §3.3`, `39 §2.0`,
+- spec: `30-taxonomy §4` (current 51-name floor; this vector covers the
+  original thirty-member subset), `33 §3.3`, `39 §2.0`,
   `38 §1.11.1–§1.11.2`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
   of the thirty pre-existing names: `Auth`, `Bool`, `Bottom`, `BufferSpan`, `Char`,
@@ -734,10 +737,11 @@ sentinel beside the current contract.
   constructor scopes and per-run checked parent ids, no-allocation floor
   installation,
   and unchanged `trusted_base()` identities.
-  A new witnessed floor member, a removed member, or a changed constructor
-  scope/visibility is a **contract change**, not routine test maintenance:
-  revise `30-taxonomy §4` and `33 §3.3` together and deliberately update this
-  vector and its source-resolution pairs. Never refresh the roster or
+  A change to these thirty identities or their constructor scopes is a
+  **contract change**, not routine test maintenance. A change to the complete
+  51-name roster is also a contract change and belongs in the full inventory
+  case in `minimality.md` plus the dedicated increment cases below; do not
+  broaden this historical subset silently. Never refresh a roster or
   constructor table merely because the implementation reports a new value.
 - **MEASURED (carried from old base):** the nine-type floor reused its recorded
   ids and preserved accounting and trust at the old base
@@ -748,9 +752,12 @@ sentinel beside the current contract.
   `30-taxonomy §4` and `33 §3.3`, realized at
   `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. **CURRENT CONTRACT:** this
   row specifies the thirty pre-existing floor members, including the six
-  FS/resource additions and their constructor dispositions. The later
-  Console/Char additions are covered by dedicated cases below. This is a
-  conformance expectation, not a measurement;
+  FS/resource additions and their constructor dispositions. The later scoped
+  families, State, Console/Char, and Inc3a additions are covered by dedicated
+  route cases and
+  the exact 51-name inventory in `minimality.md`. This is a conformance
+  expectation, not a
+  measurement;
   no official conformance-runner result is claimed. **THE GAP:** every
   constructor must retain its recorded parent identity, and equal-shaped or
   same-spelling substitutions must not replace a floor identity.
@@ -1083,20 +1090,18 @@ sentinel beside the current contract.
   on absence from a Rust name table. No official conformance-runner result
   is claimed by stating these cases.
 
-The Console/Char rows implement the two-witness `30-taxonomy §4`
-pre-flip slice. They cover strict and legacy roots plus the promised direct
-standalone routes: `elaborate_file_v1`, `elaborate_ken_md_file_v1`,
-`elaborate_decl`, literate example fences, and inline REPL submissions.
-Roots require explicit imports; Strict roots alone assert missing-import
-refusals. Each accepted direct standalone API route asserts the five original
-IDs itself; one route's result does not stand in for another. The accepted
-CLI-root arm is covered by `legacy-cli-exact-id-resolution-report` below across
-non-catalog `check`, `run`, and `native-build`. Its source-shadow discriminator
-remains a coverage gap, described with that case. Other unimported Legacy bare
-implementation globals, including `ConsoleOp`, are unspecified: neither
-promised nor refused. The scoped ConsoleStream constructor rows below retain
-their every-route contract. No row adds trust or duplicates a checked
-definition.
+The Console/Char rows implement the `30-taxonomy §4` source-availability
+contract for `ConsoleStream` and `eqChar`. They cover Strict and Legacy roots
+plus the promised standalone routes: `elaborate_file_v1`,
+`elaborate_ken_md_file_v1`, `elaborate_decl`, literate example fences, and
+inline REPL submissions. Roots require explicit imports for package homes;
+Strict roots alone assert missing-import refusals. Each accepted direct
+standalone API route asserts its own identities. The added Inc3a cases below
+cover the scoped ConsoleOp family and direct-tree operations in their specified
+routes. The CLI-root arm remains covered across non-catalog `check`, `run`, and
+`native-build`; the write-shadow arm is now constructed from the exact floor
+contract rather than left as an availability gap. No row adds trust or
+duplicates a checked definition.
 
 ### surface/modules/console-stream-checked-family-and-char-comparator
 
@@ -1150,6 +1155,231 @@ definition.
   same-leaf local control reject while the qualified positive still passes.
   Adding `Stream` to the floor makes its local-family acceptance reject in each
   route; this is independent of the `ConsoleStream` reservation control.
+
+### surface/modules/inc3a-console-op-and-direct-tree-floor-vocabulary
+
+- promise class: **normative compatibility vector** — the direct Console
+  signature, response family, and generic tree operations keep their exact
+  checked identities and scoped paths
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`, §2.2, §2.3, §4.5.7;
+  `38 §1.12`
+- given: in each of three fresh routes (Strict roots, Legacy roots, and the
+  Legacy single-file entry), use no imports and elaborate:
+
+  ```ken
+  fn console_operation_cases (op : ConsoleOp) : Bool =
+    match op {
+      ConsoleOp.Read stream limit ↦ True;
+      ConsoleOp.Write stream bytes ↦ False;
+      ConsoleOp.Flush stream ↦ True;
+      ConsoleOp.IsTerminal stream ↦ False
+    }
+
+  fn read_response
+      (reply : console_resp (ConsoleOp.Read ConsoleStream.Stdin 1))
+    : Result IOError ReadResult = reply
+
+  fn write_response
+      (reply : console_resp
+        (ConsoleOp.Write ConsoleStream.Stdout b""))
+    : Result IOError Unit = reply
+
+  fn flush_response
+      (reply : console_resp (ConsoleOp.Flush ConsoleStream.Stdout))
+    : Result IOError Unit = reply
+
+  fn terminal_response
+      (reply : console_resp (ConsoleOp.IsTerminal ConsoleStream.Stdout))
+    : Bool = reply
+
+  fn sequence_tree
+      (tree : ITree Nat (λ _. Unit) Nat)
+      (continuation : Nat → ITree Nat (λ _. Unit) Nat)
+    : ITree Nat (λ _. Unit) Nat =
+    itree_bind Nat (λ _. Unit) Nat Nat tree continuation
+
+  theorem sequence_ret
+      (value : Nat) (next : Nat → ITree Nat (λ _. Unit) Nat)
+    : Equal (ITree Nat (λ _. Unit) Nat)
+        (itree_bind Nat (λ _. Unit) Nat Nat
+          (ITree.Ret Nat (λ _. Unit) Nat value) next)
+        (next value) = Refl
+
+  theorem sequence_vis
+      (op : Nat)
+      (continuation : Unit → ITree Nat (λ _. Unit) Nat)
+      (next : Nat → ITree Nat (λ _. Unit) Nat)
+    : Equal (ITree Nat (λ _. Unit) Nat)
+        (itree_bind Nat (λ _. Unit) Nat Nat
+          (ITree.Vis Nat (λ _. Unit) Nat op continuation) next)
+        (ITree.Vis Nat (λ _. Unit) Nat op
+          (λ reply. itree_bind Nat (λ _. Unit) Nat Nat
+            (continuation reply) next)) = Refl
+
+  fn coproduct_get_response
+      (reply : resp_coproduct (StateOp Bool) ConsoleOp
+        (resp_state Bool) console_resp
+        (Coproduct.InL (StateOp Bool) ConsoleOp (StateOp.Get)))
+    : Bool = reply
+
+  fn coproduct_write_response
+      (reply : resp_coproduct (StateOp Bool) ConsoleOp
+        (resp_state Bool) console_resp
+        (Coproduct.InR (StateOp Bool) ConsoleOp
+          (ConsoleOp.Write ConsoleStream.Stdout b"")))
+    : Result IOError Unit = reply
+  ```
+
+  In each route, snapshot the checked identity of `ConsoleOp` and its four
+  constructors, `console_resp`, `itree_bind`, and `resp_coproduct`. For each
+  Console constructor `C`, in each route, declare a fresh local family with a
+  same-named constructor and the same fields, then use both `LocalC.C` and
+  `ConsoleOp.C`. These are twelve preserved-same-kind controls. In separate
+  Strict-root clients, pair each qualified constructor value with the same
+  fully applied bare value, changing only the `ConsoleOp.` qualifier. Use
+  `Read ConsoleStream.Stdin 1`, `Write ConsoleStream.Stdout b""`,
+  `Flush ConsoleStream.Stdout`, and `IsTerminal ConsoleStream.Stdout` for the
+  four pairs. The twelve local same-kind controls use these fields:
+
+  | Constructor | Local family fields |
+  |---|---|
+  | `Read` | `ConsoleStream`, `Int` |
+  | `Write` | `ConsoleStream`, `Bytes` |
+  | `Flush` | `ConsoleStream` |
+  | `IsTerminal` | `ConsoleStream` |
+
+  For each table row and each route, use two separate fresh source units:
+  one contains only the collision declaration, and the other contains only
+  its renamed local control. No unit combines multiple collisions.
+
+  | Floor name | Collision declaration | Accepted renamed control |
+  |---|---|---|
+  | `ConsoleOp` | `data ConsoleOp = LocalCase` | `data LocalConsoleOp = LocalCase` |
+  | `console_resp` | `fn console_resp (n : Nat) : Type = Unit` | `fn local_console_resp (n : Nat) : Type = Unit` |
+  | `itree_bind` | `fn itree_bind (n : Nat) : Nat = n` | `fn local_itree_bind (n : Nat) : Nat = n` |
+  | `resp_coproduct` | `fn resp_coproduct (n : Nat) : Type = Unit` | `fn local_resp_coproduct (n : Nat) : Type = Unit` |
+
+  In Strict roots, separately use the bare spelling `bind` in the exact
+  `sequence_tree` application above. Pair it with the accepted `itree_bind`
+  application and with an independent accepted `fn bind (n : Nat) : Nat = n`.
+  In Legacy roots, resolve both `bind` and `itree_bind` at the sequencing
+  operation and compare their identities with the captured bind identity. Do
+  not assert a Legacy bare-constructor outcome.
+- measured: each route's exact resolved `GlobalId`, including the references
+  in the checked type annotations; each constructor parent; all four
+  `console_resp` result types; the `resp_coproduct` reductions for State and
+  Console; the two `itree_bind` definitional equations; and each paired verdict.
+- claimed: the four `ConsoleOp` paths are the complete scoped family and
+  reduce to `Result IOError ReadResult`, `Result IOError Unit`,
+  `Result IOError Unit`, and `Bool`. `itree_bind` is the floor spelling for
+  the captured sequencing identity, with the specified Ret- and Vis-leaf
+  graft equations. `resp_coproduct` is the exact checked coproduct response
+  operation. Strict bare `bind` is unbound but remains a
+  legal user declaration; Legacy bare `bind` aliases `itree_bind` at one id.
+- the gap: a constructor-name match alone does not prove parent identity or
+  the dependent response. The result-typed functions and same-kind local
+  controls expose those distinctions independently.
+- expect: every qualified client accepts in all three routes and resolves the
+  snapshotted IDs. Each local constructor keeps a distinct parent while the
+  qualified `ConsoleOp.C` still resolves to the original parent and ID. Each
+  same-name declaration for `ConsoleOp`, `console_resp`, `itree_bind`, and
+  `resp_coproduct` refuses at binding introduction in all three routes; its
+  renamed local control accepts. The `sequence_ret` and `sequence_vis`
+  equalities accept `Refl`. Strict bare-constructor and bare-`bind` clients
+  refuse with `UnboundName`; their qualified and local-name controls accept.
+  Legacy `bind` and `itree_bind` resolve to the same captured identity. No
+  Legacy bare-case
+  outcome is asserted. None of the floor admissions changes `trusted_base()`.
+- controls: each qualified `ConsoleOp.C` is the positive for its bare-name
+  refusal. Each local same-kind constructor is an accepted control for its
+  paired qualified identity; each renamed operation binding controls its
+  same-name floor collision. Each imported or floor operation is independently
+  exercised; the State and Console response functions distinguish both
+  `resp_coproduct` summands.
+- why: the floor is not a type-name alias. Constructor paths, dependent
+  response reductions, and source protection are separate contract axes.
+- evidence boundary: these are expected fixture outcomes, not an execution
+  report; no official conformance-runner result is claimed.
+
+### surface/modules/inc3a-state-direct-operations-retain-checked-ids
+
+- promise class: **normative compatibility vector** — the three public State
+  operations retain their exact identities and declared-tree signatures
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`, §2.4, §4.2,
+  §4.5.2–§4.5.3, §4.5.7
+- given: in each of three fresh routes (Strict roots, Legacy roots, and the
+  Legacy single-file entry), use no imports and elaborate:
+
+  ```ken
+  fn state_get_probe (s : Type) (f : Type) (rf : f → Type)
+      (unit : Unit)
+    : ITree (Coproduct (StateOp s) f)
+        (resp_coproduct (StateOp s) f (resp_state s) rf) s =
+    state_get s f rf unit
+
+  fn state_put_probe (s : Type) (f : Type) (rf : f → Type)
+      (value : s)
+    : ITree (Coproduct (StateOp s) f)
+        (resp_coproduct (StateOp s) f (resp_state s) rf) Unit =
+    state_put s f rf value
+
+  fn run_state_probe (s : Type) (f : Type) (rf : f → Type) (a : Type)
+      (initial : s)
+      (tree : ITree (Coproduct (StateOp s) f)
+        (resp_coproduct (StateOp s) f (resp_state s) rf) a)
+    : ITree f rf (Pair a s) =
+    run_state s f rf a initial tree
+  ```
+
+  The two builders use §4.5.2's checked declared-tree calls: `s`, `f`,
+  `rf`, and the value argument are explicit, and each result carrier is
+  the stated coproduct tree. The wrappers are pure `fn`s that construct
+  tree values; they do not assert the unresolved `visits [State s]`
+  spelling or rely on an implicit single-State-to-coproduct lift.
+  `run_state_probe` separately consumes a tree already composed over
+  State and `f`, as §4.5.3 specifies; it supplies `s`, `f`, `rf`, and
+  `a` explicitly to `run_state` before the initial state and tree.
+
+  Snapshot each operation's pre-source `GlobalId`. In separate Strict-root
+  units, compare these one-name collision pairs:
+
+  | Floor name | Collision arm | Renamed control |
+  |---|---|---|
+  | `state_get` | `const state_get : Nat = Zero` | `const local_state_get : Nat = Zero` |
+  | `state_put` | `const state_put : Nat = Zero` | `const local_state_put : Nat = Zero` |
+  | `run_state` | `const run_state : Nat = Zero` | `const local_run_state : Nat = Zero` |
+
+  Also submit `fn get (n : Nat) : Nat = n` and
+  `fn put (n : Nat) : Nat = n` in separate Strict-root units. Do not assert a
+  Legacy bare-use outcome for either name.
+- measured: each unimported operation reference's resolved `GlobalId`, its
+  contract-matched tree type, and every same-name/local-name verdict.
+- claimed: `state_get` and `state_put` are source-nameable at their exact
+  floor identities with §4.5.2's explicit-argument coproduct-tree result
+  types; `run_state` is source-nameable at its exact floor identity and
+  consumes the specified State-plus-`f` tree. Its result type uses
+  `Pair a s` in result/state order. Bare `get` and `put` are not protected
+  by these operations.
+- the gap: an unbound-name refusal could come from an unrelated type error.
+  The first two result types match the checked declared-tree signatures, and
+  the `run_state` input is already composed as §4.5.3 specifies. The
+  one-name local binding control isolates protected-name behavior.
+- expect: all three routes accept the typed operations and resolve each
+  captured ID. Each same-name floor binding refuses at introduction and its
+  renamed local control accepts. The Strict `get` and `put` declarations
+  accept. No Legacy bare `get` or `put` outcome is asserted; no import, trust
+  entry, or replacement identity is introduced.
+- controls: the two declared-tree source-call probes and the typed
+  `run_state_probe` are positive controls for their corresponding binding
+  collisions. The `get` and `put` declarations control that those bare
+  spellings remain unreserved.
+- why: the source API names are the floor; `State` is an effect label, not a
+  second checked carrier type. The declared-tree signatures exercise the
+  source-call contract directly; no implicit lift or unresolved row syntax
+  is needed.
+- evidence boundary: these are specified source/type expectations, not
+  execution results or a reduction test for the State fold. No official
+  conformance-runner result is claimed.
 
 ### surface/modules/console-char-package-homes-export-original-ids
 
@@ -1293,33 +1523,62 @@ definition.
 - controls: an existing report path refuses creation without overwriting it;
   an elaboration failure leaves no partial report file.
 
-### Residual: standalone Legacy write-shadow report
+### surface/modules/legacy-cli-write-shadow-resolution-report-uses-floor-tree
 
-- spec: `33 §3.3`; `70 §1.4`
-- normative expectation: each of `check`, `run` and `native-build` accepts a
-  type-compatible source declaration named `write`; its `write_probe` reference
-  is reported as `source-declared` rather than `pre-source`, while the other
-  four promised identities remain pre-source.
-- status: this shadow arm is a **coverage gap**, not a conformance result. The
-  six expected invocations remain normative, but this seed does not claim to
-  cover them.
-- gap: a standalone shadow must produce the `IO (Result IOError Unit)` value
-  consumed by the unchanged `write_probe` without referring to the shadowed
-  `write`. The explicit `Capability.Console.Text` import route used by the old
-  shadow is unavailable without a catalog root, and the five-name Legacy
-  promise does not make `ConsoleOp`, `console_resp`, or other implementation
-  globals available. `36 §2` specifies `ITree.Ret`, but its source constructor
-  application needs operation and response type arguments, which the five-name
-  promise does not provide. A local CLI probe of `print_line` found `IO Unit`,
-  not this result type. No contract-backed standalone shadow fixture was found;
-  do not replace these missing inputs with assumed globals or a failing
-  positive fixture.
-- evidence boundary: Language QA's exact-parent direct CLI probes found the
-  explicit-import roots fail before report creation. Local exploratory probes
-  found the accepted no-import root passes the three direct routes, while the
-  Axiom-based shadow fails report generation with an unattributed checked
-  identity. These probes are not official conformance-runner results. No
-  all-six coverage, CI, publication or landing is claimed.
+- promise class: **normative compatibility vector** — a same-spelled source
+  declaration changes only its own resolution class in the root report
+- spec: `33 §3.3`; `36 §2.1`; `38 §1.12`; `70 §1.4`
+- given: run the accepted no-import root from
+  `legacy-cli-exact-id-resolution-report` with `ken check`, `ken run`, and
+  `ken native-build`. For a second standalone `.ken` root, insert the following
+  source declaration before the unchanged `write_probe` and `main` declarations:
+
+  ```ken
+  proc write (stream : ConsoleStream) (payload : Bytes)
+      : IO (Result IOError Unit) visits [Console] =
+    ITree.Vis ConsoleOp console_resp (Result IOError Unit)
+      (ConsoleOp.Write stream payload)
+      (λ reply. ITree.Ret ConsoleOp console_resp (Result IOError Unit) reply)
+  ```
+
+  This local tree uses no imports and does not call the shadowed `write`. Run
+  that root through the same three CLI routes, for six invocations total. Give
+  each invocation a fresh `--resolution-report=<new-path>` immediately after
+  the subcommand and supply the explicit native-build resource profile. Read
+  each route's `ken.resolution/v1` report.
+- measured: acceptance and report contents for all six invocations; the
+  `write_probe` reference class; and the classes of the five other promised
+  package identities. In the shadow input, also measure the report classes of
+  references to `IO`, `ITree.Vis`, `ITree.Ret`, `ConsoleOp.Write`,
+  `console_resp`, `Result`, `IOError`, and `Unit`.
+- claimed: both roots accept in all three routes. In the baseline, `write_probe`
+  uses pre-source `write`; in the shadow, it uses source-declared `write`. The
+  other four identities (`IO`, `print_line`, `charToInt`, and `leqChar`)
+  remain classified as `pre-source`. The shadow body's floor references receive
+  that same classification; exact identities are asserted by the direct-source
+  and home cases, not by a report that omits numeric `GlobalId`s.
+- the gap: the shadow needs a correctly typed `IO (Result IOError Unit)` value
+  without referring to `write`. The checked `ConsoleOp`, `console_resp`, and
+  fully applied `ITree.Vis`/`ITree.Ret` constructors form the source-visible
+  Console tree.
+- expect: all six invocations accept and produce complete reports with
+  `module` set to JSON `null`. Each configuration's three documents agree
+  except for the `route` field. In the shadow reports, `write_probe` is
+  `source-declared`; the other four package identities remain `pre-source`.
+  The report classifies the listed floor references as `pre-source`. No
+  numeric `GlobalId` appears, and no failed elaboration leaves
+  a partial report.
+- controls: the unchanged root's three accepted reports are the positive
+  controls for the shadow variant. In each shadow route, the source body and
+  `write_probe` stay fixed; only the local `write` declaration is added.
+  Removing a required floor identity makes the shadow input fail rather than
+  turning the missing name into a package import.
+- why: the final floor admits the exact response and constructor identities
+  needed to construct the tree. A guessed `Axiom`, an unrelated free name, or
+  an import from a catalog root cannot stand in for the source-level control.
+- evidence boundary: the six expected invocations are specified, not executed
+  by this CV contribution. No official conformance-runner, CI, publication, or
+  landing result is claimed.
 
 ### surface/modules/catalog-resolution-report-lists-entry-root-only
 
@@ -1796,7 +2055,11 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | the thirty pre-existing floor identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | strict floor scope excludes arbitrary/internal non-members | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar are covered by dedicated Console/Char cases |
+| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 51-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
+| current floor inventory | the signature traversal and internal-provision set close to 51 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 43 internal-provision identities and adds no trust | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
+| Inc3a direct-tree vocabulary | three source routes resolve ConsoleOp's four cases, four response reductions, itree_bind and resp_coproduct; twelve ConsoleOp same-kind controls reach exact parents | the new scoped families and operation names are the source contract; Strict bare cases and bare-bind refusal are separate arms | same-route qualified positives, local-family controls, captured bind identity; Legacy bare-constructor outcomes are not claimed |
+| State direct operations | three routes use typed state_get, state_put, and run_state references; Strict collision controls and free get/put names | the three checked operation IDs are source-nameable; this case does not claim fold execution | exact typed direct-tree signatures and separate same-name/local-name pairs |
+| Inc3a package homes | each of 24 ordinary H names has its own import/omission pair; eight FixedWidth conversions have separate range vectors | the target home set is 96: 81 base rows minus 17 retired FileOperation rows plus 32 additions | `seed-strict-package-homes.md` covers the exact new names and ranges; the counts are normative targets, not test-run measurements |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
 | front end | root-addressed entry resolves its otherwise unavailable dependency | catalog entry reaches the roots loader | only root and entry supplied; direct-loader producer control separate |

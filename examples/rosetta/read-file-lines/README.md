@@ -6,7 +6,7 @@ Reference: <https://rosettacode.org/wiki/Read_a_file_line_by_line>
 
 ## Status
 
-**PASS.** `main` declares `Cap APartial` on its own signature (the manifest
+`main` declares `Cap APartial` on its own signature (the manifest
 IS the signature); `ken run` reads that declaration, mints exactly that
 authority (never full, never ambient), and binds it before running the
 program. `read_bytes` carries the cap into a real `[FS]` effect
@@ -17,19 +17,10 @@ lines (`str::lines()` terminator semantics — a trailing `\n` yields no
 trailing empty line), and prints each line via `[Console]` from *inside*
 the program.
 
-**Genuine effect composition (`effect-composition` D1–D4 — retires the
-prior honesty asterisk).** `main` performs the `[FS]` read *and* the
-`[Console]` printing in **one** type-checked
-`ITree (Coproduct (FSOp APartial) ConsoleOp) (resp_coproduct ...) (Result IOError Unit)`,
-built at the surface via `inject_l`/`inject_r` (the general `g ↪ Coproduct g h` /
-`h ↪ Coproduct g h` inclusions) sequenced with the ordinary homogeneous `bind` —
-no hand-fed coproduct anywhere. `run_io`'s coproduct-aware terminal driver
-strips the `InL`/`InR` tags and dispatches both effects through the same
-loop. What remains deferred (the honest residual, not a gap in this
-example): the row-directed auto-injection sugar (`visits [FS, Console]`
-inserting `inject_l`/`inject_r` automatically) is not yet landed — this
-example uses the explicit, `inject_l`/`inject_r`-named door, the floor under
-that future sugar. On a denied/insufficient capability or a missing file,
-`main` does **not** print (fail-closed) and returns `Err e`, which
-`ken-cli` still surfaces as a non-zero exit with the exact `IOError`
-variant named on stderr — never a false success.
+`main` composes its `[FS]` read and `[Console]` printing in one checked
+`HostIO APartial` tree. `host_fs` lifts `read_bytes`, `host_console` lifts
+`print_line`, and `host_bind` sequences their responses. The interpreter
+handles the resulting effect tree without requiring source to name its
+internal coproduct operation types. On a missing file or denied capability,
+`main` prints the named error through Console and returns a nonzero
+`ExitCode.Failure`; it does not report a false success.

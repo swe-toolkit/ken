@@ -3,25 +3,20 @@
 use ken_cli::{run_program, ProgramOutcome, SourceFormat};
 use ken_interp::{CaptureHost, ClockTrace, HostHandler};
 
-const CLOCK_PACKAGE: &str = include_str!("../../../catalog/packages/Capability/Time/WallClock.ken.md");
+const CLOCK_PACKAGE: &str =
+    include_str!("../../../catalog/packages/Capability/Time/WallClock.ken.md");
 
 const CLOCK_BODY: &str = r#"
-  bind (Coproduct (FSOp APartial) AmbientOp)
-       (resp_coproduct (FSOp APartial) AmbientOp
-         (fs_resp APartial) ambient_resp)
-       Instant ExitCode
+  host_bind APartial Instant ExitCode
     (host_clock APartial Instant wall_now)
     (\first .
       match first {
         Instant.MkInstant _firstNanoseconds |->
-          bind (Coproduct (FSOp APartial) AmbientOp)
-               (resp_coproduct (FSOp APartial) AmbientOp
-                 (fs_resp APartial) ambient_resp)
-               Instant ExitCode
+          host_bind APartial Instant ExitCode
             (host_clock APartial Instant wall_now)
             (\second .
               match second {
-                Instant.MkInstant _secondNanoseconds |-> host_exit APartial ExitCode.Success
+                Instant.MkInstant _secondNanoseconds |-> host_pure APartial ExitCode ExitCode.Success
               })
       })
 "#;
@@ -32,6 +27,54 @@ fn clock_program(visits: &str) -> String {
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode {visits} =\n{CLOCK_BODY}"
     )
+}
+
+/// Promise class: durable invariant. MEASURED: the actual two-read Clock
+/// source checks under Strict only with its exact Clock and HostIO package
+/// imports, and still refuses an undeclared Clock row. CLAIMED: the H homes
+/// preserve the checked effect contract without making wall_now ambient.
+/// THE GAP: host values/order are asserted by the separate CaptureHost run.
+#[test]
+fn strict_clock_user_requires_homes_and_still_checks_the_clock_row() {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let root_import = "import Capability.Process.Exit (host_bind, host_pure, host_clock)\n";
+    let wall_import = "import Capability.Time.WallClock (wall_now)\n";
+    let composed = |visits: &str, wall: &str| {
+        clock_program(visits).replacen(
+            "program capabilities FS APartial\n",
+            &format!("program capabilities FS APartial\n{root_import}{wall}"),
+            1,
+        )
+    };
+    let mut accepted = ken_elaborator::ElabEnv::new().expect("prelude");
+    accepted
+        .elaborate_isolated_file_strict_v1(
+            &[catalog.clone()],
+            &composed("visits [Clock]", wall_import),
+        )
+        .expect("both checked Clock homes import");
+    let mut absent = ken_elaborator::ElabEnv::new().expect("prelude");
+    match absent
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &composed("visits [Clock]", ""))
+    {
+        Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, "wall_now"),
+        Err(error) => panic!("missing wall_now: wrong refusal {error:?}"),
+        Ok(_) => panic!("wall_now available without import"),
+    }
+    let mut unrowed = ken_elaborator::ElabEnv::new().expect("prelude");
+    match unrowed.elaborate_isolated_file_strict_v1(&[catalog], &composed("", wall_import)) {
+        Err(ken_elaborator::ElabError::TypeMismatch { reason, .. }) => {
+            assert!(
+                reason.contains("EffectEscapes") && reason.contains("Clock"),
+                "{reason}"
+            )
+        }
+        Err(error) => panic!("wrong undeclared-clock refusal: {error:?}"),
+        Ok(_) => panic!("Clock escaped the strict row check"),
+    }
 }
 
 fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
