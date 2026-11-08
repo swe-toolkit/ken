@@ -485,10 +485,9 @@ State S  :  Op = { Get } ∪ { Put s | s : S }   Resp Get = S ;  Resp (Put _) = 
 ```
 
 (`Op` is a small inductive of op-tags; `Put` carries its argument as
-constructor data.) The checked direct Console signature is more specific
-than the schematic `State S` display. Its canonical operation carrier has
-exactly the following four constructor signatures, using the checked
-`ConsoleStream` carrier and its scoped public paths (`30-taxonomy §4`):
+constructor data.) The checked direct Console signature has exactly
+four constructor signatures, using the checked `ConsoleStream` carrier
+and its scoped public paths (`30-taxonomy §4`):
 
 ```text
 ConsoleOp.Read       : ConsoleStream → Int → ConsoleOp
