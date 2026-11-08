@@ -95,7 +95,7 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
     }
 }
 
-/// Promise class: normative compatibility vector. MEASURED: six admitted families
+/// Promise class: normative compatibility vector. MEASURED: seven admitted families
 /// and every scoped case stay at the native-captured inductive IDs, a strict
 /// source can name every case, bare source leaves refuse, and trust is fixed.
 /// CLAIMED: source spelling changes without changing the native reply IDs.
@@ -109,6 +109,10 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
         ("ReadResult.Chunk", baseline.prelude_env.chunk_id),
         ("StateOp.Get", baseline.prelude_env.get_id),
         ("StateOp.Put", baseline.prelude_env.put_id),
+        ("ConsoleOp.Read", roles.op_console_read),
+        ("ConsoleOp.Write", roles.op_console_write),
+        ("ConsoleOp.Flush", roles.op_console_flush),
+        ("ConsoleOp.IsTerminal", roles.op_console_is_terminal),
         ("ReadResult.Eof", baseline.prelude_env.eof_id),
         ("FileKind.KFile", roles.file_kind_file),
         ("FileKind.KDirectory", roles.file_kind_directory),
@@ -163,6 +167,7 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
     for (family, members) in [
         ("ReadResult", vec!["Chunk", "Eof"]),
         ("StateOp", vec!["Get", "Put"]),
+        ("ConsoleOp", vec!["Read", "Write", "Flush", "IsTerminal"]),
         (
             "FileKind",
             vec!["KFile", "KDirectory", "KSymlink", "KOther"],
@@ -234,12 +239,18 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
          const entry : DirEntry = DirEntry.MkDirEntry (bytes_encode \"n\") FileKind.KFile\n\
          const get : StateOp Nat = StateOp.Get Nat\n\
          const put : StateOp Nat = StateOp.Put Nat Zero\n\
-         fn response (op : StateOp Nat) : Type = resp_state Nat op\n",
+         fn response (op : StateOp Nat) : Type = resp_state Nat op\n\
+         const console_read : ConsoleOp = ConsoleOp.Read ConsoleStream.Stdin 1\n\
+         const console_write : ConsoleOp = ConsoleOp.Write ConsoleStream.Stdout (bytes_encode \"x\")\n\
+         const console_flush : ConsoleOp = ConsoleOp.Flush ConsoleStream.Stdout\n\
+         const terminal_check : ConsoleOp = ConsoleOp.IsTerminal ConsoleStream.Stdout\n\
+         fn console_result (op : ConsoleOp) : Type = console_resp op\n",
     );
     assert_eq!(
         baseline.globals["StateOp"],
         baseline.prelude_env.state_op_id
     );
+    assert_eq!(baseline.globals["ConsoleOp"], roles.console_family);
     assert_eq!(
         baseline.globals["resp_state"],
         baseline.prelude_env.resp_state_id
@@ -261,6 +272,14 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
         ),
         ("FileOperation", "OpReadFile", "OpReadFile"),
         ("StateOp Nat", "Get", "Get Nat"),
+        ("ConsoleOp", "Read", "Read ConsoleStream.Stdin 1"),
+        (
+            "ConsoleOp",
+            "Write",
+            "Write ConsoleStream.Stdout (bytes_encode \"x\")",
+        ),
+        ("ConsoleOp", "Flush", "Flush ConsoleStream.Stdout"),
+        ("ConsoleOp", "IsTerminal", "IsTerminal ConsoleStream.Stdout"),
     ] {
         let bare = format!("const leak : {family} = {expr}\n");
         match strict(&bare) {

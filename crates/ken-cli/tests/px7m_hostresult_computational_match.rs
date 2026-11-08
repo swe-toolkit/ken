@@ -5,17 +5,11 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 
 const OK_PROGRAM: &str = r#"program capabilities FS APartial
 proc two_step (label : String) : HostIO APartial Unit visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit Unit
+  host_bind APartial Unit Unit
     (host_console APartial Unit (print_line label))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    (\_. host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit MkUnit))
+      (\_. host_pure APartial Unit MkUnit))
 
 proc after_write (written : Result IOError Unit)
   : HostIO APartial Unit visits [Console] =
@@ -25,34 +19,24 @@ proc after_write (written : Result IOError Unit)
   }
 
 proc inner : HostIO APartial Unit visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) Unit
+  host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "probe:")))
     after_write
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit ExitCode inner (\_. host_exit APartial ExitCode.Success)
+  host_bind APartial Unit ExitCode inner (\_. host_pure APartial ExitCode ExitCode.Success)
 "#;
 
 const ERR_PROGRAM: &str = r#"program capabilities FS APartial
 proc write_bytes_then_line (bytes : Bytes) (label : String)
   : HostIO APartial Unit visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) Unit
+  host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      Unit Unit
+    (\_. host_bind APartial Unit Unit
       (host_console APartial Unit (print_line label))
-      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit MkUnit))
+      (\_. host_pure APartial Unit MkUnit))
 
 fn failed_path (error : FileError) : Bytes =
   match error {
@@ -70,11 +54,8 @@ proc after_read (read : Result FileError Bytes)
   }
 
 proc inner (cap : Cap APartial) : HostIO APartial Unit visits [FS, Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result FileError Bytes) Unit
-    (inject_l (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp
-      (Result FileError Bytes)
+  host_bind APartial (Result FileError Bytes) Unit
+    (host_fs APartial (Result FileError Bytes)
       (readFile APartial cap (bytes_encode "missing.bin")))
     after_read
 
@@ -82,9 +63,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit ExitCode (inner cap) (\_. host_exit APartial ExitCode.Success)
+      host_bind APartial Unit ExitCode (inner cap) (\_. host_pure APartial ExitCode ExitCode.Success)
   }
 "#;
 

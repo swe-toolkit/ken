@@ -3629,6 +3629,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // declarations have been checked against their original bindings. The
     // effect/Clock constructors are registered before this capture as well.
     for name in [
+        "ConsoleOp",
         "DirEntry",
         "FileKind",
         "FileMetadata",

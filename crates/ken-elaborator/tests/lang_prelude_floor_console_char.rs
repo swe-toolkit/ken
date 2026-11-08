@@ -194,8 +194,8 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     );
     assert_eq!(
         floor.len(),
-        47,
-        "30 §4 floor count includes six new scoped families and resp_state"
+        49,
+        "30 §4 floor count includes seven new scoped families and two responses"
     );
     assert!(floor.contains("ConsoleStream") && floor.contains("eqChar"));
     assert!(!floor.contains("Stream"));
