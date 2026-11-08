@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative forty-seven-identity prelude and its exact
+> normative fifty-one-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -174,7 +174,9 @@ alone reserves a name.
 | `state_put` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires source access to the State write operation. Bare `put` remains unreserved. |
 | `leqChar` (package) | No native exact-ID reader; §37 Char ordering still requires this checked comparison. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import, with no copied definition. |
 | `charToInt` (package) | No native exact-ID reader; §18a §5.9.1 and §38 ASCII/parsing use its checked `Char → Int` projection. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import. |
-| `IO` (package) | Checked Console-ITree alias. The effect reifier selects `ITree` and `ConsoleOp` checked IDs, not the `IO` alias ID. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
+| `ConsoleOp` (floor, scoped) | The effect reifier and native Console operations select its exact checked ID; source needs it for direct Console trees. The complete `Read`/`Write`/`Flush`/`IsTerminal` family resolves only as `ConsoleOp.C`. |
+| `console_resp` (floor operation) | The effect reifier and direct Console trees use this exact checked response-family ID, not the `IO` alias. It has no constructor family. |
+| `IO` (package) | Checked Console-ITree alias. The effect reifier selects the floor `ITree` and `ConsoleOp` checked IDs, not the `IO` alias ID. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `FS` (package, not floor) | Source-promised Auth-indexed ITree alias in `read_bytes`/`write_file` types (`38`); no native reader of this alias ID. The effect/capability label `FS` is a separate namespace. |
 | `ITree` (floor, scoped) | `PreludeEnv.itree_id` captures the checked pre-source inductive ID; effect lowering and the host interpreter select that family by exact ID. The surface requires source to name the canonical type and its constructors (`36 §2.1`, §2.4). A same-shaped source family does not replace it. |
 | `Ret` (qualified floor constructor) | `PreludeEnv.ret_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Ret`, never a reserved bare `Ret`. The constructor itself is not renamed. |
@@ -182,6 +184,10 @@ alone reserves a name.
 | `Coproduct` (floor, scoped) | `PreludeEnv.coproduct_id` identifies the checked effect-signature sum; native composition keys the exact injection parents and source needs the family (`36 §2.3`, §4.5.7). |
 | `InL` (qualified floor constructor) | `CanonicalRuntimeRoles::in_l` selects the exact `Coproduct` constructor; only `Coproduct.InL` resolves, not bare `InL`. |
 | `InR` (qualified floor constructor) | `CanonicalRuntimeRoles::in_r` selects the exact `Coproduct` constructor; only `Coproduct.InR` resolves, not bare `InR`. |
+| `itree_bind` (floor operation) | The space desugarer selects `effect_sequencing_ids`' checked `bind_id`; direct State, Console and composed trees require this generic sequencing identity. Both modes add the specific `itree_bind` spelling to that ID after the pre-source snapshot. Legacy also keeps bare `bind`; Strict neither reserves nor ambiently resolves bare `bind`. The ID comes from the capture, not `globals["bind"]`. |
+| `resp_coproduct` (floor operation) | The elaborator constructs this exact checked response-family ID; direct composed-effect trees name it. It is not the `HostIO` alias or a constructor. |
+| `inject_l` (package) | No native exact-ID reader; §36 §4.5.7 promises the generic checked coproduct injection. `Core.Effect.Coproduct` exports its captured pre-source ID for explicit import. Complete HostIO instances may instead use `host_fs`. |
+| `inject_r` (package) | No native exact-ID reader; §36 §4.5.7 promises the generic checked coproduct injection. `Core.Effect.Coproduct` exports its captured pre-source ID for explicit import. Complete HostIO instances may instead use `host_console`. |
 | `ConsoleStream` (renamed from `Stream`; floor, scoped) | Native interpreter and lowering select the exact checked constructor family and parent. Source `read` and the console output package require its canonical type. The specific source name avoids collision with §37's distinct `Stream`; its pre-source native `Stream::C` artifact leaves stay unchanged. |
 | `Stdin` (qualified floor constructor) | Interpreter selects its exact checked ID; source `read` names `ConsoleStream.Stdin`, never bare `Stdin`. |
 | `Stdout` (qualified floor constructor) | Interpreter selects its exact checked ID; output source names `ConsoleStream.Stdout`, never bare `Stdout`. |
@@ -196,7 +202,7 @@ alone reserves a name.
 | `BufferHandle` (package, abstract) | `Capability.System.Buffer` homes this checked type alone; its `PrivateBufferHandle` constructor is not public or a floor identity. |
 | `readAt` (package) | `Capability.System.IO` exports the checked bounded read wrapper; it returns floor `ReadProgress`. |
 | `spanBytes` (package) | The same IO package exports the checked bounded span-to-bytes wrapper. |
-| `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
+| `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and floor `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `print_line` (package) | Checked Console helper promised by §38 and existing programs, with no native exact-ID reader. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `write_file` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`WriteFile` identities, not this wrapper's ID. |
 | `FileError` (floor, unscoped) | `38 §1.3.1` requires this public FS result carrier; native code mints the exact checked `MkFileError` constructor and thereby keys its parent. |
@@ -296,17 +302,19 @@ alone reserves a name.
 The five entrypoint-ABI, three effect/clock, `ITree`, six earlier
 FS/resource, five scoped progress/acquisition/mapping/child-result,
 `ConsoleStream`, `eqChar`, five checked State identities (the three
-prior operations plus `StateOp` and `resp_state`) and five Increment 3a
-result/FS scoped families marked floor above join B alongside the
-original fifteen: forty-seven counted identities. Their floor spellings
-are protected; scoped case leaves and bare `get` and `put` do not enter
-B through the State operations. The package-home roster's Increment
-3a target has ninety-four rows: the eighty-one at its base, minus
-seventeen retired FileOperation family rows, plus thirty new H rows
-(fifteen further checked wrappers/operations, four Child names, three
-formerly held wrappers and all eight safe fixed-width narrowings).
-The five other newly scoped families were never package homes;
-`resp_state` is floor rather than package material. The package rows
+prior operations plus `StateOp` and `resp_state`), five Increment 3a
+result/FS scoped families, and `ConsoleOp`, `console_resp`, `itree_bind`
+and `resp_coproduct` marked floor above join B alongside the original
+fifteen: fifty-one counted identities. Their floor spellings are
+protected; scoped case leaves and bare `get`, `put` and `bind` do not
+enter B through the checked operations. The package-home roster's
+Increment 3a target has ninety-six rows: the eighty-one at its base,
+minus seventeen retired FileOperation family rows, plus thirty-two
+new H rows (fifteen further checked wrappers/operations, four Child
+names, three formerly held wrappers, eight safe fixed-width narrowings,
+and two generic coproduct injections). The scoped families were never
+package homes; `resp_state`, `console_resp`, `itree_bind` and
+`resp_coproduct` are floor operations rather than package material. The package rows
 above are not additional floor members or bare Strict names. The three
 Console constructors retain their exact IDs and scoped paths but are
 not separate

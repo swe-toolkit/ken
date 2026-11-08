@@ -2,7 +2,9 @@
 
 > Status: **L5 elaborated** — implementation-ready for Team Language.
 > **Normative for the model and the elaboration** (§1–§7); concrete surface
-> *spelling* stays proposal-level (`OQ-syntax`). Effect tracking, capabilities,
+> *spelling* stays proposal-level (`OQ-syntax`) except the settled direct-ITree
+> vocabulary and package homes (§4.5.7, `30-taxonomy §4`). Effect tracking,
+> capabilities,
 > and the state/`space` escape hatch. Settled inputs (do **not** reopen):
 > **`OQ-8` / `OQ-8a` DECIDED** (operator, 2026-06-27) — static,
 > transitively-inferred effect **rows** (`visits`), pure by default; a **layered
@@ -1228,8 +1230,10 @@ injection operations** for the binary signature `Coproduct g h`, exactly as §4.
 exposes `state_get`/`state_put` and §4.5.3 exposes `run_state`:
 
 ```
-inject_l : ITree g rg a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a   -- re-tag via InL
-inject_r : ITree h rh a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a   -- re-tag via InR
+inject_l : (g h : Type) -> (rg : g -> Type) -> (rh : h -> Type) -> (a : Type) ->
+  ITree g rg a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a
+inject_r : (g h : Type) -> (rg : g -> Type) -> (rh : h -> Type) -> (a : Type) ->
+  ITree h rh a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a
 ```
 
 - **Denotation (normative):** the `elim_ITree` fold sending `Ret x ↦ Ret x` and
@@ -1239,14 +1243,19 @@ inject_r : ITree h rh a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a   
 - **Well-typed iff** the response family reduces per-tag: `resp_coproduct g h rg rh
   (InL o) ≡ rg o`, `(InR o) ≡ rh o` (§2.3 `Resp (inl o) = E.Resp o`) — so the
   re-tagged continuation keeps its response type.
-- **Surface *spelling* (`inject_l`/`inject_r`) is proposal-level (`OQ-syntax`);
-  the operation and its denotation are normative.** A program composes two base
-  effects by injecting each single-effect sub-computation, then sequencing with
-  `bind` (`ITree (Coproduct g h) …` is homogeneous). This is the **direct/monadic
-  door**; the eventual sugar is the row-directed elaboration inserting `incl`
-  automatically from a `visits [E, F]` row (§2.4), of which this is the floor —
-  as C1 threading (§4.5.6) is the floor under `[State s]`. Realization + the
-  D1/D3 couplings: `docs/program/wp/effect-composition.md` (D2).
+- **Surface names and home are fixed.** `Core.Effect.Coproduct` explicitly
+  exports the existing checked `inject_l` and `inject_r` identities with the
+  complete signatures above, not copied definitions or new primitives. They
+  are not ambient floor names; an isolated Strict source imports them.
+  A program composes two base effects by injecting each single-effect
+  sub-computation, then sequencing with floor `itree_bind` (`ITree
+  (Coproduct g h) …` is homogeneous). Legacy also resolves bare `bind` at
+  the same checked sequencing ID. This is the **direct/monadic door**;
+  the eventual sugar is the row-directed elaboration inserting `incl`
+  automatically from a `visits [E, F]` row (§2.4), of which this is the
+  floor — as C1 threading (§4.5.6) is the floor under `[State s]`.
+  Realization + the D1/D3 couplings: `docs/program/wp/effect-composition.md`
+  (D2).
 
 ## 5. Handlers — tail-resumptive only (`OQ-8`/`OQ-9` DECIDED)
 

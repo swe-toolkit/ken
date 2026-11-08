@@ -271,10 +271,13 @@ action, and `host_bind` sequences two HostIO actions. The last two
 are checked prelude definitions homed by package export, not new
 effect labels or definitions authored in `Exit.ken.md`. The
 compiler-internal `FSOp`, `AmbientOp` and `host_exit` names are not
-made source APIs by these exports, and no generic `bind`/`ret` source
-promise follows. This admission changes neither the `main` type
-above nor any CLI resolution route: an isolated route still uses
-Legacy until its separate strict flip.
+made source APIs by these exports. Independently, §30 §4 admits the
+checked generic ITree sequencer under the specific floor spelling
+`itree_bind`, while Legacy keeps bare `bind` at that same identity;
+these HostIO exports imply no generic `ret` source promise. This
+admission changes neither the `main` type above nor any CLI resolution
+route: an isolated route still uses Legacy until its separate strict
+flip.
 
 Neither header takes a name token. The file path is the single identity of the
 program or package boundary; a spelling such as `program App` or `package Lib`
@@ -421,25 +424,27 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
-  BufferSpan, Char, ChildExit, ConsoleStream, Coproduct, CreatePolicy,
-  DirEntry, Equal, ExitCode, FileError, FileKind, FileMetadata,
-  FileOperation, HostIO, IOError, ITree, Instant, List, MappingProt,
-  Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
-  ReadProgress, ReadResult, ResourceError, ResourceKind,
-  ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit, Utf8Error,
-  WriteProgress, eqChar, resp_state, run_state, state_get, state_put}`.
-  This floor subset contains forty-seven exact identities: the previous
-  forty, six scoped families and checked `resp_state` admitted in
-  Increment 3a (`30-taxonomy §4`). It is the ambiently nameable
-  checked-identity roster, not a roster of forty-seven types. `Top`
+  BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream, Coproduct,
+  CreatePolicy, DirEntry, Equal, ExitCode, FileError, FileKind,
+  FileMetadata, FileOperation, HostIO, IOError, ITree, Instant, List,
+  MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
+  Prop, Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
+  ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit,
+  Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
+  resp_coproduct, resp_state, run_state, state_get, state_put}`.
+  This floor subset contains fifty-one exact identities: the prior
+  forty-seven plus `ConsoleOp`, `console_resp`, `itree_bind` and
+  `resp_coproduct` (`30-taxonomy §4`). It is the ambiently nameable
+  checked-identity roster, not a roster of fifty-one types. `Top`
   and `Bottom` are proposition constants, `Proved` is a proof binding,
-  `HostIO` is a type-level function, and `eqChar`, `resp_state`,
-  `run_state`, `state_get` and `state_put` are checked operations, not
-  inductive types or constructor families. The space desugarer reads
-  the checked `StateOp` operation family and the `resp_state` response
-  by exact pre-source ID, as well as the three
-  State operations (`36 §4.2`, §4.5). All five enter protected B;
-  bare `get` and `put` remain unreserved by this floor. For an
+  `HostIO` is a type-level function, and `console_resp`, `eqChar`,
+  `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
+  and `state_put` are checked operations, not inductive types or
+  constructor families. The space desugarer reads the checked
+  `StateOp` family, `resp_state`, `itree_bind`, `resp_coproduct` and
+  three State operations at exact pre-source IDs (`36 §4.2`, §4.5).
+  Bare `get`, `put` and `bind` remain unreserved; Legacy keeps the
+  bare `bind` alias for the same checked sequencing identity. For an
   inductive floor type, its per-type **scoped constructors** property
   determines whether its whole exact constructor family also occupies
   bare B names. When enabled, only `T`
@@ -473,10 +478,13 @@ is a **surface error** (`24`) — it never reaches the kernel:
   use `T.C` only, never a bare reservation. The sixteen existing
   `FileOperation` cases, including `FileOperation.OpReadFile`, keep their
   exact identities and native artifact leaves; no case is dropped to
-  make the family fit the floor. `StateOp` is likewise scoped as the
-  complete `StateOp.Get` and `StateOp.Put` family. Neither bare `Get`
-  nor bare `Put` joins B; the schematic `State s` signature label in
-  §36 §4.2 is not a second checked type or a package home. `IOError`
+  make the family fit the floor. `ConsoleOp` is scoped as the complete
+  `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush` and
+  `ConsoleOp.IsTerminal` family; no bare case joins B. `StateOp` is
+  likewise scoped as the complete `StateOp.Get` and `StateOp.Put`
+  family. Neither bare `Get` nor bare `Put` joins B; the schematic
+  `State s` signature label in §36 §4.2 is not a second checked type or
+  a package home. `IOError`
   is scoped as a complete thirteen-cause family: only public
   `IOError.C` paths resolve, including `IOError.NotFound`,
   `IOError.Other`, `IOError.Unsupported`, and `IOError.Revoked`; none of
