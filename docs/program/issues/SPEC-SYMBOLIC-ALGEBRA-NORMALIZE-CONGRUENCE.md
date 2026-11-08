@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-CONGRUENCE
 title: "Spec 66 makes poly_eq a congruence for EAdd, EMul, substitute and deriv, but not for normalize, the package's own canonicalizer: two canonically equal expressions are not known to normalize to canonically equal results, so a client that normalizes both sides of a proved equation must re-derive it through soundness. Rule from a checked D0 at zero trust the public law that normalize preserves poly_eq, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1

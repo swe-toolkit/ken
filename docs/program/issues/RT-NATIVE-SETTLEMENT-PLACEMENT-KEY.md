@@ -144,6 +144,14 @@ under B1a.
    readers, pins and equality invariant. Keyed on transport-source
    membership, used as if it were relocation (`evt_3tfjfceyg80y9`,
    Architect `evt_6rnvdpnq9b9vk`).
+6. Escaping K calls are excluded from
+   `preselect_static_response_callers` per caller (SELF, CTX, SOLE,
+   exact ORACLE). With exactly the measured seats excluded, the
+   call-coverage gate (`units.rs:9807`) refuses owner 2's next context,
+   whose selected caller is the next link of a worker-body chain (worker
+   body_origin = previous producer_result_origin). Keyed on a single
+   caller's seat property, used as if escape were per-caller rather
+   than transitive (`evt_brqpp3zm90sp`, Architect `evt_p77sfegqy2k2`).
 
 ## Stop conditions
 
