@@ -4,7 +4,7 @@ Points and axis-aligned boxes over `Nat` have total, exact membership and
 geometry operations. Six box-and-distance laws, ten structural
 commutativity, associativity, absorption, idempotence and distribution laws,
 three metric
-laws, two corner-membership laws, seven corner-wise containment laws, six
+laws, two corner-membership laws, seven corner-wise containment laws, eight
 inclusion-order laws, three area laws, and three point-box laws carry
 kernel-checked generic proofs.
 
@@ -35,7 +35,7 @@ associativity, absorption, idempotence and distribution laws follow
 intersection and hull, ahead of the three metric laws. The two corner-membership laws
 follow the three metric laws, and `contains_point_box` and
 `contains_point_box_equal` follow them. The corner-wise `inside` operation
-and its seven laws come next, then the six
+and its seven laws come next, then the eight
 inclusion-order laws, followed by `area`, its three laws and `area_point_box`.
 Per-axis proof helpers and distance helpers stay private.
 
@@ -2130,6 +2130,32 @@ pub theorem hull_eq_of_inside
     : IsTrue (inside b c) → Equal Box (hull b c) c =
   λh. inside_antisym (hull b c) c (hull_least b c c h (inside_refl c)) (inside_hull_right b c)
 
+pub theorem intersect_monotone
+      (a : Box) (b : Box) (a2 : Box) (b2 : Box)
+    : IsTrue (inside a a2)
+      → IsTrue (inside b b2)
+      → IsTrue (inside (intersect a b) (intersect a2 b2)) =
+  λha.
+    λhb.
+      intersect_greatest
+        (intersect a b)
+        a2
+        b2
+        (inside_trans (intersect a b) a a2 (intersect_inside_left a b) ha)
+        (inside_trans (intersect a b) b b2 (intersect_inside_right a b) hb)
+
+pub theorem hull_monotone
+      (a : Box) (b : Box) (a2 : Box) (b2 : Box)
+    : IsTrue (inside a a2) → IsTrue (inside b b2) → IsTrue (inside (hull a b) (hull a2 b2)) =
+  λha.
+    λhb.
+      hull_least
+        a
+        b
+        (hull a2 b2)
+        (inside_trans a a2 (hull a2 b2) ha (inside_hull_left a2 b2))
+        (inside_trans b b2 (hull a2 b2) hb (inside_hull_right a2 b2))
+
 pub fn area (b : Box) : Nat =
   match b {
     MkBox lo hi ↦
@@ -2632,7 +2658,7 @@ The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
 arguments of the box laws explicit. The two associativity proofs reuse
 `max::assoc` on the lower corners and `min::assoc` on the upper corners
 for intersection, reversing those selectors for hull. `point_equal` and
-`box_equal` assemble structural box equality; none of the thirty-six
+`box_equal` assemble structural box equality; none of the thirty-eight
 pre-area public laws identifies boxes by their sets of members. Both
 mixed absorption proofs keep their shared box as the left operand.
 `intersect_hull_absorb` uses `max::absorb` to restore its lower coordinates
@@ -2672,6 +2698,11 @@ by `intersect_greatest` with `inside_refl`, and the intersection is
 inside it by `intersect_inside_left`. The hull law is dual, through
 `hull_least` and `inside_hull_right`. Neither needs a Nat selector law
 or a validity premise.
+
+`intersect_monotone` applies `intersect_greatest` to two `inside_trans`
+chains through the intersection bounds, and
+`hull_monotone` applies `hull_least` to two chains through the hull bounds.
+Neither needs a match, a Nat lemma or a validity premise.
 
 `area_inside` bounds each inner inclusive span by its outer span using
 monotonicity and antitonicity of saturating subtraction, then combines the
@@ -2731,8 +2762,8 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–16](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and forty public checked law types,
+1. **Contract.** [Exact geometry, §§1–17](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and forty-two public checked law types,
    including the two structural distribution, two corner-membership,
    inside-antisymmetry and three point-box laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
@@ -2748,7 +2779,8 @@ this interface.
    `inside_refl`, `intersect_inside_left`, `intersect_inside_right`,
    `inside_hull_left`, `inside_hull_right`, `inside_complete`, `inside_trans`,
    `inside_antisym`, `intersect_greatest`, `hull_least`,
-   `intersect_eq_of_inside`, `hull_eq_of_inside`, `area`, `area_inside`,
+   `intersect_eq_of_inside`, `hull_eq_of_inside`, `intersect_monotone`,
+   `hull_monotone`, `area`, `area_inside`,
    `area_inverted_x`, `area_inverted_y`, and `area_point_box`.
    `axis_point_equal`, `axis_within`, `axis_span`, `box_with_lo`,
    `box_with_hi`, `box_equal`, generic subtraction and multiplication bounds,
@@ -2832,7 +2864,14 @@ this interface.
    applies them to nested closed boxes, accepts a same-form one-axis control,
    and refuses a false premise and equation in separate clients. Its
    conformance seed is authored separately under `conformance/stdlib/geometry/`.
-   All sixteen authored seeds supplement rather than replace the checked
+   The [monotonicity package test](
+     ../../../../crates/ken-elaborator/tests/cat_geometry_box_intersect_hull_monotone.rs)
+   checks both generic public laws, exact trusted `GlobalId` identities,
+   closed accepted controls and isolated wrong-premise refusals. The
+   [monotonicity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-monotone.md)
+   records separate accepted and refused clients; the package test does not
+   execute that seed or establish an official conformance result.
+   All seventeen authored seeds supplement rather than replace the checked
    generic law bodies.
 
 [id]: ../../../../conformance/stdlib/geometry/seed-box-intersect-hull-idempotence.md
