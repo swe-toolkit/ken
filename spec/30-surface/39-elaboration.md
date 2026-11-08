@@ -104,14 +104,15 @@ The loader proceeds as follows:
    FileMetadata, FileOperation, HostIO, IOError, ITree, Instant, List,
    MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop,
    Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
-   ResourceOpenMode, Result, Top, TransferCount, Unit, Utf8Error,
-   WriteProgress, eqChar, run_state, state_get, state_put}`
-   (`30-taxonomy §4`; `33 §3.3`). These forty-five checked identities are
-   ambiently nameable in Strict roots, not forty-five types: `Top` and
-   `Bottom` are proposition constants, `Proved` is a proof binding,
-   `HostIO` is a type-level function, and `eqChar`, `run_state`,
-   `state_get` and `state_put` are checked operations. The three State
-   names are protected; bare `get` and `put` are not reserved by them.
+   ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit,
+   Utf8Error, WriteProgress, eqChar, resp_state, run_state, state_get,
+   state_put}` (`30-taxonomy §4`; `33 §3.3`). These forty-seven checked
+   identities are ambiently nameable in Strict roots, not forty-seven
+   types: `Top` and `Bottom` are proposition constants, `Proved` is a proof binding,
+   `HostIO` is a type-level function, and `eqChar`, `resp_state`,
+   `run_state`, `state_get` and `state_put` are checked operations. Those
+   four State operations and `StateOp` are protected; bare `get` and
+   `put` are not reserved by them.
    Admit a floor constructor only at its exact checked parent and
    subject to its per-type scoped-constructors property and visibility. `Auth`'s
    `ANone`/`APartial`/`AFull`, `Bool`'s `True`/`False`, `List`'s `Nil`/`Cons`,
@@ -133,7 +134,7 @@ The loader proceeds as follows:
    `ConsoleStream.Stderr` resolve to its three exact constructor IDs;
    bare `Stdin`, `Stdout`, `Stderr`, and the old generic `Stream`
    spelling do not enter B. The scoped constructors do not increase the
-   forty-five-name count. `IOError`'s complete thirteen-cause family,
+   forty-seven-name count. `IOError`'s complete thirteen-cause family,
    `CreatePolicy`'s three cases and `ResourceError`'s complete
    twelve-case family are scoped: their public constructor paths are
    `IOError.C`, `CreatePolicy.CreateNew` /
@@ -147,13 +148,16 @@ The loader proceeds as follows:
    `ResourceOpenMode.ResourceMetadata`,
    `ResourceOpenMode.ResourceWriteCreate`, `MappingProt.ReadOnly`,
    `MappingProt.ReadWrite`, `ChildExit.Exited` and
-   `ChildExit.Signaled`. The five Increment 3a scoped families add
+   `ChildExit.Signaled`. The first five Increment 3a scoped families add
    `ReadResult.Chunk`/`ReadResult.Eof`,
    `FileMetadata.MkFileMetadata`, `DirEntry.MkDirEntry`,
    `FileKind.KFile`/`FileKind.KDirectory`/`FileKind.KSymlink`/
-   `FileKind.KOther` and the sixteen `FileOperation.Op*` paths. None
-   reserves a bare case name. `Char`,
-   `HostIO`, transparent `Pair`, and the proposition/equality members
+   `FileKind.KOther` and the sixteen `FileOperation.Op*` paths. The
+   additional scoped State carrier resolves `StateOp.Get` and
+   `StateOp.Put` at its exact checked constructor IDs; the `State s`
+   effect label does not name this carrier as a second type. None
+   reserves a bare case name. `Char`, `HostIO`, transparent `Pair`,
+   and the proposition/equality members
    have no constructors.
    Admit the separate Pair companion-binding inventory
    `{mk_pair, pair_fst, pair_snd}` only at the three exact pre-source
@@ -178,11 +182,12 @@ The loader proceeds as follows:
    program, with an identical `trusted_base()` delta.
 
 Installing a floor member or Pair companion is a resolution operation over
-declarations that already exist. The loader reuses all forty-five exact
+declarations that already exist. The loader reuses all forty-seven exact
 checked prelude-floor identities, including `Top` and `Bottom` as
 proposition constants, `Proved`'s proof-term identity, the registered
-`eqChar` comparator ID and the three State-operation IDs read by the
-space desugarer, along with exact constructor IDs derived from recorded
+`eqChar` comparator ID, the three prior State-operation IDs, and the
+exact `StateOp` and `resp_state` IDs read by the space desugarer,
+along with constructor IDs derived from recorded
 parentage and the exact three Pair companion IDs. It allocates no
 declaration and adds no `trusted_base()` entry. A same-spelling top-level
 declaration for a floor name, an unscoped floor constructor, or a Pair
