@@ -277,21 +277,27 @@ fn admitted_console_char_resolves_qualified_family_in_each_entry_mode() {
     }
 }
 
-/// MEASURED: a source declaration of either newly admitted member is
-/// refused in each entry mode; an unrelated one-token local remains legal.
-/// CLAIMED: precisely the two checked names, not a spelling family, are
-/// reserved. THE GAP: the checked use and constructor scope have an
-/// independent positive row, so a broken parser cannot pass on rejection.
+/// MEASURED: a source declaration of each of four admitted floor members
+/// is refused in all three entry modes; an unrelated local remains legal.
+/// CLAIMED: precisely ConsoleStream, eqChar, ConsoleOp and console_resp,
+/// not their spelling families, are reserved. THE GAP: their checked uses
+/// and constructor scope have independent positive rows, so broken source
+/// elaboration cannot pass merely by refusing every declaration.
 #[test]
 fn admitted_console_char_refuse_same_name_declarations_in_each_entry_mode() {
     for mode in MODES {
         for (name, control) in [
             ("ConsoleStream", "LocalStream"),
             ("eqChar", "local_char_eq"),
+            ("ConsoleOp", "LocalConsoleOp"),
+            ("console_resp", "local_console_resp"),
         ] {
             let mut env = ElabEnv::new().expect("prelude");
             let source = format!("const {name} : Nat = Zero");
-            let err = load(&mut env, &source, mode).expect_err("admitted shadow refused");
+            let err = match load(&mut env, &source, mode) {
+                Err(error) => error,
+                Ok(()) => panic!("{mode}: {name} unexpectedly accepted as a local"),
+            };
             assert!(format!("{err:?}").contains(name), "{mode}: {name}: {err:?}");
             let mut env = ElabEnv::new().expect("prelude");
             load(&mut env, &format!("const {control} : Nat = Zero"), mode)
@@ -339,21 +345,6 @@ fn package_internal_and_bare_leaf_names_are_not_reserved() {
     }
 }
 
-/// MEASURED: a strict roots client accepts a same-name `ConsoleOp` declaration
-/// and assigns it a fresh local ID, leaving the checked family untouched.
-/// CLAIMED: the compiler-internal ConsoleOp is not admitted by family label.
-/// THE GAP: a floor-addition mutation must reach this declaration and refuse
-/// it here, not fail earlier during prelude initialization.
-#[test]
-fn compiler_internal_console_op_same_name_local_accepts_in_strict_roots() {
-    let mut env = ElabEnv::new().expect("checked prelude");
-    let original = env.globals["ConsoleOp"];
-    load(&mut env, "const ConsoleOp : Nat = Zero", "strict-roots")
-        .expect("internal ConsoleOp leaves the same-name local available");
-    assert_ne!(env.globals["Entry.ConsoleOp"], original);
-    assert_eq!(env.globals["ConsoleOp"], original);
-}
-
 /// MEASURED: strict and legacy roots clients import all five exact-ID home
 /// exports and use the ConsoleStream.Stdout family in `write`; their checked
 /// bodies mention the pre-source IDs captured from a fresh environment.
@@ -377,7 +368,24 @@ fn check_home_imports_select_all_five(mode: &str) {
     .expect("client");
     let mut env = ElabEnv::new().expect("prelude");
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
-    let expected = PACKAGED.map(|(_, name)| (name, env.globals[name]));
+    let pre = |module: &str, name: &str| -> GlobalId {
+        assert!(
+            PACKAGED.contains(&(module, name)),
+            "{module}.{name} is packaged"
+        );
+        env.globals[name]
+    };
+    let io = pre("Capability.Console.Text", "IO");
+    let write = pre("Capability.Console.Text", "write");
+    let print_line = pre("Capability.Console.Text", "print_line");
+    let char_to_int = pre("Core.Classes.LawfulClasses", "charToInt");
+    let leq_char = pre("Core.Classes.LawfulClasses", "leqChar");
+    let expected = [
+        ("Entry.send", write),
+        ("Entry.line", print_line),
+        ("Entry.char_code", char_to_int),
+        ("Entry.char_order", leq_char),
+    ];
     let stdout = env.globals["ConsoleStream.Stdout"];
     match mode {
         "strict-roots" => {
@@ -390,12 +398,7 @@ fn check_home_imports_select_all_five(mode: &str) {
         }
         _ => panic!("unknown home import mode: {mode}"),
     }
-    for (source, id) in [
-        ("Entry.send", expected[1].1),
-        ("Entry.line", expected[2].1),
-        ("Entry.char_code", expected[3].1),
-        ("Entry.char_order", expected[4].1),
-    ] {
+    for (source, id) in expected {
         let (_, body) = env
             .env
             .transparent_body(env.globals[source])
@@ -410,7 +413,7 @@ fn check_home_imports_select_all_five(mode: &str) {
         .env
         .const_type(env.globals["Entry.send"])
         .expect("send type");
-    assert!(contains_id(&ty, expected[0].1), "IO in checked result type");
+    assert!(contains_id(&ty, io), "IO in checked result type");
     assert_eq!(before, env.env.trusted_base().into_iter().collect());
 }
 
