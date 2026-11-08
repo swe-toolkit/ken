@@ -1,22 +1,18 @@
 program capabilities FS AFull
 
 fn body (_mapping : MappingHandle) : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn after_mapping (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Ok (ResourceBracketOk _) |-> host_exit AFull ExitCode.Success;
-    Ok _ |-> host_exit AFull (ExitCode.Failure 92);
-    Err _ |-> host_exit AFull (ExitCode.Failure 91)
+    Ok (ResourceBracketOk _) |-> host_pure AFull ExitCode ExitCode.Success;
+    Ok _ |-> host_pure AFull ExitCode (ExitCode.Failure 92);
+    Err _ |-> host_pure AFull ExitCode (ExitCode.Failure 91)
   }
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly body)
     (\outcome. after_mapping outcome)

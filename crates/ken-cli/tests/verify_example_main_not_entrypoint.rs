@@ -2,6 +2,7 @@
 //! Contract: spec 33 §3.2.1 and 62 §3.2; frame VERIFY-EXAMPLE-MAIN-NOT-ENTRYPOINT.
 
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 use ken_cli::{run_program, RunError, SourceFormat};
@@ -14,9 +15,47 @@ use ken_interp::PosixHost;
 use tempfile::tempdir;
 
 const MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success";
-// This is the exact AC-0 source: the first fence has a valid program boundary
-// but no main, and only the checked example declares main.
-const EXAMPLE_ONLY: &str = "# Example-only entry point\n\n```ken\nprogram capabilities FS ANone\nconst plain_probe : Bool = True\n```\n\n```ken example\nfn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success\n```\n";
+// The first fence has a valid program boundary but no main; only the
+// checked example declares main. Source-only routes have no catalog root,
+// so its wrapper import is supplied solely to the strict-entry pin below.
+const EXAMPLE_ONLY: &str = "# Example-only entry point\n\n```ken\nprogram capabilities FS ANone\nconst plain_probe : Bool = True\n```\n\n```ken example\nfn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_pure ANone ExitCode ExitCode.Success\n```\n";
+
+/// Promise class: durable invariant. MEASURED: this same literate fixture
+/// reaches MissingMain under strict with an ephemeral explicit import and
+/// refuses the wrapper without it. CLAIMED: an example declaration cannot
+/// supply the program's entrypoint. THE GAP: the original runner/native/CLI
+/// assertions below separately exercise the real entrypoint routes.
+#[test]
+fn strict_example_only_main_requires_import_then_still_is_not_entrypoint() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut unimported = ElabEnv::new().expect("prelude");
+    match unimported.elaborate_isolated_ken_md_file_strict_v1(&[root.clone()], EXAMPLE_ONLY) {
+        Err(ken_elaborator::ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "host_pure")
+        }
+        Err(error) => panic!("unexpected strict refusal: {error:?}"),
+        Ok(_) => panic!("example accessed host_pure without its package import"),
+    }
+    let imported = EXAMPLE_ONLY.replacen(
+        "program capabilities FS ANone\n",
+        "program capabilities FS ANone\nimport Capability.Process.Exit (host_pure)\n",
+        1,
+    );
+    let mut selected = ElabEnv::new().expect("prelude");
+    selected
+        .elaborate_isolated_ken_md_file_strict_v1(&[root], &imported)
+        .expect("checked example with explicit package import");
+    assert!(
+        matches!(
+            admit_checked_main(&selected),
+            Err(ProgramAdmissionError::MissingMain)
+        ),
+        "an imported checked-example main is not the program entrypoint"
+    );
+}
 
 fn with_program_main(example: Option<&str>) -> String {
     let mut source = format!("```ken\nprogram capabilities FS ANone\n{MAIN}\n```\n");

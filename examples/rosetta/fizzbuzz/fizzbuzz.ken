@@ -227,22 +227,18 @@ fn fizzBuzzLine (n : Nat) : String =
 -- closure recursive shape VAL2's own `printLoop` probe confirmed
 -- SCT-acceptable.
 --
--- `Vis`/`Ret` now take `ITree`'s 3 explicit params (State-effect-build lift,
--- VAL2 #10 / OQ-C.C2): `E=ConsoleOp`, `Resp=console_resp`, `R=Unit`.
-proc fizzBuzzLoop (remaining : Nat) (current : Nat) : IO Unit visits [Console] =
+-- A changed-result proc returns Unit while the Console visit is an
+-- explicit write before its recursive tail call.
+proc fizzBuzzLoop (remaining : Nat) (current : Nat) : Unit visits [Console] =
   match remaining {
-    Zero ↦ ITree.Ret ConsoleOp console_resp Unit MkUnit;
+    Zero ↦ MkUnit;
     Suc r ↦
-      ITree.Vis
-        ConsoleOp
-        console_resp
-        Unit
-        (Write
-          ConsoleStream.Stdout
-          (bytes_concat
-            (bytes_encode (fizzBuzzLine current))
-            (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char))))))
-        (λ_. fizzBuzzLoop r (Suc current))
+      let _ = write
+        ConsoleStream.Stdout
+        (bytes_concat
+          (bytes_encode (fizzBuzzLine current))
+          (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
+      in fizzBuzzLoop r (Suc current)
   }
 
 -- ── Oracle ───────────────────────────────────────────────────────────────────
