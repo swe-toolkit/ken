@@ -10,20 +10,14 @@ const RESOURCE_PRODUCER: &str = r#"
 fn after_metadata (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
-    Err _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
-    Ok _ |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+    Err _ |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+    Ok _ |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
   }
 
 proc body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [FS, FsHandleMetadata] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
     (resourceMetadata AFull resource) (\outcome. after_metadata outcome)
 
 proc target (cap : Cap AFull) (path : Bytes)
@@ -35,9 +29,7 @@ proc target (cap : Cap AFull) (path : Bytes)
 const DECLARED_HEADROOM_WITHOUT_METADATA: &str = r#"
 fn body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 proc target (cap : Cap AFull) (path : Bytes)
   : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit))
@@ -250,9 +242,7 @@ proc unused_sibling (_value : Unit)
 
 proc target (_value : Unit)
   : HostIO AFull Bool visits [Console] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result IOError Unit) Bool
+  host_bind AFull (Result IOError Unit) Bool
     (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
     (\outcome. after_flush outcome)
 "#;
@@ -287,9 +277,7 @@ proc walk (fuel : Nat)
   : HostIO AFull Instant visits [Console, Clock] =
   match fuel {
     Zero |-> host_clock AFull Instant wall_now;
-    Suc smaller |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result IOError Unit) Instant
+    Suc smaller |-> host_bind AFull (Result IOError Unit) Instant
       (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
       (\_outcome. walk smaller)
   }

@@ -51,28 +51,26 @@ fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
         "program capabilities FS APartial\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) \
            : HostIO APartial ExitCode visits [Console] = \
-           bind (Coproduct (FSOp APartial) AmbientOp) \
-                (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) \
-                (Result IOError Unit) ExitCode \
+           host_bind APartial (Result IOError Unit) ExitCode \
              (host_console APartial (Result IOError Unit) \
                (write ConsoleStream.Stdout (bytes_encode \"{payload}\"))) \
              (\\r. match r {{ \
                Err e |-> match e {{ \
-                 IOError.BrokenPipe |-> host_exit APartial (ExitCode.Failure 17); \
-                 IOError.NotFound |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.PermissionDenied |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.CapabilityDenied |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.Interrupted |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.AlreadyExists |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.InvalidInput |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.IsDirectory |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.NotDirectory |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.NotEmpty |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.Unsupported |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.Revoked |-> host_exit APartial (ExitCode.Failure 18); \
-                 IOError.Other errno |-> host_exit APartial (ExitCode.Failure 18) \
+                 IOError.BrokenPipe |-> host_pure APartial ExitCode (ExitCode.Failure 17); \
+                 IOError.NotFound |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.PermissionDenied |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.CapabilityDenied |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.Interrupted |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.AlreadyExists |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.InvalidInput |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.IsDirectory |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.NotDirectory |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.NotEmpty |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.Unsupported |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.Revoked |-> host_pure APartial ExitCode (ExitCode.Failure 18); \
+                 IOError.Other errno |-> host_pure APartial ExitCode (ExitCode.Failure 18) \
                }}; \
-               Ok _ |-> host_exit APartial ExitCode.Success \
+               Ok _ |-> host_pure APartial ExitCode ExitCode.Success \
              }})\n"
     );
     std::fs::write(&program, source).expect("write broken-pipe Ken program");

@@ -77,7 +77,7 @@ fn main_source(exit: &str) -> String {
     format!(
         "program capabilities FS APartial\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
-           : HostIO APartial ExitCode visits [Console] = host_exit APartial {exit}\n"
+           : HostIO APartial ExitCode visits [Console] = host_pure APartial ExitCode {exit}\n"
     )
 }
 

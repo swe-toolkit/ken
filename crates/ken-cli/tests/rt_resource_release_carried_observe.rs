@@ -69,44 +69,30 @@
 const WITNESS_SOURCE: &str = r#"program capabilities FS AFull
 fn rt_branched_body (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 proc rt_branched_endpoint_buffer
   (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file (0 : Int) buffer
       (MkBufferWindow (8 : Int) (4 : Int)))
     (\outcome. match outcome {
-      Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-      Ok progress |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+      Err error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      Ok progress |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
     })
 
 proc rt_branched_after_buffer
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-    Ok bracket |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+    Err error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+    Ok bracket |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
   }
 
 proc rt_branched_file (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (8 : Int) (rt_branched_endpoint_buffer file))
     (\outcome. rt_branched_after_buffer outcome)
@@ -115,15 +101,13 @@ proc rt_branched_done
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode visits [FS] =
   match outcome {
-    Err error |-> host_exit AFull (ExitCode.Failure 71);
-    Ok bracket |-> host_exit AFull (ExitCode.Failure 72)
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 71);
+    Ok bracket |-> host_pure AFull ExitCode (ExitCode.Failure 72)
   }
 
 proc rt_branched_stage (cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "source")
       ResourceOpenMode.ResourceRead rt_branched_file)
     (\outcome. rt_branched_done outcome)

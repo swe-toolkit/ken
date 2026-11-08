@@ -9,29 +9,25 @@ fn fixture() -> ken_elaborator::ElabEnv {
         r#"
 fn px8x_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
+  host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
 
 fn px8x_after
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err _ |-> host_exit AFull (ExitCode.Failure 51);
+    Err _ |-> host_pure AFull ExitCode (ExitCode.Failure 51);
     Ok bracket |-> match bracket {
-      ResourceBracketOk _ |-> host_exit AFull ExitCode.Success;
-      ResourceBracketBodyError _ |-> host_exit AFull (ExitCode.Failure 52);
-      ResourceBracketReleaseError _ |-> host_exit AFull (ExitCode.Failure 53);
-      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (ExitCode.Failure 54)
+      ResourceBracketOk _ |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError _ |-> host_pure AFull ExitCode (ExitCode.Failure 52);
+      ResourceBracketReleaseError _ |-> host_pure AFull ExitCode (ExitCode.Failure 53);
+      ResourceBracketBodyAndReleaseError _ _ |-> host_pure AFull ExitCode (ExitCode.Failure 54)
     }
   }
 
 proc px8x_observed (capacity : Int)
   : HostIO AFull ExitCode visits [FS, BufferAllocate, ResourceRelease] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withBuffer AFull Unit Unit capacity px8x_body)
     (\outcome. px8x_after outcome)
 "#,

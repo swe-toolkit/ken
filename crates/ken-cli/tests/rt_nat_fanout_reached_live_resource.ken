@@ -1,34 +1,22 @@
 program capabilities FS AFull
 proc second_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\r2. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
+    (\r2. host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
 
 proc after_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   (outcome : Result ResourceError ReadProgress)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
-    Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+    Err error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
     Ok progress |-> match progress {
       ReadProgress.ReadEof |-> second_read file buffer;
       ReadProgress.ReadSome span count |->
-        bind (Coproduct (FSOp AFull) AmbientOp)
-          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-          (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+        host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
           (match buffer_span_budget span {
-            Zero |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadProgress.ReadEof);
-            Suc m |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadProgress.ReadEof)
+            Zero |-> host_pure AFull (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadProgress.ReadEof);
+            Suc m |-> host_pure AFull (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadProgress.ReadEof)
           })
           (\_ignored. second_read file buffer)
     }
@@ -36,32 +24,26 @@ proc after_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
 
 proc read_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
     (\outcome. after_read file buffer outcome)
 
 proc file_body (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (6 : Int) (read_body file))
-    (\outcome. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
+    (\outcome. host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
 
 proc finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode visits [FS] =
   match outcome {
-    Err open_error |-> host_exit AFull (ExitCode.Failure 96);
+    Err open_error |-> host_pure AFull ExitCode (ExitCode.Failure 96);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
-      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 93);
-      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 94);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (ExitCode.Failure 95)
+      ResourceBracketOk value |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError error |-> host_pure AFull ExitCode (ExitCode.Failure 93);
+      ResourceBracketReleaseError error |-> host_pure AFull ExitCode (ExitCode.Failure 94);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_pure AFull ExitCode (ExitCode.Failure 95)
     }
   }
 
@@ -69,9 +51,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit
           cap (bytes_encode "held.bin") ResourceOpenMode.ResourceRead file_body)
         (\outcome. finish outcome)

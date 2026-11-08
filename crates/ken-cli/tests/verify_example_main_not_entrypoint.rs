@@ -14,7 +14,7 @@ use ken_elaborator::ElabEnv;
 use ken_interp::PosixHost;
 use tempfile::tempdir;
 
-const MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success";
+const MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_pure ANone ExitCode ExitCode.Success";
 // The first fence has a valid program boundary but no main; only the
 // checked example declares main. Source-only routes have no catalog root,
 // so its wrapper import is supplied solely to the strict-entry pin below.

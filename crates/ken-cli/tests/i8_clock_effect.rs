@@ -6,22 +6,16 @@ use ken_interp::{CaptureHost, ClockTrace, HostHandler};
 const CLOCK_PACKAGE: &str = include_str!("../../../catalog/packages/Capability/Time/WallClock.ken.md");
 
 const CLOCK_BODY: &str = r#"
-  bind (Coproduct (FSOp APartial) AmbientOp)
-       (resp_coproduct (FSOp APartial) AmbientOp
-         (fs_resp APartial) ambient_resp)
-       Instant ExitCode
+  host_bind APartial Instant ExitCode
     (host_clock APartial Instant wall_now)
     (\first .
       match first {
         Instant.MkInstant _firstNanoseconds |->
-          bind (Coproduct (FSOp APartial) AmbientOp)
-               (resp_coproduct (FSOp APartial) AmbientOp
-                 (fs_resp APartial) ambient_resp)
-               Instant ExitCode
+          host_bind APartial Instant ExitCode
             (host_clock APartial Instant wall_now)
             (\second .
               match second {
-                Instant.MkInstant _secondNanoseconds |-> host_exit APartial ExitCode.Success
+                Instant.MkInstant _secondNanoseconds |-> host_pure APartial ExitCode ExitCode.Success
               })
       })
 "#;

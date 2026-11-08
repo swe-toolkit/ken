@@ -442,7 +442,7 @@ fn rewritten_nested_read_fixture_checks_at_strict_entry_with_ephemeral_imports()
 }
 
 /// Promise class: transition sentinel, retired when 3b persists imports and
-/// switches these source routes to Strict. MEASURED: the actual 33 rewritten
+/// switches these source routes to Strict. MEASURED: the actual 40 rewritten
 /// fixture files keep their Legacy acceptance or missing-name refusal under
 /// Strict with their checked home imports; no hand-copied fixture is tested.
 /// CLAIMED: the ruled exact-body HostIO R migrations are source-valid at the
@@ -454,7 +454,7 @@ fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
 
     use ken_elaborator::lexer::{Lexer, Token};
 
-    const USERS: [&str; 33] = [
+    const USERS: [&str; 40] = [
         "crates/ken-cli/tests/fixtures/abi_s5_block_on_stdin.ken",
         "crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed.ken",
         "crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed_cow.ken",
@@ -484,6 +484,13 @@ fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
         "crates/ken-cli/tests/fixtures/rt_nested_read_nested_control.ken",
         "crates/ken-cli/tests/fixtures/rt_nested_read_single_read_control.ken",
         "crates/ken-cli/tests/fixtures/rt_performing_underived_acmain.ken",
+        "crates/ken-cli/tests/rt_one_buffer_residual_layout.ken",
+        "crates/ken-cli/tests/rt_nat_fanout_escaped_resource.ken",
+        "crates/ken-cli/tests/rt_ignored_two_buffer_witness.ken",
+        "crates/ken-cli/tests/rt_two_bracket_distinguishable.ken",
+        "crates/ken-cli/tests/rt_nat_fanout_reached_live_resource.ken",
+        "crates/ken-cli/tests/rt_per_emitter_one_bracket.ken",
+        "crates/ken-cli/tests/rt_plain_match_layout.ken",
         "crates/ken-elaborator/tests/fixtures/rt_bracket_region_early_release.ken",
         "crates/ken-elaborator/tests/fixtures/rt_bracket_region_multileaf.ken",
         "crates/ken-elaborator/tests/fixtures/rt_bracket_transport_file_backed.ken",

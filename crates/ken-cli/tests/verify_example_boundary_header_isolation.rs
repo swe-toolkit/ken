@@ -17,12 +17,12 @@ use tempfile::tempdir;
 const FULL_EXAMPLE: &str = "program capabilities FS AFull\nconst zz_example_probe : Nat = Zero";
 const BARE_EXAMPLE: &str = "const zz_example_probe : Nat = Zero";
 const WRONG_ABI: &str = "program capabilities FS ANone\n\
-    fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_exit AFull ExitCode.Success";
+    fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
 const OWN_ABI: &str = "program capabilities FS ANone\n\
-    fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_exit ANone ExitCode.Success";
+    fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_pure ANone ExitCode ExitCode.Success";
 const PRINT_OWN_ABI: &str = "program capabilities FS ANone\n\
     proc main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode visits [Console] = host_program ANone (print_line \"own authority\")";
-const HEADERLESS_ABI: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_exit AFull ExitCode.Success";
+const HEADERLESS_ABI: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
 const FULL_WRITER_UNDER_ANONE: &str = r#"program capabilities FS ANone
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =

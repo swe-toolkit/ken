@@ -6,54 +6,36 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 const PROGRAM: &str = r#"program capabilities FS APartial
 proc wrap_result (as_ok : Bool)
   : HostIO APartial (Result Bytes Bytes) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) (Result Bytes Bytes)
+  host_bind APartial (Result IOError Unit) (Result Bytes Bytes)
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "seed:")))
     (\written. match written {
-      Err _ |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        (Result Bytes Bytes) (Err Bytes Bytes (bytes_encode "host-error"));
+      Err _ |-> host_pure APartial (Result Bytes Bytes) (Err Bytes Bytes (bytes_encode "host-error"));
       Ok _ |-> match as_ok {
-        False |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          (Result Bytes Bytes) (Err Bytes Bytes (bytes_encode "err-payload"));
-        True |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          (Result Bytes Bytes) (Ok Bytes Bytes (bytes_encode "ok-payload"))
+        False |-> host_pure APartial (Result Bytes Bytes) (Err Bytes Bytes (bytes_encode "err-payload"));
+        True |-> host_pure APartial (Result Bytes Bytes) (Ok Bytes Bytes (bytes_encode "ok-payload"))
       }
     })
 
 proc write_then_exit (bytes : Bytes) (code : ExitCode)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. host_exit APartial code))
+      (\_. host_pure APartial ExitCode code))
 
 proc wrap_again (body : Unit -> HostIO APartial (Result Bytes Bytes))
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result Bytes Bytes) ExitCode
+  host_bind APartial (Result Bytes Bytes) ExitCode
     (relay body)
     finish
 
 proc relay (body : Unit -> HostIO APartial (Result Bytes Bytes))
   : HostIO APartial (Result Bytes Bytes) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result Bytes Bytes) (Result Bytes Bytes)
+  host_bind APartial (Result Bytes Bytes) (Result Bytes Bytes)
     (body MkUnit)
-    (\outcome. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result Bytes Bytes) outcome)
+    (\outcome. host_pure APartial (Result Bytes Bytes) outcome)
 
 proc finish (outcome : Result Bytes Bytes)
   : HostIO APartial ExitCode visits [Console] =
@@ -66,7 +48,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 99);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 99);
       Cons _ tail |-> match tail {
         Nil |-> wrap_again (\_. wrap_result True);
         Cons _ _ |-> wrap_again (\_. wrap_result False)
