@@ -458,6 +458,104 @@ fn closures_carries_pure_callback_through_catalog_prelude() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: the rewritten FizzBuzz source
+/// accepts under Strict only with its explicit checked package imports, and
+/// its unchanged CLI oracle records the same twenty output lines. CLAIMED:
+/// changing a hand-built Console tree to a changed-result proc preserves
+/// the application behavior without exposing ConsoleOp or Write as floor.
+/// THE GAP: this checks the concrete program and its output, not every
+/// recursive Console tail call in arbitrary Ken source.
+#[test]
+fn fizzbuzz_changed_proc_keeps_output_and_strict_import_boundary() {
+    let root = rosetta_dir().join("fizzbuzz");
+    let original = fs::read_to_string(root.join("fizzbuzz.ken")).expect("FizzBuzz source");
+    let body = original
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("FizzBuzz program header");
+    let catalog = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let other_imports = "import Core.Classes.LawfulClasses (intToChar)\n\
+                         import Capability.Process.Exit (host_program)\n";
+    let with_imports = format!(
+        "program capabilities FS APartial\n{other_imports}\
+         import Capability.Console.Text (write)\n{body}"
+    );
+    let mut selected = ElabEnv::new().expect("prelude");
+    selected
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_imports)
+        .expect("changed-result FizzBuzz with explicit imports");
+    let without_write = format!("program capabilities FS APartial\n{other_imports}{body}");
+    let mut negative = ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_write) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "write"),
+        Err(error) => panic!("FizzBuzz missing write: wrong refusal {error:?}"),
+        Ok(_) => panic!("FizzBuzz accepted without the write import"),
+    }
+    let tmp = tempfile::tempdir().expect("FizzBuzz output directory");
+    let (output, successful) = run_example("fizzbuzz", &root.join("fizzbuzz.ken"), tmp.path())
+        .expect("FizzBuzz CLI run completes");
+    assert!(successful, "the rewritten FizzBuzz program must run");
+    let Oracle::Expected(expected) = oracle_for(&root) else {
+        panic!("FizzBuzz requires its output oracle");
+    };
+    assert_eq!(output, expected, "FizzBuzz output after the R rewrite");
+}
+
+/// Promise class: durable invariant. MEASURED: the same read-file-lines
+/// program checks with explicit FS/Console/HostIO imports under Strict and
+/// still prints its exact CLI oracle on the current route. CLAIMED: the
+/// checked HostIO wrapper substitution preserves the composed effects.
+/// THE GAP: interpreter/native agreement beyond this example is exercised
+/// by its dedicated differential tests, not by this one CLI output.
+#[test]
+fn read_file_lines_rewrite_keeps_oracle_and_strict_import_boundary() {
+    let example = rosetta_dir().join("read-file-lines");
+    let original =
+        fs::read_to_string(example.join("read-file-lines.ken")).expect("read-file-lines source");
+    let body = original
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("source program header");
+    let imports = "import Capability.Console.Text (print_line)\n\
+                   import Capability.Filesystem.Authority (read_bytes)\n\
+                   import Capability.Process.Exit
+                     (host_bind, host_fs, host_pure, host_console, host_program_then)\n\
+                   import Core.Classes.LawfulClasses (charToInt)\n";
+    let catalog = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imported = format!("program capabilities FS APartial\n{imports}{body}");
+    let mut strict = ElabEnv::new().expect("prelude");
+    strict
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
+        .expect("read-file-lines with explicit checked imports");
+    let without_wrappers = imported.replace(
+        "import Capability.Process.Exit
+                     (host_bind, host_fs, host_pure, host_console, host_program_then)\n",
+        "",
+    );
+    let mut negative = ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "host_pure"),
+        Err(error) => panic!("wrong no-import refusal: {error:?}"),
+        Ok(_) => panic!("read-file-lines accepted without HostIO wrapper imports"),
+    }
+    let tmp = tempfile::tempdir().expect("read-file-lines output directory");
+    let (output, successful) = run_example(
+        "read-file-lines",
+        &example.join("read-file-lines.ken"),
+        tmp.path(),
+    )
+    .expect("read-file-lines CLI run completes");
+    assert!(successful, "rewritten read-file-lines program must run");
+    let Oracle::Expected(expected) = oracle_for(&example) else {
+        panic!("read-file-lines requires its output oracle");
+    };
+    assert_eq!(output, expected, "read-file-lines output after R rewrite");
+}
+
 /// Promise class: durable invariant. MEASURED: each of the four existing
 /// Collections-prefixed users elaborates under the strict entry with the
 /// explicit Conjunction import, while the same source without it refuses an
