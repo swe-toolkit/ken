@@ -82,7 +82,8 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
 
 /// Promise class: transition sentinel until 3b removes the Legacy route.
 /// MEASURED: five already-invalid effect-row fixtures keep TypeMismatch in
-/// both modes. CLAIMED: new vocabulary does not mask their actual error.
+/// both modes after the Strict source imports its checked H vocabulary.
+/// CLAIMED: new vocabulary does not mask their actual error.
 /// THE GAP: this is a fixed source cohort, not every generated Rust string.
 #[test]
 fn local_latent_invalid_sources_keep_their_type_mismatch_kind() {
@@ -106,9 +107,16 @@ fn local_latent_invalid_sources_keep_their_type_mismatch_kind() {
         let old = legacy
             .elaborate_file_v1(&source)
             .expect_err("legacy type mismatch");
+        let imported = source.replacen(
+            "program capabilities FS APartial\n",
+            "program capabilities FS APartial\n\
+             import Capability.Console.Text (print_line, write)\n\
+             import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)\n",
+            1,
+        );
         let mut selected = ElabEnv::new().expect("prelude");
         let new = selected
-            .elaborate_isolated_file_strict_v1(&[catalog.clone()], &source)
+            .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
             .expect_err("strict type mismatch");
         assert!(
             matches!(old, ElabError::TypeMismatch { .. }),
