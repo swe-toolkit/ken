@@ -2400,16 +2400,17 @@ fn check_performed_let(
 /// binder, or the match whose scrutinee slot the bind fills. That match's
 /// arms were resolved without the binder, so the binder is hidden from
 /// surface names and only the synthesized scrutinee reaches it.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum SequencedBody<'a> {
     Let(&'a RExpr),
     Scrutinee { equation: Option<&'a str>, arms: &'a [RMatchArm] },
+    Application { expr: RExpr, slot: usize },
 }
 
 impl<'a> SequencedBody<'a> {
     /// Push the bind's binder and return the body that reads it.
     fn enter(
-        self, cx: &mut ElabCtx<'_>, binder_ty: &Term, latent: crate::effects::RowType,
+        &self, cx: &mut ElabCtx<'_>, binder_ty: &Term, latent: crate::effects::RowType,
         rhs: &RExpr, span: &Span,
     ) -> Cow<'a, RExpr> {
         let position = cx.ctx.len();
@@ -2417,7 +2418,7 @@ impl<'a> SequencedBody<'a> {
         match self {
             SequencedBody::Let(body) => {
                 cx.push_let_latent(latent);
-                Cow::Borrowed(body)
+                Cow::Borrowed(*body)
             }
             SequencedBody::Scrutinee { equation, arms } => {
                 cx.hidden_positions.push(position);
@@ -2430,11 +2431,16 @@ impl<'a> SequencedBody<'a> {
                     span: span.clone(),
                 })
             }
+            SequencedBody::Application { expr, slot } => {
+                cx.hidden_positions.push(position);
+                cx.push_let_latent(latent.clone());
+                Cow::Owned(application_with_slot(expr, *slot, position, latent))
+            }
         }
     }
 
-    fn leave(self, cx: &mut ElabCtx<'_>) {
-        if let SequencedBody::Scrutinee { .. } = self {
+    fn leave(&self, cx: &mut ElabCtx<'_>) {
+        if matches!(self, SequencedBody::Scrutinee { .. } | SequencedBody::Application { .. }) {
             debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
         }
         cx.ctx.pop();
@@ -2453,6 +2459,9 @@ impl<'a> SequencedBody<'a> {
             SequencedBody::Scrutinee { equation, arms } => check_match_result_unsequenced(
                 cx, rhs, equation, arms, expected, span, result_predicates,
             ),
+            SequencedBody::Application { .. } => Err(ElabError::Internal(
+                "application slot entered a checked-only bind".into(),
+            )),
         }
     }
 
@@ -2465,6 +2474,7 @@ impl<'a> SequencedBody<'a> {
             SequencedBody::Scrutinee { equation: None, arms } => {
                 infer_match(cx, rhs, arms, span, None)
             }
+            SequencedBody::Application { expr, .. } => infer_application_unsequenced(cx, &expr),
         }
     }
 }
@@ -3829,7 +3839,7 @@ fn check_sequenced_scrutinee(
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
     let snapshot = refinement_snapshot::Snapshot::capture(cx);
-    let first = check_sequenced_bind(cx, &None, scrut, body, expected, span, predicates);
+    let first = check_sequenced_bind(cx, &None, scrut, body.clone(), expected, span, predicates);
     let result = match first {
         Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
             if requested == split_id => {
@@ -14810,17 +14820,106 @@ fn infer_trunc_intro_error(rspan: &Span) -> Result<(Term, Term), ElabError> {
     })
 }
 
+/// A bound value has already paid for its effects. Only an expression that
+/// evaluates an action *at this argument* takes the §2.4 slot.
+fn argument_slot_may_perform(cx: &ElabCtx<'_>, argument: &RExpr) -> bool {
+    let mut value = argument;
+    while let RExpr::RAsc(inner, _, _) = value { value = inner; }
+    !matches!(value, RExpr::RVar(..) | RExpr::RPatternAlias(..)
+        | RExpr::RSlotLocal { .. } | RExpr::RRecursiveResult { .. })
+        && let_may_perform(cx, argument, None)
+}
+
+/// Rebuild the complete source spine, replacing exactly one performed
+/// argument with the position-keyed binder introduced by the shared let path.
+/// In particular, an earlier pure argument remains in its original slot.
+#[inline(never)]
+fn application_with_slot(
+    expr: &RExpr, slot: usize, position: usize, latent: crate::effects::RowType,
+) -> RExpr {
+    let (head, arguments) = call_application_spine(expr);
+    let mut rebuilt = head.clone();
+    for (index, argument) in arguments.into_iter().enumerate() {
+        let value = if index == slot {
+            RExpr::RSlotLocal { position, latent: latent.clone(), span: argument.span().clone() }
+        } else {
+            argument.clone()
+        };
+        rebuilt = RExpr::RApp(Box::new(rebuilt), Box::new(value), expr.span().clone());
+    }
+    rebuilt
+}
+
+/// Inspect the *whole* source spine before recursing into its function. If
+/// the outermost application bound its own (rightmost) argument first, two
+/// performed arguments would execute in reverse source order.
+#[inline(never)]
+fn infer_application_slot(
+    cx: &mut ElabCtx, expr: &RExpr, span: &Span,
+) -> Result<Option<(Term, Term)>, ElabError> {
+    let (_, arguments) = call_application_spine(expr);
+    let Some((slot, argument)) = arguments.iter().copied().enumerate()
+        .find(|(_, argument)| argument_slot_may_perform(cx, argument))
+    else { return Ok(None) };
+    // A tree may also be passed *as a value* to a parameter of tree type
+    // (notably the prelude's checked equality witnesses). Such a parameter
+    // is not a §2.4 value slot and must not run or bind its argument.
+    let (head, _) = call_application_spine(expr);
+    let mut prefix = head.clone();
+    for preceding in &arguments[..slot] {
+        prefix = RExpr::RApp(
+            Box::new(prefix), Box::new((*preceding).clone()), expr.span().clone(),
+        );
+    }
+    let (_, prefix_ty) = infer(cx, &prefix)?;
+    let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &prefix_ty) else {
+        return Err(ElabError::NotAFunction { span: span.clone() });
+    };
+    if let_itree_parts(cx, &domain).is_some() {
+        return Ok(None);
+    }
+    let body = SequencedBody::Application { expr: expr.clone(), slot };
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = infer_sequenced_bind(cx, &None, argument, body, span);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            infer_sequenced_bind(
+                cx, &None, argument,
+                SequencedBody::Application { expr: expr.clone(), slot }, span,
+            )
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result.map(Some)
+}
+
 #[inline(never)]
 fn infer_application(
     cx: &mut ElabCtx,
     expr: &RExpr,
-    f: &RExpr,
-    a: &RExpr,
+    _f: &RExpr,
+    _a: &RExpr,
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
-    // Peel and inspect the whole source spine in a separate frame.
-    // On the overwhelmingly-common decline path that frame (including
-    // its argument vector) is gone before generic application recurses.
+    if let Some(call) = infer_application_slot(cx, expr, span)? {
+        return Ok(call);
+    }
+    infer_application_unsequenced(cx, expr)
+}
+
+#[inline(never)]
+fn infer_application_unsequenced(
+    cx: &mut ElabCtx, expr: &RExpr,
+) -> Result<(Term, Term), ElabError> {
+    let RExpr::RApp(f, a, span) = expr else {
+        return Err(ElabError::Internal("expected application in argument slot".into()));
+    };
     if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
         return append_saturated_preconditions(cx, expr, call, span);
     }
@@ -14922,7 +15021,7 @@ fn infer_sequenced_scrutinee(
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
     let snapshot = refinement_snapshot::Snapshot::capture(cx);
-    let first = infer_sequenced_bind(cx, &None, scrut, body, span);
+    let first = infer_sequenced_bind(cx, &None, scrut, body.clone(), span);
     let result = match first {
         Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
             if requested == split_id => {
