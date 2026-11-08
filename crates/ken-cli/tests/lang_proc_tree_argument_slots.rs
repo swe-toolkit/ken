@@ -2,7 +2,8 @@
 //! MEASURED: two performed arguments emit distinct lines in source order on
 //! interpreter and native; an untaken match arm and an unapplied closure emit
 //! none of their argument actions; a returned closure carried in an argument
-//! works at the same boundary. CLAIMED: application slots sequence only when
+//! works at the same boundary. A tree held as the first argument remains a
+//! value while a later Unit argument performs. CLAIMED: slots sequence only when
 //! evaluated, left to right, with the same denotation as explicit lets.
 //! THE GAP: these programs measure concrete Console and returned-closure
 //! shapes, not every effect family or the deferred recursive-result/IH slot;
@@ -69,6 +70,27 @@ fn two_performing_arguments_run_left_to_right_on_both_backends() {
 fn two_performing_arguments_in_changed_callee_run_left_to_right() {
     let src = format!("{HEAD}{EMIT}proc both (z : Unit) : Unit visits [Console] =\n  two (emit \"1\") (emit \"2\")\n{MAIN}  let u : Unit = both MkUnit in host_program APartial (print_line \"b\")\n");
     assert_run("a2 changed callee", &src, b"1\n2\nb\n", false);
+}
+
+#[test]
+fn held_tree_argument_does_not_suppress_later_performed_slot() {
+    let held = "host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout (bytes_encode \"held\"))";
+    let definitions =
+        "fn take (tree : HostIO APartial (Result IOError Unit)) (unit : Unit) : Unit = unit\n";
+    let direct = format!("{HEAD}{EMIT}{definitions}{MAIN}  let u = take ({held}) (emit \"later\") in host_program APartial (print_line \"done\")\n");
+    let explicit = format!("{HEAD}{EMIT}{definitions}{MAIN}  let unit = emit \"later\" in let u = take ({held}) unit in host_program APartial (print_line \"done\")\n");
+    assert_run(
+        "held tree before performed argument",
+        &direct,
+        b"later\ndone\n",
+        false,
+    );
+    assert_run(
+        "explicit let with held tree",
+        &explicit,
+        b"later\ndone\n",
+        false,
+    );
 }
 
 /// Both arms return the declared tree. A mixed Unit/ITree match has no

@@ -14857,27 +14857,31 @@ fn application_with_slot(
 fn infer_application_slot(
     cx: &mut ElabCtx, expr: &RExpr, span: &Span,
 ) -> Result<Option<(Term, Term)>, ElabError> {
-    let (_, arguments) = call_application_spine(expr);
-    let Some((slot, argument)) = arguments.iter().copied().enumerate()
-        .find(|(_, argument)| argument_slot_may_perform(cx, argument))
-    else { return Ok(None) };
-    // A tree may also be passed *as a value* to a parameter of tree type
-    // (notably the prelude's checked equality witnesses). Such a parameter
-    // is not a §2.4 value slot and must not run or bind its argument.
-    let (head, _) = call_application_spine(expr);
-    let mut prefix = head.clone();
-    for preceding in &arguments[..slot] {
-        prefix = RExpr::RApp(
-            Box::new(prefix), Box::new((*preceding).clone()), expr.span().clone(),
-        );
+    let (head, arguments) = call_application_spine(expr);
+    let mut candidate = None;
+    for (slot, argument) in arguments.iter().copied().enumerate() {
+        if !argument_slot_may_perform(cx, argument) {
+            continue;
+        }
+        // A tree passed to a tree-valued parameter is held as a value,
+        // including prelude proof witnesses. It must not end the scan: a
+        // later argument can still perform into a value-valued parameter.
+        let mut prefix = head.clone();
+        for preceding in &arguments[..slot] {
+            prefix = RExpr::RApp(
+                Box::new(prefix), Box::new((*preceding).clone()), expr.span().clone(),
+            );
+        }
+        let (_, prefix_ty) = infer(cx, &prefix)?;
+        let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &prefix_ty) else {
+            return Err(ElabError::NotAFunction { span: span.clone() });
+        };
+        if let_itree_parts(cx, &domain).is_none() {
+            candidate = Some((slot, argument));
+            break;
+        }
     }
-    let (_, prefix_ty) = infer(cx, &prefix)?;
-    let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &prefix_ty) else {
-        return Err(ElabError::NotAFunction { span: span.clone() });
-    };
-    if let_itree_parts(cx, &domain).is_some() {
-        return Ok(None);
-    }
+    let Some((slot, argument)) = candidate else { return Ok(None) };
     let body = SequencedBody::Application { expr: expr.clone(), slot };
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);

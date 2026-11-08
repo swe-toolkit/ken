@@ -2,9 +2,9 @@
 //! MEASURED: checked bodies of two direct argument slots and their explicit
 //! left-to-right let twins are exactly equal in one elaboration environment.
 //! CLAIMED: a performed argument is sequenced through the same checked bind
-//! and latent bookkeeping as an explicit let, without moving pure arguments.
-//! THE GAP: one concrete two-action and one mixed pure/action application
-//! exercise this identity; distinct literal occurrences have opaque checked
+//! and latent bookkeeping as an explicit let, without moving pure or held-tree
+//! arguments. THE GAP: two-action, mixed pure/action, and held-tree-first
+//! applications exercise this identity; literal occurrences have opaque checked
 //! global identities, so both twins reference the same declared messages.
 
 use ken_elaborator::ElabEnv;
@@ -13,6 +13,7 @@ use ken_kernel::Decl;
 const PRE: &str = r#"program capabilities FS APartial
 const first : String = "1"
 const second : String = "2"
+const held : String = "held"
 proc emit (msg : String) : Unit visits [Console] =
   let r = print_line msg in MkUnit
 fn two (x : Unit) (y : Unit) : Unit = MkUnit
@@ -54,6 +55,21 @@ fn pure_argument_stays_at_its_original_slot() {
   two u (emit second)
 proc explicit (u : Unit) : Unit visits [Console] =
   let x2 = emit second in two u x2
+"#,
+    );
+}
+
+#[test]
+fn held_tree_first_and_performed_value_second_have_exact_let_core() {
+    compare_bodies(
+        "held tree, performed value",
+        r#"fn take (tree : HostIO APartial (Result IOError Unit)) (unit : Unit) : Unit = unit
+proc direct (u : Unit) : Unit visits [Console] =
+  take (host_console APartial (Result IOError Unit)
+    (write ConsoleStream.Stdout (bytes_encode held))) (emit first)
+proc explicit (u : Unit) : Unit visits [Console] =
+  let x = emit first in take (host_console APartial (Result IOError Unit)
+    (write ConsoleStream.Stdout (bytes_encode held))) x
 "#,
     );
 }
