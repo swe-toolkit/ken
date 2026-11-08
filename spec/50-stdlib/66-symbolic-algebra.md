@@ -1249,3 +1249,47 @@ Definition immediately after `deriv_independent` and before
 `deriv_var_deriv_eval` and before `bump_at`. The public type needs
 no environment-agreement premise and changes no §§1–13 operation
 or law type. No new `Axiom`, kernel form or surface rule is needed.
+
+## 15. Normalization preserves canonical polynomial equality
+
+> **Section 15 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-CONGRUENCE).** Architect AC-0
+> `evt_7bpe5xpqbpsxd` ruled the generic law FEASIBLE from a detached
+> scratch D0 at `065bc9e1b`: the named test passed 1/1, the two
+> `trusted_base()` identity sets were equal (114 → 114), and no new
+> `Axiom` appeared. The scratch closed client accepted the commuted-sum
+> application and rejected a false premise at its own theorem. These
+> are design observations, not a committed package or assembled-tip
+> test, official conformance execution, CI, publication, landing or
+> measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent checked theorem, immediately after `substitute_normalize`
+and before private `expr_add_cong`. It takes two expressions and exactly
+one canonical-equality premise, in that order:
+
+```ken
+pub theorem poly_eq_normalize
+      (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (normalize e1) (normalize e2))
+```
+
+This is congruence of §2's Boolean canonical `poly_eq` decision under
+§1's `normalize`, for any expressions `e1` and `e2`. It is not
+structural `Equal Expr` of their normal forms, nor a claim that the
+normal forms are definitionally identical. It asks for no environment,
+expression-shape, syntactic-equality, or second `poly_eq` premise. A
+checked body composes the existing public `normalize_poly_eq e1`
+with the given premise by `poly_eq_trans`, then composes the result
+with the `poly_eq_sym` reversal of `normalize_poly_eq e2`. The body
+uses existing checked laws only: no new helper, `Axiom`, kernel rule,
+surface feature or change to any §§1–14 operation or law type.
+
+A closed client can apply the law to `EAdd (EVar Zero)
+(EVar (Suc Zero))` and its summand-swapped counterpart with `Proved`
+as the premise: their canonical `poly_eq` holds. A same-form
+application to `EVar Zero` and `EVar (Suc Zero)` has a false
+`poly_eq` premise and refuses at its own proof term when appended to
+a fresh fully accepted prefix. Both probes distinguish the premise
+rather than an `Equal Expr` assertion (§9.2); they are finite clients,
+not the generic proof or official conformance evidence.
