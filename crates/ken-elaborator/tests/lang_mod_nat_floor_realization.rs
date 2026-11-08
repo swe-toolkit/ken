@@ -383,6 +383,17 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "run_state",
             "state_get",
             "state_put",
+            "ConsoleOp",
+            "console_resp",
+            "DirEntry",
+            "FileKind",
+            "FileMetadata",
+            "FileOperation",
+            "ReadResult",
+            "StateOp",
+            "itree_bind",
+            "resp_coproduct",
+            "resp_state",
         ]
         .map(|name| env.globals[name]),
     );
