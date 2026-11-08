@@ -1305,19 +1305,18 @@ duplicates a checked definition.
 
 - promise class: **normative compatibility vector** — the three public State
   operations retain their exact identities and unbundled tree types
-- spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`, §4.2, §4.5.2–§4.5.3
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`, §2.4, §4.2,
+  §4.5.2–§4.5.3, §4.5.7
 - given: in each of three fresh routes (Strict roots, Legacy roots, and the
   Legacy single-file entry), use no imports and elaborate:
 
   ```ken
-  fn state_get_probe (s : Type) (f : Type) (rf : f → Type) (unit : Unit)
-    : ITree (Coproduct (StateOp s) f)
-        (resp_coproduct (StateOp s) f (resp_state s) rf) s =
+  fn state_get_probe (s : Type) (unit : Unit)
+    : ITree (StateOp s) (resp_state s) s =
     state_get unit
 
-  fn state_put_probe (s : Type) (f : Type) (rf : f → Type) (value : s)
-    : ITree (Coproduct (StateOp s) f)
-        (resp_coproduct (StateOp s) f (resp_state s) rf) Unit =
+  fn state_put_probe (s : Type) (value : s)
+    : ITree (StateOp s) (resp_state s) Unit =
     state_put value
 
   fn run_state_probe (s : Type) (f : Type) (rf : f → Type) (a : Type)
@@ -1327,6 +1326,12 @@ duplicates a checked definition.
     : ITree f rf (Pair a s) =
     run_state initial tree
   ```
+
+  By §2.4 and §4.2, the singleton `State s` row denotes the unbundled
+  carrier `ITree (StateOp s) (resp_state s) _`; its §4.5.2 `inj` is the
+  identity. `run_state_probe` separately consumes a tree already composed
+  over State and `f`. No implicit lift from a single-State tree to a
+  coproduct tree is claimed; §4.5.7 specifies the named injection for it.
 
   Snapshot each operation's pre-source `GlobalId`. In separate Strict-root
   units, compare these one-name collision pairs:
@@ -1341,24 +1346,28 @@ duplicates a checked definition.
   `fn put (n : Nat) : Nat = n` in separate Strict-root units. Do not assert a
   Legacy bare-use outcome for either name.
 - measured: each unimported operation reference's resolved `GlobalId`, its
-  typed direct-tree use, and every same-name/local-name verdict.
-- claimed: `state_get`, `state_put`, and `run_state` are source-nameable at
-  their exact floor identities with the typed direct-tree contracts shown.
-  The `run_state` result type uses `Pair a s` in result/state order. Bare `get`
-  and `put` are not protected by these operations.
+  contract-matched tree type, and every same-name/local-name verdict.
+- claimed: `state_get` and `state_put` are source-nameable at their exact
+  floor identities with their single-State tree denotations; `run_state` is
+  source-nameable at its exact floor identity and consumes the specified
+  State-plus-`f` tree. Its result type uses `Pair a s` in result/state order.
+  Bare `get` and `put` are not protected by these operations.
 - the gap: an unbound-name refusal could come from an unrelated type error.
-  Each source function has the complete direct-tree type from the spec, and
-  the one-name local binding control isolates protected-name behavior.
+  The first two result types match the State-only denotations, and the
+  `run_state` input is already composed as §4.5.3 specifies. The one-name
+  local binding control isolates protected-name behavior.
 - expect: all three routes accept the typed operations and resolve each
   captured ID. Each same-name floor binding refuses at introduction and its
   renamed local control accepts. The Strict `get` and `put` declarations
   accept. No Legacy bare `get` or `put` outcome is asserted; no import, trust
   entry, or replacement identity is introduced.
-- controls: the three typed direct-tree functions are positive controls for
-  their corresponding binding collisions. The `get` and `put` declarations
-  control that those bare spellings remain unreserved.
+- controls: the two single-State tree probes and the typed `run_state_probe`
+  are positive controls for their corresponding binding collisions. The
+  `get` and `put` declarations control that those bare spellings remain
+  unreserved.
 - why: the source API names are the floor; `State` is an effect label, not a
-  second checked carrier type.
+  second checked carrier type. The State-only denotations avoid relying on an
+  unprovided implicit coproduct lift.
 - evidence boundary: these are specified source/type expectations, not
   execution results or a reduction test for the State fold. No official
   conformance-runner result is claimed.
