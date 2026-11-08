@@ -21,8 +21,8 @@ fn strict(source: &str) -> Result<ElabEnv, ElabError> {
 }
 
 /// Promise class: durable invariant. MEASURED: every new H name resolves at
-/// its original checked ID through one explicitly named unit, preserves the
-/// trusted base, and refuses without import. CLAIMED: the extra homes do not
+/// its original checked ID through one explicitly named unit, adds no trust
+/// beyond loading that unit, and refuses without import. CLAIMED: the extra homes do not
 /// expand the ambient floor or mint lookalikes. THE GAP: source users with
 /// missing catalog roots are measured separately; this pin exercises the
 /// strict isolated loader with an explicit catalog root.
@@ -68,6 +68,12 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
                 .as_ref(),
         ),
     ]) {
+        // Importing LawfulClasses can bring its own pre-existing law axioms;
+        // homing a checked conversion must not add trust beyond loading that
+        // same module. Compare selected and unselected imports of the home.
+        let loaded = strict(&format!("import {home}\n"))
+            .unwrap_or_else(|err| panic!("loading {home} refused: {err:?}"));
+        let home_trust = loaded.env.trusted_base();
         for name in members {
             let providers = PRELUDE_PACKAGE_HOMES
                 .iter()
@@ -84,8 +90,8 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
             );
             assert_eq!(
                 imported.env.trusted_base(),
-                bootstrap.env.trusted_base(),
-                "{name}: trust"
+                home_trust,
+                "{name}: no additional trust beyond its package load"
             );
             match strict(&format!("export {name}\n")) {
                 Err(ElabError::UnboundName { name: missing, .. }) => assert_eq!(missing, *name),
