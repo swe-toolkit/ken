@@ -363,7 +363,7 @@ impl Fixture {
                 } else {
                     b"different-content".as_slice()
                 };
-                self.construct("Chunk", [Self::bytes(alternative)])
+                self.construct("ReadResult.Chunk", [Self::bytes(alternative)])
             }
             "FileMetadata" => {
                 let EvalVal::Ctor { id, args, .. } = actual else {
@@ -375,7 +375,10 @@ impl Fixture {
                 } else {
                     100
                 };
-                self.construct("MkFileMetadata", [EvalVal::Int(size), args[1].clone()])
+                self.construct(
+                    "FileMetadata.MkFileMetadata",
+                    [EvalVal::Int(size), args[1].clone()],
+                )
             }
             "(List DirEntry)" => {
                 assert!(
