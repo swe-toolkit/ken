@@ -608,8 +608,8 @@ must remain unchanged.
 The `ReadFile` row is a **fixture-only** source withdrawal, not a source
 home or general rewrite. The mixed-owner-relay fixture computes a host
 operation value that the package wrappers cannot express. Its
-hand-built HostIO tree moves to a Rust core term in the Language 3a
-child; the existing planner-structure assertion must remain
+hand-built HostIO tree moves to a Rust core term in 3b; the existing
+planner-structure assertion must remain
 byte-equivalent. The six separate `FSOp` DIVERGE sources of this class
 are held for Architect per-source ruling. None of these examples
 creates source-name need for the internal `ReadFile`, `FSOp`, or
