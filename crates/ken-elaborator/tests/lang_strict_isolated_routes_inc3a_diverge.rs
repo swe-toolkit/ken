@@ -44,7 +44,7 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         ("conformance/challenge/C1-deceq-noncanonical/sound-deceq-char.ken", "DecEq"),
         ("conformance/challenge/C5-verified-sort/sound-verified-sort.ken", "isSorted"),
         ("conformance/challenge/C5-verified-sort/unsound-const-nil.ken", "isSorted"),
-        ("conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken", "IsTrue"),
+        ("conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken", "Ord"),
         ("conformance/challenge/C6-lawful-ord-vs-stub/stub-ord-axiom.ken", "Ord"),
         ("crates/ken-elaborator/tests/fixtures/kernel_conv_cast_consumer.ken", "ConvCastExpectedOf"),
         ("crates/ken-elaborator/tests/fixtures/kernel_conv_omega_consumer.ken", "OmegaExpectedOf"),
