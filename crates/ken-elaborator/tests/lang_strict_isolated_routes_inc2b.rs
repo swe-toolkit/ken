@@ -132,6 +132,61 @@ fn mapping_handle_home_does_not_lease_its_private_constructor() {
     }
 }
 
+/// Promise class: durable invariant. MEASURED: each name imports and exports
+/// at its checked ID, rejects without import, and leaves trust unchanged;
+/// the private constructor rejects beside the checked resource-kind case.
+/// CLAIMED: four child identities have only their explicit package home,
+/// without constructor leakage. THE GAP: these checks exercise the real strict
+/// loader, not just home-table membership; CLI route switches are separate.
+#[test]
+fn later_child_homes_require_import_without_leaking_the_plan_constructor() {
+    const LATER_CHILD: [&str; 4] = ["SpawnPlan", "with_stderr", "take_stdin", "take_stderr"];
+    let bootstrap = ElabEnv::new().expect("checked prelude");
+    for name in LATER_CHILD {
+        let imported = format!("import Capability.Process.Child ({name})\nexport {name}\n");
+        let env =
+            strict(&imported).unwrap_or_else(|error| panic!("imported {name} refused: {error:?}"));
+        assert_eq!(
+            env.globals[name], bootstrap.globals[name],
+            "{name} checked identity"
+        );
+        assert_eq!(
+            env.env.trusted_base(),
+            bootstrap.env.trusted_base(),
+            "{name} trust"
+        );
+        assert_eq!(
+            PRELUDE_PACKAGE_HOMES
+                .iter()
+                .filter(|(_, member)| *member == name)
+                .map(|(home, _)| *home)
+                .collect::<Vec<_>>(),
+            ["Capability.Process.Child"],
+            "{name} has one home"
+        );
+        match strict(&format!("export {name}\n")) {
+            Err(ElabError::UnboundName { name: missing, .. }) => assert_eq!(missing, name),
+            Err(error) => panic!("{name} without import: wrong refusal {error:?}"),
+            Ok(_) => panic!("{name} without import unexpectedly accepted"),
+        }
+    }
+    let probe = "import Capability.Process.Child (SpawnPlan)\n\
+                 const kind_of : ResourceKind = ResourceKind.SpawnPlan\n\
+                 fn id_plan (plan : SpawnPlan) : SpawnPlan = plan\n";
+    strict(probe).expect("imported plan type and independent scoped resource kind");
+    let forge = "import Capability.Process.Child (SpawnPlan, ChildNull)\n\
+                 fn forge (exe : Bytes) : SpawnPlan =\n\
+                   SpawnPlan.PrivateSpawnPlan exe (Nil Bytes)\n\
+                     (Nil (Prod Bytes Bytes)) ChildNull ChildNull ChildNull\n";
+    match strict(forge) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "SpawnPlan.PrivateSpawnPlan");
+        }
+        Err(error) => panic!("private plan constructor: wrong refusal {error:?}"),
+        Ok(_) => panic!("private plan constructor unexpectedly accepted"),
+    }
+}
+
 fn collect_sources(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).expect("enumerate isolated sources") {
         let path = entry.expect("source entry").path();
