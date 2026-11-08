@@ -10,6 +10,8 @@
 
 use std::process::{Command, Output};
 
+use ken_elaborator::{ElabEnv, ElabError};
+
 const ACTION: &str = r#"program capabilities FS APartial
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
@@ -38,6 +40,35 @@ fn check(name: &str, source: &str) -> Output {
     cli(name, "check", source)
 }
 
+/// The ACTION prefix is the real source each affected test checks. Its
+/// standalone tails are not programs: `action` is declared by this prefix.
+/// MEASURED: the composed source with ephemeral package imports reaches the
+/// same typed Strict accept/refusal; CLAIMED: the seven former DIVERGE tail
+/// rows do not mask the test's actual effect-row boundary. THE GAP: output
+/// bytes are still checked through the unchanged CLI route until 3b.
+fn recheck_composed_under_strict(source: &str) -> Option<Result<(), ElabError>> {
+    if !source.starts_with(ACTION) {
+        return None;
+    }
+    let imported = source.replacen(
+        "program capabilities FS APartial\n",
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (write, print_line)\n\
+         import Capability.Process.Exit
+           (host_bind, host_pure, host_console, host_program)\n",
+        1,
+    );
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut env = ElabEnv::new().expect("prelude");
+    Some(
+        env.elaborate_isolated_file_strict_v1(&[catalog], &imported)
+            .map(|_| ()),
+    )
+}
+
 fn assert_escape(name: &str, source: &str, owner: &str, effect: &str) {
     let out = check(name, source);
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -48,6 +79,17 @@ fn assert_escape(name: &str, source: &str, owner: &str, effect: &str) {
         stderr.contains(&format!("EffectEscapes in '{owner}': {effect}")),
         "{name}: wrong refusal owner or effect: {stderr}"
     );
+    if let Some(result) = recheck_composed_under_strict(source) {
+        let error = result.expect_err("the composed source still refuses under Strict");
+        assert_eq!(error.code().as_str(), "E0038", "{name}: {error:?}");
+        let ElabError::TypeMismatch { reason, .. } = error else {
+            panic!("{name}: wrong Strict refusal class: {error:?}");
+        };
+        assert!(
+            reason.contains(&format!("EffectEscapes in '{owner}': {effect}")),
+            "{name}: wrong Strict owner/effect: {reason}"
+        );
+    }
 }
 
 fn assert_accept(name: &str, source: &str) {
@@ -58,6 +100,9 @@ fn assert_accept(name: &str, source: &str) {
         "{name}: {}",
         String::from_utf8_lossy(&out.stderr)
     );
+    if let Some(result) = recheck_composed_under_strict(source) {
+        result.unwrap_or_else(|error| panic!("{name}: Strict changed acceptance: {error:?}"));
+    }
 }
 
 fn assert_run(name: &str, source: &str, output: &[u8]) {
@@ -69,6 +114,9 @@ fn assert_run(name: &str, source: &str, output: &[u8]) {
         String::from_utf8_lossy(&out.stderr)
     );
     assert_eq!(out.stdout, output, "{name}: wrong action order or output");
+    if let Some(result) = recheck_composed_under_strict(source) {
+        result.unwrap_or_else(|error| panic!("{name}: Strict changed acceptance: {error:?}"));
+    }
 }
 
 const P5: &str = r#"fn sneaky (u : Unit) : HostIO APartial Unit =
