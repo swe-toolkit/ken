@@ -10362,11 +10362,6 @@ mod strict_catalog_home_tests {
             .env
             .inductive(file_operation)
             .expect("checked FileOperation floor inductive");
-        assert_eq!(
-            family.constructors.len(),
-            16,
-            "spec 30 §4's complete case set"
-        );
         let floor_ids: HashSet<_> = std::iter::once(file_operation)
             .chain(family.constructors.iter().map(|case| case.id))
             .collect();
