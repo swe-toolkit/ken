@@ -6,10 +6,13 @@
 //! unnormalized goal, through a `Ret` leaf and, under one response binder,
 //! through a `Vis`; the opposite post normalizes to `Bottom` and `tt` is
 //! refused; the proc's own type stays ITree-headed and a caller binds `Int`.
+//! Distinct clauses mint distinct goals; a parameter and written requirement
+//! are retained as binders, and the requirement itself proves the return post.
 //! CLAIMED: no payload is refined. THE GAP: discharge by the prover routes is
 //! not measured here; `ken check` reports these as open obligations.
 
 use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
+use ken_kernel::subst::weaken;
 use ken_kernel::{check, normalize, whnf, Context, GlobalId, Term};
 
 fn elaborate(source: &str) -> (ElabEnv, Vec<ElabResult>) {
@@ -116,4 +119,52 @@ fn declared_tree_post_is_all_ret_through_each_response() {
     let (control, results) = elaborate(&declared("True"));
     let goal = ensures_goal(&results, "tick");
     assert!(tt_attempt(&control, &goal, 1, control.env.bottom_id()).is_err());
+}
+
+#[test]
+fn separate_ensures_clauses_have_distinct_tree_obligations() {
+    let (env, results) = elaborate(
+        "proc pair : Int ensures Equal Int result 1 \
+         ensures Equal Int result 2 visits [Console] = 1",
+    );
+    let clauses: Vec<_> = result(&results, "pair")
+        .obligations
+        .iter()
+        .filter(|obligation| matches!(obligation.kind, ObligationKind::Ensures))
+        .collect();
+    assert_eq!(clauses.len(), 2, "one AllRet obligation per ensures clause");
+    assert_ne!(clauses[0].hole_id, clauses[1].hole_id);
+    let true_goal = &clauses[0].goal_closed;
+    let false_goal = &clauses[1].goal_closed;
+    tt_attempt(&env, true_goal, 0, env.env.top_id()).expect("first post holds");
+    assert!(tt_attempt(&env, false_goal, 0, env.env.bottom_id()).is_err());
+}
+
+#[test]
+fn written_parameter_and_requires_proof_close_tree_post_goal() {
+    let (env, results) = elaborate(
+        "proc echo (x : Bool) : Bool requires Equal Bool x True \
+         ensures Equal Bool result True visits [Console] = x",
+    );
+    let goal = ensures_goal(&results, "echo");
+    let (domains, body) = normal_form(&env, &goal);
+    assert_eq!(domains.len(), 2, "written parameter and requires proof");
+    assert_eq!(
+        body,
+        weaken(&domains[1], 1),
+        "post must use the written proof"
+    );
+    let proof = Term::lam(
+        domains[0].clone(),
+        Term::lam(domains[1].clone(), Term::var(0)),
+    );
+    check(&env.env, &Context::new(), &proof, &goal).expect("λ x h. h proves tree post");
+    let guessed = Term::lam(
+        domains[0].clone(),
+        Term::lam(domains[1].clone(), constant(env.env.tt_id())),
+    );
+    assert!(
+        check(&env.env, &Context::new(), &guessed, &goal).is_err(),
+        "the proof is required"
+    );
 }
