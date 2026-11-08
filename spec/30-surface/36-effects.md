@@ -481,13 +481,44 @@ record Effect : Type (suc (max ℓ_op ℓ_resp)) where    -- level-poly in ℓ_o
 ```
 
 ```
-Console  :  Op = { Write String }              Resp (Write _) = Unit
 State S  :  Op = { Get } ∪ { Put s | s : S }   Resp Get = S ;  Resp (Put _) = Unit
 ```
 
-(`Op` is a small inductive of op-tags; `Write`/`Put` carry their argument as
-constructor data.) The **interaction tree** over a signature `E` with result
-`R`:
+(`Op` is a small inductive of op-tags; `Put` carries its argument as
+constructor data.) The checked direct Console signature is more specific
+than the schematic `State S` display. Its canonical operation carrier has
+exactly the following four constructor signatures, using the checked
+`ConsoleStream` carrier and its scoped public paths (`30-taxonomy §4`):
+
+```text
+ConsoleOp.Read       : ConsoleStream → Int → ConsoleOp
+ConsoleOp.Write      : ConsoleStream → Bytes → ConsoleOp
+ConsoleOp.Flush      : ConsoleStream → ConsoleOp
+ConsoleOp.IsTerminal : ConsoleStream → ConsoleOp
+```
+
+The checked response operation `console_resp : ConsoleOp → Type`
+reduces by constructor, for every stream and, where present, limit
+or payload:
+
+```text
+console_resp (ConsoleOp.Read stream limit)       ≡ Result IOError ReadResult
+console_resp (ConsoleOp.Write stream bytes)      ≡ Result IOError Unit
+console_resp (ConsoleOp.Flush stream)            ≡ Result IOError Unit
+console_resp (ConsoleOp.IsTerminal stream)       ≡ Bool
+```
+
+`ReadResult` has the scoped `ReadResult.Chunk Bytes` and
+`ReadResult.Eof` cases; `IOError` has the complete checked scoped
+cause family (`30-taxonomy §4`). A read, write or flush can thus return
+an `Err IOError` value, rather than an exception, while the
+`IsTerminal` response is a `Bool`. These are the four checked
+`ConsoleOp` constructors and their actual dependent response
+reductions, not new declaration IDs or a rule that every Console
+response is `Unit`. A direct Console tree has the checked type
+`ITree ConsoleOp console_resp R`; the optional `IO R` package alias
+names that same type but does not replace either exact floor identity.
+The **interaction tree** over a signature `E` with result `R`:
 
 ```
 data ITree (E : Effect) (R : Type ℓ_R) : Type (max ℓ_R ℓ_op ℓ_resp) where
@@ -1091,10 +1122,12 @@ state_put : s →[{State s}] Unit
 - `s` is an ordinary (implicit) type parameter of each operation, fixed at a use
   site by the enclosing `run_state`'s initial state `s₀ : s` (§4.5.3) or by
   annotation.
-- `Resp Get = s` is a **non-`Unit`, `s`-typed** response — `State s` is the
-  first effect whose response *depends on* a type parameter (Console's is always
-  `Unit`). This dependence is already §2.1/§7.4 normative; §4.5.6 notes it is
-  the forcing function for the landed code.
+- `Resp Get = s` is a **non-`Unit`, `s`-typed** response — the State
+  response depends on the type parameter, whereas §2.1's checked
+  `console_resp` varies by Console operation and returns `Result IOError
+  ReadResult`, `Result IOError Unit`, or `Bool`. This State dependence is
+  already §2.1/§7.4 normative; it does not make Console's response
+  uniformly `Unit`.
 - `inj : (State s).Op ↪ ⟦ρ⟧.Op` is the row-signature injection (§2.3); in a
   single-`State s` row `⟦{State s}⟧ = State s` and `inj` is the identity.
 - The public source operations spell `state_get` and `state_put`; bare
@@ -1204,20 +1237,15 @@ The purity/totality argument is §4.2's, applied to the direct surface:
   "C1 is the floor" lock (`OQ-C`). No mutation is introduced (C3
   forbidden): the entire surface is `perform`/`bind`/`elim_ITree`
   over the pure tree.
-- **Build note — the outer-ring lift `[State s]` forces (no kernel change).**
-  The landed *runnable* `ITree` (`prelude.rs`) is **Console-hardwired** —
-  `data ITree r = Ret r | Vis ConsoleOp (Unit → ITree r)`, a fixed `Unit`
-  response and no effect parameter. `[State s]` is the **forcing function** to
-  lift three simplifications already flagged in-code as downstream work, up to
-  the §2/§4 model: **(a)** the **dependent response** `E.Resp e` (`State s`
-  needs `Resp Get = s`, non-`Unit`); **(b)** the container coproduct **`⊕`** for
-  `State s ⊕ F` (composition, §4.5.4); **(c)** **named-effect dispatch** so
-  `run_state` peels `State` and passes other ops through. All three are
-  §36-normative and admitted by K1.5's generic `elim_ITree`
-  (`kernel/tests/k1p5_wstyle.rs`) — **the kernel is untouched** (AC1). The work
-  is entirely outer-ring: `ken-elaborator/src/effects/*` + `ken-interp` + a
-  **derived** stdlib `run_state`; no new `Term`/`Decl` variant, no
-  `trusted_base()` delta.
+- **Outer-ring realization (no kernel change).** The checked pre-source
+  `ITree` already takes the operation carrier and its dependent response
+  family explicitly; Console uses `ConsoleOp`/`console_resp` (§2.1), and
+  State uses `StateOp s`/`resp_state s` (§4.2). A coproduct composes the
+  signatures, while `run_state` peels State operations and passes other
+  operations through (§4.2, §4.5.4). The generic `elim_ITree` was
+  admitted by K1.5 (`kernel/tests/k1p5_wstyle.rs`), so none of these
+  contracts needs a new kernel primitive, `Term`/`Decl` variant or
+  `trusted_base()` entry.
 
 #### 4.5.7 Injection into a coproduct — the surface morphism (`incl`, named)
 
