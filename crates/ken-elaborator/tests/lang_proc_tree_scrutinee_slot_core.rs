@@ -1,7 +1,7 @@
 //! Spec 36 §2.4: each performed scrutinee slot has the same checked core
 //! body as its explicit sequenced-let twin. Promise class: durable invariant.
-//! MEASURED: four independent pairs elaborate in one environment and produce
-//! identical body terms, in checked and inferred contexts and with nested outer
+//! MEASURED: each of four pairs elaborates both forms in one environment and
+//! produces identical body terms, in checked and inferred contexts with nested outer
 //! references. CLAIMED: scrutinee-slot elaboration reuses the let denotation.
 //! THE GAP: literal occurrences have distinct checked global identities, so
 //! the pairs hoist their shared message to one checked const; this does not
