@@ -29,7 +29,7 @@ fn strict(source: &str) -> Result<ElabEnv, ElabError> {
 #[test]
 fn ruled_h_names_import_at_the_original_checked_ids_only() {
     let bootstrap = ElabEnv::new().expect("pre-source checked identities");
-    let names: [(&str, &[&str]); 8] = [
+    let names: [(&str, &[&str]); 10] = [
         (
             "Capability.Filesystem.Authority",
             &[
@@ -50,9 +50,7 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
         ("Core.Classes.LawfulClasses", &["intToChar"]),
         ("Core.Effect.Coproduct", &["inject_l", "inject_r"]),
         ("Capability.Time.WallClock", &["wall_now"]),
-    ];
-    for (home, members) in names.into_iter().chain([
-        ("Capability.Process.Exit", &["host_clock"][..].as_ref()),
+        ("Capability.Process.Exit", &["host_clock"]),
         (
             "Data.Numeric.FixedWidth",
             &[
@@ -64,10 +62,10 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
                 "intToUInt16",
                 "intToUInt32",
                 "intToUInt64",
-            ][..]
-                .as_ref(),
+            ],
         ),
-    ]) {
+    ];
+    for (home, members) in names {
         // Importing LawfulClasses can bring its own pre-existing law axioms;
         // homing a checked conversion must not add trust beyond loading that
         // same module. Compare selected and unselected imports of the home.
