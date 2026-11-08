@@ -928,6 +928,15 @@ run_state s (Vis (inr o)        k) = Vis o (λ r. run_state s (k r))  -- other e
   (R × S)` — a structural fold, **total** (`14 §3`). The continuation `k` is
   invoked **exactly once, in tail position** in every clause, so it is
   tail-resumptive (§5) and no continuation is reified.
+- The displayed `State S` is **effect-signature notation**, not a second
+  source inductive named `State`. Its checked operation carrier is
+  `StateOp S = Get | Put S` and its checked dependent response is
+  `resp_state S : StateOp S → Type`, reducing to `S` on `Get` and to
+  `Unit` on `Put _`. Both are exact pre-source floor identities (§30 §4).
+  A source program building the direct tree uses `StateOp S`,
+  `resp_state S`, and `StateOp.Get`/`StateOp.Put`; the label `[State S]`
+  in a `visits` row denotes this signature but is not a synonym for
+  its operation-carrier type. Bare `Get` and `Put` remain unreserved.
 - `run_state s₀ ⟦body⟧ : ITree F (R × S)` returns a residual tree whose
   return values pair the result with the **final** state. When `F = 𝟘`,
   it collapses (§2.4) to the pure value `(R × S)`, yielding a pure state

@@ -426,20 +426,23 @@ is a **surface error** (`24`) — it never reaches the kernel:
   FileOperation, HostIO, IOError, ITree, Instant, List, MappingProt,
   Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
   ReadProgress, ReadResult, ResourceError, ResourceKind,
-  ResourceOpenMode, Result, Top, TransferCount, Unit, Utf8Error,
-  WriteProgress, eqChar, run_state, state_get, state_put}`. This floor
-  subset contains forty-five exact identities: the previous forty and
-  five scoped families admitted in Increment 3a (`30-taxonomy §4`). It
-  is the ambiently nameable checked-identity roster, not a roster of
-  forty-five types. `Top` and `Bottom` are proposition constants, `Proved`
-  is a proof binding, `HostIO` is a type-level function, and `eqChar`,
+  ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit, Utf8Error,
+  WriteProgress, eqChar, resp_state, run_state, state_get, state_put}`.
+  This floor subset contains forty-seven exact identities: the previous
+  forty, six scoped families and checked `resp_state` admitted in
+  Increment 3a (`30-taxonomy §4`). It is the ambiently nameable
+  checked-identity roster, not a roster of forty-seven types. `Top`
+  and `Bottom` are proposition constants, `Proved` is a proof binding,
+  `HostIO` is a type-level function, and `eqChar`, `resp_state`,
   `run_state`, `state_get` and `state_put` are checked operations, not
   inductive types or constructor families. The space desugarer reads
-  the three State operations by their exact pre-source IDs (`36 §4.5`);
-  all three enter protected B, while bare `get` and `put` remain
-  unreserved by this floor. For an inductive floor type, its per-type
-  **scoped constructors** property determines whether its whole exact
-  constructor family also occupies bare B names. When enabled, only `T`
+  the checked `StateOp` operation family and the `resp_state` response
+  by exact pre-source ID, as well as the three
+  State operations (`36 §4.2`, §4.5). All five enter protected B;
+  bare `get` and `put` remain unreserved by this floor. For an
+  inductive floor type, its per-type **scoped constructors** property
+  determines whether its whole exact constructor family also occupies
+  bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
   by that family. When disabled, its entire constructor family stays bare and
   reserved. There is no per-constructor subset choice. `ResourceKind` is scoped:
@@ -470,12 +473,15 @@ is a **surface error** (`24`) — it never reaches the kernel:
   use `T.C` only, never a bare reservation. The sixteen existing
   `FileOperation` cases, including `FileOperation.OpReadFile`, keep their
   exact identities and native artifact leaves; no case is dropped to
-  make the family fit the floor. `IOError` is scoped as a complete
-  thirteen-cause
-  family: only public `IOError.C` paths resolve, including
-  `IOError.NotFound`, `IOError.Other`, `IOError.Unsupported`, and
-  `IOError.Revoked`; none of the bare causes enters B. `CreatePolicy` is
-  scoped as a complete three-case family: `CreatePolicy.CreateNew`,
+  make the family fit the floor. `StateOp` is likewise scoped as the
+  complete `StateOp.Get` and `StateOp.Put` family. Neither bare `Get`
+  nor bare `Put` joins B; the schematic `State s` signature label in
+  §36 §4.2 is not a second checked type or a package home. `IOError`
+  is scoped as a complete thirteen-cause family: only public
+  `IOError.C` paths resolve, including `IOError.NotFound`,
+  `IOError.Other`, `IOError.Unsupported`, and `IOError.Revoked`; none of
+  the bare causes enters B. `CreatePolicy` is scoped as a complete
+  three-case family: `CreatePolicy.CreateNew`,
   `CreatePolicy.CreateOrTruncate`, and `CreatePolicy.CreateOrKeep` resolve
   to their unchanged checked IDs, not as bare names in B. `ResourceError`
   is scoped as a complete twelve-case family: its public constructors

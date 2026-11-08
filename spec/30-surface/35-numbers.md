@@ -292,6 +292,20 @@ Decimal.toFloat : Decimal → Float         -- documented-lossy; named
 Float.toDecimal : Float → Option Decimal  -- partial (NaN/∞ have no Decimal)
 ```
 
+For the eight already checked fixed-width types, source uses the safe
+`intToInt8`, `intToInt16`, `intToInt32`, `intToInt64`, `intToUInt8`,
+`intToUInt16`, `intToUInt32` and `intToUInt64` definitions with an
+explicit `Data.Numeric.FixedWidth` import (§30 §4). Each has type
+`Int → Option T` for its named target `T`, returns `Some` exactly when
+the input is in that target's range, and returns `None` otherwise
+(`../10-kernel/18a §5.7`). These are checked range-guarded definitions,
+not aliases for the native unchecked `int_to_*_raw` casts. The module
+exports the complete eight-name family at its existing pre-source
+checked identities; it does not invent a new conversion, intrinsic,
+trusted fact or floor member. The `Int64.toInt` examples above describe
+the general explicit-conversion contract; they are not additional
+FixedWidth exports by implication.
+
 The rule: a conversion that **always succeeds without loss** is `total`
 (`Int64.toInt`, narrow→wide same-signedness); one that **may not fit** returns
 `Option` (`Int.toInt64`, wide→narrow, signed↔unsigned); one that **always

@@ -304,23 +304,24 @@ literal patterns must read that same registered ID rather than a
 mutable spelling lookup. The candidate rekeys that reader, so a
 same-spelling source declaration cannot change its comparator.
 
-Thus the closed **floor-identity roster** has forty-five names: the exact
+Thus the closed **floor-identity roster** has forty-seven names: the exact
 checked identities Strict source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
 ConsoleStream, Coproduct, CreatePolicy, DirEntry, Equal, ExitCode,
 FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
 Instant, List, MappingProt, Nat, Option, Pair, ProcessInput, Prod,
 ProgramCaps, Prop, Proved, ReadProgress, ReadResult, ResourceError,
-ResourceKind, ResourceOpenMode, Result, Top, TransferCount, Unit,
-Utf8Error, WriteProgress, eqChar, run_state, state_get, state_put}`**.
-The prior forty identities and five newly admitted scoped families are
-re-checked; floor admission alone adds no postulate or `trusted_base()`
-entry. Their qualified constructors and the Pair companions are
-separate from this 45-name count. These identities are not all types:
+ResourceKind, ResourceOpenMode, Result, StateOp, Top, TransferCount,
+Unit, Utf8Error, WriteProgress, eqChar, resp_state, run_state,
+state_get, state_put}`**. The prior forty identities, six newly scoped
+families and the checked `resp_state` operation are re-checked; floor
+admission alone adds no postulate or `trusted_base()` entry. Their
+qualified constructors and the Pair companions are separate from this
+47-name count. These identities are not all types:
 `Top` and `Bottom` are proposition constants, `Proved` is a proof binding, `HostIO` a
-type-level function, and `eqChar`, `run_state`, `state_get` and
-`state_put` are checked operations. Bare `get` and `put` are not floor
-names or reserved by these operations.
+type-level function, and `eqChar`, `resp_state`, `run_state`,
+`state_get` and `state_put` are checked operations. Bare `get` and
+`put` are not floor names or reserved by these operations.
 The definable `And`/`Dec`/`Yes`/`No` stay **out**
 (source-constructible, with a `Core/Logic` package home, and no
 internal-provision witness). The `Empty` needed by `space` desugaring
@@ -386,19 +387,23 @@ The earlier scoped families expose `ReadProgress.ReadSome`,
 `ResourceOpenMode.ResourceWriteCreate`, `MappingProt.ReadOnly`,
 `MappingProt.ReadWrite`, `ChildExit.Exited` and `ChildExit.Signaled`
 at their exact checked constructor IDs; none reserves a bare leaf.
-Increment 3a admits five more complete scoped families:
+Increment 3a admits six more complete scoped families:
 `ReadResult.Chunk`/`ReadResult.Eof`, `FileKind.KFile`/
 `FileKind.KDirectory`/`FileKind.KSymlink`/`FileKind.KOther`,
-`FileMetadata.MkFileMetadata`, `DirEntry.MkDirEntry`, and every
+`FileMetadata.MkFileMetadata`, `DirEntry.MkDirEntry`, every
 `FileOperation.Op*` case in the existing sixteen-constructor family
-(§38 §1.12). Their constructor identities and native artifact leaves
-stay unchanged; no bare constructor spelling joins protected B.
+(§38 §1.12), and `StateOp.Get`/`StateOp.Put` (§36 §4.2). The `State`
+label is not a second checked operation type: `StateOp s` is that
+signature's source-nameable operation carrier; `resp_state s` is its
+checked response family. Their constructor identities and native
+artifact leaves stay unchanged; no bare constructor spelling joins B.
 `ResourceOpenMode.ResourceWriteCreate` carries the existing
 `CreatePolicy` value. `ProcessInput`, `Prod` and `Unit` are unscoped:
 their whole constructor families, respectively `MkProcessInput`,
 `MkProd` and `MkUnit`, are bare reserved names. `HostIO`, `Char`,
 and transparent `Pair` have no constructor family; `eqChar`,
-`run_state`, `state_get` and `state_put` are operations, not families.
+`resp_state`, `run_state`, `state_get` and `state_put` are operations, not
+families.
 A same-shaped source family or definition has a different identity
 and is not the floor member. Every floor identity, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
@@ -414,7 +419,12 @@ exact-ID keying and independent `38` source needs. Increment 3a adds
 `FileOperation`: the interpreter and native lowering construct or read
 their exact checked constructor identities, and §38 §1.12 or §33 §3.3
 independently requires source to name each family. A package home
-cannot substitute for these five floor admissions. The
+cannot substitute for these five floor admissions. The space desugarer
+also builds `StateOp s` and `resp_state s` using
+their exact checked pre-source IDs (`elab.rs:22321–22336`), while
+§36 §4.2's `run_state` signature independently requires a program to
+name both identities for a direct State tree. These two join the floor
+without a new intrinsic, postulate or trust entry. The
 `ConsoleStream` constructor family and `eqChar` also have separate
 exact-ID keying and source-need witnesses. The space
 desugarer reads the exact pre-source IDs of `run_state`, `state_get` and
@@ -453,7 +463,7 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the forty-five-identity set above and that candidate has no new
+remains the forty-seven-identity set above and that candidate has no new
 ambient availability. `BufferWindow`, `ResourceBodyResult`,
 `ResourceBracketResult`, the `FS` source alias, `read_bytes` and `write_file`
 are source-promised but unkeyed: they remain outside B as package material,
@@ -505,7 +515,8 @@ CLI routes or alter the separate Legacy-root guarantees below.
 not a claim that one acceptance test covers every spelling. R means
 rewrite an exact checked expression; H means an explicit-import home at
 the existing pre-source identity; B means the scoped floor with its
-complete exact constructor family; Q means Architect disposition is
+complete exact constructor family; I means no source route because the
+only user becomes a Rust core fixture; Q means Architect disposition is
 still owed and no guessed home is authorized. `FileOperation` is a
 fifty-first, already-homed family independently discovered by applying
 §4 to its native reader and §33 §3.3 source promise. For an H row the
@@ -515,10 +526,11 @@ row the pin accepts the exact floor name without an import, refuses a
 same-spelled source replacement of that checked identity, and, for a
 public constructor, accepts `T.C` but not its bare spelling. For an R
 row the pin accepts the stated replacement in the same user source and
-checks its denotation against the original checked expression. Q rows
-are held: only a later Architect ruling may state their accept/refuse
-pins. No row in this roster switches `check`, `run` or `native-build` to
-Strict; that is Increment 3b.
+checks its denotation against the original checked expression. An I row
+has no Strict source pin: its test instead pins the original planner
+property over the core fixture. Unruled non-exact R shapes remain Q to
+Architect; no guessed home or pin is authorized. No row in this roster
+switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 
 | Blocked spelling | Disposition on its written use | Strict-entry pin / owner |
 |---|---|---|
@@ -536,18 +548,18 @@ Strict; that is Increment 3b.
 | `writeAt` | H | `Capability.System.IO` beside `readAt`. |
 | `flush` | H | `Capability.Console.Text` beside `write`. |
 | `FileMetadata` | B | Scoped `FileMetadata.MkFileMetadata`, no H row. |
-| `Write` | Q | Host operation spelling; Architect must classify its user's source. |
+| `Write` | R: replace the hand-built Console `Vis` by `let _ = write s b in k` | Import `Capability.Console.Text (write)`; same oracle output for the affected program; non-Console shapes Q. |
 | `freeze` | H | `Capability.System.Buffer` beside `BufferHandle`. |
-| `intToUInt64` | Q | Architect must classify this conversion and its user. |
+| `intToUInt64` | H | `Data.Numeric.FixedWidth`, with all eight safe `intTo{N}` siblings; no native exact-ID capture. |
 | `is_terminal` | H | `Capability.Console.Text` beside `flush`. |
-| `And` | Q | Identity relative to `Core.Logic.And`'s `Both` is unsettled. |
-| `and_fst` | Q | Same `And` identity question. |
-| `and_intro` | Q | Same `And` identity question. |
-| `and_snd` | Q | Same `And` identity question. |
-| `StateOp` | Q | Only `state_get`, `state_put`, `run_state` are floor. |
+| `And` | R: import `Core.Logic.Conjunction (And)` | Existing exported `and as And` is a distinct checked identity; preserve each user's own verdict. |
+| `and_fst` | R: import `Core.Logic.Conjunction (and_fst)` | Same user's verdict with the existing package identity. |
+| `and_intro` | R: import `Core.Logic.Conjunction (and_intro)` | Same user's verdict with the existing package identity. |
+| `and_snd` | R: import `Core.Logic.Conjunction (and_snd)` | Same user's verdict with the existing package identity. |
+| `StateOp` | B | Checked source operation carrier for `State s`; complete scoped `StateOp.Get`/`StateOp.Put`, no H row. |
 | `file_metadata` | H | `Capability.Filesystem.Authority` with FS file wrappers. |
 | `resourceMetadata` | H | `Capability.System.Resource` with resource brackets. |
-| `resp_state` | Q | State-family signature not admitted to floor. |
+| `resp_state` | B | Checked `(s : Type) → StateOp s → Type` response operation, not a constructor; no H row. |
 | `ReadResult` | B | Scoped checked Console-read reply family, no H row. |
 | `host_clock` | H | `Capability.Process.Exit` with HostIO lifts. |
 | `read` | H | `Capability.Console.Text` with `write`. |
@@ -562,17 +574,46 @@ Strict; that is Increment 3b.
 | `KSymlink` | B | `FileKind.KSymlink`, not bare. |
 | `MkFileMetadata` | B | `FileMetadata.MkFileMetadata`, not bare. |
 | `Not` | R: import `Not` from `Core.Logic.Not` for `p → Bottom` | Definitional equality for the same proposition; other uses Q. |
-| `ReadFile` | Q | Host operation spelling; Architect must classify its user's source. |
+| `ReadFile` | I: internal; no Strict-source disposition | The fixture's computed-op relay becomes a Rust core term with its planner-structure assertion preserved; no source home. |
 | `append_file` | H | `Capability.Filesystem.Authority`. |
 | `change_mode` | H | `Capability.Filesystem.Authority`. |
 | `create_directory` | H | `Capability.Filesystem.Authority`. |
 | `inject_r` | R: `host_console a R act` only for `ambient_console R act` | Exact Console-to-HostIO lift; other instances Q. |
-| `intToInt8` | Q | Architect must classify this conversion and its user. |
+| `intToInt8` | H | The same eight-name `Data.Numeric.FixedWidth` home; not a separate two-name route. |
 | `read_directory` | H | `Capability.Filesystem.Authority`. |
 | `remove_directory` | H | `Capability.Filesystem.Authority`. |
 | `remove_file` | H | `Capability.Filesystem.Authority`. |
 | `rename_file` | H | `Capability.Filesystem.Authority`. |
 | `FileOperation` | B, pre-existing H home withdrawn | Complete scoped sixteen-case family; remove its seventeen H rows. |
+
+The `And` quartet rewrites the four measured users by importing
+`Core.Logic.Conjunction`; its exported `And` is an alias for that
+module's `and`, **not** the former pre-source `And` identity or the
+different `Core.Logic.And` family. Preserve the verdict of each user's
+source; no pre-source H row is added. For `Write` and hand-built
+`ConsoleOp`/`console_resp` trees in the measured fizzbuzz users, the
+exact changed-proc rewrite replaces `proc f : IO B visits [Console]`
+by `proc f : B visits [Console]`, a `Vis` of `Write s b` followed by
+`k` by `let _ = write s b in k`, and a final Console `Ret` by the
+payload `x`. §36 §2.5 denotes the payload result as the same Console
+tree; the checked `write` body and `bind` Vis equation justify the
+rewrite. The observable program result, not the presence of a source
+constructor spelling, is the pin. Non-equivalent recursion or
+non-Console shapes remain Q to Architect. The example block calling
+`host_exit ANone ExitCode.Success` takes the already ruled R form
+`host_pure ANone ExitCode ExitCode.Success`, imported from
+`Capability.Process.Exit`; its static-main-not-entrypoint assertion
+must remain unchanged.
+
+The `ReadFile` row is a **fixture-only** source withdrawal, not a source
+home or general rewrite. The mixed-owner-relay fixture computes a host
+operation value that the package wrappers cannot express. Its
+hand-built HostIO tree moves to a Rust core term in the Language 3a
+child; the existing planner-structure assertion must remain
+byte-equivalent. The six separate `FSOp` DIVERGE sources of this class
+are held for Architect per-source ruling. None of these examples
+creates source-name need for the internal `ReadFile`, `FSOp`, or
+`ConsoleOp` identities under §4.
 
 The four further Child homes have one strict-entry user pin **per name**;
 the same source without its `Capability.Process.Child` import refuses
@@ -585,15 +626,27 @@ the same source without its `Capability.Process.Child` import refuses
 | `take_stdin` | H: `Capability.Process.Child` | Take the selected pipe write end under its import. |
 | `take_stderr` | H: `Capability.Process.Child` | Take the selected pipe read end under its import. |
 
-The H roster changes from eighty-one existing rows to eighty-six: remove
-seventeen `FileOperation`-family rows, then add eight FS Authority wrappers,
-`writeAt` and `writeAll` in System.IO, `freeze` in System.Buffer,
+The H roster changes from eighty-one existing rows to ninety-four:
+remove seventeen `FileOperation`-family rows, then add eight FS
+Authority wrappers, `writeAt` and `writeAll` in System.IO, `freeze` in System.Buffer,
 `resourceMetadata` in System.Resource, `flush` and `is_terminal` in
 Console.Text, `intToChar` in LawfulClasses, the four Child rows, and
-`read`, `wall_now` and `host_clock` as above. A home row alone does
-not publish a name: each owning module also exports its assigned
-checked identity. No H row is added for any of the five new floor
-families. Ordinary source edits using non-exact R shapes and all Q
+`read`, `wall_now` and `host_clock` as above, plus the complete eight-name
+safe fixed-width narrowing family in `Data.Numeric.FixedWidth` (§35 §5):
+`intToInt8`, `intToInt16`, `intToInt32`, `intToInt64`, `intToUInt8`,
+`intToUInt16`, `intToUInt32` and `intToUInt64`. The pre-home Rust capture
+census on the authorized base found no exact-ID reader of these safe
+checked definitions outside their registration in `conversions.rs`; the
+two `intToUInt64` occurrences in checked Ken bodies are source uses, not
+native ID captures. Each of these eight checked names needs its own
+Strict-entry discriminator: an imported same-user-source use accepts,
+and removing only the import refuses `UnboundName`; range probes at
+each target's inclusive bounds and just outside them distinguish safe
+`Option` narrowing from an unchecked raw cast (§35 §5). A home row
+alone does not publish a name: each owning module also exports its
+assigned checked identity. No H row is
+added for any of the six newly scoped floor families or for
+`resp_state`. Ordinary source edits using non-exact R shapes and all Q
 names require a separate Architect disposition before their strict
 pins can be called complete. Inc 3a changes vocabulary and source
 imports only, never the CLI route; 3b owns the route switch and its
@@ -608,9 +661,9 @@ The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
 **Implementation staging.** The specification fixes the
-forty-five-identity floor and Pair's three checked companions as the
+forty-seven-identity floor and Pair's three checked companions as the
 Increment 3a target. The prior forty were delivered before this
-increment; the five further scoped families above must be admitted
+increment; six further scoped families and `resp_state` must be admitted
 with their complete constructor sets, source-path migrations and
 roster/count change in one assembled candidate. The earlier Spec
 child's code parent `1fc285c6` enumerated its then-current forty;

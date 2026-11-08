@@ -1263,7 +1263,7 @@ Clock-to-HostIO lift.
 | `Chunk` | B: `ReadResult.Chunk` | Carries the bytes read; bare `Chunk` is not reserved. |
 | `Eof` | B: `ReadResult.Eof` | End-of-input case; bare `Eof` is not reserved. |
 | `wall_now` | H: import `Capability.Time.WallClock (wall_now)` | `ClockIO Instant` action, `visits [Clock]`. |
-| `host_clock` | H: import `Capability.Process.Exit (host_clock)` | `ClockIO r → HostIO a r`, `visits [Clock]`. |
+| `host_clock` | H: import `Capability.Process.Exit (host_clock)` | `(a : Auth) (r : Type) (action : ClockIO r) : HostIO a r visits [Clock]`. |
 
 The `ReadResult` family is exactly `Chunk Bytes | Eof`; its public
 constructors use only the scoped paths shown. The native Console-read
@@ -1299,9 +1299,10 @@ to the scoped floor, with its complete cases available as
 `FileOperation.OpSeek`, `FileOperation.OpSetLength`,
 `FileOperation.OpSync`, `FileOperation.OpGetInheritance`,
 `FileOperation.OpSetInheritance` and `FileOperation.OpDuplicate`.
-Only the five family names enter the counted floor; none of these
-constructor leaves joins bare protected B. Native stable-symbol leaves
-and runtime IDs do not change.
+Only these five I/O family names enter the counted floor from this
+paragraph; none of their constructor leaves joins bare protected B.
+`StateOp.Get` and `StateOp.Put` are likewise scoped (§36 §4.2).
+Native stable-symbol leaves and runtime IDs do not change.
 
 Eight further checked FS wrappers (`append_file`, `change_mode`,
 `create_directory`, `read_directory`, `remove_directory`,
@@ -1313,10 +1314,13 @@ Eight further checked FS wrappers (`append_file`, `change_mode`,
 `charToInt` in `Core.Classes.LawfulClasses` (§30 §4). Each retains its
 checked type, capability and effect contract. None is a new floor
 member. `FileOperation` and the four other scoped families receive
-no package-home row, and `Core.Logic.And` does not silently become
-the different pre-source `And` identity. Per-name Strict-entry pins
-and unresolved names are recorded in §30 §4; no host operation
-constructor or State signature is homed by analogy.
+no package-home row. Neither `Core.Logic.And` nor
+`Core.Logic.Conjunction` becomes the distinct pre-source `And`
+identity; Conjunction's exported `And` is its own checked definition
+(§30 §4). `StateOp` and `resp_state` enter the floor via §36 §4.2,
+not via a package home. Per-name Strict-entry pins and held non-exact
+shapes are recorded in §30 §4; no host operation constructor or State
+signature is homed by analogy.
 
 ## 2. The FFI surface — the `foreign` declaration
 
