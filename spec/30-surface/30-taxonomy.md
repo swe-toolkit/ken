@@ -663,9 +663,11 @@ closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 **Implementation staging.** The specification fixes the
 forty-seven-identity floor and Pair's three checked companions as the
 Increment 3a target. The prior forty were delivered before this
-increment; six further scoped families and `resp_state` must be admitted
-with their complete constructor sets, source-path migrations and
-roster/count change in one assembled candidate. The earlier Spec
+increment; six further scoped families must be admitted with their
+complete constructor sets and source-path migrations. The checked
+`resp_state` operation must be admitted at its exact pre-source identity.
+The roster/count change for all seven is atomic in one assembled
+candidate. The earlier Spec
 child's code parent `1fc285c6` enumerated its then-current forty;
 that historical count is not evidence for this Increment 3a target.
 Candidate-local tests do not establish official conformance, CI or
