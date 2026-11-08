@@ -437,8 +437,10 @@ fn run_px8ds_real_same_depth_path() {
 #[cfg(target_os = "linux")]
 fn px8ds_swapped_arm_source() -> String {
     let original = PX8DS_SIBLING_RECURSION_PROGRAM;
-    let false_then_true = "    False |-> after_countdown (Ok Int Bool False);\n    True |-> bind";
-    let true_then_false = "    True |-> after_countdown (Ok Int Bool False);\n    False |-> bind";
+    let false_then_true =
+        "    False |-> after_countdown (Ok Int Bool False);\n    True |-> host_bind";
+    let true_then_false =
+        "    True |-> after_countdown (Ok Int Bool False);\n    False |-> host_bind";
     assert_eq!(
         original.matches(false_then_true).count(),
         1,
