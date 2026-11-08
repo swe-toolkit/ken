@@ -139,6 +139,11 @@ under B1a.
    versus placement) instead of on this Function's emission evidence.
    Keyed on owner identity (`evt_dd551d27htbj`, Architect
    `evt_7gs4bp33yneey`).
+5. Self relocation withdrawn at the post-ownership builder only, while
+   the pre-schema source stratum is a parallel derivation with its own
+   readers, pins and equality invariant. Keyed on transport-source
+   membership, used as if it were relocation (`evt_3tfjfceyg80y9`,
+   Architect `evt_6rnvdpnq9b9vk`).
 
 ## Stop conditions
 

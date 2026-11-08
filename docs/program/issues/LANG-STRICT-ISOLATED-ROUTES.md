@@ -93,17 +93,23 @@ Four increments, each its own candidate, in order.
      - The R source rewrites and the DIVERGE re-check.
      - The H homes: the four Child homes, and a new
        `Data.Numeric.FixedWidth` exporting the eight safe `intTo{N}`
-       conversions.
-     - Floor admissions under spec 30 §4, taking the floor to 47:
+       conversions, and a new `Core.Effect.Coproduct` exporting
+       `inject_l` and `inject_r`: 96 home rows in all
+       (`evt_75k6f97trqvx3`).
+     - Floor admissions under spec 30 §4, taking the floor to 51:
        `ReadResult`, `FileMetadata`, `FileKind`, `DirEntry`,
        `FileOperation`, `StateOp` and `resp_state` (Steward
        `evt_36xwaa64spemr`, `evt_v08x07hc9tp0`; Architect
-       `evt_rr57zqgt7v3g`, `evt_1bwk0v6a3frz1`).
+       `evt_rr57zqgt7v3g`, `evt_1bwk0v6a3frz1`); then the `ConsoleOp`
+       family, `console_resp`, `itree_bind` and `resp_coproduct`
+       (Steward `evt_7r7x0wsxapftg`, `evt_tccj1bnqn8em`; Architect
+       `evt_75k6f97trqvx3`).
    - **3b, route switches and roots.** The strict entries and the root
      threading above. It also carries two items:
      - the imports for every on-disk source that a no-root route checks
        today and whose body 3a rewrote (Architect `evt_5rd10s2g7cr6z`,
-       `evt_3cnt8yn597y2j`);
+       `evt_3cnt8yn597y2j`), classified over all 133 paths 3a changes
+       (list `evt_2gr5rpy4xkp00`);
      - the `rt_performing_mixed_owner_relay` fixture's move to a Rust
        core term, through one doc(hidden) env-taking preparation seam
        that production also calls. The Runtime Leader reviews it

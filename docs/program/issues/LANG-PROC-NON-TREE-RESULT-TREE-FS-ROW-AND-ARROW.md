@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-NON-TREE-RESULT-TREE-FS-ROW-AND-ARROW
 title: "LANG-PROC-NON-TREE-RESULT-TREE gives a non-tree-result proc its §2.5 tree only for closed ambient rows (Console, Clock, Entropy) and non-function results. Procs with an FS label, an open row, or a function-valued declared result keep plain B, and a performing let at their outer level is refused as an elaboration gap. Give those procs the tree the spec rules and delete the interim refusal"
-status: active
+status: merged
 owner: verify
 size: L
 tier: T1
@@ -19,7 +19,8 @@ origin: "Architect AC-0 fork on LANG-PROC-NON-TREE-RESULT-TREE (evt_2f6y8k5n184e
 Every non-space-op `visits` proc with a non-empty row and a non-tree
 declared result denotes the tree spec 36 §2.5 rules for it, including
 procs with an `FS` label, an open row, or a function-valued declared
-result. `refuse_unsequenced_performed_let` is deleted.
+result. `refuse_unsequenced_performed_let` is narrowed to the §2.5
+refusals (Architect `evt_7atdxpv0zgghg`).
 
 ## Settled inputs (to be re-anchored on the landed base at kickoff)
 
@@ -51,7 +52,8 @@ result. `refuse_unsequenced_performed_let` is deleted.
   refuses `ensures` on a changed proc with E0038 and the text "`ensures`
   cannot be checked here", pinned by
   `ensured_changed_proc_refuses_until_tree_post_is_specified`. It flips to
-  acceptance here, under the Spec node's relational post.
+  acceptance here, under the Spec node's relational post. Inc 3 flipped
+  it as `ensured_changed_proc_checks_with_all_ret_post`.
 - **E0087's text** prints raw core terms, so the user sees ids rather
   than `HostIO` and `IO` (`evt_3dqgtgqp18tbn` item 5).
 - **Scrutinee and argument slots** (Architect `evt_688spjn83adpq`).
