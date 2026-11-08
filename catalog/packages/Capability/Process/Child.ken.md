@@ -30,15 +30,20 @@ export ChildStdio,
   withChild,
   wait_child,
   take_stdout,
-  read_pipe
+  read_pipe,
+  SpawnPlan,
+  with_stderr,
+  take_stdin,
+  take_stderr
 ```
 
 ## Using it
 
-Import `spawn_plan` to build a plan and `ChildStdio` with its public cases to
-select a stream. `withChild` acquires the child in a resource bracket;
-`take_stdout` obtains its readable pipe, and `read_pipe` transfers from that
-pipe. The program still needs the Process and full FS grants required by the
+Import `spawn_plan` and `SpawnPlan` to build and name a plan. `ChildStdio`
+selects its streams, including the `with_stderr` setting. `withChild` acquires
+the child in a resource bracket; `take_stdin` obtains its writable pipe and
+`take_stdout` or `take_stderr` obtains a readable pipe. `read_pipe` transfers
+from a readable pipe. The program still needs the Process and full FS grants required by the
 [checked process contract](../../../../spec/30-surface/38-ffi-io.md).
 
 ## Laws & proofs
