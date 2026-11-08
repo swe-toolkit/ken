@@ -1951,26 +1951,26 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                 (\file_result. match file_result {
                   Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 94) ;
                   Ok file_metadata_result |-> match file_metadata_result {
-                    MkFileMetadata file_size file_kind |->
+                    FileMetadata.MkFileMetadata file_size file_kind |->
                       match eq_int file_size 5 {
                         False |-> host_pure APartial ExitCode (ExitCode.Failure 95) ;
                         True |-> match file_kind {
-                          KDirectory |-> host_pure APartial ExitCode (ExitCode.Failure 96) ;
-                          KSymlink |-> host_pure APartial ExitCode (ExitCode.Failure 97) ;
-                          KOther |-> host_pure APartial ExitCode (ExitCode.Failure 98) ;
-                          KFile |->
+                          FileKind.KDirectory |-> host_pure APartial ExitCode (ExitCode.Failure 96) ;
+                          FileKind.KSymlink |-> host_pure APartial ExitCode (ExitCode.Failure 97) ;
+                          FileKind.KOther |-> host_pure APartial ExitCode (ExitCode.Failure 98) ;
+                          FileKind.KFile |->
                             host_bind APartial (Result FileError FileMetadata) ExitCode
                               (host_fs APartial (Result FileError FileMetadata)
                                 (file_metadata APartial cap directory_path))
                               (\directory_result. match directory_result {
                                 Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 99) ;
                                 Ok directory_metadata |-> match directory_metadata {
-                                  MkFileMetadata _directory_size directory_kind |->
+                                  FileMetadata.MkFileMetadata _directory_size directory_kind |->
                                     match directory_kind {
-                                      KFile |-> host_pure APartial ExitCode (ExitCode.Failure 100) ;
-                                      KSymlink |-> host_pure APartial ExitCode (ExitCode.Failure 101) ;
-                                      KOther |-> host_pure APartial ExitCode (ExitCode.Failure 102) ;
-                                      KDirectory |-> host_pure APartial ExitCode ExitCode.Success
+                                      FileKind.KFile |-> host_pure APartial ExitCode (ExitCode.Failure 100) ;
+                                      FileKind.KSymlink |-> host_pure APartial ExitCode (ExitCode.Failure 101) ;
+                                      FileKind.KOther |-> host_pure APartial ExitCode (ExitCode.Failure 102) ;
+                                      FileKind.KDirectory |-> host_pure APartial ExitCode ExitCode.Success
                                     }
                                 }
                               })

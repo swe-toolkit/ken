@@ -251,22 +251,36 @@ fn ac5_new_combinators_add_zero_trusted_base_entries() {
 /// silently mislabeling them, so a regression in that filter reds here
 /// instead of producing a wrong tag.
 ///
-/// `by_global_name`'s `HashMap<u32, &String>` is built by `.collect()`ing
-/// `env.globals` (`HashMap<String, GlobalId>`), which would be
-/// order-dependent -- and the surface-name lookup flaky -- if any `GlobalId`
-/// had two names. `D3` enforces this directly rather than only measuring it:
-/// the `assert_eq!` below fails the moment `env.globals` ever admits a
-/// second name for one id, instead of leaving it a doc-comment claim that
-/// could go stale silently.
+/// `env.globals` is a name-to-id map and can alias a checked identity. D3
+/// permits exactly the Legacy `bind` / `itree_bind` alias at the captured
+/// bind ID and refuses any other alias in the bare prelude. MEASURED: the
+/// closed alias inventory and sorted first-spelling inversion; CLAIMED:
+/// trust labels are independent of hash iteration order. THE GAP: this is
+/// the bare prelude, not a source environment with additional declarations.
 fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
     use ken_kernel::Decl;
-    let by_global_name: std::collections::HashMap<u32, &String> =
-        env.globals.iter().map(|(name, id)| (id.0, name)).collect();
+    let mut names_by_id: std::collections::BTreeMap<u32, Vec<&String>> = Default::default();
+    for (name, id) in &env.globals {
+        names_by_id.entry(id.0).or_default().push(name);
+    }
+    for names in names_by_id.values_mut() {
+        names.sort();
+    }
+    let aliased: Vec<(u32, Vec<&str>)> = names_by_id
+        .iter()
+        .filter(|(_, names)| names.len() > 1)
+        .map(|(id, names)| (*id, names.iter().map(|name| name.as_str()).collect()))
+        .collect();
+    let bind = env.globals["bind"].0;
     assert_eq!(
-        by_global_name.len(),
-        env.globals.len(),
-        "env.globals is not injective; labels would be order-dependent"
+        aliased,
+        vec![(bind, vec!["bind", "itree_bind"])],
+        "the bare environment's only alias is the Legacy itree_bind spelling of bind"
     );
+    let by_global_name: std::collections::HashMap<u32, &String> = names_by_id
+        .iter()
+        .map(|(id, names)| (*id, names[0]))
+        .collect();
     let mut labels: Vec<String> = env
         .env
         .trusted_base()

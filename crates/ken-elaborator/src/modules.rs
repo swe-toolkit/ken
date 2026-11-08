@@ -10320,16 +10320,18 @@ mod strict_catalog_home_tests {
     }
 
     /// Promise class: durable invariant. MEASURED: capture's exact checked
-    /// identities agree with each home's public export IDs after strict load.
-    /// CLAIMED: a home grants only its pre-source IDs, not copied definitions.
-    /// THE GAP: a separate client test exercises import visibility and refusal.
+    /// identities agree with each home's public export IDs after strict load;
+    /// System.Error has no home IDs and exports its own Transience, but no
+    /// FileOperation floor ID (spec 33 §3.3). CLAIMED: a home grants only its
+    /// pre-source IDs, while Error no longer grants the former family.
+    /// THE GAP: a separate client tests import visibility and refusal; the
+    /// full floor case set is read from the checked inductive, not spellings.
     #[test]
     fn real_homes_publish_their_pre_source_identities() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
         for home in [
             "Capability.Filesystem.Authority",
             "Capability.System.Buffer",
-            "Capability.System.Error",
             "Capability.System.IO",
             "Capability.System.Resource",
         ] {
@@ -10351,6 +10353,35 @@ mod strict_catalog_home_tests {
                 }
             }
         }
+
+        const ERROR: &str = "Capability.System.Error";
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        assert!(env.module_state.package_home_ids(ERROR).is_empty());
+        let file_operation = env.globals["FileOperation"];
+        let family = env
+            .env
+            .inductive(file_operation)
+            .expect("checked FileOperation floor inductive");
+        assert_eq!(
+            family.constructors.len(),
+            16,
+            "spec 30 §4's complete case set"
+        );
+        let floor_ids: HashSet<_> = std::iter::once(file_operation)
+            .chain(family.constructors.iter().map(|case| case.id))
+            .collect();
+        env.elaborate_module_from_roots_strict(&[root], ERROR)
+            .unwrap_or_else(|error| panic!("{ERROR} strict load: {error:?}"));
+        let published = env.module_state.package_export_ids(ERROR);
+        assert!(
+            published.is_disjoint(&floor_ids),
+            "{ERROR} must not re-export the floor FileOperation family"
+        );
+        let transience = env.globals["Capability.System.Error.Transience"];
+        assert!(
+            published.contains(&transience) && !floor_ids.contains(&transience),
+            "{ERROR} still publishes its own checked Transience"
+        );
     }
 }
 
