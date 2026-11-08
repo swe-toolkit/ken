@@ -29,7 +29,7 @@ fn strict(source: &str) -> Result<ElabEnv, ElabError> {
 #[test]
 fn ruled_h_names_import_at_the_original_checked_ids_only() {
     let bootstrap = ElabEnv::new().expect("pre-source checked identities");
-    let names: [(&str, &[&str]); 7] = [
+    let names: [(&str, &[&str]); 8] = [
         (
             "Capability.Filesystem.Authority",
             &[
@@ -48,6 +48,7 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
         ("Capability.System.Resource", &["resourceMetadata"]),
         ("Capability.Console.Text", &["read", "flush", "is_terminal"]),
         ("Core.Classes.LawfulClasses", &["intToChar"]),
+        ("Core.Effect.Coproduct", &["inject_l", "inject_r"]),
         ("Capability.Time.WallClock", &["wall_now"]),
     ];
     for (home, members) in names.into_iter().chain([
@@ -93,6 +94,56 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
             }
         }
     }
+}
+
+/// Promise class: durable invariant. MEASURED: both resolution modes bind the
+/// new specific `itree_bind` spelling to the exact captured bind ID; Strict
+/// reserves that spelling and `resp_coproduct` but refuses bare `bind` unless
+/// a user defines it, while Legacy still accepts the original bare spelling.
+/// CLAIMED: direct ITree sequencing is source-nameable without reserving an
+/// unrelated package's `bind`. THE GAP: this checks checked-source binding and
+/// identical trusted-base sets, not interpreter or native execution.
+#[test]
+fn generic_effect_floor_uses_captured_id_and_leaves_bare_bind_for_users() {
+    let baseline = ElabEnv::new().expect("checked prelude");
+    let bind = baseline.prelude_env.bind_id;
+    assert_eq!(baseline.globals["itree_bind"], bind);
+    assert_eq!(baseline.globals["bind"], bind, "Legacy binding survives");
+    assert_eq!(
+        baseline.globals["resp_coproduct"],
+        baseline.prelude_env.resp_coproduct_id
+    );
+    for name in ["itree_bind", "resp_coproduct"] {
+        assert!(PRELUDE_FLOOR_NAMES.contains(&name));
+        assert!(PRELUDE_PACKAGE_HOMES
+            .iter()
+            .all(|(_, member)| *member != name));
+    }
+    assert!(!PRELUDE_FLOOR_NAMES.contains(&"bind"));
+    let source = "fn bind_tree (tree : ITree ConsoleOp console_resp Unit)
+                  : ITree ConsoleOp console_resp Unit =
+                    itree_bind ConsoleOp console_resp Unit Unit tree
+                      (λv. ITree.Ret ConsoleOp console_resp Unit v)
+                  fn response (op : Coproduct (StateOp Nat) ConsoleOp) : Type =
+                    resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp op\n";
+    let selected = strict(source).expect("specific ITree bind and response in Strict");
+    assert_eq!(selected.globals["itree_bind"], bind);
+    assert_eq!(selected.env.trusted_base(), baseline.env.trusted_base());
+    let mut legacy = ElabEnv::new().expect("checked prelude");
+    legacy
+        .elaborate_file_v1(source)
+        .expect("the specific ITree bind is also available in Legacy");
+    let mut bare_legacy = ElabEnv::new().expect("checked prelude");
+    bare_legacy
+        .elaborate_file_v1(&source.replace("itree_bind", "bind"))
+        .expect("Legacy bare bind retains the checked ID");
+    match strict(&source.replace("itree_bind", "bind")) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "bind"),
+        Err(error) => panic!("wrong bare bind refusal: {error:?}"),
+        Ok(_) => panic!("bare bind leaked into the strict floor"),
+    }
+    strict("fn bind (n : Nat) : Nat = n\nfn apply (n : Nat) : Nat = bind n\n")
+        .expect("user-defined bind is not reserved");
 }
 
 /// Promise class: normative compatibility vector. MEASURED: seven admitted families

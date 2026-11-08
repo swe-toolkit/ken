@@ -329,7 +329,7 @@ fn two_vis_nodes_resume_once_in_source_order() {
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program_then APartial
-    (bind ConsoleOp console_resp Unit Unit
+    (itree_bind ConsoleOp console_resp Unit Unit
       (print_line "one")
       (\_. print_line "two"))
     ExitCode.Success

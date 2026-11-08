@@ -497,6 +497,21 @@ impl ElabEnv {
             }
         }
         elab.prelude_env.pre_source_names = pre_source;
+        // The generic ITree binder remains available as bare `bind` on the
+        // Legacy route. Its specific floor spelling is an additional binding
+        // to the *captured* checked ID, not a new definition or a rename of
+        // the pre-source stable symbol. A later user `fn bind` cannot redirect
+        // this alias. Install it after the artifact-name snapshot above.
+        let (_, _, checked_bind_id) = elab.numeric_env.effect_sequencing_ids().ok_or_else(|| {
+            ElabError::Internal("pre-source ITree bind identity was not captured".into())
+        })?;
+        if checked_bind_id != elab.prelude_env.bind_id
+            || elab.globals.insert("itree_bind".into(), checked_bind_id).is_some()
+        {
+            return Err(ElabError::Internal(
+                "pre-source ITree bind alias conflicts with its checked identity".into(),
+            ));
+        }
         // The checked Console carrier was declared as `Stream` so its native
         // stable symbol and the three constructor symbols stay unchanged.
         // Source alone now names that same parent `ConsoleStream`, with the

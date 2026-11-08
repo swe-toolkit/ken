@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 94] = [
+const PACKAGED: [(&str, &str); 96] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -22,6 +22,8 @@ const PACKAGED: [(&str, &str); 94] = [
     ("Core.Classes.LawfulClasses", "charToInt"),
     ("Core.Classes.LawfulClasses", "leqChar"),
     ("Core.Classes.LawfulClasses", "intToChar"),
+    ("Core.Effect.Coproduct", "inject_l"),
+    ("Core.Effect.Coproduct", "inject_r"),
     ("Data.Numeric.FixedWidth", "intToInt8"),
     ("Data.Numeric.FixedWidth", "intToInt16"),
     ("Data.Numeric.FixedWidth", "intToInt32"),
@@ -194,8 +196,8 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     );
     assert_eq!(
         floor.len(),
-        49,
-        "30 §4 floor count includes seven new scoped families and two responses"
+        51,
+        "30 §4 floor count adds two exact-keyed generic effect operations"
     );
     assert!(floor.contains("ConsoleStream") && floor.contains("eqChar"));
     assert!(!floor.contains("Stream"));

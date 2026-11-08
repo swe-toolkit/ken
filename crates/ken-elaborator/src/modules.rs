@@ -267,7 +267,7 @@ impl ModuleState {
 /// identity inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 49] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 51] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -313,6 +313,8 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 49] = [
     "WriteProgress",
     "eqChar",
     "console_resp",
+    "itree_bind",
+    "resp_coproduct",
     "resp_state",
     "run_state",
     "state_get",
@@ -322,7 +324,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 49] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 94] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 96] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -332,6 +334,8 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 94] = [
     ("Core.Classes.LawfulClasses", "charToInt"),
     ("Core.Classes.LawfulClasses", "leqChar"),
     ("Core.Classes.LawfulClasses", "intToChar"),
+    ("Core.Effect.Coproduct", "inject_l"),
+    ("Core.Effect.Coproduct", "inject_r"),
     ("Data.Numeric.FixedWidth", "intToInt8"),
     ("Data.Numeric.FixedWidth", "intToInt16"),
     ("Data.Numeric.FixedWidth", "intToInt32"),
