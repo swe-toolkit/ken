@@ -1248,23 +1248,16 @@ duplicates a checked definition.
   | `Flush` | `ConsoleStream` |
   | `IsTerminal` | `ConsoleStream` |
 
-  In a fresh unit in each route, attempt these one-name protected-binding
-  collisions, each paired with the same production under the renamed local
-  binding:
+  For each table row and each route, use two separate fresh source units:
+  one contains only the collision declaration, and the other contains only
+  its renamed local control. No unit combines multiple collisions.
 
-  ```ken
-  data ConsoleOp = LocalCase
-  data LocalConsoleOp = LocalCase
-
-  fn console_resp (n : Nat) : Type = Unit
-  fn local_console_resp (n : Nat) : Type = Unit
-
-  fn itree_bind (n : Nat) : Nat = n
-  fn local_itree_bind (n : Nat) : Nat = n
-
-  fn resp_coproduct (n : Nat) : Type = Unit
-  fn local_resp_coproduct (n : Nat) : Type = Unit
-  ```
+  | Floor name | Collision declaration | Accepted renamed control |
+  |---|---|---|
+  | `ConsoleOp` | `data ConsoleOp = LocalCase` | `data LocalConsoleOp = LocalCase` |
+  | `console_resp` | `fn console_resp (n : Nat) : Type = Unit` | `fn local_console_resp (n : Nat) : Type = Unit` |
+  | `itree_bind` | `fn itree_bind (n : Nat) : Nat = n` | `fn local_itree_bind (n : Nat) : Nat = n` |
+  | `resp_coproduct` | `fn resp_coproduct (n : Nat) : Type = Unit` | `fn local_resp_coproduct (n : Nat) : Type = Unit` |
 
   In Strict roots, separately use the bare spelling `bind` in the exact
   `sequence_tree` application above. Pair it with the accepted `itree_bind`
