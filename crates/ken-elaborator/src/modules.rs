@@ -10185,6 +10185,24 @@ mod strict_catalog_home_tests {
     /// malformed home cannot confer an unrelated checked identity. THE GAP:
     /// the pre-source environment has no non-transparent non-family witness;
     /// that error arm has no live bootstrap example on this base.
+    /// Promise class: normative compatibility vector. MEASURED: the new
+    /// specific floor spelling and Legacy bare spelling share the immutable
+    /// bind ID, while the pre-source stable-name snapshot still says `bind`
+    /// and the trusted-base set equals its captured pre-source set. CLAIMED:
+    /// the alias changes source availability, not kernel identity or trust.
+    /// THE GAP: the emitter must continue to use that pre-source snapshot;
+    /// its native-symbol tests are independent of this binding check.
+    #[test]
+    fn itree_bind_alias_keeps_the_pre_source_symbol_and_trust() {
+        let env = ElabEnv::new().expect("checked pre-source environment");
+        let id = env.prelude_env.bind_id;
+        assert_eq!(env.globals["bind"], id, "Legacy original spelling");
+        assert_eq!(env.globals["itree_bind"], id, "specific floor alias");
+        assert_eq!(env.prelude_env.pre_source_names.get(&id).and_then(|name| name.as_deref()), Some("bind"));
+        let trust: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+        assert_eq!(trust, env.prelude_env.native_trusted_base);
+    }
+
     #[test]
     fn incomplete_and_cross_home_families_refuse_at_the_checked_gate() {
         let elab = ElabEnv::new().expect("pre-source environment");
