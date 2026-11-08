@@ -696,6 +696,10 @@ normalization**. The following are denotations, not new kernel forms:
   programs, including `HostIO` programs with operation labels in a row.
   The tree's declared type supplies its `Auth` index, if any; only
   capabilities actually written in the source telescope are parameters.
+  Calling a checked pure definition that *constructs* and returns
+  such a tree is not itself a performed effect in the caller's row;
+  this does not exempt a call to a producer with a genuine latent row
+  from §1.4's escape check.
   A `visits` row label matching a host-family or host-operation label
   always names that host effect (as with reserved space names in §4.1),
   even if `S` carries a user-family summand with the same spelling.
@@ -1078,14 +1082,15 @@ shared memory, but it is already an explicitly unsafe/untrusted boundary,
 
 Sections §4.1–§4.2 give the **imperative** door to state — a `space` block whose
 `mut`/`becomes` desugar to `State S` and discharge by `run_state`. This section
-adds the **monadic** door: writing `state_get`/`state_put`/`run_state`
-**directly** as a
-first-class effect — the shape a stateful computation like `accumulator-factory`
-(VAL2 #10) needs when there is no `space` to hang cells on. It introduces **no
-new denotation**: both surfaces desugar to the *same* `State S` signature (§2.1)
-and are discharged by the *same* `run_state` fold (§4.2); §4.5 only **exposes**
-that machinery as named operations. **`OQ-C` DECIDED (operator, 2026-07-03):**
-this is **C2** — an effect over the existing `ITree`/handler machinery; **C1**
+adds the **monadic** door: named `state_get`/`state_put` tree builders
+and the `run_state` handler, the shape a stateful computation like
+`accumulator-factory` (VAL2 #10) needs without a `space` to hang cells
+on. It introduces **no new denotation**: both surfaces use the same
+State signature (§2.1) and `run_state` fold (§4.2). The checked
+declared-tree source-call route is fixed in §4.5.2; the direct
+`visits [State s]` source-row spelling is not. **`OQ-C` DECIDED
+(operator, 2026-07-03):** this is **C2** — an effect over the
+existing `ITree`/handler machinery; **C1**
 (explicit state-threading) is the floor it desugars to (§4.5.6); **C3** (real
 mutable refs/cells/regions) is **forbidden** — no memory is mutated.
 
@@ -1099,11 +1104,14 @@ preserved unchanged — the type index rides the label; it does not make the
 lattice infinite.
 
 This mirrors §4.1 exactly: a `space` already contributes **one label per
-space**, bound to that space's state type `S`. The direct surface simply lets a
-program **name** `State s` in a `visits` row without introducing a `space`. A
-single `[State s]` is the common case; two *independent* states in one
-computation are two *distinct* labels (as two spaces are), peeled by nested
-`run_state` calls (§4.5.4).
+space**, bound to that space's state type `S`. In the direct row model,
+`State s` names a label without introducing a `space`; the displayed
+`visits [State s]` remains **schematic row notation**, not an accepted
+concrete source spelling (§4.5.2). A single State label is the common
+case; two *independent* states in one computation are two *distinct*
+labels (as two spaces are), peeled by nested `run_state` calls
+(§4.5.4). The checked declared-tree source route below instead
+constructs an explicitly typed coproduct tree.
 
 #### 4.5.2 `state_get` and `state_put`
 
@@ -1118,9 +1126,35 @@ state_put : s →[{State s}] Unit
   state_put s' ⤳ perform (inj (Put s')) = Vis (inj (Put s')) (λ _. Ret tt)
 ```
 
-- `s` is an ordinary (implicit) type parameter of each operation, fixed at a use
-  site by the enclosing `run_state`'s initial state `s₀ : s` (§4.5.3) or by
-  annotation.
+These displayed row-arrow types describe the **effect-model denotation**,
+not the checked direct-tree source signatures. The existing checked
+`state_get` and `state_put` identities are pure definitions that
+construct and return trees. Their source-call types, including the
+explicit residual signature `f : Type` and its response family
+`rf : f → Type`, are:
+
+```text
+state_get : (s f : Type) → (rf : f → Type) → Unit →
+  ITree (Coproduct (StateOp s) f)
+    (resp_coproduct (StateOp s) f (resp_state s) rf) s
+state_put : (s f : Type) → (rf : f → Type) → s →
+  ITree (Coproduct (StateOp s) f)
+    (resp_coproduct (StateOp s) f (resp_state s) rf) Unit
+```
+
+A source application supplies all four arguments, in this order:
+`state_get s f rf MkUnit` or `state_put s f rf new_state`. A pure
+`fn` may return their **declared coproduct-tree type** and sequence
+the resulting tree values with floor `itree_bind` (§2.4). Constructing
+the tree does not perform its State operation in the caller's empty
+row; `run_state` later interprets its State summand. This is the
+settled direct-ITree source route, not a single-`StateOp s` tree,
+not a call to a non-tree-result `proc`, and not a new identity.
+
+- `s` is an ordinary type index determined by the enclosing `run_state`'s
+  initial state `s₀ : s` (§4.5.3) or by annotation. The checked
+  direct-tree source call still supplies `s` explicitly, followed by
+  `f` and `rf` as in the signatures above.
 - `Resp Get = s` is a **non-`Unit`, `s`-typed** response — the State
   response depends on the type parameter, whereas §2.1's checked
   `console_resp` varies by Console operation and returns `Result IOError
@@ -1134,9 +1168,13 @@ state_put : s →[{State s}] Unit
   `get` and `put`, respectively: §2.1's `Get`/`Put` under §2.2's
   `perform`. The row spelling `[State s]` remains proposal-level
   (`OQ-syntax`); the **operations and their denotations are normative**.
-  An effectful producer
-  `Unit →[ρ] a` denotes to `ITree ⟦ρ⟧ a` (§1.1, §2.4), the form §4.2/§4.5.3
-  use.
+  A non-tree-result `proc ... visits [State s]` using the schematic
+  row-arrow types above is not yet an accepted source spelling or a
+  conformance positive. The checked declared-tree call instead has
+  the explicit four-argument signature above, and a `fn` returning
+  that tree is source-writable without any `visits` row (§2.4). An
+  effectful producer `Unit →[ρ] a` denotes to `ITree ⟦ρ⟧ a`
+  (§1.1, §2.4), the form §4.2/§4.5.3 use.
 
 #### 4.5.3 `run_state` is §4.2's fold at `F = 𝟘` — not re-specified
 
@@ -1492,21 +1530,28 @@ on the bug it targets, not pass vacuously):
    boundary, not merely "elaborates" and never closure identity.
 3. **Capability gate** — the same `perform` **rejects** with no `Cap E` in scope
    and **accepts** under a handler that provides it (denial-path flip).
-4. **`space` + handler** — `run_state s₀` on an `inc`/`state_get` program resumes
-   correctly; assert the **final state** value and that `inc`'s `old(n)`
-   obligation discharges.
+4. **`space` + handler** — `run_state s₀` on a `space`-bound `inc`
+   program resumes correctly; assert the **final state** value and
+   that `inc`'s `old(n)` obligation discharges. A `state_get` variant
+   uses §4.5.2's checked declared-tree call form, not the unsettled
+   concrete State row spelling.
 5. **`pure`/`impure` boundary** — a `foreign` with a non-empty row exposes its
    `Vis` op to a runtime handler; a `pure`-but-effectful `foreign` is rejected
    (`38 §3`).
-6. **Direct `[State s]` surface** — drive the **real** producer, not a hand-fed
-   harness (`conformance-hand-feeds-the-deliverable`): a
-   `state_get`/`state_put` program run under `run_state s₀` through the
-   **actual interpreter** returns the correct
-   `(result, final-state)` Σ-pair (`R × S`, §4.2) — the post-increment `next`
-   (`run_state 0 next = (0,1)`, `run_state 41 next = (41,42)`, §4.5.3). Assert the
-   **paired value**, plus (a) **composition** — a `[State s, Console]` program
-   threads state identically whether `run_state` or the Console handler is peeled
-   first (commutation, §4.5.4); (b) **re-runnability** — the same tree under two
-   `s₀` gives two independent results with no cross-run state (the C3-forbidden
-   face, §4.5.5). `run_state` is a derived total definition, so kernel-untouched
-   (AC1) holds structurally.
+6. **Direct State source calls** — drive the **real** checked
+   `state_get`/`state_put` tree builders, not a hand-fed `Vis` harness
+   (`conformance-hand-feeds-the-deliverable`). Source calls supply
+   `s`, `f`, `rf` and the value, return the exact coproduct tree of
+   §4.5.2, and may be sequenced in a pure `fn` returning that tree.
+   Through the actual interpreter, `run_state s₀` must return the
+   correct `(result, final-state)` Σ-pair (`R × S`, §4.2): the
+   post-increment `next` yields `run_state 0 next = (0,1)` and
+   `run_state 41 next = (41,42)` (§4.5.3). Assert the **paired value**,
+   (a) **composition** with Console under either handler order
+   (§4.5.4), and (b) **re-runnability** of the same tree under two
+   initial states without cross-run mutation (§4.5.5). A hand-built
+   `Vis` may independently test the handler but does not prove that
+   the public builders resolve and work. Do not assert that
+   `proc ... visits [State s]` is accepted until the row spelling is
+   settled. `run_state` is a derived total definition, so
+   kernel-untouched (AC1) holds structurally.
