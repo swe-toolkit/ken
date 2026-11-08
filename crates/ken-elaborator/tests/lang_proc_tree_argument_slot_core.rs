@@ -7,8 +7,8 @@
 //! applications exercise this identity; literal occurrences have opaque checked
 //! global identities, so both twins reference the same declared messages.
 
-use ken_elaborator::ElabEnv;
-use ken_kernel::Decl;
+use ken_elaborator::{render_open_obligations, ElabEnv, Span};
+use ken_kernel::{Decl, Term};
 
 const PRE: &str = r#"program capabilities FS APartial
 const first : String = "1"
@@ -72,4 +72,51 @@ proc explicit (u : Unit) : Unit visits [Console] =
     (write ConsoleStream.Stdout (bytes_encode held))) x
 "#,
     );
+}
+
+/// Promise class: durable invariant.
+/// MEASURED: a pure first argument opens one Requires hole in both the direct
+/// performed-second call and its explicit-let twin; their checked cores agree.
+/// CLAIMED: the argument-domain type probe does not publish obligations.
+/// THE GAP: the fixture covers an earlier pure argument with a Requires hole,
+/// not every kind of instance or meta resolved while probing a prefix.
+#[test]
+fn prefix_probe_discards_earlier_argument_obligation() {
+    fn elaborate(body: &str) -> (Term, Vec<String>) {
+        let mut env = ElabEnv::new().expect("checked prelude");
+        let results = env
+            .elaborate_file_v1(&format!(
+                "{PRE}const zero : Int = 0\n\
+                 fn need (n : Int) : Unit requires Equal Int n 5 = MkUnit\n\
+                 proc probe_user (u : Unit) : Unit visits [Console] =\n  {body}\n"
+            ))
+            .expect("open precondition in a pure earlier argument");
+        let result = results
+            .iter()
+            .find(|result| result.name == "probe_user")
+            .expect("checked probe result");
+        // Each source puts the same call at a different byte offset. Compare
+        // rendered obligations without that incidental source coordinate.
+        let mut canonical = result.clone();
+        for obligation in &mut canonical.obligations {
+            obligation.span = Span::zero();
+        }
+        let reports = render_open_obligations(&[canonical]);
+        let core = match env.env.lookup(result.def_id) {
+            Some(Decl::Transparent { body, .. }) => body.clone(),
+            other => panic!("probe_user not a checked definition: {other:?}"),
+        };
+        (core, reports)
+    }
+
+    let (direct_core, direct_open) = elaborate("two (need zero) (emit first)");
+    let (explicit_core, explicit_open) =
+        elaborate("let action = emit first in two (need zero) action");
+    assert_eq!(direct_open, explicit_open, "probe must not add open holes");
+    assert_eq!(direct_open.len(), 1, "the earlier argument opens one hole");
+    assert!(
+        direct_open[0].starts_with("unknown probe_user.requires."),
+        "{direct_open:?}"
+    );
+    assert_eq!(direct_core, explicit_core, "direct and let checked bodies");
 }

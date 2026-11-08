@@ -14872,11 +14872,18 @@ fn infer_application_slot(
                 Box::new(prefix), Box::new((*preceding).clone()), expr.span().clone(),
             );
         }
-        let (_, prefix_ty) = infer(cx, &prefix)?;
-        let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &prefix_ty) else {
-            return Err(ElabError::NotAFunction { span: span.clone() });
+        // A type-only probe: classify the parameter, then discard every
+        // obligation, instance resolution and meta it created.
+        let snapshot = refinement_snapshot::Snapshot::capture(cx);
+        let probed = match infer(cx, &prefix) {
+            Ok((_, prefix_ty)) => match whnf(cx.env, &cx.ctx, &prefix_ty) {
+                Term::Pi(domain, _) => Ok(let_itree_parts(cx, &domain).is_none()),
+                _ => Err(ElabError::NotAFunction { span: span.clone() }),
+            },
+            Err(error) => Err(error),
         };
-        if let_itree_parts(cx, &domain).is_none() {
+        snapshot.rollback(cx)?;
+        if probed? {
             candidate = Some((slot, argument));
             break;
         }
