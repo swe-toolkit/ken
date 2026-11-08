@@ -24,8 +24,14 @@ boundary for signed and unsigned 8-, 16-, 32-, and 64-bit integers.
 ## Definition
 
 ```ken
-export intToInt8, intToInt16, intToInt32, intToInt64,
-  intToUInt8, intToUInt16, intToUInt32, intToUInt64
+export intToInt8,
+  intToInt16,
+  intToInt32,
+  intToInt64,
+  intToUInt8,
+  intToUInt16,
+  intToUInt32,
+  intToUInt64
 ```
 
 ## Using it
