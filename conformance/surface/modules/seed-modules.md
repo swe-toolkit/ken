@@ -1328,7 +1328,7 @@ duplicates a checked definition.
       (tree : ITree (Coproduct (StateOp s) f)
         (resp_coproduct (StateOp s) f (resp_state s) rf) a)
     : ITree f rf (Pair a s) =
-    run_state initial tree
+    run_state s f rf a initial tree
   ```
 
   The two builders use §4.5.2's checked declared-tree calls: `s`, `f`,
@@ -1337,7 +1337,8 @@ duplicates a checked definition.
   tree values; they do not assert the unresolved `visits [State s]`
   spelling or rely on an implicit single-State-to-coproduct lift.
   `run_state_probe` separately consumes a tree already composed over
-  State and `f`, as §4.5.3 specifies.
+  State and `f`, as §4.5.3 specifies; it supplies `s`, `f`, `rf`, and
+  `a` explicitly to `run_state` before the initial state and tree.
 
   Snapshot each operation's pre-source `GlobalId`. In separate Strict-root
   units, compare these one-name collision pairs:
