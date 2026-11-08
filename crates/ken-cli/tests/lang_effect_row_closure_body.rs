@@ -313,7 +313,7 @@ fn named_proc_return_is_still_charged_at_the_pure_boundary() {
 const P8_TREE_VALUE: &str = r#"program capabilities FS APartial
 const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =
   run_state Nat ConsoleOp console_resp Unit Zero
-    (bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
+    (itree_bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
       (state_get Nat ConsoleOp console_resp MkUnit)
       (\n . inject_r (StateOp Nat) ConsoleOp (resp_state Nat) console_resp Unit (print_line "state-console-pairing")))
 
@@ -324,15 +324,49 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (\_ . host_pure APartial ExitCode ExitCode.Success)
 "#;
 
+/// Promise class: durable invariant. MEASURED: the actual P8 source keeps
+/// its pure-const E0038 owner/effect under Strict with only ephemeral H
+/// imports, while its declared-row repair accepts in both modes and the
+/// existing CLI run keeps its output. CLAIMED: the generic ITree floor
+/// vocabulary does not make a charged closure body silently pure.
+/// THE GAP: Strict execution bytes wait on 3b's rooted route switch.
 #[test]
 fn tree_typed_value_closure_requires_a_declared_row() {
     assert_escape("p8-const-tree-value", P8_TREE_VALUE, "prog", "Console");
+    let imports = "import Capability.Console.Text (print_line)\n\
+                   import Capability.Process.Exit (host_bind, host_pure, host_console)\n\
+                   import Core.Effect.Coproduct (inject_r)\n";
+    let with_imports = |source: &str| {
+        source.replacen(
+            "program capabilities FS APartial\n",
+            &format!("program capabilities FS APartial\n{imports}"),
+            1,
+        )
+    };
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut selected = ElabEnv::new().expect("prelude");
+    let error = selected
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_imports(P8_TREE_VALUE))
+        .expect_err("pure P8 tree still escapes its Console row");
+    assert_eq!(error.code().as_str(), "E0038", "{error:?}");
+    assert!(
+        matches!(error, ElabError::TypeMismatch { reason, .. }
+            if reason.contains("EffectEscapes in 'prog': Console")),
+        "the same closure body must be charged"
+    );
     let declared = P8_TREE_VALUE.replacen(
         "const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =",
         "proc prog : ITree ConsoleOp console_resp (Pair Unit Nat) visits [Console] =",
         1,
     );
     assert_accept("p8-declared-tree-value", &declared);
+    let mut repaired = ElabEnv::new().expect("prelude");
+    repaired
+        .elaborate_isolated_file_strict_v1(&[catalog], &with_imports(&declared))
+        .expect("declared P8 effect row remains accepted under Strict");
     assert_run(
         "p8-declared-tree-value",
         &declared,
