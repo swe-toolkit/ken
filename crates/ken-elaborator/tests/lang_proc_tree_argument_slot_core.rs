@@ -120,3 +120,50 @@ fn prefix_probe_discards_earlier_argument_obligation() {
     );
     assert_eq!(direct_core, explicit_core, "direct and let checked bodies");
 }
+
+const COST_PRE: &str = r#"program capabilities FS APartial
+proc action (x : Unit) : HostIO APartial Unit visits [Console] =
+  host_bind APartial (Result IOError Unit) Unit
+    (host_console APartial (Result IOError Unit)
+      (write ConsoleStream.Stdout (bytes_encode "a")))
+    (\_. host_pure APartial Unit MkUnit)
+fn seq2 (a : HostIO APartial Unit) (b : HostIO APartial Unit) : HostIO APartial Unit = a
+fn sink (t : HostIO APartial Unit) : Unit = MkUnit
+"#;
+
+/// Promise class: durable invariant.
+/// MEASURED: a depth-14 nest of performing held trees and a 12-ary flat call
+/// of them each elaborate within one second (about 5 ms on the pre-slot parent;
+/// 10.5 s and 17.3 s under the per-slot prefix probe).
+/// CLAIMED: classifying a parameter never re-elaborates the arguments to its
+/// left, so slot classification stays linear in the spine.
+/// THE GAP: a wall-clock bound rather than an operation count; a dependent
+/// parameter still checks the argument it abstracts during the scan.
+#[test]
+fn held_tree_arguments_elaborate_in_linear_time() {
+    fn elapsed(decls: &str) -> std::time::Duration {
+        let mut env = ElabEnv::new().expect("checked prelude");
+        let source = format!("{COST_PRE}{decls}");
+        let start = std::time::Instant::now();
+        env.elaborate_file(&source).expect("held-tree spine checks");
+        start.elapsed()
+    }
+    let mut tree = "(action MkUnit)".to_string();
+    for _ in 0..14 {
+        tree = format!("(seq2 {tree} (action MkUnit))");
+    }
+    let nest = elapsed(&format!(
+        "proc usep (u : Unit) : Unit visits [Console] =\n  sink {tree}\n"
+    ));
+    let params: String = (0..12)
+        .map(|i| format!(" (a{i} : HostIO APartial Unit)"))
+        .collect();
+    let args: String = (0..12).map(|_| " (action MkUnit)").collect();
+    let flat = elapsed(&format!(
+        "fn take{params} : Unit = MkUnit\nproc usep (u : Unit) : Unit visits [Console] =\n  take{args}\n"
+    ));
+    eprintln!("held-tree cost: nest={nest:?} flat={flat:?}");
+    let bound = std::time::Duration::from_secs(1);
+    assert!(nest < bound, "depth-14 held-tree nest took {nest:?}");
+    assert!(flat < bound, "12-ary held-tree call took {flat:?}");
+}

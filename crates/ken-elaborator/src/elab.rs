@@ -14850,6 +14850,33 @@ fn application_with_slot(
     rebuilt
 }
 
+/// Find the first argument that performs into a value-valued parameter,
+/// reading each parameter from the head's Pi telescope in one pass. A
+/// non-dependent codomain advances without elaborating the argument it
+/// abstracts, so a held tree is elaborated once, by the path that keeps it.
+#[inline(never)]
+fn application_slot_candidate<'e>(
+    cx: &mut ElabCtx, head: &RExpr, arguments: &[&'e RExpr], span: &Span,
+) -> Result<Option<(usize, &'e RExpr)>, ElabError> {
+    let (_, mut ty) = infer(cx, head)?;
+    for (slot, argument) in arguments.iter().copied().enumerate() {
+        let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return Err(ElabError::NotAFunction { span: span.clone() });
+        };
+        if argument_slot_may_perform(cx, argument) && let_itree_parts(cx, &domain).is_none() {
+            return Ok(Some((slot, argument)));
+        }
+        ty = match lower_by(&codomain, 1) {
+            Ok(independent) => independent,
+            Err(_) => {
+                let argument_core = check(cx, argument, &domain, span)?;
+                subst0(&codomain, &argument_core)
+            }
+        };
+    }
+    Ok(None)
+}
+
 /// Inspect the *whole* source spine before recursing into its function. If
 /// the outermost application bound its own (rightmost) argument first, two
 /// performed arguments would execute in reverse source order.
@@ -14858,37 +14885,15 @@ fn infer_application_slot(
     cx: &mut ElabCtx, expr: &RExpr, span: &Span,
 ) -> Result<Option<(Term, Term)>, ElabError> {
     let (head, arguments) = call_application_spine(expr);
-    let mut candidate = None;
-    for (slot, argument) in arguments.iter().copied().enumerate() {
-        if !argument_slot_may_perform(cx, argument) {
-            continue;
-        }
-        // A tree passed to a tree-valued parameter is held as a value,
-        // including prelude proof witnesses. It must not end the scan: a
-        // later argument can still perform into a value-valued parameter.
-        let mut prefix = head.clone();
-        for preceding in &arguments[..slot] {
-            prefix = RExpr::RApp(
-                Box::new(prefix), Box::new((*preceding).clone()), expr.span().clone(),
-            );
-        }
-        // A type-only probe: classify the parameter, then discard every
-        // obligation, instance resolution and meta it created.
-        let snapshot = refinement_snapshot::Snapshot::capture(cx);
-        let probed = match infer(cx, &prefix) {
-            Ok((_, prefix_ty)) => match whnf(cx.env, &cx.ctx, &prefix_ty) {
-                Term::Pi(domain, _) => Ok(let_itree_parts(cx, &domain).is_none()),
-                _ => Err(ElabError::NotAFunction { span: span.clone() }),
-            },
-            Err(error) => Err(error),
-        };
-        snapshot.rollback(cx)?;
-        if probed? {
-            candidate = Some((slot, argument));
-            break;
-        }
+    if !arguments.iter().any(|argument| argument_slot_may_perform(cx, argument)) {
+        return Ok(None);
     }
-    let Some((slot, argument)) = candidate else { return Ok(None) };
+    // A type-only scan: classify the parameters, then discard every
+    // obligation, instance resolution and meta it created.
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let scanned = application_slot_candidate(cx, head, &arguments, span);
+    snapshot.rollback(cx)?;
+    let Some((slot, argument)) = scanned? else { return Ok(None) };
     let body = SequencedBody::Application { expr: expr.clone(), slot };
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
