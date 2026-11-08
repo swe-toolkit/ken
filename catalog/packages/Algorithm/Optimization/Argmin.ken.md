@@ -236,6 +236,46 @@ pub theorem argmin_option_cost_order_invariant
         (argmin_cost_order_invariant a cost f same_order (nonempty_cons a x rest))
   }
 
+pub theorem argmin_option_append_keeps_left
+      (a : Type) (cost : a → Nat) (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmin a cost (nonempty_cons a y ys)))
+          (cost (argmin a cost (nonempty_cons a x xs))))
+        False
+      → Equal
+        (Option a)
+        (argmin_option a cost (list_append a (Cons a x xs) (Cons a y ys)))
+        (argmin_option a cost (Cons a x xs)) =
+  λh.
+    cong
+      a
+      (Option a)
+      (argmin a cost (nonempty_append a (nonempty_cons a x xs) (nonempty_cons a y ys)))
+      (argmin a cost (nonempty_cons a x xs))
+      (Some a)
+      (argmin_append_keeps_left a cost (nonempty_cons a x xs) (nonempty_cons a y ys) h)
+
+pub theorem argmin_option_append_takes_right
+      (a : Type) (cost : a → Nat) (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmin a cost (nonempty_cons a y ys)))
+          (cost (argmin a cost (nonempty_cons a x xs))))
+        True
+      → Equal
+        (Option a)
+        (argmin_option a cost (list_append a (Cons a x xs) (Cons a y ys)))
+        (argmin_option a cost (Cons a y ys)) =
+  λh.
+    cong
+      a
+      (Option a)
+      (argmin a cost (nonempty_append a (nonempty_cons a x xs) (nonempty_cons a y ys)))
+      (argmin a cost (nonempty_cons a y ys))
+      (Some a)
+      (argmin_append_takes_right a cost (nonempty_cons a x xs) (nonempty_cons a y ys) h)
+
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
 
@@ -422,6 +462,46 @@ pub theorem argmax_option_cost_order_invariant
         (Some a)
         (argmax_cost_order_invariant a cost f same_order (nonempty_cons a x rest))
   }
+
+pub theorem argmax_option_append_keeps_left
+      (a : Type) (cost : a → Nat) (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmax a cost (nonempty_cons a x xs)))
+          (cost (argmax a cost (nonempty_cons a y ys))))
+        False
+      → Equal
+        (Option a)
+        (argmax_option a cost (list_append a (Cons a x xs) (Cons a y ys)))
+        (argmax_option a cost (Cons a x xs)) =
+  λh.
+    cong
+      a
+      (Option a)
+      (argmax a cost (nonempty_append a (nonempty_cons a x xs) (nonempty_cons a y ys)))
+      (argmax a cost (nonempty_cons a x xs))
+      (Some a)
+      (argmax_append_keeps_left a cost (nonempty_cons a x xs) (nonempty_cons a y ys) h)
+
+pub theorem argmax_option_append_takes_right
+      (a : Type) (cost : a → Nat) (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmax a cost (nonempty_cons a x xs)))
+          (cost (argmax a cost (nonempty_cons a y ys))))
+        True
+      → Equal
+        (Option a)
+        (argmax_option a cost (list_append a (Cons a x xs) (Cons a y ys)))
+        (argmax_option a cost (Cons a y ys)) =
+  λh.
+    cong
+      a
+      (Option a)
+      (argmax a cost (nonempty_append a (nonempty_cons a x xs) (nonempty_cons a y ys)))
+      (argmax a cost (nonempty_cons a y ys))
+      (Some a)
+      (argmax_append_takes_right a cost (nonempty_cons a x xs) (nonempty_cons a y ys) h)
 
 fn argmin_from (a : Type) (cost : a → Nat) (x : a) (rest : List a) : a =
   select_from a cost lt_nat x rest
@@ -1085,7 +1165,10 @@ right minimum is not strictly cheaper, including ties;
 `argmin_append_takes_right` selects the right choice when it is strictly
 cheaper. `argmax_append_keeps_left` and `argmax_append_takes_right` mirror
 them: the left choice is retained unless the right maximum is strictly
-costlier, so a tie across the split keeps the earlier left choice.
+costlier, so a tie across the split keeps the earlier left choice. When both
+parts are constructed as `Cons` lists, the four corresponding Option laws
+select `Some` of the same winner without first exposing the `NonEmpty` view.
+The left law covers ties; the right law requires a strict improvement.
 
 ## Laws & proofs
 
@@ -1130,7 +1213,14 @@ constructors. The private `option_member` and `option_least` predicates assign
 `Top` to a missing result and the corresponding list proposition to `Some`.
 Their private base proofs use the existing `argmin_member` and `argmin_least`
 in the `Cons` case. `J` transports these proofs along the observed result
-equality to give the public membership and least-cost corollaries.
+equality to give the public membership and least-cost corollaries. For two
+`Cons` parts, `argmin_option_append_keeps_left` and
+`argmin_option_append_takes_right` lift the respective non-empty append law
+through `Some` with `cong`. The `list_append` of the first `Cons` becomes
+the tail of the same `NonEmptyCons` produced by `nonempty_append`, so both
+Option endpoints reduce to the sibling's `Some`-lifted endpoints. The single
+strict-comparison premise and the left-on-tie choice are inherited from the
+non-empty laws, without an additional selector helper.
 
 `argmax_member` transports the shared private selection-membership proof to
 the public list view. `argmax_greatest` inducts over the ordered tail and
@@ -1159,6 +1249,10 @@ to `None` and membership to `Some`. New private `option_greatest` similarly
 assigns `Top` to `None` and a greatest-cost bound to `Some`. Selector-specific
 base proofs use `argmax_member` and `argmax_greatest` for `Cons`; `J` carries
 those proofs along the observed `Some` equality to the public corollaries.
+`argmax_option_append_keeps_left` and `argmax_option_append_takes_right`
+lift the corresponding maximum append laws through `Some` in the same way.
+Their strict comparison is oriented from the left maximum to the right, so
+an equal-cost tie retains the left part's selected candidate.
 
 ## Design notes
 
@@ -1191,16 +1285,18 @@ algorithm.
 
 **Public API:** `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
-`argmin_append_takes_right`; `argmin_option` and its five laws:
+`argmin_append_takes_right`; `argmin_option` and its seven laws:
 `argmin_option_nil`, `argmin_option_cons`, `argmin_option_member`,
-`argmin_option_least` and `argmin_option_cost_order_invariant`;
+`argmin_option_least`, `argmin_option_cost_order_invariant`,
+`argmin_option_append_keeps_left` and `argmin_option_append_takes_right`;
 `argmax` and the seven §3.2 laws `argmax_member`,
 `argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
 `argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`, plus
 `argmax_cost_order_invariant`, `argmax_append_keeps_left` and
-`argmax_append_takes_right`; and `argmax_option` with five laws:
+`argmax_append_takes_right`; and `argmax_option` with seven laws:
 `argmax_option_nil`, `argmax_option_cons`, `argmax_option_member`,
-`argmax_option_greatest` and `argmax_option_cost_order_invariant`.
+`argmax_option_greatest`, `argmax_option_cost_order_invariant`,
+`argmax_option_append_keeps_left` and `argmax_option_append_takes_right`.
 Selection helpers, branch proofs, the shared membership induction and all
 Option proof helpers are private. The carrier, list view, membership predicate and
 Nat order retain their provider identities.
@@ -1264,5 +1360,11 @@ isolated false claim. The
 checks both public §1.7 and §3.7 laws on an earliest-tie list and `Nil`;
 its `cat_optimization_argmin_option_cost_order` package test checks both
 open laws and compares each isolated flattened-cost refusal with its
-accepted `Proved` control. These are candidate-local checks, not official
-conformance-runner execution, CI, publication, landing or landed trust.
+accepted `Proved` control. The
+[Option append-split seed](../../../../conformance/stdlib/optimization/seed-argmin-option-append-split.md)
+owns the closed §1.8 and §3.8 examples for both selectors. The package-owned
+`cat_optimization_option_append_split` test checks the four generic public
+laws, closed branch choices and fresh-prefix false-premise refusals; it does
+not execute the separate conformance seed. These are candidate-local checks,
+not official conformance-runner execution, CI, publication, landing or landed
+trust.
