@@ -4,6 +4,7 @@
 //! `declare_postulate`, honesty guard via `GlobalEnv::trusted_base()`, refinement
 //! lowering to checked subset Σ, `prove`/`law` declaration elaboration, `old` elaboration.
 
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
@@ -2391,13 +2392,97 @@ fn check_performed_let(
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
     expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
+    let body = SequencedBody::Let(body);
+    check_sequenced_bind(cx, ty_opt, rhs, body, expected, span, result_predicates)
+}
+
+/// What a `36 §2.4` bind scopes over: a `let`'s own body, which names its
+/// binder, or the match whose scrutinee slot the bind fills. That match's
+/// arms were resolved without the binder, so the binder is hidden from
+/// surface names and only the synthesized scrutinee reaches it.
+#[derive(Clone, Copy)]
+enum SequencedBody<'a> {
+    Let(&'a RExpr),
+    Scrutinee { equation: Option<&'a str>, arms: &'a [RMatchArm] },
+}
+
+impl<'a> SequencedBody<'a> {
+    /// Push the bind's binder and return the body that reads it.
+    fn enter(
+        self, cx: &mut ElabCtx<'_>, binder_ty: &Term, latent: crate::effects::RowType,
+        rhs: &RExpr, span: &Span,
+    ) -> Cow<'a, RExpr> {
+        let position = cx.ctx.len();
+        cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
+        match self {
+            SequencedBody::Let(body) => {
+                cx.push_let_latent(latent);
+                Cow::Borrowed(body)
+            }
+            SequencedBody::Scrutinee { equation, arms } => {
+                cx.hidden_positions.push(position);
+                cx.push_let_latent(latent.clone());
+                let scrut = RExpr::RSlotLocal { position, latent, span: rhs.span().clone() };
+                Cow::Owned(RExpr::RMatch {
+                    scrut: Box::new(scrut),
+                    equation: equation.map(str::to_owned),
+                    arms: arms.to_vec(),
+                    span: span.clone(),
+                })
+            }
+        }
+    }
+
+    fn leave(self, cx: &mut ElabCtx<'_>) {
+        if let SequencedBody::Scrutinee { .. } = self {
+            debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+        }
+        cx.ctx.pop();
+        cx.pop_let_latent();
+    }
+
+    /// The form the bind falls back to when its RHS is not a performed tree.
+    fn check_unsequenced(
+        self, cx: &mut ElabCtx, ty_opt: &Option<RType>, rhs: &RExpr,
+        expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
+    ) -> Result<Term, ElabError> {
+        match self {
+            SequencedBody::Let(body) => check_let_once(
+                cx, ty_opt, rhs, body, expected, span, result_predicates, false,
+            ),
+            SequencedBody::Scrutinee { equation, arms } => check_match_result_unsequenced(
+                cx, rhs, equation, arms, expected, span, result_predicates,
+            ),
+        }
+    }
+
+    fn infer_unsequenced(
+        self, cx: &mut ElabCtx, ty_opt: &Option<RType>, rhs: &RExpr, span: &Span,
+    ) -> Result<(Term, Term), ElabError> {
+        match self {
+            SequencedBody::Let(body) => infer_let_once(cx, ty_opt, rhs, body, span, false),
+            SequencedBody::Scrutinee { equation: Some(_), .. } => infer_match_equation_error(span),
+            SequencedBody::Scrutinee { equation: None, arms } => {
+                infer_match(cx, rhs, arms, span, None)
+            }
+        }
+    }
+}
+
+/// Bind a performed RHS before its body (`36 §2.4`): `bind rhs (λ x. body)`.
+#[inline(never)]
+fn check_sequenced_bind(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>, rhs: &RExpr, body: SequencedBody<'_>,
+    expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
     let Some(expected_tree) = let_itree_parts(cx, expected) else {
-        return check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, false);
+        return body.check_unsequenced(cx, ty_opt, rhs, expected, span, result_predicates);
     };
     let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
         prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
     else {
-        return check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates, false);
+        return body.check_unsequenced(cx, ty_opt, rhs, expected, span, result_predicates);
     };
     let (rhs_core, rhs_ty) = include_effect_tree(
         cx, rhs_core, &rhs_ty, &rhs_tree, &expected_tree, span,
@@ -2415,11 +2500,9 @@ fn check_performed_let(
         });
     }
     let latent = let_latent(cx, ty_opt, rhs, &binder_ty, true);
-    cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
-    cx.push_let_latent(latent);
-    let checked = check_result_position(cx, body, &weaken(expected, 1), span, &[]);
-    cx.ctx.pop();
-    cx.pop_let_latent();
+    let body_expr = body.enter(cx, &binder_ty, latent, rhs, span);
+    let checked = check_result_position(cx, &body_expr, &weaken(expected, 1), span, &[]);
+    body.leave(cx);
     let body_core = checked?;
     let bound_tree = (expected_tree.0, expected_tree.1, rhs_tree.2);
     bind_let_core(
@@ -3699,10 +3782,71 @@ fn check_lambda_at_subset(
     coerce_refinement(cx, function, &carrier, expected, span)
 }
 
+/// Every checked `match` enters here. A performing scrutinee is a `36 §2.4`
+/// sequencing slot, bound before the match as `let s = e in match s {..}`
+/// binds it; any other scrutinee is matched as written.
+#[inline(never)]
+fn check_match_result(
+    cx: &mut ElabCtx<'_>, scrut: &RExpr, equation: Option<&str>,
+    arms: &[RMatchArm], expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    if scrutinee_slot_may_perform(cx, scrut, Some(expected)) {
+        return check_sequenced_scrutinee(cx, scrut, equation, arms, expected, span, predicates);
+    }
+    check_match_result_unsequenced(cx, scrut, equation, arms, expected, span, predicates)
+}
+
+/// Whether a match scrutinee may take the `36 §2.4` sequenced slot: its
+/// evaluation may perform, read as a `let` RHS is read. A local reference or a
+/// nested result names a value already bound, so evaluating it performs
+/// nothing, and the match reads it unchanged.
+#[inline(never)]
+fn scrutinee_slot_may_perform(cx: &ElabCtx<'_>, scrut: &RExpr, expected: Option<&Term>) -> bool {
+    let mut value = scrut;
+    while let RExpr::RAsc(inner, _, _) = value {
+        value = inner;
+    }
+    let names_bound_value = matches!(
+        value,
+        RExpr::RVar(..)
+            | RExpr::RPatternAlias(..)
+            | RExpr::RSlotLocal { .. }
+            | RExpr::RRecursiveResult { .. }
+    );
+    !names_bound_value && let_may_perform(cx, scrut, expected)
+}
+
+/// The checked scrutinee slot, under its own split exactly as `check_let`
+/// wraps the `let` it stands for.
+#[inline(never)]
+fn check_sequenced_scrutinee(
+    cx: &mut ElabCtx<'_>, scrut: &RExpr, equation: Option<&str>,
+    arms: &[RMatchArm], expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    let body = SequencedBody::Scrutinee { equation, arms };
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = check_sequenced_bind(cx, &None, scrut, body, expected, span, predicates);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            check_sequenced_bind(cx, &None, scrut, body, expected, span, predicates)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
 /// Match setup and motive construction run with no result predicate. Only
 /// checked arm bodies receive it, including seeded general-matrix leaves.
 #[inline(never)]
-fn check_match_result(
+fn check_match_result_unsequenced(
     cx: &mut ElabCtx<'_>, scrut: &RExpr, equation: Option<&str>,
     arms: &[RMatchArm], expected: &Term, span: &Span,
     predicates: &[ResultPredicate],
@@ -14213,13 +14357,33 @@ fn infer_named_local_variable(
     if let Some(alias) = infer_virtual_pattern_alias(cx, *i, name, span)? {
         return Ok(alias);
     }
+    let (pos, actual_index) = cx
+        .surface_var(*i)
+        .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
+    infer_local_at_position(cx, pos, actual_index)
+}
+
+/// `RSlotLocal` arm of `infer`: the hidden binder of a sequenced scrutinee
+/// reads exactly as the let binder it stands for.
+#[inline(never)]
+fn infer_slot_local(cx: &mut ElabCtx, position: usize) -> Result<(Term, Term), ElabError> {
+    let actual_index = cx
+        .ctx
+        .len()
+        .checked_sub(1 + position)
+        .ok_or_else(|| ElabError::Internal(format!("slot binder {position} out of range")))?;
+    infer_local_at_position(cx, position, actual_index)
+}
+
+fn infer_local_at_position(
+    cx: &mut ElabCtx,
+    pos: usize,
+    actual_index: usize,
+) -> Result<(Term, Term), ElabError> {
     // An installed index refinement (constructor injectivity
     // / sibling convoy) replaces the bare `Var` with its `Cast`-
     // wrapped alias for the duration of one branch's body — see
     // `ElabCtx::var_refinements`.
-    let (pos, actual_index) = cx
-        .surface_var(*i)
-        .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
     if let Some((raw_term, raw_ty, install_depth)) = cx.arm_coordinates.get(&pos) {
         let growth = (cx.ctx.len() - install_depth) as i64;
         return Ok((weaken(raw_term, growth), weaken(raw_ty, growth)));
@@ -14233,7 +14397,7 @@ fn infer_named_local_variable(
     let ty_stored = cx
         .ctx
         .lookup(actual_index)
-        .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
+        .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", actual_index)))?;
     let ty = weaken(ty_stored, (actual_index as i64) + 1);
     Ok((Term::var(actual_index), ty))
 }
@@ -14733,10 +14897,54 @@ fn infer_performed_let(
     cx: &mut ElabCtx,
     ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
 ) -> Result<(Term, Term), ElabError> {
+    infer_sequenced_bind(cx, ty_opt, rhs, SequencedBody::Let(body), span)
+}
+
+/// `infer`'s match arm. A performing scrutinee takes the sequenced slot, as in
+/// `check_match_result`; any other scrutinee is matched as written.
+#[inline(never)]
+fn infer_match_expr(
+    cx: &mut ElabCtx, scrut: &RExpr, arms: &[RMatchArm], span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if scrutinee_slot_may_perform(cx, scrut, None) {
+        return infer_sequenced_scrutinee(cx, scrut, arms, span);
+    }
+    infer_match(cx, scrut, arms, span, None)
+}
+
+/// The inferred scrutinee slot, under its own split exactly as `infer_let`
+/// wraps the `let` it stands for.
+#[inline(never)]
+fn infer_sequenced_scrutinee(
+    cx: &mut ElabCtx, scrut: &RExpr, arms: &[RMatchArm], span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let body = SequencedBody::Scrutinee { equation: None, arms };
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = infer_sequenced_bind(cx, &None, scrut, body, span);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            infer_sequenced_bind(cx, &None, scrut, body, span)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+fn infer_sequenced_bind(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>, rhs: &RExpr, body: SequencedBody<'_>, span: &Span,
+) -> Result<(Term, Term), ElabError> {
     let Some((rhs_core, rhs_ty, rhs_tree, binder_ty)) =
         prepare_performed_let_rhs(cx, ty_opt, rhs, span)?
     else {
-        return infer_let_once(cx, ty_opt, rhs, body, span, false);
+        return body.infer_unsequenced(cx, ty_opt, rhs, span);
     };
     if cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id)) {
         return Err(ElabError::TypeMismatch {
@@ -14745,14 +14953,12 @@ fn infer_performed_let(
         });
     }
     let latent = let_latent(cx, ty_opt, rhs, &binder_ty, true);
-    cx.push_match_binder(binder_ty.clone(), MatchBinderOrigin::UserLocal);
-    cx.push_let_latent(latent);
-    let inferred = infer(cx, body);
+    let body_expr = body.enter(cx, &binder_ty, latent, rhs, span);
+    let inferred = infer(cx, &body_expr);
     let (body_core, body_ty) = match inferred {
         Ok(inferred) => inferred,
         Err(error) => {
-            cx.ctx.pop();
-            cx.pop_let_latent();
+            body.leave(cx);
             return Err(error);
         }
     };
@@ -14761,7 +14967,7 @@ fn infer_performed_let(
         .map(|rows| {
             let outer = |index, name: &str| cx.surface_latent(index, name);
             infer_expr_row_type(
-                body,
+                &body_expr,
                 &rows,
                 None,
                 &mut LatentScope::new(&outer)
@@ -14783,8 +14989,7 @@ fn infer_performed_let(
             let (body_core, _) = match included {
                 Ok(included) => included,
                 Err(error) => {
-                    cx.ctx.pop();
-                    cx.pop_let_latent();
+                    body.leave(cx);
                     return Err(error);
                 }
             };
@@ -14811,8 +15016,7 @@ fn infer_performed_let(
             reason: "sequenced let result type depends on its bound value".into(),
         }
     });
-    cx.ctx.pop();
-    cx.pop_let_latent();
+    body.leave(cx);
     let result_ty = result_ty?;
     let core = bind_let_core(
         cx, &rhs_tree, result_ty.clone(), rhs_core, &rhs_ty, binder_ty, body_for_bind,
@@ -14967,6 +15171,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RPatternAlias(slot, name, _span) => infer_active_pattern_alias(cx, *slot, name),
         RExpr::RVar(i, name, span) => infer_named_local_variable(cx, i, name, span),
+        RExpr::RSlotLocal { position, .. } => infer_slot_local(cx, *position),
 
         RExpr::RCell(index, _, span) => infer_space_cell(cx, *index, span),
 
@@ -15046,7 +15251,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             equation: None,
             arms,
             span,
-        } => infer_match(cx, scrut, arms, span, None),
+        } => infer_match_expr(cx, scrut, arms, span),
 
         RExpr::RProj(base, field, span) => infer_proj(cx, base, field, span),
 
@@ -18197,6 +18402,7 @@ fn written_expr_row(expr: &RExpr, rows: &CheckedEffectRows<'_>) -> crate::effect
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(..)
+        | RExpr::RSlotLocal { .. }
         | RExpr::RPatternAlias(..)
         | RExpr::RCell(..)
         | RExpr::RRecursiveResult { .. }
@@ -18381,6 +18587,7 @@ fn bound_value_latent(
 ) -> crate::effects::RowType {
     match val {
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
+        RExpr::RSlotLocal { latent, .. } => latent.clone(),
         RExpr::RPatternAlias(..) => scope.alias.clone(),
         RExpr::RCon(..) | RExpr::RCheckedGlobal { .. } => infer_expr_row_type(
             val,
@@ -18430,6 +18637,7 @@ fn bound_value_latent_from_row(
 ) -> crate::effects::RowType {
     match val {
         RExpr::RVar(..)
+        | RExpr::RSlotLocal { .. }
         | RExpr::RPatternAlias(..)
         | RExpr::RCon(..)
         | RExpr::RCheckedGlobal { .. }
@@ -18530,6 +18738,7 @@ fn infer_expr_row_type(
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(index, name, _) => scope.lookup(*index, name),
+        RExpr::RSlotLocal { latent, .. } => latent.clone(),
         RExpr::RPatternAlias(_, _, _) => scope.alias.clone(),
         RExpr::RCell(index, _, _) => scope.cell(*index),
         RExpr::RRecursiveResult { .. }
@@ -23410,6 +23619,7 @@ fn rexpr_mentions_name_in<const DEP: bool>(expr: &RExpr, name: &str) -> bool {
         RExpr::RCon(n, _) => n == name,
         RExpr::RCheckedGlobal { .. } => false,
         RExpr::RVar(_, _, _)
+        | RExpr::RSlotLocal { .. }
         | RExpr::RPatternAlias(_, _, _)
         | RExpr::RCell(_, _, _)
         | RExpr::RRecursiveResult { .. }
