@@ -8,6 +8,8 @@
 
 use std::process::{Command, Output};
 
+use ken_elaborator::{ElabEnv, ElabError};
+
 fn cli(name: &str, subcommand: &str, source: &str) -> Output {
     let root = std::env::temp_dir().join(format!("ken-proc-nontree-let-{}", std::process::id()));
     std::fs::create_dir_all(&root).expect("create fixture root");
@@ -37,6 +39,26 @@ fn assert_checks(name: &str, source: &str) {
         "{name}: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+/// MEASURED: the same fixture with only ephemeral checked imports enters
+/// Strict; CLAIMED: B Console vocabulary has not changed the actual result
+/// verdict. THE GAP: the unchanged CLI calls below observe Legacy until 3b.
+fn strict_with_imports(source: &str) -> Result<(), ElabError> {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imported = source.replacen(
+        "program capabilities FS APartial\n",
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (IO, print_line)\n\
+         import Capability.Process.Exit (host_program)\n",
+        1,
+    );
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        .map(|_| ())
 }
 
 fn assert_result_type_mismatch(name: &str, source: &str) {
@@ -125,12 +147,15 @@ fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
         "{stderr}"
     );
     assert!(stderr.contains("cannot be sequenced (36 §2.4)"), "{stderr}");
+    let strict = strict_with_imports(&outer).expect_err("outer function result still refuses");
+    assert_eq!(strict.code().as_str(), "E0038", "{strict:?}");
 
     let inner = with_main(
         "proc inner : Unit -> IO Unit visits [Console] =\n\
          \\_. let w = print_line \"x\" in ITree.Ret ConsoleOp console_resp Unit MkUnit",
     );
     assert_checks("function-result-inner", &inner);
+    strict_with_imports(&inner).expect("pure tree inside lambda still checks under Strict");
 }
 
 /// Spec 36 §2.5: a changed proc's `ensures` is a separate AllRet obligation
@@ -305,12 +330,13 @@ fn changed_proc_result_splits_still_return_their_tree() {
             "let k : Unit -> IO Int = \\_. ITree.Ret ConsoleOp console_resp Int 3 in 1",
         ),
     ] {
-        assert_checks(
-            name,
-            &with_main(&format!(
-                "proc p (b : Bool) : Int visits [Console] =\n  {body}"
-            )),
-        );
+        let source = with_main(&format!(
+            "proc p (b : Bool) : Int visits [Console] =\n  {body}"
+        ));
+        assert_checks(name, &source);
+        if name == "explicit-ret-lambda" {
+            strict_with_imports(&source).expect("explicit Console Ret lambda checks under Strict");
+        }
     }
     assert_checks(
         "two-parameter-if-tail",

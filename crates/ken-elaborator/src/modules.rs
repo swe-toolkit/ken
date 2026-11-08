@@ -267,13 +267,14 @@ impl ModuleState {
 /// identity inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 47] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 49] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
     "ChildExit",
+    "ConsoleOp",
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
@@ -311,6 +312,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 47] = [
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "console_resp",
     "resp_state",
     "run_state",
     "state_get",

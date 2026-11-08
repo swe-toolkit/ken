@@ -11,13 +11,14 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 47] = [
+const TYPE_FLOOR: [&str; 49] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
     "ChildExit",
+    "ConsoleOp",
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
@@ -55,6 +56,7 @@ const TYPE_FLOOR: [&str; 47] = [
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "console_resp",
     "resp_state",
     "run_state",
     "state_get",

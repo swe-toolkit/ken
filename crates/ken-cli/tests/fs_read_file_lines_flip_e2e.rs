@@ -79,36 +79,26 @@ const Compose (r : Type) : Type =
 proc printLines (xs : List String) : Compose (Result IOError Unit) visits [Console] =
   match xs {{
     Nil |->
-      ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
-          (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
-          (Result IOError Unit) (Ok IOError Unit MkUnit) ;
+      host_pure {auth} (Result IOError Unit) (Ok IOError Unit MkUnit) ;
     Cons x xs' |->
-      bind (Coproduct (FSOp {auth}) AmbientOp)
-           (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
-           Unit (Result IOError Unit)
+      host_bind {auth} Unit (Result IOError Unit)
         (host_console {auth} Unit (print_line x))
         (\_ . printLines xs')
   }}
 
 proc app (cap : Cap {auth}) : Compose (Result IOError Unit) visits [FS, Console] =
-  bind (Coproduct (FSOp {auth}) AmbientOp)
-       (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
-       (Result FileError Bytes) (Result IOError Unit)
-    (inject_l (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp (Result FileError Bytes)
+  host_bind {auth} (Result FileError Bytes) (Result IOError Unit)
+    (host_fs {auth} (Result FileError Bytes)
       (read_bytes {auth} cap (bytes_encode "{path}")))
     (\r .
       match r {{
         Err e    |-> match e {{
           MkFileError operation path kind |->
-            ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
-                (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
-                (Result IOError Unit) (Err IOError Unit kind)
+            host_pure {auth} (Result IOError Unit) (Err IOError Unit kind)
         }} ;
         Ok bytes |->
           match bytes_decode bytes {{
-            Err _ |-> ITree.Ret (Coproduct (FSOp {auth}) AmbientOp)
-                         (resp_coproduct (FSOp {auth}) AmbientOp (fs_resp {auth}) ambient_resp)
-                         (Result IOError Unit) (Err IOError Unit (IOError.Other 0)) ;
+            Err _ |-> host_pure {auth} (Result IOError Unit) (Err IOError Unit (IOError.Other 0)) ;
             Ok text |-> printLines (lines text)
           }}
       }})
@@ -117,9 +107,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match caps {{
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp APartial) AmbientOp)
-           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-           (Result IOError Unit) ExitCode
+      host_bind APartial (Result IOError Unit) ExitCode
         (app cap)
         (\r .
           match r {{
@@ -139,7 +127,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
                 IOError.Revoked |-> host_program_then APartial (print_line "Revoked") (ExitCode.Failure 1) ;
                 IOError.Other errno |-> host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               }} ;
-            Ok _ |-> host_exit APartial ExitCode.Success
+            Ok _ |-> host_pure APartial ExitCode ExitCode.Success
           }})
   }}
 "#,

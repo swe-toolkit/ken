@@ -6,15 +6,11 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 const PROGRAM: &str = r#"program capabilities FS APartial
 proc write_then_exit (bytes : Bytes) (code : ExitCode)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. host_exit APartial code))
+      (\_. host_pure APartial ExitCode code))
 
 proc finish (outcome : Result Bytes Bytes)
   : HostIO APartial ExitCode visits [Console] =
@@ -25,14 +21,10 @@ proc finish (outcome : Result Bytes Bytes)
 
 proc produce (as_ok : Bool)
   : HostIO APartial (Result Bytes Bytes) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) (Result Bytes Bytes)
+  host_bind APartial (Result IOError Unit) (Result Bytes Bytes)
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "seed:")))
-    (\written. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result Bytes Bytes)
+    (\written. host_pure APartial (Result Bytes Bytes)
       (match written {
         Err _ |-> Err Bytes Bytes (bytes_encode "write-error");
         Ok _ |-> match as_ok {
@@ -42,15 +34,13 @@ proc produce (as_ok : Bool)
       }))
 
 proc run_case (as_ok : Bool) : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result Bytes Bytes) ExitCode (produce as_ok) (\outcome. finish outcome)
+  host_bind APartial (Result Bytes Bytes) ExitCode (produce as_ok) (\outcome. finish outcome)
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 99);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 99);
       Cons _ tail |-> match tail {
         Nil |-> run_case True;
         Cons _ _ |-> run_case False
@@ -62,14 +52,10 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 const IGNORED_PROGRAM: &str = r#"program capabilities FS APartial
 proc produce
   : HostIO APartial (Result Bytes Bytes) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) (Result Bytes Bytes)
+  host_bind APartial (Result IOError Unit) (Result Bytes Bytes)
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "ignored")))
-    (\written. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result Bytes Bytes)
+    (\written. host_pure APartial (Result Bytes Bytes)
       (match written {
         Err _ |-> Err Bytes Bytes (bytes_encode "ignored-error");
         Ok _ |-> Ok Bytes Bytes (bytes_encode "ignored-ok")
@@ -77,39 +63,29 @@ proc produce
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result Bytes Bytes) ExitCode produce
-    (\_outcome. host_exit APartial ExitCode.Success)
+  host_bind APartial (Result Bytes Bytes) ExitCode produce
+    (\_outcome. host_pure APartial ExitCode ExitCode.Success)
 "#;
 
 const DYNAMIC_CARRIER_PROGRAM: &str = r#"program capabilities FS APartial
 proc write_then_fail (bytes : Bytes)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
-    (\_. host_exit APartial (ExitCode.Failure 36))
+    (\_. host_pure APartial ExitCode (ExitCode.Failure 36))
 
 proc finish_dynamic (outcome : Result Bytes Bytes)
   : HostIO APartial ExitCode visits [Console] =
   match outcome {
     Err bytes |-> write_then_fail bytes;
-    Ok _ |-> host_exit APartial (ExitCode.Failure 83)
+    Ok _ |-> host_pure APartial ExitCode (ExitCode.Failure 83)
   }
 
 proc produce_dynamic (cap : Cap APartial) (path : Bytes)
   : HostIO APartial (Result Bytes Bytes) visits [FS, Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result FileError Bytes) (Result Bytes Bytes)
-    (inject_l (FSOp APartial) AmbientOp
-      (fs_resp APartial) ambient_resp
-      (Result FileError Bytes) (readFile APartial cap path))
-    (\read. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result Bytes Bytes)
+  host_bind APartial (Result FileError Bytes) (Result Bytes Bytes)
+    (host_fs APartial (Result FileError Bytes) (readFile APartial cap path))
+    (\read. host_pure APartial (Result Bytes Bytes)
       (match read {
         Ok bytes |-> Ok Bytes Bytes bytes;
         Err error |-> match error {
@@ -138,15 +114,12 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 81);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 81);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (ExitCode.Failure 82);
+        Nil |-> host_pure APartial ExitCode (ExitCode.Failure 82);
         Cons path _ |-> match caps {
           ProgramCaps.MkProgramCaps cap |->
-            bind (Coproduct (FSOp APartial) AmbientOp)
-              (resp_coproduct (FSOp APartial) AmbientOp
-                (fs_resp APartial) ambient_resp)
-              (Result Bytes Bytes) ExitCode
+            host_bind APartial (Result Bytes Bytes) ExitCode
               (produce_dynamic cap path)
               (\outcome. finish_dynamic outcome)
         }

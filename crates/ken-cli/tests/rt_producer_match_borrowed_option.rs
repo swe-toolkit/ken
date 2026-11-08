@@ -12,23 +12,14 @@ const BUILD_STACK_BYTES: usize = 256 * 1024 * 1024;
 const SOURCE: &str = r#"program capabilities FS APartial
 proc read_byte (cap : Cap APartial) (chosen : UInt8)
   : HostIO APartial UInt8 visits [FS] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result FileError Bytes) UInt8
-    (inject_l (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp
-      (Result FileError Bytes)
+  host_bind APartial (Result FileError Bytes) UInt8
+    (host_fs APartial (Result FileError Bytes)
       (readFile APartial cap (bytes_encode "ac0.bin")))
     (\read. match read {
-      Err _ |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        UInt8 chosen;
+      Err _ |-> host_pure APartial UInt8 chosen;
       Ok bytes |-> match bytes_at bytes 0 {
-        None |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          UInt8 chosen;
-        Some byte |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-          UInt8 byte
+        None |-> host_pure APartial UInt8 chosen;
+        Some byte |-> host_pure APartial UInt8 byte
       }
     })
 
@@ -37,31 +28,25 @@ proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
     True |-> ExitCode.Success;
     False |-> ExitCode.Failure 7
   }) {
-    ExitCode.Success |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      Unit ExitCode
+    ExitCode.Success |-> host_bind APartial Unit ExitCode
       (host_console APartial Unit (print_line "accepted"))
-      (\_. host_exit APartial ExitCode.Success);
-    ExitCode.Failure code |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      Unit ExitCode
+      (\_. host_pure APartial ExitCode ExitCode.Success);
+    ExitCode.Failure code |-> host_bind APartial Unit ExitCode
       (host_console APartial Unit (print_line "rejected"))
-      (\_. host_exit APartial (ExitCode.Failure code))
+      (\_. host_pure APartial ExitCode (ExitCode.Failure code))
   }
 
 proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 90);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 90);
       Cons _argv0 rest |-> match rest {
-        Nil |-> host_exit APartial (ExitCode.Failure 91);
+        Nil |-> host_pure APartial ExitCode (ExitCode.Failure 91);
         Cons argument _more |-> match bytes_at argument 0 {
-          None |-> host_exit APartial (ExitCode.Failure 92);
+          None |-> host_pure APartial ExitCode (ExitCode.Failure 92);
           Some chosen |-> match caps {
-            ProgramCaps.MkProgramCaps cap |-> bind (Coproduct (FSOp APartial) AmbientOp)
-              (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-              UInt8 ExitCode (read_byte cap chosen) (\byte. decide byte)
+            ProgramCaps.MkProgramCaps cap |-> host_bind APartial UInt8 ExitCode (read_byte cap chosen) (\byte. decide byte)
           }
         }
       }
