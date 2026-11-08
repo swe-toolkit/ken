@@ -405,3 +405,103 @@ fn rewritten_nested_read_fixture_checks_at_strict_entry_with_ephemeral_imports()
         Ok(_) => panic!("R fixture accepted without package imports"),
     }
 }
+
+/// Promise class: transition sentinel, retired when 3b persists imports and
+/// switches these source routes to Strict. MEASURED: the actual 33 rewritten
+/// fixture files keep their Legacy acceptance or missing-name refusal under
+/// Strict with their checked home imports; no hand-copied fixture is tested.
+/// CLAIMED: the ruled exact-body HostIO R migrations are source-valid at the
+/// future strict entry. THE GAP: current native/interpreter parity is pinned
+/// by each fixture's owning test, not inferred from these elaboration verdicts.
+#[test]
+fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use ken_elaborator::lexer::{Lexer, Token};
+
+    const USERS: [&str; 33] = [
+        "crates/ken-cli/tests/fixtures/abi_s5_block_on_stdin.ken",
+        "crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed.ken",
+        "crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed_cow.ken",
+        "crates/ken-cli/tests/fixtures/d0_abi_mapping_source.ken",
+        "crates/ken-cli/tests/fixtures/d0_branched_scrutinee_source.ken",
+        "crates/ken-cli/tests/fixtures/d0_px8ta_nested_source.ken",
+        "crates/ken-cli/tests/fixtures/d0_rt_parity_source.ken",
+        "crates/ken-cli/tests/fixtures/px10_argv_env_pipe.ken",
+        "crates/ken-cli/tests/fixtures/px10_child_wait_smoke.ken",
+        "crates/ken-cli/tests/fixtures/px10_live_child.ken",
+        "crates/ken-cli/tests/fixtures/px10_native_tested_pending_overlap.ken",
+        "crates/ken-cli/tests/fixtures/rt_bracket_body_once_buffer.ken",
+        "crates/ken-cli/tests/fixtures/rt_bracket_body_once_lookalike.ken",
+        "crates/ken-cli/tests/fixtures/rt_bracket_body_once_no_bracket.ken",
+        "crates/ken-cli/tests/fixtures/rt_bracket_body_once_resource.ken",
+        "crates/ken-cli/tests/fixtures/rt_bracket_body_once_three.ken",
+        "crates/ken-cli/tests/fixtures/rt_native_erased_omega_call_explicit.ken",
+        "crates/ken-cli/tests/fixtures/rt_native_erased_omega_call_plain.ken",
+        "crates/ken-cli/tests/fixtures/rt_native_erased_omega_call_refined.ken",
+        "crates/ken-cli/tests/fixtures/rt_native_erased_omega_call_refnonrec.ken",
+        "crates/ken-cli/tests/fixtures/rt_native_erased_omega_call_requires.ken",
+        "crates/ken-cli/tests/fixtures/rt_native_erased_omega_call_requires_dropped.ken",
+        "crates/ken-cli/tests/fixtures/rt_nested_read_at_b2.ken",
+        "crates/ken-cli/tests/fixtures/rt_nested_read_at_more.ken",
+        "crates/ken-cli/tests/fixtures/rt_nested_read_captured_read.ken",
+        "crates/ken-cli/tests/fixtures/rt_nested_read_length_more.ken",
+        "crates/ken-cli/tests/fixtures/rt_nested_read_nested_control.ken",
+        "crates/ken-cli/tests/fixtures/rt_nested_read_single_read_control.ken",
+        "crates/ken-cli/tests/fixtures/rt_performing_underived_acmain.ken",
+        "crates/ken-elaborator/tests/fixtures/rt_bracket_region_early_release.ken",
+        "crates/ken-elaborator/tests/fixtures/rt_bracket_region_multileaf.ken",
+        "crates/ken-elaborator/tests/fixtures/rt_bracket_transport_file_backed.ken",
+        "crates/ken-elaborator/tests/fixtures/rt_bracket_transport_mapping.ken",
+    ];
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("workspace root");
+    for path in USERS {
+        let source = std::fs::read_to_string(repo.join(path)).expect("actual R user source");
+        let tokens = Lexer::lex(&source).expect("lex actual user source");
+        let names = tokens
+            .iter()
+            .filter_map(|(token, _)| match token {
+                Token::Ident(name) | Token::ConId(name) => Some(name.as_str()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let mut imports: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for &(home, name) in &PRELUDE_PACKAGE_HOMES {
+            if names.contains(name) {
+                imports.entry(home).or_default().insert(name);
+            }
+        }
+        let (header, body) = source.split_once('\n').expect("fixture program header");
+        assert!(
+            header.starts_with("program capabilities "),
+            "{path}: {header}"
+        );
+        let import_lines = imports
+            .into_iter()
+            .map(|(home, names)| {
+                format!(
+                    "import {home} ({})\n",
+                    names.into_iter().collect::<Vec<_>>().join(", ")
+                )
+            })
+            .collect::<String>();
+        let with_imports = format!("{header}\n{import_lines}{body}");
+        let mut legacy = ElabEnv::new().expect("prelude");
+        let old = legacy.elaborate_file_v1(&source);
+        let new = strict(&with_imports).map(|_| ());
+        match (old, new) {
+            (Ok(_), Ok(_)) => {}
+            (
+                Err(ElabError::UnresolvedCon { name: before, .. }),
+                Err(
+                    ElabError::UnboundName { name: after, .. }
+                    | ElabError::UnresolvedCon { name: after, .. },
+                ),
+            ) if before == after => {}
+            (old, new) => panic!("{path}: source verdict shifted: Legacy={old:?}, Strict={new:?}"),
+        }
+    }
+}
