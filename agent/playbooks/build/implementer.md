@@ -415,5 +415,5 @@ The two steps most often skipped, both of which have blocked candidates here:
   publisher path publishes and merges (COORDINATION §14). After you hand off,
   stop. Review feedback and CI-red arrive as a **mootup mention** (from the
   Architect, your leader, or the publisher caller); to act on one, check
-  `wp/<ID>` out again, `git rebase origin/main`, fix, commit, hand back. Don't
-  poll anything.
+  `wp/<ID>` out again, fix, commit, hand back. Rebase only when your leader
+  asks for the union (COORDINATION §14(5)). Don't poll anything.

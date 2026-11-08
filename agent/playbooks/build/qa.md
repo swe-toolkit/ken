@@ -563,15 +563,22 @@ hand back to the implementer, or raise the behavioral question to Spec.
 - You are the checker step in the ring; you do **not** pre-draft tests while the
   implementer is mid-task (that fragments the ring). Engage when work reaches you.
 - **Local git only — no GitHub** (COORDINATION §14). Once the implementer is
-  back on its home branch, check `wp/<ID>` out in *your* worktree, `git rebase
-  origin/main`, and verify against the branch (not a stale worktree — the §1
-  worktree/`main`-mismatch trap). Commit any small repairs to `wp/<ID>`, then
-  return to your home branch.
-- **After `git rebase origin/main`, RECOMPILE before trusting any green
-  (promoted T2-repl).** The surface drifts under you — `main` may have added enum
-  variants / changed signatures since the implementer's pre-rebase run, so a
-  pre-rebase green is **stale**. Re-run the build + the targeted rows on the
-  rebased branch; never trust the implementer's reported counts across a rebase.
+  back on its home branch, check `wp/<ID>` out in *your* worktree and run the
+  branch-identity pre-flight below. Commit any small repairs to `wp/<ID>`, then
+  return to your home branch. A repair commit is a new SHA, so your verdict
+  names that SHA, not the handed-off one.
+- **Verify the handed-off SHA as handed off. Do not rebase it.** A rebase makes
+  a new SHA, which voids every exact-tip vote already cast. Run the
+  COORDINATION §14(5) intersection instead. If it is empty, the base is
+  immaterial, so verify as is. If it is not, report the shared paths to the
+  leader with your verdict. The leader inspects them and decides whether the
+  implementer takes the union at a new SHA. You will be tempted to rebase
+  "to be current". Current `main` is the publisher's job: CI tests the merge
+  commit against the `main` tip.
+- **When a SHA comes back rebased, recompile before trusting any green.**
+  `main` may have added enum variants or changed signatures since the
+  pre-rebase run, so a pre-rebase green is stale. Re-run the build and the
+  targeted rows on the new SHA. Never carry reported counts across a rebase.
 - **Never `EnterPlanMode` or `schedule_call` — they wedge your session
   unreachable (promoted T2-repl).** Plan mode is read-only and **blocks you from
   posting**; `schedule_call` broadcasts into the space and needs a permission
