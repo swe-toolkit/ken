@@ -10,9 +10,7 @@ use std::os::unix::ffi::OsStrExt;
 
 const SOURCE_TEMPLATE: &str = r#"program capabilities FS AFull
 const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
+  host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
 
 proc metadata_chain (file : Resource ResourceKind.FsHandle)
@@ -22,21 +20,19 @@ __CHAIN__
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (ExitCode.Failure 91);
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 91);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
-      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 92);
-      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 93);
+      ResourceBracketOk value |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError error |-> host_pure AFull ExitCode (ExitCode.Failure 92);
+      ResourceBracketReleaseError error |-> host_pure AFull ExitCode (ExitCode.Failure 93);
       ResourceBracketBodyAndReleaseError body_error release_error |->
-        host_exit AFull (ExitCode.Failure 94)
+        host_pure AFull ExitCode (ExitCode.Failure 94)
     }
   }
 
 proc stage (cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
     (withResource AFull Unit Unit cap (bytes_encode "held.bin")
       ResourceOpenMode.ResourceMetadata metadata_chain)
     (\outcome. finish outcome)
@@ -48,27 +44,17 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
-const TWO_CHAIN: &str = r#"  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+const TWO_CHAIN: &str = r#"  host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
     (resourceMetadata AFull file)
-    (\first. bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+    (\first. host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
       (resourceMetadata AFull file)
       (\second. body_ok_io))"#;
 
-const THREE_CHAIN: &str = r#"  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+const THREE_CHAIN: &str = r#"  host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
     (resourceMetadata AFull file)
-    (\first. bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+    (\first. host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
       (resourceMetadata AFull file)
-      (\second. bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
+      (\second. host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
         (resourceMetadata AFull file)
         (\third. body_ok_io)))"#;
 
