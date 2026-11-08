@@ -18,8 +18,8 @@ origin: "Architect FSRA closeout evt_7atdxpv0zgghg (scrutinee and argument slots
 
 A performing proc whose callee returns a tree sequences that tree where
 spec 36 §2.4 rules it: in each argument of `g a1 … an`, left to right,
-and in a match scrutinee. The pin `r1_recursive_result` flips from
-refusal to execution.
+and in a match scrutinee. A `main` that matches on a recursive proc's
+result (the D0 s12 shape) runs.
 
 ## Settled inputs (measured at `45b53ce49`, FSRA Inc 3 landed)
 
@@ -51,9 +51,13 @@ base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-Scrutinee and argument sequencing in the elaborator, the native plan
-the accepted programs need, and the migrated pins, in the increments
-AC-0 rules.
+Scrutinee and argument sequencing in the elaborator and the migrated
+pins, in the increments AC-0 ruled (Architect `evt_214sk9hkje5k`): Inc 1
+the scrutinee slot, Inc 2 the argument slots with AC-1r, Inc 3 the
+recursive result in let and scrutinee slots. Each slot's core is its let
+twin's, reusing the let arm's sequencing and latent bookkeeping; a
+trial D0-2 precedes coding. No runtime change: a `Ret` carrying a
+closure already runs natively.
 
 ## Acceptance
 
@@ -63,15 +67,20 @@ AC-0 rules.
   per slot, the native plan for a `Ret` that carries a closure, and the
   increment split. A runtime plan change outside the elaborator is a
   stop to the Steward for placement.
-- **AC-1.** `r1_recursive_result` and `r1f_recursive_result_fs_row` run
-  and print the pinned output. A new pin applies a callee to two
+- **AC-1.** The s12 pin (`main` matches on `pick (Node (One Rose
+  Leaf))`) runs and prints `ab`. A new pin applies a callee to two
   tree-returning arguments whose actions print distinct bytes, and its
-  output order is `a1` before `a2`.
+  output order is `a1` before `a2`. Each increment adds a core-equality
+  pin: the slot form's elaborated body converts to its let twin's.
+  `r1_recursive_result` and `r1f_recursive_result_fs_row` stay
+  RefuseTreeScrutinee through Inc 2 and re-pin to RefuseInclusion at
+  Inc 3, since their arm is r1k's shape. At Inc 3 the D0 s3 shape with
+  a pure arm is the executing recursive-result pin.
 - **AC-1r.** An argument action inside a lambda or a match branch is
   not hoisted out of it. A pin whose branch is not taken prints none of
   that branch's bytes.
 - **AC-2.** A mutation that restores the scrutinee refusal reddens
-  AC-1. A mutation that reverses argument order reddens the order pin.
+  the s12 pin. A mutation that reverses argument order reddens the order pin.
 
 ## Stop conditions
 
