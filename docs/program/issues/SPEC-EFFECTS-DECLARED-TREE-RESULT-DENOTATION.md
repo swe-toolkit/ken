@@ -49,7 +49,9 @@ gap.
   the tree's Ret leaves, with a bind (cut) rule. The result type and every
   consumer stay at B. LANG-PROC-NON-TREE-RESULT-TREE Inc 1 refuses it by
   name, with the sentinel
-  `ensured_changed_proc_refuses_until_tree_post_is_specified`.
+  `ensured_changed_proc_refuses_until_tree_post_is_specified`, renamed
+  `ensured_changed_proc_checks_with_all_ret_post` when FSRA Inc 3
+  flipped it.
 - **A recommendation, not a ruling** (Architect `evt_6cwmzctkn0ht5`): a
   declared `ITree S R` is its own denotation, with ρ kept as an escape
   bound checked against S (each label injects into S, as `host_console`
