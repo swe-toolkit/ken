@@ -1308,6 +1308,16 @@ pub theorem substitute_normalize
     : IsTrue (poly_eq (substitute s (normalize e)) (substitute s e)) =
   poly_eq_substitute s (normalize e) e (normalize_poly_eq e)
 
+pub theorem poly_eq_normalize
+      (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (normalize e1) (normalize e2)) =
+  poly_eq_trans
+    (normalize e1)
+    e2
+    (normalize e2)
+    (poly_eq_trans (normalize e1) e1 e2 (normalize_poly_eq e1) h)
+    (poly_eq_sym (normalize e2) e2 (normalize_poly_eq e2))
+
 theorem expr_add_cong
       (a1 : Expr)
       (a2 : Expr)
@@ -3049,8 +3059,13 @@ expression trees are structurally equal.
 that the normalized expression and its source have the same polynomial
 function. `deriv_normalize` and `substitute_normalize` apply the existing
 preservation laws to that result; they add no hypotheses and do not export
-value-level laws. Clients derive pointwise evaluation equalities with
-`poly_eq_sound` when needed.
+value-level laws. `poly_eq_normalize` transports a `poly_eq` premise from
+both source expressions to their normal forms. It composes
+`normalize_poly_eq` on the left with `poly_eq_trans`, and uses
+`poly_eq_sym` to reverse `normalize_poly_eq` on the right before the
+outer transitivity step. It needs no further premise or proof helper.
+Clients derive pointwise evaluation equalities with `poly_eq_sound` when
+needed.
 
 ## 5. Design notes
 
@@ -3093,7 +3108,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–14 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–15 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3107,13 +3122,14 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
+[normalization-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-congruence.md),
 [congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md), and
 [pointwise-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-pointwise-congruence.md)
 specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fourteen operations,
-and thirty checked theorems; Horner, substitution and differentiation
+and thirty-one checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3146,6 +3162,12 @@ bodies and exact trusted identities, and applies the open law under a
 syntactic-absence premise. The actual seed's absent-index `Proved` control
 accepts; its occurring-index and occurring-but-unused-index claims refuse
 at their own premise, with the rest of the expression held fixed.
+
+The normalization-congruence package test checks the new generic public
+law under a selective import, compares exact trusted-`GlobalId` identity
+sets, accepts a commuted-sum premise and law application, and rejects a
+false distinct-variable premise at its own proof on a fresh accepted prefix.
+It does not execute the separate conformance seed.
 
 Package tests are not official conformance-runner execution or CI. The
 extension adds no Axiom, postulate, primitive or foreign operation; inherited
