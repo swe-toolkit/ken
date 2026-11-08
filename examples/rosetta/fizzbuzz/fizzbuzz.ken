@@ -233,12 +233,14 @@ proc fizzBuzzLoop (remaining : Nat) (current : Nat) : Unit visits [Console] =
   match remaining {
     Zero ↦ MkUnit;
     Suc r ↦
-      let _ = write
-        ConsoleStream.Stdout
-        (bytes_concat
-          (bytes_encode (fizzBuzzLine current))
-          (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
-      in fizzBuzzLoop r (Suc current)
+      let _ =
+        write
+          ConsoleStream.Stdout
+          (bytes_concat
+            (bytes_encode (fizzBuzzLine current))
+            (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
+      in
+        fizzBuzzLoop r (Suc current)
   }
 
 -- ── Oracle ───────────────────────────────────────────────────────────────────
