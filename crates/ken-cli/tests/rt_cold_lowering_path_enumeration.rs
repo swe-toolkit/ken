@@ -62,6 +62,9 @@
 
 #![cfg(target_os = "linux")]
 
+use ken_elaborator::{ElabEnv, ElabError};
+use ken_kernel::KernelError;
+
 const RT_PARITY_SOURCE: &str = r#"program capabilities FS AFull
 fn rt_body_ok (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
@@ -398,6 +401,64 @@ const ENTRIES: &[&str] = &[
     "rt_write_readonly_stage",
     "rt_write_writable_stage",
 ];
+
+/// Promise class: transition sentinel for the 3b route switch. MEASURED:
+/// each generated entry from the closed source population checks under
+/// Strict with its explicit H and R imports, except the same pre-existing
+/// write-pair TypeMismatch; omitting the R wrapper import refuses it.
+/// CLAIMED: the R template rewrite does not shift the admissible entries or
+/// launder the one original type error. THE GAP: native traversability and
+/// runtime parity remain the separate existing enumeration/RT_PARITY tests.
+#[test]
+fn strict_rechecks_every_generated_cold_entry_after_r_template_rewrite() {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imports = "import Capability.Process.Exit (host_pure, host_bind)\n\
+                   import Capability.System.Buffer (BufferHandle, MkBufferWindow)\n\
+                   import Capability.System.IO (readAt, writeAt)\n\
+                   import Capability.System.Resource
+                     (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr,
+                      ResourceBracketResult, ResourceBracketOk, withResource, withBuffer)\n\
+                   import Data.Numeric.FixedWidth (intToUInt64)\n";
+    let body = RT_PARITY_SOURCE
+        .strip_prefix("program capabilities FS AFull\n")
+        .expect("cold parity template header");
+    for entry in ENTRIES {
+        let source = format!("program capabilities FS AFull\n{imports}{body}")
+            .replace("__RT_PARITY_ENTRY__", entry);
+        let mut strict = ElabEnv::new().expect("prelude");
+        match strict.elaborate_isolated_file_strict_v1(&[catalog.clone()], &source) {
+            Ok(_) if *entry != "rt_write_pair_source" => {}
+            Err(ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }) if *entry == "rt_write_pair_source" => {}
+            Ok(_) => panic!("{entry}: former TypeMismatch became acceptance"),
+            Err(error) => panic!("{entry}: strict verdict shifted: {error:?}"),
+        }
+    }
+    let without_wrappers = format!(
+        "program capabilities FS AFull\n{}{}",
+        imports.replace(
+            "import Capability.Process.Exit (host_pure, host_bind)\n",
+            ""
+        ),
+        body.replace("__RT_PARITY_ENTRY__", ENTRIES[0])
+    );
+    let mut negative = ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert!(
+                ["host_pure", "host_bind"].contains(&name.as_str()),
+                "{name}"
+            )
+        }
+        Err(error) => panic!("wrong wrapper no-import refusal: {error:?}"),
+        Ok(_) => panic!("unimported HostIO wrappers accepted under Strict"),
+    }
+}
 
 /// The terminal state each entry is expected to reach, and what retires that
 /// expectation.

@@ -8,6 +8,8 @@
 
 use std::os::unix::ffi::OsStrExt;
 
+use ken_elaborator::{ElabEnv, ElabError};
+
 const SOURCE_TEMPLATE: &str = r#"program capabilities FS AFull
 const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)
@@ -136,6 +138,43 @@ fn run_case(case: &str, chain: &str, repeats: usize) {
         };
         assert_eq!(metadata.size, 13);
         assert_eq!(format!("{:?}", metadata.kind), "File");
+    }
+}
+
+/// Promise class: durable invariant. MEASURED: both generated sources
+/// elaborate under Strict with their explicit package imports, and each
+/// refuses the first HostIO wrapper without that import. CLAIMED: the R
+/// template rewrite removes internal FSOp/ambient_response source needs
+/// without narrowing the two- or three-stage input population. THE GAP:
+/// interpreter/native parity is still the existing test below.
+#[test]
+fn strict_rechecks_both_generated_metadata_chains_with_explicit_imports() {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let resource_import = "import Capability.System.Resource\n\
+      (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult,\n\
+       ResourceBracketOk, ResourceBracketBodyError, ResourceBracketReleaseError,\n\
+       ResourceBracketBodyAndReleaseError, withResource, resourceMetadata)\n";
+    let wrappers = "import Capability.Process.Exit (host_pure, host_bind)\n";
+    for (label, chain) in [("two", TWO_CHAIN), ("three", THREE_CHAIN)] {
+        let source = SOURCE_TEMPLATE.replace("__CHAIN__", chain);
+        let body = source
+            .strip_prefix("program capabilities FS AFull\n")
+            .expect("generated source header");
+        let imported = format!("program capabilities FS AFull\n{resource_import}{wrappers}{body}");
+        let mut selected = ElabEnv::new().expect("prelude");
+        selected
+            .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
+            .unwrap_or_else(|error| panic!("{label} stage: {error:?}"));
+        let no_wrappers = format!("program capabilities FS AFull\n{resource_import}{body}");
+        let mut negative = ElabEnv::new().expect("prelude");
+        match negative.elaborate_isolated_file_strict_v1(&[catalog.clone()], &no_wrappers) {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "host_pure"),
+            Err(error) => panic!("{label}: wrong missing-import refusal {error:?}"),
+            Ok(_) => panic!("{label}: internal wrapper was ambient"),
+        }
     }
 }
 
