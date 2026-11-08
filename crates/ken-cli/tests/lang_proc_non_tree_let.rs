@@ -133,11 +133,10 @@ fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
     assert_checks("function-result-inner", &inner);
 }
 
-/// Transition sentinel, owned by SPEC-EFFECTS-DECLARED-TREE-RESULT-DENOTATION:
-/// a changed proc's `ensures` is refused until its tree-result post is
-/// specified, instead of refining the payload type every caller reads.
+/// Spec 36 §2.5: a changed proc's `ensures` is a separate AllRet obligation
+/// on its tree, so the declaration checks and its caller binds Int.
 #[test]
-fn ensured_changed_proc_refuses_until_tree_post_is_specified() {
+fn ensured_changed_proc_checks_with_all_ret_post() {
     let source = r#"program capabilities FS APartial
 proc one : Int visits [Console] = 1
 proc alias : Int ensures Equal Int result 1 visits [Console] = one
@@ -146,12 +145,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO AParti
 "#;
     let output = cli("ensured-changed-proc", "check", source);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(1), "{stderr}");
-    assert!(stderr.contains("error[E0038]"), "{stderr}");
-    assert!(
-        stderr.contains("`ensures` cannot be checked here"),
-        "{stderr}"
-    );
+    assert_eq!(output.status.code(), Some(0), "{stderr}");
+    assert!(!stderr.contains("error["), "{stderr}");
 }
 
 /// Durable invariant: `requires` without `ensures` leaves the action's

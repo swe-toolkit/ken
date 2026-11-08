@@ -2486,17 +2486,6 @@ fn refuse_unsequenced_performed_let(
     })
 }
 
-/// A changed proc returns an action tree, and a postcondition on that tree's
-/// result has no specified denotation yet (36 §2.5). Refuse it rather than
-/// refine the payload type that every consumer reads.
-#[inline(never)]
-fn refuse_returned_tree_ensures(span: &Span) -> ElabError {
-    ElabError::TypeMismatch {
-        span: span.clone(),
-        reason: "this proc's row is ambient-only and its declared result is not a tree, so it returns an action tree (36 §2.5); a postcondition on that action's result is not yet specified, so `ensures` cannot be checked here; state the property on a pure function the proc calls".into(),
-    }
-}
-
 /// `check_let_once`'s one post-RHS call: refine the RHS, then refuse it if it
 /// performs unsequenced. One call site keeps that recursive frame at its base
 /// size (`elab_recursive_frame_budget` row M).
@@ -16179,6 +16168,50 @@ fn literal_returned_tree_parts(
     Ok((effect.as_ref().clone(), response.as_ref().clone(), payload.as_ref().clone()))
 }
 
+/// The checked tree a proc's `ensures` constrains (36 §2.5), when its result
+/// denotes one: a changed non-tree result, or a declared tree on a non-space
+/// proc with a non-empty concrete row. `None` retains the Σ result meaning.
+fn tree_result_parts(
+    env: &GlobalEnv,
+    rdecl: &RDecl,
+    param_types: &[Term],
+    carrier_result: &Term,
+    returned_tree_mode: bool,
+    numeric_env: &NumericEnv,
+) -> Result<Option<(Term, Term, Term)>, ElabError> {
+    if returned_tree_mode {
+        return literal_returned_tree_parts(carrier_result, numeric_env).map(Some);
+    }
+    if !matches!(
+        rdecl.kind,
+        RDeclKind::View { keyword: DefKeyword::Proc, is_space_op: false, .. }
+    ) {
+        return Ok(None);
+    }
+    match surface_declared_row_type(rdecl)? {
+        Some(crate::effects::RowType::Concrete(row)) if !row.is_empty() => {}
+        _ => return Ok(None),
+    }
+    let Some((itree_id, _, _)) = numeric_env.effect_sequencing_ids() else {
+        return Ok(None);
+    };
+    let mut ctx = Context::new();
+    for param in param_types {
+        ctx.push(param.clone());
+    }
+    let head = whnf(env, &ctx, carrier_result);
+    let mut spine = &head;
+    let mut args = 0;
+    while let Term::App(function, _) = spine {
+        spine = function;
+        args += 1;
+    }
+    if args != 3 || !matches!(spine, Term::IndFormer { id, .. } if *id == itree_id) {
+        return Ok(None);
+    }
+    literal_returned_tree_parts(&head, numeric_env).map(Some)
+}
+
 fn build_contract_type(
     carrier_ty: &Term,
     param_count: usize,
@@ -23635,19 +23668,20 @@ fn elaborate_view_with_spec(
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
                 (carrier_ty, assumptions, req_cores, changed)
             };
-            if returned_tree_mode && !all_ensures.is_empty() {
-                return Err(refuse_returned_tree_ensures(&rdecl.span));
-            }
             let (param_types, carrier_result) = split_params(&carrier_ty, param_count)
                 .ok_or_else(|| ElabError::Internal(
                     "declaration parameter telescope is shorter than its source arity".into(),
                 ))?;
-            let returned_parts = if returned_tree_mode {
-                Some(literal_returned_tree_parts(&carrier_result, numeric_env)?)
-            } else {
+            // 36 §2.5: a tree result keeps its tree, and each `ensures` is a
+            // separate AllRet obligation on it, minted below once `id` is staged.
+            let tree_post = if all_ensures.is_empty() {
                 None
+            } else {
+                tree_result_parts(
+                    env, rdecl, &param_types, &carrier_result, returned_tree_mode, numeric_env,
+                )?
             };
-            let source_result = weaken(returned_parts.as_ref().map_or(&carrier_result, |parts| &parts.2),
+            let source_result = weaken(tree_post.as_ref().map_or(&carrier_result, |parts| &parts.2),
                 req_cores.len() as i64);
             // The result predicate is checked before staging the self name:
             // recursive calls in the body must see the *final* Σ result type.
@@ -23657,15 +23691,10 @@ fn elaborate_view_with_spec(
                 &all_ensures, &param_types, &req_cores, &source_result,
             )?;
             absorb_obligations(&mut decl_obligations, psi_obligations);
-            let result_ty_under_requires = ensured_result_type(&source_result, &predicates);
-            let result_ty_under_requires = if let Some((effect, response, _)) = returned_parts {
-                let itree_id = numeric_env.effect_sequencing_ids()
-                    .expect("returned contract tree has ITree").0;
-                [weaken(&effect, req_cores.len() as i64),
-                    weaken(&response, req_cores.len() as i64), result_ty_under_requires]
-                    .into_iter().fold(Term::indformer(itree_id, vec![]), Term::app)
+            let (result_ty_under_requires, predicates, tree_predicates) = if tree_post.is_some() {
+                (weaken(&carrier_result, req_cores.len() as i64), Vec::new(), predicates)
             } else {
-                result_ty_under_requires
+                (ensured_result_type(&source_result, &predicates), predicates, Vec::new())
             };
             let (_, _, full_ty) = build_contract_type(
                 &carrier_ty, param_count, &req_cores, &result_ty_under_requires,
@@ -23711,6 +23740,49 @@ fn elaborate_view_with_spec(
                     cx.metas.zonk_term(&body_inner),
                 )
             };
+            // 36 §2.5: Π p̄ r̄. AllRet E Resp B (λ r. ψ) (f p̄ r̄), one per clause,
+            // on the staged identity so it shares the admission rollback.
+            if let Some((effect, response, payload)) = &tree_post {
+                let (all_ret_id, _) = numeric_env.all_ret_ids().ok_or_else(|| {
+                    ElabError::Internal("tree-result ensures has no AllRet identity".into())
+                })?;
+                let requirement_count = req_cores.len() as i64;
+                let depth = param_types.len() + req_cores.len();
+                let applied = (0..depth)
+                    .rev()
+                    .fold(Term::const_(id, vec![]), |f, index| Term::app(f, Term::var(index)));
+                for predicate in &tree_predicates {
+                    let goal = [
+                        weaken(effect, requirement_count),
+                        weaken(response, requirement_count),
+                        weaken(payload, requirement_count),
+                        predicate.predicate.clone(),
+                        applied.clone(),
+                    ]
+                    .into_iter()
+                    .fold(Term::const_(all_ret_id, vec![]), Term::app);
+                    let mut closed = goal;
+                    for requirement in req_cores.iter().rev() {
+                        closed = Term::pi(requirement.clone(), closed);
+                    }
+                    for parameter in param_types.iter().rev() {
+                        closed = Term::pi(parameter.clone(), closed);
+                    }
+                    let hole_id =
+                        declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
+                            .map_err(|error| ElabError::KernelRejected {
+                                error,
+                                span: predicate.span.clone(),
+                            })?;
+                    decl_obligations.push(Obligation {
+                        id: decl_obligations.len() as u32,
+                        hole_id,
+                        goal_closed: closed,
+                        span: predicate.span.clone(),
+                        kind: ObligationKind::Ensures,
+                    });
+                }
+            }
             (
                 full_body,
                 body_inner,

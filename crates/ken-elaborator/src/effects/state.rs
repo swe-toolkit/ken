@@ -102,6 +102,10 @@ fn ty0() -> Term {
     Term::ty(lv0())
 }
 
+fn om0() -> Term {
+    Term::omega(lv0())
+}
+
 /// `Type 1` — the classifier of `Type0`-VALUED terms (e.g. the literal term
 /// `Type0` used as a large-elimination motive's body, or a type-former
 /// application like `ITree e resp b`). Every motive in this file computes a
@@ -566,6 +570,172 @@ pub fn declare_bind(env: &mut GlobalEnv, itree_id: GlobalId, vis_id: GlobalId) -
     let ret_ty = apply_all(Term::indformer(itree_id, vec![]), &[Term::var(5), Term::var(4), Term::var(2)]);
     let ty = pi_chain(&final_domains, ret_ty);
     declare_def(env, vec![], ty, body).map_err(|e| format!("bind declaration failed: {e:?}"))
+}
+
+/// `AllRet` (36 §4.3): the Ω-valued fold over a checked tree.
+/// `AllRet P (Ret x) = P x`; `AllRet P (Vis op k) = Π (r : Resp op). AllRet P (k r)`.
+/// A single eliminator defines it without self-reference or a trusted entry.
+pub fn declare_all_ret(env: &mut GlobalEnv, itree_id: GlobalId) -> Result<GlobalId, String> {
+    let itree = |e: Term, resp: Term, r: Term| {
+        apply_all(Term::indformer(itree_id, vec![]), &[e, resp, r])
+    };
+    // Outer ctx [E, Resp, X, P, t] (len 5).
+    let d_e = ty0();
+    let d_resp = Term::pi(Term::var(0), ty0());
+    let d_x = ty0();
+    let d_p = Term::pi(v(3, 2), om0());
+    let d_t = itree(v(4, 0), v(4, 1), v(4, 2));
+    let domains = [d_e, d_resp, d_x, d_p, d_t];
+
+    // Motive: λ _ : ITree E Resp X. Ω0, classified by Type1.
+    let motive_dom = itree(v(5, 0), v(5, 1), v(5, 2));
+    let motive = ascribed(Term::lam(motive_dom.clone(), om0()), Term::pi(motive_dom, ty1()));
+
+    // Ret method: λ x : X. P x.
+    let method_ret = Term::lam(v(5, 2), Term::app(v(6, 3), v(6, 5)));
+
+    // Vis method: λ op cont ih. Π (r : Resp op). ih r.
+    let op_dom = v(5, 0);
+    let cont_dom = Term::pi(Term::app(v(6, 1), v(6, 5)), itree(v(7, 0), v(7, 1), v(7, 2)));
+    let ih_dom = Term::pi(Term::app(v(7, 1), v(7, 5)), om0());
+    let vis_body = Term::pi(Term::app(v(8, 1), v(8, 5)), Term::app(v(9, 7), v(9, 8)));
+    let method_vis = Term::lam(op_dom, Term::lam(cont_dom, Term::lam(ih_dom, vis_body)));
+
+    let elim = Term::Elim {
+        fam: itree_id,
+        level_args: vec![],
+        params: vec![v(5, 0), v(5, 1), v(5, 2)],
+        motive: Box::new(motive),
+        methods: vec![method_ret, method_vis],
+        indices: vec![],
+        scrut: Box::new(v(5, 4)),
+    };
+    let ty = pi_chain(&domains, om0());
+    let body = lam_chain(&domains, elim);
+    declare_def(env, vec![], ty, body).map_err(|e| format!("AllRet: {e:?}"))
+}
+
+/// `all_ret_bind` (36 §4.3): cut over `bind`, via one `elim_ITree` on `t`.
+/// The motive generalizes the `AllRet P s` hypothesis; `g` remains fixed.
+pub fn declare_all_ret_bind(
+    env: &mut GlobalEnv,
+    itree_id: GlobalId,
+    ret_id: GlobalId,
+    vis_id: GlobalId,
+    bind_id: GlobalId,
+    all_ret_id: GlobalId,
+) -> Result<GlobalId, String> {
+    let itree = |e: Term, resp: Term, r: Term| {
+        apply_all(Term::indformer(itree_id, vec![]), &[e, resp, r])
+    };
+    let ret = |e: Term, resp: Term, r: Term, x: Term| {
+        apply_all(Term::constructor(ret_id, vec![]), &[e, resp, r, x])
+    };
+    let vis = |e: Term, resp: Term, r: Term, op: Term, k: Term| {
+        apply_all(Term::constructor(vis_id, vec![]), &[e, resp, r, op, k])
+    };
+    let bind = |e: Term, resp: Term, a: Term, b: Term, t: Term, k: Term| {
+        apply_all(Term::const_(bind_id, vec![]), &[e, resp, a, b, t, k])
+    };
+    let all_ret = |e: Term, resp: Term, x: Term, p: Term, t: Term| {
+        apply_all(Term::const_(all_ret_id, vec![]), &[e, resp, x, p, t])
+    };
+    // Logical positions: E0 Resp1 X2 Y3 P4 Q5 t6 k7 h8 g9.
+    let d_e = ty0();
+    let d_resp = Term::pi(v(1, 0), ty0());
+    let d_x = ty0();
+    let d_y = ty0();
+    let d_p = Term::pi(v(4, 2), om0());
+    let d_q = Term::pi(v(5, 3), om0());
+    let d_t = itree(v(6, 0), v(6, 1), v(6, 2));
+    let d_k = Term::pi(v(7, 2), itree(v(8, 0), v(8, 1), v(8, 3)));
+    let d_h = all_ret(v(8, 0), v(8, 1), v(8, 2), v(8, 4), v(8, 6));
+    // g : Π (x : X). P x -> AllRet Q (k x).
+    let d_g = Term::pi(
+        v(9, 2),
+        Term::pi(
+            Term::app(v(10, 4), v(10, 9)),
+            all_ret(v(11, 0), v(11, 1), v(11, 3), v(11, 5), Term::app(v(11, 7), v(11, 9))),
+        ),
+    );
+    let domains = [d_e, d_resp, d_x, d_y, d_p, d_q, d_t, d_k, d_h, d_g];
+    let ret_ty = all_ret(
+        v(10, 0),
+        v(10, 1),
+        v(10, 3),
+        v(10, 5),
+        bind(v(10, 0), v(10, 1), v(10, 2), v(10, 3), v(10, 6), v(10, 7)),
+    );
+
+    // Motive: λ s. AllRet P s -> AllRet Q (bind s k).
+    let motive_dom = itree(v(10, 0), v(10, 1), v(10, 2));
+    let motive_body = Term::pi(
+        all_ret(v(11, 0), v(11, 1), v(11, 2), v(11, 4), v(11, 10)),
+        all_ret(
+            v(12, 0),
+            v(12, 1),
+            v(12, 3),
+            v(12, 5),
+            bind(v(12, 0), v(12, 1), v(12, 2), v(12, 3), v(12, 10), v(12, 7)),
+        ),
+    );
+    let motive = ascribed(Term::lam(motive_dom.clone(), motive_body), Term::pi(motive_dom, om0()));
+
+    // Ret method: λ x hx. g x hx.
+    let hx_dom = all_ret(
+        v(11, 0),
+        v(11, 1),
+        v(11, 2),
+        v(11, 4),
+        ret(v(11, 0), v(11, 1), v(11, 2), v(11, 10)),
+    );
+    let method_ret = Term::lam(
+        v(10, 2),
+        Term::lam(hx_dom, Term::app(Term::app(v(12, 9), v(12, 10)), v(12, 11))),
+    );
+
+    // Vis method: λ op cont ih hv. λ r. ih r (hv r).
+    let op_dom = v(10, 0);
+    let cont_dom = Term::pi(Term::app(v(11, 1), v(11, 10)), itree(v(12, 0), v(12, 1), v(12, 2)));
+    let ih_dom = Term::pi(
+        Term::app(v(12, 1), v(12, 10)),
+        Term::pi(
+            all_ret(v(13, 0), v(13, 1), v(13, 2), v(13, 4), Term::app(v(13, 11), v(13, 12))),
+            all_ret(
+                v(14, 0),
+                v(14, 1),
+                v(14, 3),
+                v(14, 5),
+                bind(v(14, 0), v(14, 1), v(14, 2), v(14, 3), Term::app(v(14, 11), v(14, 12)), v(14, 7)),
+            ),
+        ),
+    );
+    let hv_dom = all_ret(
+        v(13, 0),
+        v(13, 1),
+        v(13, 2),
+        v(13, 4),
+        vis(v(13, 0), v(13, 1), v(13, 2), v(13, 10), v(13, 11)),
+    );
+    let r_dom = Term::app(v(14, 1), v(14, 10));
+    let r_body = Term::app(Term::app(v(15, 12), v(15, 14)), Term::app(v(15, 13), v(15, 14)));
+    let method_vis = Term::lam(
+        op_dom,
+        Term::lam(cont_dom, Term::lam(ih_dom, Term::lam(hv_dom, Term::lam(r_dom, r_body)))),
+    );
+
+    let elim = Term::Elim {
+        fam: itree_id,
+        level_args: vec![],
+        params: vec![v(10, 0), v(10, 1), v(10, 2)],
+        motive: Box::new(motive),
+        methods: vec![method_ret, method_vis],
+        indices: vec![],
+        scrut: Box::new(v(10, 6)),
+    };
+    let ty = pi_chain(&domains, ret_ty);
+    let body = lam_chain(&domains, Term::app(elim, v(10, 8)));
+    declare_def(env, vec![], ty, body).map_err(|e| format!("all_ret_bind: {e:?}"))
 }
 
 /// `run_state : (s f:Type) -> (RespF:f->Type) -> (a:Type) -> s ->

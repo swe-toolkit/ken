@@ -153,6 +153,9 @@ pub struct NumericEnv {
     /// Checked ITree, Ret and bind identities, installed together after bind
     /// registration; absent while the prelude itself is still being built.
     effect_sequencing_ids: Option<(GlobalId, GlobalId, GlobalId)>,
+    /// Checked AllRet and all_ret_bind identities (36 §4.3), installed once
+    /// after bind; absent while the prelude itself is still being built.
+    all_ret_ids: Option<(GlobalId, GlobalId)>,
     /// Closed effect-signature table, captured before source may shadow names.
     effect_tree_ids: Option<EffectTreeIds>,
     /// Bytes registrar's two carrier IDs, available before prelude source is
@@ -303,6 +306,17 @@ impl NumericEnv {
 
     pub(crate) fn effect_sequencing_ids(&self) -> Option<(GlobalId, GlobalId, GlobalId)> {
         self.effect_sequencing_ids
+    }
+
+    pub(crate) fn install_all_ret_ids(&mut self, all_ret: GlobalId, all_ret_bind: GlobalId) {
+        assert!(
+            self.all_ret_ids.replace((all_ret, all_ret_bind)).is_none(),
+            "AllRet IDs are captured once"
+        );
+    }
+
+    pub(crate) fn all_ret_ids(&self) -> Option<(GlobalId, GlobalId)> {
+        self.all_ret_ids
     }
 
     pub(crate) fn install_effect_tree_ids(&mut self, ids: EffectTreeIds) {
@@ -792,6 +806,7 @@ pub fn register_numeric_env(
         fixed_int_literal_descriptors,
         literal_plan_ids: None,
         effect_sequencing_ids: None,
+        all_ret_ids: None,
         effect_tree_ids: None,
         literal_carriers: None,
         add_table,
