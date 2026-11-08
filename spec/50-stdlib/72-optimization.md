@@ -530,6 +530,53 @@ Foundation's exact-`56b8864` checks, not tests of the later status
 respin or official conformance-runner execution, CI, publication,
 landing or measured landed trust.
 
+### 1.8 Option selection over two appended non-empty parts
+
+`Algorithm.Optimization.Argmin` must export two public Transparent checked
+laws immediately after `argmin_option_cost_order_invariant` and before
+`argmax`. Both inputs are `Cons` lists; each law has exactly the
+corresponding §1.6 `lt_nat` premise on their non-empty views:
+
+```ken
+pub theorem argmin_option_append_keeps_left
+      (a : Type) (cost : a → Nat)
+      (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmin a cost (nonempty_cons a y ys)))
+          (cost (argmin a cost (nonempty_cons a x xs))))
+        False
+      → Equal (Option a)
+          (argmin_option a cost
+            (list_append a (Cons a x xs) (Cons a y ys)))
+          (argmin_option a cost (Cons a x xs))
+
+pub theorem argmin_option_append_takes_right
+      (a : Type) (cost : a → Nat)
+      (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmin a cost (nonempty_cons a y ys)))
+          (cost (argmin a cost (nonempty_cons a x xs))))
+        True
+      → Equal (Option a)
+          (argmin_option a cost
+            (list_append a (Cons a x xs) (Cons a y ys)))
+          (argmin_option a cost (Cons a y ys))
+```
+
+A `False` comparison keeps the left option, including a tie between
+parts; `True` takes the strictly cheaper right option. These are
+structural `Equal (Option a)` conclusions about selected values, not
+cost equality. `list_append` on the first `Cons` and `nonempty_append`
+on the first `nonempty_cons` give the same ordered input. Each proof
+lifts its checked §1.6 sibling through `Some a` by `cong`; no extra
+premise, `Axiom`, import or helper is needed. The two-`Cons` restriction
+does not assert an append-split law when either input is `Nil`, and no
+existing operation or law type changes. The Architect's AC-0 D0 is
+scratch feasibility evidence, not official conformance, CI or landed
+trust measurement; the generic laws require checked catalog bodies.
+
 ## 2. Least witness below a finite bound
 
 > **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
@@ -1298,3 +1345,50 @@ identity sets 114 → 114 on exact `56b8864` (`evt_6ch2ekksk284x`).
 These candidate-local checks are distinct from AC-0 scratch and do not
 attest the later status respin, official conformance-runner execution,
 CI, publication, landing or measured landed trust.
+
+### 3.8 Greatest-cost Option selection over two appended non-empty parts
+
+`Algorithm.Optimization.Argmin` must export the two public Transparent
+checked `argmax_option` twins immediately after
+`argmax_option_cost_order_invariant` and before the private
+`argmin_from`. Their single premises are §3.6's left-versus-right
+strict comparison on the two non-empty views:
+
+```ken
+pub theorem argmax_option_append_keeps_left
+      (a : Type) (cost : a → Nat)
+      (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmax a cost (nonempty_cons a x xs)))
+          (cost (argmax a cost (nonempty_cons a y ys))))
+        False
+      → Equal (Option a)
+          (argmax_option a cost
+            (list_append a (Cons a x xs) (Cons a y ys)))
+          (argmax_option a cost (Cons a x xs))
+
+pub theorem argmax_option_append_takes_right
+      (a : Type) (cost : a → Nat)
+      (x : a) (xs : List a) (y : a) (ys : List a)
+    : Equal Bool
+        (lt_nat
+          (cost (argmax a cost (nonempty_cons a x xs)))
+          (cost (argmax a cost (nonempty_cons a y ys))))
+        True
+      → Equal (Option a)
+          (argmax_option a cost
+            (list_append a (Cons a x xs) (Cons a y ys)))
+          (argmax_option a cost (Cons a y ys))
+```
+
+`False` keeps the earlier left choice even when the two parts tie;
+`True` takes the strictly costlier right choice. Both conclusions
+are structural equalities of `Option a`, not of costs. The two-`Cons`
+append reduces to the same input as §3.6's `nonempty_append` on the
+corresponding `nonempty_cons` values, so each checked sibling lifts
+through `Some a` with `cong`. No extra premise, `Axiom`, import or
+helper is added. Neither law makes a claim for an empty input or
+changes any existing §3 operation or law type. The Architect's D0
+checks only scratch feasibility; official conformance, CI and landed
+trust remain separate gates.
