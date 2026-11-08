@@ -17,6 +17,8 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+use ken_elaborator::{ElabEnv, ElabError};
+
 fn ken_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_ken"))
 }
@@ -34,18 +36,50 @@ fn workspace_root() -> PathBuf {
 const PROG: &str = r#"program capabilities FS APartial
 proc prog : ITree ConsoleOp console_resp (Pair Unit Nat) visits [Console] =
   run_state Nat ConsoleOp console_resp Unit Zero
-    (bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
+    (itree_bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit
       (state_get Nat ConsoleOp console_resp MkUnit)
       (\n . inject_r (StateOp Nat) ConsoleOp (resp_state Nat) console_resp Unit (print_line "state-console-pairing")))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-       (Pair Unit Nat) ExitCode
+  host_bind APartial (Pair Unit Nat) ExitCode
     (host_console APartial (Pair Unit Nat) prog)
-    (\_ . host_exit APartial ExitCode.Success)
+    (\_ . host_pure APartial ExitCode ExitCode.Success)
 "#;
+
+/// Promise class: durable invariant. MEASURED: this same State-Console
+/// program checks through the strict entry with explicit package imports,
+/// and refuses the inclusion without its home import. CLAIMED: the specific
+/// ITree binder and general inclusion preserve the checked composition.
+/// THE GAP: the unchanged CLI run below independently observes the one
+/// Console effect, rather than inferring execution from elaboration.
+#[test]
+fn state_console_source_rechecks_under_strict_without_internal_effect_names() {
+    let root = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let body = PROG
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("source program header");
+    let other_imports = "import Capability.Console.Text (print_line)\n\
+                         import Capability.Process.Exit (host_console, host_bind, host_pure)\n";
+    let complete = format!(
+        "program capabilities FS APartial\n{other_imports}\
+         import Core.Effect.Coproduct (inject_r)\n{body}"
+    );
+    let mut strict = ElabEnv::new().expect("prelude");
+    strict
+        .elaborate_isolated_file_strict_v1(&[root.clone()], &complete)
+        .expect("State-Console source with checked effect imports");
+    let without_inject = format!("program capabilities FS APartial\n{other_imports}{body}");
+    let mut negative = ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[root], &without_inject) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "inject_r"),
+        Err(error) => panic!("wrong no-import refusal: {error:?}"),
+        Ok(_) => panic!("generic inclusion available without its package import"),
+    }
+}
 
 #[test]
 fn state_console_pairing_runs_through_run_state_then_run_io() {

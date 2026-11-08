@@ -556,6 +556,50 @@ fn read_file_lines_rewrite_keeps_oracle_and_strict_import_boundary() {
     assert_eq!(output, expected, "read-file-lines output after R rewrite");
 }
 
+/// Promise class: durable invariant. MEASURED: the same accumulator program
+/// checks at the strict entry with its package imports but no generic-bind
+/// import, and its current CLI route keeps the output oracle. CLAIMED:
+/// `itree_bind` and `resp_coproduct` are floor identities usable before
+/// run_state, without changing the hidden-state program's result.
+/// THE GAP: this output does not establish every State handler equation.
+#[test]
+fn accumulator_factory_uses_generic_floor_bind_and_keeps_its_oracle() {
+    let example = rosetta_dir().join("accumulator-factory");
+    let source =
+        fs::read_to_string(example.join("accumulator-factory.ken")).expect("accumulator source");
+    let body = source
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("program header");
+    let imported = format!(
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (print_line)\n\
+         import Capability.Process.Exit (host_program)\n{body}"
+    );
+    let catalog = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut strict = ElabEnv::new().expect("prelude");
+    strict
+        .elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        .expect("direct State tree names the generic floor without an import");
+    let tmp = tempfile::tempdir().expect("accumulator output directory");
+    let (output, successful) = run_example(
+        "accumulator-factory",
+        &example.join("accumulator-factory.ken"),
+        tmp.path(),
+    )
+    .expect("accumulator CLI run completes");
+    assert!(successful, "the rewritten State tree must run");
+    let Oracle::Expected(expected) = oracle_for(&example) else {
+        panic!("accumulator requires its output oracle");
+    };
+    assert_eq!(
+        output, expected,
+        "accumulator output after the floor spelling"
+    );
+}
+
 /// Promise class: durable invariant. MEASURED: each of the four existing
 /// Collections-prefixed users elaborates under the strict entry with the
 /// explicit Conjunction import, while the same source without it refuses an
