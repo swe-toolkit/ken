@@ -31,9 +31,9 @@ fn missing_observation(
 
 /// Promise class: transition sentinel, retired with the 3b route switch
 /// that removes the Legacy side of the comparison. MEASURED: each static
-/// invalid-source fixture reaches its own measured Legacy missing name and
-/// that same token under Strict after only its required imports. Report raw
-/// spans and compare offsets relative to the imported prefix: a new import
+/// invalid-source fixture reaches Legacy E0027 on its own missing name and
+/// Strict E0012 on that same name after only its required imports. Report raw
+/// spans and compare the normalized Strict span to the Legacy span: an import
 /// changes absolute byte positions but not the error's source location. CLAIMED: vocabulary changes
 /// do not mask or shift these intentional refusals. THE GAP: generated Rust
 /// sources and the six FSOp template cases are separate populations, not
@@ -70,6 +70,8 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         let c5 = path.starts_with("conformance/challenge/C5-verified-sort/");
         let strict_source = if c5 {
             format!("import Core.Logic.Conjunction (And)\n{original}")
+        } else if path == "conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken" {
+            format!("import Core.Classes.LawfulClasses (IsTrue)\n{original}")
         } else if path == "examples/rosetta/merge-sort/merge-sort.ken" {
             original.replacen(
                 "program capabilities FS APartial\n",
@@ -122,7 +124,8 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         if old.0 != expected
             || new.0 != old.0
             || normalized != (Some(old.1.start), Some(old.1.end))
-            || (c5 && new.2 != old.2)
+            || old.2 != "E0027"
+            || new.2 != "E0012"
         {
             mismatches.push(format!(
                 "{path}: expected {expected}, observed {old:?} -> {new:?}"
