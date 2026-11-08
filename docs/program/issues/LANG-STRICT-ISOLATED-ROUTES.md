@@ -87,7 +87,27 @@ Four increments, each its own candidate, in order.
 4. **Increment 3, route switches.** check, run (with roots threaded
    through the API) and native-build through a strict preparation entry.
    It also migrates the files and inline sources. It opens with its own
-   AC-0 on the full inline population, ken-verify included.
+   AC-0 on the full inline population, ken-verify included. Split on
+   that AC-0 (`evt_4pmxxzsaegb2q`; Steward `evt_4p7v4m5yy8bjd`):
+   - **3a, vocabulary; no route switch.**
+     - The R source rewrites and the DIVERGE re-check.
+     - The H homes: the four Child homes, and a new
+       `Data.Numeric.FixedWidth` exporting the eight safe `intTo{N}`
+       conversions.
+     - Floor admissions under spec 30 §4, taking the floor to 47:
+       `ReadResult`, `FileMetadata`, `FileKind`, `DirEntry`,
+       `FileOperation`, `StateOp` and `resp_state` (Steward
+       `evt_36xwaa64spemr`, `evt_v08x07hc9tp0`; Architect
+       `evt_rr57zqgt7v3g`, `evt_1bwk0v6a3frz1`).
+   - **3b, route switches and roots.** The strict entries and the root
+     threading above. It also carries two items:
+     - the imports for every on-disk source that a no-root route checks
+       today and whose body 3a rewrote (Architect `evt_5rd10s2g7cr6z`,
+       `evt_3cnt8yn597y2j`);
+     - the `rt_performing_mixed_owner_relay` fixture's move to a Rust
+       core term, through one doc(hidden) env-taking preparation seam
+       that production also calls. The Runtime Leader reviews it
+       (Steward `evt_1fzss5jnzbbqc`).
 
 The Spec co-turn owns `spec/`, and CV votes on `spec/` and
 `conformance/`.
