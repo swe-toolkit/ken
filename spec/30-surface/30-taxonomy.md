@@ -304,28 +304,50 @@ literal patterns must read that same registered ID rather than a
 mutable spelling lookup. The candidate rekeys that reader, so a
 same-spelling source declaration cannot change its comparator.
 
-Thus the closed **floor-identity roster** has forty-seven names: the exact
+The direct-ITree source vocabulary has four further internal-provision
+members. The exact checked `ConsoleOp` carrier and `console_resp` response
+family are selected by the effect reifier and native Console operations;
+source needs them to construct a direct Console tree with a plain-value
+leaf. `ConsoleOp` is scoped as the complete `ConsoleOp.Read`,
+`ConsoleOp.Write`, `ConsoleOp.Flush`, `ConsoleOp.IsTerminal` family;
+none of those four cases is bare-reserved. The space desugarer selects
+the checked `bind` and `resp_coproduct` identities by exact ID; direct
+State and composed-effect trees need both, and a direct Console tree
+needs the generic sequencing identity. The floor spelling of that
+sequencing identity is **`itree_bind`**, not the colliding generic
+`bind`: both modes add `itree_bind` at the *same* captured checked ID;
+Legacy retains bare `bind`, while Strict does not reserve or ambiently
+resolve bare `bind`. A user `fn bind` remains legal in Strict. The
+response operation keeps the specific spelling `resp_coproduct`.
+These four admissions allocate no new checked identity and add no
+`trusted_base()` entry. HostIO-only uses can still migrate to the
+checked `host_bind` and related wrappers without admitting their
+`FSOp`, `AmbientOp`, `fs_resp` or `ambient_resp` internals.
+
+Thus the closed **floor-identity roster** has fifty-one names: the exact
 checked identities Strict source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
-ConsoleStream, Coproduct, CreatePolicy, DirEntry, Equal, ExitCode,
-FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
-Instant, List, MappingProt, Nat, Option, Pair, ProcessInput, Prod,
-ProgramCaps, Prop, Proved, ReadProgress, ReadResult, ResourceError,
-ResourceKind, ResourceOpenMode, Result, StateOp, Top, TransferCount,
-Unit, Utf8Error, WriteProgress, eqChar, resp_state, run_state,
-state_get, state_put}`**. The prior forty identities, six newly scoped
-families and the checked `resp_state` operation are re-checked; floor
-admission alone adds no postulate or `trusted_base()` entry. Their
-qualified constructors and the Pair companions are separate from this
-47-name count. These identities are not all types:
-`Top` and `Bottom` are proposition constants, `Proved` is a proof binding, `HostIO` a
-type-level function, and `eqChar`, `resp_state`, `run_state`,
-`state_get` and `state_put` are checked operations. Bare `get` and
-`put` are not floor names or reserved by these operations.
-The definable `And`/`Dec`/`Yes`/`No` stay **out**
-(source-constructible, with a `Core/Logic` package home, and no
-internal-provision witness). The `Empty` needed by `space` desugaring
-is different: its identity is captured before source elaboration and read by exact ID
+ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, DirEntry, Equal,
+ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO,
+IOError, ITree, Instant, List, MappingProt, Nat, Option, Pair,
+ProcessInput, Prod, ProgramCaps, Prop, Proved, ReadProgress,
+ReadResult, ResourceError, ResourceKind, ResourceOpenMode, Result,
+StateOp, Top, TransferCount, Unit, Utf8Error, WriteProgress,
+console_resp, eqChar, itree_bind, resp_coproduct, resp_state,
+run_state, state_get, state_put}`**. The prior forty-seven identities,
+`ConsoleOp`, `console_resp`, `itree_bind` and `resp_coproduct` are
+re-checked; floor admission alone adds no postulate or `trusted_base()`
+entry. Their qualified constructors and the Pair companions are
+separate from this 51-name count. These identities are not all types:
+`Top` and `Bottom` are proposition constants, `Proved` is a proof
+binding, `HostIO` a type-level function, and `console_resp`, `eqChar`,
+`itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
+and `state_put` are checked operations. Bare `get`, `put` and `bind`
+are not floor names or reserved by these operations. The definable
+`And`/`Dec`/`Yes`/`No` stay **out** (source-constructible, with a
+`Core/Logic` package home, and no internal-provision witness). The
+`Empty` needed by `space` desugaring is different: its identity is
+captured before source elaboration and read by exact ID
 (`prelude.empty_id`), but no surface contract independently requires
 source to name it. It belongs internally, not in the floor. The
 source name `Empty` is provided by the explicit-import catalog package
@@ -369,6 +391,10 @@ enters the counted floor, while `ConsoleStream.Stdin`,
 `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` reach their exact
 pre-source constructor IDs. Bare `Stdin`, `Stdout`, and `Stderr` do not
 enter B; the unrelated source name `Stream` is not reserved.
+`ConsoleOp` is also scoped as a complete four-case family: only its
+type name enters the counted floor; its `Read`, `Write`, `Flush` and
+`IsTerminal` cases resolve as `ConsoleOp.C` at their exact IDs, not
+as bare B names.
 `FileError` is unscoped: `MkFileError` is bare and reserved. `IOError`
 is scoped as the complete thirteen-cause family: each source path is
 `IOError.C` (including `IOError.NotFound`, `IOError.Other`,
@@ -463,7 +489,7 @@ intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
 Until D0 proves both witness clauses for another candidate, the floor
-remains the forty-seven-identity set above and that candidate has no new
+remains the fifty-one-identity set above and that candidate has no new
 ambient availability. `BufferWindow`, `ResourceBodyResult`,
 `ResourceBracketResult`, the `FS` source alias, `read_bytes` and `write_file`
 are source-promised but unkeyed: they remain outside B as package material,
@@ -535,15 +561,15 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | Blocked spelling | Disposition on its written use | Strict-entry pin / owner |
 |---|---|---|
 | `host_exit` | R: `host_pure a ExitCode c` | Exact return tree; import `Capability.Process.Exit`. |
-| `bind` | R: `host_bind a X Y m k` only for the complete HostIO instantiation | Exact sequencing tree; import `Capability.Process.Exit`; other instances Q. |
-| `resp_coproduct` | R: part of the same complete HostIO instantiation | `HostIO a R` or `host_bind` conversion; other instances Q. |
+| `bind` | R: use floor `itree_bind` for a direct ITree, or `host_bind a X Y m k` for a complete HostIO instance | `itree_bind` has the same exact checked ID in both modes; bare `bind` stays legal as a user declaration in Strict, not protected B. HostIO rewrite imports `Capability.Process.Exit`. |
+| `resp_coproduct` | B | Checked generic response family; direct composed-effect trees name it without an import. |
 | `AmbientOp` | R: part of the same complete HostIO instantiation | `HostIO a R` conversion; other instances Q. |
 | `FSOp` | R: part of the same complete HostIO instantiation | `HostIO a R` conversion; other instances Q. |
 | `ambient_resp` | R: part of the same complete HostIO instantiation | `HostIO a R` conversion; other instances Q. |
 | `fs_resp` | R: part of the same complete HostIO instantiation | `HostIO a R` conversion; other instances Q. |
-| `inject_l` | R: `host_fs a R act` for the ruled FS-to-HostIO lift | Exact resulting tree; import `Capability.Process.Exit`; other instances Q. |
-| `ConsoleOp` | R: `IO R` only in `ITree ConsoleOp console_resp R` | Import `Capability.Console.Text`; other instances Q. |
-| `console_resp` | R: the same complete `IO R` expression | Definitional equality; other instances Q. |
+| `inject_l` | H: `Core.Effect.Coproduct`; exact HostIO uses may still rewrite to `host_fs a R act` | Import the checked generic injection for direct coproduct trees; HostIO rewrite imports `Capability.Process.Exit`. |
+| `ConsoleOp` | B | Complete scoped four-case family at exact IDs; bare cases remain unreserved. |
+| `console_resp` | B | Checked Console response operation, no H row. |
 | `intToChar` | H | `Core.Classes.LawfulClasses` beside `charToInt`. |
 | `writeAt` | H | `Capability.System.IO` beside `readAt`. |
 | `flush` | H | `Capability.Console.Text` beside `write`. |
@@ -578,7 +604,7 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `append_file` | H | `Capability.Filesystem.Authority`. |
 | `change_mode` | H | `Capability.Filesystem.Authority`. |
 | `create_directory` | H | `Capability.Filesystem.Authority`. |
-| `inject_r` | R: `host_console a R act` only for `ambient_console R act` | Exact Console-to-HostIO lift; other instances Q. |
+| `inject_r` | H: `Core.Effect.Coproduct`; exact HostIO uses may still rewrite to `host_console a R act` | Import the checked generic injection for direct coproduct trees; HostIO rewrite imports `Capability.Process.Exit`. |
 | `intToInt8` | H | The same eight-name `Data.Numeric.FixedWidth` home; not a separate two-name route. |
 | `read_directory` | H | `Capability.Filesystem.Authority`. |
 | `remove_directory` | H | `Capability.Filesystem.Authority`. |
@@ -610,10 +636,11 @@ home or general rewrite. The mixed-owner-relay fixture computes a host
 operation value that the package wrappers cannot express. Its
 hand-built HostIO tree moves to a Rust core term in 3b; the existing
 planner-structure assertion must remain
-byte-equivalent. The six separate `FSOp` DIVERGE sources of this class
-are held for Architect per-source ruling. None of these examples
-creates source-name need for the internal `ReadFile`, `FSOp`, or
-`ConsoleOp` identities under §4.
+byte-equivalent. The six separate `FSOp` DIVERGE sources use the ruled
+exact HostIO wrapper rewrite, not a new source home for `FSOp`. None of these
+examples creates source-name need for internal `ReadFile`, `FSOp`,
+`AmbientOp`, `fs_resp` or `ambient_resp`. The independent direct-tree
+Console source need admits `ConsoleOp` and `console_resp` under §4.
 
 The four further Child homes have one strict-entry user pin **per name**;
 the same source without its `Capability.Process.Child` import refuses
@@ -626,7 +653,7 @@ the same source without its `Capability.Process.Child` import refuses
 | `take_stdin` | H: `Capability.Process.Child` | Take the selected pipe write end under its import. |
 | `take_stderr` | H: `Capability.Process.Child` | Take the selected pipe read end under its import. |
 
-The H roster changes from eighty-one existing rows to ninety-four:
+The H roster changes from eighty-one existing rows to ninety-six:
 remove seventeen `FileOperation`-family rows, then add eight FS
 Authority wrappers, `writeAt` and `writeAll` in System.IO, `freeze` in System.Buffer,
 `resourceMetadata` in System.Resource, `flush` and `is_terminal` in
@@ -634,7 +661,8 @@ Console.Text, `intToChar` in LawfulClasses, the four Child rows, and
 `read`, `wall_now` and `host_clock` as above, plus the complete eight-name
 safe fixed-width narrowing family in `Data.Numeric.FixedWidth` (§35 §5):
 `intToInt8`, `intToInt16`, `intToInt32`, `intToInt64`, `intToUInt8`,
-`intToUInt16`, `intToUInt32` and `intToUInt64`. The pre-home Rust capture
+`intToUInt16`, `intToUInt32` and `intToUInt64`, plus `inject_l`
+and `inject_r` in `Core.Effect.Coproduct`. The pre-home Rust capture
 census on the authorized base found no exact-ID reader of these safe
 checked definitions outside their registration in `conversions.rs`; the
 two `intToUInt64` occurrences in checked Ken bodies are source uses, not
@@ -644,13 +672,14 @@ and removing only the import refuses `UnboundName`; range probes at
 each target's inclusive bounds and just outside them distinguish safe
 `Option` narrowing from an unchecked raw cast (§35 §5). A home row
 alone does not publish a name: each owning module also exports its
-assigned checked identity. No H row is
-added for any of the six newly scoped floor families or for
-`resp_state`. Ordinary source edits using non-exact R shapes and all Q
-names require a separate Architect disposition before their strict
-pins can be called complete. Inc 3a changes vocabulary and source
-imports only, never the CLI route; 3b owns the route switch and its
-separate full-population acceptance.
+assigned checked identity. No H row is added for a scoped floor family
+or checked floor operation, including `ConsoleOp`, `console_resp`,
+`itree_bind` and `resp_coproduct`. The generic direct-tree residue has
+its final class disposition; a shape outside this ruled class still
+requires an Architect disposition before its strict pin can be called
+complete. Inc 3a changes vocabulary and source imports only, never
+the CLI route; 3b owns the route switch and its separate full-population
+acceptance.
 
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
@@ -661,12 +690,14 @@ The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
 **Implementation staging.** The specification fixes the
-forty-seven-identity floor and Pair's three checked companions as the
+fifty-one-identity floor and Pair's three checked companions as the
 Increment 3a target. The prior forty were delivered before this
-increment; six further scoped families must be admitted with their
-complete constructor sets and source-path migrations. The checked
-`resp_state` operation must be admitted at its exact pre-source identity.
-The roster/count change for all seven is atomic in one assembled
+increment; `ReadResult`, `FileMetadata`, `FileKind`, `DirEntry`,
+`FileOperation`, `StateOp` and `ConsoleOp` require complete scoped
+constructor families and source-path migrations. The checked
+`resp_state`, `console_resp`, `itree_bind` and `resp_coproduct`
+operations must be admitted at their exact pre-source identities.
+All eleven additions to the prior forty are atomic in one assembled
 candidate. The earlier Spec
 child's code parent `1fc285c6` enumerated its then-current forty;
 that historical count is not evidence for this Increment 3a target.
