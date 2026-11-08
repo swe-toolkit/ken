@@ -3122,6 +3122,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
+[normalization-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-congruence.md),
 [congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md), and
 [pointwise-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-pointwise-congruence.md)
 specify the public surface and closed observations. The equivalence seed is
