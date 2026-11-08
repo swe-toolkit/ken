@@ -51,8 +51,9 @@
 //! **CLAIMED.** No package declaration can capture a Runtime role. For
 //! constructor roles this is now enforced by declaration-time rejection —
 //! strictly stronger than the old "declared but not redirected". For op-defs and
-//! family formers, which the guard does not reject (a constructor shadowing a
-//! def, or a `data` former shadowing a former, are a different collision class),
+//! unfloored family formers, which the guard does not reject (a constructor
+//! shadowing a def, or an unfloored `data` former shadowing a former, are a
+//! different collision class),
 //! non-capture stays closed by the producers' `&PreludeEnv` signature, which puts
 //! the package namespace out of scope — never measured from a test, by design.
 //!
@@ -90,7 +91,6 @@ const PACKAGE: &str = "d1b_role_a_shadow_pkg";
 /// `env.globals.get(name)` in `checked_host_spine_v1` or
 /// `checked_runtime_symbols_v1`.
 const SHADOWING_SOURCE: &str = r#"data FSOp = ShadowFsOp
-data ConsoleOp = ShadowConsoleOp
 data ClockOp = ShadowClockOp
 data EntropyOp = ShadowEntropyOp
 data Cap = ShadowCap
@@ -232,7 +232,8 @@ fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
 /// Shadowable **family** roles are declarations rather than constructors.
 /// A shadow is a top-level `data` of the same name rather than a colliding
 /// constructor. Kept in its own table because the declaration shape differs.
-const SHADOWED_FAMILIES: &[&str] = &["FSOp", "ConsoleOp", "ClockOp", "EntropyOp", "Cap"];
+/// ConsoleOp is now floor-protected and tested as an admitted member instead.
+const SHADOWED_FAMILIES: &[&str] = &["FSOp", "ClockOp", "EntropyOp", "Cap"];
 
 /// Shadowable entry functions have a different declaration shape from families.
 const SHADOWED_DEFINITIONS: &[&str] = &["host_exit"];
@@ -255,9 +256,10 @@ fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
     // "declared but not redirected". So the fixture no longer compiles, and the
     // faithful assertion is the rejection itself.
     //
-    // (Op-role and family-name shadows are NOT rejected by the guard — a
-    // constructor shadowing a def, or a `data` former shadowing a former, are a
-    // different collision class — but their non-capture remains closed by the
+    // (Op-role and non-floor family-name shadows are NOT rejected by the guard
+    // — a constructor shadowing a def, or a non-floor `data` former shadowing a
+    // former, are a different collision class — but their non-capture stays
+    // closed by the
     // `&PreludeEnv` signature exactly as the module doc describes; nothing here
     // relied on this test to establish it.)
     match compile_shadowing_package() {
