@@ -124,6 +124,21 @@ under B1a.
    verified incoming call and no candidate disposition, although its
    source Construct was lowered. Keyed on `ContinuationCallIdentity`,
    the selected caller (`evt_3aax4002wm3yt`).
+3. The checked-IH environment transport moves a K call's emission to
+   its destination owner, but three consumers read the planned emitter
+   or a plan-wide fact instead. The detached-seat exit and the
+   candidate close key on plan-wide "is a transport source", and plane
+   B's settlement gate keys on `k_identity().emission_owner()`. On F,
+   all 21 self transports (emitter == destination) are unemitted. An
+   env-gated arm consult restores native parity on all four rows, but
+   six producer-reached ones stay dormant. On e9fbbca83 the plane B
+   gate refuses 18/19 main checked_ih parity tests. Keyed on the
+   planned emitter, not the code identity that emits the call
+   (`evt_662q5ektq3zcx`, Architect `evt_1dnbnhbgs176n`).
+4. Detached seat pass-through keyed on owner comparison (live owner
+   versus placement) instead of on this Function's emission evidence.
+   Keyed on owner identity (`evt_dd551d27htbj`, Architect
+   `evt_7gs4bp33yneey`).
 
 ## Stop conditions
 
