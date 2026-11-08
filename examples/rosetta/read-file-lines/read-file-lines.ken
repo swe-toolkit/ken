@@ -82,11 +82,11 @@ const Compose (r : Type) : Type = HostIO APartial r
 -- resume N times through `print_line`'s continuation).
 proc printLines (xs : List String) : Compose (Result IOError Unit) visits [Console] =
   match xs {
-    Nil ↦
-      host_pure APartial (Result IOError Unit)
-        (Ok IOError Unit MkUnit);
+    Nil ↦ host_pure APartial (Result IOError Unit) (Ok IOError Unit MkUnit);
     Cons x xs' ↦
-      host_bind APartial Unit
+      host_bind
+        APartial
+        Unit
         (Result IOError Unit)
         (host_console APartial Unit (print_line x))
         (λ_. printLines xs')
@@ -95,23 +95,25 @@ proc printLines (xs : List String) : Compose (Result IOError Unit) visits [Conso
 -- Reads the fixture through `host_fs (read_bytes ...)`, then prints each
 -- parsed line through `host_console (print_line ...)` in one composed tree.
 proc app (cap : Cap APartial) : Compose (Result IOError Unit) visits [FS, Console] =
-  host_bind APartial (Result FileError Bytes)
+  host_bind
+    APartial
+    (Result FileError Bytes)
     (Result IOError Unit)
-    (host_fs APartial (Result FileError Bytes)
+    (host_fs
+      APartial
+      (Result FileError Bytes)
       (read_bytes APartial cap (bytes_encode "conformance/fs/fixtures/three-lines.txt")))
     (λr.
       match r {
         Err e ↦
           match e {
             MkFileError operation path kind ↦
-              host_pure APartial (Result IOError Unit)
-                (Err IOError Unit kind)
+              host_pure APartial (Result IOError Unit) (Err IOError Unit kind)
           };
         Ok bytes ↦
           match bytes_decode bytes {
             Err _ ↦
-              host_pure APartial (Result IOError Unit)
-                (Err IOError Unit (IOError.Other 0));
+              host_pure APartial (Result IOError Unit) (Err IOError Unit (IOError.Other 0));
             Ok text ↦ printLines (lines text)
           }
       })
@@ -122,7 +124,9 @@ proc main
     visits [FS, Console] =
   match caps {
     ProgramCaps.MkProgramCaps cap ↦
-      host_bind APartial (Result IOError Unit)
+      host_bind
+        APartial
+        (Result IOError Unit)
         ExitCode
         (app cap)
         (λr.
@@ -162,8 +166,6 @@ proc main
                 IOError.Other errno ↦
                   host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               };
-            Ok _ ↦
-              host_pure APartial ExitCode
-                ExitCode.Success
+            Ok _ ↦ host_pure APartial ExitCode ExitCode.Success
           })
   }
