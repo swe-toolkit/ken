@@ -6,9 +6,19 @@ effect row names the world interaction. The authority-polymorphic reader below
 uses the landed `read_bytes` producer without minting or wrapping a capability.
 
 ```ken
-export FS, read_bytes, write_file, readFile, writeFile,
-  append_file, change_mode, create_directory, read_directory,
-  remove_directory, remove_file, rename_file, file_metadata
+export FS,
+  read_bytes,
+  write_file,
+  readFile,
+  writeFile,
+  append_file,
+  change_mode,
+  create_directory,
+  read_directory,
+  remove_directory,
+  remove_file,
+  rename_file,
+  file_metadata
 
 proc capability_read
       (a : Auth) (cap : Cap a) (path : Bytes)
