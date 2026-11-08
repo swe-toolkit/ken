@@ -8,6 +8,11 @@ These cases are authored but unexecuted. No Ken check or official
 conformance-runner result is claimed. No CI, publication, landing, or trust
 measurement is claimed.
 
+The Increment 3a target is 96 home rows: 81 at its base, less the 17
+`FileOperation` rows retired by its scoped-floor move, plus 32 new H names.
+The additions below pin 24 ordinary-home names; the following range case pins
+the eight `Data.Numeric.FixedWidth` names.
+
 ### surface/modules/catalog-package-homes-preserve-checked-identities
 
 - promise class: **normative compatibility vector** — the listed pre-source
@@ -489,9 +494,9 @@ measurement is claimed.
 
 ### surface/modules/inc3a-added-scoped-floor-families
 
-- promise class: **normative compatibility vector** — the five remaining
-  scoped floor families and `resp_state` retain their exact identities and
-  complete public paths
+- promise class: **normative compatibility vector** — the five
+  ReadResult/metadata/State carrier families and `resp_state` retain their exact
+  identities and complete public paths
 - spec: `30-taxonomy §4`; `33 §3.3`; `36 §4.2`; `38 §1.12`
 - given: in a fresh environment, snapshot the pre-source `GlobalId` of
   `ReadResult`, `FileKind`, `FileMetadata`, `DirEntry`, `StateOp`,
@@ -632,11 +637,13 @@ measurement is claimed.
   | `read` | `Capability.Console.Text` |
   | `wall_now` | `Capability.Time.WallClock` |
   | `host_clock` | `Capability.Process.Exit` |
+  | `inject_l` | `Core.Effect.Coproduct` |
+  | `inject_r` | `Core.Effect.Coproduct` |
 
 - measured: each positive client's import and re-export resolution, the
   resulting canonical `GlobalId`, and each paired omission's exact name error.
   The omitted-import `export name` is the source-name reference under test.
-- claimed: all twenty-two names have the specified public home and original
+- claimed: all twenty-four names have the specified public home and original
   pre-source identity; an unrelated loaded module or flat-global entry cannot
   satisfy a missing Strict import.
 - the gap: an omitted-import rejection could arise from another missing
@@ -651,6 +658,100 @@ measurement is claimed.
 - why: each row is a separate route from an ordinary package home. A home
   cannot be inferred from a sibling name or from implementation-global
   registration.
+
+### surface/modules/inc3a-coproduct-injections-have-imported-signatures
+
+- promise class: **normative compatibility vector** — each imported injection
+  retains its checked five-binder signature and original identity
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §4.5.7`
+- given: snapshot the pre-source identities of `inject_l` and `inject_r`.
+  Load `Core.Effect.Coproduct` as a roots-loaded owner exporting both checked
+  identities. In separate Strict-root clients, import only the selected name
+  from `Core.Effect.Coproduct` and use these source declarations:
+
+  ```ken
+  fn inject_left
+      (tree : ITree (StateOp Bool) (resp_state Bool) Bool)
+    : ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool =
+    inject_l (StateOp Bool) ConsoleOp (resp_state Bool) console_resp Bool tree
+
+  fn inject_right
+      (tree : ITree ConsoleOp console_resp Bool)
+    : ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool =
+    inject_r (StateOp Bool) ConsoleOp (resp_state Bool) console_resp Bool tree
+
+  theorem inject_left_ret (value : Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_left
+          (ITree.Ret (StateOp Bool) (resp_state Bool) Bool value))
+        (ITree.Ret (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool value) = Refl
+
+  theorem inject_left_vis (op : StateOp Bool)
+      (continuation : resp_state Bool op ->
+        ITree (StateOp Bool) (resp_state Bool) Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_left
+          (ITree.Vis (StateOp Bool) (resp_state Bool) Bool op continuation))
+        (ITree.Vis (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool
+          (Coproduct.InL (StateOp Bool) ConsoleOp op)
+          (λ reply. inject_l (StateOp Bool) ConsoleOp (resp_state Bool)
+            console_resp Bool (continuation reply))) = Refl
+
+  theorem inject_right_ret (value : Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_right (ITree.Ret ConsoleOp console_resp Bool value))
+        (ITree.Ret (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool value) = Refl
+
+  theorem inject_right_vis (op : ConsoleOp)
+      (continuation : console_resp op -> ITree ConsoleOp console_resp Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_right (ITree.Vis ConsoleOp console_resp Bool op continuation))
+        (ITree.Vis (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool
+          (Coproduct.InR (StateOp Bool) ConsoleOp op)
+          (λ reply. inject_r (StateOp Bool) ConsoleOp (resp_state Bool)
+            console_resp Bool (continuation reply))) = Refl
+  ```
+
+  In each fresh client, include only the functions and Refl laws for the
+  selected injection. For each, make a paired fresh client with the same
+  source and dependencies but omit only that name's import.
+- measured: each imported function's resolved `GlobalId` and checked type,
+  the four `Refl` equations, and each paired omission's exact name error.
+- claimed: each home publishes its original checked injection with all five
+  explicit parameters in spec order; the `Ret` and `Vis` clauses preserve the
+  value and response continuation while adding the appropriate coproduct tag.
+- the gap: import resolution and typechecking alone would not detect a wrong
+  constructor tag or continuation. Separate left/right `Ret` and `Vis` equations
+  pin both branches.
+- expect: both imported clients accept and resolve the snapshotted IDs. Their
+  function types are the checked left and right inclusion signatures in
+  `36 §4.5.7`; all four `Refl` equations accept. Each omitted-import client
+  refuses with `UnboundName` naming only its selected injection.
+- controls: each imported client is the positive control for its one-name
+  omission. The `Ret` values and the typed left/right operations are the
+  positive controls for the branch equations.
+- why: the generic home is not a HostIO alias. Complete HostIO instances may
+  use the separate `host_fs` or `host_console` rewrites instead.
 
 ### surface/modules/inc3a-fixed-width-imports-and-safe-range-boundaries
 
