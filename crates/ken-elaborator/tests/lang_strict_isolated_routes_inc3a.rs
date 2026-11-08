@@ -146,8 +146,16 @@ fn generic_effect_floor_uses_captured_id_and_leaves_bare_bind_for_users() {
         Err(error) => panic!("wrong bare bind refusal: {error:?}"),
         Ok(_) => panic!("bare bind leaked into the strict floor"),
     }
-    strict("fn bind (n : Nat) : Nat = n\nfn apply (n : Nat) : Nat = bind n\n")
+    let shadow = strict("fn bind (n : Nat) : Nat = n\nfn apply (n : Nat) : Nat = bind n\n")
         .expect("user-defined bind is not reserved");
+    assert_ne!(
+        shadow.globals["bind"], bind,
+        "the user's bind is a new definition"
+    );
+    assert_eq!(
+        shadow.globals["itree_bind"], bind,
+        "the user cannot redirect the floor alias"
+    );
 }
 
 /// Promise class: normative compatibility vector. MEASURED: seven admitted families
