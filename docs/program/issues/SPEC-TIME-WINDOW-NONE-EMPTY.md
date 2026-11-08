@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-NONE-EMPTY
 title: "Spec 69 §10 says a window covering every event of a trace leaves it unchanged, and §9 says an inverted window selects nothing, but no law states the dual of §10: a window that contains none of a trace's events selects the empty trace, whatever its bounds. A client that proves a quiet period must re-derive it from membership soundness. Rule from a checked D0 at zero trust the public law that a membership-quantified miss empties the window, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
