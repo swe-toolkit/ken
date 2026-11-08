@@ -37,6 +37,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use ken_elaborator::lexer::{Lexer, Token};
+use ken_elaborator::{ElabEnv, ElabError};
 
 const PER_EXAMPLE_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -455,6 +456,49 @@ fn closures_carries_pure_callback_through_catalog_prelude() {
         output, expected,
         "the accepted example must preserve its output"
     );
+}
+
+/// Promise class: durable invariant. MEASURED: each of the four existing
+/// Collections-prefixed users elaborates under the strict entry with the
+/// explicit Conjunction import, while the same source without it refuses an
+/// unbound conjunction name. CLAIMED: the imported checked conjunction is
+/// sufficient for these users, rather than adding the pre-source And to the
+/// floor. THE GAP: their output parity is independently checked by the
+/// existing CLI oracle test, not by this strict elaboration pin.
+#[test]
+fn collections_users_recheck_with_explicit_conjunction_import_under_strict() {
+    let root = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imports = "import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)\n";
+    let other_imports = "import Capability.Console.Text (print_line)\n\
+                         import Capability.Process.Exit (host_program)\n\
+                         import Core.Classes.LawfulClasses (leqChar)\n";
+    let prefix = collections_prelude();
+    for slug in NEEDS_COLLECTIONS {
+        let body = fs::read_to_string(rosetta_dir().join(slug).join(format!("{slug}.ken")))
+            .unwrap_or_else(|error| panic!("{slug}: source missing: {error}"));
+        let body = body
+            .strip_prefix("program capabilities FS APartial\n")
+            .expect("existing Rosetta program header");
+        let composed =
+            format!("program capabilities FS APartial\n{imports}{other_imports}{prefix}\n{body}");
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_isolated_file_strict_v1(&[root.clone()], &composed)
+            .unwrap_or_else(|error| panic!("{slug}: strict conjunction import: {error:?}"));
+        let without_conjunction =
+            format!("program capabilities FS APartial\n{other_imports}{prefix}\n{body}");
+        let mut negative = ElabEnv::new().expect("prelude");
+        match negative.elaborate_isolated_file_strict_v1(&[root.clone()], &without_conjunction) {
+            Err(ElabError::UnboundName { name, .. }) => assert!(
+                ["And", "and_intro", "and_fst", "and_snd"].contains(&name.as_str()),
+                "{slug}: no-import first missing name {name}"
+            ),
+            Err(error) => panic!("{slug}: wrong no-import refusal: {error:?}"),
+            Ok(_) => panic!("{slug}: strict source accepted without its conjunction import"),
+        }
+    }
 }
 
 #[test]

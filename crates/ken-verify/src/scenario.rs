@@ -2113,7 +2113,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
               (\observed. match observed {
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
-                    OpReadDirectory |-> match cause {
+                    FileOperation.OpReadDirectory |-> match cause {
                       IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
                       IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
                       IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
@@ -2128,21 +2128,21 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
                       IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
+                    FileOperation.OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
                 Ok entries |-> match entries {
@@ -2185,7 +2185,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
               (\observed. match observed {
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
-                    OpCreateDirectory |-> match cause {
+                    FileOperation.OpCreateDirectory |-> match cause {
                       IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
                       IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
                       IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
@@ -2200,21 +2200,21 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
                       IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
+                    FileOperation.OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull ExitCode.Success
@@ -2244,7 +2244,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
               (\observed. match observed {
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
-                    OpRemoveFile |-> match cause {
+                    FileOperation.OpRemoveFile |-> match cause {
                       IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
                       IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
                       IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
@@ -2259,21 +2259,21 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
                       IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
+                    FileOperation.OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRemoveDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull ExitCode.Success
@@ -2304,7 +2304,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
               (\observed. match observed {
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
-                    OpRemoveDirectory |-> match cause {
+                    FileOperation.OpRemoveDirectory |-> match cause {
                       IOError.CapabilityDenied |-> host_exit AFull (ExitCode.Failure 44) ;
                       IOError.NotFound |-> host_exit AFull (ExitCode.Failure 45) ;
                       IOError.PermissionDenied |-> host_exit AFull (ExitCode.Failure 46) ;
@@ -2319,21 +2319,21 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                       IOError.Revoked |-> host_exit AFull (ExitCode.Failure 55) ;
                       IOError.Other _ |-> host_exit AFull (ExitCode.Failure 56)
                     } ;
-                    OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
-                    OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
+                    FileOperation.OpReadFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpWriteFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpChangeMode |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpAppendFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpMetadata |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpReadDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpCreateDirectory |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRemoveFile |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpRename |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSeek |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetLength |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSync |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpGetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpSetInheritance |-> host_exit AFull (ExitCode.Failure 199) ;
+                    FileOperation.OpDuplicate |-> host_exit AFull (ExitCode.Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull ExitCode.Success

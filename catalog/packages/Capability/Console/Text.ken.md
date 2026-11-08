@@ -12,7 +12,7 @@ single-write trees. These nine exports are ordinary kernel-checked Ken
 definitions with zero `trusted_base()` delta.
 
 ```ken
-export IO, write, print_line
+export IO, write, print_line, read, flush, is_terminal
 
 pub proc print (text : String) : IO (Result IOError Unit) visits [Console] =
   write ConsoleStream.Stdout (bytes_encode text)

@@ -11,7 +11,7 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 40] = [
+const TYPE_FLOOR: [&str; 47] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -21,9 +21,13 @@ const TYPE_FLOOR: [&str; 40] = [
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
+    "DirEntry",
     "Equal",
     "ExitCode",
     "FileError",
+    "FileKind",
+    "FileMetadata",
+    "FileOperation",
     "HostIO",
     "IOError",
     "ITree",
@@ -39,16 +43,19 @@ const TYPE_FLOOR: [&str; 40] = [
     "Prop",
     "Proved",
     "ReadProgress",
+    "ReadResult",
     "ResourceError",
     "ResourceKind",
     "ResourceOpenMode",
     "Result",
+    "StateOp",
     "Top",
     "TransferCount",
     "Unit",
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "resp_state",
     "run_state",
     "state_get",
     "state_put",
@@ -634,7 +641,10 @@ fn pair_floor_closure_is_rederived_after_realization() {
         let mut env = ElabEnv::new().expect("base environment");
         let pair_bindings = PAIR_BINDINGS.map(|name| env.globals[name]);
         let result = env.elaborate_module_from_roots_strict(&[root.clone()], module);
-        assert!(result.is_ok(), "{module} must load through its checked providers: {result:?}");
+        assert!(
+            result.is_ok(),
+            "{module} must load through its checked providers: {result:?}"
+        );
         assert_eq!(
             PAIR_BINDINGS.map(|name| env.globals[name]),
             pair_bindings,
