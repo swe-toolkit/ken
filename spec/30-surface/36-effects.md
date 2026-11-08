@@ -1172,8 +1172,18 @@ Pair(run_state s₀ m, π) : Σ(t:ITree F (a × s)).AllRet P t
   tree, `../40-runtime/42`); it is **not** an I/O driver like Console's `run_io`
   (§7.2), because pure state threading performs no I/O.
 - Worked `accumulator-factory` (VAL2 #10) — a post-increment `next` that returns
-  the current value and bumps the state:
+  the current value and bumps the state. The following is a **schematic
+  denotational equation**, not a Ken source example or an acceptance
+  claim in either resolution mode:
   `next () = bind (state_get ()) (λ n. bind (state_put (n + 1)) (λ _. Ret n))`.
+  Here `bind` means §2.2's tree grafting, and `Ret` is the tree return
+  with its type and response-family arguments elided. Strict source
+  names the checked sequencer `itree_bind` and the scoped constructor
+  `ITree.Ret`, applying the latter with its operation carrier,
+  response family, result type and value (`§2.1`, `30-taxonomy §4`).
+  Legacy also resolves bare `bind` to that same checked sequencer ID;
+  the displayed bare `Ret` and omitted arguments are not a source
+  promise in Legacy either.
 
   ```
   run_state 0  next  =  (0, 1)     -- result = old value 0 ; final state 1 ; pair = (result, state)
