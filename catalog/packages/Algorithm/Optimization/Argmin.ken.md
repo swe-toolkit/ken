@@ -28,8 +28,8 @@ tail. On a possibly empty `List`, each Option selector returns no value on
 ## Definition
 
 The minimum selector and its ten laws lead, followed by its Option selector
-and five laws. The maximum selector and its ten laws follow, then its Option
-selector and five laws. Private shared selection helpers, inductive proofs and
+and seven laws. The maximum selector and its ten laws follow, then its Option
+selector and seven laws. Private shared selection helpers, inductive proofs and
 Option proof helpers close the definition. Two generic Nat-order facts come
 from their canonical owner, `Data.Numeric.Nat.Order`.
 
