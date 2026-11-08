@@ -16,7 +16,7 @@ restate the publisher mechanics (that is `lieutenant.md` and
 
 | act | who | how |
 |---|---|---|
-| publish: push `wp/<ID>`, CI-gate, merge | **lieutenant** | scripted publisher path (`lieutenant.md`) |
+| publish: push `wp/<ID>`, CI-gate, merge; close+reopen a PR to re-trigger CI; close the PR of a withdrawn SHA | **lieutenant** | scripted publisher path (`lieutenant.md`); `gh pr close` for a withdrawal (`merge-procedure.md` M5) |
 | any other write, under operator direction or exceptional circumstance | **Steward** | corpus route (`agent/**` + `IMPLEMENTATION-PROGRESS.md`); or operate the publisher when no lieutenant is seated |
 | **read** CI runs, logs, PR/check status | **any seat** | mint a token (below), read-only `gh` |
 

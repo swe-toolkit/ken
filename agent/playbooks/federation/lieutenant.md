@@ -110,6 +110,7 @@ artifacts have not already settled goes to the Steward.**
 | release the next slice of a **framed, dependency-clear** campaign node | frame a successor, or release a node that is not yet framed |
 | re-trigger CI on the same SHA for an obviously-transient red | a red whose cause is not obviously transient (attribute → escalate) |
 | stuck-check / dead-publisher recovery on an unchanged SHA | a merge conflict, a moved base, a shape that no longer matches the Decision |
+| stop the publisher and close the PR of a withdrawn SHA (`merge-procedure.md` M5) | whether to withdraw it |
 | M8 Adversary compact/notify/rouse | a soundness question, or anything that grows the TCB |
 | cross-lane ordering the Steward has already prioritized | which lane wins when priority is genuinely unsettled |
 

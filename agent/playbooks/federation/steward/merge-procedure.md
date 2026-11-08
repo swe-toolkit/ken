@@ -129,6 +129,19 @@ same SHA only after confirming the SHA and PR head did not move: close and
 reopen the PR, then re-run the publisher. Never `gh run rerun`: it is refused
 (`COORDINATION.md §12a`) and would retest the old merge ref.
 
+When the Steward withdraws a routed SHA, the lieutenant:
+1. kills the publisher process for that SHA and confirms it has exited. A live
+   publisher reopens a PR it closed to re-trigger CI.
+2. closes the PR:
+   `gh pr close <n> --comment "Withdrawn: <Steward withdrawal event id>"`.
+   Do not delete the branch, and do not wait for the run to finish. If the PR
+   has already merged, do not close anything: report the landing to the
+   Steward.
+
+The successor SHA gets a new route and a new PR. You will be tempted to leave
+the PR for the Steward because the publisher has no close-only mode. The
+close is yours.
+
 ## M6 — Verify the landing
 
 Fetch and compare every path from the reviewed merge-base range against landed

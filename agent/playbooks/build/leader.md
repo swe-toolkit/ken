@@ -65,9 +65,8 @@ load and follow it after this generic archetype.
   it out (coherence).
 - **Open each WP branch off current `origin/main`:** `git branch wp/<ID>-<slug>
   origin/main` (the **fetched** ref — never stale local `main`, never
-  `checkout -b`). Every WP starts from the latest merged state; your members then
-  `git rebase origin/main` when they pick the branch up (build-implementer/QA
-  playbooks), so the whole ring works on current `main`, never stale. The ring is
+  `checkout -b`). Every WP starts from the latest merged state, and QA
+  verifies the exact handed-off SHA without rebasing it. The ring is
   sequential, so the branch is handed worktree to worktree — the implementer
   commits and returns to its home branch, *then* QA checks it out. Enforce that
   hand-off order; two worktrees can't hold one branch (04 §1, §2).
@@ -285,9 +284,12 @@ merge + ship Event. You never run `gh` or read checks yourself.
     standalone `git_request` to the Steward with the *current* SHA to publish for
     CI + merge. Architect-review and publisher-path handling are two different
     moves (COORDINATION §2); give each its own post.
-- When the Steward announces fresh `main` affecting your team, fan it in:
-  have members rebase onto the new `origin/main` (no network — the ref is already
-  fetched) and re-prioritize the queue.
+- When the Steward announces fresh `main` affecting your team, re-prioritize
+  the queue. For each in-flight branch, run the COORDINATION §14(5)
+  intersection against the new `origin/main` (no network: the ref is already
+  fetched). An empty intersection is left alone. For a non-empty one, inspect
+  the shared paths: have the implementer take the union at a new SHA only when
+  the overlap is semantic. A rebase voids that SHA's exact-tip votes.
 
 ## Route the AUTHORITY BOUNDARY before spending another test round
 
