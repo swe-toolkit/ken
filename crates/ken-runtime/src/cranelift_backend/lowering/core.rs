@@ -13117,6 +13117,18 @@ impl<'a> Lowering<'a> {
         let placement = self
             .static_transition_plan
             .k_emission_placement(&edge.identity)?;
+        if self.defining_emission_owner == Some(placement)
+            && self
+                .static_transition_plan
+                .checked_ih_environment_transport_source(&edge.identity)
+                .is_some()
+        {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "CheckedIhEnvironmentTransport",
+                "a K call is relocated into the owner that plans it; a self-relocation is \
+                 identity and is never issued",
+            ));
+        }
         if self
             .static_transition_plan
             .checked_ih_environment_transport_source(&edge.identity)

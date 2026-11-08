@@ -6425,6 +6425,12 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                 continue;
             }
             let destination_owner = ContinuationEmissionOwner::Specialization(destination.id());
+            // A relocation into the owner that already plans the call is no
+            // relocation: self-relocation is identity and is never issued. The
+            // call stays with its planner owner and that owner's seat emits it.
+            if destination_owner == source_call_identity.emission_owner() {
+                continue;
+            }
             if plan.aggregate_ownership.iter().any(|record| {
                 matches!(
                     record.producer,
