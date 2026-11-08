@@ -16,29 +16,21 @@ fn env() -> ken_elaborator::ElabEnv {
         r#"
         fn px7f_escape_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
-          ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
+          host_pure AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
             (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)
 
         fn px7f_metadata_after (outcome : Result ResourceError FileMetadata)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) =
           match outcome {
-            Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (ResourceBodyResult ResourceError Unit)
+            Err error |-> host_pure AFull (ResourceBodyResult ResourceError Unit)
               (ResourceBodyErr ResourceError Unit error);
-            Ok metadata |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (ResourceBodyResult ResourceError Unit)
+            Ok metadata |-> host_pure AFull (ResourceBodyResult ResourceError Unit)
               (ResourceBodyOk ResourceError Unit MkUnit)
           }
 
         proc px7f_metadata_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result ResourceError FileMetadata)
+          host_bind AFull (Result ResourceError FileMetadata)
             (ResourceBodyResult ResourceError Unit)
             (resourceMetadata AFull resource)
             (\outcome. px7f_metadata_after outcome)
@@ -46,21 +38,15 @@ fn env() -> ken_elaborator::ElabEnv {
         fn px7f_release_after (outcome : Result ResourceError Unit)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) =
           match outcome {
-            Err error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (ResourceBodyResult ResourceError Unit)
+            Err error |-> host_pure AFull (ResourceBodyResult ResourceError Unit)
               (ResourceBodyErr ResourceError Unit error);
-            Ok unit |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (ResourceBodyResult ResourceError Unit)
+            Ok unit |-> host_pure AFull (ResourceBodyResult ResourceError Unit)
               (ResourceBodyOk ResourceError Unit MkUnit)
           }
 
         proc px7f_early_release_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult ResourceError Unit) visits [FS] =
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result ResourceError Unit)
+          host_bind AFull (Result ResourceError Unit)
             (ResourceBodyResult ResourceError Unit)
             (release AFull resource)
             (\outcome. px7f_release_after outcome)
@@ -70,18 +56,12 @@ fn env() -> ken_elaborator::ElabEnv {
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           match bracket {
             ResourceBracketOk resource |-> resourceMetadata AFull resource;
-            ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError FileMetadata)
+            ResourceBracketBodyError error |-> host_pure AFull (Result ResourceError FileMetadata)
               (Err ResourceError FileMetadata ResourceError.MalformedResource);
-            ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError FileMetadata)
+            ResourceBracketReleaseError error |-> host_pure AFull (Result ResourceError FileMetadata)
               (Err ResourceError FileMetadata error);
             ResourceBracketBodyAndReleaseError body_error release_error |->
-              ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-                (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-                (Result ResourceError FileMetadata)
+              host_pure AFull (Result ResourceError FileMetadata)
                 (Err ResourceError FileMetadata release_error)
           }
 
@@ -89,18 +69,14 @@ fn env() -> ken_elaborator::ElabEnv {
           (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
           match outcome {
-            Err open_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError FileMetadata)
+            Err open_error |-> host_pure AFull (Result ResourceError FileMetadata)
               (Err ResourceError FileMetadata ResourceError.MalformedResource);
             Ok bracket |-> px7f_after_escaped_bracket bracket
           }
 
         proc px7f_escape_then_use (cap : Cap AFull) (path : Bytes)
           : HostIO AFull (Result ResourceError FileMetadata) visits [FS] =
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
+          host_bind AFull (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
             (Result ResourceError FileMetadata)
             (withResource AFull Unit (Resource ResourceKind.FsHandle)
               cap path ResourceOpenMode.ResourceMetadata px7f_escape_body)

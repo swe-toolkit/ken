@@ -9,14 +9,8 @@ const PX8DS_SIBLING_RECURSION_PROGRAM: &str = r#"program capabilities FS APartia
 proc countdown (fuel : Nat)
   : HostIO APartial (Result Int Bool) visits [Console] =
   match fuel {
-    Zero |-> ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp
-        (fs_resp APartial) ambient_resp)
-      (Result Int Bool) (Ok Int Bool True);
-    Suc rest |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp
-        (fs_resp APartial) ambient_resp)
-      Bool (Result Int Bool)
+    Zero |-> host_pure APartial (Result Int Bool) (Ok Int Bool True);
+    Suc rest |-> host_bind APartial Bool (Result Int Bool)
       (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
       (\terminal. match terminal {
         False |-> countdown rest;
@@ -26,17 +20,11 @@ proc countdown (fuel : Nat)
 
 fn after_countdown (_outcome : Result Int Bool)
   : HostIO APartial (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp
-      (fs_resp APartial) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+  host_pure APartial (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 proc after_first_countdown (_outcome : Result Int Bool)
   : HostIO APartial (ResourceBodyResult Unit Unit) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp
-      (fs_resp APartial) ambient_resp)
-    (Result Int Bool) (ResourceBodyResult Unit Unit)
+  host_bind APartial (Result Int Bool) (ResourceBodyResult Unit Unit)
     (countdown (Suc Zero))
     (\outcome. after_countdown outcome)
 
@@ -44,20 +32,14 @@ proc selected_buffer_body (terminal : Bool)
   : HostIO APartial (ResourceBodyResult Unit Unit) visits [Console] =
   match terminal {
     False |-> after_countdown (Ok Int Bool False);
-    True |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp
-        (fs_resp APartial) ambient_resp)
-      (Result Int Bool) (ResourceBodyResult Unit Unit)
+    True |-> host_bind APartial (Result Int Bool) (ResourceBodyResult Unit Unit)
       (countdown (Suc (Suc Zero)))
       (\outcome. after_first_countdown outcome)
   }
 
 proc buffer_body (_buffer : BufferHandle)
   : HostIO APartial (ResourceBodyResult Unit Unit) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp
-      (fs_resp APartial) ambient_resp)
-    Bool (ResourceBodyResult Unit Unit)
+  host_bind APartial Bool (ResourceBodyResult Unit Unit)
     (host_console APartial Bool (is_terminal ConsoleStream.Stdout))
     (\terminal. selected_buffer_body terminal)
 
@@ -65,17 +47,14 @@ fn finish_buffer
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO APartial ExitCode =
   match outcome {
-    Err _ |-> host_exit APartial (ExitCode.Failure 91);
-    Ok (ResourceBracketOk _) |-> host_exit APartial ExitCode.Success;
-    Ok _ |-> host_exit APartial (ExitCode.Failure 92)
+    Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 91);
+    Ok (ResourceBracketOk _) |-> host_pure APartial ExitCode ExitCode.Success;
+    Ok _ |-> host_pure APartial ExitCode (ExitCode.Failure 92)
   }
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp
-      (fs_resp APartial) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind APartial (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withBuffer APartial Unit Unit (2 : Int) buffer_body)
     (\outcome. finish_buffer outcome)
 "#;

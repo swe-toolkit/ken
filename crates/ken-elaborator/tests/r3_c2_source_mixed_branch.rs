@@ -129,7 +129,7 @@ const C2_MIXED_SOURCE: &str = "program capabilities FS APartial\n\
     }\n\
     fn main (input : ProcessInput) (_caps : ProgramCaps APartial) \
       : HostIO APartial ExitCode = \
-      host_exit APartial (sizeExit (liftSize (inputRose input)))";
+      host_pure APartial ExitCode (sizeExit (liftSize (inputRose input)))";
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
     StableSymbol::declaration(package, &[], name)
@@ -501,7 +501,7 @@ const R3_4B_ARTIFACT_OUTPUT: &str = "KEN_R3_4B_ARTIFACT_OUTPUT";
 const R3_4B_IDENTITY_SOURCE: &str = r#"program capabilities FS APartial
 fn unused_sibling (_input : ProcessInput) : ExitCode = ExitCode.Success
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
-  : HostIO APartial ExitCode = host_exit APartial ExitCode.Success
+  : HostIO APartial ExitCode = host_pure APartial ExitCode ExitCode.Success
 "#;
 
 /// Nested-compilation worker for the artifact-identity control below.

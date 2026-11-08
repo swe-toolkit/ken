@@ -6,15 +6,11 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 const PROGRAM: &str = r#"program capabilities FS APartial
 proc write_then_exit (bytes : Bytes) (code : ExitCode)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. host_exit APartial code))
+      (\_. host_pure APartial ExitCode code))
 
 proc finish (outer : Result IOError (Result Bytes Bytes))
   : HostIO APartial ExitCode visits [Console] =
@@ -27,9 +23,7 @@ proc finish (outer : Result IOError (Result Bytes Bytes))
   }
 
 proc run_case (as_ok : Bool) : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "seed:")))
     (\written. finish (match written {
@@ -46,7 +40,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 99);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 99);
       Cons _ tail |-> match tail {
         Nil |-> run_case True;
         Cons _ _ |-> run_case False
@@ -58,14 +52,12 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 const IGNORED_PAYLOAD_PROGRAM: &str = r#"program capabilities FS APartial
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "ignored")))
     (\written. match written {
-      Err _ |-> host_exit APartial (ExitCode.Failure 3);
-      Ok _ |-> host_exit APartial ExitCode.Success
+      Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 3);
+      Ok _ |-> host_pure APartial ExitCode ExitCode.Success
     })
 "#;
 

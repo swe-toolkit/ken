@@ -28,7 +28,7 @@ fn input_flag (input : ProcessInput) : Bool =
 
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
-  host_exit APartial (exit_for (input_flag input))
+  host_pure APartial ExitCode (exit_for (input_flag input))
 "#;
 
 const COMPUTATIONAL_PROOF: &str = r#"program capabilities FS APartial
@@ -38,7 +38,7 @@ fn computational_prop (b : Bool) : Nat =
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
-  host_exit APartial (match computational_prop True {
+  host_pure APartial ExitCode (match computational_prop True {
     Zero |-> ExitCode.Success; Suc _ |-> ExitCode.Failure 7
   })
 "#;
@@ -53,7 +53,7 @@ fn dependent_type (b : Bool) : result_type b =
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
-  host_exit APartial ExitCode.Success
+  host_pure APartial ExitCode ExitCode.Success
 "#;
 
 fn selected_package(

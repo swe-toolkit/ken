@@ -53,7 +53,7 @@ fn exactNatThree (value : Nat) : ExitCode = match value {
 
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (exactNatThree (liftSize
+  host_pure APartial ExitCode (exactNatThree (liftSize
     (LiftNode (Join LiftRose
       (One LiftRose LiftLeaf)
       (One LiftRose (LiftNode (Empty LiftRose)))))))
