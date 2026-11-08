@@ -1019,22 +1019,22 @@ pub fn with_stderr (plan : SpawnPlan) (target : ChildStdio) : SpawnPlan
 payloads, not bare `Exited` or `Signaled`. This does not make the
 separate `ChildStdio` family a floor admission.
 
-**Child-process package home (Increment 2b).**
-`Capability.Process.Child` is the explicit-import home for exactly
-twelve checked pre-source names: `ChildStdio`, `ChildPipe`,
-`ChildNull`, `ChildInherit`, `spawn_plan`, `with_environment`,
-`with_stdin`, `with_stdout`, `withChild`, `wait_child`,
-`take_stdout` and `read_pipe`. The `ChildStdio` export carries its
-complete three-constructor public family; the private plan
-constructor remains hidden. `ChildExit` and its qualified cases
-remain in the scoped floor (§30 §4), not in this package. This home
-does not add `SpawnPlan`, `with_stderr`, `take_stdin` or `take_stderr`:
-those four home promises require the separate Increment 3 AC-0.
-Other child and pipe operations described below retain their existing
-contract; this roster does not give them an unruled home. The twelve
-exports reuse checked identities and require an explicit import in
-Strict isolated source; they do not alter authority, trust or CLI
-resolution routes.
+**Child-process package home (Increment 2b, extended in Increment 3a).**
+`Capability.Process.Child` is the explicit-import home for sixteen
+checked pre-source names: `ChildStdio`, `ChildPipe`, `ChildNull`,
+`ChildInherit`, `SpawnPlan`, `spawn_plan`, `with_environment`,
+`with_stdin`, `with_stdout`, `with_stderr`, `withChild`, `wait_child`,
+`take_stdin`, `take_stdout`, `take_stderr` and `read_pipe`. The first
+twelve were homed in Increment 2b; Increment 3a adds `SpawnPlan`,
+`with_stderr`, `take_stdin` and `take_stderr` at their existing IDs.
+The `ChildStdio` export carries its complete three-constructor public
+family; the `SpawnPlan` export exposes the type without its private
+constructor. `ChildExit` and its qualified cases remain in the scoped
+floor (§30 §4), not in this package. Other child and pipe operations
+described below retain their existing contract; this roster does not
+give them an unruled home. Each homed name requires an explicit import
+in Strict isolated source; this addition alters neither authority,
+trust nor CLI resolution routes.
 
 `spawn_plan` sets the environment to empty and all three child streams to
 `ChildNull`. `with_environment` replaces, rather than adds to, the plan's
@@ -1233,6 +1233,90 @@ Native Process parity, cwd attachments, credentials, namespaces,
 cgroups, rlimits, PATH search, process groups, pidfd signalling and
 non-blocking wait are successor work, not implicit fields or behaviors
 of this first slice.
+
+### 1.12 Strict isolated I/O vocabulary (Increment 3a)
+
+> **Increment 3a status: specified, not an implementation or route gate.**
+> The exact-base AC-0 census on `f3c016f89` identified source-written
+> names blocked at the Strict entry; the Architect's floor analysis and
+> Steward admission `evt_36xwaa64spemr` classify the exact checked IDs.
+> Their package tests, assembled-candidate review, official conformance,
+> CI and landed trust are separate evidence, not established here.
+
+The four added Child homes and the six names held since Increment 2 are
+resolved as follows. H means an existing checked pre-source identity
+published by an ordinary catalog unit; B means a scoped floor family,
+**not** a package home. These are source-availability changes, not new
+operations or a change to any existing type, capability, effect row or
+native artifact leaf. The `read` and `wall_now` operations keep their
+existing Console and Clock effect rows, and `host_clock` remains the
+Clock-to-HostIO lift.
+
+| Written name | Strict source path | Existing checked role |
+|---|---|---|
+| `SpawnPlan` | H: import `Capability.Process.Child (SpawnPlan)` | Public plan type; constructor remains private. |
+| `with_stderr` | H: import `Capability.Process.Child (with_stderr)` | Pure setter alongside `with_stdin` and `with_stdout`. |
+| `take_stdin` | H: import `Capability.Process.Child (take_stdin)` | Parent write end of child stdin. |
+| `take_stderr` | H: import `Capability.Process.Child (take_stderr)` | Parent read end of child stderr. |
+| `read` | H: import `Capability.Console.Text (read)` | `ConsoleStream → Int → IO (Result IOError ReadResult)`, `visits [Console]`. |
+| `ReadResult` | B: `ReadResult` without import | Exact checked Console read result type. |
+| `Chunk` | B: `ReadResult.Chunk` | Carries the bytes read; bare `Chunk` is not reserved. |
+| `Eof` | B: `ReadResult.Eof` | End-of-input case; bare `Eof` is not reserved. |
+| `wall_now` | H: import `Capability.Time.WallClock (wall_now)` | `ClockIO Instant` action, `visits [Clock]`. |
+| `host_clock` | H: import `Capability.Process.Exit (host_clock)` | `ClockIO r → HostIO a r`, `visits [Clock]`. |
+
+The `ReadResult` family is exactly `Chunk Bytes | Eof`; its public
+constructors use only the scoped paths shown. The native Console-read
+reply is built with those same checked constructor IDs, so an imported
+lookalike family cannot replace it. `Capability.Console.Text` already
+homes `write` and `IO`, `Capability.Time.WallClock` has the wall-clock
+helpers, and `Capability.Process.Exit` already homes the other HostIO
+lifts. An H home requires both the package-home mapping and its unit's
+public export; a mapping row alone is not an importable interface.
+For each H name a Strict isolated client with its import accepts and
+the same client without the import refuses `UnboundName`. Floor names
+need no import; their qualified public cases resolve at the original
+constructor IDs, with a same-spelled source family unable to replace
+the native response. The CLI's `check`, `run` and `native-build` route
+switches belong to Increment 3b, not this vocabulary slice.
+
+The existing exact checked FS result carriers `FileKind` (`KFile`,
+`KDirectory`, `KSymlink`, `KOther`), `FileMetadata`
+(`MkFileMetadata Int FileKind`) and `DirEntry`
+(`MkDirEntry Bytes FileKind`) also enter the scoped floor. Native
+metadata and directory replies select their checked constructors;
+source uses only `FileKind.KFile` and its three sibling qualified
+cases, `FileMetadata.MkFileMetadata` and `DirEntry.MkDirEntry`.
+`FileOperation` has sixteen exact checked operation cases selected by
+native FileError production and already named by source in
+`Capability.System.Error` (§33 §3.3). It moves from that package home
+to the scoped floor, with its complete cases available as
+`FileOperation.OpReadFile`, `FileOperation.OpWriteFile`,
+`FileOperation.OpAppendFile`, `FileOperation.OpMetadata`,
+`FileOperation.OpReadDirectory`, `FileOperation.OpCreateDirectory`,
+`FileOperation.OpRemoveFile`, `FileOperation.OpRemoveDirectory`,
+`FileOperation.OpRename`, `FileOperation.OpChangeMode`,
+`FileOperation.OpSeek`, `FileOperation.OpSetLength`,
+`FileOperation.OpSync`, `FileOperation.OpGetInheritance`,
+`FileOperation.OpSetInheritance` and `FileOperation.OpDuplicate`.
+Only the five family names enter the counted floor; none of these
+constructor leaves joins bare protected B. Native stable-symbol leaves
+and runtime IDs do not change.
+
+Eight further checked FS wrappers (`append_file`, `change_mode`,
+`create_directory`, `read_directory`, `remove_directory`,
+`remove_file`, `rename_file` and `file_metadata`) are homed in
+`Capability.Filesystem.Authority`; `writeAt` and `writeAll` in
+`Capability.System.IO`; `freeze` in `Capability.System.Buffer`;
+`resourceMetadata` in `Capability.System.Resource`; `flush` and
+`is_terminal` in `Capability.Console.Text`; and `intToChar` beside
+`charToInt` in `Core.Classes.LawfulClasses` (§30 §4). Each retains its
+checked type, capability and effect contract. None is a new floor
+member. `FileOperation` and the four other scoped families receive
+no package-home row, and `Core.Logic.And` does not silently become
+the different pre-source `And` identity. Per-name Strict-entry pins
+and unresolved names are recorded in §30 §4; no host operation
+constructor or State signature is homed by analogy.
 
 ## 2. The FFI surface — the `foreign` declaration
 
