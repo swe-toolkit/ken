@@ -11,50 +11,37 @@ fn retain_tree
 
 proc step (marker : Bytes) (tree : HostIO APartial (Result Int Bool))
   : HostIO APartial (Result Int Bool) visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) (Result Int Bool)
+  host_bind APartial (Result IOError Unit) (Result Int Bool)
     (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout marker))
     (retain_tree tree)
 
 fn zero_tree (_unit : Unit) : HostIO APartial (Result Int Bool) =
-  ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result Int Bool) (Ok Int Bool True)
+  host_pure APartial (Result Int Bool) (Ok Int Bool True)
 
 proc multi_tree (_unit : Unit)
   : HostIO APartial (Result Int Bool) visits [Console] =
   step (bytes_encode "A")
     (step (bytes_encode "B")
       (step (bytes_encode "C")
-        (ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp
-            (fs_resp APartial) ambient_resp)
-          (Result Int Bool) (Err Int Bool (7 : Int)))))
+        (host_pure APartial (Result Int Bool) (Err Int Bool (7 : Int)))))
 
 fn exit_with (code : ExitCode) (_flushed : Result IOError Unit)
-  : HostIO APartial ExitCode = host_exit APartial code
+  : HostIO APartial ExitCode = host_pure APartial ExitCode code
 
 proc flush_then_exit (code : ExitCode) (_written : Result IOError Unit)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
     (exit_with code)
 
 proc finish (outcome : Result Int Bool)
   : HostIO APartial ExitCode visits [Console] =
   match outcome {
-    Err value |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    Err value |-> host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit)
         (write ConsoleStream.Stdout (bytes_encode ":final-E")))
       (flush_then_exit (ExitCode.Failure 7));
-    Ok value |-> bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    Ok value |-> host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit)
         (write ConsoleStream.Stdout (bytes_encode ":final-O")))
       (flush_then_exit ExitCode.Success)
@@ -64,16 +51,10 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
     MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_exit APartial (ExitCode.Failure 99);
+      Nil |-> host_pure APartial ExitCode (ExitCode.Failure 99);
       Cons _argv0 rest |-> match rest {
-        Nil |-> bind (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp
-            (fs_resp APartial) ambient_resp)
-          (Result Int Bool) ExitCode (zero_tree MkUnit) (\outcome. finish outcome);
-        Cons _argument _tail |-> bind (Coproduct (FSOp APartial) AmbientOp)
-          (resp_coproduct (FSOp APartial) AmbientOp
-            (fs_resp APartial) ambient_resp)
-          (Result Int Bool) ExitCode (multi_tree MkUnit) (\outcome. finish outcome)
+        Nil |-> host_bind APartial (Result Int Bool) ExitCode (zero_tree MkUnit) (\outcome. finish outcome);
+        Cons _argument _tail |-> host_bind APartial (Result Int Bool) ExitCode (multi_tree MkUnit) (\outcome. finish outcome)
       }
     }
   }

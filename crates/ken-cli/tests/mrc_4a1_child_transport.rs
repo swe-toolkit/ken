@@ -29,17 +29,11 @@ use std::process::Command;
 /// census whose fixture is novel measures the fixture first.
 const CENSUS_PROGRAM: &str = r#"program capabilities FS APartial
 proc two_step (label : String) : HostIO APartial Unit visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit Unit
+  host_bind APartial Unit Unit
     (host_console APartial Unit (print_line label))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) Unit
+    (\_. host_bind APartial (Result IOError Unit) Unit
       (host_console APartial (Result IOError Unit) (flush ConsoleStream.Stdout))
-      (\_. ITree.Ret (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        Unit MkUnit))
+      (\_. host_pure APartial Unit MkUnit))
 
 proc after_write (written : Result IOError Unit)
   : HostIO APartial Unit visits [Console] =
@@ -49,18 +43,14 @@ proc after_write (written : Result IOError Unit)
   }
 
 proc inner : HostIO APartial Unit visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) Unit
+  host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "probe:")))
     after_write
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    Unit ExitCode inner (\_. host_exit APartial ExitCode.Success)
+  host_bind APartial Unit ExitCode inner (\_. host_pure APartial ExitCode ExitCode.Success)
 "#;
 
 // ---- the envelope, and the instrument that reads it ----------------------

@@ -5,9 +5,7 @@ pub(super) fn nested_bracket_source(depth: usize) -> String {
         1 => "leaf_body",
         2 => {
             r#"(\resource.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit))
+          host_bind AFull (Result FileError (ResourceBracketResult Unit Unit))
             (ResourceBodyResult Unit Unit)
             (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
               ResourceOpenMode.ResourceMetadata leaf_body)
@@ -15,16 +13,11 @@ pub(super) fn nested_bracket_source(depth: usize) -> String {
         }
         3 => {
             r#"(\resource.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit))
+          host_bind AFull (Result FileError (ResourceBracketResult Unit Unit))
             (ResourceBodyResult Unit Unit)
             (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
               ResourceOpenMode.ResourceMetadata (\inner_resource.
-                bind (Coproduct (FSOp AFull) AmbientOp)
-                  (resp_coproduct (FSOp AFull) AmbientOp
-                    (fs_resp AFull) ambient_resp)
-                  (Result FileError (ResourceBracketResult Unit Unit))
+                host_bind AFull (Result FileError (ResourceBracketResult Unit Unit))
                   (ResourceBodyResult Unit Unit)
                   (withResource AFull Unit Unit cap (bytes_encode "held-2.bin")
                     ResourceOpenMode.ResourceMetadata leaf_body)

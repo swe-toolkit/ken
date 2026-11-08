@@ -10,21 +10,15 @@ fn body_from_write (outcome : Result ResourceError Unit)
 
 fn after_write (outcome : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (body_from_write outcome)
+  host_pure AFull (ResourceBodyResult Unit Unit) (body_from_write outcome)
 
 fn read_error_body (error : ResourceError)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
 
 fn read_eof_body (_unit : Unit)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
 
 proc after_read
   (output : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
@@ -35,9 +29,7 @@ proc after_read
     Ok progress |-> match progress {
       ReadProgress.ReadEof |-> read_eof_body MkUnit;
       ReadProgress.ReadSome span count |->
-        bind (Coproduct (FSOp AFull) AmbientOp)
-          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-          (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+        host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
           (writeAll AFull output (0 : Int) buffer span)
           (\written. after_write written)
     }
@@ -47,9 +39,7 @@ proc buffer_body
   (input : Resource ResourceKind.FsHandle) (output : Resource ResourceKind.FsHandle)
   (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
     (readAt AFull input (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
     (\outcome. after_read output buffer outcome)
 
@@ -70,16 +60,12 @@ fn buffer_bracket_body
 fn after_buffer
   (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (buffer_bracket_body outcome)
+  host_pure AFull (ResourceBodyResult Unit Unit) (buffer_bracket_body outcome)
 
 proc output_body
   (input : Resource ResourceKind.FsHandle) (output : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (6 : Int) (buffer_body input output))
     (\outcome. after_buffer outcome)
@@ -101,15 +87,11 @@ fn file_bracket_body
 fn after_output
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit) (file_bracket_body outcome)
+  host_pure AFull (ResourceBodyResult Unit Unit) (file_bracket_body outcome)
 
 proc input_body (cap : Cap AFull) (input : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "output.bin")
       (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrTruncate) (output_body input))
@@ -118,13 +100,13 @@ proc input_body (cap : Cap AFull) (input : Resource ResourceKind.FsHandle)
 fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (ExitCode.Failure 81);
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 81);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
-      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 82);
-      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 83);
+      ResourceBracketOk value |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError error |-> host_pure AFull ExitCode (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_pure AFull ExitCode (ExitCode.Failure 83);
       ResourceBracketBodyAndReleaseError body_error release_error |->
-        host_exit AFull (ExitCode.Failure 84)
+        host_pure AFull ExitCode (ExitCode.Failure 84)
     }
   }
 
@@ -132,9 +114,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "input.bin")
           ResourceOpenMode.ResourceRead (input_body cap))
         (\outcome. finish outcome)

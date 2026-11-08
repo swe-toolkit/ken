@@ -35,7 +35,8 @@ the bracket's private finalizer treats the resulting `Closed` as already
 settled rather than closing the OS resource twice.
 
 ```ken
-export ResourceBodyResult,
+export resourceMetadata,
+  ResourceBodyResult,
   ResourceBodyOk,
   ResourceBodyErr,
   ResourceBracketResult,

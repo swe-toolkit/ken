@@ -7,20 +7,14 @@
 const SAME_TYPE: &str = r#"program capabilities FS APartial
 proc send_pair (left : Bytes) (right : Bytes)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "begin:")))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout left))
-      (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        (Result IOError Unit) ExitCode
+      (\_. host_bind APartial (Result IOError Unit) ExitCode
         (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout right))
-        (\_. host_exit APartial ExitCode.Success)))
+        (\_. host_pure APartial ExitCode ExitCode.Success)))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
@@ -30,16 +24,12 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 const MIXED_TYPE: &str = r#"program capabilities FS APartial
 proc send_and_exit (bytes : Bytes) (code : ExitCode)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
     (host_console APartial (Result IOError Unit)
       (write ConsoleStream.Stdout (bytes_encode "begin:")))
-    (\_. bind (Coproduct (FSOp APartial) AmbientOp)
-      (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-      (Result IOError Unit) ExitCode
+    (\_. host_bind APartial (Result IOError Unit) ExitCode
       (host_console APartial (Result IOError Unit) (write ConsoleStream.Stdout bytes))
-      (\_. host_exit APartial code))
+      (\_. host_pure APartial ExitCode code))
 
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =

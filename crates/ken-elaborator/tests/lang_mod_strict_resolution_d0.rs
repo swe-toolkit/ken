@@ -839,7 +839,8 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            // Capability.System.Error carries the checked classification ambient row.
+            // FileOperation's former package names now enter the scoped floor;
+            // this historical census row must clear without an Error import.
             "Capability.System.Error".to_string(),
             [
                 "FileOperation",
@@ -1183,7 +1184,7 @@ fn catalog_ambient_passthrough_migration_census() {
     );
     assert!(
         clean.iter().any(|entry| entry == "Capability.System.Error"),
-        "the checked FileOperation home must clear Error's census row"
+        "scoped FileOperation floor must clear Error's former census row"
     );
 
     let ambient = census
