@@ -530,8 +530,8 @@ fn pinned_interior_evidence(
             "the renderer must actually retain the field type"
         );
         assert!(
-            !PRELUDE_FLOOR_NAMES.contains(&"FileOperation"),
-            "an unkeyed field type is not reserved"
+            PRELUDE_FLOOR_NAMES.contains(&"FileOperation"),
+            "FileOperation is a scoped floor family (intrinsic ledger)"
         );
         return BTreeSet::from([operation]);
     }
