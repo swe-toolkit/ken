@@ -1,14 +1,16 @@
 //! Spec 36 §2.5, §4.3: a tree-result proc's `ensures` is a separate `AllRet`
 //! obligation on its unrefined tree. Promise class: durable invariant.
-//! MEASURED: each post mints one Ensures obligation; the true post's goal
-//! normalizes to a reflexive equation the kernel proves by `Refl`, through a
-//! `Ret` leaf and through a `Vis` response; the opposite post's goal is
+//! MEASURED: each post mints one Ensures obligation; the kernel's observational
+//! `Eq` decides the post at each returned literal or constructor, so a true
+//! post's goal normalizes to `Top` and the kernel checks `tt` against the
+//! unnormalized goal, through a `Ret` leaf and, under one response binder,
+//! through a `Vis`; the opposite post normalizes to `Bottom` and `tt` is
 //! refused; the proc's own type stays ITree-headed and a caller binds `Int`.
 //! CLAIMED: no payload is refined. THE GAP: discharge by the prover routes is
 //! not measured here; `ken check` reports these as open obligations.
 
 use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
-use ken_kernel::{check, convert, normalize, whnf, Context, Term};
+use ken_kernel::{check, normalize, whnf, Context, GlobalId, Term};
 
 fn elaborate(source: &str) -> (ElabEnv, Vec<ElabResult>) {
     let mut env = ElabEnv::new().expect("prelude");
@@ -36,26 +38,36 @@ fn ensures_goal(results: &[ElabResult], name: &str) -> Term {
     goals[0].clone()
 }
 
-/// `λ binders. Refl lhs` for a goal whose normal form is `Π binders. Eq T lhs rhs`.
-fn refl_attempt(env: &ElabEnv, goal: &Term) -> Result<(), String> {
-    let mut ctx = Context::new();
+fn constant(id: GlobalId) -> Term {
+    Term::Const {
+        id,
+        level_args: Vec::new(),
+    }
+}
+
+/// The goal's normal form split into its `Π` binder domains and its leaf.
+fn normal_form(env: &ElabEnv, goal: &Term) -> (Vec<Term>, Term) {
     let mut binders = Vec::new();
-    let mut body = normalize(&env.env, &ctx, goal);
+    let mut body = normalize(&env.env, &Context::new(), goal);
     while let Term::Pi(domain, codomain) = body {
-        ctx.push(domain.as_ref().clone());
-        binders.push(domain.as_ref().clone());
+        binders.push(*domain);
         body = *codomain;
     }
-    let Term::Eq(ty, lhs, rhs) = &body else {
-        return Err(format!("goal leaf is not an equation: {body:?}"));
-    };
-    if !convert(&env.env, &ctx, ty, lhs, rhs) {
-        return Err("leaf equation is not reflexive".into());
-    }
-    let proof = binders
+    (binders, body)
+}
+
+/// Asserts the goal's normal form is `Π^binders. leaf`, then has the kernel
+/// check `λ binders. tt` against the original, unnormalized goal.
+fn tt_attempt(env: &ElabEnv, goal: &Term, binders: usize, leaf: GlobalId) -> Result<(), String> {
+    let (domains, body) = normal_form(env, goal);
+    assert_eq!(domains.len(), binders, "response binders in {body:?}");
+    assert_eq!(body, constant(leaf), "the decided post");
+    let proof = domains
         .into_iter()
         .rev()
-        .fold(Term::Refl(lhs.clone()), |proof, domain| Term::lam(domain, proof));
+        .fold(constant(env.env.tt_id()), |proof, domain| {
+            Term::lam(domain, proof)
+        });
     check(&env.env, &Context::new(), &proof, goal).map_err(|error| format!("{error:?}"))
 }
 
@@ -76,9 +88,13 @@ fn declared(post: &str) -> String {
 #[test]
 fn changed_proc_post_is_all_ret_on_its_ret_leaf() {
     let (env, results) = elaborate(&changed(1));
-    refl_attempt(&env, &ensures_goal(&results, "one")).expect("AllRet (λ r. r = 1) (Ret 1)");
+    let goal = ensures_goal(&results, "one");
+    tt_attempt(&env, &goal, 0, env.env.top_id()).expect("AllRet (λ r. r = 1) (Ret 1)");
     let itree = env.globals["ITree"];
-    let (_, ty) = env.env.const_type(result(&results, "one").def_id).expect("checked one");
+    let (_, ty) = env
+        .env
+        .const_type(result(&results, "one").def_id)
+        .expect("checked one");
     let mut spine = whnf(&env.env, &Context::new(), &ty);
     while let Term::App(function, _) = spine {
         spine = *function;
@@ -88,13 +104,16 @@ fn changed_proc_post_is_all_ret_on_its_ret_leaf() {
         "the payload is not refined to a Σ: {spine:?}"
     );
     let (control, results) = elaborate(&changed(2));
-    assert!(refl_attempt(&control, &ensures_goal(&results, "one")).is_err());
+    let goal = ensures_goal(&results, "one");
+    assert!(tt_attempt(&control, &goal, 0, control.env.bottom_id()).is_err());
 }
 
 #[test]
 fn declared_tree_post_is_all_ret_through_each_response() {
     let (env, results) = elaborate(&declared("False"));
-    refl_attempt(&env, &ensures_goal(&results, "tick")).expect("every leaf returns False");
+    let goal = ensures_goal(&results, "tick");
+    tt_attempt(&env, &goal, 1, env.env.top_id()).expect("every leaf returns False");
     let (control, results) = elaborate(&declared("True"));
-    assert!(refl_attempt(&control, &ensures_goal(&results, "tick")).is_err());
+    let goal = ensures_goal(&results, "tick");
+    assert!(tt_attempt(&control, &goal, 1, control.env.bottom_id()).is_err());
 }
