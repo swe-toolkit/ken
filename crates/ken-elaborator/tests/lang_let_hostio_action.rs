@@ -273,10 +273,11 @@ fn valid_console_inclusion_injects_into_host_before_binding() {
     );
 }
 
-/// Promise class: durable fail-closed boundary. FS a has no injection into
-/// IO; the closed table must report E0087 rather than mis-tag the FS action.
+/// Promise class: durable fail-closed boundary (36 §2.5). An FS label
+/// cannot inject into a declared IO tree. Refuse the declaration before
+/// attempting to sequence its body into IO.
 #[test]
-fn unavailable_fs_into_io_inclusion_still_reports_e0087() {
+fn fs_row_cannot_inject_into_declared_io_result() {
     let mut env = ElabEnv::new().expect("checked prelude");
     let error = env
         .elaborate_decl(
@@ -285,17 +286,12 @@ fn unavailable_fs_into_io_inclusion_still_reports_e0087() {
              let x = readFile APartial cap (bytes_encode \"p\") in \
                ITree.Ret ConsoleOp console_resp (Result FileError Bytes) x",
         )
-        .expect_err("FS a cannot enter IO");
+        .expect_err("FS has no summand in IO");
     assert!(
-        error
-            .to_string()
-            .starts_with("unsupported: 36 §2.4 inclusion of effect signature"),
-        "{error}"
+        matches!(error, ElabError::TypeMismatch { reason, .. }
+            if reason.contains("row label `FS` has no summand")),
+        "the declaration must refuse FS before sequencing its body"
     );
-    let ElabError::UnsupportedEffectInclusion { from, to, .. } = error else {
-        panic!("a distinct FS->IO signature must take E0087, got {error:?}")
-    };
-    assert_ne!(from, to);
 }
 
 /// Promise class: durable invariant. An annotation naming an action instead
