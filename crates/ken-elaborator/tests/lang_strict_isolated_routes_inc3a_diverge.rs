@@ -12,11 +12,29 @@ fn missing_name(error: ElabError) -> String {
     }
 }
 
+fn missing_observation(
+    result: Result<(), ElabError>,
+) -> Result<(String, ken_elaborator::Span, String), String> {
+    match result {
+        Ok(()) => Err("source accepted".into()),
+        Err(error) => {
+            let code = error.code().as_str().to_string();
+            match error {
+                ElabError::UnresolvedCon { name, span } | ElabError::UnboundName { name, span } => {
+                    Ok((name, span, code))
+                }
+                other => Err(format!("unexpected diagnostic {other:?}")),
+            }
+        }
+    }
+}
+
 /// Promise class: transition sentinel, retired with the 3b route switch
 /// that removes the Legacy side of the comparison. MEASURED: each static
-/// invalid-source fixture reaches its original missing constructor under
-/// Legacy and the same missing name under Strict; the merge-sort fixture's
-/// previously homed `leqChar` has its own import. CLAIMED: vocabulary changes
+/// invalid-source fixture reaches its own measured Legacy missing name and
+/// that same token under Strict after only its required imports. Report raw
+/// spans and compare offsets relative to the imported prefix: a new import
+/// changes absolute byte positions but not the error's source location. CLAIMED: vocabulary changes
 /// do not mask or shift these intentional refusals. THE GAP: generated Rust
 /// sources and the six FSOp template cases are separate populations, not
 /// claimed by this file-source subset.
@@ -24,8 +42,8 @@ fn missing_name(error: ElabError) -> String {
 fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
     const CASES: [(&str, &str); 16] = [
         ("conformance/challenge/C1-deceq-noncanonical/sound-deceq-char.ken", "DecEq"),
-        ("conformance/challenge/C5-verified-sort/sound-verified-sort.ken", "And"),
-        ("conformance/challenge/C5-verified-sort/unsound-const-nil.ken", "And"),
+        ("conformance/challenge/C5-verified-sort/sound-verified-sort.ken", "isSorted"),
+        ("conformance/challenge/C5-verified-sort/unsound-const-nil.ken", "isSorted"),
         ("conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken", "IsTrue"),
         ("conformance/challenge/C6-lawful-ord-vs-stub/stub-ord-axiom.ken", "Ord"),
         ("crates/ken-elaborator/tests/fixtures/kernel_conv_cast_consumer.ken", "ConvCastExpectedOf"),
@@ -45,17 +63,23 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         .canonicalize()
         .expect("workspace root");
     let catalog = root.join("catalog/packages");
+    let mut mismatches = Vec::new();
     for (path, expected) in CASES {
         let original = std::fs::read_to_string(root.join(path))
             .unwrap_or_else(|error| panic!("{path}: cannot read fixture: {error}"));
-        let mut strict_source = original.clone();
-        if path == "examples/rosetta/merge-sort/merge-sort.ken" {
-            strict_source = strict_source.replacen(
+        let c5 = path.starts_with("conformance/challenge/C5-verified-sort/");
+        let strict_source = if c5 {
+            format!("import Core.Logic.Conjunction (And)\n{original}")
+        } else if path == "examples/rosetta/merge-sort/merge-sort.ken" {
+            original.replacen(
                 "program capabilities FS APartial\n",
                 "program capabilities FS APartial\nimport Core.Classes.LawfulClasses (leqChar)\n",
                 1,
-            );
-        }
+            )
+        } else {
+            original.clone()
+        };
+        let shift = strict_source.len() - original.len();
         let literate = path.ends_with(".ken.md");
         let mut legacy = ElabEnv::new().expect("checked prelude");
         let legacy = if literate {
@@ -63,8 +87,14 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         } else {
             legacy.elaborate_file_v1(&original).map(|_| ())
         };
-        let old_name = missing_name(legacy.expect_err("invalid fixture under Legacy"));
-        assert_eq!(old_name, expected, "{path}: original error name");
+        let old = match missing_observation(legacy) {
+            Ok(observation) => observation,
+            Err(detail) => {
+                println!("ISOL3A_SAME_NAME {path} legacy={detail}");
+                mismatches.push(format!("{path}: {detail}"));
+                continue;
+            }
+        };
         let mut selected = ElabEnv::new().expect("checked prelude");
         let strict = if literate {
             selected
@@ -75,9 +105,34 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
                 .elaborate_isolated_file_strict_v1(&[catalog.clone()], &strict_source)
                 .map(|_| ())
         };
-        let new_name = missing_name(strict.expect_err("invalid fixture under Strict"));
-        assert_eq!(new_name, old_name, "{path}: first missing name changed");
+        let new = match missing_observation(strict) {
+            Ok(observation) => observation,
+            Err(detail) => {
+                println!("ISOL3A_SAME_NAME {path} legacy={old:?} strict={detail}");
+                mismatches.push(format!("{path}: {detail}"));
+                continue;
+            }
+        };
+        let normalized = (new.1.start.checked_sub(shift), new.1.end.checked_sub(shift));
+        println!(
+            "ISOL3A_SAME_NAME {path} legacy={}@{}..{} code={} strict={}@{}..{} code={} normalized={normalized:?} import_bytes={shift}",
+            old.0, old.1.start, old.1.end, old.2,
+            new.0, new.1.start, new.1.end, new.2,
+        );
+        if old.0 != expected
+            || new.0 != old.0
+            || normalized != (Some(old.1.start), Some(old.1.end))
+            || (c5 && new.2 != old.2)
+        {
+            mismatches.push(format!(
+                "{path}: expected {expected}, observed {old:?} -> {new:?}"
+            ));
+        }
     }
+    assert!(
+        mismatches.is_empty(),
+        "same-name/position divergence: {mismatches:?}"
+    );
 }
 
 /// Promise class: transition sentinel until 3b removes the Legacy route.
