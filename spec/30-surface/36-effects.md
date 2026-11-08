@@ -2,7 +2,9 @@
 
 > Status: **L5 elaborated** — implementation-ready for Team Language.
 > **Normative for the model and the elaboration** (§1–§7); concrete surface
-> *spelling* stays proposal-level (`OQ-syntax`). Effect tracking, capabilities,
+> *spelling* stays proposal-level (`OQ-syntax`) except the settled direct-ITree
+> vocabulary and package homes (§4.5.7, `30-taxonomy §4`). Effect tracking,
+> capabilities,
 > and the state/`space` escape hatch. Settled inputs (do **not** reopen):
 > **`OQ-8` / `OQ-8a` DECIDED** (operator, 2026-06-27) — static,
 > transitively-inferred effect **rows** (`visits`), pure by default; a **layered
@@ -479,13 +481,43 @@ record Effect : Type (suc (max ℓ_op ℓ_resp)) where    -- level-poly in ℓ_o
 ```
 
 ```
-Console  :  Op = { Write String }              Resp (Write _) = Unit
 State S  :  Op = { Get } ∪ { Put s | s : S }   Resp Get = S ;  Resp (Put _) = Unit
 ```
 
-(`Op` is a small inductive of op-tags; `Write`/`Put` carry their argument as
-constructor data.) The **interaction tree** over a signature `E` with result
-`R`:
+(`Op` is a small inductive of op-tags; `Put` carries its argument as
+constructor data.) The checked direct Console signature has exactly
+four constructor signatures, using the checked `ConsoleStream` carrier
+and its scoped public paths (`30-taxonomy §4`):
+
+```text
+ConsoleOp.Read       : ConsoleStream → Int → ConsoleOp
+ConsoleOp.Write      : ConsoleStream → Bytes → ConsoleOp
+ConsoleOp.Flush      : ConsoleStream → ConsoleOp
+ConsoleOp.IsTerminal : ConsoleStream → ConsoleOp
+```
+
+The checked response operation `console_resp : ConsoleOp → Type`
+reduces by constructor, for every stream and, where present, limit
+or payload:
+
+```text
+console_resp (ConsoleOp.Read stream limit)       ≡ Result IOError ReadResult
+console_resp (ConsoleOp.Write stream bytes)      ≡ Result IOError Unit
+console_resp (ConsoleOp.Flush stream)            ≡ Result IOError Unit
+console_resp (ConsoleOp.IsTerminal stream)       ≡ Bool
+```
+
+`ReadResult` has the scoped `ReadResult.Chunk Bytes` and
+`ReadResult.Eof` cases; `IOError` has the complete checked scoped
+cause family (`30-taxonomy §4`). A read, write or flush can thus return
+an `Err IOError` value, rather than an exception, while the
+`IsTerminal` response is a `Bool`. These are the four checked
+`ConsoleOp` constructors and their actual dependent response
+reductions, not new declaration IDs or a rule that every Console
+response is `Unit`. A direct Console tree has the checked type
+`ITree ConsoleOp console_resp R`; the optional `IO R` package alias
+names that same type but does not replace either exact floor identity.
+The **interaction tree** over a signature `E` with result `R`:
 
 ```
 data ITree (E : Effect) (R : Type ℓ_R) : Type (max ℓ_R ℓ_op ℓ_resp) where
@@ -664,6 +696,10 @@ normalization**. The following are denotations, not new kernel forms:
   programs, including `HostIO` programs with operation labels in a row.
   The tree's declared type supplies its `Auth` index, if any; only
   capabilities actually written in the source telescope are parameters.
+  Calling a checked pure definition that *constructs* and returns
+  such a tree is not itself a performed effect in the caller's row;
+  this does not exempt a call to a producer with a genuine latent row
+  from §1.4's escape check.
   A `visits` row label matching a host-family or host-operation label
   always names that host effect (as with reserved space names in §4.1),
   even if `S` carries a user-family summand with the same spelling.
@@ -928,6 +964,15 @@ run_state s (Vis (inr o)        k) = Vis o (λ r. run_state s (k r))  -- other e
   (R × S)` — a structural fold, **total** (`14 §3`). The continuation `k` is
   invoked **exactly once, in tail position** in every clause, so it is
   tail-resumptive (§5) and no continuation is reified.
+- The displayed `State S` is **effect-signature notation**, not a second
+  source inductive named `State`. Its checked operation carrier is
+  `StateOp S = Get | Put S` and its checked dependent response is
+  `resp_state S : StateOp S → Type`, reducing to `S` on `Get` and to
+  `Unit` on `Put _`. Both are exact pre-source floor identities (§30 §4).
+  A source program building the direct tree uses `StateOp S`,
+  `resp_state S`, and `StateOp.Get`/`StateOp.Put`; the label `[State S]`
+  in a `visits` row denotes this signature but is not a synonym for
+  its operation-carrier type. Bare `Get` and `Put` remain unreserved.
 - `run_state s₀ ⟦body⟧ : ITree F (R × S)` returns a residual tree whose
   return values pair the result with the **final** state. When `F = 𝟘`,
   it collapses (§2.4) to the pure value `(R × S)`, yielding a pure state
@@ -1037,14 +1082,15 @@ shared memory, but it is already an explicitly unsafe/untrusted boundary,
 
 Sections §4.1–§4.2 give the **imperative** door to state — a `space` block whose
 `mut`/`becomes` desugar to `State S` and discharge by `run_state`. This section
-adds the **monadic** door: writing `state_get`/`state_put`/`run_state`
-**directly** as a
-first-class effect — the shape a stateful computation like `accumulator-factory`
-(VAL2 #10) needs when there is no `space` to hang cells on. It introduces **no
-new denotation**: both surfaces desugar to the *same* `State S` signature (§2.1)
-and are discharged by the *same* `run_state` fold (§4.2); §4.5 only **exposes**
-that machinery as named operations. **`OQ-C` DECIDED (operator, 2026-07-03):**
-this is **C2** — an effect over the existing `ITree`/handler machinery; **C1**
+adds the **monadic** door: named `state_get`/`state_put` tree builders
+and the `run_state` handler, the shape a stateful computation like
+`accumulator-factory` (VAL2 #10) needs without a `space` to hang cells
+on. It introduces **no new denotation**: both surfaces use the same
+State signature (§2.1) and `run_state` fold (§4.2). The checked
+declared-tree source-call route is fixed in §4.5.2; the direct
+`visits [State s]` source-row spelling is not. **`OQ-C` DECIDED
+(operator, 2026-07-03):** this is **C2** — an effect over the
+existing `ITree`/handler machinery; **C1**
 (explicit state-threading) is the floor it desugars to (§4.5.6); **C3** (real
 mutable refs/cells/regions) is **forbidden** — no memory is mutated.
 
@@ -1058,11 +1104,14 @@ preserved unchanged — the type index rides the label; it does not make the
 lattice infinite.
 
 This mirrors §4.1 exactly: a `space` already contributes **one label per
-space**, bound to that space's state type `S`. The direct surface simply lets a
-program **name** `State s` in a `visits` row without introducing a `space`. A
-single `[State s]` is the common case; two *independent* states in one
-computation are two *distinct* labels (as two spaces are), peeled by nested
-`run_state` calls (§4.5.4).
+space**, bound to that space's state type `S`. In the direct row model,
+`State s` names a label without introducing a `space`; the displayed
+`visits [State s]` remains **schematic row notation**, not an accepted
+concrete source spelling (§4.5.2). A single State label is the common
+case; two *independent* states in one computation are two *distinct*
+labels (as two spaces are), peeled by nested `run_state` calls
+(§4.5.4). The checked declared-tree source route below instead
+constructs an explicitly typed coproduct tree.
 
 #### 4.5.2 `state_get` and `state_put`
 
@@ -1077,13 +1126,41 @@ state_put : s →[{State s}] Unit
   state_put s' ⤳ perform (inj (Put s')) = Vis (inj (Put s')) (λ _. Ret tt)
 ```
 
-- `s` is an ordinary (implicit) type parameter of each operation, fixed at a use
-  site by the enclosing `run_state`'s initial state `s₀ : s` (§4.5.3) or by
-  annotation.
-- `Resp Get = s` is a **non-`Unit`, `s`-typed** response — `State s` is the
-  first effect whose response *depends on* a type parameter (Console's is always
-  `Unit`). This dependence is already §2.1/§7.4 normative; §4.5.6 notes it is
-  the forcing function for the landed code.
+These displayed row-arrow types describe the **effect-model denotation**,
+not the checked direct-tree source signatures. The existing checked
+`state_get` and `state_put` identities are pure definitions that
+construct and return trees. Their source-call types, including the
+explicit residual signature `f : Type` and its response family
+`rf : f → Type`, are:
+
+```text
+state_get : (s f : Type) → (rf : f → Type) → Unit →
+  ITree (Coproduct (StateOp s) f)
+    (resp_coproduct (StateOp s) f (resp_state s) rf) s
+state_put : (s f : Type) → (rf : f → Type) → s →
+  ITree (Coproduct (StateOp s) f)
+    (resp_coproduct (StateOp s) f (resp_state s) rf) Unit
+```
+
+A source application supplies all four arguments, in this order:
+`state_get s f rf MkUnit` or `state_put s f rf new_state`. A pure
+`fn` may return their **declared coproduct-tree type** and sequence
+the resulting tree values with floor `itree_bind` (§2.4). Constructing
+the tree does not perform its State operation in the caller's empty
+row; `run_state` later interprets its State summand. This is the
+settled direct-ITree source route, not a single-`StateOp s` tree,
+not a call to a non-tree-result `proc`, and not a new identity.
+
+- `s` is an ordinary type index determined by the enclosing `run_state`'s
+  initial state `s₀ : s` (§4.5.3) or by annotation. The checked
+  direct-tree source call still supplies `s` explicitly, followed by
+  `f` and `rf` as in the signatures above.
+- `Resp Get = s` is a **non-`Unit`, `s`-typed** response — the State
+  response depends on the type parameter, whereas §2.1's checked
+  `console_resp` varies by Console operation and returns `Result IOError
+  ReadResult`, `Result IOError Unit`, or `Bool`. This State dependence is
+  already §2.1/§7.4 normative; it does not make Console's response
+  uniformly `Unit`.
 - `inj : (State s).Op ↪ ⟦ρ⟧.Op` is the row-signature injection (§2.3); in a
   single-`State s` row `⟦{State s}⟧ = State s` and `inj` is the identity.
 - The public source operations spell `state_get` and `state_put`; bare
@@ -1091,9 +1168,13 @@ state_put : s →[{State s}] Unit
   `get` and `put`, respectively: §2.1's `Get`/`Put` under §2.2's
   `perform`. The row spelling `[State s]` remains proposal-level
   (`OQ-syntax`); the **operations and their denotations are normative**.
-  An effectful producer
-  `Unit →[ρ] a` denotes to `ITree ⟦ρ⟧ a` (§1.1, §2.4), the form §4.2/§4.5.3
-  use.
+  A non-tree-result `proc ... visits [State s]` using the schematic
+  row-arrow types above is not yet an accepted source spelling or a
+  conformance positive. The checked declared-tree call instead has
+  the explicit four-argument signature above, and a `fn` returning
+  that tree is source-writable without any `visits` row (§2.4). An
+  effectful producer `Unit →[ρ] a` denotes to `ITree ⟦ρ⟧ a`
+  (§1.1, §2.4), the form §4.2/§4.5.3 use.
 
 #### 4.5.3 `run_state` is §4.2's fold at `F = 𝟘` — not re-specified
 
@@ -1129,8 +1210,18 @@ Pair(run_state s₀ m, π) : Σ(t:ITree F (a × s)).AllRet P t
   tree, `../40-runtime/42`); it is **not** an I/O driver like Console's `run_io`
   (§7.2), because pure state threading performs no I/O.
 - Worked `accumulator-factory` (VAL2 #10) — a post-increment `next` that returns
-  the current value and bumps the state:
+  the current value and bumps the state. The following is a **schematic
+  denotational equation**, not a Ken source example or an acceptance
+  claim in either resolution mode:
   `next () = bind (state_get ()) (λ n. bind (state_put (n + 1)) (λ _. Ret n))`.
+  Here `bind` means §2.2's tree grafting, and `Ret` is the tree return
+  with its type and response-family arguments elided. Strict source
+  names the checked sequencer `itree_bind` and the scoped constructor
+  `ITree.Ret`, applying the latter with its operation carrier,
+  response family, result type and value (`§2.1`, `30-taxonomy §4`).
+  Legacy also resolves bare `bind` to that same checked sequencer ID;
+  the displayed bare `Ret` and omitted arguments are not a source
+  promise in Legacy either.
 
   ```
   run_state 0  next  =  (0, 1)     -- result = old value 0 ; final state 1 ; pair = (result, state)
@@ -1193,20 +1284,15 @@ The purity/totality argument is §4.2's, applied to the direct surface:
   "C1 is the floor" lock (`OQ-C`). No mutation is introduced (C3
   forbidden): the entire surface is `perform`/`bind`/`elim_ITree`
   over the pure tree.
-- **Build note — the outer-ring lift `[State s]` forces (no kernel change).**
-  The landed *runnable* `ITree` (`prelude.rs`) is **Console-hardwired** —
-  `data ITree r = Ret r | Vis ConsoleOp (Unit → ITree r)`, a fixed `Unit`
-  response and no effect parameter. `[State s]` is the **forcing function** to
-  lift three simplifications already flagged in-code as downstream work, up to
-  the §2/§4 model: **(a)** the **dependent response** `E.Resp e` (`State s`
-  needs `Resp Get = s`, non-`Unit`); **(b)** the container coproduct **`⊕`** for
-  `State s ⊕ F` (composition, §4.5.4); **(c)** **named-effect dispatch** so
-  `run_state` peels `State` and passes other ops through. All three are
-  §36-normative and admitted by K1.5's generic `elim_ITree`
-  (`kernel/tests/k1p5_wstyle.rs`) — **the kernel is untouched** (AC1). The work
-  is entirely outer-ring: `ken-elaborator/src/effects/*` + `ken-interp` + a
-  **derived** stdlib `run_state`; no new `Term`/`Decl` variant, no
-  `trusted_base()` delta.
+- **Outer-ring realization (no kernel change).** The checked pre-source
+  `ITree` already takes the operation carrier and its dependent response
+  family explicitly; Console uses `ConsoleOp`/`console_resp` (§2.1), and
+  State uses `StateOp s`/`resp_state s` (§4.2). A coproduct composes the
+  signatures, while `run_state` peels State operations and passes other
+  operations through (§4.2, §4.5.4). The generic `elim_ITree` was
+  admitted by K1.5 (`kernel/tests/k1p5_wstyle.rs`), so none of these
+  contracts needs a new kernel primitive, `Term`/`Decl` variant or
+  `trusted_base()` entry.
 
 #### 4.5.7 Injection into a coproduct — the surface morphism (`incl`, named)
 
@@ -1219,8 +1305,10 @@ injection operations** for the binary signature `Coproduct g h`, exactly as §4.
 exposes `state_get`/`state_put` and §4.5.3 exposes `run_state`:
 
 ```
-inject_l : ITree g rg a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a   -- re-tag via InL
-inject_r : ITree h rh a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a   -- re-tag via InR
+inject_l : (g h : Type) -> (rg : g -> Type) -> (rh : h -> Type) -> (a : Type) ->
+  ITree g rg a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a
+inject_r : (g h : Type) -> (rg : g -> Type) -> (rh : h -> Type) -> (a : Type) ->
+  ITree h rh a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a
 ```
 
 - **Denotation (normative):** the `elim_ITree` fold sending `Ret x ↦ Ret x` and
@@ -1230,14 +1318,19 @@ inject_r : ITree h rh a -> ITree (Coproduct g h) (resp_coproduct g h rg rh) a   
 - **Well-typed iff** the response family reduces per-tag: `resp_coproduct g h rg rh
   (InL o) ≡ rg o`, `(InR o) ≡ rh o` (§2.3 `Resp (inl o) = E.Resp o`) — so the
   re-tagged continuation keeps its response type.
-- **Surface *spelling* (`inject_l`/`inject_r`) is proposal-level (`OQ-syntax`);
-  the operation and its denotation are normative.** A program composes two base
-  effects by injecting each single-effect sub-computation, then sequencing with
-  `bind` (`ITree (Coproduct g h) …` is homogeneous). This is the **direct/monadic
-  door**; the eventual sugar is the row-directed elaboration inserting `incl`
-  automatically from a `visits [E, F]` row (§2.4), of which this is the floor —
-  as C1 threading (§4.5.6) is the floor under `[State s]`. Realization + the
-  D1/D3 couplings: `docs/program/wp/effect-composition.md` (D2).
+- **Surface names and home are fixed.** `Core.Effect.Coproduct` explicitly
+  exports the existing checked `inject_l` and `inject_r` identities with the
+  complete signatures above, not copied definitions or new primitives. They
+  are not ambient floor names; an isolated Strict source imports them.
+  A program composes two base effects by injecting each single-effect
+  sub-computation, then sequencing with floor `itree_bind` (`ITree
+  (Coproduct g h) …` is homogeneous). Legacy also resolves bare `bind` at
+  the same checked sequencing ID. This is the **direct/monadic door**;
+  the eventual sugar is the row-directed elaboration inserting `incl`
+  automatically from a `visits [E, F]` row (§2.4), of which this is the
+  floor — as C1 threading (§4.5.6) is the floor under `[State s]`.
+  Realization + the D1/D3 couplings: `docs/program/wp/effect-composition.md`
+  (D2).
 
 ## 5. Handlers — tail-resumptive only (`OQ-8`/`OQ-9` DECIDED)
 
@@ -1437,21 +1530,28 @@ on the bug it targets, not pass vacuously):
    boundary, not merely "elaborates" and never closure identity.
 3. **Capability gate** — the same `perform` **rejects** with no `Cap E` in scope
    and **accepts** under a handler that provides it (denial-path flip).
-4. **`space` + handler** — `run_state s₀` on an `inc`/`state_get` program resumes
-   correctly; assert the **final state** value and that `inc`'s `old(n)`
-   obligation discharges.
+4. **`space` + handler** — `run_state s₀` on a `space`-bound `inc`
+   program resumes correctly; assert the **final state** value and
+   that `inc`'s `old(n)` obligation discharges. A `state_get` variant
+   uses §4.5.2's checked declared-tree call form, not the unsettled
+   concrete State row spelling.
 5. **`pure`/`impure` boundary** — a `foreign` with a non-empty row exposes its
    `Vis` op to a runtime handler; a `pure`-but-effectful `foreign` is rejected
    (`38 §3`).
-6. **Direct `[State s]` surface** — drive the **real** producer, not a hand-fed
-   harness (`conformance-hand-feeds-the-deliverable`): a
-   `state_get`/`state_put` program run under `run_state s₀` through the
-   **actual interpreter** returns the correct
-   `(result, final-state)` Σ-pair (`R × S`, §4.2) — the post-increment `next`
-   (`run_state 0 next = (0,1)`, `run_state 41 next = (41,42)`, §4.5.3). Assert the
-   **paired value**, plus (a) **composition** — a `[State s, Console]` program
-   threads state identically whether `run_state` or the Console handler is peeled
-   first (commutation, §4.5.4); (b) **re-runnability** — the same tree under two
-   `s₀` gives two independent results with no cross-run state (the C3-forbidden
-   face, §4.5.5). `run_state` is a derived total definition, so kernel-untouched
-   (AC1) holds structurally.
+6. **Direct State source calls** — drive the **real** checked
+   `state_get`/`state_put` tree builders, not a hand-fed `Vis` harness
+   (`conformance-hand-feeds-the-deliverable`). Source calls supply
+   `s`, `f`, `rf` and the value, return the exact coproduct tree of
+   §4.5.2, and may be sequenced in a pure `fn` returning that tree.
+   Through the actual interpreter, `run_state s₀` must return the
+   correct `(result, final-state)` Σ-pair (`R × S`, §4.2): the
+   post-increment `next` yields `run_state 0 next = (0,1)` and
+   `run_state 41 next = (41,42)` (§4.5.3). Assert the **paired value**,
+   (a) **composition** with Console under either handler order
+   (§4.5.4), and (b) **re-runnability** of the same tree under two
+   initial states without cross-run mutation (§4.5.5). A hand-built
+   `Vis` may independently test the handler but does not prove that
+   the public builders resolve and work. Do not assert that
+   `proc ... visits [State s]` is accepted until the row spelling is
+   settled. `run_state` is a derived total definition, so
+   kernel-untouched (AC1) holds structurally.

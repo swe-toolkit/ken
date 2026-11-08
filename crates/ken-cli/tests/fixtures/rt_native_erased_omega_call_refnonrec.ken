@@ -19,4 +19,4 @@ fn classify (n : Nat) : ExitCode = match n {
 fn refined_pick (n : AnyNat) : Nat = match n { Zero |-> Zero ; Suc m |-> Suc (Suc m) }
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (classify (refined_pick (Suc (Suc Zero))))
+  host_pure APartial ExitCode (classify (refined_pick (Suc (Suc Zero))))

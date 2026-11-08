@@ -37,6 +37,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use ken_elaborator::lexer::{Lexer, Token};
+use ken_elaborator::{ElabEnv, ElabError};
 
 const PER_EXAMPLE_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -455,6 +456,191 @@ fn closures_carries_pure_callback_through_catalog_prelude() {
         output, expected,
         "the accepted example must preserve its output"
     );
+}
+
+/// Promise class: durable invariant. MEASURED: the rewritten FizzBuzz source
+/// accepts under Strict only with its explicit checked package imports, and
+/// its unchanged CLI oracle records the same twenty output lines. CLAIMED:
+/// changing a hand-built Console tree to a changed-result proc preserves
+/// the application behavior without exposing ConsoleOp or Write as floor.
+/// THE GAP: this checks the concrete program and its output, not every
+/// recursive Console tail call in arbitrary Ken source.
+#[test]
+fn fizzbuzz_changed_proc_keeps_output_and_strict_import_boundary() {
+    let root = rosetta_dir().join("fizzbuzz");
+    let original = fs::read_to_string(root.join("fizzbuzz.ken")).expect("FizzBuzz source");
+    let body = original
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("FizzBuzz program header");
+    let catalog = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let other_imports = "import Core.Classes.LawfulClasses (intToChar)\n\
+                         import Capability.Process.Exit (host_program)\n";
+    let with_imports = format!(
+        "program capabilities FS APartial\n{other_imports}\
+         import Capability.Console.Text (write)\n{body}"
+    );
+    let mut selected = ElabEnv::new().expect("prelude");
+    selected
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_imports)
+        .expect("changed-result FizzBuzz with explicit imports");
+    let without_write = format!("program capabilities FS APartial\n{other_imports}{body}");
+    let mut negative = ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_write) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "write"),
+        Err(error) => panic!("FizzBuzz missing write: wrong refusal {error:?}"),
+        Ok(_) => panic!("FizzBuzz accepted without the write import"),
+    }
+    let tmp = tempfile::tempdir().expect("FizzBuzz output directory");
+    let (output, successful) = run_example("fizzbuzz", &root.join("fizzbuzz.ken"), tmp.path())
+        .expect("FizzBuzz CLI run completes");
+    assert!(successful, "the rewritten FizzBuzz program must run");
+    let Oracle::Expected(expected) = oracle_for(&root) else {
+        panic!("FizzBuzz requires its output oracle");
+    };
+    assert_eq!(output, expected, "FizzBuzz output after the R rewrite");
+}
+
+/// Promise class: durable invariant. MEASURED: the same read-file-lines
+/// program checks with explicit FS/Console/HostIO imports under Strict and
+/// still prints its exact CLI oracle on the current route. CLAIMED: the
+/// checked HostIO wrapper substitution preserves the composed effects.
+/// THE GAP: interpreter/native agreement beyond this example is exercised
+/// by its dedicated differential tests, not by this one CLI output.
+#[test]
+fn read_file_lines_rewrite_keeps_oracle_and_strict_import_boundary() {
+    let example = rosetta_dir().join("read-file-lines");
+    let original =
+        fs::read_to_string(example.join("read-file-lines.ken")).expect("read-file-lines source");
+    let body = original
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("source program header");
+    let imports = "import Capability.Console.Text (print_line)\n\
+                   import Capability.Filesystem.Authority (read_bytes)\n\
+                   import Capability.Process.Exit
+                     (host_bind, host_fs, host_pure, host_console, host_program_then)\n\
+                   import Core.Classes.LawfulClasses (charToInt)\n";
+    let catalog = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imported = format!("program capabilities FS APartial\n{imports}{body}");
+    let mut strict = ElabEnv::new().expect("prelude");
+    strict
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
+        .expect("read-file-lines with explicit checked imports");
+    let without_wrappers = imported.replace(
+        "import Capability.Process.Exit
+                     (host_bind, host_fs, host_pure, host_console, host_program_then)\n",
+        "",
+    );
+    let mut negative = ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "host_pure"),
+        Err(error) => panic!("wrong no-import refusal: {error:?}"),
+        Ok(_) => panic!("read-file-lines accepted without HostIO wrapper imports"),
+    }
+    let tmp = tempfile::tempdir().expect("read-file-lines output directory");
+    let (output, successful) = run_example(
+        "read-file-lines",
+        &example.join("read-file-lines.ken"),
+        tmp.path(),
+    )
+    .expect("read-file-lines CLI run completes");
+    assert!(successful, "rewritten read-file-lines program must run");
+    let Oracle::Expected(expected) = oracle_for(&example) else {
+        panic!("read-file-lines requires its output oracle");
+    };
+    assert_eq!(output, expected, "read-file-lines output after R rewrite");
+}
+
+/// Promise class: durable invariant. MEASURED: the same accumulator program
+/// checks at the strict entry with its package imports but no generic-bind
+/// import, and its current CLI route keeps the output oracle. CLAIMED:
+/// `itree_bind` and `resp_coproduct` are floor identities usable before
+/// run_state, without changing the hidden-state program's result.
+/// THE GAP: this output does not establish every State handler equation.
+#[test]
+fn accumulator_factory_uses_generic_floor_bind_and_keeps_its_oracle() {
+    let example = rosetta_dir().join("accumulator-factory");
+    let source =
+        fs::read_to_string(example.join("accumulator-factory.ken")).expect("accumulator source");
+    let body = source
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("program header");
+    let imported = format!(
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (print_line)\n\
+         import Capability.Process.Exit (host_program)\n{body}"
+    );
+    let catalog = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let mut strict = ElabEnv::new().expect("prelude");
+    strict
+        .elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        .expect("direct State tree names the generic floor without an import");
+    let tmp = tempfile::tempdir().expect("accumulator output directory");
+    let (output, successful) = run_example(
+        "accumulator-factory",
+        &example.join("accumulator-factory.ken"),
+        tmp.path(),
+    )
+    .expect("accumulator CLI run completes");
+    assert!(successful, "the rewritten State tree must run");
+    let Oracle::Expected(expected) = oracle_for(&example) else {
+        panic!("accumulator requires its output oracle");
+    };
+    assert_eq!(
+        output, expected,
+        "accumulator output after the floor spelling"
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: each of the four existing
+/// Collections-prefixed users elaborates under the strict entry with the
+/// explicit Conjunction import, while the same source without it refuses an
+/// unbound conjunction name. CLAIMED: the imported checked conjunction is
+/// sufficient for these users, rather than adding the pre-source And to the
+/// floor. THE GAP: their output parity is independently checked by the
+/// existing CLI oracle test, not by this strict elaboration pin.
+#[test]
+fn collections_users_recheck_with_explicit_conjunction_import_under_strict() {
+    let root = workspace_root()
+        .join("catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let imports = "import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)\n";
+    let other_imports = "import Capability.Console.Text (print_line)\n\
+                         import Capability.Process.Exit (host_program)\n\
+                         import Core.Classes.LawfulClasses (leqChar)\n";
+    let prefix = collections_prelude();
+    for slug in NEEDS_COLLECTIONS {
+        let body = fs::read_to_string(rosetta_dir().join(slug).join(format!("{slug}.ken")))
+            .unwrap_or_else(|error| panic!("{slug}: source missing: {error}"));
+        let body = body
+            .strip_prefix("program capabilities FS APartial\n")
+            .expect("existing Rosetta program header");
+        let composed =
+            format!("program capabilities FS APartial\n{imports}{other_imports}{prefix}\n{body}");
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_isolated_file_strict_v1(&[root.clone()], &composed)
+            .unwrap_or_else(|error| panic!("{slug}: strict conjunction import: {error:?}"));
+        let without_conjunction =
+            format!("program capabilities FS APartial\n{other_imports}{prefix}\n{body}");
+        let mut negative = ElabEnv::new().expect("prelude");
+        match negative.elaborate_isolated_file_strict_v1(&[root.clone()], &without_conjunction) {
+            Err(ElabError::UnboundName { name, .. }) => assert!(
+                ["And", "and_intro", "and_fst", "and_snd"].contains(&name.as_str()),
+                "{slug}: no-import first missing name {name}"
+            ),
+            Err(error) => panic!("{slug}: wrong no-import refusal: {error:?}"),
+            Ok(_) => panic!("{slug}: strict source accepted without its conjunction import"),
+        }
+    }
 }
 
 #[test]

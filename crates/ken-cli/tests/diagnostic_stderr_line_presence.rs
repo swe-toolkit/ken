@@ -22,14 +22,22 @@ fn write_source(dir: &Path, name: &str, source: &str) -> String {
 fn host_exit_source(bytes: &str, exit: &str) -> String {
     format!(
         "program capabilities FS APartial\n\
-         proc act : IO Unit visits [Console] =\n\
-           ITree.Vis ConsoleOp console_resp Unit (Write ConsoleStream.Stderr (bytes_encode {bytes}))\n\
-             (\\_. ITree.Ret ConsoleOp console_resp Unit MkUnit)\n\
+         proc act : Unit visits [Console] =\n\
+           let _ = write ConsoleStream.Stderr (bytes_encode {bytes}) in MkUnit\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode visits [Console] =\n\
            host_program_then APartial act {exit}\n"
     )
 }
+
+const STUCK_TREE: &str = r#"program capabilities FS APartial
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  host_bind APartial (Result IOError Unit) ExitCode
+    (host_console APartial (Result IOError Unit)
+      (write ConsoleStream.Stderr (bytes_encode "partial")))
+    (\_ . match (intToInt8 (sub_int 0 128)) { Some m |-> (match (eq_int (int8_to_int (neg_int8 m)) 0) { True |-> host_pure APartial ExitCode ExitCode.Success ; False |-> host_pure APartial ExitCode ExitCode.Success }) ; None |-> host_pure APartial ExitCode ExitCode.Success })
+"#;
 
 fn assert_whole_line_after_program_bytes(output: &Output, program_bytes: &[u8], code: &str) {
     assert_eq!(output.status.code(), Some(1), "stderr: {:?}", output.stderr);
@@ -62,22 +70,45 @@ fn post_execution_host_diagnostic_starts_on_its_own_line() {
     assert_whole_line_after_program_bytes(&output, b"partial", "H0003");
 }
 
+/// Promise class: durable invariant. MEASURED: the actual stuck-tree source
+/// imports the checked safe intToInt8 through FixedWidth in Strict, and
+/// removing only that import refuses it. CLAIMED: the package home does not
+/// alter the program's checked continuation. THE GAP: X0003 after the write
+/// is separately observed by the unchanged CLI runtime assertion below.
+#[test]
+fn strict_stuck_tree_requires_its_fixed_width_import() {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")
+        .canonicalize()
+        .expect("catalog root");
+    let body = STUCK_TREE
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("stuck-tree header");
+    let common = "import Capability.Console.Text (write)\n\
+                  import Capability.Process.Exit (host_bind, host_console, host_pure)\n";
+    let imported = format!(
+        "program capabilities FS APartial\n{common}\
+         import Data.Numeric.FixedWidth (intToInt8)\n{body}"
+    );
+    let mut selected = ken_elaborator::ElabEnv::new().expect("prelude");
+    selected
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
+        .expect("the checked narrowing import preserves the stuck continuation");
+    let without_conversion = format!("program capabilities FS APartial\n{common}{body}");
+    let mut negative = ken_elaborator::ElabEnv::new().expect("prelude");
+    match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_conversion) {
+        Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, "intToInt8"),
+        Err(error) => panic!("wrong no-import refusal: {error:?}"),
+        Ok(_) => panic!("intToInt8 was ambient without the FixedWidth import"),
+    }
+}
+
 #[test]
 fn post_execution_x_diagnostic_starts_on_its_own_line() {
     let dir = tempfile::tempdir().unwrap();
     // A checked continuation becomes stuck after the Console write, so run_io
     // returns X0003 rather than an admitted program outcome.
-    let source = write_source(
-        dir.path(),
-        "stuck-tree.ken",
-        r#"program capabilities FS APartial
-proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
-  : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp) (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) Unit ExitCode
-    (host_console APartial Unit (ITree.Vis ConsoleOp console_resp Unit (Write ConsoleStream.Stderr (bytes_encode "partial")) (\_. ITree.Ret ConsoleOp console_resp Unit MkUnit)))
-    (\_ . match (intToInt8 (sub_int 0 128)) { Some m |-> (match (eq_int (int8_to_int (neg_int8 m)) 0) { True |-> host_exit APartial ExitCode.Success ; False |-> host_exit APartial ExitCode.Success }) ; None |-> host_exit APartial ExitCode.Success })
-"#,
-    );
+    let source = write_source(dir.path(), "stuck-tree.ken", STUCK_TREE);
     let output = run(&["run", &source]);
     assert_whole_line_after_program_bytes(&output, b"partial", "X0003");
 }

@@ -1,12 +1,17 @@
 # Strict catalog package homes — seed cases
 
 Format: `../../README.md`.
-Spec: `spec/30-surface/33-declarations.md §3.3`. Attached-proof selection
-also uses §8.2.
+Spec: `30-taxonomy §4`; `33 §3.3`; `35 §5`; `36 §4.2`; `38 §1.12`.
+Attached-proof selection also uses `33 §8.2`.
 
 These cases are authored but unexecuted. No Ken check or official
 conformance-runner result is claimed. No CI, publication, landing, or trust
 measurement is claimed.
+
+The Increment 3a target is 96 home rows: 81 at its base, less the 17
+`FileOperation` rows retired by its scoped-floor move, plus 32 new H names.
+The additions below pin 24 ordinary-home names; the following range case pins
+the eight `Data.Numeric.FixedWidth` names.
 
 ### surface/modules/catalog-package-homes-preserve-checked-identities
 
@@ -14,9 +19,9 @@ measurement is claimed.
   identities and complete constructor sets are fixed by §3.3
 - spec: `33 §3.3`; the IO attached proof additionally uses `33 §8.2`
 - given: in a fresh pre-source environment, record the `GlobalId` for each
-  listed identity before loading any catalog source. Load the five home units
-  and a separate catalog-root consumer with these explicit imports. Run each
-  client through `elaborate_module_from_roots_strict` and through the
+  listed identity before loading any catalog source. Load the four retained
+  home units and a separate catalog-root consumer with these explicit imports.
+  Run each client through `elaborate_module_from_roots_strict` and through the
   `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`
   entrypoints that §3.3 assigns Legacy roots:
 
@@ -27,11 +32,6 @@ measurement is claimed.
       transfer_count_int, transfer_count_nat, transfer_count_positive,
       transfer_count_positive_prop, transfer_count_remaining,
       transfer_count_nat_succ, transfer_count_predecessor)
-  import Capability.System.Error
-    (FileOperation, OpReadFile, OpWriteFile, OpAppendFile, OpMetadata,
-      OpReadDirectory, OpCreateDirectory, OpRemoveFile, OpRemoveDirectory,
-      OpRename, OpChangeMode, OpSeek, OpSetLength, OpSync, OpGetInheritance,
-      OpSetInheritance, OpDuplicate)
   import Capability.System.IO (write_all_exact_prefix_prop)
   import Capability.System.Resource
     (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr,
@@ -43,26 +43,6 @@ measurement is claimed.
   fn window_start (window : BufferWindow) : Int =
     match window {
       MkBufferWindow start length ↦ start
-    }
-
-  fn file_operation_control (operation : FileOperation) : Bool =
-    match operation {
-      OpReadFile ↦ True;
-      OpWriteFile ↦ False;
-      OpAppendFile ↦ False;
-      OpMetadata ↦ True;
-      OpReadDirectory ↦ True;
-      OpCreateDirectory ↦ False;
-      OpRemoveFile ↦ False;
-      OpRemoveDirectory ↦ False;
-      OpRename ↦ False;
-      OpChangeMode ↦ True;
-      OpSeek ↦ False;
-      OpSetLength ↦ True;
-      OpSync ↦ True;
-      OpGetInheritance ↦ True;
-      OpSetInheritance ↦ True;
-      OpDuplicate ↦ False
     }
 
   fn body_result_control (e : Type) (a : Type)
@@ -97,22 +77,22 @@ measurement is claimed.
 - the gap: spelling equality is not identity equality. The oracle compares
   each resolved `GlobalId` with the independent pre-source snapshot and
   records each constructor's parent.
-- expect: the clients accept in both roots modes. Each home's pre-source
-  ordinary export subset is exactly its listed ordinary names. The 40 named
-  import bindings equal their pre-source `GlobalId`s; the attached proof is
-  checked through its subject in the IO-private case, not as a bare export. Together
-  the checks cover all 41 rows. No pre-source identity is attributed to more
-  than one home. Constructor sets are exactly
-  `BufferWindow` with `MkBufferWindow`, `FileOperation` with the sixteen
-  imported `Op*` constructors, `ResourceBodyResult` with `ResourceBodyOk` and
-  `ResourceBodyErr`, and `ResourceBracketResult` with its four imported result
-  constructors. Every constructor parent equals its pre-source family ID. The
-  Buffer home publishes no constructor of the floor `BufferSpan` or
-  `TransferCount` families.
+- expect: the clients accept in both roots modes. Each retained home's
+  pre-source ordinary export subset is exactly its listed ordinary names. The
+  23 named import bindings equal their pre-source `GlobalId`s; the attached
+  proof is checked through its subject in the IO-private case, not as a bare
+  export. Together the checks cover all 24 rows. No pre-source identity is
+  attributed to more than one home. Constructor sets are exactly
+  `BufferWindow` with `MkBufferWindow`, `ResourceBodyResult` with
+  `ResourceBodyOk` and `ResourceBodyErr`, and `ResourceBracketResult` with
+  its four imported result constructors. Every constructor parent equals its
+  pre-source family ID. The Buffer home publishes no constructor of the floor
+  `BufferSpan` or `TransferCount` families.
 - controls: `MkBufferWindow` and its closed one-arm match are the positive
-  inductive-family control. The other matches reach the complete FileOperation
-  and Resource constructor sets rather than relying on type-name-only imports.
-  The System.IO-to-System.Buffer IDs are compared with the Buffer home IDs.
+  inductive-family control. The Resource matches reach their complete
+  constructor sets rather than relying on type-name-only imports. The
+  System.IO-to-System.Buffer IDs are compared with the Buffer home IDs.
+  `FileOperation` is covered separately as a no-import scoped floor family.
 - why: a spelling-only lookup, replacement identity, wrong-family
   constructor, omitted constructor, or duplicated home changes the resolved
   identity or family-parent relation.
@@ -125,21 +105,18 @@ measurement is claimed.
 - given: in fresh catalog-root clients, use these source probes, each in its
   own input. The positive imports are `FS` from
   `Capability.Filesystem.Authority`, `BufferWindow` and `MkBufferWindow` from
-  `Capability.System.Buffer`, `FileOperation` from `Capability.System.Error`,
-  `write_all_exact_prefix_prop` from `Capability.System.IO`, and
-  `ResourceBodyResult` from `Capability.System.Resource`. The Buffer negative
-  retains `BufferWindow` and omits only `MkBufferWindow`. Each other Strict
-  negative omits only its named import; all five provider roots and other
-  dependencies remain loaded, and the source body stays fixed.
+  `Capability.System.Buffer`, `write_all_exact_prefix_prop` from
+  `Capability.System.IO`, and `ResourceBodyResult` from
+  `Capability.System.Resource`. The Buffer negative retains `BufferWindow`
+  and omits only `MkBufferWindow`. Each other Strict negative omits only its
+  named import; all four home roots and other dependencies remain loaded, and
+  the source body stays fixed.
 
   ```ken
   theorem fs_type_probe
       (computation : FS AFull (Result FileError Bytes)) : Top = Proved
 
   const window_probe : BufferWindow = MkBufferWindow 1 2
-
-  fn file_operation_type_probe
-      (operation : FileOperation) : FileOperation = operation
 
   fn io_subject_probe (span : BufferSpan) (count : TransferCount)
       (evidence : write_all_exact_prefix_prop span count)
@@ -150,10 +127,11 @@ measurement is claimed.
   ```
 
   For each probe, make a positive and a negative Strict-root client that
-  differ only by its home import. Pair `FS` with Authority, `MkBufferWindow`
-  with Buffer, `FileOperation` with Error, `write_all_exact_prefix_prop` with
-  IO, and `ResourceBodyResult` with Resource. The IO probe uses the subject
-  in a proposition type; attached-proof visibility is tested separately.
+  differ only by its home import. Pair `FS` with Authority,
+  `MkBufferWindow` with Buffer, `write_all_exact_prefix_prop` with IO, and
+  `ResourceBodyResult` with Resource. The IO probe uses the subject in a
+  proposition type; attached-proof visibility is tested separately.
+  `FileOperation` is no longer a System.Error home and is tested separately.
 - measured: the exact resolution outcome of each fresh client, with all other
   provider roots and dependencies present.
 - claimed: each specified home edge is necessary in Strict roots; an
@@ -164,8 +142,9 @@ measurement is claimed.
 - expect: each Strict client with the selected home import omitted rejects
   with `UnboundName` naming exactly its target binding. Restoring only that
   home import accepts the same client.
-- controls: the five import-restored Strict clients isolate each home edge.
-  The complete import clients in the preceding case are accepted controls.
+- controls: the four import-restored Strict clients isolate each retained
+  home edge. The complete import clients in the preceding case are accepted
+  controls.
 - why: Strict roots resolve only through explicit imports and the closed
   prelude; a name held only by a catalog home is not ambient.
 
@@ -308,7 +287,7 @@ measurement is claimed.
 - promise class: **transition sentinel** — the current Legacy bare-use
   compatibility boundary must be reviewed when the roots entrypoint flips
 - spec: `33 §3.3` (Legacy resolution and the L2-4 strict-entry flip)
-- given: run each of the five source probes from
+- given: run each of the four source probes from
   `strict-package-home-imports-are-required` in a fresh catalog-root client
   with its home import removed and no same-name local declaration. Use the
   `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`
@@ -320,9 +299,10 @@ measurement is claimed.
   uses in Legacy roots without promising their identities under all load
   orders.
 - the gap: a passing input must actually use the representative name. The
-  probes use `FS`, `MkBufferWindow`, `FileOperation`,
-  `write_all_exact_prefix_prop`, and `ResourceBodyResult` respectively.
-- expect: all five Legacy clients accept. The corresponding Strict clients
+  probes use `FS`, `MkBufferWindow`, `write_all_exact_prefix_prop`, and
+  `ResourceBodyResult` respectively. `FileOperation` is now a floor identity,
+  not a home, and its no-import behavior is pinned separately.
+- expect: all four Legacy clients accept. The corresponding Strict clients
   without home imports reject with `UnboundName`, as specified in the prior
   case.
 - controls: the imported Legacy clients in the identity case remain the
@@ -441,3 +421,377 @@ measurement is claimed.
   only at the proof reference.
 - why: §8.2 requires both an exported subject and `pub proof` for external
   attached-proof visibility; subject selection alone cannot cross privacy.
+
+### surface/modules/inc3a-file-operation-is-a-scoped-floor-family
+
+- promise class: **normative compatibility vector** — the existing checked
+  identity and complete constructor family are fixed by the spec
+- spec: `30-taxonomy §4`; `33 §3.3`; `38 §1.12`
+- given: before loading catalog source, snapshot the pre-source `GlobalId` of
+  `FileOperation` and each of its sixteen constructor identities. In a fresh
+  Strict-roots client with no `Capability.System.Error` import, use the exact
+  type and complete qualified family:
+
+  ```ken
+  fn file_operation_control (operation : FileOperation) : Bool =
+    match operation {
+      FileOperation.OpReadFile ↦ True;
+      FileOperation.OpWriteFile ↦ False;
+      FileOperation.OpAppendFile ↦ False;
+      FileOperation.OpMetadata ↦ True;
+      FileOperation.OpReadDirectory ↦ True;
+      FileOperation.OpCreateDirectory ↦ False;
+      FileOperation.OpRemoveFile ↦ False;
+      FileOperation.OpRemoveDirectory ↦ False;
+      FileOperation.OpRename ↦ False;
+      FileOperation.OpChangeMode ↦ True;
+      FileOperation.OpSeek ↦ False;
+      FileOperation.OpSetLength ↦ True;
+      FileOperation.OpSync ↦ True;
+      FileOperation.OpGetInheritance ↦ True;
+      FileOperation.OpSetInheritance ↦ True;
+      FileOperation.OpDuplicate ↦ False
+    }
+  ```
+
+  For each constructor `C` in that closed family, make a separate pair of
+  Strict clients with the same body and no imports. The positive expression
+  is `const operation : FileOperation = FileOperation.C`; its paired negative
+  changes only the right-hand side to bare `C`. Also compare two source
+  declaration controls: `data FileOperation = LocalFileOperation` and
+  `data LocalOperation = LocalFileOperation`. The first attempts to replace a
+  floor name; the second controls that the declaration form is otherwise
+  accepted.
+
+  Load `Capability.System.Error` as a dependency in both clients of one
+  further import pair. The accepted client uses `FileOperation` without
+  importing it. Its paired client adds only
+  `import Capability.System.Error (FileOperation, OpReadFile)`.
+- measured: resolution of the type and all constructor paths against the
+  pre-source snapshots; acceptance or refusal of each paired source client;
+  and the public export set of `Capability.System.Error` for this family.
+- claimed: `FileOperation` is an always-present scoped floor family, not a
+  package home. All sixteen qualified cases retain their original IDs and
+  parent; none of the bare cases is reserved or resolved to that family.
+  `Capability.System.Error` no longer exports or homes the family.
+- the gap: matching source spellings do not establish canonical identity or
+  complete family registration. An unrelated failure in the negative clients
+  could mimic the scoped-name or retired-home refusal; each positive keeps the
+  source body fixed and changes only the spelling/import under test.
+- expect: the no-import exhaustive match accepts and every measured ID equals
+  its pre-source snapshot. Each qualified `FileOperation.C` client accepts;
+  its bare `C` pair refuses with `UnboundName` naming `C`. The replacement
+  named `FileOperation` refuses, while the `LocalOperation` control accepts.
+  The old System.Error import refuses at import resolution; its no-import
+  control accepts. No constructor ID, parent, or native artifact leaf changes.
+- controls: the complete match and each qualified-constructor client are
+  positive controls for their paired bare-name refusals. The local-name
+  declaration controls the replacement refusal. The no-import client is the
+  positive control for the retired Error-home import.
+- why: moving this identity from H to B must preserve the exact family while
+  making its sixteenth case usable by qualification, without leaving an old
+  package route or bare-constructor fallback.
+
+### surface/modules/inc3a-added-scoped-floor-families
+
+- promise class: **normative compatibility vector** — the five
+  ReadResult/metadata/State carrier families and `resp_state` retain their exact
+  identities and complete public paths
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §4.2`; `38 §1.12`
+- given: in a fresh environment, snapshot the pre-source `GlobalId` of
+  `ReadResult`, `FileKind`, `FileMetadata`, `DirEntry`, `StateOp`,
+  `resp_state`, and every public constructor below. Use a Strict-roots client
+  with no imports for these names:
+
+  ```ken
+  fn read_result_cases (result : ReadResult) : Bool =
+    match result {
+      ReadResult.Chunk bytes ↦ True;
+      ReadResult.Eof ↦ False
+    }
+
+  fn file_kind_cases (kind : FileKind) : Bool =
+    match kind {
+      FileKind.KFile ↦ True;
+      FileKind.KDirectory ↦ True;
+      FileKind.KSymlink ↦ False;
+      FileKind.KOther ↦ False
+    }
+
+  const metadata_control : FileMetadata =
+    FileMetadata.MkFileMetadata 0 FileKind.KFile
+
+  const entry_control : DirEntry =
+    DirEntry.MkDirEntry b"file" FileKind.KDirectory
+
+  fn state_operation_cases (operation : StateOp Bool) : Bool =
+    match operation {
+      StateOp.Get ↦ True;
+      StateOp.Put value ↦ value
+    }
+
+  fn get_response (response : resp_state Bool StateOp.Get) : Bool =
+    response
+
+  fn put_response (response : resp_state Bool (StateOp.Put True)) : Unit =
+    response
+  ```
+
+  The complete public constructor sets are `ReadResult.Chunk` and
+  `ReadResult.Eof`; `FileKind.KFile`, `KDirectory`, `KSymlink`, and `KOther`;
+  `FileMetadata.MkFileMetadata`; `DirEntry.MkDirEntry`; and `StateOp.Get` and
+  `StateOp.Put`. For each listed `T.C`, make a separate positive client using
+  the qualified constructor and a paired client that changes only `T.C` to
+  bare `C`, with no local binding or import for `C`.
+
+  Make a separate source declaration replacement client for each of
+  `ReadResult`, `FileKind`, `FileMetadata`, and `DirEntry`, using
+  `data T = LocalT` with the target name substituted for `T`. Replace
+  `StateOp` with `data StateOp (s : Type) = LocalStateOp`. Each is paired
+  with the same declaration under a unique local type name, which must
+  accept. For `resp_state`, attempt a same-typed local definition:
+
+  ```ken
+  fn resp_state (s : Type) (operation : StateOp s) : Type =
+    match operation {
+      StateOp.Get ↦ s;
+      StateOp.Put value ↦ Unit
+    }
+  ```
+
+  Pair it with the same definition named `local_resp_state`. A separate
+  negative client uses `State Bool` as a type; its positive control uses
+  `StateOp Bool` as the checked operation carrier.
+- measured: each unimported reference's resolved `GlobalId`, each constructor
+  parent, the `resp_state` result types at `Get` and `Put`, and each paired
+  client's elaboration verdict.
+- claimed: each new floor identity is available without import at its exact
+  pre-source identity. Each inductive family is complete and scoped: public
+  cases resolve as `T.C`, not bare `C`. `resp_state` is an operation with
+  type `(s : Type) → StateOp s → Type`, reducing to `s` for `Get` and `Unit`
+  for `Put`; it has no constructor family. The source uses `StateOp` as the
+  carrier, not `State` as a second type.
+- the gap: a successful constructor spelling could resolve to a same-shaped
+  source declaration, and a no-import acceptance alone would not prove the
+  response family has the specified dependent cases. The snapshot, complete
+  matches, type-level responses, and same-name replacement pairs expose those
+  alternatives.
+- expect: all no-import clients accept and resolve the snapshotted IDs.
+  `ReadResult.Chunk`/`Eof`, the four `FileKind` cases, both single-constructor
+  families, and `StateOp.Get`/`Put` are complete; every listed bare `C` pair
+  refuses with `UnboundName` naming `C`. The `Get` response has type `Bool`
+  and the `Put` response has type `Unit`. Each same-name floor replacement
+  refuses, while a same-shaped declaration under its unique local control
+  name accepts. The `State Bool` type use refuses with `UnboundName`; the
+  `StateOp Bool` carrier use accepts.
+- controls: each qualified constructor client controls its bare-name pair;
+  each no-import type/operation use controls its source-name replacement.
+  The `get_response` and `put_response` declarations are separate controls for
+  the two `resp_state` reductions.
+- why: the names are source-required checked identities, not optional package
+  declarations; their complete paths and parent identities cannot be replaced
+  by lookalikes.
+
+### surface/modules/inc3a-added-checked-homes-require-each-import
+
+- promise class: **durable provider-edge invariant** — every new H name needs
+  its own explicit Strict-root import and retains its checked identity
+- spec: `30-taxonomy §4`; `33 §3.3–§4.3`; `38 §1.12`
+- given: snapshot each listed name's pre-source `GlobalId` before loading any
+  catalog source. For every row, create a separate Strict-roots client with
+  the owner's public export loaded. The positive client contains
+  `import Owner (name)` followed by `export name`. Its paired negative has
+  the same source body and dependencies, but omits only that import. This
+  export is a source use of the imported binding and preserves its canonical
+  identity under §4.3. For example, the `host_clock` pair is:
+
+  ```ken
+  import Capability.Process.Exit (host_clock)
+  export host_clock
+  ```
+
+  The paired client removes only the import and retains `export host_clock`.
+  Instantiate this pair independently for every row below.
+
+  | H name | Owner |
+  |---|---|
+  | `append_file` | `Capability.Filesystem.Authority` |
+  | `change_mode` | `Capability.Filesystem.Authority` |
+  | `create_directory` | `Capability.Filesystem.Authority` |
+  | `file_metadata` | `Capability.Filesystem.Authority` |
+  | `read_directory` | `Capability.Filesystem.Authority` |
+  | `remove_directory` | `Capability.Filesystem.Authority` |
+  | `remove_file` | `Capability.Filesystem.Authority` |
+  | `rename_file` | `Capability.Filesystem.Authority` |
+  | `writeAt` | `Capability.System.IO` |
+  | `writeAll` | `Capability.System.IO` |
+  | `freeze` | `Capability.System.Buffer` |
+  | `resourceMetadata` | `Capability.System.Resource` |
+  | `flush` | `Capability.Console.Text` |
+  | `is_terminal` | `Capability.Console.Text` |
+  | `intToChar` | `Core.Classes.LawfulClasses` |
+  | `SpawnPlan` | `Capability.Process.Child` |
+  | `with_stderr` | `Capability.Process.Child` |
+  | `take_stdin` | `Capability.Process.Child` |
+  | `take_stderr` | `Capability.Process.Child` |
+  | `read` | `Capability.Console.Text` |
+  | `wall_now` | `Capability.Time.WallClock` |
+  | `host_clock` | `Capability.Process.Exit` |
+  | `inject_l` | `Core.Effect.Coproduct` |
+  | `inject_r` | `Core.Effect.Coproduct` |
+
+- measured: each positive client's import and re-export resolution, the
+  resulting canonical `GlobalId`, and each paired omission's exact name error.
+  The omitted-import `export name` is the source-name reference under test.
+- claimed: all twenty-four names have the specified public home and original
+  pre-source identity; an unrelated loaded module or flat-global entry cannot
+  satisfy a missing Strict import.
+- the gap: an omitted-import rejection could arise from another missing
+  dependency or an invalid source body. Separate clients differ only by the
+  selected import, while the accepted re-export is the positive control.
+- expect: every imported client accepts and its re-export equals the
+  pre-source `GlobalId` snapshot. Every omission client rejects with
+  `UnboundName` naming exactly its omitted H name. No name is added to the
+  floor, and each home publishes the checked identity rather than a copy.
+- controls: the import-restored client is the positive control for each
+  omitted-import case; the independent pre-source snapshot controls identity.
+- why: each row is a separate route from an ordinary package home. A home
+  cannot be inferred from a sibling name or from implementation-global
+  registration.
+
+### surface/modules/inc3a-coproduct-injections-have-imported-signatures
+
+- promise class: **normative compatibility vector** — each imported injection
+  retains its checked five-binder signature and original identity
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §4.5.7`
+- given: snapshot the pre-source identities of `inject_l` and `inject_r`.
+  Load `Core.Effect.Coproduct` as a roots-loaded owner exporting both checked
+  identities. In separate Strict-root clients, import only the selected name
+  from `Core.Effect.Coproduct` and use these source declarations:
+
+  ```ken
+  fn inject_left
+      (tree : ITree (StateOp Bool) (resp_state Bool) Bool)
+    : ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool =
+    inject_l (StateOp Bool) ConsoleOp (resp_state Bool) console_resp Bool tree
+
+  fn inject_right
+      (tree : ITree ConsoleOp console_resp Bool)
+    : ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool =
+    inject_r (StateOp Bool) ConsoleOp (resp_state Bool) console_resp Bool tree
+
+  theorem inject_left_ret (value : Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_left
+          (ITree.Ret (StateOp Bool) (resp_state Bool) Bool value))
+        (ITree.Ret (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool value) = Refl
+
+  theorem inject_left_vis (op : StateOp Bool)
+      (continuation : resp_state Bool op ->
+        ITree (StateOp Bool) (resp_state Bool) Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_left
+          (ITree.Vis (StateOp Bool) (resp_state Bool) Bool op continuation))
+        (ITree.Vis (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool
+          (Coproduct.InL (StateOp Bool) ConsoleOp op)
+          (λ reply. inject_l (StateOp Bool) ConsoleOp (resp_state Bool)
+            console_resp Bool (continuation reply))) = Refl
+
+  theorem inject_right_ret (value : Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_right (ITree.Ret ConsoleOp console_resp Bool value))
+        (ITree.Ret (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool value) = Refl
+
+  theorem inject_right_vis (op : ConsoleOp)
+      (continuation : console_resp op -> ITree ConsoleOp console_resp Bool) :
+      Equal (ITree (Coproduct (StateOp Bool) ConsoleOp)
+        (resp_coproduct (StateOp Bool) ConsoleOp
+          (resp_state Bool) console_resp) Bool)
+        (inject_right (ITree.Vis ConsoleOp console_resp Bool op continuation))
+        (ITree.Vis (Coproduct (StateOp Bool) ConsoleOp)
+          (resp_coproduct (StateOp Bool) ConsoleOp
+            (resp_state Bool) console_resp) Bool
+          (Coproduct.InR (StateOp Bool) ConsoleOp op)
+          (λ reply. inject_r (StateOp Bool) ConsoleOp (resp_state Bool)
+            console_resp Bool (continuation reply))) = Refl
+  ```
+
+  In each fresh client, include only the functions and Refl laws for the
+  selected injection. For each, make a paired fresh client with the same
+  source and dependencies but omit only that name's import.
+- measured: each imported function's resolved `GlobalId` and checked type,
+  the four `Refl` equations, and each paired omission's exact name error.
+- claimed: each home publishes its original checked injection with all five
+  explicit parameters in spec order; the `Ret` and `Vis` clauses preserve the
+  value and response continuation while adding the appropriate coproduct tag.
+- the gap: import resolution and typechecking alone would not detect a wrong
+  constructor tag or continuation. Separate left/right `Ret` and `Vis` equations
+  pin both branches.
+- expect: both imported clients accept and resolve the snapshotted IDs. Their
+  function types are the checked left and right inclusion signatures in
+  `36 §4.5.7`; all four `Refl` equations accept. Each omitted-import client
+  refuses with `UnboundName` naming only its selected injection.
+- controls: each imported client is the positive control for its one-name
+  omission. The `Ret` values and the typed left/right operations are the
+  positive controls for the branch equations.
+- why: the generic home is not a HostIO alias. Complete HostIO instances may
+  use the separate `host_fs` or `host_console` rewrites instead.
+
+### surface/modules/inc3a-fixed-width-imports-and-safe-range-boundaries
+
+- promise class: **durable invariant** — each named conversion is explicit,
+  imported from its home, and succeeds exactly on its target range
+- spec: `35 §5`; `30-taxonomy §4`; `33 §3.3`; `10-kernel/18a §5.7`
+- given: snapshot the eight pre-source conversion `GlobalId`s before loading
+  catalog source. For each row, make a separate Strict-roots client importing
+  only that conversion from `Data.Numeric.FixedWidth`. Let `f`, `T`, `lo`,
+  and `hi` be that row's function, target, and inclusive bounds. The client
+  declares four `Option T` values by evaluating `f (lo - 1)`, `f lo`, `f hi`,
+  and `f (hi + 1)`. Pair it with an otherwise identical client that omits
+  only this conversion import. The range endpoints are contract literals:
+
+  | Conversion | Target range | Expected results |
+  |---|---:|---|
+  | `intToInt8` | `-128..127` | `-129 → None Int8`; `-128 → Some Int8 (-128)`; `127 → Some Int8 127`; `128 → None Int8` |
+  | `intToInt16` | `-32768..32767` | `-32769 → None Int16`; `-32768 → Some Int16 (-32768)`; `32767 → Some Int16 32767`; `32768 → None Int16` |
+  | `intToInt32` | `-2147483648..2147483647` | `-2147483649 → None Int32`; `-2147483648 → Some Int32 (-2147483648)`; `2147483647 → Some Int32 2147483647`; `2147483648 → None Int32` |
+  | `intToInt64` | `-9223372036854775808..9223372036854775807` | `-9223372036854775809 → None Int64`; `-9223372036854775808 → Some Int64 (-9223372036854775808)`; `9223372036854775807 → Some Int64 9223372036854775807`; `9223372036854775808 → None Int64` |
+  | `intToUInt8` | `0..255` | `-1 → None UInt8`; `0 → Some UInt8 0`; `255 → Some UInt8 255`; `256 → None UInt8` |
+  | `intToUInt16` | `0..65535` | `-1 → None UInt16`; `0 → Some UInt16 0`; `65535 → Some UInt16 65535`; `65536 → None UInt16` |
+  | `intToUInt32` | `0..4294967295` | `-1 → None UInt32`; `0 → Some UInt32 0`; `4294967295 → Some UInt32 4294967295`; `4294967296 → None UInt32` |
+  | `intToUInt64` | `0..18446744073709551615` | `-1 → None UInt64`; `0 → Some UInt64 0`; `18446744073709551615 → Some UInt64 18446744073709551615`; `18446744073709551616 → None UInt64` |
+
+- measured: each client's resolved conversion `GlobalId` and the four
+  returned `Option T` values for its target.
+- claimed: each imported name resolves to its existing checked identity and
+  returns `Some` exactly within its target range, `None` just outside. No
+  native unchecked raw cast or implicit conversion supplies these results.
+- the gap: a range check for one width cannot establish the other seven
+  widths' limits or import edges. Each conversion has its own import/omission
+  pair and its own lower/upper boundary pair.
+- expect: all eight imported clients accept and match all four expected
+  outputs in their row. Each omission client rejects with `UnboundName`
+  naming exactly its conversion. In-range endpoints return `Some T value`;
+  adjacent out-of-range values return `None T`.
+- controls: each import-restored client controls its one-name omission.
+  The two in-range values control that a conversion is not an always-`None`
+  stub; the adjacent out-of-range values distinguish safe narrowing from a
+  wrapping raw cast.
+- why: all eight definitions share one home but have distinct checked IDs and
+  target ranges; no representative width stands for the remaining seven.

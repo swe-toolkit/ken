@@ -19,4 +19,4 @@ fn classify (n : Nat) : ExitCode = match n {
 fn fw (n : Nat) : Nat requires Top = match n { Zero |-> Zero ; Suc m |-> Suc (Suc Zero) }
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (classify (fw (Suc (Suc Zero))))
+  host_pure APartial ExitCode (classify (fw (Suc (Suc Zero))))

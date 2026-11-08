@@ -53,7 +53,7 @@ import Core.Logic.Compare
 
 import Data.Text.StringBijection (string_to_list_char_injective)
 
-export charToInt, leqChar
+export charToInt, leqChar, intToChar
 
 pub fn IsTrue (b : Bool) : Prop = Equal Bool b True
 ```

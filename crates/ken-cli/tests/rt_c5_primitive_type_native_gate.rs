@@ -29,8 +29,8 @@ const checkResult : Bool =
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
   match checkResult {
-    True |-> host_exit APartial ExitCode.Success;
-    False |-> host_exit APartial (ExitCode.Failure 1)
+    True |-> host_pure APartial ExitCode ExitCode.Success;
+    False |-> host_pure APartial ExitCode (ExitCode.Failure 1)
   }
 "#;
 

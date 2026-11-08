@@ -15,6 +15,7 @@ by `writeAll`, however, are ordinary Ken data and their laws are kernel-checked.
 
 ```ken
 export BufferHandle,
+  freeze,
   BufferWindow,
   MkBufferWindow,
   buffer_span_length,

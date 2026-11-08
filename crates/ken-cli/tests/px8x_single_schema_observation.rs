@@ -10,21 +10,19 @@ fn output_dir() -> tempfile::TempDir {
 const RESOURCE_PROGRAM: &str = r#"program capabilities FS AFull
 fn px8x_body (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
+  host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
 
 fn px8x_after
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err _ |-> host_exit AFull (ExitCode.Failure 41);
+    Err _ |-> host_pure AFull ExitCode (ExitCode.Failure 41);
     Ok bracket |-> match bracket {
-      ResourceBracketOk _ |-> host_exit AFull ExitCode.Success;
-      ResourceBracketBodyError _ |-> host_exit AFull (ExitCode.Failure 42);
-      ResourceBracketReleaseError _ |-> host_exit AFull (ExitCode.Failure 43);
-      ResourceBracketBodyAndReleaseError _ _ |-> host_exit AFull (ExitCode.Failure 44)
+      ResourceBracketOk _ |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError _ |-> host_pure AFull ExitCode (ExitCode.Failure 42);
+      ResourceBracketReleaseError _ |-> host_pure AFull ExitCode (ExitCode.Failure 43);
+      ResourceBracketBodyAndReleaseError _ _ |-> host_pure AFull ExitCode (ExitCode.Failure 44)
     }
   }
 
@@ -32,9 +30,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
         (withResource AFull Unit Unit cap (bytes_encode "held.bin")
           ResourceOpenMode.ResourceMetadata px8x_body)
         (\outcome. px8x_after outcome)

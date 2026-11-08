@@ -73,7 +73,7 @@ const d5_tree : D5Tree =
 
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (classify (inorder d5_tree))
+  host_pure APartial ExitCode (classify (inorder d5_tree))
 "#;
 
 fn d5_source(inorder_arm: &str) -> String {

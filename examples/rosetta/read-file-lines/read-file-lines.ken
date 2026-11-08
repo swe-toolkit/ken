@@ -14,11 +14,9 @@ program capabilities FS APartial
 --
 -- GENUINE COMPOSITION (effect-composition D1-D4, retires the prior "FS-read
 -- + pure-parse, NOT effect composition" asterisk): `main` performs the
--- `[FS]` read AND the `[Console]` printing in ONE type-checked `ITree (Coproduct
--- (FSOp APartial) ConsoleOp) (resp_coproduct ...) (Result IOError Unit)`, built at
--- the surface via `inject_l`/`inject_r` (the general `g ↪ Coproduct g h` / `h ↪ Coproduct
--- g h` inclusions, `36 §2.4`'s `incl`) sequenced with the homogeneous
--- `bind`. `run_io`'s coproduct-aware terminal driver (D3) strips the
+-- `[FS]` read AND the `[Console]` printing in ONE checked `HostIO APartial`
+-- tree. `host_fs` and `host_console` lift the effects, and `host_bind`
+-- sequences them. `run_io`'s coproduct-aware terminal driver strips the
 -- `InL`/`InR` tags down to each real base op and dispatches both effects
 -- through the SAME loop -- no hand-fed `Coproduct` anywhere in this file. On a
 -- missing file, the application reports the exact error through Console and
@@ -84,35 +82,25 @@ const Compose (r : Type) : Type = HostIO APartial r
 -- resume N times through `print_line`'s continuation).
 proc printLines (xs : List String) : Compose (Result IOError Unit) visits [Console] =
   match xs {
-    Nil ↦
-      ITree.Ret
-        (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-        (Result IOError Unit)
-        (Ok IOError Unit MkUnit);
+    Nil ↦ host_pure APartial (Result IOError Unit) (Ok IOError Unit MkUnit);
     Cons x xs' ↦
-      bind
-        (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      host_bind
+        APartial
         Unit
         (Result IOError Unit)
         (host_console APartial Unit (print_line x))
         (λ_. printLines xs')
   }
 
--- Reads the fixture via `inject_l (read_bytes ...)`, and on success prints
--- each parsed line via `inject_r (print_line ...)` in one composed tree.
+-- Reads the fixture through `host_fs (read_bytes ...)`, then prints each
+-- parsed line through `host_console (print_line ...)` in one composed tree.
 proc app (cap : Cap APartial) : Compose (Result IOError Unit) visits [FS, Console] =
-  bind
-    (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+  host_bind
+    APartial
     (Result FileError Bytes)
     (Result IOError Unit)
-    (inject_l
-      (FSOp APartial)
-      AmbientOp
-      (fs_resp APartial)
-      ambient_resp
+    (host_fs
+      APartial
       (Result FileError Bytes)
       (read_bytes APartial cap (bytes_encode "conformance/fs/fixtures/three-lines.txt")))
     (λr.
@@ -120,20 +108,12 @@ proc app (cap : Cap APartial) : Compose (Result IOError Unit) visits [FS, Consol
         Err e ↦
           match e {
             MkFileError operation path kind ↦
-              ITree.Ret
-                (Coproduct (FSOp APartial) AmbientOp)
-                (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-                (Result IOError Unit)
-                (Err IOError Unit kind)
+              host_pure APartial (Result IOError Unit) (Err IOError Unit kind)
           };
         Ok bytes ↦
           match bytes_decode bytes {
             Err _ ↦
-              ITree.Ret
-                (Coproduct (FSOp APartial) AmbientOp)
-                (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-                (Result IOError Unit)
-                (Err IOError Unit (IOError.Other 0));
+              host_pure APartial (Result IOError Unit) (Err IOError Unit (IOError.Other 0));
             Ok text ↦ printLines (lines text)
           }
       })
@@ -144,9 +124,8 @@ proc main
     visits [FS, Console] =
   match caps {
     ProgramCaps.MkProgramCaps cap ↦
-      bind
-        (Coproduct (FSOp APartial) AmbientOp)
-        (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+      host_bind
+        APartial
         (Result IOError Unit)
         ExitCode
         (app cap)
@@ -187,11 +166,6 @@ proc main
                 IOError.Other errno ↦
                   host_program_then APartial (print_line "Other") (ExitCode.Failure 1)
               };
-            Ok _ ↦
-              ITree.Ret
-                (Coproduct (FSOp APartial) AmbientOp)
-                (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-                ExitCode
-                ExitCode.Success
+            Ok _ ↦ host_pure APartial ExitCode ExitCode.Success
           })
   }

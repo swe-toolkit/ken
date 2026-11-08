@@ -25,7 +25,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
         r"fn client_console_tree (stream : ConsoleStream) (payload : Bytes)
              : IO (Result IOError Unit) =
            ITree.Vis ConsoleOp console_resp (Result IOError Unit)
-             (Write stream payload)
+             (ConsoleOp.Write stream payload)
              (λr. ITree.Ret ConsoleOp console_resp (Result IOError Unit) r)",
     )
     .expect("independent one-Write Result-passthrough tree");

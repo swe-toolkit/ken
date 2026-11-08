@@ -271,10 +271,13 @@ action, and `host_bind` sequences two HostIO actions. The last two
 are checked prelude definitions homed by package export, not new
 effect labels or definitions authored in `Exit.ken.md`. The
 compiler-internal `FSOp`, `AmbientOp` and `host_exit` names are not
-made source APIs by these exports, and no generic `bind`/`ret` source
-promise follows. This admission changes neither the `main` type
-above nor any CLI resolution route: an isolated route still uses
-Legacy until its separate strict flip.
+made source APIs by these exports. Independently, §30 §4 admits the
+checked generic ITree sequencer under the specific floor spelling
+`itree_bind`, while Legacy keeps bare `bind` at that same identity;
+these HostIO exports imply no generic `ret` source promise. This
+admission changes neither the `main` type above nor any CLI resolution
+route: an isolated route still uses Legacy until its separate strict
+flip.
 
 Neither header takes a name token. The file path is the single identity of the
 program or package boundary; a spelling such as `program App` or `package Lib`
@@ -312,8 +315,8 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
   to the exact pre-source `GlobalId`; without it, an unimported bare use
   raises `UnboundName` in Strict roots.
-- **Checked package homes for the Strict catalog route.** The five catalog
-  units that otherwise fail at resolution under Strict roots have the
+- **Checked package homes for the Strict catalog route.** The four catalog
+  units below that otherwise fail at resolution under Strict roots have the
   following explicit-import homes for their already-checked pre-source
   declarations. Each listed binding retains its exact pre-source
   `GlobalId`; a home does not copy a definition, mint another identity,
@@ -334,12 +337,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
     `transfer_count_remaining`, `transfer_count_nat_succ`, and
     `transfer_count_predecessor`. This does not publish either private
     constructor of the floor `BufferSpan` or `TransferCount` family.
-  - `Capability.System.Error` homes `FileOperation` and its complete
-    sixteen-constructor checked family: `OpReadFile`, `OpWriteFile`,
-    `OpAppendFile`, `OpMetadata`, `OpReadDirectory`,
-    `OpCreateDirectory`, `OpRemoveFile`, `OpRemoveDirectory`,
-    `OpRename`, `OpChangeMode`, `OpSeek`, `OpSetLength`, `OpSync`,
-    `OpGetInheritance`, `OpSetInheritance`, and `OpDuplicate`.
+  `Capability.System.Error` continues to use the same checked
+  `FileOperation` identity and its sixteen cases, but no longer homes or
+  exports that family: §30 §4 admits it to the scoped floor in Increment
+  3a. Each source use of a case takes the qualified `FileOperation.C`
+  path, including in this package.
   - `Capability.System.IO` homes the checked
     `write_all_exact_prefix_prop` definition and its attached proof
     `write_all_exact_prefix_prop::exact_prefix`; the attached proof is
@@ -422,24 +424,30 @@ is a **surface error** (`24`) — it never reaches the kernel:
   kernel/built-in vocabulary (`30-taxonomy §3`: audited native names, `Omega`,
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
-  BufferSpan, Char, ChildExit, ConsoleStream, Coproduct, CreatePolicy,
-  Equal, ExitCode, FileError, HostIO, IOError, ITree, Instant, List,
+  BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream, Coproduct,
+  CreatePolicy, DirEntry, Equal, ExitCode, FileError, FileKind,
+  FileMetadata, FileOperation, HostIO, IOError, ITree, Instant, List,
   MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
-  Prop, Proved, ReadProgress, ResourceError, ResourceKind,
-  ResourceOpenMode, Result, Top, TransferCount, Unit, Utf8Error,
-  WriteProgress, eqChar, run_state, state_get, state_put}`. This floor
-  subset contains forty exact identities: the prior thirty-two, five
-  scoped families and three State operations (`30-taxonomy §4`). It
-  is the ambiently nameable checked-identity roster, not a roster of
-  forty types. `Top` and `Bottom` are proposition constants, `Proved`
-  is a proof binding, `HostIO` is a type-level function, and `eqChar`,
-  `run_state`, `state_get` and `state_put` are checked operations, not
-  inductive types or constructor families. The space desugarer reads
-  the three State operations by their exact pre-source IDs (`36 §4.5`);
-  all three enter protected B, while bare `get` and `put` remain
-  unreserved by this floor. For an inductive floor type, its per-type
-  **scoped constructors** property determines whether its whole exact
-  constructor family also occupies bare B names. When enabled, only `T`
+  Prop, Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
+  ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit,
+  Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
+  resp_coproduct, resp_state, run_state, state_get, state_put}`.
+  This floor subset contains fifty-one exact identities: the prior
+  forty-seven plus `ConsoleOp`, `console_resp`, `itree_bind` and
+  `resp_coproduct` (`30-taxonomy §4`). It is the ambiently nameable
+  checked-identity roster, not a roster of fifty-one types. `Top`
+  and `Bottom` are proposition constants, `Proved` is a proof binding,
+  `HostIO` is a type-level function, and `console_resp`, `eqChar`,
+  `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
+  and `state_put` are checked operations, not inductive types or
+  constructor families. The space desugarer reads the checked
+  `StateOp` family, `resp_state`, `itree_bind`, `resp_coproduct` and
+  three State operations at exact pre-source IDs (`36 §4.2`, §4.5).
+  Bare `get`, `put` and `bind` remain unreserved; Legacy keeps the
+  bare `bind` alias for the same checked sequencing identity. For an
+  inductive floor type, its per-type **scoped constructors** property
+  determines whether its whole exact constructor family also occupies
+  bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved
   by that family. When disabled, its entire constructor family stays bare and
   reserved. There is no per-constructor subset choice. `ResourceKind` is scoped:
@@ -465,11 +473,23 @@ is a **surface error** (`24`) — it never reaches the kernel:
   generic `Stream` spelling are not reserved by it. No constructor ID
   is renamed.
   `FileError` is unscoped: `MkFileError` remains bare and reserved with
-  its exact parent. `IOError` is scoped as a complete thirteen-cause
-  family: only public `IOError.C` paths resolve, including
-  `IOError.NotFound`, `IOError.Other`, `IOError.Unsupported`, and
-  `IOError.Revoked`; none of the bare causes enters B. `CreatePolicy` is
-  scoped as a complete three-case family: `CreatePolicy.CreateNew`,
+  its exact parent. `ReadResult`, `FileKind`, `FileMetadata`, `DirEntry`
+  and `FileOperation` are scoped complete families: their public cases
+  use `T.C` only, never a bare reservation. The sixteen existing
+  `FileOperation` cases, including `FileOperation.OpReadFile`, keep their
+  exact identities and native artifact leaves; no case is dropped to
+  make the family fit the floor. `ConsoleOp` is scoped as the complete
+  `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush` and
+  `ConsoleOp.IsTerminal` family; no bare case joins B. `StateOp` is
+  likewise scoped as the complete `StateOp.Get` and `StateOp.Put`
+  family. Neither bare `Get` nor bare `Put` joins B; the schematic
+  `State s` signature label in §36 §4.2 is not a second checked type or
+  a package home. `IOError`
+  is scoped as a complete thirteen-cause family: only public
+  `IOError.C` paths resolve, including `IOError.NotFound`,
+  `IOError.Other`, `IOError.Unsupported`, and `IOError.Revoked`; none of
+  the bare causes enters B. `CreatePolicy` is scoped as a complete
+  three-case family: `CreatePolicy.CreateNew`,
   `CreatePolicy.CreateOrTruncate`, and `CreatePolicy.CreateOrKeep` resolve
   to their unchanged checked IDs, not as bare names in B. `ResourceError`
   is scoped as a complete twelve-case family: its public constructors

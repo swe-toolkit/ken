@@ -210,22 +210,22 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
     assert_eq!(
         constructor_names(&env, "FileOperation"),
         [
-            "OpReadFile",
-            "OpWriteFile",
-            "OpAppendFile",
-            "OpMetadata",
-            "OpReadDirectory",
-            "OpCreateDirectory",
-            "OpRemoveFile",
-            "OpRemoveDirectory",
-            "OpRename",
-            "OpChangeMode",
-            "OpSeek",
-            "OpSetLength",
-            "OpSync",
-            "OpGetInheritance",
-            "OpSetInheritance",
-            "OpDuplicate",
+            "FileOperation.OpReadFile",
+            "FileOperation.OpWriteFile",
+            "FileOperation.OpAppendFile",
+            "FileOperation.OpMetadata",
+            "FileOperation.OpReadDirectory",
+            "FileOperation.OpCreateDirectory",
+            "FileOperation.OpRemoveFile",
+            "FileOperation.OpRemoveDirectory",
+            "FileOperation.OpRename",
+            "FileOperation.OpChangeMode",
+            "FileOperation.OpSeek",
+            "FileOperation.OpSetLength",
+            "FileOperation.OpSync",
+            "FileOperation.OpGetInheritance",
+            "FileOperation.OpSetInheritance",
+            "FileOperation.OpDuplicate",
         ]
     );
     assert_eq!(
@@ -250,7 +250,14 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
     );
     assert_eq!(
         system_constructor_names(&env, &owned, "ProcessOperation"),
-        ["SpawnChild", "TakePipe", "ReadPipe", "WritePipe", "ClosePipe", "WaitChild"]
+        [
+            "SpawnChild",
+            "TakePipe",
+            "ReadPipe",
+            "WritePipe",
+            "ClosePipe",
+            "WaitChild"
+        ]
     );
     assert_eq!(
         system_constructor_names(&env, &owned, "ResourceRef"),
@@ -315,7 +322,7 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
         r#"
 const px9_error : SystemError =
   MkSystemError
-    (FilesystemOp OpReadFile)
+    (FilesystemOp FileOperation.OpReadFile)
     (FilesystemResource (None Bytes))
     IOError.Revoked
     RedactedSafeContext
@@ -352,22 +359,22 @@ theorem px9_revoked : Equal Transience (error_transience IOError.Revoked) Perman
 const px9_other_identity : IOError = IOError.Other 0
 theorem px9_other : Equal Transience (error_transience px9_other_identity) Permanent = Proved
 
-theorem px9_read_file : Equal Idempotence (operation_idempotence (FilesystemOp OpReadFile)) Idempotent = Proved
-theorem px9_write_file : Equal Idempotence (operation_idempotence (FilesystemOp OpWriteFile)) NonIdempotent = Proved
-theorem px9_append_file : Equal Idempotence (operation_idempotence (FilesystemOp OpAppendFile)) NonIdempotent = Proved
-theorem px9_metadata : Equal Idempotence (operation_idempotence (FilesystemOp OpMetadata)) Idempotent = Proved
-theorem px9_read_directory : Equal Idempotence (operation_idempotence (FilesystemOp OpReadDirectory)) Idempotent = Proved
-theorem px9_create_directory : Equal Idempotence (operation_idempotence (FilesystemOp OpCreateDirectory)) NonIdempotent = Proved
-theorem px9_remove_file : Equal Idempotence (operation_idempotence (FilesystemOp OpRemoveFile)) NonIdempotent = Proved
-theorem px9_remove_directory : Equal Idempotence (operation_idempotence (FilesystemOp OpRemoveDirectory)) NonIdempotent = Proved
-theorem px9_rename : Equal Idempotence (operation_idempotence (FilesystemOp OpRename)) NonIdempotent = Proved
-theorem px9_change_mode : Equal Idempotence (operation_idempotence (FilesystemOp OpChangeMode)) Idempotent = Proved
-theorem px9_seek : Equal Idempotence (operation_idempotence (FilesystemOp OpSeek)) NonIdempotent = Proved
-theorem px9_set_length : Equal Idempotence (operation_idempotence (FilesystemOp OpSetLength)) Idempotent = Proved
-theorem px9_sync : Equal Idempotence (operation_idempotence (FilesystemOp OpSync)) Idempotent = Proved
-theorem px9_get_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp OpGetInheritance)) Idempotent = Proved
-theorem px9_set_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp OpSetInheritance)) Idempotent = Proved
-theorem px9_duplicate : Equal Idempotence (operation_idempotence (FilesystemOp OpDuplicate)) NonIdempotent = Proved
+theorem px9_read_file : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpReadFile)) Idempotent = Proved
+theorem px9_write_file : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpWriteFile)) NonIdempotent = Proved
+theorem px9_append_file : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpAppendFile)) NonIdempotent = Proved
+theorem px9_metadata : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpMetadata)) Idempotent = Proved
+theorem px9_read_directory : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpReadDirectory)) Idempotent = Proved
+theorem px9_create_directory : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpCreateDirectory)) NonIdempotent = Proved
+theorem px9_remove_file : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpRemoveFile)) NonIdempotent = Proved
+theorem px9_remove_directory : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpRemoveDirectory)) NonIdempotent = Proved
+theorem px9_rename : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpRename)) NonIdempotent = Proved
+theorem px9_change_mode : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpChangeMode)) Idempotent = Proved
+theorem px9_seek : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSeek)) NonIdempotent = Proved
+theorem px9_set_length : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSetLength)) Idempotent = Proved
+theorem px9_sync : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSync)) Idempotent = Proved
+theorem px9_get_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpGetInheritance)) Idempotent = Proved
+theorem px9_set_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSetInheritance)) Idempotent = Proved
+theorem px9_duplicate : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpDuplicate)) NonIdempotent = Proved
 
 theorem px9_transient_idempotent : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved
 theorem px9_transient_nonidempotent : Equal RetryGuidance (retry_guidance Transient NonIdempotent) RetryUnsafeNonIdempotent = Proved

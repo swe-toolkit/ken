@@ -3,13 +3,9 @@ program capabilities FS AFull
 fn leaf_body (terminal : Bool) (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match terminal {
-    True |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit)
+    True |-> host_pure AFull (ResourceBodyResult Unit Unit)
       (ResourceBodyOk Unit Unit MkUnit);
-    False |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit)
+    False |-> host_pure AFull (ResourceBodyResult Unit Unit)
       (ResourceBodyErr Unit Unit MkUnit)
   }
 
@@ -18,19 +14,13 @@ fn body_result
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
     Ok (ResourceBracketOk unit) |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
+      host_pure AFull (ResourceBodyResult Unit Unit)
         (ResourceBodyOk Unit Unit MkUnit);
     Ok bracket |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
+      host_pure AFull (ResourceBodyResult Unit Unit)
         (ResourceBodyErr Unit Unit MkUnit);
     Err error |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
+      host_pure AFull (ResourceBodyResult Unit Unit)
         (ResourceBodyErr Unit Unit MkUnit)
   }
 
@@ -38,9 +28,7 @@ proc level_one_body
   (cap : Cap AFull) (terminal : Bool)
   (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
       ResourceOpenMode.ResourceMetadata (\resource. leaf_body terminal resource))
@@ -50,9 +38,7 @@ proc level_two_body
   (cap : Cap AFull) (terminal : Bool)
   (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withResource AFull Unit Unit cap (bytes_encode "held-2.bin")
       ResourceOpenMode.ResourceMetadata (\resource. level_one_body cap terminal resource))
@@ -62,26 +48,22 @@ fn after_root
   (outcome : Result FileError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Ok (ResourceBracketOk unit) |-> host_exit AFull ExitCode.Success;
-    Ok (ResourceBracketBodyError error) |-> host_exit AFull (ExitCode.Failure 81);
-    Ok (ResourceBracketReleaseError error) |-> host_exit AFull (ExitCode.Failure 82);
+    Ok (ResourceBracketOk unit) |-> host_pure AFull ExitCode ExitCode.Success;
+    Ok (ResourceBracketBodyError error) |-> host_pure AFull ExitCode (ExitCode.Failure 81);
+    Ok (ResourceBracketReleaseError error) |-> host_pure AFull ExitCode (ExitCode.Failure 82);
     Ok (ResourceBracketBodyAndReleaseError body_error release_error) |->
-      host_exit AFull (ExitCode.Failure 83);
-    Err error |-> host_exit AFull (ExitCode.Failure 84)
+      host_pure AFull ExitCode (ExitCode.Failure 83);
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 84)
   }
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        Bool ExitCode
+      host_bind AFull Bool ExitCode
         (host_console AFull Bool (is_terminal ConsoleStream.Stdout))
         (\terminal.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+          host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
             (withResource AFull Unit Unit cap (bytes_encode "held-0.bin")
               ResourceOpenMode.ResourceMetadata __ROOT_BODY__)
             (\outcome. after_root outcome))
