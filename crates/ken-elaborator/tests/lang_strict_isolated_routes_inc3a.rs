@@ -146,12 +146,19 @@ fn generic_effect_floor_uses_captured_id_and_leaves_bare_bind_for_users() {
         Err(error) => panic!("wrong bare bind refusal: {error:?}"),
         Ok(_) => panic!("bare bind leaked into the strict floor"),
     }
-    let shadow = strict("fn bind (n : Nat) : Nat = n\nfn apply (n : Nat) : Nat = bind n\n")
+    let mut shadow = ElabEnv::new().expect("checked prelude");
+    let results = shadow
+        .elaborate_isolated_file_strict_v1(
+            &[catalog()],
+            "fn bind (n : Nat) : Nat = n\nfn apply (n : Nat) : Nat = bind n\n",
+        )
         .expect("user-defined bind is not reserved");
-    assert_ne!(
-        shadow.globals["bind"], bind,
-        "the user's bind is a new definition"
-    );
+    let user_bind_id = results
+        .iter()
+        .find(|result| result.name == "bind")
+        .expect("the user's checked bind declaration")
+        .def_id;
+    assert_ne!(user_bind_id, bind, "the user's bind is a new definition");
     assert_eq!(
         shadow.globals["itree_bind"], bind,
         "the user cannot redirect the floor alias"
