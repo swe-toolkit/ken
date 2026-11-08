@@ -312,8 +312,8 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
   to the exact pre-source `GlobalId`; without it, an unimported bare use
   raises `UnboundName` in Strict roots.
-- **Checked package homes for the Strict catalog route.** The five catalog
-  units that otherwise fail at resolution under Strict roots have the
+- **Checked package homes for the Strict catalog route.** The four catalog
+  units below that otherwise fail at resolution under Strict roots have the
   following explicit-import homes for their already-checked pre-source
   declarations. Each listed binding retains its exact pre-source
   `GlobalId`; a home does not copy a definition, mint another identity,
@@ -334,12 +334,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
     `transfer_count_remaining`, `transfer_count_nat_succ`, and
     `transfer_count_predecessor`. This does not publish either private
     constructor of the floor `BufferSpan` or `TransferCount` family.
-  - `Capability.System.Error` homes `FileOperation` and its complete
-    sixteen-constructor checked family: `OpReadFile`, `OpWriteFile`,
-    `OpAppendFile`, `OpMetadata`, `OpReadDirectory`,
-    `OpCreateDirectory`, `OpRemoveFile`, `OpRemoveDirectory`,
-    `OpRename`, `OpChangeMode`, `OpSeek`, `OpSetLength`, `OpSync`,
-    `OpGetInheritance`, `OpSetInheritance`, and `OpDuplicate`.
+  `Capability.System.Error` continues to use the same checked
+  `FileOperation` identity and its sixteen cases, but no longer homes or
+  exports that family: §30 §4 admits it to the scoped floor in Increment
+  3a. Each source use of a case takes the qualified `FileOperation.C`
+  path, including in this package.
   - `Capability.System.IO` homes the checked
     `write_all_exact_prefix_prop` definition and its attached proof
     `write_all_exact_prefix_prop::exact_prefix`; the attached proof is
@@ -423,15 +422,16 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
   BufferSpan, Char, ChildExit, ConsoleStream, Coproduct, CreatePolicy,
-  Equal, ExitCode, FileError, HostIO, IOError, ITree, Instant, List,
-  MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
-  Prop, Proved, ReadProgress, ResourceError, ResourceKind,
+  DirEntry, Equal, ExitCode, FileError, FileKind, FileMetadata,
+  FileOperation, HostIO, IOError, ITree, Instant, List, MappingProt,
+  Nat, Option, Pair, ProcessInput, Prod, ProgramCaps, Prop, Proved,
+  ReadProgress, ReadResult, ResourceError, ResourceKind,
   ResourceOpenMode, Result, Top, TransferCount, Unit, Utf8Error,
   WriteProgress, eqChar, run_state, state_get, state_put}`. This floor
-  subset contains forty exact identities: the prior thirty-two, five
-  scoped families and three State operations (`30-taxonomy §4`). It
+  subset contains forty-five exact identities: the previous forty and
+  five scoped families admitted in Increment 3a (`30-taxonomy §4`). It
   is the ambiently nameable checked-identity roster, not a roster of
-  forty types. `Top` and `Bottom` are proposition constants, `Proved`
+  forty-five types. `Top` and `Bottom` are proposition constants, `Proved`
   is a proof binding, `HostIO` is a type-level function, and `eqChar`,
   `run_state`, `state_get` and `state_put` are checked operations, not
   inductive types or constructor families. The space desugarer reads
@@ -465,7 +465,13 @@ is a **surface error** (`24`) — it never reaches the kernel:
   generic `Stream` spelling are not reserved by it. No constructor ID
   is renamed.
   `FileError` is unscoped: `MkFileError` remains bare and reserved with
-  its exact parent. `IOError` is scoped as a complete thirteen-cause
+  its exact parent. `ReadResult`, `FileKind`, `FileMetadata`, `DirEntry`
+  and `FileOperation` are scoped complete families: their public cases
+  use `T.C` only, never a bare reservation. The sixteen existing
+  `FileOperation` cases, including `FileOperation.OpReadFile`, keep their
+  exact identities and native artifact leaves; no case is dropped to
+  make the family fit the floor. `IOError` is scoped as a complete
+  thirteen-cause
   family: only public `IOError.C` paths resolve, including
   `IOError.NotFound`, `IOError.Other`, `IOError.Unsupported`, and
   `IOError.Revoked`; none of the bare causes enters B. `CreatePolicy` is

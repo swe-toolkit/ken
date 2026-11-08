@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative forty-identity prelude and its exact
+> normative forty-five-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -42,9 +42,10 @@ not candidates for floor membership.
 
 Apart from internal-only `Empty` and the admitted entrypoint-ABI,
 effect/clock, ITree, six earlier FS/resource families, the five
-scoped progress/acquisition/mapping/child-result families,
-`ConsoleStream`, `eqChar` and the three State operations below, the
-other names in this table are
+scoped progress/acquisition/mapping/child-result families, the five
+Increment 3a scoped families (`ReadResult`, `FileMetadata`, `FileKind`,
+`DirEntry`, `FileOperation`), `ConsoleStream`, `eqChar` and the three
+State operations below, the other names in this table are
 **observed spellings**, not names approved for permanent reservation.
 Before a later slice admits a newly witnessed name, Spec checks that
 its spelling closely encloses its meaning (`30 §4`). For the admitted
@@ -88,6 +89,11 @@ constructor still has the same checked parent and `GlobalId`.
 | `ResourceOpenMode` (floor) | Yes | `ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata` and `ResourceOpenMode.ResourceWriteCreate` select FS acquisition modes; their leaves are not bare-reserved. |
 | `MappingProt` (floor) | Yes | `MappingProt.ReadOnly` and `MappingProt.ReadWrite` select mapping protection; neither leaf is bare-reserved. |
 | `ChildExit` (floor) | Yes | `ChildExit.Exited` and `ChildExit.Signaled` are the complete checked wait-result family; neither leaf is bare-reserved. |
+| `ReadResult` (floor) | Yes | `ReadResult.Chunk` and `ReadResult.Eof` are the complete checked Console-read reply family; bare leaves are not reserved. |
+| `FileMetadata` (floor) | Yes | The native-selected constructor resolves only as `FileMetadata.MkFileMetadata`, with no bare reservation. |
+| `FileKind` (floor) | Yes | The four native-selected kind cases resolve only as `FileKind.KFile`, `FileKind.KDirectory`, `FileKind.KSymlink` and `FileKind.KOther`. |
+| `DirEntry` (floor) | Yes | The native-selected constructor resolves only as `DirEntry.MkDirEntry`, with no bare reservation. |
+| `FileOperation` (floor; former package home) | Yes | All sixteen checked operation cases resolve only as `FileOperation.Op*` paths; the old bare exports and home rows retire atomically. |
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
 | `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
@@ -241,8 +247,37 @@ alone reserves a name.
 | `ReadOnly` (qualified floor constructor) | Checked mapping protection, source `MappingProt.ReadOnly`, not bare. |
 | `ReadWrite` (qualified floor constructor) | Checked mapping protection, source `MappingProt.ReadWrite`, not bare. |
 | `ChildExit` (floor, scoped) | Native child wait returns this exact checked family (`38 §1.11`); source matches its code or signal. |
+| `ReadResult` (floor, scoped) | The Console-read dispatcher creates exact `Chunk`/`Eof` IDs (`ken-interp/eval.rs`); §38 §1.12 requires source to name the result family. |
+| `FileMetadata` (floor, scoped) | Native metadata replies create `MkFileMetadata` by exact ID; §38 §1.12 requires source to name the result. |
+| `FileKind` (floor, scoped) | Native metadata and directory replies create exact kind constructors; §38 §1.12 requires source case analysis. |
+| `DirEntry` (floor, scoped) | Native directory replies create `MkDirEntry` by exact ID; §38 §1.12 requires source to name it. |
+| `FileOperation` (floor, scoped; former package home) | Native FileError paths create exact operation cases; §33 §3.3 already requires source to name this family. Retire its H home and all sixteen constructor rows together. |
 | `Exited` (qualified floor constructor) | Checked exit-code result, source `ChildExit.Exited`, not bare. |
 | `Signaled` (qualified floor constructor) | Checked signal result, source `ChildExit.Signaled`, not bare. |
+| `Chunk` (qualified floor constructor) | Native Console-read reply constructs its exact checked ID; source `ReadResult.Chunk`. |
+| `Eof` (qualified floor constructor) | Native Console-read reply constructs its exact checked ID; source `ReadResult.Eof`. |
+| `MkFileMetadata` (qualified floor constructor) | Native metadata reply constructs its exact checked ID; source `FileMetadata.MkFileMetadata`. |
+| `KFile` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KFile`. |
+| `KDirectory` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KDirectory`. |
+| `KSymlink` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KSymlink`. |
+| `KOther` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KOther`. |
+| `MkDirEntry` (qualified floor constructor) | Native directory entry ID; source `DirEntry.MkDirEntry`. |
+| `OpReadFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpReadFile`. |
+| `OpWriteFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpWriteFile`. |
+| `OpAppendFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpAppendFile`. |
+| `OpMetadata` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpMetadata`. |
+| `OpReadDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpReadDirectory`. |
+| `OpCreateDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpCreateDirectory`. |
+| `OpRemoveFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveFile`. |
+| `OpRemoveDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveDirectory`. |
+| `OpRename` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRename`. |
+| `OpChangeMode` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpChangeMode`. |
+| `OpSeek` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSeek`. |
+| `OpSetLength` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSetLength`. |
+| `OpSync` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSync`. |
+| `OpGetInheritance` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpGetInheritance`. |
+| `OpSetInheritance` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSetInheritance`. |
+| `OpDuplicate` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpDuplicate`. |
 | `ResourceBodyResult` (package, not floor) | Source-promised bracket body-result carrier (`38 §1.7.1`); no native reader or producer of its exact ID. |
 | `ResourceBodyOk` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
 | `ResourceBodyErr` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
@@ -253,15 +288,18 @@ alone reserves a name.
 | `ResourceBracketBodyAndReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 
 The five entrypoint-ABI, three effect/clock, `ITree`, six earlier
-FS/resource, five new scoped progress/acquisition/mapping/child-result,
-`ConsoleStream`, `eqChar` and the three checked State operations marked
-floor above join B alongside the original fifteen: forty counted
-identities. Their operation spellings are protected; bare `get` and
-`put` are not reserved by the State trio.
-The package-home roster now has sixty-one rows: the prior forty-six,
-twelve further checked homes, and the three Exit HostIO lifts/return/
-sequence names. The package rows above are not additional floor
-members or bare Strict names. The three Console constructors retain
+FS/resource, five scoped progress/acquisition/mapping/child-result,
+`ConsoleStream`, `eqChar`, three checked State operations and five
+Increment 3a scoped families marked floor above join B alongside the
+original fifteen: forty-five counted identities. Their floor spellings
+are protected; bare case names and bare `get` and `put` are not reserved
+by the State trio. The package-home roster's Increment 3a target has
+eighty-six rows: the eighty-one at its base, minus seventeen retired
+FileOperation family rows, plus twenty-two new H rows (fifteen further
+checked wrappers/operations, four Child names and three formerly held
+wrappers). The four other newly scoped families were never package
+homes. The package rows above are not additional floor members or bare
+Strict names. The three Console constructors retain
 their exact IDs and scoped paths but are not separate
 `PRELUDE_FLOOR_NAMES` entries. Unscoped constructor
 families reserve bare names; scoped families retain exact IDs reachable
