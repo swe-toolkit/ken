@@ -4732,17 +4732,6 @@ impl StaticTransitionPlan<'_> {
             planner_error("a causal K call has no recorded emission placement"))
     }
 
-    /// A checked-IH source whose call is already emitted by its own worker.
-    /// Geometry certifies the route class; the recorded placement alone
-    /// determines which Function owns its call.
-    pub(in crate::cranelift_backend) fn checked_ih_self_emitter_call(
-        &self,
-        identity: &ContinuationCallIdentity,
-    ) -> Result<bool, CraneliftBackendError> {
-        Ok(self.k_emission_placement(identity)? == identity.emission_owner()
-            && checked_ih_self_emitter_source(self, identity)?)
-    }
-
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source(
         &self,
         identity: &ContinuationCallIdentity,

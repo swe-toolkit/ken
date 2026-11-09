@@ -13197,20 +13197,6 @@ impl<'a> Lowering<'a> {
             .k_emission_placement(&edge.identity)?;
         let physical = self.checked_placement_owner(self.emitting_function_owner)?;
         if physical == Some(placement)
-            && matches!(lowered, LoweringOperand::Carried(_))
-            && self.static_transition_plan.checked_ih_self_emitter_call(&edge.identity)?
-        {
-            // This worker already produced a carried result in its own
-            // Function: there is no detached call to emit or constructor to
-            // reconstruct. Settle this candidate as inline, never as an
-            // unobserved direct call; the ledger refuses a later conflicting
-            // call disposition for the same identity.
-            self.settle_continuation_candidate(
-                &edge.identity, super::units::CandidateDisposition::InlineNoCall,
-            )?;
-            return Ok(lowered);
-        }
-        if physical == Some(placement)
             && self
                 .static_transition_plan
                 .checked_ih_environment_transport_source(&edge.identity)
