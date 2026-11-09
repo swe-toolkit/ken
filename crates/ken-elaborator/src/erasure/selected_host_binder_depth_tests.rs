@@ -57,8 +57,16 @@ fn chosen_operation(constructors: &[String], arguments: Vec<RuntimeExpr>) -> Run
     body
 }
 
-#[test]
-fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environments() {
+fn selected_host_fixture() -> (
+    checked_core::CheckedCoreSemanticInputs,
+    CheckedHostSpineV1,
+    StableSymbol,
+    StableSymbol,
+    StableSymbol,
+    StableSymbol,
+    StableSymbol,
+    StableSymbol,
+) {
     let id = |name: &str| StableSymbol::declaration("selected-host-depth", &[], name);
     let coproduct = id("Coproduct");
     let in_l = StableSymbol::constructor(&coproduct, "InL");
@@ -184,6 +192,16 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
         bracket_finalizer_constructor: None,
         operations,
     };
+    (
+        semantic, spine, in_l, in_r, fs_op, console_op, clock_op, entropy_op,
+    )
+}
+
+#[test]
+fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environments() {
+    let id = |name: &str| StableSymbol::declaration("selected-host-depth", &[], name);
+    let (semantic, spine, in_l, in_r, fs_op, console_op, clock_op, entropy_op) =
+        selected_host_fixture();
     let word = |text: &str| RuntimeExpr::Value(RuntimeValue::String(text.into()));
     let outer = Resolved::Word("outer-variable".into());
     let neighbour = Resolved::Word("neighbour-variable".into());
@@ -240,5 +258,93 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
     assert!(
         wrong_tail_reads.is_empty(),
         "each tail leaf must resolve its outer Var instead of an intervening binder: {wrong_tail_reads:?}"
+    );
+}
+
+/// Durable refusal pin (42 §3): an unknown checked Vis operation family is
+/// refused at the type boundary, not inferred from an operation's spelling.
+#[test]
+fn checked_host_layout_refuses_foreign_checked_type_head() {
+    let id = |name: &str| StableSymbol::declaration("selected-host-depth", &[], name);
+    let (mut semantic, spine, ..) = selected_host_fixture();
+    let coproduct = id("Coproduct");
+    let constructor = |symbol| checked_core::ConstructorMetadata {
+        symbol,
+        argument_count: 1,
+        target_index_count: 0,
+        recursive_positions: Vec::new(),
+        lowerability: checked_core::LowerabilityStatus::Supported,
+    };
+    semantic.data_metadata.insert(
+        coproduct,
+        checked_core::DataMetadata {
+            parameter_count: 2,
+            index_count: 0,
+            constructors: vec![
+                constructor(spine.in_l.clone()),
+                constructor(spine.in_r.clone()),
+            ],
+            eliminator: checked_core::LowerabilityStatus::Supported,
+            lowerability: checked_core::LowerabilityStatus::Supported,
+        },
+    );
+    let foreign = id("ForeignOp");
+    let global = ken_kernel::GlobalId(900);
+    let mut symbols = checked_core::StableSymbolTable::new();
+    symbols.insert_global(global, foreign);
+    let ty = checked_core::canonical_term_bytes(
+        &ken_kernel::Term::Const {
+            id: global,
+            level_args: Vec::new(),
+        },
+        &symbols,
+    )
+    .expect("canonical checked foreign type");
+    let err = checked_host_operation_layout(&ty, &semantic, &spine, &id("main"))
+        .expect_err("foreign Vis operation family must refuse");
+    assert!(
+        matches!(err, ErasureError::ExpressionLowering { lane: "host_coproduct_identity", ref reason, .. }
+            if reason == "checked operation type has a foreign family identity"),
+        "foreign checked type must refuse at its own layout boundary: {err:?}"
+    );
+}
+
+/// Durable refusal pin (42 §3): an FS operation cannot be decoded beneath a
+/// Console-only checked Vis operation type, even with a valid FS constructor.
+#[test]
+fn checked_host_decode_refuses_operation_outside_vis_layout_family() {
+    let id = |name: &str| StableSymbol::declaration("selected-host-depth", &[], name);
+    let (_, spine, _, _, fs_op, ..) = selected_host_fixture();
+    let mut term =
+        CheckedCoreBodyTerm::ConstructorReference(checked_core::CheckedCoreConstructorView {
+            checked_node_id: None,
+            symbol: fs_op,
+            family_symbol: spine.fs_family.clone(),
+            level_args: Vec::new(),
+            family_parameter_count: 1,
+            family_index_count: 0,
+            argument_count: 2,
+            target_index_count: 0,
+            recursive_positions: Vec::new(),
+            constructor_lowerability: checked_core::LowerabilityStatus::Supported,
+            family_lowerability: checked_core::LowerabilityStatus::Supported,
+        });
+    for arg in [
+        CheckedCoreBodyTerm::ErasedConstructorArgument { term: Vec::new() },
+        CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 },
+        CheckedCoreBodyTerm::Variable { de_bruijn_index: 1 },
+    ] {
+        term = CheckedCoreBodyTerm::Application {
+            function: Box::new(term),
+            argument: Box::new(arg),
+        };
+    }
+    let layout = CheckedHostOperationLayout::Leaf(spine.console_family.clone());
+    let err = decode_checked_host_operation(&term, &layout, &spine, &id("main"))
+        .expect_err("FS operation outside a Console-only Vis type must refuse");
+    assert!(
+        matches!(err, ErasureError::ExpressionLowering { lane: "host_operation_family_identity", ref reason, .. }
+            if reason == "host operation does not belong to the Vis node's checked operation type"),
+        "checked Vis layout mismatch must reach the layout-family guard: {err:?}"
     );
 }

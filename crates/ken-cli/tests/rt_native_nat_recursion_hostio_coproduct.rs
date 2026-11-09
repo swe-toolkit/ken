@@ -110,6 +110,16 @@ fn rose_recursive_control_still_executes_byte_equal() {
 }
 
 #[test]
+fn clock_hostio_depth_three_leaf_executes_byte_equal() {
+    let source = "program capabilities FS APartial\n\
+         proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+         : HostIO APartial ExitCode visits [Clock, Console] =\n\
+         let now = host_clock APartial Instant wall_now in\n\
+         host_program APartial (print_line \"clock\")\n";
+    assert_native_matches_run("Clock depth-three HostIO leaf", source, b"clock\n");
+}
+
+#[test]
 fn written_cap_fsra_hostio_result_still_executes_byte_equal() {
     let source = "program capabilities FS AFull\n\
          proc f (c : Cap AFull) : String visits [FS, Console] =\n\
