@@ -1662,7 +1662,7 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-two
+   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-four
    checked interval laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1693,7 +1693,7 @@ interval subtraction are not.
    Inverted emptiness composes the member's two checked comparisons against
    the false endpoint order; each ordered endpoint uses reflexivity and
    conjunction introduction. Neither family adds a helper.
-4. **Trusted-base delta.** Zero: all fifty-two laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all fifty-four laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
