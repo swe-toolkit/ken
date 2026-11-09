@@ -5916,15 +5916,15 @@ mod tests {
             .stack_size(256 * 1024 * 1024)
             .spawn(|| {
                 let source = "program capabilities FS APartial\n\
+                    import Capability.Process.Exit (host_pure)\n\
                     proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
                       : HostIO APartial ExitCode visits [FS] = host_pure APartial ExitCode ExitCode.Success";
                 let package_name = "rt_motive_prelude_proof";
                 let preparation = crate::compiler_driver::prepare_native_program_sources(
                     package_name,
-                    vec![crate::compiler_driver::CompilerSource::new(
-                        "src/main.ken",
-                        source,
-                    )],
+                    vec![crate::compiler_driver::CompilerSource::new("src/main.ken", source)
+                        .with_roots(vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .join("../../catalog/packages")])],
                 )
                 .expect("a host program delivers its checked prelude declarations");
                 let semantic = &preparation.checked_package_for_test().artifact.semantic;

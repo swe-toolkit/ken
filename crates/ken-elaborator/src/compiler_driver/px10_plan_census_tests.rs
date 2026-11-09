@@ -10,6 +10,13 @@ const SMOKE: &str = include_str!("../../../ken-cli/tests/fixtures/px10_child_wai
 const ARGV_ENV_PIPE: &str = include_str!("../../../ken-cli/tests/fixtures/px10_argv_env_pipe.ken");
 const LIVE_CHILD: &str = include_str!("../../../ken-cli/tests/fixtures/px10_live_child.ken");
 
+fn px10_native_source(source: &str) -> CompilerSource {
+    CompilerSource::new("src/main.ken", source)
+        .with_roots(vec![
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+        ])
+}
+
 /// The z3 adapter job runs this module as effective root: its container is
 /// created with no `--user` and its image sets no `USER`. Startup admission
 /// refuses root unless the program declares the allowance (ADR 0019 §2), so
@@ -40,9 +47,8 @@ fn emit_below_gate(
     name: &str,
     source: &str,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
-    let preparation =
-        prepare_native_program_sources(name, vec![CompilerSource::new("src/main.ken", source)])
-            .expect("the px10 program prepares");
+    let preparation = prepare_native_program_sources(name, vec![px10_native_source(source)])
+        .expect("the px10 program prepares");
     assert!(
         preparation.plan.process_declared,
         "the census must plan a program the Process gate refuses"
@@ -67,7 +73,7 @@ fn px10_set_issuing_smoke_without_process_gate_refuses_containment() {
     in_census_thread("px10-containment-without-process-bit", || {
         let mut preparation = prepare_native_program_sources(
             "px10_containment_without_process_bit",
-            vec![CompilerSource::new("src/main.ken", SMOKE)],
+            vec![px10_native_source(SMOKE)],
         )
         .expect("smoke prepares");
         assert!(
@@ -153,7 +159,7 @@ fn unavailable_process_operation_names_its_host_refusal() {
     in_census_thread("px10-unavailable-native-diagnostic", || {
         let preparation = prepare_native_program_sources(
             "px10_unavailable_native_diagnostic",
-            vec![CompilerSource::new("src/main.ken", root_allowed_smoke())],
+            vec![px10_native_source(&root_allowed_smoke())],
         )
         .expect("px10 smoke prepares");
         assert!(
@@ -207,6 +213,8 @@ fn unavailable_process_operation_names_its_host_refusal() {
 #[test]
 fn native_tested_console_write_retains_its_single_event() {
     const SOURCE: &str = r#"program capabilities FS APartial, RootExecution Allow
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program APartial (print_line "unavailable-control")
@@ -214,7 +222,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     in_census_thread("native-tested-unavailable-control", || {
         let preparation = prepare_native_program_sources(
             "native_tested_unavailable_control",
-            vec![CompilerSource::new("src/main.ken", SOURCE)],
+            vec![px10_native_source(SOURCE)],
         )
         .expect("NativeTested Console program prepares");
         assert!(
