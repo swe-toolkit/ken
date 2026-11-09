@@ -4,6 +4,8 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, is_terminal, print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc selected_body (terminal : Bool) (message : String)
   : Unit -> HostIO APartial Unit visits [Console] =
   \_. match terminal {
@@ -29,12 +31,16 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const STATIC_DIRECT_VIS: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program APartial (print_line "static")
 "#;
 
 const CONSUMED_RUNTIME_RESPONSE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, is_terminal, print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program)
 proc selected_result (terminal : Bool) (message : String)
   : Unit -> HostIO APartial (Result IOError Unit) visits [Console] =
   \_. match terminal {
@@ -151,9 +157,10 @@ fn contains_recursive_bind_ir(expr: &ken_runtime::RuntimeExpr) -> bool {
 // is emitted. This test observes native effect consumption, not admission.
 fn delayed_capturing_generic_bind_agrees_across_real_executors() {
     let dir = output_dir("agreement");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px7l-recursive-bind",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -174,6 +181,7 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
     let interpreted = ken_cli::run_program_effect_observation(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",
@@ -231,9 +239,10 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
 // is emitted. This test observes native effect consumption, not admission.
 fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
     let dir = output_dir("consumed-response");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         CONSUMED_RUNTIME_RESPONSE,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px7l-consumed-runtime-response",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -254,6 +263,7 @@ fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
     let interpreted = ken_cli::run_program_effect_observation(
         CONSUMED_RUNTIME_RESPONSE,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",
@@ -280,9 +290,10 @@ fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
 #[test]
 fn static_direct_vis_retains_the_existing_lowering_path() {
     let dir = output_dir("static-direct-vis");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         STATIC_DIRECT_VIS,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px7l-static-direct-vis",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

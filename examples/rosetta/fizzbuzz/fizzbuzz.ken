@@ -1,4 +1,7 @@
 program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_program)
+import Core.Classes.LawfulClasses (intToChar)
 
 -- Rosetta Code: FizzBuzz
 -- https://rosettacode.org/wiki/FizzBuzz

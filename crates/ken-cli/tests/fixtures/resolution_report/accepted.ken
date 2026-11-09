@@ -1,4 +1,7 @@
 program capabilities FS APartial
+import Capability.Console.Text (IO, print_line, write)
+import Capability.Process.Exit (host_program)
+import Core.Classes.LawfulClasses (charToInt, leqChar)
 
 proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
   write ConsoleStream.Stdout payload

@@ -1,4 +1,7 @@
 program capabilities FS AFull, Process
+import Capability.Process.Child (spawn_plan, wait_child, withChild)
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult)
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [Process] =

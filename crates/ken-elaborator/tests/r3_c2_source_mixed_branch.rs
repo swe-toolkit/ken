@@ -499,6 +499,7 @@ fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
 
 const R3_4B_ARTIFACT_OUTPUT: &str = "KEN_R3_4B_ARTIFACT_OUTPUT";
 const R3_4B_IDENTITY_SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 fn unused_sibling (_input : ProcessInput) : ExitCode = ExitCode.Success
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode = host_pure APartial ExitCode ExitCode.Success

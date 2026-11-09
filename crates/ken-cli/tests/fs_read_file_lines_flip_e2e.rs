@@ -32,6 +32,10 @@ fn workspace_root() -> PathBuf {
 fn program_src(path: &str) -> String {
     format!(
         r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Filesystem.Authority (read_bytes)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_program_then, host_pure)
+import Core.Classes.LawfulClasses (charToInt)
 fn isNewline (c : Char) : Bool = eq_int (charToInt c) 10
 
 fn consFirst (c : Char) (acc : List (List Char)) : List (List Char) =
@@ -140,7 +144,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
 /// the real `ken` binary (subprocess), from the workspace root (the fixture
 /// path is workspace-root-relative). Returns `(stdout, stderr, success)`.
 fn run(name: &str, src: &str) -> (String, String, bool) {
-    let tmp_dir = std::env::temp_dir().join("ken-fs-flip-e2e");
+    let tmp_dir = workspace_root().join("target/tmp/ken-fs-flip-e2e");
     std::fs::create_dir_all(&tmp_dir).expect("create tmp dir");
     let path = tmp_dir.join(format!("{name}.ken"));
     std::fs::write(&path, src).expect("write program");

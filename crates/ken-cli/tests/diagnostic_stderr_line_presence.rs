@@ -31,6 +31,9 @@ fn host_exit_source(bytes: &str, exit: &str) -> String {
 }
 
 const STUCK_TREE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
+import Data.Numeric.FixedWidth (intToInt8)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial (Result IOError Unit) ExitCode

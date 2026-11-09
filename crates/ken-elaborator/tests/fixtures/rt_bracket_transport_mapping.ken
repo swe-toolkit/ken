@@ -1,4 +1,7 @@
 program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Mapping (Anonymous, MappingHandle)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withMapping)
 
 fn body (_mapping : MappingHandle) : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)

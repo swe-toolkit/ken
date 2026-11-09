@@ -48,6 +48,7 @@ fn differential(
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         interpreted_root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
