@@ -1384,3 +1384,48 @@ refused, paired with the same-form accepted `tall` claim, so refusal
 tracks the failed containment rather than an invalid proof form.
 These closed cases delimit the contract; they do not replace the
 checked generic proofs. The CV seed and its execution are separate.
+
+## 17. Intersection and hull are monotone in corner-wise inclusion
+
+> Section 17 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-INTERSECT-HULL-MONOTONE). Architect's AC-0 on
+> landed base `2345d4178` checked both generic compositions in
+> disposable scratch: the before/after trusted `GlobalId` identity
+> sets were equal (114 → 114), and the insertion added no `Axiom`.
+> This is feasibility evidence, not an authored conformance seed,
+> official conformance run, CI or landed-trust measurement for §17.
+
+`Algorithm.Geometry.NatBox` must export exactly two public Transparent
+checked laws in the following order, directly after
+`hull_eq_of_inside` and before `area`:
+
+```ken
+pub theorem intersect_monotone
+      (a : Box) (b : Box) (a2 : Box) (b2 : Box)
+    : IsTrue (inside a a2) → IsTrue (inside b b2)
+      → IsTrue (inside (intersect a b) (intersect a2 b2))
+
+pub theorem hull_monotone
+      (a : Box) (b : Box) (a2 : Box) (b2 : Box)
+    : IsTrue (inside a a2) → IsTrue (inside b b2)
+      → IsTrue (inside (hull a b) (hull a2 b2))
+```
+
+Each law takes exactly the two displayed premises, in that order.
+Containment here is §3's corner-wise `inside`, not inclusion of point
+sets. The laws hold for inverted boxes too: they add neither a
+validity premise nor an equation identifying differently represented
+empty boxes. The conclusion is an `IsTrue (inside …)` proposition,
+not structural `Equal Box` of the constructed results.
+
+For intersection, §5's `intersect_greatest (intersect a b) a2 b2`
+takes two `inside_trans` chains: §3's `intersect_inside_left a b`
+followed by `inside a a2`, and §3's `intersect_inside_right a b`
+followed by `inside b b2`. Dually, §5's
+`hull_least a b (hull a2 b2)` takes §3's `inside_hull_left a2 b2`
+after `inside a a2`, and `inside_hull_right a2 b2` after
+`inside b b2`. These are checked compositions of public laws; no
+match, Nat lemma, import, new axiom or change to any §1–§16 operation
+or law type is required. Closed applications test the interfaces but
+do not substitute for the generic checked bodies; CV owns the
+separate accepted and refused conformance seed.
