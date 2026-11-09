@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-SUCCESSOR-LIST-ADAPTOR
 title: "Spec 62 builds a Graph only from a Boolean edge function (MkGraph) and names a successor-list adaptor as outside §1 (62-graphs.md:348), so a client holding adjacency lists must write the decision function and re-prove its membership meaning by hand. Rule from a checked D0 at zero trust a public adaptor from a DecEq-keyed successor function to Graph, with sound and complete laws tying its edge to list membership, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1

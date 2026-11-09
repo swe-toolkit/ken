@@ -20,7 +20,7 @@ Every static settlement point in the PX10 native planner is keyed on
 (origin, placement). Activations of the same placement share that key,
 are planned once, and are kept apart at runtime by their frame, never by
 a second static key. With this in place, B1a's direct-style bind
-reaches native parity on the three F2 rows.
+reaches the boundary arm on the three F2 rows and refuses there by name.
 
 This is the standard discipline: a return point is a static label, a
 specialization is a static placement, and an activation is a runtime
@@ -98,30 +98,36 @@ The candidate also carries nested Deferred settlement (Steward
 - **The product shape** follows the C-20 D0's LIFO-PARITY branch, as
   the Architect rules it.
 
-The C-28 recut (Steward `evt_527p7m4kfdbc0`, Architect
-`evt_3zrg52751abmn`) adds the forwarded-Vis owner. F's region body
-forwards an inner Vis through a carried clause's Vis arm, but no
-response owner is installed for it, so the arm's IH is lowered as an
-in-place header jump and the request is never dispatched.
+The C-28 recut (Steward `evt_527p7m4kfdbc0`) located F's defect (D2,
+`evt_6t5mkjt1y7znx`). F's body-tail request enters a pure-forward carried
+clause whose IH lowers in place: it jumps the header with k under the
+CHECKED control, both tags miss, and the checked-answer fallback releases
+Buffer1 early. Step 0 found a genuine handler between the clause and the
+host (HANDLERS-PRESENT, `evt_4n6yrejbn6f1a`), so the direct forward was
+withdrawn. D0 S0b returned RE-ENTRY-ABSENT: the caller's handler is
+reachable, but no re-entry unit exists, and the chain is two clauses
+(S1165, then C986 in argv; S606, then C427 in live). The lawful forward is
+`RT-NATIVE-FORWARDED-CONTINUATION-REENTRY`. This candidate lands
+fail-closed (Steward `evt_6rkw3hdx6m2jn` and the 14:50Z recut):
 
-- **Slice 1 (D0).** Count every forwarding-arm IH lowering across the
-  committed native suites and F, classified by whether the forwarded
-  Vis has an installed owner. The Architect rules a lowering-time
-  refusal or a further ruling from the count. A refusal travels in the
-  one candidate.
-- **Slice 2.** Install the owner row: its K applies k to the response
-  and re-enters the clause's carried header under its checked
-  constructor identity. The IH is lowered as that owner's
-  continuation.
-- **F acceptance.** argv, v-null and live equal the interpreter: exit 0,
-  19, 14 and 17 ordered events, and event 6 is ProcessPlanPush field2.
-  The control-1 fallback count is 0 and a dispatch marker fires for
-  S724 and S165. Smoke 9/9 and both G controls are unchanged. M-D,
-  which restores the header jump, reddens F.
+- **The trap.** The boundary arm's in-place IH edge, jump header(k, 1),
+  becomes a named trap. The boundary arm is the pure-forward arm
+  (`brackets.rs:429` `forwarding_vis_arm`) whose clause is the outermost
+  carried ComputationalMatch of its emitting function: C986 in argv, C427
+  in live. Inner pure-forward clauses keep their by-value forward. The
+  checked-answer fallback stays untrapped.
+- **F's result.** Each F row refuses natively by the trap's name at the
+  boundary clause, after the inner S1165 or S606 Vis case has executed, in
+  S0b M4's order, shown by ordered markers. The fallback count is 0.
+
+- **Residual, not in scope.** A recursive non-Unit Nat result used
+  after a later Console effect fails native-build closed with N0003
+  (`BoundaryCarrier`; Architect probe `natrec-inc2/after-effect.ken`,
+  `evt_5b1bpcemby1jm`). It belongs to B1a's runtime half.
 - **WIP2's erasure half** (`erasure.rs`,
-  `erasure/performed_call_scrutinee_tests.rs`) is carried by
-  `RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT` (`evt_m1tpqnr44meb`). This
-  candidate's rebase drops them.
+  `erasure/performed_call_scrutinee_tests.rs`) stays with B1a's WIP2,
+  because `RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT` is parked behind B1a
+  (`evt_50705xx614069`).
 
 ## Acceptance
 
@@ -134,22 +140,38 @@ in-place header jump and the request is never dispatched.
       owner);
     - whether `:6798` is rekeyed or deleted;
     - whether plane C is in scope.
-- **AC-1.** The three F2 rows are committed as named rows. Under B1a's
-  Let form each is native-Ok, with native exit and stdout equal to the
-  interpreter's.
+- **AC-1 (measured, not committed).** On any production base the Process
+  gate refuses F before object emission
+  (`compiler_driver.rs:3001`-`3024`, `host_effect_lowering_unavailable`),
+  so the trap is observed under the C-28 diagnostic overlay: the gate
+  condition and the stream and Process availability, uncommitted, named
+  by sha256 in the report. Under it, each F2 row refuses natively by the
+  trap's name at the boundary clause, as stated above, with the fallback
+  count 0. This is B1's posture (`evt_5vsaybryes08b`; Steward
+  `evt_1kpgr76vwez5g`). QA re-runs it at the exact tip. Native parity on
+  these rows is `RT-NATIVE-FORWARDED-CONTINUATION-REENTRY`'s.
+- **AC-1c (committed).** The F2 fixtures, with a committed native test
+  whose expectation is today's production refusal naming the seven
+  unavailable operations, for B2 to promote.
 - **AC-2.** These stay green:
-  - the smoke;
+  - the smoke 9/9, both G controls, px8ta 3/3 and the 9 checked_ih rows;
+  - the two-print parity row (`rt_selected_pending_call_admission.rs:303`)
+    and span freeze 2/2;
   - the green-three row;
   - entry 18's row;
   - B-closure's census pin and six-case matrix.
 
   They are regression controls, because green-three reaches none of
   these sites.
-- **AC-3.** Each mutation compiles and reddens the F2 rows:
+- **AC-3.** Each mutation compiles and, under the AC-1 overlay, moves the
+  F2 rows' refusal off the trap's name:
   - M-A, which restores the (origin, frame) exit key, at `:7043`;
   - M-B, which restores one owner per region, at `:263`;
   - M-C, which restores the separate consumer search past the
-    boundary, with "no exact incoming edge".
+    boundary, with "no exact incoming edge";
+  - M-T, which removes the trap and restores the early Buffer1 release;
+  - M-P, which places the trap at the inner clause, and the ordered
+    markers show the wrong placement.
 - **AC-4.** Full-workspace CI is green on the exact candidate. Edge
   equality is not evidence; native parity is the gate.
 

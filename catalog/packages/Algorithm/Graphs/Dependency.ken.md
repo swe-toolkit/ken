@@ -762,6 +762,21 @@ pub theorem contains_complete
             })
           h
   }
+
+pub fn graph_from_successors (q : Type) (d : DecEq q) (successors : q → List q) : Graph q =
+  MkGraph q (λs. λt. contains q d t (successors s))
+
+pub theorem graph_from_successors_sound
+      (q : Type) (d : DecEq q) (successors : q → List q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_from_successors q d successors) s t) True
+      → list_elem q t (successors s) =
+  contains_sound q d t (successors s)
+
+pub theorem graph_from_successors_complete
+      (q : Type) (d : DecEq q) (successors : q → List q) (s : q) (t : q)
+    : list_elem q t (successors s)
+      → Equal Bool (edge q (graph_from_successors q d successors) s t) True =
+  contains_complete q d t (successors s)
 ```
 
 ## 3. Using it
@@ -2725,7 +2740,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–13](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–14](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2754,12 +2769,16 @@ uses a one-way chain order to exclude backward reachability and refuses an
 order on a two-cycle. The
 [§13 seed](../../../../conformance/stdlib/graphs/seed-topo-order-edge-antitone.md)
 removes a shortcut edge while keeping the ordered list and refuses inclusion
-of an added backward edge. The public API is the graph, path and certificate
-types, their constructors, walk composition and reversal, the graph reversal
-and predicate-reachability operations and witness, the dependency-order
-operation, five list/order predicates, and twenty-three kernel-checked laws.
-Every other
-helper is private to this package.
+of an added backward edge. The public API exports six data families (`Graph`,
+`Walk`, `Cycle`, `ReachWitness`, `TopoOrder`, `OrderOrCycle`) and eight
+constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
+`MkTopoOrder`, `HasOrder`, `HasCycle`). Its fifteen functions are `edge`,
+`walk_append`, `graph_reachable`, `graph_find_walk`, `graph_reverse`,
+`walk_reverse`, `contains`, `before`, `no_duplicates`, `all_vertices`,
+`all_edges_forward`, `ordered_vertices`, `topo_order_edge_antitone`,
+`dependency_order_or_cycle`, and `graph_from_successors`. Twenty-five
+kernel-checked theorems expose their laws, including successor-list soundness
+and completeness. Every other helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -2792,7 +2811,8 @@ The §10 package test checks the graph and walk involution laws on generic
 inputs and a closed directed chain, with their private proof helpers hidden
 from imports. The §11 package test checks the generic transitivity law, a
 reflexive client derived from public `graph_reachable_complete`, and the §11
-seed's accepted and refused rows, with zero local trust delta. These package
-tests do not stand in for official conformance-runner execution or CI, and do
-not establish execution of the §2
-seed.
+seed's accepted and refused rows, with zero local trust delta. The §14
+package test checks the generic successor-list exports and listed and unlisted
+edges on a closed three-vertex client, including a false-edge refusal. These
+package tests do not stand in for official conformance-runner execution or CI,
+and do not establish execution of the §2 seed.

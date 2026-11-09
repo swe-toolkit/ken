@@ -6318,6 +6318,21 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
+fn native_fixture_roots() -> Vec<std::path::PathBuf> {
+    vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
+}
+
+#[cfg(test)]
+fn native_fixture_source(name: &str, source: &str, imports: &str) -> CompilerSource {
+    let (header, body) = source
+        .split_once('\n')
+        .expect("native fixture has a header");
+    assert!(header.starts_with("program capabilities "));
+    CompilerSource::new(name, format!("{header}\n{imports}{body}"))
+        .with_roots(native_fixture_roots())
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::checked_core::{
@@ -6779,7 +6794,11 @@ proc main
         let package_name = "caller_reporting_open_native";
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE)],
+            vec![native_fixture_source(
+                "src/main.ken",
+                CALLER_OPEN_SOURCE,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            )],
         )
         .expect("native preparation accepts open obligations");
         let report =
@@ -6856,7 +6875,11 @@ proc main
     fn native_control_core_semantic_hash(package_name: &str, source: &str) -> u64 {
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new("src/main.ken", source)],
+            vec![native_fixture_source(
+                "src/main.ken",
+                source,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            )],
         )
         .expect("control native preparation succeeds");
         assert!(preparation.package.artifact.semantic.obligations.is_empty());
@@ -7013,7 +7036,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let package_name = "r3_gate_4a_equality";
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new("src/main.ken", GATE_4A_EQUALITY_SOURCE)],
+            vec![native_fixture_source(
+                "src/main.ken",
+                GATE_4A_EQUALITY_SOURCE,
+                "import Capability.Process.Exit (host_pure)\n",
+            )],
         )
         .expect("the already-green recursive native source reaches preparation");
 
@@ -9504,8 +9531,12 @@ mod native_program_example_exclusion {
 
     fn sources(first: &str, main: &str) -> Vec<CompilerSource> {
         vec![
-            CompilerSource::new("src/dependency.ken.md", first),
-            CompilerSource::new("src/main.ken", main),
+            CompilerSource::new("src/dependency.ken.md", first).with_roots(native_fixture_roots()),
+            native_fixture_source(
+                "src/main.ken",
+                main,
+                "import Capability.Process.Exit (host_pure)\n",
+            ),
         ]
     }
 
