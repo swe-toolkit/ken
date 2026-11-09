@@ -17,7 +17,21 @@ const ARGV: &str = include_str!("fixtures/px10_argv_env_pipe.ken");
 const LIVE: &str = include_str!("fixtures/px10_live_child.ken");
 const NULL_STDOUT: &str = include_str!("fixtures/rnspk_v_argv_stdout_null.ken");
 
-fn assert_production_process_refusal(name: &str, raw: &str) {
+fn assert_production_process_refusal(name: &'static str, raw: &'static str) {
+    // The F argv source overflowed the 2 MiB test-harness worker and
+    // completed on a stated 8 MiB worker. Provision 16 MiB, at least 8 MiB
+    // above that measured passing ceiling. This is not a depth claim;
+    // the same F source must still reach the typed Process gate.
+    std::thread::Builder::new()
+        .name(format!("rnspk-{name}"))
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || check_production_process_refusal(name, raw))
+        .expect("F preparation thread")
+        .join()
+        .expect("F preparation completed without stack overflow");
+}
+
+fn check_production_process_refusal(name: &str, raw: &str) {
     let root = tempfile::tempdir().expect("isolated native output root");
     let source = raw
         .replace(
