@@ -756,10 +756,9 @@ fn exported_process_resource_lifetime_obligation(
     // elaborates standalone in Legacy without catalog roots; remove only the
     // route's import directives, leaving the program body and effects intact.
     let source = LIVE_CHILD
-        .lines()
+        .split_inclusive('\n')
         .filter(|line| !line.starts_with("import "))
-        .collect::<Vec<_>>()
-        .join("\n");
+        .collect::<String>();
     // Elaborating the program needs the fixture stack the interpreter runs use:
     // 3292 KiB resident on AC-1, provisioned at 16 MiB.
     std::thread::Builder::new()
