@@ -106,12 +106,7 @@ fn generic_transpose_adjoint_is_owned_checked_private_and_trust_free() {
     assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     env.elaborate_file(GENERIC_CLIENT)
         .expect("independent arbitrary-index client consumes the exact §7 type");
-    for helper in [
-        "dot_zero_columns",
-        "transpose_cons_image",
-        "dot_scale_right",
-        "dot_distrib_right",
-    ] {
+    for helper in ["dot_zero_columns", "transpose_cons_image"] {
         match loaded_matrix().elaborate_file(&format!("import {MATRIX} ({helper})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{MATRIX}.{helper}"));

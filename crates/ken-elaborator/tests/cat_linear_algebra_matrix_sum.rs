@@ -134,12 +134,7 @@ fn generic_matrix_sum_exports_are_checked_private_and_trust_free() {
     }
     env.elaborate_file(GENERIC_CLIENT)
         .expect("independent indexed client consumes all five §4 types");
-    for helper in [
-        "dot_distrib_right",
-        "columns_add_right",
-        "row_product_add",
-        "zip_prepend_add",
-    ] {
+    for helper in ["columns_add_right", "row_product_add", "zip_prepend_add"] {
         match env.elaborate_file(&format!("import {MATRIX} ({helper})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{MATRIX}.{helper}"));

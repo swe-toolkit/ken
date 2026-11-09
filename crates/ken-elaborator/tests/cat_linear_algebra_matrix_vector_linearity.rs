@@ -121,13 +121,13 @@ fn generic_vector_linearity_is_owned_checked_private_and_trust_free() {
     }
     env.elaborate_file(GENERIC_CLIENT)
         .expect("generic independent clients consume the exact §6 types");
-    for helper in ["dot_distrib_right", "dot_scale_right"] {
-        match env.elaborate_file(&format!("import {MATRIX} ({helper})")) {
-            Err(ElabError::UnboundName { name, .. }) => {
-                assert_eq!(name, format!("{MATRIX}.{helper}"));
-            }
-            other => panic!("{helper} must remain private: {other:?}"),
-        }
+    // §15: the right-argument laws §6 consumes are public checked API.
+    for law in ["dot_distrib_right", "dot_scale_right"] {
+        let id = env.globals[&format!("{MATRIX}.{law}")];
+        assert!(owned.contains(&id), "{law} belongs to NatMatrix");
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+        env.elaborate_file(&format!("import {MATRIX} ({law} as public_{law})"))
+            .unwrap_or_else(|error| panic!("{law} must be public: {error:?}"));
     }
 }
 

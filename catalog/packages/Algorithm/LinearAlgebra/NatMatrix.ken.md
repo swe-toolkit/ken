@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and forty algebraic laws have checked proofs.
+all arithmetic is exact, and forty-two algebraic laws have checked proofs.
 
 ## Contents
 
@@ -212,6 +212,46 @@ pub theorem dot_scale
                   (mul_add_distrib_r x (mul y z) tail_dot)))
       }
   }
+
+pub theorem dot_distrib_right
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
+    : Equal Nat (dot n xs (vector_add n ys zs)) (add (dot n xs ys) (dot n xs zs)) =
+  trans
+    Nat
+    (dot n xs (vector_add n ys zs))
+    (dot n (vector_add n ys zs) xs)
+    (add (dot n xs ys) (dot n xs zs))
+    (dot_comm n xs (vector_add n ys zs))
+    (trans
+      Nat
+      (dot n (vector_add n ys zs) xs)
+      (add (dot n ys xs) (dot n zs xs))
+      (add (dot n xs ys) (dot n xs zs))
+      (dot_distrib n ys zs xs)
+      (trans
+        Nat
+        (add (dot n ys xs) (dot n zs xs))
+        (add (dot n xs ys) (dot n zs xs))
+        (add (dot n xs ys) (dot n xs zs))
+        (cong Nat Nat (dot n ys xs) (dot n xs ys) (λv. add v (dot n zs xs)) (dot_comm n ys xs))
+        (cong Nat Nat (dot n zs xs) (dot n xs zs) (add (dot n xs ys)) (dot_comm n zs xs))))
+
+pub theorem dot_scale_right
+      (n : Nat) (factor : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    : Equal Nat (dot n xs (vector_scale n factor ys)) (mul factor (dot n xs ys)) =
+  trans
+    Nat
+    (dot n xs (vector_scale n factor ys))
+    (dot n (vector_scale n factor ys) xs)
+    (mul factor (dot n xs ys))
+    (dot_comm n xs (vector_scale n factor ys))
+    (trans
+      Nat
+      (dot n (vector_scale n factor ys) xs)
+      (mul factor (dot n ys xs))
+      (mul factor (dot n xs ys))
+      (dot_scale n factor ys xs)
+      (cong Nat Nat (dot n ys xs) (dot n xs ys) (mul factor) (dot_comm n ys xs)))
 
 pub theorem transpose_invol
       (m : Nat) (n : Nat) (rows : Vec (Vec Nat n) m)
@@ -2791,46 +2831,6 @@ theorem zip_prepend_map
             (zip_prepend_map k n j arow at_rest rest))
   }
 
-theorem dot_distrib_right
-      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
-    : Equal Nat (dot n xs (vector_add n ys zs)) (add (dot n xs ys) (dot n xs zs)) =
-  trans
-    Nat
-    (dot n xs (vector_add n ys zs))
-    (dot n (vector_add n ys zs) xs)
-    (add (dot n xs ys) (dot n xs zs))
-    (dot_comm n xs (vector_add n ys zs))
-    (trans
-      Nat
-      (dot n (vector_add n ys zs) xs)
-      (add (dot n ys xs) (dot n zs xs))
-      (add (dot n xs ys) (dot n xs zs))
-      (dot_distrib n ys zs xs)
-      (trans
-        Nat
-        (add (dot n ys xs) (dot n zs xs))
-        (add (dot n xs ys) (dot n zs xs))
-        (add (dot n xs ys) (dot n xs zs))
-        (cong Nat Nat (dot n ys xs) (dot n xs ys) (λv. add v (dot n zs xs)) (dot_comm n ys xs))
-        (cong Nat Nat (dot n zs xs) (dot n xs zs) (add (dot n xs ys)) (dot_comm n zs xs))))
-
-theorem dot_scale_right
-      (n : Nat) (factor : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
-    : Equal Nat (dot n xs (vector_scale n factor ys)) (mul factor (dot n xs ys)) =
-  trans
-    Nat
-    (dot n xs (vector_scale n factor ys))
-    (dot n (vector_scale n factor ys) xs)
-    (mul factor (dot n xs ys))
-    (dot_comm n xs (vector_scale n factor ys))
-    (trans
-      Nat
-      (dot n (vector_scale n factor ys) xs)
-      (mul factor (dot n ys xs))
-      (mul factor (dot n xs ys))
-      (dot_scale n factor ys xs)
-      (cong Nat Nat (dot n ys xs) (dot n xs ys) (mul factor) (dot_comm n ys xs)))
-
 theorem dot_zero_columns
       (n : Nat) (x : Vec Nat n) (y : Vec Nat Zero)
     : Equal Nat (dot n x (matrix_vector n Zero (repeat (Vec Nat Zero) n (VNil Nat)) y)) Zero =
@@ -3136,10 +3136,13 @@ that the zero right factor has zero columns. `transpose_zero` handles
 zero rows with `zero_width_repeat` and the successor with `zip_zero_map`
 and the private `map_repeat`; every dimension, including zero, is covered.
 
-`matrix_vector_additive` uses the private right-argument dot-distribution
-lemma to transport each row's head, then transports the tail by induction.
-`matrix_vector_homogeneous` uses a private right-argument scaling lemma
-obtained from `dot_comm` and the public `dot_scale` proof. The two results
+`dot_distrib_right` and `dot_scale_right` commute the dot product with
+`dot_comm`, apply `dot_distrib` or `dot_scale`, and commute each product
+back; with the first-argument laws they make `dot` bilinear.
+
+`matrix_vector_additive` uses `dot_distrib_right` to transport each row's
+head, then transports the tail by induction. `matrix_vector_homogeneous`
+uses `dot_scale_right` in the same position. The two results
 hold for any row and column counts, including zero.
 
 ## 5. Design notes
@@ -3179,8 +3182,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–14 owns
-fifty public names across ten operations and forty laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–15 owns
+fifty-two public names across ten operations and forty-two laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -3193,8 +3196,9 @@ provide finite behavioral clients. The zero-vector seed is authored but not
 Ken-checked or officially conformance-run. The module reuses the published
 `Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
 prepending, row products and proof bridges remain private. The new
-`dot_zero_columns` and `transpose_cons_image` helpers, like
-`dot_scale_right` and `dot_distrib_right`, are not public. The
+`dot_zero_columns` and `transpose_cons_image` helpers are not public; the
+§15 laws `dot_distrib_right` and `dot_scale_right` are public and follow
+`dot_scale`. The
 `map_repeat` and `zero_columns_row` steps also remain private. The scaling
 proof's `vector_cons_eq` also remains private. `vector_zero`,
 `vector_add_zero_left`, `vector_add_zero_right`, `vector_scale_zero` and
@@ -3209,7 +3213,7 @@ The three §13 laws `matrix_product_zero_left`,
 `matrix_vector_zero_matrix`. The natural `mul_self_eq_zero` step remains
 private, as does the reused `vector_cons_eq`. The two zero-sum steps
 are imported from Nat Arithmetic as `add::eq_zero_l` and `add::eq_zero_r`.
-All forty laws have checked bodies.
+All forty-two laws have checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -3237,6 +3241,10 @@ open law types and closed product and transpose applications, then accepts
 a same-form zero-factor control before refusing a false identity-factor
 result. The [dot-self-zero package test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_dot_self_zero.rs)
 checks the public generic law, the zero and nonzero closed controls, two
-isolated false Nat premises and the three private import boundaries. These
-tests use root-loaded exports; they are not official conformance-runner
-runs or claims of CI, publication or landing.
+isolated false Nat premises and the three private import boundaries. The
+[right-linearity package test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_dot_right_linearity.rs)
+checks both public generic law types, transparent ownership and exact
+trusted-identity preservation. Its closed conformance client is separate;
+this package test does not execute that client. These tests use root-loaded
+exports; they are not official conformance-runner runs or claims of CI,
+publication or landing.
