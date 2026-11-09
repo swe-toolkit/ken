@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INTERSECT-HULL-MONOTONE
 title: "Spec 67 bounds box intersection and hull by their arguments (§3, §5) but states no law that either operation is monotone in containment: a client that shrinks both arguments must rebuild the bound by hand from four public laws. Rule from a checked D0 at zero trust that intersect and hull are each monotone under corner-wise inside, and state both laws with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
