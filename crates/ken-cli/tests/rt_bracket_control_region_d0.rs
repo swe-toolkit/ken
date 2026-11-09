@@ -20,6 +20,11 @@ use ken_runtime::{
     RuntimeGroundValue, SemanticErrorV1, TerminalErrorV1, TerminalExitClass,
 };
 
+fn checked_catalog_roots() -> Vec<std::path::PathBuf> {
+    vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
+}
+
 /// One lane-independent resource identity, numbered by the order in which its
 /// successful acquisition appears in the ordered host-effect trace.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -392,9 +397,10 @@ fn d0_body_error_outcome_exact_tuple() {
                 "    (ResourceBodyErr Unit Unit MkUnit)\n\nfn body_result",
                 1,
             );
-            let output = ken_cli::build_native_program(
+            let output = ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt-bracket-d0-body-error",
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -414,7 +420,7 @@ fn d0_body_error_outcome_exact_tuple() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -458,9 +464,10 @@ fn d0_missing_resource_acquisition_exact_tuple() {
             let source = bracket_source::nested_bracket_source(1);
             // Do not provision held-0.bin: the program must observe the
             // actual FsOpen acquisition error and its outer failure branch.
-            let output = ken_cli::build_native_program(
+            let output = ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt-bracket-d0-missing-resource",
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -480,7 +487,7 @@ fn d0_missing_resource_acquisition_exact_tuple() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -528,9 +535,10 @@ fn d0_read_offset_and_window_exact_tuples() {
                 let root = tempfile::tempdir().expect("D0 read root");
                 std::fs::write(root.path().join("source"), b"ab").expect("D0 read source file");
                 let source = D0_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
-                let output = ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
+                let output = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                     &format!("rt-bracket-d0-read-{}", case.replace('-', "_")),
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -550,7 +558,7 @@ fn d0_read_offset_and_window_exact_tuples() {
                 let interpreted = ken_cli::run_program_effect_observation(
                     &source,
                     ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                     &[],
                     &[],
                     root.path().as_os_str().as_encoded_bytes(),
@@ -595,9 +603,10 @@ fn d0_mapping_six_exact_tuples() {
                 let source = D0_MAPPING_SOURCE
                     .replace("__ENTRY__", "matrix_stage")
                     .replace("__MATRIX_BODY__", body);
-                let output = ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
+                let output = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                     &format!("rt-bracket-d0-mapping-{}", case.replace('-', "_")),
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -617,7 +626,7 @@ fn d0_mapping_six_exact_tuples() {
                 let interpreted = ken_cli::run_program_effect_observation(
                     &source,
                     ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                     &[],
                     &[],
                     root.path().as_os_str().as_encoded_bytes(),
@@ -652,9 +661,10 @@ fn d0_branched_scrutinee_out_of_bounds_exact_tuple() {
             std::fs::write(root.path().join("source"), b"0123456789abcdef")
                 .expect("D0 readable source file");
             let source = D0_BRANCHED_SOURCE;
-            let output = ken_cli::build_native_program(
+            let output = ken_cli::build_native_program_with_roots(
                 source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt-bracket-d0-branched-out-of-bounds",
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -674,7 +684,7 @@ fn d0_branched_scrutinee_out_of_bounds_exact_tuple() {
             let interpreted = ken_cli::run_program_effect_observation(
                 source,
                 ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -731,9 +741,10 @@ fn d0_measured_depth_two_members_exact_tuples() {
                 } else {
                     D0_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry)
                 };
-                let output = ken_cli::build_native_program(
-                    &source,
-                    ken_cli::SourceFormat::Ken,
+                let output = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                     &format!("d0-measured-{}", case),
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -753,7 +764,7 @@ fn d0_measured_depth_two_members_exact_tuples() {
                 let interpreted = ken_cli::run_program_effect_observation(
                     &source,
                     ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                     &[],
                     &[],
                     root.path().as_os_str().as_encoded_bytes(),
@@ -796,8 +807,10 @@ fn d0_px8ta_dual_owner_plan_close_refuses_per_installed_row() {
                 let source = bracket_source::nested_bracket_source(depth);
                 let build = |suffix: &str| {
                     ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                        ken_cli::build_native_program(
-                            &source, ken_cli::SourceFormat::Ken,
+                        ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                             &format!("rt-bracket-d0-dual-{depth}-{suffix}"), root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
@@ -875,9 +888,10 @@ fn d0_px8ta_exact_tuple(depth: usize) {
                 .expect("D0 input");
             }
             let source = bracket_source::nested_bracket_source(depth);
-            let output = ken_cli::build_native_program(
+            let output = ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 &format!("rt-bracket-d0-depth-{depth}"),
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -897,7 +911,7 @@ fn d0_px8ta_exact_tuple(depth: usize) {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
