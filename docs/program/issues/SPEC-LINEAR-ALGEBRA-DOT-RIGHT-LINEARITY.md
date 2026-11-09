@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY
 title: "Spec 65 exports the dot product's linearity in its first argument (dot_distrib, dot_scale) but keeps the second-argument laws private, so a client must rebuild right-linearity from dot_comm, although the package already proves it. Rule from a checked D0 at zero trust that the two right-position laws become public, so dot is bilinear in the public API, and state them with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
@@ -32,8 +32,10 @@ bilinear. Spec 65 states both by their public types.
   is a composition of `dot_comm` with `dot_distrib` or `dot_scale`.
   Inside the package, they are used at `:1211`, `:1247`, `:1339`,
   `:1346` and `:2936`.
-- **The privacy pins.** Three package tests assert that these laws are
-  private:
+- **The privacy pins.** Four package tests assert that these laws are
+  private (Steward amendment `evt_6rtw73k3h6r0n`):
+  - `cat_linear_algebra_nat_matrix.rs:277`, an exact `visible ==
+    expected` set over the package's whole public API;
   - `cat_linear_algebra_matrix_sum.rs:138`;
   - `cat_linear_algebra_matrix_vector_linearity.rs:124`;
   - `cat_linear_algebra_transpose_adjoint.rs:112`-`113`.
@@ -56,7 +58,7 @@ One candidate carries all of it:
 
 - the two laws made public, with their names and placement as AC-0
   rules them;
-- the three privacy pins migrated to public-law pins;
+- the four privacy pins migrated, as AC-3 states;
 - the stale "private" prose corrected wherever it appears;
 - a §15 in spec 65 stating both laws by their public types;
 - a closed conformance seed;
@@ -80,7 +82,11 @@ One candidate carries all of it:
   closed vector. A kernel that accepts it would show the law was not
   checked.
 - **AC-3.** Every package test that checked before still checks. The
-  migrated pins fail if either law is made private again.
+  migrated public pins (`nat_matrix:277` and
+  `matrix_vector_linearity:124`) and the new
+  `cat_linear_algebra_dot_right_linearity` client fail if either law is
+  made private again. `matrix_sum:138` and `transpose_adjoint:112`-`113`
+  drop the names (Architect `evt_7zfpwrrkpp18`).
 
 ## Stop conditions
 
@@ -90,6 +96,8 @@ One candidate carries all of it:
 Checks: 3 fired: `dot_distrib_right` and `dot_scale_right` were grepped
 over `catalog/`, `crates/`, `conformance/`, `examples/`, `spec/`,
 `r_layer_tests` and `docs/program/issues`; the consumers are the package,
-three tests, spec 65, SPEC-PROGRESS and three merged frames. 4 fired:
+three tests, spec 65, SPEC-PROGRESS and three merged frames. The name
+grep missed the whole-API set pin at `nat_matrix:277`; the amendment
+adds it. 4 fired:
 both private signatures were read at `:2794` and `:2817` on `ebd6b4f26`,
 and they match the objective's types exactly.

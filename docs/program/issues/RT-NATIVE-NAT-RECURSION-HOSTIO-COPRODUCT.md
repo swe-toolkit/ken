@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT
 title: "A [Console] proc that recurses structurally on Nat, called from a let in main, checks and runs, but native-build refuses it with E0079 host_coproduct_identity: the decoded HostIO operation's outer constructor is neither in_l nor in_r. Its Rose-recursive twin builds and matches. Locate the cause and make the Nat-recursive shape build with exec equal to run"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

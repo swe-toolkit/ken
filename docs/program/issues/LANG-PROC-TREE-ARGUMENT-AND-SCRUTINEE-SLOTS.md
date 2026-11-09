@@ -1,7 +1,7 @@
 ---
 id: LANG-PROC-TREE-ARGUMENT-AND-SCRUTINEE-SLOTS
 title: "A performing proc sequences a callee's tree only at a let and a returned tail. A tree-typed result in a scrutinee is refused E0038 with a diagnostic that names ITree where the user wrote Box, and spec 36 §2.4's argument sequencing (g a1 … an) is not implemented. Sequence a tree in the scrutinee and argument slots as §2.4 rules, with the native plan for a Ret that carries a closure"
-status: active
+status: merged
 owner: verify
 size: L
 tier: T1
