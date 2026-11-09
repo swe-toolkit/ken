@@ -2324,7 +2324,8 @@ fn prepare_performed_let_rhs(
         .with_alias(cx.alias_latent())
         .with_cells(&cx.cell_latents);
     if cx.numeric_env.effect_sequencing_ids().is_none()
-        || let_rhs_row(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
+        || (let_rhs_row(rhs, &rows, None, &mut scope) == crate::effects::RowType::empty()
+            && !recursive_result_slot_may_perform(cx, rhs))
     {
         return Ok(None);
     }
@@ -2368,9 +2369,31 @@ fn bind_let_core(
         .fold(Term::const_(bind_id, vec![]), Term::app))
 }
 
-/// Whether a `let` can take the `36 §2.4` sequenced arm. It reads only
-/// the syntactic row plane and the expected type, so an ordinary `let`
-/// holds a `bool` in its frame and none of the arm's temporaries.
+/// A selected child result may be a pending tree even though the syntactic
+/// row plane cannot name its hidden binder. A structural self-call has the
+/// same blind spot before the recursive owner's row is registered; its tree
+/// type is checked by the shared sequencing arm before a bind is emitted.
+#[inline(never)]
+fn recursive_result_slot_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr) -> bool {
+    let mut value = rhs;
+    while let RExpr::RAsc(inner, _, _) = value { value = inner; }
+    if let RExpr::RRecursiveResult { index, .. } = value {
+        return cx.selected_recursive_result(*index)
+            .is_some_and(|(_, ty)| let_itree_parts(cx, &ty).is_some());
+    }
+    let (head, arguments) = call_application_spine(value);
+    let (RExpr::RCon(name, _), Some(RExpr::RVar(index, _, _))) =
+        (head, arguments.first().copied())
+    else { return false };
+    name == &cx.owner_label
+        && cx.surface_var(*index).is_some_and(|(position, _)| {
+            cx.lift_bindings.contains_key(&position)
+        })
+}
+
+/// Whether a `let` can take the `36 §2.4` sequenced arm. It reads the
+/// syntactic row plane or the selected recursive result's checked tree type.
+/// An ordinary `let` holds only a bool in its recursive frame.
 #[inline(never)]
 fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bool {
     let Some(rows) = cx.effect_rows else { return false };
@@ -2379,7 +2402,8 @@ fn let_may_perform(cx: &ElabCtx<'_>, rhs: &RExpr, expected: Option<&Term>) -> bo
         .with_alias(cx.alias_latent())
         .with_cells(&cx.cell_latents);
     cx.numeric_env.effect_sequencing_ids().is_some()
-        && let_rhs_row(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
+        && (let_rhs_row(rhs, &rows, None, &mut scope) != crate::effects::RowType::empty()
+            || recursive_result_slot_may_perform(cx, rhs))
         && expected.map_or(true, |expected| let_itree_parts(cx, expected).is_some())
 }
 
@@ -3809,8 +3833,7 @@ fn check_match_result(
 
 /// Whether a match scrutinee may take the `36 §2.4` sequenced slot: its
 /// evaluation may perform, read as a `let` RHS is read. A local reference or a
-/// nested result names a value already bound, so evaluating it performs
-/// nothing, and the match reads it unchanged.
+/// nested result is held unless its checked type is a pending action tree.
 #[inline(never)]
 fn scrutinee_slot_may_perform(cx: &ElabCtx<'_>, scrut: &RExpr, expected: Option<&Term>) -> bool {
     let mut value = scrut;
@@ -3822,7 +3845,6 @@ fn scrutinee_slot_may_perform(cx: &ElabCtx<'_>, scrut: &RExpr, expected: Option<
         RExpr::RVar(..)
             | RExpr::RPatternAlias(..)
             | RExpr::RSlotLocal { .. }
-            | RExpr::RRecursiveResult { .. }
     );
     !names_bound_value && let_may_perform(cx, scrut, expected)
 }
@@ -14850,6 +14872,33 @@ fn application_with_slot(
     rebuilt
 }
 
+/// Find the first argument that performs into a value-valued parameter,
+/// reading each parameter from the head's Pi telescope in one pass. A
+/// non-dependent codomain advances without elaborating the argument it
+/// abstracts, so a held tree is elaborated once, by the path that keeps it.
+#[inline(never)]
+fn application_slot_candidate<'e>(
+    cx: &mut ElabCtx, head: &RExpr, arguments: &[&'e RExpr], span: &Span,
+) -> Result<Option<(usize, &'e RExpr)>, ElabError> {
+    let (_, mut ty) = infer(cx, head)?;
+    for (slot, argument) in arguments.iter().copied().enumerate() {
+        let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return Err(ElabError::NotAFunction { span: span.clone() });
+        };
+        if argument_slot_may_perform(cx, argument) && let_itree_parts(cx, &domain).is_none() {
+            return Ok(Some((slot, argument)));
+        }
+        ty = match lower_by(&codomain, 1) {
+            Ok(independent) => independent,
+            Err(_) => {
+                let argument_core = check(cx, argument, &domain, span)?;
+                subst0(&codomain, &argument_core)
+            }
+        };
+    }
+    Ok(None)
+}
+
 /// Inspect the *whole* source spine before recursing into its function. If
 /// the outermost application bound its own (rightmost) argument first, two
 /// performed arguments would execute in reverse source order.
@@ -14858,37 +14907,15 @@ fn infer_application_slot(
     cx: &mut ElabCtx, expr: &RExpr, span: &Span,
 ) -> Result<Option<(Term, Term)>, ElabError> {
     let (head, arguments) = call_application_spine(expr);
-    let mut candidate = None;
-    for (slot, argument) in arguments.iter().copied().enumerate() {
-        if !argument_slot_may_perform(cx, argument) {
-            continue;
-        }
-        // A tree passed to a tree-valued parameter is held as a value,
-        // including prelude proof witnesses. It must not end the scan: a
-        // later argument can still perform into a value-valued parameter.
-        let mut prefix = head.clone();
-        for preceding in &arguments[..slot] {
-            prefix = RExpr::RApp(
-                Box::new(prefix), Box::new((*preceding).clone()), expr.span().clone(),
-            );
-        }
-        // A type-only probe: classify the parameter, then discard every
-        // obligation, instance resolution and meta it created.
-        let snapshot = refinement_snapshot::Snapshot::capture(cx);
-        let probed = match infer(cx, &prefix) {
-            Ok((_, prefix_ty)) => match whnf(cx.env, &cx.ctx, &prefix_ty) {
-                Term::Pi(domain, _) => Ok(let_itree_parts(cx, &domain).is_none()),
-                _ => Err(ElabError::NotAFunction { span: span.clone() }),
-            },
-            Err(error) => Err(error),
-        };
-        snapshot.rollback(cx)?;
-        if probed? {
-            candidate = Some((slot, argument));
-            break;
-        }
+    if !arguments.iter().any(|argument| argument_slot_may_perform(cx, argument)) {
+        return Ok(None);
     }
-    let Some((slot, argument)) = candidate else { return Ok(None) };
+    // A type-only scan: classify the parameters, then discard every
+    // obligation, instance resolution and meta it created.
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let scanned = application_slot_candidate(cx, head, &arguments, span);
+    snapshot.rollback(cx)?;
+    let Some((slot, argument)) = scanned? else { return Ok(None) };
     let body = SequencedBody::Application { expr: expr.clone(), slot };
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);

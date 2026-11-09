@@ -1,12 +1,12 @@
-//! Spec 36 §2.4, SLOTS Increment 1. Promise class: durable invariant.
+//! Spec 36 §2.4, SLOTS Increments 1 and 3. Promise class: durable invariant.
 //! MEASURED: a performing proc's tree is bound before a match scrutinee in
 //! checked and inferred modes; the selected callback runs once, and nested
 //! matches retain outer references. The s12 fixture executes identically on
 //! the interpreter and native backend. CLAIMED: scrutinee-slot sequencing
 //! preserves the explicit-let result, latent row and execution order.
 //! THE GAP: these fixtures exercise checked/inferred call, returned closure,
-//! and nested outer-reference shapes, not the later argument or IH increments;
-//! the elaborator's separate core-identity pin checks the let twin structurally.
+//! nested outer-reference and recursive-result shapes, not every IH carrier;
+//! the elaborator's separate core-identity pins check the let twins structurally.
 
 use std::path::Path;
 use std::process::{Command, Output};
@@ -120,4 +120,35 @@ fn nested_scrutinee_retains_outer_reference_and_callback_latent() {
          {MAIN_HEAD}{MAIN_USE}"
     );
     assert_run("e3 nested scrutinee", &source, b"q\nab\n", false);
+}
+
+fn recursive_result_program(join_body: &str) -> String {
+    let pre = PRE.replacen(
+        "Join xs ys ↦ MkBox action",
+        &format!("Join xs ys ↦ {join_body}"),
+        1,
+    );
+    assert_ne!(pre, PRE, "Join arm for recursive-result fixture");
+    format!(
+        "{pre}{MAIN_HEAD}  let bx = pick (Node (Join Rose (One Rose Leaf) (One Rose Leaf))) in\n  host_program APartial (print_line \"b\")\n"
+    )
+}
+
+/// Promise class: durable invariant. The pure arm must be reached by a real
+/// recursive call; an unchanged refusal or an uncalled declaration fails.
+/// MEASURED: a Join call with `recursive result for xs` in a let executes.
+/// CLAIMED: the selected IH result is sequenced through the let arm.
+/// THE GAP: this Rose/Box example does not exercise every recursive carrier.
+#[test]
+fn recursive_result_pure_arm_let_executes() {
+    let source = recursive_result_program(
+        "let s = (recursive result for xs) in match s { MkBox f ↦ MkBox f }",
+    );
+    assert_run("s3 recursive result let", &source, b"b\n", false);
+}
+
+#[test]
+fn recursive_result_pure_arm_scrutinee_executes() {
+    let source = recursive_result_program("match (recursive result for xs) { MkBox f ↦ MkBox f }");
+    assert_run("s2 recursive result scrutinee", &source, b"b\n", false);
 }
