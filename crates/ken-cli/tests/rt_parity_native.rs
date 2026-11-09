@@ -6671,7 +6671,7 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
         "MkBufferWindow (sub_int 0 1) (1 : Int)",
         "BufferWindow",
         "import Capability.Process.Exit (host_pure)\n\
-         import Capability.System.Buffer (MkBufferWindow)\n",
+         import Capability.System.Buffer (BufferWindow, MkBufferWindow)\n",
     )
         .expect("control: the public window constructor elaborates from source");
 }
