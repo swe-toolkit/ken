@@ -13,7 +13,8 @@
 > SPEC-LINEAR-ALGEBRA-ZERO-ANNIHILATION §11;
 > SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT §12;
 > SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO §13;
-> SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO §14).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO §14;
+> SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY §15).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -408,27 +409,30 @@ non-square matrices are included. The section does not specify
 `matrix_vector` distributivity over a sum in its **vector** argument:
 that is a different orientation, specified separately in §6.
 
-### 4.3 Private proof boundary and evidence
+### 4.3 Proof boundary and historical evidence
 
-The ruled proof stages `dot_distrib_right`, `columns_add_right`,
-`row_product_add`, and `zip_prepend_add` remain **private**. Right-
-argument dot distributivity is obtained from the existing public
-`dot_comm` and `dot_distrib`; it is not a fifth exported law. The
-private `columns_add_right` carries that dot step over columns;
+The checked `dot_distrib_right` is public under §15; the other ruled
+proof stages `columns_add_right`, `row_product_add`, and
+`zip_prepend_add` remain **private**. Right-argument dot distributivity
+follows from public `dot_comm` and `dot_distrib`. It does not add a
+fifth §4 law; §15 exposes the already-checked theorem alongside
+`dot_scale_right` as part of dot's public bilinearity. The private
+`columns_add_right` carries the dot step over columns;
 `row_product_add` uses `transpose_add` and the column step. The
 previously private `columns_add` and `zero_width_repeat` are reused.
 The right product law reduces row-by-row through `columns_add`,
 `matrix_vector_distrib` through `dot_distrib`, and `transpose_add`
-through the empty-width case and `zip_prepend_add`. None promotes a
-private helper or changes any §1–3 operation or law.
+through the empty-width case and `zip_prepend_add`. No other private
+helper is promoted and no §1–3 operation or law type changes.
 
 The Architect's D0 on base `b5b423cad974d803da3286b82156bfcc92d515bb`
 added only the scratch `NatMatrix` declarations: `ken check` returned
 rc 0 with no new `Axiom`, postulate or opaque declaration. Its scratch
 trust test passed 1/1; the exact `trusted_base()` set remained
 **109 → 109**, with 61 owned package declarations and five new public
-names transparent and owned. A client import of private
-`dot_distrib_right` was refused with E0012. The ambient-passthrough
+names transparent and owned. At that historical D0, an import of
+then-private `dot_distrib_right` was refused with E0012; §15 now
+makes that import legal. The ambient-passthrough
 census test **was not run to a verdict**: the Architect stopped it to
 release the shared build lock. That scratch result claims no census
 success; the package candidate separately passes the strict-resolution
@@ -597,38 +601,41 @@ there is no implicit resizing. This is not §4.2's public
 Neither a finite closed equality nor only checking the displayed
 types supplies the required generic proof.
 
-### 6.2 Private proof boundary and evidence
+### 6.2 Proof boundary and historical evidence
 
-Additivity reuses §4.3's private `dot_distrib_right`, obtained from
-public `dot_comm` and `dot_distrib`. For homogeneity the private
-second-position sibling `dot_scale_right` follows from public
-`dot_comm` and `dot_scale`; it is not another public law:
+Additivity reuses §15's public `dot_distrib_right`, obtained from
+public `dot_comm` and `dot_distrib`. For homogeneity, §15's public
+second-position sibling `dot_scale_right` follows from `dot_comm` and
+`dot_scale`. Its unchanged type is:
 
 ```ken
-theorem dot_scale_right
+pub theorem dot_scale_right
       (n : Nat) (factor : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
     : Equal Nat (dot n xs (vector_scale n factor ys)) (mul factor (dot n xs ys))
 ```
 
 Both matrix-vector proofs descend over the matrix rows. A row step
-transports the dot-product head with its corresponding private law,
+transports the dot-product head with its corresponding checked law,
 then transports the ordered tail with the induction hypothesis using
 `cong` and `trans`. The existing vector and matrix operations and all
-§1–5 public laws are unchanged. No axiom, new Nat law, kernel rule,
-surface form, or additional import is required. The helper remains
-private even though its first-position sibling `dot_scale` is public.
+§1–5 public law types are unchanged. No axiom, new Nat law, kernel
+rule, surface form, or additional import is required. The two
+right-position dot laws are public under §15; all other helpers in
+this proof remain private.
 
 The Architect's detached D0 checked the two generic proof bodies and
 a client on `aa6370449`: `ken check` and `ken fmt --check` returned
 rc 0, two probe tests passed, no `Axiom` was added, and the scratch
 trusted GlobalId set stayed 109 → 109 after loading the existing
-providers and NatMatrix. Selective imports of both private dot
-helpers were refused. The separately authored seed has independent
-closed `Refl` value oracles for a non-square `2 × 3` matrix, direct
-applications of both new public laws, and one false equation after
-a fresh accepted prefix; its closed instances do not prove generic
-linearity. The D0 checked proposed proofs in isolation; both checked exports and a
-root-loaded package test of the seed have since landed on main. The D0
+providers and NatMatrix. Selective imports of both then-private dot
+laws were refused in that historical D0; those refusals do not
+describe §15's public import behavior. The separately authored seed
+has independent closed `Refl` value oracles for a non-square `2 × 3`
+matrix, direct applications of both new public laws, and one false
+equation after a fresh accepted prefix; its closed instances do not
+prove generic linearity. The D0 checked proposed proofs in isolation;
+both checked exports and a root-loaded package test of the seed have
+since landed on main. The D0
 and package test do not establish official conformance-runner execution
 or landed trust.
 
@@ -666,19 +673,20 @@ natural dot results, not an equality of vectors or matrices. Its
 argument order is dimensions first, then `a`, `x`, `y`. A closed
 example cannot prove the universal theorem.
 
-### 7.2 Private proof boundary and evidence
+### 7.2 Proof boundary and historical evidence
 
 The new `dot_zero_columns` handles the zero-row base. The new
 `transpose_cons_image` identifies the transposed image after adding a
 row: the leading component of `y` scales that row and the tail acts
 through the remaining columns. Both are **private** proof helpers,
 not additional public laws. The proof reuses public `dot_comm` and
-Nat multiplication commutativity, plus existing private
+Nat multiplication commutativity, plus the now-public §15 laws
 `dot_scale_right` and `dot_distrib_right` and Nat addition's zero law;
 `cong`, `sym`, and `trans` transport the equalities. Its public type
 has no added premise, import, operation, kernel rule, or scalar tier.
-The §1–6 operations, laws, and private helper visibility remain
-unchanged. The §7 checked export and updated package law count are now on main.
+The §1–6 operation and law types and all other private helper
+visibilities remain unchanged. The §7 checked export and its
+then-current package law count are on main.
 
 The closed seed uses the non-square `2 × 3` matrix with rows
 `[1,2,3]` and `[4,0,1]`, `x = [2,1,3]`, and `y = [1,2]`. Separate
@@ -1275,17 +1283,70 @@ the two attached Nat exports, no new kernel rule, surface form,
 public NatMatrix helper, trusted assumption or §1–§13
 operation/law-type change is needed.
 
-The §14 roster is **ten operations and forty laws, fifty public
-names**: this one law adds no operation to §13's ten operations and
-thirty-nine laws. A closed control uses two zero entries `zeros`,
-whose self-dot equals `Zero` by `Proved`, then applies the theorem to
-obtain vector equality. For `bumped`, with a nonzero second entry,
-its self-dot equals `Suc Zero` by the same Nat-goal proof form
-`Proved`. An isolated application of the theorem with a false
-zero-self-dot premise must refuse; a separate claim that the
-self-dot of `bumped` equals `Zero` must also refuse. The true
+Before §15's visibility promotion, the §14 roster is **ten operations
+and forty laws, fifty public names**: this one law adds no operation to
+§13's ten operations and thirty-nine laws. A closed control uses two
+zero entries `zeros`, whose self-dot equals `Zero` by `Proved`, then
+applies the theorem to obtain vector equality. For `bumped`, with a
+nonzero second entry, its self-dot equals `Suc Zero` by the same
+Nat-goal proof form `Proved`. An isolated application of the theorem
+with a false zero-self-dot premise must refuse; a separate claim that
+the self-dot of `bumped` equals `Zero` must also refuse. The true
 `bumped` self-dot is the accepted control for these Nat-goal
 refusals. Scratch D0 found `Proved` unsuitable for a vector equality
 control, so no vector-goal refusal is claimed here. These finite
 cases delimit the checked generic law, not execution of the
 CV-owned seed or a candidate gate.
+
+## 15. Dot is linear in its second argument
+
+> Section 15 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY). Architect's AC-0 on
+> landed base `208e39926` checked the existing proof bodies after
+> moving them into the public dot block, with no added `Axiom` and
+> equal scratch trusted `GlobalId` sets. Both laws kept their types.
+> Two independent re-privatization mutations reddened the exact
+> public-inventory and import pins. These are scratch observations,
+> not this Spec child's tests, official conformance, CI, publication,
+> landing or a landed-trust measurement for §15.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export the following two
+public Transparent checked theorems, directly after `dot_scale` and
+before `transpose_invol`, in this order. Their existing proof bodies
+and types are promoted without wrappers or new premises:
+
+```ken
+pub theorem dot_distrib_right
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
+    : Equal Nat
+        (dot n xs (vector_add n ys zs))
+        (add (dot n xs ys) (dot n xs zs))
+
+pub theorem dot_scale_right
+      (n : Nat) (factor : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    : Equal Nat
+        (dot n xs (vector_scale n factor ys))
+        (mul factor (dot n xs ys))
+```
+
+Both laws are premise-free equalities of `Nat` for every indexed
+length `n`, including `Zero`. `dot_distrib_right` distributes the
+second argument over `vector_add` while holding `xs` fixed;
+`dot_scale_right` scales that argument by `factor`, which also
+appears as the left operand of `mul` in the result. Together with
+§3's public `dot_distrib` and `dot_scale` in the first argument,
+these four public laws make the dot product bilinear over the
+existing natural operations. No function equality, implicit vector
+resize, signed or approximate scalar tier is asserted.
+
+Each already-checked proof composes public `dot_comm` with its
+first-argument sibling and transports the result using `trans` and
+`cong`. Promoting the two laws does not expose their other private
+callers, change their definitions, introduce a new `Axiom` or change
+any §1–§14 operation or law type. The §15 public roster is **ten
+operations and forty-two laws, fifty-two public names**: two more
+public laws than §14's historical forty, with no new operation.
+A closed conformance seed may independently calculate both sides of
+each equality and apply the public laws; such instances do not
+replace the generic checked proofs. CV owns that separate seed and
+its accepted and refused cases.
