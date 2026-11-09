@@ -11,7 +11,9 @@
 > SPEC-GRAPHS-WALK-REVERSE-APPEND §9;
 > SPEC-GRAPHS-REVERSE-INVOLUTION §10;
 > SPEC-GRAPHS-REACHABILITY-TRANS §11;
-> SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC §12).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC §12;
+> SPEC-GRAPHS-ORDER-EDGE-ANTITONE §13;
+> SPEC-GRAPHS-SUCCESSOR-LIST-ADAPTOR §14).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1248,3 +1250,60 @@ required inclusion proof fails on that backward edge. The accepted
 edge-removal application is the same-form control. Neither closed
 case replaces the generic checked law or establishes that a separate
 CV seed was authored, run as Ken or executed by the official runner.
+
+## 14. Constructing a graph from successor lists
+
+> **Section 14 status: DRAFT v0
+> (SPEC-GRAPHS-SUCCESSOR-LIST-ADAPTOR).** Architect's AC-0 on exact
+> base `ec8ff0f30` checked the generic adaptor and both proof bodies
+> in scratch, with no added `Axiom`, equal `trusted_base()` identity
+> sets of 114 `GlobalId`s, and exactly three added public names.
+> Both constant-edge mutations rejected the fixed proof bodies.
+> These are scratch measurements, not tests of this Spec child, the
+> separate catalog or CV seed children, an assembled candidate,
+> official conformance, CI, publication, landing or a landed-trust
+> measurement. The mutations pin proof dependence on the list, not
+> the closed listed/unlisted edge observations.
+
+`Algorithm.Graphs.Dependency` must export one public checked operation
+and two public Transparent checked laws, after `contains_complete` at
+the end of its public block. Their public types are:
+
+```ken
+pub fn graph_from_successors
+      (q : Type) (d : DecEq q) (successors : q → List q) : Graph q
+
+pub theorem graph_from_successors_sound
+      (q : Type) (d : DecEq q) (successors : q → List q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_from_successors q d successors) s t) True
+      → list_elem q t (successors s)
+
+pub theorem graph_from_successors_complete
+      (q : Type) (d : DecEq q) (successors : q → List q) (s : q) (t : q)
+    : list_elem q t (successors s)
+      → Equal Bool (edge q (graph_from_successors q d successors) s t) True
+```
+
+The operation builds a `Graph q` whose edge from `s` to `t` is
+`contains q d t (successors s)`. The sound law turns a checked true
+edge into membership of `t` in `successors s`; the complete law turns
+that membership into a checked true edge. The two directions are
+premise-matched, with no `Finite q` argument, no distinctness or
+ordering requirement on each list, and no premise about the total
+number of vertices. As in §1, duplicate listed successors become
+one Boolean edge, and a listed self-loop remains an edge. The
+`Data.Collections.Map` adjacency tree is not adapted here; a
+Map-to-Graph bridge belongs to Map, which owns that tree's
+invariants. The §1.4 exclusion concerns §1 only; this adaptor is
+specified here in §14.
+
+The checked proof bodies reuse the existing public `contains_sound`
+and `contains_complete`: reducing `edge` of this `Graph` to
+`contains q d t (successors s)` makes each body's type convertible
+to its corresponding membership law. The operation and laws add no
+axiom, kernel or surface rule, second graph representation, or
+change to any §1–§13 operation or law type. CV separately owns a
+three-vertex accepted client checking listed edges through both
+laws and a same-form refused unlisted edge; these closed cases do
+not replace the generic checked proofs. The scratch D0 is not a
+claim that the CV seed or official runner has executed.
