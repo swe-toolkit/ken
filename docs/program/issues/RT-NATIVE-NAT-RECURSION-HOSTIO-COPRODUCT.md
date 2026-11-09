@@ -66,9 +66,11 @@ sites (`core.rs:3581`, `:6873`, `:18421`; `lowering/source.rs:5382`,
   repair site from the report.
 - **AC-1.** s23 and `cnth` each native-build with exec stdout equal to
   run stdout, `p\nb\n`. s21 still does.
-- **AC-2.** A mutation restoring each repair (the layout, and the
-  emitted-member scrutinee lowering) reddens s23 and `cnth`, and s21
-  stays green under it.
+- **AC-2.** Each repair's restoring mutation reddens every row that
+  repair enables, and s21 stays green under each (Steward
+  `evt_66zq90w96fp7b`). Restoring the old fixed HostIO layout reddens
+  s23; `cnth`, which is HostIO-typed, never needed it. Restoring the
+  emitted-member scrutinee lowering reddens s23 and `cnth`.
 - **AC-3.** Before handoff, the committed native suites that lower
   performed calls run to completion by exact name: the px10 and px8ta
   smoke and green-three rows, checked_ih parity, and the SLOTS and FSRA

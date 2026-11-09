@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-ISOLATED-ROUTES
 title: "After the catalog route is strict, ken check on an isolated .ken or .ken.md file, ken run and ken native-build still elaborate in Legacy, and 50 of the 62 isolated files that check today refuse under Strict: isolated files have no import loader, and the program vocabulary (host_program, host_exit, bind, FSOp, the State family and others) has no import home. Add strict file entries and an isolated-file import loader, home the program vocabulary under the 2026-09-25 rule, migrate the refusing files, and move the isolated routes to Strict"
-status: ready
+status: active
 owner: language
 size: L
 tier: T1
@@ -89,7 +89,7 @@ Four increments, each its own candidate, in order.
    It also migrates the files and inline sources. It opens with its own
    AC-0 on the full inline population, ken-verify included. Split on
    that AC-0 (`evt_4pmxxzsaegb2q`; Steward `evt_4p7v4m5yy8bjd`):
-   - **3a, vocabulary; no route switch.**
+   - **3a, vocabulary; no route switch** (merged `644cc093c`).
      - The R source rewrites and the DIVERGE re-check.
      - The H homes: the four Child homes, and a new
        `Data.Numeric.FixedWidth` exporting the eight safe `intTo{N}`
@@ -104,8 +104,8 @@ Four increments, each its own candidate, in order.
        family, `console_resp`, `itree_bind` and `resp_coproduct`
        (Steward `evt_7r7x0wsxapftg`, `evt_tccj1bnqn8em`; Architect
        `evt_75k6f97trqvx3`).
-   - **3b, route switches and roots.** The strict entries and the root
-     threading above. It also carries two items:
+   - **3b, route switches and roots** (released `evt_1nk07jvrampbt`).
+     The strict entries and the root threading above. It also carries two items:
      - the imports for every on-disk source that a no-root route checks
        today and whose body 3a rewrote (Architect `evt_5rd10s2g7cr6z`,
        `evt_3cnt8yn597y2j`), classified over all 133 paths 3a changes
