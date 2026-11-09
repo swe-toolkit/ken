@@ -5,13 +5,6 @@ use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
 
-fn missing_name(error: ElabError) -> String {
-    match error {
-        ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. } => name,
-        other => panic!("expected the same missing name, got {other:?}"),
-    }
-}
-
 fn missing_observation(
     result: Result<(), ElabError>,
 ) -> Result<(String, ken_elaborator::Span, String), String> {
@@ -40,7 +33,7 @@ fn missing_observation(
 /// claimed by this file-source subset.
 #[test]
 fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
-    const CASES: [(&str, &str); 16] = [
+    const CASES: [(&str, &str); 15] = [
         ("conformance/challenge/C1-deceq-noncanonical/sound-deceq-char.ken", "DecEq"),
         ("conformance/challenge/C5-verified-sort/sound-verified-sort.ken", "isSorted"),
         ("conformance/challenge/C5-verified-sort/unsound-const-nil.ken", "isSorted"),
@@ -54,7 +47,6 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         ("crates/ken-elaborator/tests/fixtures/sibling_goal_refinement/lookup_zip_with.ken.md", "Vec"),
         ("crates/ken-elaborator/tests/fixtures/sibling_goal_refinement/lookup_zip_with_user_local.ken.md", "Vec"),
         ("examples/rosetta/closures/closures.ken", "concat"),
-        ("examples/rosetta/merge-sort/merge-sort.ken", "eq"),
         ("examples/rosetta/palindrome/palindrome.ken", "list_append"),
         ("examples/rosetta/tree-traversal/tree-traversal.ken", "list_append"),
     ];
@@ -72,12 +64,6 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
             format!("import Core.Logic.Conjunction (And)\n{original}")
         } else if path == "conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken" {
             format!("import Core.Classes.LawfulClasses (IsTrue)\n{original}")
-        } else if path == "examples/rosetta/merge-sort/merge-sort.ken" {
-            original.replacen(
-                "program capabilities FS APartial\n",
-                "program capabilities FS APartial\nimport Core.Classes.LawfulClasses (leqChar)\n",
-                1,
-            )
         } else {
             original.clone()
         };
@@ -138,11 +124,31 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
     );
 }
 
-/// Promise class: transition sentinel until 3b removes the Legacy route.
-/// MEASURED: five already-invalid effect-row fixtures keep TypeMismatch in
-/// both modes after the Strict source imports its checked H vocabulary.
-/// CLAIMED: new vocabulary does not mask their actual error.
-/// THE GAP: this is a fixed source cohort, not every generated Rust string.
+/// Promise class: transition sentinel, retired when merge-sort's currently
+/// unsupported `eq` is given a real checked definition. MEASURED: the
+/// rewritten example imports its checked ordering while the first remaining
+/// missing name is `eq`. CLAIMED: the route switch does not mask this known
+/// negative as a missing ordering home. THE GAP: this negative says nothing
+/// about the other (independently checked) examples.
+#[test]
+fn merge_sort_still_refuses_on_its_unhomed_eq_after_ordering_import() {
+    let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/rosetta/merge-sort/merge-sort.ken");
+    let source = std::fs::read_to_string(&source_path).expect("example source");
+    let roots: Vec<_> = ken_elaborator::modules::isolated_catalog_root(&source_path)
+        .into_iter()
+        .collect();
+    let mut env = ElabEnv::new().expect("prelude");
+    match env.elaborate_isolated_file_strict_v1(&roots, &source) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "eq"),
+        other => panic!("merge-sort must preserve its known missing name: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant. MEASURED: five invalid effect-row
+/// fixtures retain E0038 through the switched Strict entry with their own
+/// persisted checked H imports. CLAIMED: no missing-import error masks their
+/// effect-row rejection. THE GAP: generated Rust strings are separate inputs.
 #[test]
 fn local_latent_invalid_sources_keep_their_type_mismatch_kind() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -161,93 +167,16 @@ fn local_latent_invalid_sources_keep_their_type_mismatch_kind() {
             .join("crates/ken-cli/tests/fixtures/lang_effect_row_local_latent")
             .join(format!("{name}.ken"));
         let source = std::fs::read_to_string(&path).expect("negative source");
-        let mut legacy = ElabEnv::new().expect("prelude");
-        let old = legacy
-            .elaborate_file_v1(&source)
-            .expect_err("legacy type mismatch");
-        let imported = source.replacen(
-            "program capabilities FS APartial\n",
-            "program capabilities FS APartial\n\
-             import Capability.Console.Text (print_line, write)\n\
-             import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)\n",
-            1,
-        );
         let mut selected = ElabEnv::new().expect("prelude");
-        let new = selected
-            .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
-            .expect_err("strict type mismatch");
-        assert!(
-            matches!(old, ElabError::TypeMismatch { .. }),
-            "{name}: wrong Legacy kind: {old:?}"
-        );
-        assert!(
-            matches!(new, ElabError::TypeMismatch { .. }),
-            "{name}: wrong Strict kind: {new:?}"
-        );
-    }
-}
-
-/// Promise class: transition sentinel until the planned source-route switch.
-/// MEASURED: each of the four R-rewritten raw templates refuses on its same
-/// remaining placeholder constructor in Legacy and Strict after importing
-/// every checked H name the real fixture writes. CLAIMED: an internal FSOp
-/// refusal did not displace the original negative. THE GAP: substituted
-/// executable instances are separately pinned by their consumers.
-#[test]
-fn raw_fsop_templates_keep_the_same_placeholder_refusal_after_r_rewrite() {
-    use std::collections::{BTreeMap, BTreeSet};
-
-    use ken_elaborator::lexer::{Lexer, Token};
-    use ken_elaborator::modules::PRELUDE_PACKAGE_HOMES;
-
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("workspace root");
-    let catalog = root.join("catalog/packages");
-    for path in [
-        "crates/ken-cli/tests/fixtures/d0_abi_mapping_source.ken",
-        "crates/ken-cli/tests/fixtures/d0_px8ta_nested_source.ken",
-        "crates/ken-cli/tests/fixtures/d0_rt_parity_source.ken",
-        "crates/ken-elaborator/tests/fixtures/rt_bracket_region_multileaf.ken",
-    ] {
-        let source = std::fs::read_to_string(root.join(path)).expect("R template");
-        let mut legacy = ElabEnv::new().expect("prelude");
-        let old = legacy
-            .elaborate_file_v1(&source)
-            .expect_err("unfilled template");
-        let original_missing = missing_name(old);
-        let tokens = Lexer::lex(&source).expect("lex actual template");
-        let names = tokens
-            .iter()
-            .filter_map(|(token, _)| match token {
-                Token::Ident(name) | Token::ConId(name) => Some(name.as_str()),
-                _ => None,
-            })
-            .collect::<BTreeSet<_>>();
-        let mut required: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-        for &(owner, member) in &PRELUDE_PACKAGE_HOMES {
-            if names.contains(member) {
-                required.entry(owner).or_default().insert(member);
+        let error = selected
+            .elaborate_isolated_file_strict_v1(&[catalog.clone()], &source)
+            .expect_err("strict effect escape");
+        match error {
+            ElabError::TypeMismatch { reason, .. } => {
+                assert!(reason.contains("EffectEscapes"), "{name}: {reason}");
             }
+            other => panic!("{name}: wrong Strict refusal {other:?}"),
         }
-        let (header, body) = source.split_once('\n').expect("template header");
-        assert!(header.starts_with("program capabilities FS "), "{path}");
-        let imports = required
-            .into_iter()
-            .map(|(owner, members)| {
-                format!(
-                    "import {owner} ({})\n",
-                    members.into_iter().collect::<Vec<_>>().join(", ")
-                )
-            })
-            .collect::<String>();
-        let composed = format!("{header}\n{imports}{body}");
-        let mut selected = ElabEnv::new().expect("prelude");
-        let new = selected
-            .elaborate_isolated_file_strict_v1(&[catalog.clone()], &composed)
-            .expect_err("unfilled template under Strict");
-        assert_eq!(missing_name(new), original_missing, "{path}: error shifted");
     }
 }
 

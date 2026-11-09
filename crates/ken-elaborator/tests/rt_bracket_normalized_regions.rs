@@ -6,7 +6,9 @@ use ken_elaborator::compiler_driver::{prepare_native_program_sources, CompilerSo
 fn regions(source: &str) -> Vec<ken_elaborator::compiler_driver::NormalizedBracketRegion> {
     prepare_native_program_sources(
         "rt-bracket-region",
-        vec![CompilerSource::new("region.ken", source)],
+        vec![CompilerSource::new("region.ken", source).with_roots(vec![
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+        ])],
     )
     .unwrap_or_else(|err| panic!("checked bracket preparation: {err:?}"))
     .bracket_regions()

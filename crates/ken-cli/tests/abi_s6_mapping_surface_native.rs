@@ -24,9 +24,12 @@ fn try_differential(case: &str, entry: &str, matrix_body: &str) -> Result<Differ
     let source = SOURCE
         .replace("__ENTRY__", entry)
         .replace("__MATRIX_BODY__", matrix_body);
-    let output = ken_cli::build_native_program(
+    let catalog = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")];
+    let output = ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &catalog,
         &format!("abi_s6_surface_{}", case.replace('-', "_")),
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -46,6 +49,7 @@ fn try_differential(case: &str, entry: &str, matrix_body: &str) -> Result<Differ
     let interpreted = ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &catalog,
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),

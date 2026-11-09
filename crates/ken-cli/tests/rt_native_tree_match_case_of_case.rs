@@ -6,6 +6,8 @@ use std::os::unix::ffi::OsStringExt;
 // ordinary Match emitter, not the D1 producer-local composition route.
 #[cfg(target_os = "linux")]
 const SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc host_byte (chosen : UInt8) : HostIO APartial UInt8 visits [Console] =
   host_bind APartial Unit UInt8
     (host_console APartial Unit (print_line "seed"))
@@ -46,6 +48,8 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 // producer-local route must be taken rather than the ordinary Match emitter.
 #[cfg(target_os = "linux")]
 const SHARED_BIND_SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
   host_bind APartial ExitCode ExitCode
     (match (match eq_int (uint8_to_int byte) 1 {
@@ -113,6 +117,8 @@ fn root_exit_discriminator_source(runtime_failure: bool) -> String {
 // reaches both arms; the test compares their full native/interpreter envelopes.
 #[cfg(target_os = "linux")]
 const OPTION_OUTER_SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
   host_bind APartial ExitCode ExitCode
     (match (match eq_int (uint8_to_int byte) 1 {
@@ -149,6 +155,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 // Inner arms rather than inferring selection from its terminal code alone.
 #[cfg(target_os = "linux")]
 const CHECKED_INNER_SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 data Inner = Hit | Miss
 fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
@@ -177,9 +184,10 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 fn console_direct_exit_nested_match_uses_existing_route() {
     let dir = tempfile::tempdir().unwrap();
     let (artifact, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-tree-exit-direct-exit",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -213,6 +221,7 @@ fn console_direct_exit_nested_match_uses_existing_route() {
         let interpreted = ken_cli::run_program_effect_observation(
             SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &[b"ken".to_vec(), vec![byte]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),
@@ -281,9 +290,10 @@ fn carrier_root_exit_nested_match_agrees_with_interpreter() {
     let dir = tempfile::tempdir().unwrap();
     let ((build, d1_hits), forced_matches) = ken_runtime::with_forced_carrier_match_joins(|| {
         ken_runtime::with_exit_code_case_of_case_route_count(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 SOURCE,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "rt-tree-exit-forced-carrier",
                 dir.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -304,6 +314,7 @@ fn carrier_root_exit_nested_match_agrees_with_interpreter() {
         let interpreted = ken_cli::run_program_effect_observation(
             SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &[b"ken".to_vec(), vec![byte]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),
@@ -352,6 +363,7 @@ fn shared_bind_exit_code_arm_matches_interpreter(byte: u8, stdout: &[u8], exit: 
     let interpreted = ken_cli::run_program_effect_observation(
         SHARED_BIND_SOURCE,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec(), vec![byte]],
         &[],
         dir.path().as_os_str().as_encoded_bytes(),
@@ -374,9 +386,10 @@ fn shared_bind_exit_code_arm_matches_interpreter(byte: u8, stdout: &[u8], exit: 
     assert_eq!(interp_ops, vec![ken_runtime::HostOpV1::ConsoleWrite]);
 
     let (artifact, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             SHARED_BIND_SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-tree-exit-shared-bind",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -442,9 +455,10 @@ fn shared_bind_failure_arm_matches_interpreter_on_d1_route() {
 fn option_outer_family_matches_interpreter_while_exit_code_uses_d1() {
     let dir = tempfile::tempdir().unwrap();
     let (build, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             OPTION_OUTER_SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-tree-option-outer-parity",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -460,6 +474,7 @@ fn option_outer_family_matches_interpreter_while_exit_code_uses_d1() {
         let interpreted = ken_cli::run_program_effect_observation(
             OPTION_OUTER_SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &[b"ken".to_vec(), vec![byte]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),
@@ -507,9 +522,10 @@ fn root_exit_closed_and_runtime_failure_agree_on_both_bytes() {
         let source = root_exit_discriminator_source(runtime_failure);
         let dir = tempfile::tempdir().unwrap();
         let (artifact, hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "rt-root-exit-closed-and-runtime",
                 dir.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -529,6 +545,7 @@ fn root_exit_closed_and_runtime_failure_agree_on_both_bytes() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 &[b"ken".to_vec(), vec![byte]],
                 &[],
                 dir.path().as_os_str().as_encoded_bytes(),
@@ -571,9 +588,10 @@ fn checked_inner_nonexit_result_and_outer_exit_match_interpreter() {
             CHECKED_INNER_SOURCE.to_owned()
         };
         let dir = tempfile::tempdir().unwrap();
-        let artifact = ken_cli::build_native_program(
+        let artifact = ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-root-exit-checked-inner",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -584,6 +602,7 @@ fn checked_inner_nonexit_result_and_outer_exit_match_interpreter() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 &[b"ken".to_vec(), vec![byte]],
                 &[],
                 dir.path().as_os_str().as_encoded_bytes(),
@@ -635,9 +654,10 @@ fn root_exit_ret_carried_success_and_failure_zero_match_interpreter() {
         );
         let dir = tempfile::tempdir().unwrap();
         let (build, hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "rt-root-exit-ret-carried-zero-success",
                 dir.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -653,6 +673,7 @@ fn root_exit_ret_carried_success_and_failure_zero_match_interpreter() {
         let interpreted = ken_cli::run_program_effect_observation(
             &source,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &[b"ken".to_vec(), vec![1]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),

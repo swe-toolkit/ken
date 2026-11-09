@@ -2,6 +2,8 @@
 // below are not a proxy for execution or for consumption at the D2 gate.
 
 const PX7L: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, is_terminal, print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc selected_body (terminal : Bool) (message : String)
   : Unit -> HostIO APartial Unit visits [Console] =
   \_. match terminal {
@@ -72,9 +74,10 @@ fn strict_pending_console_source_requires_each_operation_import() {
 fn selected_pending_call_admits_validated_owner_without_a_package() {
     let dir = tempfile::tempdir().unwrap();
     let (outcome, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             PX7L,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-pending-admission",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -124,8 +127,9 @@ fn selected_pending_call_admits_validated_owner_without_a_package() {
 fn owner_scoped_false_ordinary_answer_restores_join_refusal() {
     let dir = tempfile::tempdir().unwrap();
     let (outcome, applied) = ken_runtime::with_owner_fed_join_forced_ordinary(|| {
-        ken_cli::build_native_program(
-            PX7L, ken_cli::SourceFormat::Ken, "rt-pending-false-ordinary",
+        ken_cli::build_native_program_with_roots(
+            PX7L, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], "rt-pending-false-ordinary",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
@@ -145,8 +149,9 @@ fn owner_scoped_false_ordinary_answer_restores_join_refusal() {
 fn owner_vis_join_consumption_refuses_before_dead_subtree_disposition() {
     let dir = tempfile::tempdir().unwrap();
     let (outcome, applied) = ken_runtime::with_owner_vis_join_consumed(|| {
-        ken_cli::build_native_program(
-            PX7L, ken_cli::SourceFormat::Ken, "rt-pending-vis-consumed",
+        ken_cli::build_native_program_with_roots(
+            PX7L, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], "rt-pending-vis-consumed",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
@@ -170,9 +175,10 @@ fn checked_double_bind_admits_and_runs_with_native_parity() {
     let source = PX7L.replacen(ORIGINAL, DOUBLE_BIND, 1);
     let dir = tempfile::tempdir().unwrap();
     let (outcome, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-pending-duplicate",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -205,7 +211,8 @@ fn checked_double_bind_admits_and_runs_with_native_parity() {
     ).expect("the emitted artifact must run");
     let mut host = ken_interp::CaptureHost::new(Vec::new());
     let interpreted = ken_cli::run_program_effect_observation(
-        &source, ken_cli::SourceFormat::Ken, &[b"ken".to_vec()], &[], b"/", &mut host,
+        &source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], &[b"ken".to_vec()], &[], b"/", &mut host,
     ).expect("the same checked source must run through the interpreter");
     assert_eq!(native, interpreted, "both effects must survive native lowering");
     assert_eq!(native.exit_status, 0);
@@ -235,8 +242,9 @@ fn assert_native_interpreted_route(
     source: &str, name: &str, stdout: &[u8], ops: &[ken_runtime::HostOpV1],
 ) {
     let dir = tempfile::tempdir().unwrap();
-    let output = ken_cli::build_native_program(
-        source, ken_cli::SourceFormat::Ken, name, dir.path(),
+    let output = ken_cli::build_native_program_with_roots(
+        source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], name, dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     ).expect("a selected route must emit an artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -248,7 +256,8 @@ fn assert_native_interpreted_route(
     ).expect("native selected route must return a complete observation");
     let mut host = ken_interp::CaptureHost::new(Vec::new());
     let interpreted = ken_cli::run_program_effect_observation(
-        source, ken_cli::SourceFormat::Ken, &[b"ken".to_vec()], &[], b"/", &mut host,
+        source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], &[b"ken".to_vec()], &[], b"/", &mut host,
     ).expect("the same checked source must run through the interpreter");
     assert_eq!(native, interpreted, "native cannot drop a selected continuation");
     assert_eq!(native.exit_status, 0);
@@ -313,8 +322,9 @@ fn selected_pending_two_print_route_has_native_interpreter_parity() {
     let source = PX7L.replacen(OLD_ARM, TWO_PRINTS, 1);
     let dir = tempfile::tempdir().unwrap();
     let (outcome, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
-        ken_cli::build_native_program(
-            &source, ken_cli::SourceFormat::Ken, "rt-pending-two-print",
+        ken_cli::build_native_program_with_roots(
+            &source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], "rt-pending-two-print",
             dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });

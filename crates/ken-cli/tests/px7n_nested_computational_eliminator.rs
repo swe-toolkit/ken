@@ -4,6 +4,8 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc wrap_result (as_ok : Bool)
   : HostIO APartial (Result Bytes Bytes) visits [Console] =
   host_bind APartial (Result IOError Unit) (Result Bytes Bytes)
@@ -60,9 +62,10 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
     let name = if arguments.is_empty() { "ok" } else { "err" };
     let dir = output_dir(name);
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px7n-nested-computational-eliminator",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -89,6 +92,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
     let interpreted = ken_cli::run_program_effect_observation(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &argv,
         &[],
         b"/",

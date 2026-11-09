@@ -117,6 +117,7 @@ fn example_only_main_refused_before_either_entrypoint_admission() {
         SourceFormat::LiterateKen,
         &[],
         &[],
+        &[],
         b"/",
         &mut host,
     );
@@ -206,7 +207,8 @@ fn own_main_followed_by_unrelated_example_keeps_both_admissions() {
         own_ids.push(admit_checked_main(&env).expect("own main must admit").main);
         let mut host = PosixHost::new();
         outcomes.push(
-            run_program(source, SourceFormat::LiterateKen, &[], &[], b"/", &mut host)
+            run_program(source, SourceFormat::LiterateKen,
+        &[], &[], &[], b"/", &mut host)
                 .expect("reference runner must admit own main")
                 .exit_status,
         );

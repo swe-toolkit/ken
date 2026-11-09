@@ -13,6 +13,10 @@ use std::path::{Path, PathBuf};
 const INTERPRETER_CHILD_ROOT: &str = "KEN_PX8F_INTERPRETER_CHILD_ROOT";
 
 const WRITE_ALL_PARTITION: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAll)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn body_from_write (outcome : Result ResourceError Unit)
   : ResourceBodyResult Unit Unit =
   match outcome {
@@ -433,6 +437,7 @@ fn run_interpreter_child() {
     let observation = ken_cli::run_program_effect_observation(
         WRITE_ALL_PARTITION,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.as_os_str().as_bytes(),
@@ -478,9 +483,10 @@ fn run_write_partition() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create PX8-F differential root");
     let preload = build_interposer(&dir);
-    let build = ken_cli::build_native_program(
+    let build = ken_cli::build_native_program_with_roots(
         WRITE_ALL_PARTITION,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px8f_write_partition",
         dir.join("build"),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

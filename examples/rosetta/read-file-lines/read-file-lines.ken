@@ -1,4 +1,8 @@
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Filesystem.Authority (read_bytes)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_program_then, host_pure)
+import Core.Classes.LawfulClasses (charToInt)
 
 -- Rosetta Code: Read a file line by line
 -- https://rosettacode.org/wiki/Read_a_file_line_by_line

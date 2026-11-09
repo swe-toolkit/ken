@@ -296,6 +296,7 @@ fn branched_scrutinee_forwarded_read_matches_interpreter_body() {
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         root.path().as_os_str().as_bytes(),
         &mut host,
     )

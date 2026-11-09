@@ -88,6 +88,7 @@ fn assert_row_on_stated_stack(
         let interpreted = ken_cli::run_program_effect_observation(
             source,
             ken_cli::SourceFormat::Ken,
+        &[],
             &[b"ken".to_vec(), vec![2u8]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),

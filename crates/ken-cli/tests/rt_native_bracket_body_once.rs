@@ -26,6 +26,7 @@ fn assert_bracket_body_observation(
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         dir.path().as_os_str().as_bytes(),
         &mut host,
     )

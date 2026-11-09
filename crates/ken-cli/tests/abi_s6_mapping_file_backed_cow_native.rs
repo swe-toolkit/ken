@@ -47,6 +47,7 @@ fn differential(source: &str) -> Result<(Observation, Observation, Vec<u8>, Vec<
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         interpreted_root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )

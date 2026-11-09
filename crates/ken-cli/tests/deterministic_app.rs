@@ -6,6 +6,9 @@ use ken_interp::{
 };
 
 const APP: &str = r#"program capabilities FS AFull
+import Capability.Console.Text (write)
+import Capability.Filesystem.Authority (writeFile)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
@@ -50,6 +53,7 @@ fn run_once() -> Snapshot {
     let outcome = run_program(
         APP,
         SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"fixed argv".to_vec()],
         &[(b"FIXED_KEY".to_vec(), b"fixed env value".to_vec())],
         b"sandbox/output",
@@ -101,6 +105,7 @@ fn checked_application_exposes_the_real_dispatch_observation() {
     let observation = run_program_effect_observation(
         APP,
         SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"fixed argv".to_vec()],
         &[(b"FIXED_KEY".to_vec(), b"fixed env value".to_vec())],
         b"sandbox/./output",
@@ -148,6 +153,7 @@ fn checked_application_exposes_the_real_dispatch_observation() {
     let sibling = run_program_effect_observation(
         APP,
         SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"fixed argv".to_vec()],
         &[(b"FIXED_KEY".to_vec(), b"fixed env value".to_vec())],
         b"sandbox/output",
