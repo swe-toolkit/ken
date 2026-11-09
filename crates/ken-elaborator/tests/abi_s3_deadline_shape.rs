@@ -34,7 +34,7 @@ fn constructor_arity(env: &ElabEnv, name: &str) -> usize {
 /// type or on the surface sleep operation.
 /// THE GAP: an arity of one is only evidence if the probe can read arities
 /// other than one — so the same probe is required to report `0` for the
-/// nullary clock operations and `2` for a genuinely binary constructor. Without
+/// nullary clock operations and `2` for `Cons` (head and tail). Without
 /// that, "exactly one argument" is indistinguishable from a probe that returns
 /// one for everything.
 #[test]
@@ -49,7 +49,7 @@ fn abi_s3_the_deadline_type_carries_exactly_its_reading_and_no_cancellation_fiel
     );
     assert_eq!(constructor_arity(&env, "MonotonicNow"), 0);
     assert_eq!(
-        constructor_arity(&env, "Read"),
+        constructor_arity(&env, "Cons"),
         2,
         "the probe must be able to report an arity above one, or 'exactly one' \
          below is indistinguishable from a probe that always answers one"
