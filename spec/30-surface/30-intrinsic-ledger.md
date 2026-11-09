@@ -40,13 +40,15 @@ copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
 there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
-Apart from internal-only `Empty` and the admitted entrypoint-ABI,
-effect/clock, ITree, six earlier FS/resource families, the five
-scoped progress/acquisition/mapping/child-result families, the five
+Apart from internal-only `Empty`, the original fifteen floor identities
+(`30 §4`), and the admitted entrypoint-ABI, effect/clock, ITree, six
+earlier FS/resource families, the five scoped
+progress/acquisition/mapping/child-result families, the five
 Increment 3a scoped families (`ReadResult`, `FileMetadata`, `FileKind`,
 `DirEntry`, `FileOperation`), scoped `StateOp` and checked `resp_state`,
-`ConsoleStream`, `eqChar` and the three earlier State operations below,
-the other names in this table are
+the four direct-ITree floor identities (`ConsoleOp`, `console_resp`,
+`itree_bind`, `resp_coproduct`), `ConsoleStream`, `eqChar`, and the three
+earlier State operations below, the other names in this table are
 **observed spellings**, not names approved for permanent reservation.
 Before a later slice admits a newly witnessed name, Spec checks that
 its spelling closely encloses its meaning (`30 §4`). For the admitted
