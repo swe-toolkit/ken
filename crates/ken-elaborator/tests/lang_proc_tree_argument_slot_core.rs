@@ -137,8 +137,9 @@ fn sink (t : HostIO APartial Unit) : Unit = MkUnit
 /// 10.5 s and 17.3 s under the per-slot prefix probe).
 /// CLAIMED: classifying a parameter never re-elaborates the arguments to its
 /// left, so slot classification stays linear in the spine.
-/// THE GAP: a wall-clock bound rather than an operation count; a dependent
-/// parameter still checks the argument it abstracts during the scan.
+/// THE GAP: a wall-clock bound rather than an operation count; when a later
+/// slot's classification depends on a prior argument's core, the exact-walk
+/// fallback still elaborates the dependent argument in the discarded scan.
 #[test]
 fn held_tree_arguments_elaborate_in_linear_time() {
     fn elapsed(decls: &str) -> std::time::Duration {
@@ -155,6 +156,15 @@ fn held_tree_arguments_elaborate_in_linear_time() {
     let nest = elapsed(&format!(
         "proc usep (u : Unit) : Unit visits [Console] =\n  sink {tree}\n"
     ));
+    let mut dependent_tree = "(action MkUnit)".to_string();
+    for _ in 0..14 {
+        dependent_tree = format!("(seqd {dependent_tree} (action MkUnit))");
+    }
+    let dependent = elapsed(&format!(
+        "fn Same (t : HostIO APartial Unit) : Type = HostIO APartial Unit\n\
+         fn seqd (a : HostIO APartial Unit) (b : HostIO APartial Unit) : Same a = a\n\
+         proc use_dep (u : Unit) : Unit visits [Console] =\n  sink {dependent_tree}\n"
+    ));
     let params: String = (0..12)
         .map(|i| format!(" (a{i} : HostIO APartial Unit)"))
         .collect();
@@ -162,8 +172,65 @@ fn held_tree_arguments_elaborate_in_linear_time() {
     let flat = elapsed(&format!(
         "fn take{params} : Unit = MkUnit\nproc usep (u : Unit) : Unit visits [Console] =\n  take{args}\n"
     ));
-    eprintln!("held-tree cost: nest={nest:?} flat={flat:?}");
+    eprintln!("held-tree cost: nest={nest:?} dependent={dependent:?} flat={flat:?}");
     let bound = std::time::Duration::from_secs(1);
     assert!(nest < bound, "depth-14 held-tree nest took {nest:?}");
+    assert!(
+        dependent < bound,
+        "depth-14 dependent held-tree nest took {dependent:?}"
+    );
     assert!(flat < bound, "12-ary held-tree call took {flat:?}");
+}
+
+/// Durable invariant (36 §2.4): a subset-typed application head and its
+/// explicit-let twin have the same checked body at either argument slot.
+#[test]
+fn subset_head_second_performed_slot_has_exact_let_core() {
+    compare_bodies(
+        "subset head, second performed slot",
+        r#"def Fn2 = { f : Unit -> Unit -> Unit | Equal Unit (f MkUnit MkUnit) MkUnit }
+proc direct (g : Fn2) : Unit visits [Console] = g MkUnit (emit second)
+proc explicit (g : Fn2) : Unit visits [Console] =
+  let x = emit second in g MkUnit x
+"#,
+    );
+}
+
+#[test]
+fn subset_head_first_performed_slot_has_exact_let_core() {
+    compare_bodies(
+        "subset head, first performed slot",
+        r#"def Fn2 = { f : Unit -> Unit -> Unit | Equal Unit (f MkUnit MkUnit) MkUnit }
+proc direct (g : Fn2) : Unit visits [Console] = g (emit second) MkUnit
+proc explicit (g : Fn2) : Unit visits [Console] =
+  let x = emit second in g x MkUnit
+"#,
+    );
+}
+
+/// Durable invariant: if the later performing domain depends on an earlier
+/// argument's core, the exact-walk fallback preserves the explicit-let core.
+#[test]
+fn dependent_domain_performed_slot_uses_exact_fallback() {
+    compare_bodies(
+        "dependent domain, performed second slot",
+        r#"fn hd (T : Type) (x : T) : Unit = MkUnit
+proc direct (u : Unit) : Unit visits [Console] = hd Unit (emit second)
+proc explicit (u : Unit) : Unit visits [Console] =
+  let x = emit second in hd Unit x
+"#,
+    );
+}
+
+/// The same dependent head must leave an already-tree-valued argument held,
+/// instead of guessing that it performs into a plain value slot.
+#[test]
+fn dependent_domain_tree_argument_remains_held_under_fallback() {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    env.elaborate_file(&format!(
+        "{COST_PRE}fn hd (T : Type) (x : T) : Unit = MkUnit\n\
+         proc direct (u : Unit) : Unit visits [Console] =\n\
+           hd (HostIO APartial Unit) (action MkUnit)\n"
+    ))
+    .expect("dependent-domain tree argument stays held");
 }

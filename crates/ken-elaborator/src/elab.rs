@@ -14873,16 +14873,76 @@ fn application_with_slot(
 }
 
 /// Find the first argument that performs into a value-valued parameter,
-/// reading each parameter from the head's Pi telescope in one pass. A
-/// non-dependent codomain advances without elaborating the argument it
-/// abstracts, so a held tree is elaborated once, by the path that keeps it.
+/// reading each parameter from the head's Pi telescope in one pass. No
+/// argument is elaborated here unless a later slot's classification depends
+/// on an earlier argument's core, so a held tree is elaborated once, by the
+/// path that keeps it.
 #[inline(never)]
 fn application_slot_candidate<'e>(
     cx: &mut ElabCtx, head: &RExpr, arguments: &[&'e RExpr], span: &Span,
 ) -> Result<Option<(usize, &'e RExpr)>, ElabError> {
-    let (_, mut ty) = infer(cx, head)?;
+    let (_, head_ty) = infer(cx, head)?;
+    match application_slot_by_type(cx, head_ty.clone(), arguments, span)? {
+        Ok(found) => Ok(found),
+        Err(SlotScanUndecided) => application_slot_by_core(cx, head_ty, arguments, span),
+    }
+}
+
+/// A later slot's classification could change once an earlier argument's
+/// core is substituted, so the type-only walk declines to decide it.
+struct SlotScanUndecided;
+
+/// Classify the slots from the telescope alone. A dependent codomain is
+/// entered under a fresh binder of its domain instead of the argument's
+/// core. The walk decides only where substituting the core cannot change
+/// the answer: the remaining type is already a Pi, and a performing
+/// argument's domain does not mention an entered binder.
+#[inline(never)]
+fn application_slot_by_type<'e>(
+    cx: &ElabCtx<'_>, mut ty: Term, arguments: &[&'e RExpr], span: &Span,
+) -> Result<Result<Option<(usize, &'e RExpr)>, SlotScanUndecided>, ElabError> {
+    let mut ctx = Cow::Borrowed(&cx.ctx);
+    let mut entered = 0;
     for (slot, argument) in arguments.iter().copied().enumerate() {
-        let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+        if entered == 0 {
+            ty = elimination_head_type(cx, ty);
+        }
+        let Term::Pi(domain, codomain) = whnf(cx.env, &ctx, &ty) else {
+            if entered == 0 {
+                return Err(ElabError::NotAFunction { span: span.clone() });
+            }
+            return Ok(Err(SlotScanUndecided));
+        };
+        if argument_slot_may_perform(cx, argument) {
+            let Ok(domain) = lower_by(&domain, entered) else {
+                return Ok(Err(SlotScanUndecided));
+            };
+            if let_itree_parts(cx, &domain).is_none() {
+                return Ok(Ok(Some((slot, argument))));
+            }
+        }
+        ty = match lower_by(&codomain, 1) {
+            Ok(independent) => independent,
+            Err(_) => {
+                ctx.to_mut().push(*domain);
+                entered += 1;
+                *codomain
+            }
+        };
+    }
+    Ok(Ok(None))
+}
+
+/// The exact walk, for a telescope the type-only walk declined. It checks
+/// each dependent argument inside the caller's discarded snapshot, so it
+/// elaborates that argument twice and is not linear.
+#[inline(never)]
+fn application_slot_by_core<'e>(
+    cx: &mut ElabCtx, mut ty: Term, arguments: &[&'e RExpr], span: &Span,
+) -> Result<Option<(usize, &'e RExpr)>, ElabError> {
+    for (slot, argument) in arguments.iter().copied().enumerate() {
+        let head_ty = elimination_head_type(cx, ty);
+        let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &head_ty) else {
             return Err(ElabError::NotAFunction { span: span.clone() });
         };
         if argument_slot_may_perform(cx, argument) && let_itree_parts(cx, &domain).is_none() {
@@ -14974,6 +15034,16 @@ fn infer_application_unsequenced(
             Ok((Term::app(f_core, a_core), result_ty))
         }
         _ => Err(ElabError::NotAFunction { span: span.clone() }),
+    }
+}
+
+/// The type an elimination head is applied at: a subset's carrier, else the
+/// type itself. The argument-slot scan reads it at the same positions where
+/// `forget_subset_at_elimination_head` rewrites the head, so the two agree.
+fn elimination_head_type(cx: &ElabCtx<'_>, ty: Term) -> Term {
+    match subset_refinement(cx, &ty) {
+        Some((carrier, _)) => carrier,
+        None => ty,
     }
 }
 
