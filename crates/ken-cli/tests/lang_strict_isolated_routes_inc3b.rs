@@ -98,7 +98,10 @@ fn cut_base_legacy_clean_file_cohort_checks_through_switched_cli_route() {
     assert_eq!(legacy_clean.len(), CUT_LEGACY_CLEAN, "Legacy-clean cohort drifted");
     assert!(legacy_clean.contains(&&relay), "internal relay is in the cohort");
     assert_eq!(
-        legacy_clean.iter().filter(|path| **path != relay).count(),
+        legacy_clean
+            .iter()
+            .filter(|path| path.as_path() != relay.as_path())
+            .count(),
         CUT_LEGACY_CLEAN - INTERNAL_CORE_ONLY,
         "only the I-row core fixture is exempt from the switched source route"
     );
