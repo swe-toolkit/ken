@@ -313,9 +313,11 @@ fn read_write_read_relay_copies_have_distinct_members_and_resumes() {
         .spawn(move || {
             let root = tempfile::tempdir().expect("relay-copy output directory");
             let (built, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(
-                || ken_cli::build_native_program(
+                || ken_cli::build_native_program_with_roots(
                     &source,
                     ken_cli::SourceFormat::Ken,
+                    &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../catalog/packages")],
                     "abi_s6_relay_copy_census",
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),

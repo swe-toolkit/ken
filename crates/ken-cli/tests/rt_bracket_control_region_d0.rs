@@ -536,9 +536,9 @@ fn d0_read_offset_and_window_exact_tuples() {
                 std::fs::write(root.path().join("source"), b"ab").expect("D0 read source file");
                 let source = D0_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
                 let output = ken_cli::build_native_program_with_roots(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &checked_catalog_roots(),
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     &format!("rt-bracket-d0-read-{}", case.replace('-', "_")),
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -604,9 +604,9 @@ fn d0_mapping_six_exact_tuples() {
                     .replace("__ENTRY__", "matrix_stage")
                     .replace("__MATRIX_BODY__", body);
                 let output = ken_cli::build_native_program_with_roots(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &checked_catalog_roots(),
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     &format!("rt-bracket-d0-mapping-{}", case.replace('-', "_")),
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -742,9 +742,9 @@ fn d0_measured_depth_two_members_exact_tuples() {
                     D0_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry)
                 };
                 let output = ken_cli::build_native_program_with_roots(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &checked_catalog_roots(),
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     &format!("d0-measured-{}", case),
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -808,9 +808,9 @@ fn d0_px8ta_dual_owner_plan_close_refuses_per_installed_row() {
                 let build = |suffix: &str| {
                     ken_runtime::with_static_response_feasibility_diagnostics(|| {
                         ken_cli::build_native_program_with_roots(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &checked_catalog_roots(),
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             &format!("rt-bracket-d0-dual-{depth}-{suffix}"), root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
