@@ -4988,12 +4988,14 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             1,
         );
         let arguments = vec![b"px15".to_vec(), b"x".to_vec(), b"x".to_vec()];
+        let catalog = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../catalog/packages")];
         let cwd_bytes = root.as_os_str().as_bytes();
         let mut cwd_host = ken_interp::PosixHost::new_at(&root);
         let cwd_observation = ken_cli::run_program_effect_observation(
             &cwd_source,
             ken_cli::SourceFormat::Ken,
-        &[],
+            &catalog,
             &arguments,
             &[],
             cwd_bytes,
@@ -5004,7 +5006,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         let absolute_observation = ken_cli::run_program_effect_observation(
             &absolute_source,
             ken_cli::SourceFormat::Ken,
-        &[],
+            &catalog,
             &arguments,
             &[],
             cwd_bytes,
