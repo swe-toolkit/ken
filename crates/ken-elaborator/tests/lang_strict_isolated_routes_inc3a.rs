@@ -523,3 +523,29 @@ fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
     }
     assert_eq!(checked, USERS.len() - templates.len());
 }
+
+/// Promise class: durable invariant. The native preparation split retains
+/// the pre-existing error priority when package name and source set are both
+/// empty. MEASURED: the real production preparation refuses the doubly empty
+/// input on EmptyPackageName while a named empty-source control refuses on
+/// EmptySourceSet. CLAIMED: factoring the fixture's env-taking phase did not
+/// change the ordinary source API's validation order. THE GAP: this tests
+/// exactly the two empty boundary operands, not the full native package path.
+#[test]
+fn native_preparation_keeps_empty_package_name_before_empty_source_set() {
+    use ken_elaborator::compiler_driver::{
+        prepare_native_program_sources, CompilerDriverError, NativeProgramBuildError,
+    };
+    let empty_name = prepare_native_program_sources("", vec![])
+        .expect_err("both missing operands must refuse on the package name");
+    assert!(matches!(
+        empty_name,
+        NativeProgramBuildError::Driver(CompilerDriverError::EmptyPackageName)
+    ));
+    let empty_sources = prepare_native_program_sources("named", vec![])
+        .expect_err("an existing package name needs at least one source");
+    assert!(matches!(
+        empty_sources,
+        NativeProgramBuildError::Driver(CompilerDriverError::EmptySourceSet)
+    ));
+}

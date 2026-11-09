@@ -2415,6 +2415,15 @@ pub fn prepare_native_program_sources_with_resolution_report(
     prepare_native_program_sources_inner(package_name, sources, true)
 }
 
+fn require_native_package_name(package_name: &str) -> Result<(), NativeProgramBuildError> {
+    if package_name.is_empty() {
+        return Err(NativeProgramBuildError::Driver(
+            CompilerDriverError::EmptyPackageName,
+        ));
+    }
+    Ok(())
+}
+
 /// Checked elaboration output consumed by native preparation. Production
 /// constructs it from source text; the single fixture caller supplies the
 /// unchanged Legacy-elaborated program with compiler-internal identities.
@@ -2492,6 +2501,7 @@ fn prepare_native_program_sources_inner(
     sources: Vec<CompilerSource>,
     report: bool,
 ) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    require_native_package_name(package_name)?;
     prepare_native_program_from_elaborated(
         package_name,
         elaborate_native_program_sources(sources)?,
@@ -2523,11 +2533,7 @@ fn prepare_native_program_from_elaborated(
         example_ids,
     } = elaborated;
     let manifest = CompilerManifest::new(package_name, Vec::new());
-    if package_name.is_empty() {
-        return Err(NativeProgramBuildError::Driver(
-            CompilerDriverError::EmptyPackageName,
-        ));
-    }
+    require_native_package_name(package_name)?;
     let mut admitted_ids = Vec::new();
     for result in &declarations {
         admitted_ids.extend(result.auxiliary_ids.iter().copied());
