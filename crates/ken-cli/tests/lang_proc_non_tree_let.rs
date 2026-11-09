@@ -163,6 +163,8 @@ fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
 #[test]
 fn ensured_changed_proc_checks_with_all_ret_post() {
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc one : Int visits [Console] = 1
 proc alias : Int ensures Equal Int result 1 visits [Console] = one
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] =

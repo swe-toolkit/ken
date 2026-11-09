@@ -8,6 +8,8 @@ fn output_dir() -> tempfile::TempDir {
 }
 
 const RESOURCE_PROGRAM: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withResource)
 fn px8x_body (_resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)
@@ -85,9 +87,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 fn linked_route_exposes_real_ordered_role_labelled_bindings() {
     let dir = output_dir();
     std::fs::write(dir.path().join("held.bin"), b"held").unwrap();
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         RESOURCE_PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px8x-single-schema-observation",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

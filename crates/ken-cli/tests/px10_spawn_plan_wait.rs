@@ -19,6 +19,7 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
@@ -112,6 +113,7 @@ fn ac1_checked_interpreter_wait_reports_signaled_sigterm() {
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
@@ -162,6 +164,7 @@ fn ac1_checked_interpreter_stdout_pipe_preserves_argv_and_environment() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -266,6 +269,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -365,6 +369,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
     let failed = ken_cli::run_program_effect_observation(
         &failed_source,
         ken_cli::SourceFormat::Ken,
+        &[],
         &[],
         &[],
         failed_root.path().as_os_str().as_encoded_bytes(),
@@ -601,6 +606,7 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),

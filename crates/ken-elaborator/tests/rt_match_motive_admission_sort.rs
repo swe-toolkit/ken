@@ -13,6 +13,7 @@ use ken_elaborator::compiler_driver::{
 use ken_elaborator::omega_erasure::OmegaErasurePlan;
 
 const HOST_AND_PROOF: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 theorem proof_match (b : Bool) : Top =
   match b { True |-> Proved; False |-> Proved }
@@ -32,6 +33,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const COMPUTATIONAL_PROOF: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 fn computational_prop (b : Bool) : Nat =
   let p : Top = match b { True |-> Proved; False |-> Proved } in Zero
@@ -44,6 +46,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const DEPENDENT_TYPE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 fn result_type (b : Bool) : Type =
   match b { True |-> Nat; False |-> Bool }

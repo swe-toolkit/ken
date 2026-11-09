@@ -33,6 +33,7 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
             let interpreted = ken_cli::run_program_effect_observation(
                 source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),

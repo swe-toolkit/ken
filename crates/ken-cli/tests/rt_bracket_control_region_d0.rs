@@ -414,6 +414,7 @@ fn d0_body_error_outcome_exact_tuple() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -479,6 +480,7 @@ fn d0_missing_resource_acquisition_exact_tuple() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -548,6 +550,7 @@ fn d0_read_offset_and_window_exact_tuples() {
                 let interpreted = ken_cli::run_program_effect_observation(
                     &source,
                     ken_cli::SourceFormat::Ken,
+        &[],
                     &[],
                     &[],
                     root.path().as_os_str().as_encoded_bytes(),
@@ -614,6 +617,7 @@ fn d0_mapping_six_exact_tuples() {
                 let interpreted = ken_cli::run_program_effect_observation(
                     &source,
                     ken_cli::SourceFormat::Ken,
+        &[],
                     &[],
                     &[],
                     root.path().as_os_str().as_encoded_bytes(),
@@ -670,6 +674,7 @@ fn d0_branched_scrutinee_out_of_bounds_exact_tuple() {
             let interpreted = ken_cli::run_program_effect_observation(
                 source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -748,6 +753,7 @@ fn d0_measured_depth_two_members_exact_tuples() {
                 let interpreted = ken_cli::run_program_effect_observation(
                     &source,
                     ken_cli::SourceFormat::Ken,
+        &[],
                     &[],
                     &[],
                     root.path().as_os_str().as_encoded_bytes(),
@@ -891,6 +897,7 @@ fn d0_px8ta_exact_tuple(depth: usize) {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),

@@ -10,6 +10,9 @@ use std::os::unix::ffi::OsStringExt;
 const BUILD_STACK_BYTES: usize = 256 * 1024 * 1024;
 
 const SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_pure)
 proc read_byte (cap : Cap APartial) (chosen : UInt8)
   : HostIO APartial UInt8 visits [FS] =
   host_bind APartial (Result FileError Bytes) UInt8
@@ -75,9 +78,10 @@ fn fs_read_byte_borrowed_option_producer_matches_interpreter() {
 fn assert_fs_read_byte_borrowed_option_producer() {
     let dir = tempfile::tempdir().unwrap();
     let (build, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt-producer-match-borrowed-option",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -108,6 +112,7 @@ fn assert_fs_read_byte_borrowed_option_producer() {
         let interpreted = ken_cli::run_program_effect_observation(
             SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &[b"ken".to_vec(), vec![2u8]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),

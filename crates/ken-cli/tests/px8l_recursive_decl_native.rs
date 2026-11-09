@@ -86,6 +86,7 @@ fn declaration_refs(
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 fn walk (fuel : Nat) (state : Bool) : HostIO APartial ExitCode =
   match fuel {
     Zero |-> match state {
@@ -120,9 +121,10 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
     } else {
         "multi"
     });
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px8l-recursive-declaration",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -169,6 +171,7 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
     let interpreted = ken_cli::run_program_effect_observation(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &argv,
         &[],
         b"/",
@@ -259,9 +262,10 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode = spin Zero
 "#;
     let dir = output_dir("nondecreasing");
-    let error = ken_cli::build_native_program(
+    let error = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px8l-nondecreasing-cycle",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

@@ -417,25 +417,19 @@ fn imported_not_is_definitionally_equal_to_the_pre_source_negation() {
 }
 
 /// Promise class: durable invariant. MEASURED: the on-disk rewritten source
-/// keeps the Legacy checker verdict and the same body accepts under strict
-/// with its import but rejects without it. CLAIMED: a R rewrite does not
-/// require opening an internal HostIO constructor to user code. THE GAP:
-/// execution parity remains the original native/interpreter test's oracle;
-/// this pin checks strict elaboration, not native execution.
+/// accepts under Strict with its persisted package imports and refuses when
+/// only the checked HostIO wrapper import is removed. CLAIMED: an R rewrite
+/// needs no internal HostIO constructor exposed to source. THE GAP: execution
+/// parity remains the owning native/interpreter test's separate oracle.
 #[test]
-fn rewritten_nested_read_fixture_checks_at_strict_entry_with_ephemeral_imports() {
+fn rewritten_nested_read_fixture_checks_at_strict_entry_with_persisted_imports() {
     let fixture = include_str!("../../ken-cli/tests/fixtures/rt_nested_read_at_b2.ken");
-    let (header, body) = fixture.split_once('\n').expect("program header");
-    assert!(
-        header.starts_with("program capabilities "),
-        "program header"
+    strict(fixture).expect("R fixture with its persisted package imports");
+    let without_wrapper_imports = fixture.replacen(
+        "import Capability.Process.Exit (host_bind, host_fs, host_pure)\n",
+        "",
+        1,
     );
-    let imports = "import Capability.Process.Exit (host_bind, host_fs, host_pure)\n\
-                   import Capability.Filesystem.Authority (readFile)\n";
-    let with_imports = format!("{header}\n{imports}{body}");
-    strict(&with_imports).expect("R fixture with its explicit package imports");
-    let without_wrapper_imports =
-        format!("{header}\nimport Capability.Filesystem.Authority (readFile)\n{body}");
     match strict(&without_wrapper_imports) {
         Err(ElabError::UnboundName { name, .. }) => {
             assert!(
@@ -448,18 +442,15 @@ fn rewritten_nested_read_fixture_checks_at_strict_entry_with_ephemeral_imports()
     }
 }
 
-/// Promise class: transition sentinel, retired when 3b persists imports and
-/// switches these source routes to Strict. MEASURED: the actual 40 rewritten
-/// fixture files keep their Legacy acceptance or missing-name refusal under
-/// Strict with their checked home imports; no hand-copied fixture is tested.
-/// CLAIMED: the ruled exact-body HostIO R migrations are source-valid at the
-/// future strict entry. THE GAP: current native/interpreter parity is pinned
-/// by each fixture's owning test, not inferred from these elaboration verdicts.
+/// Promise class: durable invariant. MEASURED: the actual migrated R files
+/// (not test-owned copies or ephemeral imports) elaborate at the Strict entry;
+/// the four held source templates still refuse on their unsubstituted marker.
+/// CLAIMED: migrated fixture imports survive the isolated route switch.
+/// THE GAP: the substituted templates and interpreter/native denotations are
+/// exercised by their own Rust-held consumer tests, not by this file census.
 #[test]
 fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
-    use std::collections::{BTreeMap, BTreeSet};
-
-    use ken_elaborator::lexer::{Lexer, Token};
+    use ken_elaborator::modules::isolated_catalog_root;
 
     const USERS: [&str; 40] = [
         "crates/ken-cli/tests/fixtures/abi_s5_block_on_stdin.ken",
@@ -507,50 +498,28 @@ fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
         .join("../..")
         .canonicalize()
         .expect("workspace root");
+    let templates = [
+        ("d0_abi_mapping_source.ken", "__MATRIX_BODY__"),
+        ("d0_px8ta_nested_source.ken", "__ROOT_BODY__"),
+        ("d0_rt_parity_source.ken", "__RT_PARITY_ENTRY__"),
+        ("rt_bracket_region_multileaf.ken", "__ROOT_BODY__"),
+    ];
+    let mut checked = 0;
     for path in USERS {
-        let source = std::fs::read_to_string(repo.join(path)).expect("actual R user source");
-        let tokens = Lexer::lex(&source).expect("lex actual user source");
-        let names = tokens
-            .iter()
-            .filter_map(|(token, _)| match token {
-                Token::Ident(name) | Token::ConId(name) => Some(name.as_str()),
-                _ => None,
-            })
-            .collect::<BTreeSet<_>>();
-        let mut imports: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-        for &(home, name) in &PRELUDE_PACKAGE_HOMES {
-            if names.contains(name) {
-                imports.entry(home).or_default().insert(name);
+        let source_path = repo.join(path);
+        let source = std::fs::read_to_string(&source_path).expect("actual R user source");
+        let roots: Vec<_> = isolated_catalog_root(&source_path).into_iter().collect();
+        let mut env = ElabEnv::new().expect("prelude");
+        let result = env.elaborate_isolated_file_strict_v1(&roots, &source);
+        if let Some((_, marker)) = templates.iter().find(|(suffix, _)| path.ends_with(suffix)) {
+            match result {
+                Err(ElabError::UnboundName { name, .. }) => assert_eq!(&name, marker, "{path}"),
+                other => panic!("{path}: unsubstituted template: {other:?}"),
             }
-        }
-        let (header, body) = source.split_once('\n').expect("fixture program header");
-        assert!(
-            header.starts_with("program capabilities "),
-            "{path}: {header}"
-        );
-        let import_lines = imports
-            .into_iter()
-            .map(|(home, names)| {
-                format!(
-                    "import {home} ({})\n",
-                    names.into_iter().collect::<Vec<_>>().join(", ")
-                )
-            })
-            .collect::<String>();
-        let with_imports = format!("{header}\n{import_lines}{body}");
-        let mut legacy = ElabEnv::new().expect("prelude");
-        let old = legacy.elaborate_file_v1(&source);
-        let new = strict(&with_imports).map(|_| ());
-        match (old, new) {
-            (Ok(_), Ok(_)) => {}
-            (
-                Err(ElabError::UnresolvedCon { name: before, .. }),
-                Err(
-                    ElabError::UnboundName { name: after, .. }
-                    | ElabError::UnresolvedCon { name: after, .. },
-                ),
-            ) if before == after => {}
-            (old, new) => panic!("{path}: source verdict shifted: Legacy={old:?}, Strict={new:?}"),
+        } else {
+            result.unwrap_or_else(|error| panic!("{path}: persisted imports: {error:?}"));
+            checked += 1;
         }
     }
+    assert_eq!(checked, USERS.len() - templates.len());
 }

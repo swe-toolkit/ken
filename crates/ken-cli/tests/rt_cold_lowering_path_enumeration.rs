@@ -66,6 +66,11 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::KernelError;
 
 const RT_PARITY_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withBuffer, withResource)
+import Data.Numeric.FixedWidth (intToUInt64)
 fn rt_body_ok (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
@@ -545,9 +550,10 @@ fn entry_outcome(entry: &str) -> String {
         let root = tempfile::tempdir().expect("temporary native-build root");
         std::fs::write(root.path().join("source"), b"ab").unwrap();
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", &entry);
-        match ken_cli::build_native_program(
+        match ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &format!("rt_cold_enum_{entry}"),
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),

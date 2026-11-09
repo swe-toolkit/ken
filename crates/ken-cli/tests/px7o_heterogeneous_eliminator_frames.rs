@@ -4,6 +4,8 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc write_then_exit (bytes : Bytes) (code : ExitCode)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial (Result IOError Unit) ExitCode
@@ -50,6 +52,8 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const IGNORED_PAYLOAD_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial (Result IOError Unit) ExitCode
@@ -64,9 +68,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
     let name = if arguments.is_empty() { "ok" } else { "err" };
     let dir = output_dir(name);
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px7o-heterogeneous-eliminator-frames",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -93,6 +98,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
     let interpreted = ken_cli::run_program_effect_observation(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &argv,
         &[],
         b"/",
@@ -130,9 +136,10 @@ fn nested_err_payload_reaches_both_real_executors() {
 #[test]
 fn ignored_payload_twin_remains_an_opposite_only() {
     let dir = output_dir("ignored-payload");
-    ken_cli::build_native_program(
+    ken_cli::build_native_program_with_roots(
         IGNORED_PAYLOAD_PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px7o-ignored-payload-opposite",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

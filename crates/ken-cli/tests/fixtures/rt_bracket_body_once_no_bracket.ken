@@ -1,4 +1,6 @@
 program capabilities FS AFull
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [Console] =
   host_bind AFull Unit ExitCode (host_console AFull Unit (print_line "x"))

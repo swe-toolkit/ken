@@ -76,6 +76,7 @@ fn write_source(dir: &Path, name: &str, source: &str) -> String {
 fn main_source(exit: &str) -> String {
     format!(
         "program capabilities FS APartial\n\
+         import Capability.Process.Exit (host_pure)\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode visits [Console] = host_pure APartial ExitCode {exit}\n"
     )
@@ -154,7 +155,10 @@ fn fmt_reports_each_failed_path_and_delegates_formatter_errors_to_e() {
 
 #[test]
 fn wrapped_carriers_keep_e_and_x_and_admitted_program_statuses_are_uncoded() {
-    let dir = tempfile::tempdir().expect("private temp directory");
+    let dir = tempfile::Builder::new()
+        .prefix("diagnostic-codes-")
+        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .expect("private source directory under the catalog root");
     let malformed = write_source(dir.path(), "malformed.ken", "fn\n");
     assert_codes(&run(&["check", &malformed]), &["E0001"]);
     let output_dir = dir.path().join("native-out");

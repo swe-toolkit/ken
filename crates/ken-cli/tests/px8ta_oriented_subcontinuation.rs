@@ -6,6 +6,10 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const PX8DS_SIBLING_RECURSION_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (is_terminal)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
+import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withBuffer)
 proc countdown (fuel : Nat)
   : HostIO APartial (Result Int Bool) visits [Console] =
   match fuel {
@@ -75,9 +79,10 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         )
         .unwrap();
     }
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &format!("px8ta-depth-{depth}"),
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -134,9 +139,10 @@ fn nested_bracket_repeated_producer_has_bounded_deferred_owner() {
 fn check_nested_bracket_repeated_producer_owner() {
     let dir = output_dir("depth-3-bounded-owner");
     let (built, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             &nested_bracket_source(3),
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "px8ta-depth-3-bounded-owner",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -215,9 +221,10 @@ fn assert_nested_deferred_refuses_at_planning(depth: usize) {
         .stack_size(256 * 1024 * 1024)
         .spawn(move || {
             let dir = output_dir(&format!("forced-deferred-{depth}"));
-            let result = ken_cli::build_native_program(
+            let result = ken_cli::build_native_program_with_roots(
                 &nested_bracket_source(depth),
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 &format!("px8ta-forced-deferred-{depth}"),
                 dir.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -325,9 +332,10 @@ fn run_px8ds_retired_flat_control() {
 
     let retired_dir = output_dir("px8ds-retired-flat");
     let retired = ken_runtime::with_px8ds_retired_flat_order(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             PX8DS_SIBLING_RECURSION_PROGRAM,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "px8ds-retired-flat",
             retired_dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -386,9 +394,10 @@ fn px8ds_real_same_depth_path_runs_exact_edges() {
 #[cfg(target_os = "linux")]
 fn observe_px8ds_real_same_depth_path() -> ken_runtime::EffectObservation {
     let exact_dir = output_dir("px8ds-exact-edges");
-    let exact = ken_cli::build_native_program(
+    let exact = ken_cli::build_native_program_with_roots(
         PX8DS_SIBLING_RECURSION_PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px8ds-exact-edges",
         exact_dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -459,9 +468,10 @@ fn observe_px8ds_p1_parity(
 ) {
     let dir = output_dir(case);
     let (compiled, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             source,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             case,
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -482,6 +492,7 @@ fn observe_px8ds_p1_parity(
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         dir.path().as_os_str().as_encoded_bytes(),

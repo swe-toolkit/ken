@@ -10,7 +10,7 @@ fn ken_bin() -> PathBuf {
 }
 
 fn fixture(name: &str, source: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join("ken-cli-i1-entrypoint-abi");
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ken-cli-i1-entrypoint-abi");
     fs::create_dir_all(&dir).expect("create fixture directory");
     let path = dir.join(format!("{name}.ken"));
     fs::write(&path, source).expect("write fixture");
@@ -39,7 +39,7 @@ fn abi_main(body: &str) -> String {
 #[test]
 fn named_main_runs_when_it_is_not_the_last_declaration() {
     let source = format!(
-        "{}\nconst afterMain : Nat = Zero\n",
+        "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n{}\nconst afterMain : Nat = Zero\n",
         abi_main("host_program APartial (print_line \"named-main\")")
     );
     let output = run("not-last", &source, []);
@@ -60,7 +60,7 @@ fn missing_and_duplicate_main_report_distinct_named_errors() {
     let duplicate = run(
         "duplicate",
         &format!(
-            "{}{}",
+            "import Capability.Process.Exit (host_pure)\n{}{}",
             abi_main("host_pure APartial ExitCode ExitCode.Success"),
             abi_main("host_pure APartial ExitCode ExitCode.Success")
         ),
@@ -96,6 +96,8 @@ fn argv_after_separator_round_trips_non_utf8_and_pre_separator_is_rejected() {
     use std::os::unix::ffi::OsStringExt;
 
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program, host_pure)
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
@@ -141,7 +143,10 @@ fn exit_code_mapping_covers_every_contract_arm() {
     ] {
         let output = run(
             name,
-            &abi_main(&format!("host_pure APartial ExitCode ({value})")),
+            &format!(
+                "import Capability.Process.Exit (host_pure)\n{}",
+                abi_main(&format!("host_pure APartial ExitCode ({value})"))
+            ),
             [],
         );
         assert_eq!(

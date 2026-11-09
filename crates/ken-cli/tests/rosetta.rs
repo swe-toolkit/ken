@@ -384,23 +384,43 @@ fn oracle_for(dir: &Path) -> Oracle {
 /// `ken` binary as a subprocess, with a generous timeout. Returns
 /// `Some((stdout, exit_success))` on completion within the timeout, `None`
 /// on timeout (killed).
-fn run_example(slug: &str, ken_src_path: &Path, tmp_dir: &Path) -> Option<(String, bool)> {
+fn rosetta_program_source(slug: &str, ken_src_path: &Path) -> String {
     let own_src = fs::read_to_string(ken_src_path)
         .unwrap_or_else(|e| panic!("{}: cannot read {}: {}", slug, ken_src_path.display(), e));
-    let full_src = if NEEDS_COLLECTIONS.contains(&slug) {
-        let body = own_src
-            .strip_prefix("program capabilities FS APartial\n")
-            .expect("runnable Rosetta source starts with its program header");
-        format!(
-            "program capabilities FS APartial\n{}\n{}",
-            collections_prelude(),
-            body
-        )
-    } else {
-        own_src
-    };
+    if !NEEDS_COLLECTIONS.contains(&slug) {
+        return own_src;
+    }
+    let mut body = own_src
+        .strip_prefix("program capabilities FS APartial\n")
+        .expect("runnable Rosetta source starts with its program header")
+        .to_owned();
+    if slug == "merge-sort" {
+        // The flat provider needs leqChar before its declarations; the
+        // isolated file's later import is redundant in this composed source.
+        remove_flattened_directive(
+            &mut body,
+            "merge-sort",
+            "import Core.Classes.LawfulClasses (leqChar)",
+        );
+    }
+    let other_imports = "import Capability.Console.Text (print_line)\n\
+                         import Capability.Process.Exit (host_program)\n\
+                         import Core.Classes.LawfulClasses (leqChar)\n";
+    format!(
+        "program capabilities FS APartial\n\
+         import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)\n\
+         {other_imports}{}\n{body}",
+        collections_prelude()
+    )
+}
 
-    let concat_path = tmp_dir.join(format!("{slug}.ken"));
+fn run_example(slug: &str, ken_src_path: &Path, tmp_dir: &Path) -> Option<(String, bool)> {
+    let full_src = rosetta_program_source(slug, ken_src_path);
+    let source_dir = workspace_root()
+        .join("target/tmp/rosetta-strict-sources")
+        .join(tmp_dir.file_name().expect("named example scratch directory"));
+    fs::create_dir_all(&source_dir).expect("catalog-rooted example scratch directory");
+    let concat_path = source_dir.join(format!("{slug}.ken"));
     fs::write(&concat_path, full_src)
         .unwrap_or_else(|e| panic!("{}: cannot write concatenated source: {}", slug, e));
 
@@ -469,24 +489,15 @@ fn closures_carries_pure_callback_through_catalog_prelude() {
 fn fizzbuzz_changed_proc_keeps_output_and_strict_import_boundary() {
     let root = rosetta_dir().join("fizzbuzz");
     let original = fs::read_to_string(root.join("fizzbuzz.ken")).expect("FizzBuzz source");
-    let body = original
-        .strip_prefix("program capabilities FS APartial\n")
-        .expect("FizzBuzz program header");
     let catalog = workspace_root()
         .join("catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let other_imports = "import Core.Classes.LawfulClasses (intToChar)\n\
-                         import Capability.Process.Exit (host_program)\n";
-    let with_imports = format!(
-        "program capabilities FS APartial\n{other_imports}\
-         import Capability.Console.Text (write)\n{body}"
-    );
     let mut selected = ElabEnv::new().expect("prelude");
     selected
-        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &with_imports)
-        .expect("changed-result FizzBuzz with explicit imports");
-    let without_write = format!("program capabilities FS APartial\n{other_imports}{body}");
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &original)
+        .expect("changed-result FizzBuzz with persisted imports");
+    let without_write = original.replacen("import Capability.Console.Text (write)\n", "", 1);
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_write) {
         Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "write"),
@@ -514,27 +525,18 @@ fn read_file_lines_rewrite_keeps_oracle_and_strict_import_boundary() {
     let example = rosetta_dir().join("read-file-lines");
     let original =
         fs::read_to_string(example.join("read-file-lines.ken")).expect("read-file-lines source");
-    let body = original
-        .strip_prefix("program capabilities FS APartial\n")
-        .expect("source program header");
-    let imports = "import Capability.Console.Text (print_line)\n\
-                   import Capability.Filesystem.Authority (read_bytes)\n\
-                   import Capability.Process.Exit
-                     (host_bind, host_fs, host_pure, host_console, host_program_then)\n\
-                   import Core.Classes.LawfulClasses (charToInt)\n";
     let catalog = workspace_root()
         .join("catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let imported = format!("program capabilities FS APartial\n{imports}{body}");
     let mut strict = ElabEnv::new().expect("prelude");
     strict
-        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
-        .expect("read-file-lines with explicit checked imports");
-    let without_wrappers = imported.replace(
-        "import Capability.Process.Exit
-                     (host_bind, host_fs, host_pure, host_console, host_program_then)\n",
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &original)
+        .expect("read-file-lines with persisted checked imports");
+    let without_wrappers = original.replacen(
+        "import Capability.Process.Exit (host_bind, host_console, host_fs, host_program_then, host_pure)\n",
         "",
+        1,
     );
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {
@@ -567,21 +569,13 @@ fn accumulator_factory_uses_generic_floor_bind_and_keeps_its_oracle() {
     let example = rosetta_dir().join("accumulator-factory");
     let source =
         fs::read_to_string(example.join("accumulator-factory.ken")).expect("accumulator source");
-    let body = source
-        .strip_prefix("program capabilities FS APartial\n")
-        .expect("program header");
-    let imported = format!(
-        "program capabilities FS APartial\n\
-         import Capability.Console.Text (print_line)\n\
-         import Capability.Process.Exit (host_program)\n{body}"
-    );
     let catalog = workspace_root()
         .join("catalog/packages")
         .canonicalize()
         .expect("catalog root");
     let mut strict = ElabEnv::new().expect("prelude");
     strict
-        .elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        .elaborate_isolated_file_strict_v1(&[catalog], &source)
         .expect("direct State tree names the generic floor without an import");
     let tmp = tempfile::tempdir().expect("accumulator output directory");
     let (output, successful) = run_example(
@@ -614,23 +608,13 @@ fn collections_users_recheck_with_explicit_conjunction_import_under_strict() {
         .canonicalize()
         .expect("catalog root");
     let imports = "import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)\n";
-    let other_imports = "import Capability.Console.Text (print_line)\n\
-                         import Capability.Process.Exit (host_program)\n\
-                         import Core.Classes.LawfulClasses (leqChar)\n";
-    let prefix = collections_prelude();
     for slug in NEEDS_COLLECTIONS {
-        let body = fs::read_to_string(rosetta_dir().join(slug).join(format!("{slug}.ken")))
-            .unwrap_or_else(|error| panic!("{slug}: source missing: {error}"));
-        let body = body
-            .strip_prefix("program capabilities FS APartial\n")
-            .expect("existing Rosetta program header");
-        let composed =
-            format!("program capabilities FS APartial\n{imports}{other_imports}{prefix}\n{body}");
+        let source_path = rosetta_dir().join(slug).join(format!("{slug}.ken"));
+        let composed = rosetta_program_source(slug, &source_path);
         let mut env = ElabEnv::new().expect("prelude");
         env.elaborate_isolated_file_strict_v1(&[root.clone()], &composed)
             .unwrap_or_else(|error| panic!("{slug}: strict conjunction import: {error:?}"));
-        let without_conjunction =
-            format!("program capabilities FS APartial\n{other_imports}{prefix}\n{body}");
+        let without_conjunction = composed.replacen(imports, "", 1);
         let mut negative = ElabEnv::new().expect("prelude");
         match negative.elaborate_isolated_file_strict_v1(&[root.clone()], &without_conjunction) {
             Err(ElabError::UnboundName { name, .. }) => assert!(

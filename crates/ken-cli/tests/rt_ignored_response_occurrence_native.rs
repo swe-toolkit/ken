@@ -120,6 +120,7 @@ fn run_plain_recursive_match_census() {
     let interpreted = ken_cli::run_program_effect_observation(
         PLAIN_MATCH_WITNESS,
         ken_cli::SourceFormat::Ken,
+        &[],
         &[b"native-program".to_vec()],
         &[],
         output.path().as_os_str().as_encoded_bytes(),
@@ -197,7 +198,8 @@ fn run_one_bracket_layout() {
     ).expect("one native bracket executes");
     let mut host = ken_interp::PosixHost::new_at(output.path());
     let interpreted = ken_cli::run_program_effect_observation(
-        ONE_BUFFER_WITNESS, ken_cli::SourceFormat::Ken, &[], &[],
+        ONE_BUFFER_WITNESS, ken_cli::SourceFormat::Ken,
+        &[], &[], &[],
         output.path().as_os_str().as_encoded_bytes(), &mut host,
     ).expect("one checked bracket interprets");
     assert_eq!(native, interpreted, "one-bracket observation is byte-identical by value");
@@ -361,6 +363,7 @@ fn run_sequential_brackets_witness() {
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
+        &[],
         output.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
@@ -462,6 +465,7 @@ fn run_distinguishable_brackets_witness() {
     let interpreted = ken_cli::run_program_effect_observation(
         DISTINGUISHABLE_BRACKETS,
         ken_cli::SourceFormat::Ken,
+        &[],
         &[],
         &[],
         output.path().as_os_str().as_encoded_bytes(),

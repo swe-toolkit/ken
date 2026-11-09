@@ -11,6 +11,8 @@ use std::os::unix::ffi::OsStrExt;
 use ken_elaborator::{ElabEnv, ElabError};
 
 const SOURCE_TEMPLATE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_pure)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult)
 const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
@@ -77,9 +79,10 @@ fn run_case(case: &str, chain: &str, repeats: usize) {
     std::fs::write(root.path().join("held.bin"), b"held resource")
         .expect("writes repeated-metadata source");
 
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &format!("rt_multiop_{}", case.replace('-', "_")),
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -100,6 +103,7 @@ fn run_case(case: &str, chain: &str, repeats: usize) {
     let interpreted = ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.path().as_os_str().as_bytes(),
