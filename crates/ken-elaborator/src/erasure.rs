@@ -1194,7 +1194,9 @@ impl NativeLoweringPlanCollector {
         if let Some(bound) = self.consumed_brackets.get(&key) {
             let lane = match bound.marker.role {
                 ken_runtime::CheckedBracketMarkRole::Acquire => "checked_bracket_acquire_duplicate",
-                ken_runtime::CheckedBracketMarkRole::Finalizer => "checked_bracket_marker_duplicate",
+                ken_runtime::CheckedBracketMarkRole::Finalizer => {
+                    "checked_bracket_marker_duplicate"
+                }
             };
             return Err(expression_lowering_error(
                 owner,
@@ -1230,7 +1232,10 @@ impl NativeLoweringPlanCollector {
             };
             self.consumed_brackets.insert(
                 key,
-                BoundBracketMark { marker: marker.clone(), constructor: pending.constructor },
+                BoundBracketMark {
+                    marker: marker.clone(),
+                    constructor: pending.constructor,
+                },
             );
             return Ok(Some(marker));
         }
@@ -1245,9 +1250,11 @@ impl NativeLoweringPlanCollector {
     }
 
     fn validate_bracket_regions_bound(&self, root: &StableSymbol) -> Result<(), ErasureError> {
-        if let Some(((owner, node_id), _)) = self.pending_brackets.iter().find(|(_, pending)| {
-            pending.role == ken_runtime::CheckedBracketMarkRole::Acquire
-        }) {
+        if let Some(((owner, node_id), _)) = self
+            .pending_brackets
+            .iter()
+            .find(|(_, pending)| pending.role == ken_runtime::CheckedBracketMarkRole::Acquire)
+        {
             return Err(expression_lowering_error(
                 root,
                 "checked_bracket_acquire_without_marker",
@@ -1258,7 +1265,9 @@ impl NativeLoweringPlanCollector {
             return Err(expression_lowering_error(
                 root,
                 "checked_bracket_region_without_marker",
-                format!("region {owner} at finalizer Constructor node {node_id} has no Runtime marker"),
+                format!(
+                    "region {owner} at finalizer Constructor node {node_id} has no Runtime marker"
+                ),
             ));
         }
         Ok(())
@@ -1830,11 +1839,12 @@ impl OrientedSubcontinuationPlanCollector {
                 .find(|frame| frame.frame_id == callee_frames[0])
                 .expect("callee root frame exists")
                 .segment_site_id;
-            assert!(callee_frames.iter().all(|id| self
-                .frames
-                .iter()
-                .find(|frame| frame.frame_id == *id)
-                .is_some_and(|frame| frame.segment_site_id == segment_site_id)));
+            assert!(callee_frames.iter().all(|id| {
+                self.frames
+                    .iter()
+                    .find(|frame| frame.frame_id == *id)
+                    .is_some_and(|frame| frame.segment_site_id == segment_site_id)
+            }));
 
             // The kernel-inferred fully-applied result is the endpoint
             // authority for the reusable callee template.  Rebind the final
@@ -2278,7 +2288,10 @@ fn remove_unplanned_recursive_invocation_markers(
 
 enum BracketRuntimeSubject {
     Construct(String),
-    StaticEffect { family: String, operation: ken_host::HostOpV1 },
+    StaticEffect {
+        family: String,
+        operation: ken_host::HostOpV1,
+    },
     Other,
 }
 
@@ -2447,15 +2460,20 @@ fn bind_bracket_runtime_marker_locations(
             return Err(expression_lowering_error(
                 root,
                 duplicate,
-                format!("bound region {owner} at node {node_id} has {} Runtime markers", found.len()),
+                format!(
+                    "bound region {owner} at node {node_id} has {} Runtime markers",
+                    found.len()
+                ),
             ));
         }
         let subject_matches = match (&found[0].2, bound.marker.role) {
             (BracketRuntimeSubject::Construct(actual), _) => {
                 actual == &bound.constructor.to_string()
             }
-            (BracketRuntimeSubject::StaticEffect { family, operation },
-             ken_runtime::CheckedBracketMarkRole::Acquire) => {
+            (
+                BracketRuntimeSubject::StaticEffect { family, operation },
+                ken_runtime::CheckedBracketMarkRole::Acquire,
+            ) => {
                 let mut family_components = bound.constructor.components.clone();
                 let _ = family_components.pop();
                 let expected_family = StableSymbol::new(
@@ -2466,8 +2484,10 @@ fn bind_bracket_runtime_marker_locations(
                     && checked_operations.get(&bound.constructor) == Some(operation)
             }
             (BracketRuntimeSubject::Other, _)
-            | (BracketRuntimeSubject::StaticEffect { .. },
-               ken_runtime::CheckedBracketMarkRole::Finalizer) => false,
+            | (
+                BracketRuntimeSubject::StaticEffect { .. },
+                ken_runtime::CheckedBracketMarkRole::Finalizer,
+            ) => false,
         };
         if !subject_matches {
             return Err(expression_lowering_error(
@@ -2482,7 +2502,9 @@ fn bind_bracket_runtime_marker_locations(
             return Err(expression_lowering_error(
                 root,
                 mismatch,
-                format!("Runtime marker for {owner} at node {node_id} differs from its checked region"),
+                format!(
+                    "Runtime marker for {owner} at node {node_id} differs from its checked region"
+                ),
             ));
         }
     }
@@ -2497,12 +2519,19 @@ fn bind_bracket_runtime_marker_locations(
             ));
         }
     }
-    if let Some((_, extra)) = locations.brackets.iter().find(|(_, extras)| {
-        extras[0].0.role == ken_runtime::CheckedBracketMarkRole::Acquire
-    }).or_else(|| locations.brackets.iter().next()) {
+    if let Some((_, extra)) = locations
+        .brackets
+        .iter()
+        .find(|(_, extras)| extras[0].0.role == ken_runtime::CheckedBracketMarkRole::Acquire)
+        .or_else(|| locations.brackets.iter().next())
+    {
         let lane = match extra[0].0.role {
-            ken_runtime::CheckedBracketMarkRole::Acquire => "checked_bracket_acquire_without_region",
-            ken_runtime::CheckedBracketMarkRole::Finalizer => "checked_bracket_marker_without_region",
+            ken_runtime::CheckedBracketMarkRole::Acquire => {
+                "checked_bracket_acquire_without_region"
+            }
+            ken_runtime::CheckedBracketMarkRole::Finalizer => {
+                "checked_bracket_marker_without_region"
+            }
         };
         return Err(expression_lowering_error(
             root,
@@ -2515,9 +2544,10 @@ fn bind_bracket_runtime_marker_locations(
         .iter()
         .filter(|constructor| *constructor == &private_constructor)
         .count();
-    let finalizer_count = expected.values().filter(|bound| {
-        bound.marker.role == ken_runtime::CheckedBracketMarkRole::Finalizer
-    }).count();
+    let finalizer_count = expected
+        .values()
+        .filter(|bound| bound.marker.role == ken_runtime::CheckedBracketMarkRole::Finalizer)
+        .count();
     if private_count != finalizer_count {
         return Err(expression_lowering_error(
             root,
@@ -2737,15 +2767,25 @@ fn collect_oriented_runtime_marker_locations(
             Ok(())
         }
         RuntimeExpr::Effect {
-            family, operation, capability, args, bracket_acquire,
+            family,
+            operation,
+            capability,
+            args,
+            bracket_acquire,
         } => {
             if let Some(region) = bracket_acquire {
-                locations.brackets
+                locations
+                    .brackets
                     .entry((region.owner.clone(), region.constructor_node_id))
                     .or_default()
-                    .push(((**region).clone(), location(), BracketRuntimeSubject::StaticEffect {
-                        family: family.clone(), operation: *operation,
-                    }));
+                    .push((
+                        (**region).clone(),
+                        location(),
+                        BracketRuntimeSubject::StaticEffect {
+                            family: family.clone(),
+                            operation: *operation,
+                        },
+                    ));
             }
             if let Some(capability) = capability {
                 collect_oriented_runtime_marker_child(
@@ -4072,13 +4112,25 @@ fn lower_checked_host_computation(
             );
         }
         if constructor.symbol == spine.vis {
-            if args.len() < 2 {
+            if constructor.family_parameter_count != 3 || args.len() != 5 {
                 return Err(expression_lowering_error(
                     root,
                     "host_vis_arity",
-                    "Vis is missing its operation or continuation",
+                    "Vis does not carry the checked operation type and its two operands",
                 ));
             }
+            let CheckedCoreBodyTerm::ErasedConstructorArgument {
+                term: operation_type,
+            } = args[0]
+            else {
+                return Err(expression_lowering_error(
+                    root,
+                    "host_operation_type_layout",
+                    "Vis has no checked operation type for host decoding",
+                ));
+            };
+            let operation_layout =
+                checked_host_operation_layout(operation_type, semantic, spine, root)?;
             let operation_term = args[args.len() - 2];
             let continuation = args[args.len() - 1];
             let continuation_body = if let CheckedCoreBodyTerm::Lambda { body, .. } = continuation {
@@ -4223,7 +4275,13 @@ fn lower_checked_host_computation(
                     args: vec![RuntimeExpr::Var(0)],
                 }
             };
-            let decoded = match select_checked_host_operation(operation_term, spine, root, true)? {
+            let decoded = match select_checked_host_operation(
+                operation_term,
+                &operation_layout,
+                spine,
+                root,
+                true,
+            )? {
                 CheckedHostOperationSelection::Static(decoded) => decoded,
                 CheckedHostOperationSelection::RuntimeSelected => {
                     let operation = lower_body_term_inner(
@@ -4239,6 +4297,7 @@ fn lower_checked_host_computation(
                         operation,
                         continuation_body,
                         semantic,
+                        &operation_layout,
                         spine,
                         root,
                     );
@@ -4406,13 +4465,130 @@ enum CheckedHostOperationSelection<'a> {
     RuntimeSelected,
 }
 
+/// Checked operation-type layout shared by static decoding and runtime-selected
+/// dispatch. Alias expansion reads the checked declaration, never a source name.
+#[derive(Clone, Debug)]
+enum CheckedHostOperationLayout {
+    Coproduct(Box<Self>, Box<Self>),
+    Leaf(StableSymbol),
+}
+
+fn checked_host_operation_layout(
+    operation_type: &[u8],
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+    spine: &CheckedHostSpineV1,
+    root: &StableSymbol,
+) -> Result<CheckedHostOperationLayout, ErasureError> {
+    let mut families = semantic.data_metadata.iter().filter(|(_, data)| {
+        [&spine.in_l, &spine.in_r].iter().all(|identity| {
+            data.constructors
+                .iter()
+                .any(|constructor| &constructor.symbol == *identity)
+        })
+    });
+    let Some((coproduct_family, _)) = families.next() else {
+        return Err(expression_lowering_error(
+            root,
+            "host_coproduct_identity",
+            "checked Coproduct family is absent",
+        ));
+    };
+    if families.next().is_some() {
+        return Err(expression_lowering_error(
+            root,
+            "host_coproduct_identity",
+            "checked Coproduct family is ambiguous",
+        ));
+    }
+
+    fn visit(
+        ty: &[u8],
+        semantic: &checked_core::CheckedCoreSemanticInputs,
+        spine: &CheckedHostSpineV1,
+        root: &StableSymbol,
+        coproduct: &StableSymbol,
+        depth: usize,
+    ) -> Result<CheckedHostOperationLayout, ErasureError> {
+        if depth > 16 {
+            return Err(expression_lowering_error(
+                root,
+                "host_coproduct_identity",
+                "checked operation type aliases exceed the layout bound",
+            ));
+        }
+        let (head, arguments) = checked_core::checked_type_application(ty)
+            .map_err(|reason| expression_lowering_error(root, "host_coproduct_identity", reason))?
+            .ok_or_else(|| {
+                expression_lowering_error(
+                    root,
+                    "host_coproduct_identity",
+                    "checked operation type has no family identity",
+                )
+            })?;
+        if &head == coproduct {
+            let [left, right] = arguments.as_slice() else {
+                return Err(expression_lowering_error(
+                    root,
+                    "host_coproduct_identity",
+                    "checked Coproduct operation type has the wrong arity",
+                ));
+            };
+            return Ok(CheckedHostOperationLayout::Coproduct(
+                Box::new(visit(left, semantic, spine, root, coproduct, depth + 1)?),
+                Box::new(visit(right, semantic, spine, root, coproduct, depth + 1)?),
+            ));
+        }
+        if [
+            &spine.fs_family,
+            &spine.console_family,
+            &spine.clock_family,
+            &spine.entropy_family,
+        ]
+        .contains(&&head)
+        {
+            return Ok(CheckedHostOperationLayout::Leaf(head));
+        }
+        if arguments.is_empty() {
+            let definition =
+                checked_core::checked_transparent_type_body(semantic, &head).map_err(|reason| {
+                    expression_lowering_error(root, "host_coproduct_identity", reason)
+                })?;
+            if let Some(definition) = definition {
+                return visit(&definition, semantic, spine, root, coproduct, depth + 1);
+            }
+        }
+        Err(expression_lowering_error(
+            root,
+            "host_coproduct_identity",
+            "checked operation type has a foreign family identity",
+        ))
+    }
+    visit(operation_type, semantic, spine, root, coproduct_family, 0)
+}
+
+#[cfg(test)]
+fn test_hostio_layout(spine: &CheckedHostSpineV1) -> CheckedHostOperationLayout {
+    use CheckedHostOperationLayout::{Coproduct, Leaf};
+    Coproduct(
+        Box::new(Leaf(spine.fs_family.clone())),
+        Box::new(Coproduct(
+            Box::new(Leaf(spine.console_family.clone())),
+            Box::new(Coproduct(
+                Box::new(Leaf(spine.clock_family.clone())),
+                Box::new(Leaf(spine.entropy_family.clone())),
+            )),
+        )),
+    )
+}
+
 fn select_checked_host_operation<'a>(
     term: &'a CheckedCoreBodyTerm,
+    layout: &CheckedHostOperationLayout,
     spine: &CheckedHostSpineV1,
     root: &StableSymbol,
     allow_runtime_selected: bool,
 ) -> Result<CheckedHostOperationSelection<'a>, ErasureError> {
-    match decode_checked_host_operation(term, spine, root) {
+    match decode_checked_host_operation(term, layout, spine, root) {
         Ok(decoded) => Ok(CheckedHostOperationSelection::Static(decoded)),
         Err(_error)
             if allow_runtime_selected && matches!(term, CheckedCoreBodyTerm::Variable { .. }) =>
@@ -4425,82 +4601,65 @@ fn select_checked_host_operation<'a>(
 
 fn decode_checked_host_operation<'a>(
     term: &'a CheckedCoreBodyTerm,
+    layout: &CheckedHostOperationLayout,
     spine: &CheckedHostSpineV1,
     root: &StableSymbol,
 ) -> Result<DecodedCheckedHostOperation<'a>, ErasureError> {
-    let (outer, outer_args) = constructor_application_spine(term).ok_or_else(|| {
-        expression_lowering_error(
-            root,
-            "host_coproduct_shape",
-            format!("HostIO operation is not a checked coproduct constructor: {term:?}"),
-        )
-    })?;
-    let leaf = if outer.symbol == spine.in_l {
-        outer_args.last().copied()
-    } else if outer.symbol == spine.in_r {
-        let ambient = outer_args.last().copied().ok_or_else(|| {
-            expression_lowering_error(
-                root,
-                "host_coproduct_arity",
-                "ambient coproduct arm is empty",
-            )
-        })?;
-        let (ambient_arm, ambient_args) =
-            constructor_application_spine(ambient).ok_or_else(|| {
-                expression_lowering_error(
-                    root,
-                    "host_coproduct_shape",
-                    "ambient operation is not a checked coproduct constructor",
-                )
-            })?;
-        if ambient_arm.symbol == spine.in_l {
-            // Coproduct ConsoleOp AmbientTailOp: the left arm is Console.
-            ambient_args.last().copied()
-        } else if ambient_arm.symbol == spine.in_r {
-            // AmbientTailOp is itself Coproduct ClockOp EntropyOp. Static
-            // decoding must peel this second layer just as the runtime-selected
-            // eliminator below does; stopping at its InL/InR wrapper mistakes a
-            // coproduct constructor for the host operation identity.
-            let tail = ambient_args.last().copied().ok_or_else(|| {
-                expression_lowering_error(
-                    root,
-                    "host_coproduct_arity",
-                    "ambient tail coproduct arm is empty",
-                )
-            })?;
-            let (tail_arm, tail_args) = constructor_application_spine(tail).ok_or_else(|| {
-                expression_lowering_error(
-                    root,
-                    "host_coproduct_shape",
-                    "ambient tail operation is not a checked coproduct \
-                         constructor",
-                )
-            })?;
-            if tail_arm.symbol != spine.in_l && tail_arm.symbol != spine.in_r {
-                return Err(expression_lowering_error(
-                    root,
-                    "host_coproduct_identity",
-                    "ambient tail coproduct constructor identity changed",
-                ));
+    fn peel<'a, 'l>(
+        term: &'a CheckedCoreBodyTerm,
+        layout: &'l CheckedHostOperationLayout,
+        spine: &CheckedHostSpineV1,
+        root: &StableSymbol,
+        depth: usize,
+    ) -> Result<(&'a CheckedCoreBodyTerm, &'l StableSymbol), ErasureError> {
+        match layout {
+            CheckedHostOperationLayout::Leaf(family) => Ok((term, family)),
+            CheckedHostOperationLayout::Coproduct(left, right) => {
+                let (constructor, args) = constructor_application_spine(term).ok_or_else(|| {
+                    expression_lowering_error(
+                        root,
+                        "host_coproduct_shape",
+                        match depth {
+                            0 => format!(
+                                "HostIO operation is not a checked coproduct constructor: {term:?}"
+                            ),
+                            1 => "ambient operation is not a checked coproduct constructor".into(),
+                            _ => "ambient tail operation is not a checked coproduct constructor"
+                                .into(),
+                        },
+                    )
+                })?;
+                let child = if constructor.symbol == spine.in_l {
+                    left
+                } else if constructor.symbol == spine.in_r {
+                    right
+                } else {
+                    return Err(expression_lowering_error(
+                        root,
+                        "host_coproduct_identity",
+                        match depth {
+                            0 => "HostIO coproduct constructor identity changed",
+                            1 => "ambient coproduct constructor identity changed",
+                            _ => "ambient tail coproduct constructor identity changed",
+                        },
+                    ));
+                };
+                let operand = args.last().copied().ok_or_else(|| {
+                    expression_lowering_error(
+                        root,
+                        "host_coproduct_arity",
+                        match depth {
+                            1 => "ambient coproduct arm is empty",
+                            2 => "ambient tail coproduct arm is empty",
+                            _ => "coproduct arm is empty",
+                        },
+                    )
+                })?;
+                peel(operand, child, spine, root, depth + 1)
             }
-            tail_args.last().copied()
-        } else {
-            return Err(expression_lowering_error(
-                root,
-                "host_coproduct_identity",
-                "ambient coproduct constructor identity changed",
-            ));
         }
-    } else {
-        return Err(expression_lowering_error(
-            root,
-            "host_coproduct_identity",
-            "HostIO coproduct constructor identity changed",
-        ));
     }
-    .ok_or_else(|| {
-        expression_lowering_error(root, "host_coproduct_arity", "coproduct arm is empty")
-    })?;
+    let (leaf, layout_family) = peel(term, layout, spine, root, 0)?;
     let (constructor, args) = constructor_application_spine(leaf).ok_or_else(|| {
         expression_lowering_error(
             root,
@@ -4522,7 +4681,9 @@ fn decode_checked_host_operation<'a>(
     let expected_family = match crate::export::host_operation_family_v1(operation) {
         crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
         crate::export::HostOpFamilyV1::Console => &spine.console_family,
-        crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => &spine.fs_family,
+        crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => {
+            &spine.fs_family
+        }
         crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
     };
     if &constructor.family_symbol != expected_family {
@@ -4530,6 +4691,13 @@ fn decode_checked_host_operation<'a>(
             root,
             "host_operation_family_identity",
             "host operation constructor belongs to the wrong checked family",
+        ));
+    }
+    if layout_family != expected_family {
+        return Err(expression_lowering_error(
+            root,
+            "host_operation_family_identity",
+            "host operation does not belong to the Vis node's checked operation type",
         ));
     }
     let expected = constructor.family_parameter_count + constructor.argument_count;
@@ -4603,6 +4771,7 @@ fn lower_runtime_selected_host_operation(
     operation: RuntimeExpr,
     continuation_body: RuntimeExpr,
     semantic: &checked_core::CheckedCoreSemanticInputs,
+    layout: &CheckedHostOperationLayout,
     spine: &CheckedHostSpineV1,
     root: &StableSymbol,
 ) -> Result<RuntimeExpr, ErasureError> {
@@ -4640,7 +4809,9 @@ fn lower_runtime_selected_host_operation(
             let expected_family = match crate::export::host_operation_family_v1(host_operation) {
                 crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
                 crate::export::HostOpFamilyV1::Console => &spine.console_family,
-                crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => &spine.fs_family,
+                crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => {
+                    &spine.fs_family
+                }
                 crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
             };
             if family != expected_family {
@@ -4714,82 +4885,46 @@ fn lower_runtime_selected_host_operation(
         })
     };
 
-    // Each nested coproduct Match adds one case binder before its leaf.
-    let hostio_leaf_depth = 1;
-    let fs = leaf_dispatch(&spine.fs_family, RuntimeExpr::Var(0), hostio_leaf_depth)?;
-    let ambient_leaf_depth = hostio_leaf_depth + 1;
-    let console = leaf_dispatch(
-        &spine.console_family,
-        RuntimeExpr::Var(0),
-        ambient_leaf_depth,
-    )?;
-    let tail_leaf_depth = ambient_leaf_depth + 1;
-    let clock = leaf_dispatch(&spine.clock_family, RuntimeExpr::Var(0), tail_leaf_depth)?;
-    let entropy = leaf_dispatch(&spine.entropy_family, RuntimeExpr::Var(0), tail_leaf_depth)?;
-    // The ambient algebra is the closed three-way sum Console + Clock +
-    // Entropy, represented as Coproduct ConsoleOp (Coproduct ClockOp
-    // EntropyOp). The elimination mirrors that nesting exactly, and lives
-    // only here so no other consumer reproduces the topology.
-    let clock_or_entropy = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Var(0)),
-        cases: vec![
-            RuntimeMatchCase {
-                constructor: spine.in_l.to_string(),
-                binders: 1,
-                body: clock,
-            },
-            RuntimeMatchCase {
-                constructor: spine.in_r.to_string(),
-                binders: 1,
-                body: entropy,
-            },
-        ],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "runtime-selected ambient tail operation had malformed coproduct identity"
-                .to_string(),
-        },
-    };
-    let ambient = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Var(0)),
-        cases: vec![
-            RuntimeMatchCase {
-                constructor: spine.in_l.to_string(),
-                binders: 1,
-                body: console,
-            },
-            RuntimeMatchCase {
-                constructor: spine.in_r.to_string(),
-                binders: 1,
-                body: clock_or_entropy,
-            },
-        ],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "runtime-selected ambient operation had malformed coproduct identity"
-                .to_string(),
-        },
-    };
-    Ok(RuntimeExpr::Match {
-        scrutinee: Box::new(operation),
-        cases: vec![
-            RuntimeMatchCase {
-                constructor: spine.in_l.to_string(),
-                binders: 1,
-                body: fs,
-            },
-            RuntimeMatchCase {
-                constructor: spine.in_r.to_string(),
-                binders: 1,
-                body: ambient,
-            },
-        ],
-        default: RuntimeTrap {
-            code: RuntimeTrapCode::PatternMatchFailure,
-            message: "runtime-selected HostIO operation had malformed coproduct identity"
-                .to_string(),
-        },
-    })
+    fn dispatch(
+        layout: &CheckedHostOperationLayout,
+        operation: RuntimeExpr,
+        depth: u32,
+        spine: &CheckedHostSpineV1,
+        leaf: &impl Fn(&StableSymbol, RuntimeExpr, u32) -> Result<RuntimeExpr, ErasureError>,
+    ) -> Result<RuntimeExpr, ErasureError> {
+        match layout {
+            CheckedHostOperationLayout::Leaf(family) => leaf(family, operation, depth),
+            CheckedHostOperationLayout::Coproduct(left, right) => {
+                let left_body = dispatch(left, RuntimeExpr::Var(0), depth + 1, spine, leaf)?;
+                let right_body = dispatch(right, RuntimeExpr::Var(0), depth + 1, spine, leaf)?;
+                Ok(RuntimeExpr::Match {
+                    scrutinee: Box::new(operation),
+                    cases: vec![
+                        RuntimeMatchCase {
+                            constructor: spine.in_l.to_string(),
+                            binders: 1,
+                            body: left_body,
+                        },
+                        RuntimeMatchCase {
+                            constructor: spine.in_r.to_string(),
+                            binders: 1,
+                            body: right_body,
+                        },
+                    ],
+                    default: RuntimeTrap {
+                        code: RuntimeTrapCode::PatternMatchFailure,
+                        message: match depth {
+                            0 => "runtime-selected HostIO operation had malformed coproduct identity",
+                            1 => "runtime-selected ambient operation had malformed coproduct identity",
+                            _ => "runtime-selected ambient tail operation had malformed coproduct identity",
+                        }
+                        .to_string(),
+                    },
+                })
+            }
+        }
+    }
+    dispatch(layout, operation, 0, spine, &leaf_dispatch)
 }
 
 pub fn emit_proof_erasure_boundary_witness(
@@ -9398,18 +9533,21 @@ mod px7l_tests {
         let spine = spine();
         let root = family("main");
         let dynamic = CheckedCoreBodyTerm::Variable { de_bruijn_index: 2 };
+        let layout = test_hostio_layout(&spine);
         assert!(matches!(
-            select_checked_host_operation(&dynamic, &spine, &root, true).unwrap(),
+            select_checked_host_operation(&dynamic, &layout, &spine, &root, true).unwrap(),
             CheckedHostOperationSelection::RuntimeSelected
         ));
         assert_eq!(
-            lane(select_checked_host_operation(&dynamic, &spine, &root, false).unwrap_err()),
+            lane(
+                select_checked_host_operation(&dynamic, &layout, &spine, &root, false).unwrap_err()
+            ),
             "host_coproduct_shape"
         );
 
         let static_read = static_fs_read(&spine);
         let CheckedHostOperationSelection::Static(decoded) =
-            select_checked_host_operation(&static_read, &spine, &root, false).unwrap()
+            select_checked_host_operation(&static_read, &layout, &spine, &root, false).unwrap()
         else {
             panic!("visible constructor spine must retain the static path")
         };
@@ -9533,9 +9671,10 @@ mod px7l_tests {
 
         let mut unknown = spine();
         unknown.operations.clear();
+        let layout = test_hostio_layout(&unknown);
         assert_eq!(
             lane(
-                decode_checked_host_operation(&static_fs_read(&unknown), &unknown, &root)
+                decode_checked_host_operation(&static_fs_read(&unknown), &layout, &unknown, &root)
                     .unwrap_err()
             ),
             "unknown_host_operation_identity"
@@ -9546,6 +9685,7 @@ mod px7l_tests {
             lane(
                 decode_checked_host_operation(
                     &static_fs_read_with_leaf_family(&wrong_family, &wrong_family.console_family,),
+                    &test_hostio_layout(&wrong_family),
                     &wrong_family,
                     &root,
                 )
@@ -9559,6 +9699,7 @@ mod px7l_tests {
             lane(
                 decode_checked_host_operation(
                     &CheckedCoreBodyTerm::Variable { de_bruijn_index: 7 },
+                    &test_hostio_layout(&malformed),
                     &malformed,
                     &root,
                 )

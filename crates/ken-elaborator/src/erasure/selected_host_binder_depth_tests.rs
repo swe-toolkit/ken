@@ -225,6 +225,7 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
             chosen_operation(&path, args),
             RuntimeExpr::Var(1),
             &semantic,
+            &test_hostio_layout(&spine),
             &spine,
             &id("main"),
         )

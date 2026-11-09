@@ -1924,7 +1924,7 @@ fn validate_semantic_contract(
             _ => {
                 return Err(CheckedCorePackageError::UnsupportedEntryNotBlocking {
                     symbol: symbol.clone(),
-                })
+                });
             }
         }
     }
@@ -4991,6 +4991,49 @@ pub(crate) fn checked_constant_motive_result_type(
         return Ok(None);
     }
     Ok(Some(body))
+}
+
+/// Read the checked head and its arguments without interpreting a type's
+/// spelling or reconstructing it from an erased runtime expression.
+pub(crate) fn checked_type_application(
+    checked_type: &[u8],
+) -> Result<Option<(StableSymbol, Vec<Vec<u8>>)>, String> {
+    fn walk(
+        cursor: &mut CanonicalCursor<'_>,
+    ) -> Result<Option<(StableSymbol, Vec<Vec<u8>>)>, String> {
+        match cursor.read_tag()?.as_str() {
+            "const" | "ind_former" => {
+                let symbol = decode_stable_symbol(cursor)?;
+                skip_levels(cursor)?;
+                Ok(Some((symbol, Vec::new())))
+            }
+            "app" => {
+                let head = walk(cursor)?;
+                let argument = capture_canonical_term(cursor)?;
+                Ok(head.map(|(symbol, mut arguments)| {
+                    arguments.push(argument);
+                    (symbol, arguments)
+                }))
+            }
+            _ => Ok(None),
+        }
+    }
+    let mut cursor = CanonicalCursor::new(checked_type);
+    let head = walk(&mut cursor)?;
+    if cursor.remaining() != 0 {
+        return Err(format!(
+            "checked type has {} trailing bytes",
+            cursor.remaining()
+        ));
+    }
+    Ok(head)
+}
+
+pub(crate) fn checked_transparent_type_body(
+    semantic: &CheckedCoreSemanticInputs,
+    symbol: &StableSymbol,
+) -> Result<Option<Vec<u8>>, String> {
+    delivered_transparent_body(semantic, symbol)
 }
 
 /// Exact stable head identity of one canonical checked type, when its head is
