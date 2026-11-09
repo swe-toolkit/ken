@@ -95,8 +95,10 @@ fn run_plain_recursive_match_census() {
             ken_runtime::with_recursive_residual_disposition_census(|| {
                 ken_runtime::with_recursive_residual_match_guard_observations(
                     ken_runtime::RecursiveResidualMatchGuardMutation::Exact,
-                    || ken_cli::build_native_program(
-                        PLAIN_MATCH_WITNESS, ken_cli::SourceFormat::Ken,
+                    || ken_cli::build_native_program_with_roots(
+                        PLAIN_MATCH_WITNESS,
+                        ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         "native-program", output.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     ),
@@ -120,7 +122,7 @@ fn run_plain_recursive_match_census() {
     let interpreted = ken_cli::run_program_effect_observation(
         PLAIN_MATCH_WITNESS,
         ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
         &[b"native-program".to_vec()],
         &[],
         output.path().as_os_str().as_encoded_bytes(),
@@ -163,8 +165,10 @@ fn run_one_bracket_layout() {
         ken_runtime::with_recursive_residual_disposition_census(|| {
             ken_runtime::with_recursive_residual_match_guard_observations(
                 ken_runtime::RecursiveResidualMatchGuardMutation::Exact,
-                || ken_cli::build_native_program(
-                    ONE_BUFFER_WITNESS, ken_cli::SourceFormat::Ken,
+                || ken_cli::build_native_program_with_roots(
+                    ONE_BUFFER_WITNESS,
+                    ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     "rt_one_buffer_residual_layout", output.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 ),
@@ -199,7 +203,7 @@ fn run_one_bracket_layout() {
     let mut host = ken_interp::PosixHost::new_at(output.path());
     let interpreted = ken_cli::run_program_effect_observation(
         ONE_BUFFER_WITNESS, ken_cli::SourceFormat::Ken,
-        &[], &[], &[],
+        &checked_catalog_roots(), &[], &[],
         output.path().as_os_str().as_encoded_bytes(), &mut host,
     ).expect("one checked bracket interprets");
     assert_eq!(native, interpreted, "one-bracket observation is byte-identical by value");
@@ -226,8 +230,10 @@ fn suppressing_w5_cannot_publish_either_bracket_witness() {
                 let (built, applied) =
                     ken_runtime::with_recursive_residual_disposition_mutation(
                         ken_runtime::RecursiveResidualDispositionMutation::SuppressW5,
-                        || ken_cli::build_native_program(
-                            source, ken_cli::SourceFormat::Ken, name, output.path(),
+                        || ken_cli::build_native_program_with_roots(
+                            source,
+                            ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(), name, output.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         ),
                     );
@@ -266,8 +272,10 @@ fn worker_and_context_capture_counts_each_refuse_when_corrupted() {
                 let (built, applied) =
                     ken_runtime::with_recursive_residual_disposition_mutation(
                         mutation,
-                        || ken_cli::build_native_program(
-                            TWO_BUFFER_WITNESS, ken_cli::SourceFormat::Ken,
+                        || ken_cli::build_native_program_with_roots(
+                            TWO_BUFFER_WITNESS,
+                            ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             name, output.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         ),
@@ -293,9 +301,10 @@ fn run_sequential_brackets_witness() {
     let ((compiled, diagnostics), dispositions) =
         ken_runtime::with_recursive_residual_disposition_census(|| {
             ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
+                ken_cli::build_native_program_with_roots(
                     TWO_BUFFER_WITNESS,
                     ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     "rt_ignored_two_buffer_witness",
                     output.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -361,7 +370,7 @@ fn run_sequential_brackets_witness() {
     let interpreted = ken_cli::run_program_effect_observation(
         TWO_BUFFER_WITNESS,
         ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
         &[],
         &[],
         output.path().as_os_str().as_encoded_bytes(),
@@ -402,9 +411,10 @@ fn run_distinguishable_brackets_witness() {
         .tempdir()
         .expect("unique distinguishable-bracket output root");
     let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             DISTINGUISHABLE_BRACKETS,
             ken_cli::SourceFormat::Ken,
+            &checked_catalog_roots(),
             "rt_two_bracket_distinguishable",
             output.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -465,7 +475,7 @@ fn run_distinguishable_brackets_witness() {
     let interpreted = ken_cli::run_program_effect_observation(
         DISTINGUISHABLE_BRACKETS,
         ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
         &[],
         &[],
         output.path().as_os_str().as_encoded_bytes(),
@@ -571,4 +581,9 @@ fn run_distinguishable_brackets_witness() {
         release_ids, allocated_ids,
         "release exactly the allocated buffers"
     );
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

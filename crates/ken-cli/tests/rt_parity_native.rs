@@ -63,6 +63,11 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 
 const RT_PARITY_SOURCE: &str = include_str!("fixtures/d0_rt_parity_source.ken");
 
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
+}
+
 /// One case's differential outcome, used for the exact-variant assertions.
 struct Differential {
     interpreted: ken_runtime::EffectObservation,
@@ -1193,9 +1198,10 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
             let ((result, diagnostics), role_rows) =
                 ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
                     ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             &source,
                             ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             &format!("rt_parity_static_response_demand_{label}"),
                             root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -1483,9 +1489,10 @@ fn static_response_context_demand_control(
     let compile = |label: &str| {
         let root = output_dir(&format!("static-response-demand-control-{label}"));
         let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt_parity_static_response_demand_control",
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -1637,9 +1644,10 @@ macro_rules! full_demand_compile {
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", $entry);
         let root = output_dir(&format!("static-response-full-grid-{}-{}", $entry, $label));
         let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 &format!("rt_parity_static_response_full_grid_{}", $entry),
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -2145,9 +2153,10 @@ fn static_response_selected_caller_retarget_reaches_and_restores() {
         let compile = |label: &str| {
             let root = output_dir(&format!("static-response-retarget-{label}"));
             let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
+                ken_cli::build_native_program_with_roots(
                     &source,
                     ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     "rt_parity_static_response_retarget",
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -2360,9 +2369,10 @@ fn owner_body_control(
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
         let root = output_dir(&format!("static-response-owner-grid-{entry}-{label}"));
         let observed = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 &format!("rt_parity_static_response_owner_grid_{entry}"),
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -2581,9 +2591,10 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
                     ken_runtime::with_checked_ih_direct_application_mutation(
                         ken_runtime::CheckedIhDirectApplicationMutation::Exact,
                         || {
-                            ken_cli::build_native_program(
+                            ken_cli::build_native_program_with_roots(
                                 &source,
                                 ken_cli::SourceFormat::Ken,
+                                &checked_catalog_roots(),
                                 &format!("rt_parity_direct_application_pairing_{label}"),
                                 root.path(),
                                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -2764,9 +2775,10 @@ fn direct_application_control_arm(
         let root = output_dir(&format!("direct-application-control-{label}"));
         let (result, observations, applications) =
             ken_runtime::with_checked_ih_direct_application_mutation(mutation, || {
-                ken_cli::build_native_program(
+                ken_cli::build_native_program_with_roots(
                     &source,
                     ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     "rt_parity_direct_application_control",
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -3202,9 +3214,10 @@ fn checked_ih_generated_entry_arrival_cannot_be_replaced_by_producer_source() {
             let (result, rows) =
                 ken_runtime::with_checked_ih_generated_entry_confluence_mutation(mutation, || {
                     ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             &source,
                             ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             &format!("rt_parity_generated_entry_e_from_s_{label}"),
                             root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -3272,9 +3285,10 @@ fn assert_generated_entry_arrival_mutation_child() {
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
     let (build, rows) = ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
         ken_runtime::with_checked_ih_generated_entry_arrival_mutation(mutation, || {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 &format!(
                     "rt_parity_generated_entry_arrival_{}",
                     mode.replace('-', "_")
@@ -4197,9 +4211,10 @@ fn build_write_stage_for_materialization_control() -> Result<
     let root = output_dir("fs-write-at-offset-single");
     std::fs::write(root.path().join("source"), b"ab").unwrap();
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
-    ken_cli::build_native_program(
+    ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         "rt_parity_fs_write_at_offset_single",
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -4666,9 +4681,10 @@ fn composed_return_ret_sink_population_is_unique() {
                     || {
                         ken_runtime::with_static_response_feasibility_diagnostics(|| {
                             ken_runtime::with_checked_ih_generated_entry_observations(|| {
-                                ken_cli::build_native_program(
+                                ken_cli::build_native_program_with_roots(
                                     &source,
                                     ken_cli::SourceFormat::Ken,
+                                    &checked_catalog_roots(),
                                     &format!("rt_parity_composed_return_ret_sink_{label}"),
                                     root.path(),
                                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -4851,9 +4867,10 @@ fn composed_return_ret_sink_lookup_controls_refuse() {
             let root = output_dir(&format!("composed-return-ret-sink-control-{label}"));
             let (result, observations, applications) =
                 ken_runtime::with_composed_return_ret_sink_mutation(mutation, || {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         &source,
                         ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         &format!(
                             "rt_parity_composed_return_ret_sink_control_{}",
                             label.replace('-', "_")
@@ -4901,9 +4918,10 @@ fn composed_return_ret_sink_is_byte_inert() {
                         ken_runtime::with_composed_return_forward_ret_authority_mutation(
                             ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
                             || {
-                                ken_cli::build_native_program(
+                                ken_cli::build_native_program_with_roots(
                                     &source,
                                     ken_cli::SourceFormat::Ken,
+                                    &checked_catalog_roots(),
                                     "rt_parity_composed_return_ret_sink_inert",
                                     exact_root.path(),
                                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -4922,9 +4940,10 @@ fn composed_return_ret_sink_is_byte_inert() {
                         ken_runtime::with_composed_return_forward_ret_authority_mutation(
                             ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
                             || {
-                                ken_cli::build_native_program(
+                                ken_cli::build_native_program_with_roots(
                                     &source,
                                     ken_cli::SourceFormat::Ken,
+                                    &checked_catalog_roots(),
                                     "rt_parity_composed_return_ret_sink_inert",
                                     suppressed_root.path(),
                                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5100,9 +5119,10 @@ fn composed_return_forward_ret_proof_consumption_partition_is_exact() {
                     ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
                         ken_runtime::with_static_response_feasibility_diagnostics(|| {
                             ken_runtime::with_checked_ih_generated_entry_observations(|| {
-                                ken_cli::build_native_program(
+                                ken_cli::build_native_program_with_roots(
                                     &source,
                                     ken_cli::SourceFormat::Ken,
+                                    &checked_catalog_roots(),
                                     "rt_parity_forward_ret_proof_partition",
                                     exact_root.path(),
                                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5117,9 +5137,10 @@ fn composed_return_forward_ret_proof_consumption_partition_is_exact() {
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::SuppressForInertness,
                 || {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         &source,
                         ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         "rt_parity_forward_ret_proof_partition",
                         suppressed_root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5258,9 +5279,10 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
                         ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
                             ken_runtime::with_static_response_feasibility_diagnostics(|| {
                                 ken_runtime::with_checked_ih_generated_entry_observations(|| {
-                                    ken_cli::build_native_program(
+                                    ken_cli::build_native_program_with_roots(
                                         &source,
                                         ken_cli::SourceFormat::Ken,
+                                        &checked_catalog_roots(),
                                         &format!("rt_parity_forward_ret_role_witness_{label}"),
                                         root.path(),
                                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5409,9 +5431,10 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
             let root = output_dir(&format!("forward-edge-collapsibility-{label}"));
             let (result, observations) =
                 ken_runtime::with_composed_return_forward_edge_collapsibility_observations(|| {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         &source,
                         ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         &format!("rt_parity_forward_edge_collapsibility_{label}"),
                         root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5518,9 +5541,10 @@ fn composed_return_forward_ret_population_control(arm: ForwardRetPopulationArm) 
             ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
                 ken_runtime::with_static_response_feasibility_diagnostics(|| {
                     ken_runtime::with_checked_ih_generated_entry_observations(|| {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             &source,
                             ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             &format!("rt_parity_forward_ret_authority_population_{label}"),
                             root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5820,9 +5844,10 @@ fn composed_return_forward_ret_authority_refusal_control(
     let root = output_dir(&format!("forward-ret-authority-control-{label}"));
     let (result, observations, applications) =
         ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 &format!(
                     "rt_parity_forward_ret_authority_control_{}",
                     label.replace('-', "_")
@@ -5920,9 +5945,10 @@ fn checked_ih_inheritance_and_fresh_result_route_are_byte_inert() {
             let suppressed_root = output_dir(&format!(
                 "continuation-inheritance-inert-suppressed-{entry}"
             ));
-            let exact = ken_cli::build_native_program(
+            let exact = ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt_parity_continuation_inheritance_inert",
                 exact_root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -5931,9 +5957,10 @@ fn checked_ih_inheritance_and_fresh_result_route_are_byte_inert() {
             let suppressed = ken_runtime::with_checked_ih_continuation_inheritance_mutation(
                 ken_runtime::CheckedIhContinuationInheritanceMutation::SuppressForInertness,
                 || {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         &source,
                         ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         "rt_parity_continuation_inheritance_inert",
                         suppressed_root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -6714,9 +6741,10 @@ fn assert_option2_unrelated_owner_child() {
     let result = ken_runtime::with_retained_unit_call_target_mutation(
         ken_runtime::RetainedUnitCallTargetMutation::SubstituteUnrelatedOwnerRoot,
         || {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt_parity_option2_unrelated_owner",
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
