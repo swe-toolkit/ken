@@ -57,15 +57,15 @@ fn checked(env: &mut ElabEnv, name: &str, proposition: &str) {
         .unwrap_or_else(|error| panic!("{name}: independent closed oracle must check: {error:?}"));
 }
 
-/// Promise class: durable invariant. MEASURED: the provider's 10 public
-/// declarations, exported constructor, and 25 public checked laws have owned
-/// GlobalIds; an independent generic client unpacks every law at its exact
-/// proposition; the exact trusted-ID set stays equal. CLAIMED: §§1–2.2 add a
+/// Promise class: durable invariant. MEASURED: the provider's pre-existing
+/// public declarations, exported constructor, and checked laws have owned
+/// GlobalIds; an independent generic client unpacks those laws at their exact
+/// propositions; the exact trusted-ID set stays equal. CLAIMED: §§1–2.2 add a
 /// zero-trust importable rational value and all its generic obligations. THE
 /// GAP: the five separate seed cases exercise concrete value distinctions;
 /// neither the owned-ID census nor this client's type alone is a seed oracle.
 #[test]
-fn all_public_values_and_laws_import_generically_without_trust_growth() {
+fn prior_public_values_and_laws_import_generically_without_trust_growth() {
     let mut env = ElabEnv::new().expect("base environment");
     for provider in [
         "Core.Logic.Transport",

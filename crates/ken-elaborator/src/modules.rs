@@ -10389,7 +10389,7 @@ mod cat_numeric_interval_public_export_tests {
 
     const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 
-    /// SOURCE: spec/50-stdlib/68-numerical.md §§1–13.
+    /// SOURCE: spec/50-stdlib/68-numerical.md; public interval API.
     /// PROMISE CLASS: transition sentinel; a future numerical API extension
     /// must update this roster with the deliberate new public law or operation.
     /// MEASURED: the actual root file export table from a roots-loaded package
@@ -10426,6 +10426,7 @@ mod cat_numeric_interval_public_export_tests {
             "interval_add",
             "interval_mul",
             "interval_point",
+            "interval_width",
             "interval_hull",
             "interval_intersect",
             "interval_inside",
@@ -10439,6 +10440,8 @@ mod cat_numeric_interval_public_export_tests {
             "interval_ordered_contains_hi",
             "interval_add_point",
             "interval_mul_point",
+            "interval_width_point",
+            "interval_width_add",
             "interval_hull_contains_left",
             "interval_hull_contains_right",
             "interval_intersect_sound",
