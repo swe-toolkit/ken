@@ -1655,6 +1655,10 @@ impl<'src> Planner<'src> {
         // the residual scalar with the catalog identity rather than minting a
         // second sentinel namespace.
         self.intern_trap(&super::joins_traps::malformed_dynamic_constructor_trap())?;
+        // A forwarded Vis escaping its outermost carried bracket clause has
+        // no generated re-entry unit yet. Its fail-closed outcome is issued by
+        // the same catalog as source and other compiler-generated traps.
+        self.intern_trap(&super::brackets::forwarding_boundary_trap())?;
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;

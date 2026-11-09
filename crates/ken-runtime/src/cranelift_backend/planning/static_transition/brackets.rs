@@ -11,7 +11,7 @@ use super::{planner_capacity_error, planner_error, CraneliftBackendError, Static
     StaticTransitionPlan};
 use crate::{CheckedBracketMarkRole, CheckedBracketRegionMarker,
     CheckedComputationalIHInvocationKind, NativeProcessSymbols, RuntimeDeclaration,
-    RuntimeDeclarationKind, RuntimeExpr, RuntimeSymbol};
+    RuntimeDeclarationKind, RuntimeExpr, RuntimeSymbol, RuntimeTrap, RuntimeTrapCode};
 
 /// Which planning plane named a static region exit's owner.
 #[cfg(feature = "px8-ds-test-support")]
@@ -209,7 +209,68 @@ impl BracketSettlement {
         -> &BTreeSet<super::responses::StaticResponseContinuationId> { &self.response_owners }
 }
 
+/// The compiler-owned fail-closed outcome until the forwarded-continuation
+/// re-entry unit can return this Vis through its original caller's handler.
+/// Both planner and lowerer use one value so the planned trap token cannot
+/// disagree with the emitted trap.
+pub(in crate::cranelift_backend) fn forwarding_boundary_trap() -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::UnsupportedErasure,
+        message: "native forwarded-continuation re-entry required at boundary IH".to_string(),
+    }
+}
+
 impl BracketSettlementControlView {
+    /// Replace only a pure-forward Vis IH at the *outermost* carried clause of
+    /// the currently emitting function. Source ancestry beyond this function's
+    /// worker root is not an in-function continuation; an enclosing genuine
+    /// handler in another unit must not be bypassed by an in-place IH jump.
+    pub(in crate::cranelift_backend) fn is_boundary_forwarding_arm(
+        &self,
+        plan: &StaticTransitionPlan<'_>,
+        match_origin: StaticOriginId,
+        case_index: usize,
+        owner: ContinuationEmissionOwner,
+    ) -> Result<bool, CraneliftBackendError> {
+        if !self.regions.values().any(|region| region.clause_origin == Some(match_origin)) {
+            return Ok(false);
+        }
+        let roles = plan.bracket_settlements.roles.as_ref().ok_or_else(||
+            planner_error("a marked forwarding clause has no checked constructor roles"))?;
+        let RuntimeExpr::ComputationalMatch { cases, .. } = expr(plan, match_origin)? else {
+            return Err(planner_error("a marked forwarding clause is not computational"));
+        };
+        let (_, vis) = select_cases(plan, match_origin, &roles.ret, &roles.vis)?;
+        if vis != case_index || cases[vis].argument_binders != 2
+            || cases[vis].recursive_positions.as_slice() != [1]
+            || !forwarding_vis_arm(&cases[vis].body, &roles.vis)
+        {
+            return Ok(false);
+        }
+        let root = match owner {
+            ContinuationEmissionOwner::Specialization(id) => plan.continuation_units()?
+                .into_iter().find(|unit| unit.id() == id)
+                .map(|unit| unit.worker_body_origin()),
+            ContinuationEmissionOwner::Predeclared(id) => plan.emittable_units()?
+                .into_iter().find(|unit| unit.function() == id)
+                .map(|unit| unit.body_occurrence()),
+            ContinuationEmissionOwner::Fusion(_) => return Err(planner_error(
+                "a forwarded boundary in a fusion owner has no settled worker root")),
+        }.ok_or_else(|| planner_error("a forwarding clause has no emission-owner body"))?;
+        let ancestry = parents(plan)?;
+        let mut cursor = match_origin;
+        while cursor != root {
+            let Some((parent, _)) = ancestry.get(&cursor).copied() else {
+                return Err(planner_error("a forwarding clause lies outside its emitting body"));
+            };
+            if matches!(expr(plan, parent)?, RuntimeExpr::ComputationalMatch { .. }) {
+                return Ok(false);
+            }
+            cursor = parent;
+        }
+        Ok(true)
+    }
+
     pub(in crate::cranelift_backend) fn from_plan(
         plan: &StaticTransitionPlan<'_>,
     ) -> Result<Self, CraneliftBackendError> {
