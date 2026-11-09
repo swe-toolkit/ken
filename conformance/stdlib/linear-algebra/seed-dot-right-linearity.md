@@ -2,7 +2,7 @@
 
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/65-linear-algebra.md` §15.
-AC-1 child SHA: `20ed02d72ad8e3fbf8caf722eb0ca9cf942c86e3`.
+AC-1 child SHA: `16342ad2573c0cb2c7d28109a8feb1b08dd679f8`.
 Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY.md`.
 
 Status: authored; not executed. The seed applies the two public checked laws
