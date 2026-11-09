@@ -20,24 +20,29 @@ A natural numerator and a syntactically positive denominator suffice to
 represent every non-negative rational. The constructor preserves the supplied
 spelling; equality of values is instead stated by equality of cross products.
 No normal form, quotient, rounding, or floating comparison is required.
-`rational_min` and `rational_max` select one stored rational by exact value order;
-their six checked bounds support interval hull and intersection.
+`rational_sub` truncates at zero: subtracting a larger value never introduces a
+signed result. `rational_min` and `rational_max` select one stored rational by
+exact value order; their six checked bounds support interval hull and
+intersection.
 
 ## 2. Definition
 
 The second constructor field is the denominator's predecessor: `MkRational n k`
 represents `n/(Suc k)`. All exported calculations preserve that positivity.
 Min and max compare exact values and return an original operand; neither
-normalizes its spelling.
+normalizes its spelling. Subtraction cross-multiplies two positive denominators,
+subtracts the numerators with Nat's truncated `sub`, and retains a positive
+product denominator.
 
 ```ken
 import Core.Logic.Transport (sym, trans, cong)
 
 import Core.Classes.LawfulClasses (IsTrue, bool_or, leq_nat)
 
-import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
+import Data.Numeric.Nat.Arithmetic
+  (add, mul, mul_add_distrib_l, mul_add_distrib_r, add_cancel_r)
 
-import Data.Numeric.Nat.Order (lt_nat, leq_nat_mul_right_mono, leq_nat_mul_right_cancel)
+import Data.Numeric.Nat.Order (sub, lt_nat, leq_nat_mul_right_mono, leq_nat_mul_right_cancel)
 
 pub data Rational : Type where {
   MkRational : (num : Nat) → (den_tail : Nat) → Rational
@@ -148,6 +153,15 @@ pub fn rational_add (x : Rational) (y : Rational) : Rational =
       match y {
         MkRational ny dy ↦
           MkRational (add (mul nx (Suc dy)) (mul ny (Suc dx))) (positive_product_tail dx dy)
+      }
+  }
+
+pub fn rational_sub (x : Rational) (y : Rational) : Rational =
+  match x {
+    MkRational nx dx ↦
+      match y {
+        MkRational ny dy ↦
+          MkRational (sub (mul nx (Suc dy)) (mul ny (Suc dx))) (positive_product_tail dx dy)
       }
   }
 
@@ -564,6 +578,89 @@ pub theorem rational_add_mono
       }
   }
 
+pub proof self_is_zero for rational_sub
+      (x : Rational)
+    : rational_equiv (rational_sub x x) rational_zero =
+  match x {
+    MkRational a b ↦
+      trans
+        Nat
+        (mul (sub (mul a (Suc b)) (mul a (Suc b))) (Suc Zero))
+        (mul Zero (Suc Zero))
+        (mul Zero (Suc (positive_product_tail b b)))
+        (cong
+          Nat
+          Nat
+          (sub (mul a (Suc b)) (mul a (Suc b)))
+          Zero
+          (λv. mul v (Suc Zero))
+          ((proof self_is_zero for sub) (mul a (Suc b))))
+        (sym
+          Nat
+          (mul Zero (Suc (positive_product_tail b b)))
+          Zero
+          ((proof zero_l for mul) (Suc (positive_product_tail b b))))
+  }
+
+pub proof add_cancel for rational_sub
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq y x) → rational_equiv (rational_add (rational_sub x y) y) x =
+  match x {
+    MkRational a bx ↦
+      match y {
+        MkRational c by ↦ λordered. rational_sub_add_cancel_cross a c (Suc bx) (Suc by) ordered
+      }
+  }
+
+pub proof add_distrib for rational_sub
+      (x1 : Rational) (y1 : Rational) (x2 : Rational) (y2 : Rational)
+    : IsTrue (rational_leq y1 x1)
+      → IsTrue (rational_leq y2 x2)
+      → rational_equiv
+        (rational_sub (rational_add x1 x2) (rational_add y1 y2))
+        (rational_add (rational_sub x1 y1) (rational_sub x2 y2)) =
+  λfirst_ordered.
+    λsecond_ordered.
+      let
+        high = rational_add x1 x2;
+        low = rational_add y1 y2;
+        total_width = rational_sub high low;
+        first_width = rational_sub x1 y1;
+        second_width = rational_sub x2 y2;
+        separate_widths = rational_add first_width second_width;
+        total_cancel : rational_equiv (rational_add total_width low) high =
+          (proof add_cancel for rational_sub)
+            high
+            low
+            (rational_add_mono y1 x1 y2 x2 first_ordered second_ordered);
+        separate_cancel : rational_equiv (rational_add separate_widths low) high =
+          (proof trans for rational_equiv)
+            (rational_add separate_widths low)
+            (rational_add (rational_add first_width y1) (rational_add second_width y2))
+            high
+            (rational_add_interchange first_width second_width y1 y2)
+            ((proof respect for rational_add)
+              (rational_add first_width y1)
+              x1
+              (rational_add second_width y2)
+              x2
+              ((proof add_cancel for rational_sub) x1 y1 first_ordered)
+              ((proof add_cancel for rational_sub) x2 y2 second_ordered));
+        same_after_add : rational_equiv
+          (rational_add total_width low)
+          (rational_add separate_widths low) =
+          (proof trans for rational_equiv)
+            (rational_add total_width low)
+            high
+            (rational_add separate_widths low)
+            total_cancel
+            ((proof sym for rational_equiv)
+              (rational_add separate_widths low)
+              high
+              separate_cancel)
+      in
+        rational_add_cancel_r total_width separate_widths low same_after_add
+
 pub theorem rational_mul_mono
       (x : Rational) (y : Rational) (z : Rational) (w : Rational)
     : Equal Bool (rational_leq x y) True
@@ -735,11 +832,264 @@ expands the numerator and refactors the two resulting products around their
 shared denominator. Every final equation is value equivalence, not structural
 identity of two carrier spellings.
 
+Subtraction's self-zero proof reduces Nat subtraction of a cross product from
+itself. Its ordered add-cancellation proof distributes the two numerator
+products, uses Nat `sub::add_cancel`, then reorders their common denominator
+factors. The two-input distribution proof adds the smaller values back to each
+truncated difference, rearranges the rational sums, and cancels their common
+right addend with private cross-product lemmas. Both order premises are needed;
+no subtraction identity is asserted for arbitrary reversed operands.
+
 ```ken
 theorem positive_product_factor
       (bx : Nat) (by : Nat)
     : Equal Nat (Suc (positive_product_tail bx by)) (mul (Suc bx) (Suc by)) =
   Refl
+
+theorem mul_twice_shift
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (mul (mul a b) b) c) (mul a (mul (mul c b) b)) =
+  let
+    initial = mul (mul (mul a b) b) c;
+    moved = mul (mul (mul a b) c) b;
+    paired = mul (mul (mul a c) b) b;
+    grouped = mul (mul a c) (mul b b);
+    nested = mul a (mul c (mul b b));
+    final_value = mul a (mul (mul c b) b)
+  in
+    trans
+      Nat
+      initial
+      moved
+      final_value
+      (mul_swap_tail (mul a b) b c)
+      (trans
+        Nat
+        moved
+        paired
+        final_value
+        (cong Nat Nat (mul (mul a b) c) (mul (mul a c) b) (λv. mul v b) (mul_swap_tail a b c))
+        (trans
+          Nat
+          paired
+          grouped
+          final_value
+          (sym Nat grouped paired ((proof assoc for mul) (mul a c) b b))
+          (trans
+            Nat
+            grouped
+            nested
+            final_value
+            (sym Nat nested grouped ((proof assoc for mul) a c (mul b b)))
+            (cong
+              Nat
+              Nat
+              (mul c (mul b b))
+              (mul (mul c b) b)
+              (mul a)
+              ((proof assoc for mul) c b b)))))
+
+theorem rational_sub_add_cancel_cross
+      (a : Nat) (c : Nat) (aa : Nat) (cc : Nat)
+    : IsTrue (leq_nat (mul c aa) (mul a cc))
+      → Equal Nat
+        (mul (add (mul (sub (mul a cc) (mul c aa)) cc) (mul c (mul aa cc))) aa)
+        (mul a (mul (mul aa cc) cc)) =
+  λordered.
+    let
+      difference = sub (mul a cc) (mul c aa);
+      initial = mul (add (mul difference cc) (mul c (mul aa cc))) aa;
+      associated = mul (add (mul difference cc) (mul (mul c aa) cc)) aa;
+      distributed = mul (mul (add difference (mul c aa)) cc) aa;
+      cancelled = mul (mul (mul a cc) cc) aa;
+      final_value = mul a (mul (mul aa cc) cc)
+    in
+      trans
+        Nat
+        initial
+        associated
+        final_value
+        (cong
+          Nat
+          Nat
+          (mul c (mul aa cc))
+          (mul (mul c aa) cc)
+          (λv. mul (add (mul difference cc) v) aa)
+          ((proof assoc for mul) c aa cc))
+        (trans
+          Nat
+          associated
+          distributed
+          final_value
+          (cong
+            Nat
+            Nat
+            (add (mul difference cc) (mul (mul c aa) cc))
+            (mul (add difference (mul c aa)) cc)
+            (λv. mul v aa)
+            (sym
+              Nat
+              (mul (add difference (mul c aa)) cc)
+              (add (mul difference cc) (mul (mul c aa) cc))
+              (mul_add_distrib_l difference (mul c aa) cc)))
+          (trans
+            Nat
+            distributed
+            cancelled
+            final_value
+            (cong
+              Nat
+              Nat
+              (add difference (mul c aa))
+              (mul a cc)
+              (λv. mul (mul v cc) aa)
+              ((proof add_cancel for sub) (mul c aa) (mul a cc) ordered))
+            (mul_twice_shift a cc aa)))
+
+theorem rational_add_cancel_cross
+      (a : Nat) (b : Nat) (c : Nat) (aa : Nat) (bb : Nat) (tail : Nat)
+    : Equal Nat
+        (mul (add (mul a (Suc tail)) (mul c aa)) (mul bb (Suc tail)))
+        (mul (add (mul b (Suc tail)) (mul c bb)) (mul aa (Suc tail)))
+      → Equal Nat (mul a bb) (mul b aa) =
+  λsame_sum.
+    let
+      cc = Suc tail;
+      first = mul (mul a cc) (mul bb cc);
+      shared_left = mul (mul c aa) (mul bb cc);
+      second = mul (mul b cc) (mul aa cc);
+      shared_right = mul (mul c bb) (mul aa cc);
+      first_scaled = mul (mul a bb) (mul cc cc);
+      second_scaled = mul (mul b aa) (mul cc cc);
+      initial_left = mul (add (mul a cc) (mul c aa)) (mul bb cc);
+      initial_right = mul (add (mul b cc) (mul c bb)) (mul aa cc);
+      expanded_left = add first shared_left;
+      expanded_right = add second shared_right;
+      aligned_left = add first_scaled shared_right;
+      aligned_right = add second_scaled shared_right;
+      left_expansion : Equal Nat initial_left expanded_left =
+        mul_add_distrib_l (mul a cc) (mul c aa) (mul bb cc);
+      right_expansion : Equal Nat initial_right expanded_right =
+        mul_add_distrib_l (mul b cc) (mul c bb) (mul aa cc);
+      expanded_equality : Equal Nat expanded_left expanded_right =
+        trans
+          Nat
+          expanded_left
+          initial_left
+          expanded_right
+          (sym Nat initial_left expanded_left left_expansion)
+          (trans Nat initial_left initial_right expanded_right same_sum right_expansion);
+      left_alignment : Equal Nat expanded_left aligned_left =
+        add_cong2
+          first
+          first_scaled
+          shared_left
+          shared_right
+          (mul_shuffle a cc bb cc)
+          (mul_shuffle c aa bb cc);
+      right_alignment : Equal Nat expanded_right aligned_right =
+        add_cong2 second second_scaled shared_right shared_right (mul_shuffle b cc aa cc) Refl;
+      aligned_equality : Equal Nat aligned_left aligned_right =
+        trans
+          Nat
+          aligned_left
+          expanded_left
+          aligned_right
+          (sym Nat expanded_left aligned_left left_alignment)
+          (trans
+            Nat
+            expanded_left
+            expanded_right
+            aligned_right
+            expanded_equality
+            right_alignment);
+      scaled_equality : Equal Nat first_scaled second_scaled =
+        add_cancel_r first_scaled second_scaled shared_right aligned_equality
+    in
+      (proof cancel_r for mul)
+        (mul a bb)
+        (mul b aa)
+        (positive_product_tail tail tail)
+        scaled_equality
+
+theorem rational_add_cancel_r
+      (x : Rational) (y : Rational) (z : Rational)
+    : rational_equiv (rational_add x z) (rational_add y z) → rational_equiv x y =
+  match x {
+    MkRational a bx ↦
+      match y {
+        MkRational b by ↦
+          match z {
+            MkRational c bz ↦
+              λsame_sum. rational_add_cancel_cross a b c (Suc bx) (Suc by) bz same_sum
+          }
+      }
+  }
+
+theorem rational_add_interchange
+      (a : Rational) (b : Rational) (c : Rational) (d : Rational)
+    : rational_equiv
+        (rational_add (rational_add a b) (rational_add c d))
+        (rational_add (rational_add a c) (rational_add b d)) =
+  let
+    initial = rational_add (rational_add a b) (rational_add c d);
+    right_nested = rational_add a (rational_add b (rational_add c d));
+    middle_regrouped = rational_add a (rational_add (rational_add b c) d);
+    middle_swapped = rational_add a (rational_add (rational_add c b) d);
+    left_nested = rational_add a (rational_add c (rational_add b d));
+    final_sum = rational_add (rational_add a c) (rational_add b d)
+  in
+    (proof trans for rational_equiv)
+      initial
+      right_nested
+      final_sum
+      ((proof sym for rational_equiv)
+        right_nested
+        initial
+        ((proof assoc for rational_add) a b (rational_add c d)))
+      ((proof trans for rational_equiv)
+        right_nested
+        middle_regrouped
+        final_sum
+        ((proof respect for rational_add)
+          a
+          a
+          (rational_add b (rational_add c d))
+          (rational_add (rational_add b c) d)
+          ((proof refl for rational_equiv) a)
+          ((proof assoc for rational_add) b c d))
+        ((proof trans for rational_equiv)
+          middle_regrouped
+          middle_swapped
+          final_sum
+          ((proof respect for rational_add)
+            a
+            a
+            (rational_add (rational_add b c) d)
+            (rational_add (rational_add c b) d)
+            ((proof refl for rational_equiv) a)
+            ((proof respect for rational_add)
+              (rational_add b c)
+              (rational_add c b)
+              d
+              d
+              ((proof comm for rational_add) b c)
+              ((proof refl for rational_equiv) d)))
+          ((proof trans for rational_equiv)
+            middle_swapped
+            left_nested
+            final_sum
+            ((proof respect for rational_add)
+              a
+              a
+              (rational_add (rational_add c b) d)
+              (rational_add c (rational_add b d))
+              ((proof refl for rational_equiv) a)
+              ((proof sym for rational_equiv)
+                (rational_add c (rational_add b d))
+                (rational_add (rational_add c b) d)
+                ((proof assoc for rational_add) c b d)))
+            ((proof assoc for rational_add) a c (rational_add b d)))))
 
 theorem add_cross_respect
       (a : Nat)
@@ -1544,11 +1894,13 @@ min/max when argument order changes; no structural commutativity is claimed.
 ## 7. Trust & derivation
 
 1. **Public API.** The exported constructor, projections, value constants,
-   natural embedding, equivalence, three arithmetic/order operations and the
+   natural embedding, equivalence, four arithmetic/order operations and the
    checked equations and order laws of specification §§1–2.2 appear above.
    `rational_add_mono` and `rational_mul_mono` supply checked two-input
    monotonicity. `rational_min` and `rational_max` add six attached order
-   proofs required by interval hull and intersection.
+   proofs required by interval hull and intersection. `rational_sub` adds
+   self-zero, ordered add-cancellation and ordered two-input distribution
+   under spec 68 §15.
 2. **Source map.** [Definition](#2-definition) lists the exported values and
    laws; [Laws & proofs](#4-laws--proofs) explains and carries the private
    derivation, including the cross-product monotonicity helpers;
@@ -1560,6 +1912,8 @@ min/max when argument order changes; no structural commutativity is claimed.
    Paired-input monotonicity uses only checked Nat add and multiply laws.
    Comparison selection uses rational order reflexivity and totality, with
    private pick helpers connecting each Boolean branch to its bounds.
+   Subtraction uses Nat's checked truncated `sub` and right-add cancellation;
+   the Rational sum cancellation and factor rearrangements remain private.
 4. **Trusted-base delta.** Zero: all exported theorems carry checked proof
    terms. Nat and equality imports retain their existing trusted base; this
    package adds no `Axiom`, postulate, primitive or floating point.
