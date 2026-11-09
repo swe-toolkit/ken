@@ -45,7 +45,7 @@ fn exactNatTwo (value : Nat) : ExitCode = match value {
 
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (exactNatTwo (nsize two_leaves))
+  host_pure APartial ExitCode (exactNatTwo (nsize two_leaves))
 "#;
 
 // The reaching source mutation: the SAME program whose fold DROPS the nested-IH
@@ -83,7 +83,7 @@ fn exactNatTwo (value : Nat) : ExitCode = match value {
 
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode =
-  host_exit APartial (exactNatTwo (nsize two_leaves))
+  host_pure APartial ExitCode (exactNatTwo (nsize two_leaves))
 "#;
 
 fn output_dir() -> tempfile::TempDir {

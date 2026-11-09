@@ -1,26 +1,22 @@
 program capabilities FS AFull
 const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
+  host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
 
 const body_error_io : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
+  host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyErr Unit Unit MkUnit)
 
 fn finish (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
   : HostIO AFull ExitCode =
   match outcome {
-    Err error |-> host_exit AFull (ExitCode.Failure 91);
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 91);
     Ok bracket |-> match bracket {
-      ResourceBracketOk value |-> host_exit AFull ExitCode.Success;
-      ResourceBracketBodyError error |-> host_exit AFull (ExitCode.Failure 92);
-      ResourceBracketReleaseError error |-> host_exit AFull (ExitCode.Failure 93);
+      ResourceBracketOk value |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError error |-> host_pure AFull ExitCode (ExitCode.Failure 92);
+      ResourceBracketReleaseError error |-> host_pure AFull ExitCode (ExitCode.Failure 93);
       ResourceBracketBodyAndReleaseError body_error release_error |->
-        host_exit AFull (ExitCode.Failure 94)
+        host_pure AFull ExitCode (ExitCode.Failure 94)
     }
   }
 
@@ -44,17 +40,13 @@ proc map_bytes_window (mapping : MappingHandle) (start : Int) (length : Int)
 
 proc read_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (map_bytes_window mapping (2 : Int) (4 : Int))
     (\outcome. expect_bytes outcome)
 
 proc read_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly read_body)
     (\outcome. finish outcome)
 
@@ -63,26 +55,20 @@ proc after_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    Ok unit |-> host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
       (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
       (\bytes. expect_bytes bytes)
   }
 
 proc write_read_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
     (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
     (\outcome. after_write mapping outcome)
 
 proc write_read_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite write_read_body)
     (\outcome. finish outcome)
 
@@ -91,26 +77,20 @@ proc after_read (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    Ok bytes |-> host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
       (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
       (\written. expect_unit written)
   }
 
 proc read_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (map_bytes_window mapping (2 : Int) (4 : Int))
     (\outcome. after_read mapping outcome)
 
 proc read_write_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite read_write_body)
     (\outcome. finish outcome)
 
@@ -119,18 +99,14 @@ proc after_read_to_read (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    Ok bytes |-> host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
       (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
       (\read. expect_bytes read)
   }
 
 proc read_read_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (map_bytes_window mapping (2 : Int) (4 : Int))
     (\outcome. after_read_to_read mapping outcome)
 
@@ -139,18 +115,14 @@ proc after_write_to_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    Ok unit |-> host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
       (mapWrite AFull mapping (2 : Int) (bytes_encode "EFGH"))
       (\written. expect_unit written)
   }
 
 proc write_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
     (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
     (\outcome. after_write_to_write mapping outcome)
 
@@ -159,9 +131,7 @@ proc after_second_write_to_read (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    Ok unit |-> host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
       (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
       (\read. expect_bytes read)
   }
@@ -171,18 +141,14 @@ proc after_read_to_write_read (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    Ok bytes |-> host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
       (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
       (\written. after_second_write_to_read mapping written)
   }
 
 proc read_write_read_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (map_bytes_window mapping (2 : Int) (4 : Int))
     (\outcome. after_read_to_write_read mapping outcome)
 
@@ -191,9 +157,7 @@ proc after_second_read_to_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    Ok bytes |-> host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
       (mapWrite AFull mapping (2 : Int) (bytes_encode "EFGH"))
       (\written. expect_unit written)
   }
@@ -203,26 +167,20 @@ proc after_write_to_read_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    Ok unit |-> host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
       (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
       (\read. after_second_read_to_write mapping read)
   }
 
 proc write_read_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
     (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
     (\outcome. after_write_to_read_write mapping outcome)
 
 proc matrix_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite __MATRIX_BODY__)
     (\outcome. finish outcome)
 
@@ -244,51 +202,39 @@ fn expect_invalid_bounds_unit (outcome : Result ResourceError Unit)
 
 proc out_of_range_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (mapBytes AFull mapping (MkMappingWindow (6 : Int) (4 : Int)))
     (\outcome. expect_invalid_bounds outcome)
 
 proc out_of_range_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly out_of_range_body)
     (\outcome. finish outcome)
 
 proc out_of_range_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
     (mapWrite AFull mapping (6 : Int) (bytes_encode "ABCD"))
     (\outcome. expect_invalid_bounds_unit outcome)
 
 proc out_of_range_write_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadWrite
       out_of_range_write_body)
     (\outcome. finish outcome)
 
 proc negative_window_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (mapBytes AFull mapping
       (MkMappingWindow (sub_int (0 : Int) (1 : Int)) (1 : Int)))
     (\outcome. expect_invalid_bounds outcome)
 
 proc negative_window_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly negative_window_body)
     (\outcome. finish outcome)
 
@@ -305,26 +251,20 @@ proc after_read_to_read_only_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    Ok bytes |-> host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
       (mapWrite AFull mapping (0 : Int) (bytes_encode "X"))
       (\written. expect_read_only_refusal written)
   }
 
 proc read_then_read_only_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (mapBytes AFull mapping (MkMappingWindow (0 : Int) (1 : Int)))
     (\outcome. after_read_to_read_only_write mapping outcome)
 
 proc read_then_read_only_write_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly
       read_then_read_only_write_body)
     (\outcome. finish outcome)
@@ -334,43 +274,33 @@ proc after_read_to_out_of_range (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    Ok bytes |-> host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
       (mapBytes AFull mapping (MkMappingWindow (6 : Int) (4 : Int)))
       (\read. expect_invalid_bounds read)
   }
 
 proc read_then_out_of_range_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
     (mapBytes AFull mapping (MkMappingWindow (0 : Int) (1 : Int)))
     (\outcome. after_read_to_out_of_range mapping outcome)
 
 proc read_then_out_of_range_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly
       read_then_out_of_range_body)
     (\outcome. finish outcome)
 
 proc read_only_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
     (mapWrite AFull mapping (0 : Int) (bytes_encode "X"))
     (\outcome. expect_read_only_refusal outcome)
 
 proc read_only_write_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) MappingProt.ReadOnly read_only_write_body)
     (\outcome. finish outcome)
 
@@ -380,17 +310,13 @@ proc accounting_body (_mapping : MappingHandle)
 
 proc one_byte_accounting_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (1 : Int)) MappingProt.ReadOnly accounting_body)
     (\outcome. finish outcome)
 
 proc over_page_accounting_stage (_cap : Cap AFull)
   : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (4097 : Int)) MappingProt.ReadOnly accounting_body)
     (\outcome. finish outcome)
 

@@ -530,8 +530,8 @@ fn pinned_interior_evidence(
             "the renderer must actually retain the field type"
         );
         assert!(
-            !PRELUDE_FLOOR_NAMES.contains(&"FileOperation"),
-            "an unkeyed field type is not reserved"
+            PRELUDE_FLOOR_NAMES.contains(&"FileOperation"),
+            "FileOperation is a scoped floor family (intrinsic ledger)"
         );
         return BTreeSet::from([operation]);
     }
@@ -1083,13 +1083,13 @@ fn facade_exported_length_is_directly_import_explained() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: a non-home consumer refuses in Strict roots; its Legacy core
-/// retains the checked FileOperation ID as an unmet CanonicalHome prerequisite.
-/// CLAIMED: a directly written unimported name is not explained merely by
-/// its presence in an unrelated floor type. THE GAP: the homed System.Error
-/// unit is tested separately as a successful Strict owner.
+/// MEASURED: an unimported non-home unit writing FileOperation succeeds in
+/// Strict roots, and its Legacy core's FileOperation ID is explained by the
+/// scoped floor with no CanonicalHome prerequisite. CLAIMED: floor admission,
+/// not a home grant, accounts for the name. THE GAP: qualified Op* constructor
+/// resolution is pinned by the /conformance child, not here.
 #[test]
-fn system_error_written_file_operation_stays_a_prerequisite() {
+fn written_file_operation_resolves_from_the_scoped_floor() {
     let root = std::env::temp_dir()
         .join(format!("ken-file-operation-nonhome-{}", std::process::id()))
         .join("catalog")
@@ -1103,28 +1103,21 @@ fn system_error_written_file_operation_stays_a_prerequisite() {
     let units = discover_units(&root);
     let module = "Consumer";
     assert!(units[module].direct_imports.is_empty());
-    assert_eq!(
-        observe_strict(&root, module),
-        LoaderObservation::Refused {
-            stage: PipelineStage::Resolution,
-        }
-    );
+    assert_eq!(observe_strict(&root, module), LoaderObservation::Succeeded);
     let env = ElabEnv::new().expect("base environment");
     let file_operation = env.globals["FileOperation"];
     let evidence = legacy_evidence(&root, module, &units[module], &units);
     let row = UnitCensusRow {
         canonical_module: module.to_string(),
         parsed_direct_imports: units[module].direct_imports.clone(),
-        strict_observation: LoaderObservation::Refused {
-            stage: PipelineStage::Resolution,
-        },
+        strict_observation: LoaderObservation::Succeeded,
         legacy_observation: LoaderObservation::Succeeded,
         legacy_identity_evidence: evidence.clone(),
     };
     assert_eq!(
         validate_evidence_frontier(&[row]),
         Ok(()),
-        "non-home written prerequisite: {evidence:?}"
+        "written scoped-floor identity: {evidence:?}"
     );
     match evidence {
         LegacyIdentityEvidence::ExactLedger {
@@ -1133,12 +1126,7 @@ fn system_error_written_file_operation_stays_a_prerequisite() {
             ..
         } => {
             assert!(resolved_globals.contains(&file_operation));
-            assert!(identity_grounded_prerequisites.contains(
-                &IdentityPrerequisite::CanonicalHome {
-                    identity: file_operation,
-                    current_names: vec!["FileOperation".to_string()],
-                }
-            ));
+            assert!(identity_grounded_prerequisites.is_empty());
         }
         other => panic!("Consumer must have exact legacy evidence: {other:?}"),
     }
@@ -1149,22 +1137,25 @@ fn system_error_written_file_operation_stays_a_prerequisite() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: System.Error succeeds under Strict and the pre-source
-/// FileOperation identity is explained by its own checked home grant.
-/// CLAIMED: home ownership accounts for this direct source use without
-/// broadening the floor. THE GAP: a non-home consumer is tested above.
+/// FileOperation identity is explained by the scoped floor; the former home
+/// grant is retired (intrinsic ledger). CLAIMED: floor admission, not home
+/// ownership, accounts for this direct source use. THE GAP: the non-home
+/// consumer is tested by written_file_operation_resolves_from_the_scoped_floor
+/// above.
 #[test]
-fn system_error_file_operation_home_is_explained() {
+fn system_error_file_operation_is_floor_not_home_granted() {
     let root = catalog_root();
     let units = discover_units(&root);
     let module = "Capability.System.Error";
     assert_eq!(observe_strict(&root, module), LoaderObservation::Succeeded);
     let env = ElabEnv::new().expect("pre-source environment");
     let file_operation = env.globals["FileOperation"];
-    assert!(env
+    assert!(!env
         .module_state
         .package_home_ids(module)
         .iter()
         .any(|(_, id)| *id == file_operation));
+    assert!(PRELUDE_FLOOR_NAMES.contains(&"FileOperation"));
     match legacy_evidence(&root, module, &units[module], &units) {
         LegacyIdentityEvidence::ExactLedger {
             resolved_globals,
@@ -1174,7 +1165,7 @@ fn system_error_file_operation_home_is_explained() {
             assert!(resolved_globals.contains(&file_operation));
             assert!(
                 identity_grounded_prerequisites.is_empty(),
-                "home grant explains source identity"
+                "scoped floor explains source identity"
             );
         }
         other => panic!("System.Error must have exact evidence: {other:?}"),

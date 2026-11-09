@@ -8,7 +8,7 @@ program capabilities FS APartial
 -- total each time it is called.
 --
 -- Genuine hidden state, not a threaded parameter: built on the landed
--- `[State]` effect surface (VAL2 #10) -- `state_get`/`state_put`/`bind`/
+-- `[State]` effect surface (VAL2 #10) -- `state_get`/`state_put`/`itree_bind`/
 -- `run_state` over an `ITree`. Each "call" (`addTo n`) is one
 -- `state_get`-then-`state_put`-then-`Ret`
 -- step; the accumulator's running total is never a caller-visible
@@ -46,14 +46,14 @@ fn addNat (a : Nat) (b : Nat) : Nat =
 -- one "call": read the running total, add `n`, store it back, return the
 -- NEW total (the task's own semantics: "returns the current total").
 fn addTo (n : Nat) : ITree Op Resp Nat =
-  bind
+  itree_bind
     Op
     Resp
     Nat
     Nat
     (state_get Nat Eff RespEff MkUnit)
     (λprev.
-      bind
+      itree_bind
         Op
         Resp
         Unit
@@ -93,14 +93,14 @@ const ten : Nat = addNat five five
 -- discriminating: each returns the NEW running total (2, then 5), and the
 -- state persists/accumulates across calls (not just constant per-call).
 const prog : ITree Op Resp Bool =
-  bind
+  itree_bind
     Op
     Resp
     Nat
     Bool
     (addTo two)
     (λr1.
-      bind
+      itree_bind
         Op
         Resp
         Nat

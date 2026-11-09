@@ -495,6 +495,7 @@ fn class_owner_provider_loader_visible_inventories_are_exact() {
             "bytes_deceq_eq::sound".to_owned(),
             "bytes_to_list_injective".to_owned(),
             "charToInt".to_owned(),
+            "intToChar".to_owned(),
             "bool_and".to_owned(),
             "bool_and::assoc".to_owned(),
             "bool_and::comm".to_owned(),

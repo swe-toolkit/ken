@@ -193,8 +193,8 @@ fn safe_bytes_option_and_result_slots_agree_with_source_values() {
 #[test]
 fn fs_directory_and_file_error_path_slots_agree_with_source() {
     let (elab, mut store) = fixture(&[
-        "const dirSource : List DirEntry = Cons DirEntry (MkDirEntry (bytes_encode \"a\") KFile) (Nil DirEntry)",
-        "const dirDifferent : List DirEntry = Cons DirEntry (MkDirEntry (bytes_encode \"b\") KFile) (Nil DirEntry)",
+        "const dirSource : List DirEntry = Cons DirEntry (DirEntry.MkDirEntry (bytes_encode \"a\") FileKind.KFile) (Nil DirEntry)",
+        "const dirDifferent : List DirEntry = Cons DirEntry (DirEntry.MkDirEntry (bytes_encode \"b\") FileKind.KFile) (Nil DirEntry)",
         "const pathSource : Option Bytes = Some Bytes (bytes_encode \"a\")",
         "const pathDifferent : Option Bytes = Some Bytes (bytes_encode \"b\")",
     ]);

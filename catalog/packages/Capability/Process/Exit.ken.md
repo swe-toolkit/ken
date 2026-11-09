@@ -11,7 +11,7 @@ total policy supplied by the program, so every constructor of an
 application-specific result is handled in ordinary Ken code.
 
 ```ken
-export host_program, host_program_then, host_console, host_fs, host_pure, host_bind
+export host_program, host_program_then, host_console, host_fs, host_pure, host_bind, host_clock
 
 const exit_success : ExitCode = ExitCode.Success
 

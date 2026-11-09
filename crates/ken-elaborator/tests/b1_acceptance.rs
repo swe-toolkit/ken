@@ -441,9 +441,7 @@ proc after_flush (_outcome : Result IOError Unit)
   host_clock AFull Instant wall_now
 
 proc h (_value : Unit) : HostIO AFull Instant visits [Console, Clock] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result IOError Unit) Instant
+  host_bind AFull (Result IOError Unit) Instant
     (host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout))
     (\outcome. after_flush outcome)
 "#;

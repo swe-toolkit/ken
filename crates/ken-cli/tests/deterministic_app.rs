@@ -11,31 +11,23 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   match input {
     MkProcessInput arguments environment cwd |->
       match arguments {
-        Nil |-> host_exit AFull (ExitCode.Failure 2) ;
+        Nil |-> host_pure AFull ExitCode (ExitCode.Failure 2) ;
         Cons argument _ |->
           match environment {
-            Nil |-> host_exit AFull (ExitCode.Failure 3) ;
+            Nil |-> host_pure AFull ExitCode (ExitCode.Failure 3) ;
             Cons entry _ |->
               match entry {
                 MkProd _ value |->
                   match caps {
                     ProgramCaps.MkProgramCaps cap |->
-                      bind (Coproduct (FSOp AFull) AmbientOp)
-                           (resp_coproduct (FSOp AFull) AmbientOp
-                             (fs_resp AFull) ambient_resp)
-                           (Result FileError Unit) ExitCode
-                        (inject_l (FSOp AFull) AmbientOp
-                          (fs_resp AFull) ambient_resp
-                          (Result FileError Unit)
+                      host_bind AFull (Result FileError Unit) ExitCode
+                        (host_fs AFull (Result FileError Unit)
                           (writeFile cap cwd CreatePolicy.CreateNew value))
                         (\_ .
-                          bind (Coproduct (FSOp AFull) AmbientOp)
-                               (resp_coproduct (FSOp AFull) AmbientOp
-                                 (fs_resp AFull) ambient_resp)
-                               (Result IOError Unit) ExitCode
+                          host_bind AFull (Result IOError Unit) ExitCode
                             (host_console AFull (Result IOError Unit)
                               (write ConsoleStream.Stdout argument))
-                            (\_ . host_exit AFull ExitCode.Success))
+                            (\_ . host_pure AFull ExitCode ExitCode.Success))
                   }
               }
           }

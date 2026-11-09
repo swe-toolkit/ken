@@ -41,24 +41,6 @@ retry rule and both laws are the entry's first operations.
 ### Data families
 
 ```ken
-export FileOperation,
-  OpReadFile,
-  OpWriteFile,
-  OpAppendFile,
-  OpMetadata,
-  OpReadDirectory,
-  OpCreateDirectory,
-  OpRemoveFile,
-  OpRemoveDirectory,
-  OpRename,
-  OpChangeMode,
-  OpSeek,
-  OpSetLength,
-  OpSync,
-  OpGetInheritance,
-  OpSetInheritance,
-  OpDuplicate
-
 import Core.Logic.Conjunction (And, and_intro)
 
 export Transience, Transient, Permanent
@@ -170,22 +152,22 @@ pub fn operation_idempotence (operation : Operation) : Idempotence =
   match operation {
     FilesystemOp file_operation ↦
       match file_operation {
-        OpReadFile ↦ Idempotent;
-        OpWriteFile ↦ NonIdempotent;
-        OpAppendFile ↦ NonIdempotent;
-        OpMetadata ↦ Idempotent;
-        OpReadDirectory ↦ Idempotent;
-        OpCreateDirectory ↦ NonIdempotent;
-        OpRemoveFile ↦ NonIdempotent;
-        OpRemoveDirectory ↦ NonIdempotent;
-        OpRename ↦ NonIdempotent;
-        OpChangeMode ↦ Idempotent;
-        OpSeek ↦ NonIdempotent;
-        OpSetLength ↦ Idempotent;
-        OpSync ↦ Idempotent;
-        OpGetInheritance ↦ Idempotent;
-        OpSetInheritance ↦ Idempotent;
-        OpDuplicate ↦ NonIdempotent
+        FileOperation.OpReadFile ↦ Idempotent;
+        FileOperation.OpWriteFile ↦ NonIdempotent;
+        FileOperation.OpAppendFile ↦ NonIdempotent;
+        FileOperation.OpMetadata ↦ Idempotent;
+        FileOperation.OpReadDirectory ↦ Idempotent;
+        FileOperation.OpCreateDirectory ↦ NonIdempotent;
+        FileOperation.OpRemoveFile ↦ NonIdempotent;
+        FileOperation.OpRemoveDirectory ↦ NonIdempotent;
+        FileOperation.OpRename ↦ NonIdempotent;
+        FileOperation.OpChangeMode ↦ Idempotent;
+        FileOperation.OpSeek ↦ NonIdempotent;
+        FileOperation.OpSetLength ↦ Idempotent;
+        FileOperation.OpSync ↦ Idempotent;
+        FileOperation.OpGetInheritance ↦ Idempotent;
+        FileOperation.OpSetInheritance ↦ Idempotent;
+        FileOperation.OpDuplicate ↦ NonIdempotent
       };
     ProcessOp process_operation ↦
       match process_operation {
@@ -224,7 +206,7 @@ revocation identity.
 const revoked_retry : RetryGuidance =
   retry_guidance
     (error_transience IOError.Revoked)
-    (operation_idempotence (FilesystemOp OpReadFile))
+    (operation_idempotence (FilesystemOp FileOperation.OpReadFile))
 
 theorem revoked_retry_is_permanent : Equal RetryGuidance revoked_retry DoNotRetryPermanent =
   Proved

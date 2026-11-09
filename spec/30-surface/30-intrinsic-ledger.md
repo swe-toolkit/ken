@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative forty-identity prelude and its exact
+> normative fifty-one-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -40,11 +40,15 @@ copied source declaration **cannot** replace a machinery-keyed `GlobalId`;
 there is **no intrinsic import module**. The unkeyed laws/helpers below are
 not candidates for floor membership.
 
-Apart from internal-only `Empty` and the admitted entrypoint-ABI,
-effect/clock, ITree, six earlier FS/resource families, the five
-scoped progress/acquisition/mapping/child-result families,
-`ConsoleStream`, `eqChar` and the three State operations below, the
-other names in this table are
+Apart from internal-only `Empty`, the original fifteen floor identities
+(`30 §4`), and the admitted entrypoint-ABI, effect/clock, ITree, six
+earlier FS/resource families, the five scoped
+progress/acquisition/mapping/child-result families, the five
+Increment 3a scoped families (`ReadResult`, `FileMetadata`, `FileKind`,
+`DirEntry`, `FileOperation`), scoped `StateOp` and checked `resp_state`,
+the four direct-ITree floor identities (`ConsoleOp`, `console_resp`,
+`itree_bind`, `resp_coproduct`), `ConsoleStream`, `eqChar`, and the three
+earlier State operations below, the other names in this table are
 **observed spellings**, not names approved for permanent reservation.
 Before a later slice admits a newly witnessed name, Spec checks that
 its spelling closely encloses its meaning (`30 §4`). For the admitted
@@ -88,6 +92,12 @@ constructor still has the same checked parent and `GlobalId`.
 | `ResourceOpenMode` (floor) | Yes | `ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata` and `ResourceOpenMode.ResourceWriteCreate` select FS acquisition modes; their leaves are not bare-reserved. |
 | `MappingProt` (floor) | Yes | `MappingProt.ReadOnly` and `MappingProt.ReadWrite` select mapping protection; neither leaf is bare-reserved. |
 | `ChildExit` (floor) | Yes | `ChildExit.Exited` and `ChildExit.Signaled` are the complete checked wait-result family; neither leaf is bare-reserved. |
+| `ReadResult` (floor) | Yes | `ReadResult.Chunk` and `ReadResult.Eof` are the complete checked Console-read reply family; bare leaves are not reserved. |
+| `FileMetadata` (floor) | Yes | The native-selected constructor resolves only as `FileMetadata.MkFileMetadata`, with no bare reservation. |
+| `FileKind` (floor) | Yes | The four native-selected kind cases resolve only as `FileKind.KFile`, `FileKind.KDirectory`, `FileKind.KSymlink` and `FileKind.KOther`. |
+| `DirEntry` (floor) | Yes | The native-selected constructor resolves only as `DirEntry.MkDirEntry`, with no bare reservation. |
+| `FileOperation` (floor; former package home) | Yes | All sixteen checked operation cases resolve only as `FileOperation.Op*` paths; the old bare exports and home rows retire atomically. |
+| `StateOp` (floor) | Yes | The exact checked State operation carrier resolves as `StateOp.Get` and `StateOp.Put`; neither generic leaf is bare-reserved. `State s` is its signature label, not a separate source type (§36 §4.2). |
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
 | `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
@@ -157,12 +167,18 @@ alone reserves a name.
 | `host_pure` (package) | Checked prelude HostIO return definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
 | `host_bind` (package) | Checked prelude HostIO sequencing definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
 | `eqChar` (floor operation) | `decimal_char.rs::set_eq_entry` captures its checked ID; the Char `==` plan and character literal patterns read that registration. The string-literal-pattern reader is rekeyed to the same exact ID instead of a mutable spelling lookup. §34 literal equality and §37 Char/string operations require the canonical comparator in source. It is a checked operation, not a type or constructor family. |
+| `StateOp` (floor, scoped) | The space desugarer constructs this exact checked operation carrier (`elab.rs:22321–22336`); §36 §4.2 requires source to name it for direct `run_state` trees. Its checked `Get`/`Put` leaves resolve as `StateOp.Get`/`StateOp.Put`. |
+| `resp_state` (floor operation) | The same desugarer constructs this exact checked response family; §36 §4.2's dependent State response requires it in a direct tree. `resp_state` is a checked definition, not a constructor or separate `State` type. |
+| `Get` (qualified floor constructor) | Exact State operation ID, source `StateOp.Get`, not bare. |
+| `Put` (qualified floor constructor) | Exact State operation ID, source `StateOp.Put`, not bare. |
 | `run_state` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires the State runner as a source operation. Not a type or Pair companion. |
 | `state_get` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires source access to the State read operation. Bare `get` remains unreserved. |
 | `state_put` (floor operation) | The space desugarer reads its exact pre-source checked ID; §36 §4.5 requires source access to the State write operation. Bare `put` remains unreserved. |
 | `leqChar` (package) | No native exact-ID reader; §37 Char ordering still requires this checked comparison. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import, with no copied definition. |
 | `charToInt` (package) | No native exact-ID reader; §18a §5.9.1 and §38 ASCII/parsing use its checked `Char → Int` projection. `Core.Classes.LawfulClasses` exports its captured pre-source ID for explicit import. |
-| `IO` (package) | Checked Console-ITree alias. The effect reifier selects `ITree` and `ConsoleOp` checked IDs, not the `IO` alias ID. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
+| `ConsoleOp` (floor, scoped) | The effect reifier and native Console operations select its exact checked ID; source needs it for direct Console trees. The complete `Read`/`Write`/`Flush`/`IsTerminal` family resolves only as `ConsoleOp.C`. |
+| `console_resp` (floor operation) | The effect reifier and direct Console trees use this exact checked response-family ID, not the `IO` alias. It has no constructor family. |
+| `IO` (package) | Checked Console-ITree alias. The effect reifier selects the floor `ITree` and `ConsoleOp` checked IDs, not the `IO` alias ID. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `FS` (package, not floor) | Source-promised Auth-indexed ITree alias in `read_bytes`/`write_file` types (`38`); no native reader of this alias ID. The effect/capability label `FS` is a separate namespace. |
 | `ITree` (floor, scoped) | `PreludeEnv.itree_id` captures the checked pre-source inductive ID; effect lowering and the host interpreter select that family by exact ID. The surface requires source to name the canonical type and its constructors (`36 §2.1`, §2.4). A same-shaped source family does not replace it. |
 | `Ret` (qualified floor constructor) | `PreludeEnv.ret_id` and the runtime-role capture select its checked `ITree` constructor ID; source uses `ITree.Ret`, never a reserved bare `Ret`. The constructor itself is not renamed. |
@@ -170,6 +186,10 @@ alone reserves a name.
 | `Coproduct` (floor, scoped) | `PreludeEnv.coproduct_id` identifies the checked effect-signature sum; native composition keys the exact injection parents and source needs the family (`36 §2.3`, §4.5.7). |
 | `InL` (qualified floor constructor) | `CanonicalRuntimeRoles::in_l` selects the exact `Coproduct` constructor; only `Coproduct.InL` resolves, not bare `InL`. |
 | `InR` (qualified floor constructor) | `CanonicalRuntimeRoles::in_r` selects the exact `Coproduct` constructor; only `Coproduct.InR` resolves, not bare `InR`. |
+| `itree_bind` (floor operation) | The space desugarer selects `effect_sequencing_ids`' checked `bind_id`; direct State, Console and composed trees require this generic sequencing identity. Both modes add the specific `itree_bind` spelling to that ID after the pre-source snapshot. Legacy also keeps bare `bind`; Strict neither reserves nor ambiently resolves bare `bind`. The ID comes from the capture, not `globals["bind"]`. |
+| `resp_coproduct` (floor operation) | The elaborator constructs this exact checked response-family ID; direct composed-effect trees name it. It is not the `HostIO` alias or a constructor. |
+| `inject_l` (package) | No native exact-ID reader; §36 §4.5.7 promises the generic checked coproduct injection. `Core.Effect.Coproduct` exports its captured pre-source ID for explicit import. Complete HostIO instances may instead use `host_fs`. |
+| `inject_r` (package) | No native exact-ID reader; §36 §4.5.7 promises the generic checked coproduct injection. `Core.Effect.Coproduct` exports its captured pre-source ID for explicit import. Complete HostIO instances may instead use `host_console`. |
 | `ConsoleStream` (renamed from `Stream`; floor, scoped) | Native interpreter and lowering select the exact checked constructor family and parent. Source `read` and the console output package require its canonical type. The specific source name avoids collision with §37's distinct `Stream`; its pre-source native `Stream::C` artifact leaves stay unchanged. |
 | `Stdin` (qualified floor constructor) | Interpreter selects its exact checked ID; source `read` names `ConsoleStream.Stdin`, never bare `Stdin`. |
 | `Stdout` (qualified floor constructor) | Interpreter selects its exact checked ID; output source names `ConsoleStream.Stdout`, never bare `Stdout`. |
@@ -184,7 +204,7 @@ alone reserves a name.
 | `BufferHandle` (package, abstract) | `Capability.System.Buffer` homes this checked type alone; its `PrivateBufferHandle` constructor is not public or a floor identity. |
 | `readAt` (package) | `Capability.System.IO` exports the checked bounded read wrapper; it returns floor `ReadProgress`. |
 | `spanBytes` (package) | The same IO package exports the checked bounded span-to-bytes wrapper. |
-| `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
+| `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and floor `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `print_line` (package) | Checked Console helper promised by §38 and existing programs, with no native exact-ID reader. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `write_file` (package, not floor) | Source-promised checked FS wrapper; native code keys the emitted `ITree.Vis`/`WriteFile` identities, not this wrapper's ID. |
 | `FileError` (floor, unscoped) | `38 §1.3.1` requires this public FS result carrier; native code mints the exact checked `MkFileError` constructor and thereby keys its parent. |
@@ -241,8 +261,37 @@ alone reserves a name.
 | `ReadOnly` (qualified floor constructor) | Checked mapping protection, source `MappingProt.ReadOnly`, not bare. |
 | `ReadWrite` (qualified floor constructor) | Checked mapping protection, source `MappingProt.ReadWrite`, not bare. |
 | `ChildExit` (floor, scoped) | Native child wait returns this exact checked family (`38 §1.11`); source matches its code or signal. |
+| `ReadResult` (floor, scoped) | The Console-read dispatcher creates exact `Chunk`/`Eof` IDs (`ken-interp/eval.rs`); §38 §1.12 requires source to name the result family. |
+| `FileMetadata` (floor, scoped) | Native metadata replies create `MkFileMetadata` by exact ID; §38 §1.12 requires source to name the result. |
+| `FileKind` (floor, scoped) | Native metadata and directory replies create exact kind constructors; §38 §1.12 requires source case analysis. |
+| `DirEntry` (floor, scoped) | Native directory replies create `MkDirEntry` by exact ID; §38 §1.12 requires source to name it. |
+| `FileOperation` (floor, scoped; former package home) | Native FileError paths create exact operation cases; §33 §3.3 already requires source to name this family. Retire its H home and all sixteen constructor rows together. |
 | `Exited` (qualified floor constructor) | Checked exit-code result, source `ChildExit.Exited`, not bare. |
 | `Signaled` (qualified floor constructor) | Checked signal result, source `ChildExit.Signaled`, not bare. |
+| `Chunk` (qualified floor constructor) | Native Console-read reply constructs its exact checked ID; source `ReadResult.Chunk`. |
+| `Eof` (qualified floor constructor) | Native Console-read reply constructs its exact checked ID; source `ReadResult.Eof`. |
+| `MkFileMetadata` (qualified floor constructor) | Native metadata reply constructs its exact checked ID; source `FileMetadata.MkFileMetadata`. |
+| `KFile` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KFile`. |
+| `KDirectory` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KDirectory`. |
+| `KSymlink` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KSymlink`. |
+| `KOther` (qualified floor constructor) | Native metadata kind ID; source `FileKind.KOther`. |
+| `MkDirEntry` (qualified floor constructor) | Native directory entry ID; source `DirEntry.MkDirEntry`. |
+| `OpReadFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpReadFile`. |
+| `OpWriteFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpWriteFile`. |
+| `OpAppendFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpAppendFile`. |
+| `OpMetadata` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpMetadata`. |
+| `OpReadDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpReadDirectory`. |
+| `OpCreateDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpCreateDirectory`. |
+| `OpRemoveFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveFile`. |
+| `OpRemoveDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveDirectory`. |
+| `OpRename` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRename`. |
+| `OpChangeMode` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpChangeMode`. |
+| `OpSeek` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSeek`. |
+| `OpSetLength` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSetLength`. |
+| `OpSync` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSync`. |
+| `OpGetInheritance` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpGetInheritance`. |
+| `OpSetInheritance` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSetInheritance`. |
+| `OpDuplicate` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpDuplicate`. |
 | `ResourceBodyResult` (package, not floor) | Source-promised bracket body-result carrier (`38 §1.7.1`); no native reader or producer of its exact ID. |
 | `ResourceBodyOk` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
 | `ResourceBodyErr` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
@@ -253,16 +302,24 @@ alone reserves a name.
 | `ResourceBracketBodyAndReleaseError` (package constructor) | Checked `ResourceBracketResult` case, not a floor constructor or bare reservation. |
 
 The five entrypoint-ABI, three effect/clock, `ITree`, six earlier
-FS/resource, five new scoped progress/acquisition/mapping/child-result,
-`ConsoleStream`, `eqChar` and the three checked State operations marked
-floor above join B alongside the original fifteen: forty counted
-identities. Their operation spellings are protected; bare `get` and
-`put` are not reserved by the State trio.
-The package-home roster now has sixty-one rows: the prior forty-six,
-twelve further checked homes, and the three Exit HostIO lifts/return/
-sequence names. The package rows above are not additional floor
-members or bare Strict names. The three Console constructors retain
-their exact IDs and scoped paths but are not separate
+FS/resource, five scoped progress/acquisition/mapping/child-result,
+`ConsoleStream`, `eqChar`, five checked State identities (the three
+prior operations plus `StateOp` and `resp_state`), five Increment 3a
+result/FS scoped families, and `ConsoleOp`, `console_resp`, `itree_bind`
+and `resp_coproduct` marked floor above join B alongside the original
+fifteen: fifty-one counted identities. Their floor spellings are
+protected; scoped case leaves and bare `get`, `put` and `bind` do not
+enter B through the checked operations. The package-home roster's
+Increment 3a target has ninety-six rows: the eighty-one at its base,
+minus seventeen retired FileOperation family rows, plus thirty-two
+new H rows (fifteen further checked wrappers/operations, four Child
+names, three formerly held wrappers, eight safe fixed-width narrowings,
+and two generic coproduct injections). The scoped families were never
+package homes; `resp_state`, `console_resp`, `itree_bind` and
+`resp_coproduct` are floor operations rather than package material. The package rows
+above are not additional floor members or bare Strict names. The three
+Console constructors retain their exact IDs and scoped paths but are
+not separate
 `PRELUDE_FLOOR_NAMES` entries. Unscoped constructor
 families reserve bare names; scoped families retain exact IDs reachable
 only through `T.C` when public, without bare B entries.
@@ -354,7 +411,7 @@ only if source must name that exact identity, otherwise it remains internal.
 | Family | Existing normative promise | Disposition once unkeyed is confirmed |
 |---|---|---|
 | `checked*` / `saturating*` | `35 §3.2` promises `Option`-on-overflow and clamp semantics as distinct explicit classes; `18a §5.3` derives them from bignum and safe casts. | Keep the named behavior as checked package definitions; never silently delete the class or make bare arithmetic wrap. |
-| `intTo*` | `35 §5` promises explicit total/partial conversions; `18a §5.7` distinguishes safe `intToIntN` from native unchecked `int_to_*_raw`. | Export safe conversions from packages; raw casts retain only their audited primitive role, not an ambient safe alias. Missing non-width conversions remain declared gaps. |
+| `intTo*` | `35 §5` promises explicit total/partial conversions; `18a §5.7` distinguishes safe `intToIntN` from native unchecked `int_to_*_raw`. | The eight checked safe `intToInt8/16/32/64` and `intToUInt8/16/32/64` definitions have one explicit-import home, `Data.Numeric.FixedWidth`, at their existing IDs. Native Rust captures none of these safe definition IDs outside their registration (`conversions.rs:229–242`); they do not join the floor. The raw casts keep their separate primitive role; missing non-width conversions remain gaps. |
 | `decimal*` | `35 §2.3` and `18a §5.6.1` require exact decimal arithmetic and distinct value equality; `decimalPow10Unbounded` is the exceptional audited postulate. | Place ordinary derived arithmetic/comparison helpers in packages; do not silently equate value-equality with structural `Equal` or delete the deferred alignment boundary. |
 | Retry/transience | `38 §1.8` requires separate error-transience and operation-idempotence inputs and one permanent `Revoked` identity. | Publish checked classification types and laws through an explicit package; a transience-only `retryable` is not a substitute. |
 | Mapping/buffer | `38 §1.7` and `§1.9` require bounded, bracket-scoped buffer/mapping operations, view identities, and refusals. | Public checked brackets, descriptors, accessors and laws move into explicit-import packages; native resource operations/IDs stay behind the host boundary. |

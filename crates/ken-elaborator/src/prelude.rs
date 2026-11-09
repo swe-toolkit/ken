@@ -981,10 +981,11 @@ fn register_prelude_inductives(elab: &mut ElabEnv) -> Result<(), ElabError> {
         // never went through `elab.globals.insert`), say `<unnamed>` and
         // still print the bare id -- a diagnostic that can fail to render is
         // worse than the bare id it replaces.
+        let names = crate::names_by_id(&elab.globals);
         let offenders: Vec<String> = combinator_actual_delta
             .iter()
-            .map(|id| match elab.globals.iter().find(|(_, v)| *v == id) {
-                Some((name, _)) => format!("{name} ({id:?})"),
+            .map(|id| match names.get(id) {
+                Some(name) => format!("{name} ({id:?})"),
                 None => format!("<unnamed> ({id:?})"),
             })
             .collect();
@@ -3629,6 +3630,13 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // declarations have been checked against their original bindings. The
     // effect/Clock constructors are registered before this capture as well.
     for name in [
+        "ConsoleOp",
+        "DirEntry",
+        "FileKind",
+        "FileMetadata",
+        "FileOperation",
+        "ReadResult",
+        "StateOp",
         "ExitCode",
         "ProgramCaps",
         "Coproduct",

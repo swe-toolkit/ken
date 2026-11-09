@@ -311,9 +311,8 @@ impl Fixture {
 
     fn alternative_error(&mut self, e: &str, actual: &EvalVal) -> EvalVal {
         match e {
-            "FileError" => {
-                self.eval_expr("MkFileError OpReadFile (None Bytes) IOError.Unsupported")
-            }
+            "FileError" => self
+                .eval_expr("MkFileError FileOperation.OpReadFile (None Bytes) IOError.Unsupported"),
             "ResourceError" => {
                 let alternative = if matches!(actual, EvalVal::Ctor { id, .. }
                     if *id == self.id("ResourceError.InvalidBounds"))
@@ -364,7 +363,7 @@ impl Fixture {
                 } else {
                     b"different-content".as_slice()
                 };
-                self.construct("Chunk", [Self::bytes(alternative)])
+                self.construct("ReadResult.Chunk", [Self::bytes(alternative)])
             }
             "FileMetadata" => {
                 let EvalVal::Ctor { id, args, .. } = actual else {
@@ -376,7 +375,10 @@ impl Fixture {
                 } else {
                     100
                 };
-                self.construct("MkFileMetadata", [EvalVal::Int(size), args[1].clone()])
+                self.construct(
+                    "FileMetadata.MkFileMetadata",
+                    [EvalVal::Int(size), args[1].clone()],
+                )
             }
             "(List DirEntry)" => {
                 assert!(

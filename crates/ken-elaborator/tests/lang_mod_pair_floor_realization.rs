@@ -11,19 +11,24 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 40] = [
+const TYPE_FLOOR: [&str; 51] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
     "ChildExit",
+    "ConsoleOp",
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
+    "DirEntry",
     "Equal",
     "ExitCode",
     "FileError",
+    "FileKind",
+    "FileMetadata",
+    "FileOperation",
     "HostIO",
     "IOError",
     "ITree",
@@ -39,22 +44,73 @@ const TYPE_FLOOR: [&str; 40] = [
     "Prop",
     "Proved",
     "ReadProgress",
+    "ReadResult",
     "ResourceError",
     "ResourceKind",
     "ResourceOpenMode",
     "Result",
+    "StateOp",
     "Top",
     "TransferCount",
     "Unit",
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "console_resp",
+    "itree_bind",
+    "resp_coproduct",
+    "resp_state",
     "run_state",
     "state_get",
     "state_put",
 ];
 
 const COMPANIONS: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
+const INTERNAL_FLOOR: [&str; 43] = [
+    "Nat",
+    "Pair",
+    "Coproduct",
+    "ConsoleStream",
+    "eqChar",
+    "Instant",
+    "ITree",
+    "Unit",
+    "Bottom",
+    "BufferSpan",
+    "ChildExit",
+    "CreatePolicy",
+    "Equal",
+    "ExitCode",
+    "FileError",
+    "HostIO",
+    "IOError",
+    "MappingProt",
+    "ProcessInput",
+    "Prod",
+    "ProgramCaps",
+    "Prop",
+    "Proved",
+    "ReadProgress",
+    "ResourceError",
+    "ResourceOpenMode",
+    "TransferCount",
+    "Top",
+    "WriteProgress",
+    "run_state",
+    "state_get",
+    "state_put",
+    "ConsoleOp",
+    "console_resp",
+    "DirEntry",
+    "FileKind",
+    "FileMetadata",
+    "FileOperation",
+    "ReadResult",
+    "StateOp",
+    "itree_bind",
+    "resp_coproduct",
+    "resp_state",
+];
 const PAIR_BINDINGS: [&str; 4] = ["Pair", "mk_pair", "pair_fst", "pair_snd"];
 
 struct FixtureRoot(PathBuf);
@@ -213,20 +269,22 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the primitive producer traversal yields exactly eight signature
-/// identities, and Nat, Pair, five kernel-keyed proposition/equality members,
-/// five source-required entrypoint-ABI identities, three effect/clock identities,
-/// ITree, and six FS/resource families (BufferSpan, CreatePolicy, FileError,
-/// IOError, ResourceError, TransferCount), ConsoleStream, and the separate
-/// checked Char comparator eqChar, five scoped resource families and three
-/// checked State operations close the floor to forty identities.
-/// The separately configured companion inventory has three checked-transparent
-/// constants keyed to the exact Pair identity. CLAIMED: type and binding
-/// membership are independent closed
-/// inventories rather than one compiler-global allow-list. THE GAP: source
-/// resolution through these inventories is pinned independently below.
+/// identities. Nat, Pair, the kernel-keyed proposition/equality members,
+/// entrypoint-ABI and effect/clock identities, ITree, the FS/resource families,
+/// ConsoleStream and eqChar, scoped resource families and State operations
+/// formed the prior forty-member floor. The scoped ConsoleOp family with
+/// console_resp, the FS metadata/operation families (DirEntry, FileKind,
+/// FileMetadata, FileOperation, ReadResult), StateOp, and the ITree/response
+/// combinators itree_bind, resp_coproduct and resp_state close the floor to
+/// fifty-one. The separately configured companion inventory has three
+/// checked-transparent constants keyed to the exact Pair identity. CLAIMED:
+/// type and binding membership are independent closed inventories rather
+/// than one compiler-global allow-list. THE GAP: source resolution through
+/// these inventories is pinned independently below.
 #[test]
 fn prelude_signature_inventory_is_executable_and_closed() {
     assert_eq!(PRELUDE_FLOOR_NAMES.as_slice(), TYPE_FLOOR.as_slice());
+    assert!(INTERNAL_FLOOR.iter().all(|name| TYPE_FLOOR.contains(name)));
     assert_eq!(
         PRELUDE_COMPANION_BINDING_NAMES.as_slice(),
         COMPANIONS.as_slice()
@@ -235,84 +293,15 @@ fn prelude_signature_inventory_is_executable_and_closed() {
     let env = ElabEnv::new().expect("base environment");
     let signature_expected = TYPE_FLOOR
         .into_iter()
-        .filter(|name| {
-            !matches!(
-                *name,
-                "Nat"
-                    | "Pair"
-                    | "Coproduct"
-                    | "ConsoleStream"
-                    | "eqChar"
-                    | "Instant"
-                    | "ITree"
-                    | "Unit"
-                    | "Bottom"
-                    | "BufferSpan"
-                    | "ChildExit"
-                    | "CreatePolicy"
-                    | "Equal"
-                    | "ExitCode"
-                    | "FileError"
-                    | "HostIO"
-                    | "IOError"
-                    | "MappingProt"
-                    | "ProcessInput"
-                    | "Prod"
-                    | "ProgramCaps"
-                    | "Prop"
-                    | "Proved"
-                    | "ReadProgress"
-                    | "ResourceError"
-                    | "ResourceOpenMode"
-                    | "TransferCount"
-                    | "Top"
-                    | "WriteProgress"
-                    | "run_state"
-                    | "state_get"
-                    | "state_put"
-            )
-        })
+        .filter(|name| !INTERNAL_FLOOR.contains(name))
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
     assert_eq!(primitive_signature_type_ids(&env), signature_expected);
 
-    let internal = [
-        "Nat",
-        "Pair",
-        "Coproduct",
-        "ConsoleStream",
-        "eqChar",
-        "Instant",
-        "ITree",
-        "Unit",
-        "Bottom",
-        "BufferSpan",
-        "ChildExit",
-        "CreatePolicy",
-        "Equal",
-        "ExitCode",
-        "FileError",
-        "HostIO",
-        "IOError",
-        "MappingProt",
-        "ProcessInput",
-        "Prod",
-        "ProgramCaps",
-        "Prop",
-        "Proved",
-        "ReadProgress",
-        "ResourceError",
-        "ResourceOpenMode",
-        "TransferCount",
-        "Top",
-        "WriteProgress",
-        "run_state",
-        "state_get",
-        "state_put",
-    ]
-    .map(|name| env.globals[name])
-    .into_iter()
-    .collect::<BTreeSet<_>>();
+    let internal = INTERNAL_FLOOR
+        .map(|name| env.globals[name])
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     let configured = PRELUDE_FLOOR_NAMES
         .map(|name| env.globals[name])
         .into_iter()
@@ -634,7 +623,10 @@ fn pair_floor_closure_is_rederived_after_realization() {
         let mut env = ElabEnv::new().expect("base environment");
         let pair_bindings = PAIR_BINDINGS.map(|name| env.globals[name]);
         let result = env.elaborate_module_from_roots_strict(&[root.clone()], module);
-        assert!(result.is_ok(), "{module} must load through its checked providers: {result:?}");
+        assert!(
+            result.is_ok(),
+            "{module} must load through its checked providers: {result:?}"
+        );
         assert_eq!(
             PAIR_BINDINGS.map(|name| env.globals[name]),
             pair_bindings,

@@ -267,19 +267,24 @@ impl ModuleState {
 /// identity inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 40] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 51] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
     "Char",
     "ChildExit",
+    "ConsoleOp",
     "ConsoleStream",
     "Coproduct",
     "CreatePolicy",
+    "DirEntry",
     "Equal",
     "ExitCode",
     "FileError",
+    "FileKind",
+    "FileMetadata",
+    "FileOperation",
     "HostIO",
     "IOError",
     "ITree",
@@ -295,16 +300,22 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 40] = [
     "Prop",
     "Proved",
     "ReadProgress",
+    "ReadResult",
     "ResourceError",
     "ResourceKind",
     "ResourceOpenMode",
     "Result",
+    "StateOp",
     "Top",
     "TransferCount",
     "Unit",
     "Utf8Error",
     "WriteProgress",
     "eqChar",
+    "console_resp",
+    "itree_bind",
+    "resp_coproduct",
+    "resp_state",
     "run_state",
     "state_get",
     "state_put",
@@ -313,15 +324,38 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 40] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 81] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 96] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
+    ("Capability.Console.Text", "read"),
     ("Capability.Console.Text", "print_line"),
+    ("Capability.Console.Text", "flush"),
+    ("Capability.Console.Text", "is_terminal"),
     ("Core.Classes.LawfulClasses", "charToInt"),
     ("Core.Classes.LawfulClasses", "leqChar"),
+    ("Core.Classes.LawfulClasses", "intToChar"),
+    ("Core.Effect.Coproduct", "inject_l"),
+    ("Core.Effect.Coproduct", "inject_r"),
+    ("Data.Numeric.FixedWidth", "intToInt8"),
+    ("Data.Numeric.FixedWidth", "intToInt16"),
+    ("Data.Numeric.FixedWidth", "intToInt32"),
+    ("Data.Numeric.FixedWidth", "intToInt64"),
+    ("Data.Numeric.FixedWidth", "intToUInt8"),
+    ("Data.Numeric.FixedWidth", "intToUInt16"),
+    ("Data.Numeric.FixedWidth", "intToUInt32"),
+    ("Data.Numeric.FixedWidth", "intToUInt64"),
     ("Capability.Filesystem.Authority", "FS"),
     ("Capability.Filesystem.Authority", "read_bytes"),
     ("Capability.Filesystem.Authority", "write_file"),
+    ("Capability.Filesystem.Authority", "append_file"),
+    ("Capability.Filesystem.Authority", "change_mode"),
+    ("Capability.Filesystem.Authority", "create_directory"),
+    ("Capability.Filesystem.Authority", "read_directory"),
+    ("Capability.Filesystem.Authority", "remove_directory"),
+    ("Capability.Filesystem.Authority", "remove_file"),
+    ("Capability.Filesystem.Authority", "rename_file"),
+    ("Capability.Filesystem.Authority", "file_metadata"),
+    ("Capability.System.Buffer", "freeze"),
     ("Capability.System.Buffer", "BufferWindow"),
     ("Capability.System.Buffer", "MkBufferWindow"),
     ("Capability.System.Buffer", "buffer_span_length"),
@@ -333,25 +367,11 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 81] = [
     ("Capability.System.Buffer", "transfer_count_positive_prop"),
     ("Capability.System.Buffer", "transfer_count_predecessor"),
     ("Capability.System.Buffer", "transfer_count_nat_succ"),
-    ("Capability.System.Error", "FileOperation"),
-    ("Capability.System.Error", "OpReadFile"),
-    ("Capability.System.Error", "OpWriteFile"),
-    ("Capability.System.Error", "OpAppendFile"),
-    ("Capability.System.Error", "OpMetadata"),
-    ("Capability.System.Error", "OpReadDirectory"),
-    ("Capability.System.Error", "OpCreateDirectory"),
-    ("Capability.System.Error", "OpRemoveFile"),
-    ("Capability.System.Error", "OpRemoveDirectory"),
-    ("Capability.System.Error", "OpRename"),
-    ("Capability.System.Error", "OpChangeMode"),
-    ("Capability.System.Error", "OpSeek"),
-    ("Capability.System.Error", "OpSetLength"),
-    ("Capability.System.Error", "OpSync"),
-    ("Capability.System.Error", "OpGetInheritance"),
-    ("Capability.System.Error", "OpSetInheritance"),
-    ("Capability.System.Error", "OpDuplicate"),
+    ("Capability.System.IO", "writeAt"),
+    ("Capability.System.IO", "writeAll"),
     ("Capability.System.IO", "write_all_exact_prefix_prop"),
     ("Capability.System.IO", "write_all_exact_prefix_prop::exact_prefix"),
+    ("Capability.System.Resource", "resourceMetadata"),
     ("Capability.System.Resource", "ResourceBodyResult"),
     ("Capability.System.Resource", "ResourceBodyOk"),
     ("Capability.System.Resource", "ResourceBodyErr"),
@@ -375,6 +395,8 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 81] = [
     ("Capability.Process.Exit", "host_fs"),
     ("Capability.Process.Exit", "host_pure"),
     ("Capability.Process.Exit", "host_bind"),
+    ("Capability.Process.Exit", "host_clock"),
+    ("Capability.Time.WallClock", "wall_now"),
     ("Capability.System.Mapping", "MappingHandle"),
     ("Capability.System.Mapping", "MappingWindow"),
     ("Capability.System.Mapping", "MkMappingWindow"),
@@ -395,6 +417,10 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 81] = [
     ("Capability.Process.Child", "wait_child"),
     ("Capability.Process.Child", "take_stdout"),
     ("Capability.Process.Child", "read_pipe"),
+    ("Capability.Process.Child", "SpawnPlan"),
+    ("Capability.Process.Child", "with_stderr"),
+    ("Capability.Process.Child", "take_stdin"),
+    ("Capability.Process.Child", "take_stderr"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
@@ -10160,6 +10186,24 @@ mod strict_catalog_home_tests {
     /// malformed home cannot confer an unrelated checked identity. THE GAP:
     /// the pre-source environment has no non-transparent non-family witness;
     /// that error arm has no live bootstrap example on this base.
+    /// Promise class: normative compatibility vector. MEASURED: the new
+    /// specific floor spelling and Legacy bare spelling share the immutable
+    /// bind ID, while the pre-source stable-name snapshot still says `bind`
+    /// and the trusted-base set equals its captured pre-source set. CLAIMED:
+    /// the alias changes source availability, not kernel identity or trust.
+    /// THE GAP: the emitter must continue to use that pre-source snapshot;
+    /// its native-symbol tests are independent of this binding check.
+    #[test]
+    fn itree_bind_alias_keeps_the_pre_source_symbol_and_trust() {
+        let env = ElabEnv::new().expect("checked pre-source environment");
+        let id = env.prelude_env.bind_id;
+        assert_eq!(env.globals["bind"], id, "Legacy original spelling");
+        assert_eq!(env.globals["itree_bind"], id, "specific floor alias");
+        assert_eq!(env.prelude_env.pre_source_names.get(&id).and_then(|name| name.as_deref()), Some("bind"));
+        let trust: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+        assert_eq!(trust, env.prelude_env.native_trusted_base);
+    }
+
     #[test]
     fn incomplete_and_cross_home_families_refuse_at_the_checked_gate() {
         let elab = ElabEnv::new().expect("pre-source environment");
@@ -10181,9 +10225,10 @@ mod strict_catalog_home_tests {
             ),
             (vec![("A", "MkBufferWindow")], "homed without its family"),
             (
-                vec![("A", "BufferWindow"), ("A", "OpReadFile")],
-                "incomplete checked constructor set",
+                vec![("A", "BufferWindow"), ("A", "FileOperation.OpReadFile")],
+                "also strict ambient",
             ),
+            (vec![("A", "OpReadFile")], "no pre-source identity"),
             (
                 vec![
                     ("A", "BufferWindow"),
@@ -10275,16 +10320,18 @@ mod strict_catalog_home_tests {
     }
 
     /// Promise class: durable invariant. MEASURED: capture's exact checked
-    /// identities agree with each home's public export IDs after strict load.
-    /// CLAIMED: a home grants only its pre-source IDs, not copied definitions.
-    /// THE GAP: a separate client test exercises import visibility and refusal.
+    /// identities agree with each home's public export IDs after strict load;
+    /// System.Error has no home IDs and exports its own Transience, but no
+    /// FileOperation floor ID (spec 33 §3.3). CLAIMED: a home grants only its
+    /// pre-source IDs, while Error no longer grants the former family.
+    /// THE GAP: a separate client tests import visibility and refusal; the
+    /// full floor case set is read from the checked inductive, not spellings.
     #[test]
     fn real_homes_publish_their_pre_source_identities() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
         for home in [
             "Capability.Filesystem.Authority",
             "Capability.System.Buffer",
-            "Capability.System.Error",
             "Capability.System.IO",
             "Capability.System.Resource",
         ] {
@@ -10306,6 +10353,30 @@ mod strict_catalog_home_tests {
                 }
             }
         }
+
+        const ERROR: &str = "Capability.System.Error";
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        assert!(env.module_state.package_home_ids(ERROR).is_empty());
+        let file_operation = env.globals["FileOperation"];
+        let family = env
+            .env
+            .inductive(file_operation)
+            .expect("checked FileOperation floor inductive");
+        let floor_ids: HashSet<_> = std::iter::once(file_operation)
+            .chain(family.constructors.iter().map(|case| case.id))
+            .collect();
+        env.elaborate_module_from_roots_strict(&[root], ERROR)
+            .unwrap_or_else(|error| panic!("{ERROR} strict load: {error:?}"));
+        let published = env.module_state.package_export_ids(ERROR);
+        assert!(
+            published.is_disjoint(&floor_ids),
+            "{ERROR} must not re-export the floor FileOperation family"
+        );
+        let transience = env.globals["Capability.System.Error.Transience"];
+        assert!(
+            published.contains(&transience) && !floor_ids.contains(&transience),
+            "{ERROR} still publishes its own checked Transience"
+        );
     }
 }
 

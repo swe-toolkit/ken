@@ -639,13 +639,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-           (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-           (Result FileError Unit) ExitCode
-        (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
-          (Result FileError Unit)
+      host_bind AFull (Result FileError Unit) ExitCode
+        (host_fs AFull (Result FileError Unit)
           (writeFile cap (bytes_encode "root/out") CreatePolicy.CreateNew (bytes_encode "lit")))
-        (\_. host_exit AFull ExitCode.Success)
+        (\_. host_pure AFull ExitCode ExitCode.Success)
   }"#,
         );
         let admitted = ken_elaborator::program_admission::admit_checked_main(&env)
@@ -693,29 +690,46 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 
     #[test]
     fn fs_effect_without_declared_family_is_named_static_rejection() {
-        let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
-        let error = env
-            .elaborate_file(
-                r#"program
+        let source = r#"program
 proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match caps {
     ProgramCaps.MkProgramCaps cap |->
-      bind (Coproduct (FSOp APartial) AmbientOp)
-           (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-           (Result FileError Bytes) ExitCode
-        (inject_l (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp
-          (Result FileError Bytes)
+      host_bind APartial (Result FileError Bytes) ExitCode
+        (host_fs APartial (Result FileError Bytes)
           (readFile APartial cap (bytes_encode "missing")))
-        (\_. host_exit APartial ExitCode.Success)
-  }"#,
-            )
+        (\_. host_pure APartial ExitCode ExitCode.Success)
+  }"#;
+        let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+        let error = env
+            .elaborate_file(source)
             .expect_err("an FS effect requires a declared FS capability");
         match error {
             ken_elaborator::ElabError::MissingCapability { effect, .. } => {
                 assert_eq!(effect, "FS")
             }
             other => panic!("expected MissingCapability {{ effect = FS }}, got {other:?}"),
+        }
+
+        // The same source must reach the capability gate after the exact R
+        // wrappers are supplied by explicit package imports under Strict.
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../catalog/packages")
+            .canonicalize()
+            .expect("catalog root");
+        let imported = source.replacen(
+            "program\n",
+            "program\nimport Capability.Process.Exit (host_bind, host_fs, host_pure)\n\
+             import Capability.Filesystem.Authority (readFile)\n",
+            1,
+        );
+        let mut strict = ken_elaborator::ElabEnv::new().expect("prelude");
+        match strict.elaborate_isolated_file_strict_v1(&[root], &imported) {
+            Err(ken_elaborator::ElabError::MissingCapability { effect, .. }) => {
+                assert_eq!(effect, "FS")
+            }
+            Err(other) => panic!("Strict changed the refusal: {other:?}"),
+            Ok(_) => panic!("Strict admitted an undeclared FS capability"),
         }
     }
 
@@ -895,13 +909,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
             r#"program capabilities FS APartial{marker}
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-       (resp_coproduct (FSOp APartial) AmbientOp
-         (fs_resp APartial) ambient_resp)
-       (Result IOError Unit) ExitCode
+  host_bind APartial (Result IOError Unit) ExitCode
        (host_console APartial (Result IOError Unit)
          (write ConsoleStream.Stdout (bytes_encode "admitted")))
-       (\_ . host_exit APartial ExitCode.Success)
+       (\_ . host_pure APartial ExitCode ExitCode.Success)
 "#
         )
     }
