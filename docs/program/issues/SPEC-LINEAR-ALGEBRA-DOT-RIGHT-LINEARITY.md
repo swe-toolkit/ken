@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY
 title: "Spec 65 exports the dot product's linearity in its first argument (dot_distrib, dot_scale) but keeps the second-argument laws private, so a client must rebuild right-linearity from dot_comm, although the package already proves it. Rule from a checked D0 at zero trust that the two right-position laws become public, so dot is bilinear in the public API, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1

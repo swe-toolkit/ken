@@ -98,6 +98,31 @@ The candidate also carries nested Deferred settlement (Steward
 - **The product shape** follows the C-20 D0's LIFO-PARITY branch, as
   the Architect rules it.
 
+The C-28 recut (Steward `evt_527p7m4kfdbc0`, Architect
+`evt_3zrg52751abmn`) adds the forwarded-Vis owner. F's region body
+forwards an inner Vis through a carried clause's Vis arm, but no
+response owner is installed for it, so the arm's IH is lowered as an
+in-place header jump and the request is never dispatched.
+
+- **Slice 1 (D0).** Count every forwarding-arm IH lowering across the
+  committed native suites and F, classified by whether the forwarded
+  Vis has an installed owner. The Architect rules a lowering-time
+  refusal or a further ruling from the count. A refusal travels in the
+  one candidate.
+- **Slice 2.** Install the owner row: its K applies k to the response
+  and re-enters the clause's carried header under its checked
+  constructor identity. The IH is lowered as that owner's
+  continuation.
+- **F acceptance.** argv, v-null and live equal the interpreter: exit 0,
+  19, 14 and 17 ordered events, and event 6 is ProcessPlanPush field2.
+  The control-1 fallback count is 0 and a dispatch marker fires for
+  S724 and S165. Smoke 9/9 and both G controls are unchanged. M-D,
+  which restores the header jump, reddens F.
+- **WIP2's erasure half** (`erasure.rs`,
+  `erasure/performed_call_scrutinee_tests.rs`) is carried by
+  `RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT` (`evt_m1tpqnr44meb`). This
+  candidate's rebase drops them.
+
 ## Acceptance
 
 - **AC-0 (D0, before any build).** At the `:263` gate on the 3 F2 rows,
