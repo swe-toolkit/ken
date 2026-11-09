@@ -38,16 +38,19 @@ fn invoke(route: &str, source: &Path, dir: &Path) -> Output {
 /// its one compiler-internal relay exemption changes. The AC-0 census found
 /// 98 isolated sources and 64 Legacy-clean at the cut; the relay keeps its
 /// separate Legacy elaboration as a core-term fixture (30 §4, I row). MEASURED:
-/// every presently Strict-clean physical root runs through the real CLI check
-/// binary, not just the library's direct entry. CLAIMED: every cut-base
-/// Legacy-clean isolated file except that single internal fixture checks on
+/// the independent Legacy entry rechecks each body without its new import
+/// directives, then every Legacy-clean root except the relay checks through
+/// the real CLI binary. CLAIMED: every cut-base Legacy-clean file checks on
 /// the switched route. THE GAP: Rust-held source variants are separately
 /// provisioned and tested by their owning binaries, not by this file cohort.
 #[test]
 fn cut_base_legacy_clean_file_cohort_checks_through_switched_cli_route() {
     const CUT_LEGACY_CLEAN: usize = 64;
     const INTERNAL_CORE_ONLY: usize = 1;
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("repository root");
     let relay = repo.join("crates/ken-cli/tests/fixtures/rt_performing_mixed_owner_relay.ken");
     let relay_source = std::fs::read_to_string(&relay).expect("internal relay fixture");
     let mut legacy = ken_elaborator::ElabEnv::new().expect("prelude");
@@ -71,29 +74,38 @@ fn cut_base_legacy_clean_file_cohort_checks_through_switched_cli_route() {
                 || path.components().any(|part| part.as_os_str() == "tests"))
     });
     files.sort();
-    let mut accepted = Vec::new();
+    let mut legacy_clean = Vec::new();
     for path in &files {
         let source = std::fs::read_to_string(path).expect("physical Ken source");
-        let roots: Vec<_> = ken_elaborator::modules::isolated_catalog_root(path)
-            .into_iter()
-            .collect();
+        // The cut-base bodies predate the selective imports, so remove only
+        // import directives for the independent Legacy classification.
+        let legacy_source = source
+            .lines()
+            .filter(|line| !line.starts_with("import "))
+            .collect::<Vec<_>>()
+            .join("\n");
         let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
         let result = if path.to_string_lossy().ends_with(".ken.md") {
-            env.elaborate_isolated_ken_md_file_strict_v1(&roots, &source)
+            env.elaborate_ken_md_file_v1(&legacy_source)
         } else {
-            env.elaborate_isolated_file_strict_v1(&roots, &source)
+            env.elaborate_file_v1(&legacy_source)
         };
         if result.is_ok() {
-            accepted.push(path);
+            legacy_clean.push(path);
         }
     }
     assert_eq!(files.len(), 98, "cut-base isolated file population changed");
+    assert_eq!(legacy_clean.len(), CUT_LEGACY_CLEAN, "Legacy-clean cohort drifted");
+    assert!(legacy_clean.contains(&&relay), "internal relay is in the cohort");
     assert_eq!(
-        accepted.len(),
+        legacy_clean.iter().filter(|path| **path != relay).count(),
         CUT_LEGACY_CLEAN - INTERNAL_CORE_ONLY,
-        "cut-base Legacy-clean files, except the internal relay, need imports"
+        "only the I-row core fixture is exempt from the switched source route"
     );
-    for path in accepted {
+    for path in legacy_clean {
+        if path == &relay {
+            continue;
+        }
         let checked = Command::new(env!("CARGO_BIN_EXE_ken"))
             .arg("check")
             .arg(path)
