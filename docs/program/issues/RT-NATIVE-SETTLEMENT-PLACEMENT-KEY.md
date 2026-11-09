@@ -125,9 +125,9 @@ fail-closed (Steward `evt_6rkw3hdx6m2jn` and the 14:50Z recut):
   (`BoundaryCarrier`; Architect probe `natrec-inc2/after-effect.ken`,
   `evt_5b1bpcemby1jm`). It belongs to B1a's runtime half.
 - **WIP2's erasure half** (`erasure.rs`,
-  `erasure/performed_call_scrutinee_tests.rs`) is carried by
-  `RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT` (`evt_m1tpqnr44meb`). This
-  candidate's rebase drops them.
+  `erasure/performed_call_scrutinee_tests.rs`) stays with B1a's WIP2,
+  because `RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT` is parked behind B1a
+  (`evt_50705xx614069`).
 
 ## Acceptance
 
@@ -140,10 +140,19 @@ fail-closed (Steward `evt_6rkw3hdx6m2jn` and the 14:50Z recut):
       owner);
     - whether `:6798` is rekeyed or deleted;
     - whether plane C is in scope.
-- **AC-1.** The three F2 rows are committed as named rows. Under B1a's
-  Let form each refuses natively by the trap's name at the boundary
-  clause, as stated above, with the fallback count 0. Native parity on
-  them is `RT-NATIVE-FORWARDED-CONTINUATION-REENTRY`'s acceptance.
+- **AC-1 (measured, not committed).** On any production base the Process
+  gate refuses F before object emission
+  (`compiler_driver.rs:3001`-`3024`, `host_effect_lowering_unavailable`),
+  so the trap is observed under the C-28 diagnostic overlay: the gate
+  condition and the stream and Process availability, uncommitted, named
+  by sha256 in the report. Under it, each F2 row refuses natively by the
+  trap's name at the boundary clause, as stated above, with the fallback
+  count 0. This is B1's posture (`evt_5vsaybryes08b`; Steward
+  `evt_1kpgr76vwez5g`). QA re-runs it at the exact tip. Native parity on
+  these rows is `RT-NATIVE-FORWARDED-CONTINUATION-REENTRY`'s.
+- **AC-1c (committed).** The F2 fixtures, with a committed native test
+  whose expectation is today's production refusal naming the seven
+  unavailable operations, for B2 to promote.
 - **AC-2.** These stay green:
   - the smoke 9/9, both G controls, px8ta 3/3 and the 9 checked_ih rows;
   - the two-print parity row (`rt_selected_pending_call_admission.rs:303`)
@@ -154,8 +163,8 @@ fail-closed (Steward `evt_6rkw3hdx6m2jn` and the 14:50Z recut):
 
   They are regression controls, because green-three reaches none of
   these sites.
-- **AC-3.** Each mutation compiles and moves the F2 rows' refusal off
-  the trap's name:
+- **AC-3.** Each mutation compiles and, under the AC-1 overlay, moves the
+  F2 rows' refusal off the trap's name:
   - M-A, which restores the (origin, frame) exit key, at `:7043`;
   - M-B, which restores one owner per region, at `:263`;
   - M-C, which restores the separate consumer search past the

@@ -88,6 +88,10 @@ obligation, one composed re-entry per chain:
 - **Step 0 (before product code).** Name the S571 IH call site
   (file:line) and show it can call a generated specialization. If it
   cannot, stop back to the Architect.
+- **Posture.** Until B2 opens the Process gate, A1, A2 and A4 are
+  measured under the uncommitted C-28 diagnostic overlay, as in RNSPK's
+  AC-1, and their committed rows are promoted in B2. A3 and A6 are
+  committed and production-gated.
 - **A1, parity.** argv exits 0 with 19 events, v-null exits 73 with 14,
   and live exits 0 with 17. Each equals the interpreter, and event 6 is
   the field2 ProcessPlanPush (Effect S724 in argv, S165 in live).
