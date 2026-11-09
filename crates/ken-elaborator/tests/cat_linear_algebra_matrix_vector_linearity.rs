@@ -87,15 +87,17 @@ theorem generic_homogeneous
 
 /// SOURCE: spec/50-stdlib/65-linear-algebra.md §§6.1–6.2.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: both owned, Transparent proofs root-load and satisfy independent
+/// MEASURED: both §6 owned, Transparent proofs root-load and satisfy generic
 /// arbitrary-index clients, including the zero-index domain of their types;
-/// both dot helpers refuse public import. Provider and package trusted-base
-/// GlobalId sets are exactly equal, not merely equal in cardinality.
-/// CLAIMED: the two generic public laws close without new trust or helpers.
+/// the §15 right-dot laws are NatMatrix-owned, Transparent and selectively
+/// importable. Provider and package trusted-base GlobalId sets are exactly
+/// equal, not merely equal in cardinality.
+/// CLAIMED: the generic vector laws and their public right-dot dependencies
+/// close without new trust or helpers.
 /// THE GAP: inherited provider trust remains, and the existing package test
 /// pins the complete public inventory. QA separately mutates a proof step.
 #[test]
-fn generic_vector_linearity_is_owned_checked_private_and_trust_free() {
+fn generic_vector_linearity_and_right_dot_exports_are_public_owned_and_trust_free() {
     let mut env = ElabEnv::new().expect("compiler base");
     for provider in [
         "Core.Classes.LawfulClasses",
@@ -121,13 +123,13 @@ fn generic_vector_linearity_is_owned_checked_private_and_trust_free() {
     }
     env.elaborate_file(GENERIC_CLIENT)
         .expect("generic independent clients consume the exact §6 types");
-    for helper in ["dot_distrib_right", "dot_scale_right"] {
-        match env.elaborate_file(&format!("import {MATRIX} ({helper})")) {
-            Err(ElabError::UnboundName { name, .. }) => {
-                assert_eq!(name, format!("{MATRIX}.{helper}"));
-            }
-            other => panic!("{helper} must remain private: {other:?}"),
-        }
+    // §15: the right-argument laws §6 consumes are public checked API.
+    for law in ["dot_distrib_right", "dot_scale_right"] {
+        let id = env.globals[&format!("{MATRIX}.{law}")];
+        assert!(owned.contains(&id), "{law} belongs to NatMatrix");
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+        env.elaborate_file(&format!("import {MATRIX} ({law} as public_{law})"))
+            .unwrap_or_else(|error| panic!("{law} must be public: {error:?}"));
     }
 }
 
