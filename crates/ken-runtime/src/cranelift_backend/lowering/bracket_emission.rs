@@ -62,9 +62,16 @@ impl Lowering<'_> {
             region.body_exit(),
             region.settlement(),
         )?;
+        let placement = self.checked_placement_owner(self.emitting_function_owner)?
+            .ok_or_else(|| Self::bracket_error(
+                "a marked S effect claim has no emitting Function owner"))?;
+        if region.k_placement() != Some(placement) {
+            return Err(Self::bracket_error(
+                "a marked S effect claim is outside its K call's emission placement"));
+        }
         if self
             .bracket_effect_claim
-            .replace((region.id(), row.effect_origin()))
+            .replace((region.id(), row.effect_origin(), placement))
             .is_some()
         {
             return Err(Self::bracket_error(

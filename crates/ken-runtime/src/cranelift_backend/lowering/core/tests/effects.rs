@@ -102,6 +102,7 @@ fn run_checked_bounded_nat_fixture(
         checked_call_ledger: None,
         defining_unit: None,
         defining_emission_owner: None,
+        emitting_function_owner: None,
         defining_function_id: None,
         aggregate_allocations: None,
         host_effect_seats: None,

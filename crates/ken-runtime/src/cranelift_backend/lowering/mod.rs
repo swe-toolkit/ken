@@ -3351,7 +3351,9 @@ struct Lowering<'a> {
     bracket_clause_body: Option<StaticOriginId>,
     bracket_ledger: BracketSettlementLedger,
     /// Exactly one validated S effect may run under the in-place release call.
-    bracket_effect_claim: Option<(BracketSettlementId, StaticOriginId)>,
+    bracket_effect_claim: Option<(
+        BracketSettlementId, StaticOriginId, ContinuationEmissionOwner,
+    )>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,
@@ -3512,6 +3514,9 @@ struct Lowering<'a> {
     /// stand in for the generated context — the exact conflation
     /// `evt_609am4v7cdt5b` ruled against.
     defining_emission_owner: Option<ContinuationEmissionOwner>,
+    /// Physical owner of the Function currently emitted. Unlike the ambient
+    /// record authority above, it survives nested effect/consumer rebindings.
+    emitting_function_owner: Option<ContinuationEmissionOwner>,
     /// **`RT-DECL-CLOSURE-PORT` `D7`** — the exact declared function whose body
     /// is being emitted, which scopes this body's allocation EVENTS.
     ///

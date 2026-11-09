@@ -661,6 +661,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// facts, but no lowering accessor exists until the activation slice.
     continuation_specializations: Vec<PlannedContinuationSpecialization>,
     continuation_specialization_calls: Vec<PlannedContinuationSpecializationCall>,
+    /// The single emission owner of each planned causal K call. Issued from
+    /// closed continuation identities and escape geometry before response
+    /// planning; later ownership records validate rather than select it.
+    k_call_placements: BTreeMap<ContinuationCallIdentity, ContinuationEmissionOwner>,
     /// Handler-owned Deferred drives have a separate, post-response-B identity domain.
     handler_resumptions: Vec<PlannedHandlerResumptionCall>,
     /// One independently validated consumer-level occurrence per continuation

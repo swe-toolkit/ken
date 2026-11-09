@@ -194,6 +194,7 @@ impl BracketSettlement {
     pub(in crate::cranelift_backend) fn id(&self) -> BracketSettlementId { self.id }
     pub(in crate::cranelift_backend) fn is_nested(&self) -> bool { self.parent.is_some() }
     pub(in crate::cranelift_backend) fn settlement(&self) -> StaticOriginId { self.settlement }
+    pub(in crate::cranelift_backend) fn k_placement(&self) -> Option<ContinuationEmissionOwner> { self.k_placement }
     pub(in crate::cranelift_backend) fn clause_origin(&self) -> Option<StaticOriginId> { self.clause_origin }
     pub(in crate::cranelift_backend) fn clause_scrutinee_contains(&self, head: StaticOriginId) -> bool {
         self.clause_scrutinee.contains(&head)

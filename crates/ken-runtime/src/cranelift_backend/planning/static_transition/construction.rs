@@ -48,7 +48,8 @@ use super::aggregates::{
 };
 #[allow(unused_imports)]
 use super::aggregates::{
-    build_aggregate_ownership_plan, build_recursive_carrier_boxed_stores,
+    build_aggregate_ownership_plan, build_k_call_placement_plan,
+    build_recursive_carrier_boxed_stores,
     build_recursive_residual_dispositions,
     derive_checked_ih_transport_source_population,
     build_checked_ih_continuation_inheritances,
@@ -298,6 +299,7 @@ impl<'src> Planner<'src> {
                 join_results: Vec::new(),
                 case_emissions: Vec::new(),
                 aggregate_ownership: Vec::new(),
+                k_call_placements: BTreeMap::new(),
                 pre_schema_transport_sources: BTreeSet::new(),
                 pre_schema_relay_promotions: BTreeSet::new(),
                 preselected_response_callers: BTreeSet::new(),
@@ -1450,6 +1452,9 @@ impl<'src> Planner<'src> {
         // `continuation_contexts` both require the ABI installed above, so the
         // earliest possible view is built after this line.
         finalize_continuation_availability_plan(&mut self.plan)?;
+        // Place each causal K call once, before phase A can read it. The
+        // pre-schema and post-ownership transport stages consume this record.
+        self.plan.k_call_placements = build_k_call_placement_plan(&self.plan)?;
         self.plan.join_results =
             build_join_result_plan(&self.plan, functionized_units, forced_carrier_joins)?;
         // The host effect seat plane reads only `source_occurrences` (fixed at

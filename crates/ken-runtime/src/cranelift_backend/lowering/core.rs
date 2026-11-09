@@ -1975,6 +1975,8 @@ pub(super) struct CheckedFrameBranchScope {
 pub(super) struct AmbientBodyAuthority {
     enclosing_owner: Option<ContinuationEmissionOwner>,
     enclosing_unit: Option<PredeclaredFunctionId>,
+    enclosing_physical: Option<ContinuationEmissionOwner>,
+    physical_body: bool,
 }
 
 impl AmbientBodyAuthority {
@@ -1987,6 +1989,8 @@ impl AmbientBodyAuthority {
         let scope = Self {
             enclosing_owner: compiler.defining_emission_owner,
             enclosing_unit: compiler.defining_unit,
+            enclosing_physical: compiler.emitting_function_owner,
+            physical_body: false,
         };
         compiler.defining_emission_owner = Some(owner);
         compiler.defining_unit = Some(unit);
@@ -2015,6 +2019,21 @@ impl AmbientBodyAuthority {
         scope
     }
 
+    /// A new Function body is the only boundary that installs physical
+    /// placement. Nested ambient scopes change record authority, not its
+    /// emitted Function. Only the four unit/context body-definition sites
+    /// call this variant; the other bind sites preserve the physical owner.
+    pub(super) fn bind_body(
+        compiler: &mut Lowering<'_>,
+        owner: ContinuationEmissionOwner,
+        unit: PredeclaredFunctionId,
+    ) -> Self {
+        let mut scope = Self::bind(compiler, owner, unit);
+        scope.physical_body = true;
+        compiler.emitting_function_owner = Some(owner);
+        scope
+    }
+
     /// Release it, restoring the enclosing scope's facts.
     pub(super) fn release(self, compiler: &mut Lowering<'_>) {
         // ⛔ `D8o` — the pre-repair behaviour, restored under test: the body's
@@ -2024,6 +2043,34 @@ impl AmbientBodyAuthority {
         if crate::cranelift_backend::lowering::d8o_inherit_residue() {
             return;
         }
+        compiler.defining_emission_owner = self.enclosing_owner;
+        compiler.defining_unit = self.enclosing_unit;
+        if self.physical_body {
+            compiler.emitting_function_owner = self.enclosing_physical;
+        }
+    }
+}
+
+/// A marked S's host effect borrows its base owner's records while code stays
+/// in the same emitted Function. Release restores exactly the prior authority.
+struct EffectAuthority {
+    enclosing_owner: Option<ContinuationEmissionOwner>,
+    enclosing_unit: Option<PredeclaredFunctionId>,
+}
+
+impl EffectAuthority {
+    fn bind(compiler: &mut Lowering<'_>, owner: ContinuationEmissionOwner,
+            unit: PredeclaredFunctionId) -> Self {
+        let scope = Self {
+            enclosing_owner: compiler.defining_emission_owner,
+            enclosing_unit: compiler.defining_unit,
+        };
+        compiler.defining_emission_owner = Some(owner);
+        compiler.defining_unit = Some(unit);
+        scope
+    }
+
+    fn release(self, compiler: &mut Lowering<'_>) {
         compiler.defining_emission_owner = self.enclosing_owner;
         compiler.defining_unit = self.enclosing_unit;
     }
@@ -3116,6 +3163,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         checked_call_ledger: None,
         defining_unit: None,
         defining_emission_owner: None,
+        emitting_function_owner: None,
         defining_function_id: None,
         aggregate_allocations: None,
         host_effect_seats: None,
@@ -3445,6 +3493,20 @@ impl ProducerTrampolineStep<'_> {
 }
 
 impl<'a> Lowering<'a> {
+    /// Seal a settlement placement read against the physical Function owner.
+    /// Passing a transient record authority here is a named planner error,
+    /// even when both values have the same enum type.
+    pub(super) fn checked_placement_owner(
+        &self,
+        selected: Option<ContinuationEmissionOwner>,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if selected != self.emitting_function_owner {
+            return Err(backend_module(LoweringCause::PlannerInvariant,
+                "placement read through effect authority".to_string()));
+        }
+        Ok(selected)
+    }
+
     pub(super) fn resume_active_continuation(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -6542,7 +6604,7 @@ impl<'a> Lowering<'a> {
         // owner, even when this S is emitted in another owner's body. This
         // binding ends before K: its closure and arguments stay copy-lexical.
         let authority = effect_authority
-            .map(|(owner, unit)| AmbientBodyAuthority::bind(self, owner, unit));
+            .map(|(owner, unit)| EffectAuthority::bind(self, owner, unit));
         let response = self.lower_process_host_effect(
             builder,
             family,
@@ -7423,8 +7485,9 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        let physical = self.checked_placement_owner(self.emitting_function_owner)?;
         if let Some(region) = self.bracket_view.settlement_at(
-            static_origin, self.defining_emission_owner,
+            static_origin, physical,
         )?.cloned() {
             match region.mode() {
                 BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
@@ -13132,7 +13195,22 @@ impl<'a> Lowering<'a> {
         let placement = self
             .static_transition_plan
             .k_emission_placement(&edge.identity)?;
-        if self.defining_emission_owner == Some(placement)
+        let physical = self.checked_placement_owner(self.emitting_function_owner)?;
+        if physical == Some(placement)
+            && matches!(lowered, LoweringOperand::Carried(_))
+            && self.static_transition_plan.checked_ih_self_emitter_call(&edge.identity)?
+        {
+            // This worker already produced a carried result in its own
+            // Function: there is no detached call to emit or constructor to
+            // reconstruct. Settle this candidate as inline, never as an
+            // unobserved direct call; the ledger refuses a later conflicting
+            // call disposition for the same identity.
+            self.settle_continuation_candidate(
+                &edge.identity, super::units::CandidateDisposition::InlineNoCall,
+            )?;
+            return Ok(lowered);
+        }
+        if physical == Some(placement)
             && self
                 .static_transition_plan
                 .checked_ih_environment_transport_source(&edge.identity)
@@ -13148,9 +13226,7 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .checked_ih_environment_transport_source(&edge.identity)
             .is_some()
-            && self
-                .defining_emission_owner
-                .is_some_and(|owner| owner != placement)
+            && physical.is_some_and(|owner| owner != placement)
             && matches!(&lowered, LoweringOperand::Carried(_))
         {
             // The call is relocated into another owner, whose destination
@@ -16458,8 +16534,8 @@ impl<'a> Lowering<'a> {
             // genuine handler. Refuse exactly that Vis arm before its IH edge;
             // the checked-answer fallback below remains unchanged.
             if case.constructor == self.process_symbols.itree_vis {
-                let owner = self.defining_emission_owner.ok_or_else(||
-                    backend_module(LoweringCause::PlannerInvariant,
+                let owner = self.checked_placement_owner(self.emitting_function_owner)?
+                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
                         "a carried forwarding clause has no emission owner".to_string()))?;
                 if self.bracket_view.is_boundary_forwarding_arm(
                     &self.static_transition_plan,
@@ -17267,8 +17343,12 @@ impl<'a> Lowering<'a> {
         args: &[RuntimeExpr],
         env: &[LoweringEnvironmentBinding],
     ) -> ConstructBracketEntry {
+        let physical = match self.checked_placement_owner(self.emitting_function_owner) {
+            Ok(owner) => owner,
+            Err(error) => return ConstructBracketEntry::Done(Box::new(Err(error))),
+        };
         let region = match self.bracket_view.settlement_at(
-            static_origin, self.defining_emission_owner,
+            static_origin, physical,
         ) {
             Ok(Some(region)) => region.clone(),
             Ok(None) => return ConstructBracketEntry::Unmarked,

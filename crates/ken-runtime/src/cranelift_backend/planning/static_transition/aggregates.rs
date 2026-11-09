@@ -4728,20 +4728,19 @@ impl StaticTransitionPlan<'_> {
         &self,
         identity: &ContinuationCallIdentity,
     ) -> Result<ContinuationEmissionOwner, CraneliftBackendError> {
-        let mut destinations = self
-            .checked_ih_environment_transports
-            .iter()
-            .filter(|transport| &transport.source_call_identity == identity)
-            .map(|transport| transport.destination_owner)
-            .collect::<BTreeSet<_>>()
-            .into_iter();
-        match (destinations.next(), destinations.next()) {
-            (None, _) => Ok(identity.emission_owner()),
-            (Some(owner), None) => Ok(owner),
-            (Some(_), Some(_)) => Err(planner_error(
-                "one K call is relocated into two destination owners; it has no single emission placement",
-            )),
-        }
+        self.k_call_placements.get(identity).copied().ok_or_else(||
+            planner_error("a causal K call has no recorded emission placement"))
+    }
+
+    /// A checked-IH source whose call is already emitted by its own worker.
+    /// Geometry certifies the route class; the recorded placement alone
+    /// determines which Function owns its call.
+    pub(in crate::cranelift_backend) fn checked_ih_self_emitter_call(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<bool, CraneliftBackendError> {
+        Ok(self.k_emission_placement(identity)? == identity.emission_owner()
+            && checked_ih_self_emitter_source(self, identity)?)
     }
 
     pub(in crate::cranelift_backend) fn checked_ih_environment_transport_source(
@@ -6309,61 +6308,71 @@ pub(super) fn checked_ih_self_emitter_source(
     Ok(false)
 }
 
-pub(in crate::cranelift_backend::planning::static_transition) fn derive_checked_ih_transport_source_population(
+/// Issue each planned K call's physical emission owner once, before any
+/// response or ownership plane reads a relocation. A crossing is decided by
+/// closed unit-root escape geometry; aggregate ownership can only validate it.
+pub(in crate::cranelift_backend::planning::static_transition) fn build_k_call_placement_plan(
     plan: &StaticTransitionPlan<'_>,
-) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+) -> Result<BTreeMap<ContinuationCallIdentity, ContinuationEmissionOwner>, CraneliftBackendError> {
     let units = plan.continuation_units()?;
-    let mut population = BTreeSet::new();
+    let mut placements = plan.continuation_calls()?.into_iter()
+        .map(|call| {
+            let identity = call.identity();
+            (identity.clone(), identity.emission_owner())
+        })
+        .collect::<BTreeMap<_, _>>();
+    if placements.len() != plan.continuation_specialization_calls.len() {
+        return Err(planner_error("two causal K calls share one placement identity"));
+    }
     for source in &units {
         if checked_ih_coordinate_run(source)?.is_none() {
             continue;
         }
         let parent = source.producer_construct_origin();
-        let identity = plan
-            .continuation_call_binding_for(
-                parent,
-                source.continuation_origin(),
-                source.producer_alternative(),
-                source.recursive_position(),
-            )?
-            .ok_or_else(|| {
-                planner_error(
-                    "a checked-IH transport source has no causal call identity for its own producer edge",
-                )
-            })?;
-        if identity.target() != source.id() {
+        let identity = plan.continuation_call_binding_for(
+            parent, source.continuation_origin(), source.producer_alternative(),
+            source.recursive_position(),
+        )?.ok_or_else(|| planner_error(
+            "a checked-IH transport source has no causal call identity for its own producer edge",
+        ))?;
+        if identity.target() != source.id() || !placements.contains_key(&identity) {
             return Err(planner_error(
-                "a checked-IH transport's causal identity targets a different specialization than its force materialization",
+                "a checked-IH source has no matching recorded causal K call",
             ));
         }
-        let mut has_destination = false;
-        for destination in &units {
-            let destination_owner = ContinuationEmissionOwner::Specialization(destination.id());
-            // The post-ownership transport builder cannot issue a relocation
-            // into the very owner that already emits this call. Apply the same
-            // exclusion before the response plane reads this source set.
-            if destination.id() == source.id()
-                || destination_owner == identity.emission_owner()
-            {
+        let mut destination = None;
+        for candidate in &units {
+            let owner = ContinuationEmissionOwner::Specialization(candidate.id());
+            if candidate.id() == source.id() || owner == identity.emission_owner() {
                 continue;
             }
-            let body = destination.worker_body_origin();
+            let body = candidate.worker_body_origin();
             if checked_ih_escape_subtree_contains(plan, body, parent)?
                 && checked_ih_escape_subtree_contains(
-                    plan,
-                    body,
-                    source.producer_result_origin(),
+                    plan, body, source.producer_result_origin(),
                 )?
             {
-                has_destination = true;
-                break;
+                if destination.replace(owner).is_some() {
+                    return Err(planner_error(
+                        "one K call is relocated into two destination owners; it has no single emission placement",
+                    ));
+                }
             }
         }
-        if has_destination {
-            population.insert(identity);
+        if let Some(owner) = destination {
+            placements.insert(identity, owner);
         }
     }
-    Ok(population)
+    Ok(placements)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn derive_checked_ih_transport_source_population(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+    Ok(plan.k_call_placements.iter()
+        .filter(|(identity, owner)| **owner != identity.emission_owner())
+        .map(|(identity, _)| identity.clone())
+        .collect())
 }
 
 pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_environment_transports(
@@ -6444,27 +6453,39 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
             ));
         }
 
-        for destination in &units {
+        let recorded_destination = plan.k_emission_placement(&source_call_identity)?;
+        // Identity placement issues no transport into the current emitter.
+        if recorded_destination == source_call_identity.emission_owner() {
+            continue;
+        }
+        let recorded_unit = units.iter().find(|unit|
+            ContinuationEmissionOwner::Specialization(unit.id()) == recorded_destination);
+        if recorded_destination != source_call_identity.emission_owner()
+            && recorded_unit.is_none()
+        {
+            return Err(planner_error(
+                "a recorded K-call destination has no continuation unit",
+            ));
+        }
+        for destination in recorded_unit {
             if destination.id() == source.id() {
-                continue;
+                return Err(planner_error(
+                    "a checked-IH transport records a self-relocation",
+                ));
             }
             let body = destination.worker_body_origin();
+            // Ownership validates the precomputed destination; it does not
+            // search other units or choose a new owner here.
             if !checked_ih_escape_subtree_contains(plan, body, parent)?
                 || !checked_ih_escape_subtree_contains(
-                    plan,
-                    body,
-                    source.producer_result_origin(),
+                    plan, body, source.producer_result_origin(),
                 )?
             {
-                continue;
+                return Err(planner_error(
+                    "a recorded K-call destination lacks its checked escape geometry",
+                ));
             }
-            let destination_owner = ContinuationEmissionOwner::Specialization(destination.id());
-            // A relocation into the owner that already plans the call is no
-            // relocation: self-relocation is identity and is never issued. The
-            // call stays with its planner owner and that owner's seat emits it.
-            if destination_owner == source_call_identity.emission_owner() {
-                continue;
-            }
+            let destination_owner = recorded_destination;
             if plan.aggregate_ownership.iter().any(|record| {
                 matches!(
                     record.producer,
