@@ -28,7 +28,7 @@ non-head list member; the complete-law instance uses a head member.
 ```ken
 import Core.Classes.LawfulClasses (DecEq)
 
-import Data.Collections.Derived (list_elem_head, list_elem_later)
+import Data.Collections.Derived (list_elem, list_elem_head, list_elem_later)
 
 import Algorithm.Graphs.Dependency
   (Graph, edge, graph_from_successors,
