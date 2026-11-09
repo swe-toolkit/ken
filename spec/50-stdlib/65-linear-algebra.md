@@ -1334,8 +1334,8 @@ length `n`, including `Zero`. `dot_distrib_right` distributes the
 second argument over `vector_add` while holding `xs` fixed;
 `dot_scale_right` scales that argument by `factor`, which also
 appears as the left operand of `mul` in the result. Together with
-§3's public `dot_distrib` and `dot_scale` in the first argument,
-these four public laws make the dot product bilinear over the
+§1.3's public `dot_distrib` and §3's public `dot_scale` in the first
+argument, these four public laws make the dot product bilinear over the
 existing natural operations. No function equality, implicit vector
 resize, signed or approximate scalar tier is asserted.
 
