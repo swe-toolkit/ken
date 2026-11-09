@@ -173,6 +173,7 @@ pub(in crate::cranelift_backend) enum BracketSettlementMode {
 #[derive(Clone, Debug)]
 pub(in crate::cranelift_backend) struct BracketSettlement {
     id: BracketSettlementId,
+    parent: Option<BracketSettlementId>,
     settlement: StaticOriginId,
     clause_origin: Option<StaticOriginId>,
     clause_scrutinee: BTreeSet<StaticOriginId>,
@@ -191,6 +192,7 @@ pub(in crate::cranelift_backend) struct BracketSettlement {
 
 impl BracketSettlement {
     pub(in crate::cranelift_backend) fn id(&self) -> BracketSettlementId { self.id }
+    pub(in crate::cranelift_backend) fn is_nested(&self) -> bool { self.parent.is_some() }
     pub(in crate::cranelift_backend) fn settlement(&self) -> StaticOriginId { self.settlement }
     pub(in crate::cranelift_backend) fn clause_origin(&self) -> Option<StaticOriginId> { self.clause_origin }
     pub(in crate::cranelift_backend) fn clause_scrutinee_contains(&self, head: StaticOriginId) -> bool {
@@ -276,15 +278,19 @@ impl BracketSettlementControlView {
             } else {
                 mode
             };
-            // A nested Deferred region has no in-place owner to order its
-            // settlement against the parent. Refuse it before lowering.
-            if mode == BracketSettlementMode::Deferred && region.parent.is_some() {
-                return Err(planner_error(
-                    "a nested bracket region has no in-place settlement owner; \
-                     deferred settlement order is not planned for nested regions",
-                ));
-            }
             let row = plan.bracket_rows.get(&region.id).cloned();
+            // A nested Deferred region settles at its own marked S only when
+            // a checked continuation row names this same Vis and identity.
+            // Root Deferred retains the driver route; it cannot borrow this
+            // local settlement just because its source has an ancestor.
+            if mode == BracketSettlementMode::Deferred && region.parent.is_some()
+                && !matches!((&region.context, &row),
+                    (BracketResponseContextKey::Continuation(identity), Some(row))
+                        if row.vis_origin() == region.settlement
+                            && row.k_identity() == identity)
+            {
+                return Err(planner_error("nested region has no settlement row"));
+            }
             match (&region.context, &row) {
                 (BracketResponseContextKey::Continuation(identity), Some(row))
                     if row.vis_origin() == region.settlement && row.k_identity() == identity => {}
@@ -297,8 +303,8 @@ impl BracketSettlementControlView {
                 .map(|row| plan.k_emission_placement(row.k_identity()))
                 .transpose()?;
             if view.regions.insert(region.id, BracketSettlement {
-                id: region.id, settlement: region.settlement,
-                clause_origin, clause_scrutinee,
+                id: region.id, parent: region.parent,
+                settlement: region.settlement, clause_origin, clause_scrutinee,
                 body_exit: region.body_exit, outcome_merge: region.outcome_merge,
                 resume: region.resume, mode, row, k_placement, response_owners: owners,
             }).is_some() {

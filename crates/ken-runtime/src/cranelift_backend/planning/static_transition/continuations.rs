@@ -3199,9 +3199,9 @@ pub(super) fn continuation_owner_entry_sources(
 /// `binding_ordinal` already distinguish every binding, including two of
 /// different kinds, so adding a kind tag to the representation would be a
 /// second statement of a fact the identity already carries. This selects the
-/// two facts whose *derivation* differs, and nothing else.
+/// facts whose *derivation* differs, and nothing else.
 ///
-/// ⛔ Closed, no default arm: a third binding kind must state its carrier and
+/// Closed, no default arm: every new binding kind must state its carrier and
 /// its referent lifetime explicitly rather than inherit either.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProducerLocalKind {
@@ -3224,12 +3224,17 @@ enum ProducerLocalKind {
     /// IH prefix; the Architect blocked it at `evt_9krmbv834z9p`. There is
     /// deliberately no `RecursiveIhBinder` arm here — see the walk.
     CaseArgumentBinder { match_origin: StaticOriginId },
+    /// The result of a direct declaration call bound by a `Let` -- B1a's
+    /// direct-style bind of a performed member. The `Call` occurrence owns the
+    /// identity; its carrier is the one its result travels in, read off its
+    /// semantic seed, and its referent lifetime is the `Call` occurrence's own.
+    DeclarationCallResult,
 }
 
 /// `RT-CONTSRC-PRODUCER-LOCAL` `D2` — the planner contract for one
 /// producer-local binding.
 ///
-/// ⭐ **One authority for both kinds.** Only the carrier and the referent
+/// **One authority for every kind.** Only the carrier and the referent
 /// lifetime are derived per kind; ownership and storage owner are read off
 /// `AbiCarrier`'s existing methods — the same two the entry plane's `abi::slot`
 /// reads — so this record cannot disagree with the entry plane about what a
@@ -3239,12 +3244,12 @@ enum ProducerLocalKind {
 /// **Where each fact comes from, stated because "planner-derived" is not an
 /// answer:**
 ///
-/// | fact | host-effect result | constructor **argument** binder |
-/// |---|---|---|
-/// | carrier | `abi::result_carrier` on the `Effect` shape — the existing "carrier an occurrence's result travels in" authority, and this binding *is* that result | `abi::result_carrier` on the **scrutinee's** shape, gated by `slot_referent_affinity` |
-/// | ownership | `AbiCarrier::ownership` | `AbiCarrier::ownership` |
-/// | storage owner | `AbiCarrier::storage_owner` | `AbiCarrier::storage_owner` |
-/// | referent affinity | the `Effect` occurrence's own lifetime authority | the scrutinee child's lifetime authority |
+/// | fact | host-effect result | constructor **argument** binder | direct declaration call result |
+/// |---|---|---|---|
+/// | carrier | `abi::result_carrier` on the `Effect` shape — the existing "carrier an occurrence's result travels in" authority, and this binding *is* that result | `abi::result_carrier` on the **scrutinee's** shape, gated by `slot_referent_affinity` | `abi::result_carrier` on the `Call`'s semantic seed, gated by `slot_referent_affinity` |
+/// | ownership | `AbiCarrier::ownership` | `AbiCarrier::ownership` | `AbiCarrier::ownership` |
+/// | storage owner | `AbiCarrier::storage_owner` | `AbiCarrier::storage_owner` | `AbiCarrier::storage_owner` |
+/// | referent affinity | the `Effect` occurrence's own lifetime authority | the scrutinee child's lifetime authority | the `Call` occurrence's own lifetime authority |
 ///
 /// ⛔ **Recursive IH binders are not in this table and take no contract here.**
 /// They are a separate subrun of a `ComputationalMatch` case and stay `Open`;
@@ -3268,6 +3273,18 @@ fn producer_local_source(
             abi::result_carrier(SemanticSourceKind::Expression(RuntimeExprShape::Effect))?,
             occurrence_authority(plan, binding.binding_origin)?.lifetime,
         ),
+        ProducerLocalKind::DeclarationCallResult => {
+            let seed = plan
+                .semantic_sources
+                .iter()
+                .find(|seed| seed.origin == binding.binding_origin)
+                .ok_or_else(|| {
+                    planner_error("a let-bound declaration call has no semantic seed")
+                })?;
+            let carrier = abi::result_carrier(seed.source)?;
+            slot_referent_affinity(carrier)?;
+            (carrier, occurrence_authority(plan, binding.binding_origin)?.lifetime)
+        }
         ProducerLocalKind::CaseArgumentBinder { match_origin } => {
             let scrutinee = occurrence_authority(plan, match_origin)?
                 .children
@@ -3313,8 +3330,8 @@ fn producer_local_source(
 ///
 /// `binding_origin` is what **creates** the value; `locator.environment_origin`
 /// is the scope whose environment **contains** it. For a case binder the two
-/// coincide; for a `Let`-bound effect result they deliberately do not, which is
-/// the separation `D1` exists to express.
+/// coincide; for a `Let`-bound effect or declaration-call result they
+/// deliberately do not, which is the separation `D1` exists to express.
 fn producer_local_value(
     plan: &StaticTransitionPlan<'_>,
     kind: ProducerLocalKind,
@@ -3438,6 +3455,8 @@ fn walk_continuation_value_environment_impl(
             // ⛔ The binding origin is the `Effect` occurrence — what creates
             // the value — while the locator names this `Let`'s body, whose
             // environment holds it at index 0. The two differ on purpose.
+            // A `Let`-bound direct declaration call result is producer-local on
+            // the same terms (B1a direct-style bind).
             let bound_origin = child(0)?;
             let value = match plan.planned_occurrence_expr(bound_origin)? {
                 RuntimeExpr::Effect { .. } => producer_local_value(
@@ -3448,6 +3467,18 @@ fn walk_continuation_value_environment_impl(
                     child(1)?,
                     0,
                 )?,
+                RuntimeExpr::Call { callee, .. }
+                    if matches!(callee.as_ref(), RuntimeExpr::DeclarationRef { .. }) =>
+                {
+                    producer_local_value(
+                        plan,
+                        ProducerLocalKind::DeclarationCallResult,
+                        bound_origin,
+                        0,
+                        child(1)?,
+                        0,
+                    )?
+                }
                 _ => value,
             };
             let mut nested = Vec::with_capacity(environment.len() + 1);

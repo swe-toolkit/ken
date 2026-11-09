@@ -6280,6 +6280,35 @@ fn checked_ih_escape_subtree_contains(
 /// Compute transport-source call identities before residual issuance. Only the
 /// continuation/source plane decides membership; ownership records are checked
 /// separately by the post-ownership transport builder.
+/// A checked-IH source whose only apparent crossing is into the owner that
+/// already emits the call. Such a crossing cannot mint a relocation, but its
+/// result still escapes into that owner's worker and cannot acquire a response
+/// owner merely because the transport source was correctly omitted.
+pub(super) fn checked_ih_self_emitter_source(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+) -> Result<bool, CraneliftBackendError> {
+    let units = plan.continuation_units()?;
+    let source = units.iter().find(|unit| unit.id() == identity.target())
+        .ok_or_else(|| planner_error("a response demand has no checked-IH source unit"))?;
+    if checked_ih_coordinate_run(source)?.is_none() {
+        return Ok(false);
+    }
+    let parent = source.producer_construct_origin();
+    let result = source.producer_result_origin();
+    for destination in &units {
+        if destination.id() != source.id()
+            && identity.emission_owner()
+                == ContinuationEmissionOwner::Specialization(destination.id())
+            && checked_ih_escape_subtree_contains(plan, destination.worker_body_origin(), parent)?
+            && checked_ih_escape_subtree_contains(plan, destination.worker_body_origin(), result)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub(in crate::cranelift_backend::planning::static_transition) fn derive_checked_ih_transport_source_population(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
@@ -6290,26 +6319,6 @@ pub(in crate::cranelift_backend::planning::static_transition) fn derive_checked_
             continue;
         }
         let parent = source.producer_construct_origin();
-        let mut has_destination = false;
-        for destination in &units {
-            if destination.id() == source.id() {
-                continue;
-            }
-            let body = destination.worker_body_origin();
-            if checked_ih_escape_subtree_contains(plan, body, parent)?
-                && checked_ih_escape_subtree_contains(
-                    plan,
-                    body,
-                    source.producer_result_origin(),
-                )?
-            {
-                has_destination = true;
-                break;
-            }
-        }
-        if !has_destination {
-            continue;
-        }
         let identity = plan
             .continuation_call_binding_for(
                 parent,
@@ -6327,7 +6336,32 @@ pub(in crate::cranelift_backend::planning::static_transition) fn derive_checked_
                 "a checked-IH transport's causal identity targets a different specialization than its force materialization",
             ));
         }
-        population.insert(identity);
+        let mut has_destination = false;
+        for destination in &units {
+            let destination_owner = ContinuationEmissionOwner::Specialization(destination.id());
+            // The post-ownership transport builder cannot issue a relocation
+            // into the very owner that already emits this call. Apply the same
+            // exclusion before the response plane reads this source set.
+            if destination.id() == source.id()
+                || destination_owner == identity.emission_owner()
+            {
+                continue;
+            }
+            let body = destination.worker_body_origin();
+            if checked_ih_escape_subtree_contains(plan, body, parent)?
+                && checked_ih_escape_subtree_contains(
+                    plan,
+                    body,
+                    source.producer_result_origin(),
+                )?
+            {
+                has_destination = true;
+                break;
+            }
+        }
+        if has_destination {
+            population.insert(identity);
+        }
     }
     Ok(population)
 }

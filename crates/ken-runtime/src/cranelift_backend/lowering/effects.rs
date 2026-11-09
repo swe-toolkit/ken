@@ -2885,7 +2885,8 @@ impl<'a> Lowering<'a> {
         let bracket_claim = if let Some((id, origin)) = self.bracket_effect_claim {
             if origin == static_origin {
                 let matches = self.bracket_view.region(id).is_some_and(|region|
-                    region.mode() == BracketSettlementMode::InPlace
+                    (region.mode() == BracketSettlementMode::InPlace
+                        || (region.mode() == BracketSettlementMode::Deferred && region.is_nested()))
                     && region.row().is_some_and(|row| row.effect_origin() == origin));
                 if !matches {
                     return Err(backend_module(LoweringCause::PlannerInvariant,

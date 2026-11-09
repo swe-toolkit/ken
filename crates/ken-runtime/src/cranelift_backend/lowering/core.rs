@@ -7447,6 +7447,21 @@ impl<'a> Lowering<'a> {
                         },
                     )));
                 }
+                BracketSettlementMode::Deferred if region.is_nested() => {
+                    let lowered_args = args.iter().enumerate()
+                        .map(|(position, arg)| {
+                            let arg = self.child_occurrence(static_origin, position, arg)?;
+                            self.lower_expr(builder, arg, producer_env)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let (body, env) =
+                        self.settle_bracket_at_source(builder, &region, &lowered_args)?;
+                    return Ok(ProducerTrampolineStep::Continue(Box::new(
+                        ProducerTrampolineWork::LexicalK {
+                            body, env, eliminators: eliminators.to_vec(),
+                        },
+                    )));
+                }
                 BracketSettlementMode::Deferred => {
                     self.bracket_ledger.consume_settlement(region.id(), region.mode(),
                         region.body_exit(), static_origin)?;
@@ -17253,6 +17268,19 @@ impl<'a> Lowering<'a> {
                 let k_body = self.retained_body_occurrence(body)?;
                 self.lower_expr(builder, k_body, &k_env)
             })())),
+            BracketSettlementMode::Deferred if region.is_nested() =>
+                ConstructBracketEntry::Done(Box::new((|| {
+                    let lowered_args = args.iter().enumerate()
+                        .map(|(position, arg)| {
+                            let arg = self.child_occurrence(static_origin, position, arg)?;
+                            self.lower_expr(builder, arg, env)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let (body, k_env) =
+                        self.settle_bracket_at_source(builder, &region, &lowered_args)?;
+                    let k_body = self.retained_body_occurrence(body)?;
+                    self.lower_expr(builder, k_body, &k_env)
+                })())),
             BracketSettlementMode::Deferred => match self.bracket_ledger.consume_settlement(
                 region.id(), region.mode(), region.body_exit(), static_origin,
             ) {

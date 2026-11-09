@@ -947,7 +947,8 @@ fn inline_synthesized_seat_emission_owners(
                         None => false,
                     },
                     DeferredResponseSubCase::NoContinuationUnit
-                    | DeferredResponseSubCase::ContinuationBodyTail => false,
+                    | DeferredResponseSubCase::ContinuationBodyTail
+                    | DeferredResponseSubCase::EscapedCheckedIhCaller => false,
                 }
             };
             if !owns_seat {

@@ -24,8 +24,9 @@ impl Lowering<'_> {
         let row = region.row().cloned().ok_or_else(|| {
             Self::bracket_error("an InPlace bracket settlement has no validated response row")
         })?;
-        if region.mode() != BracketSettlementMode::InPlace
-            || row.vis_origin() != region.settlement()
+        let local_settlement = region.mode() == BracketSettlementMode::InPlace
+            || (region.mode() == BracketSettlementMode::Deferred && region.is_nested());
+        if !local_settlement || row.vis_origin() != region.settlement()
             || lowered_args.len() != 2
         {
             return Err(Self::bracket_error(

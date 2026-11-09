@@ -797,6 +797,10 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// body root. It returns a Vis without an enclosing consumer seat, so no
     /// selected response-owner call can be recorded in that function.
     ContinuationBodyTail,
+    /// A checked-IH result escapes into the worker that already emits its
+    /// call. No self-relocation is issued and no response owner can assume
+    /// that the escaped result returns through an ordinary call seat.
+    EscapedCheckedIhCaller,
 }
 
 /// One response `Vis` classified `Deferred` (recut amendment
@@ -4087,6 +4091,67 @@ impl StaticTransitionPlan<'_> {
         Ok(specialized.into_iter().map(|demand| demand.k_identity).collect())
     }
 
+    /// Close a non-relocatable checked-IH source over the exact worker and
+    /// emission graph before assigning any response owner. The sole source
+    /// seed prevents a sibling fan-out from inventing a response owner for a
+    /// result that returns inside its own emitting worker. A consumer whose
+    /// worker body is that result, its same-result siblings, and calls emitted
+    /// in an already affected worker (E3) all remain on the residual route.
+    /// This is re-derived by installation and validation from identical
+    /// phase-A demands; it never depends on an already-installed owner.
+    fn escaped_checked_ih_callers(
+        &self,
+        demands: &[StaticResponseContextDemand],
+        transport_sources: &BTreeSet<ContinuationCallIdentity>,
+        units: &[super::continuations::ContinuationUnitView<'_>],
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let mut counts = BTreeMap::new();
+        for demand in demands {
+            *counts.entry(demand.k_identity.producer_result_origin()).or_insert(0usize) += 1;
+        }
+        let mut closed = BTreeSet::new();
+        for demand in demands {
+            let identity = &demand.k_identity;
+            if counts.get(&identity.producer_result_origin()) == Some(&1)
+                && !transport_sources.contains(identity)
+                && super::aggregates::checked_ih_self_emitter_source(self, identity)?
+            {
+                closed.insert(identity.clone());
+            }
+        }
+        loop {
+            let results = closed.iter().map(ContinuationCallIdentity::producer_result_origin)
+                .collect::<BTreeSet<_>>();
+            let targets = closed.iter().map(ContinuationCallIdentity::target)
+                .collect::<BTreeSet<_>>();
+            let before = closed.len();
+            for demand in demands {
+                let identity = &demand.k_identity;
+                let body = units.iter().find(|unit| unit.id() == identity.target())
+                    .ok_or_else(|| planner_error("an escaped response caller has no target unit"))?
+                    .worker_body_origin();
+                let emitted_in_affected = match identity.emission_owner() {
+                    ContinuationEmissionOwner::Specialization(owner) =>
+                        targets.contains(&owner) || self.continuation_contexts.iter().any(|context|
+                            context.enclosing_specialization == owner
+                                && demands.iter().any(|member|
+                                    closed.contains(&member.k_identity)
+                                        && member.k_body_origin == context.worker_body_origin)),
+                    ContinuationEmissionOwner::Predeclared(_)
+                    | ContinuationEmissionOwner::Fusion(_) => false,
+                };
+                if results.contains(&body)
+                    || results.contains(&identity.producer_result_origin())
+                    || emitted_in_affected
+                {
+                    closed.insert(identity.clone());
+                }
+            }
+            if closed.len() == before { break; }
+        }
+        Ok(closed)
+    }
+
     fn static_response_phase_b_split_over(
         &self,
         demands: Vec<StaticResponseContextDemand>,
@@ -4144,9 +4209,24 @@ impl StaticTransitionPlan<'_> {
         }
         let requires_execute_then_resume = ordinary_stage_count >= 2 || pending_checked_ret_sink;
         let units = self.continuation_units()?;
+        let escaped = self.escaped_checked_ih_callers(&demands, transport_sources, &units)?;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
+            if escaped.contains(&demand.k_identity) {
+                deferred.push(DeferredResponseRow {
+                    vis_origin: demand.vis_origin,
+                    producer_call_origin: demand.producer_call_origin,
+                    operation_root_origin: demand.operation_root_origin,
+                    selected_operation_origin: demand.selected_operation_origin,
+                    effect_origin: demand.effect_origin,
+                    operation: demand.operation,
+                    sub_case: DeferredResponseSubCase::EscapedCheckedIhCaller,
+                    capture_count: demand.captures.len(),
+                    continuation_input_count: demand.continuation_inputs.len(),
+                });
+                continue;
+            }
             // A construct returned as the emitting worker's body root has no
             // enclosing eliminator in that Function: neither the direct claim
             // nor the bypassed-candidate bridge can settle its selected call.
@@ -4762,7 +4842,8 @@ impl StaticTransitionPlan<'_> {
             };
             match row.sub_case {
                 DeferredResponseSubCase::NoContinuationUnit
-                | DeferredResponseSubCase::ContinuationBodyTail => continue,
+                | DeferredResponseSubCase::ContinuationBodyTail
+                | DeferredResponseSubCase::EscapedCheckedIhCaller => continue,
                 DeferredResponseSubCase::UnconsumedTransportCaller => {}
             }
             if !visited.insert(row.vis_origin()) {
@@ -4820,7 +4901,8 @@ impl StaticTransitionPlan<'_> {
         match row.sub_case {
             DeferredResponseSubCase::UnconsumedTransportCaller => {}
             DeferredResponseSubCase::NoContinuationUnit
-            | DeferredResponseSubCase::ContinuationBodyTail => return Ok(None),
+            | DeferredResponseSubCase::ContinuationBodyTail
+            | DeferredResponseSubCase::EscapedCheckedIhCaller => return Ok(None),
         }
         let mut owners = Vec::new();
         for response in &self.static_response_continuations {
@@ -4877,7 +4959,8 @@ impl StaticTransitionPlan<'_> {
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
         // A continuation-body-root Vis has no selected incoming owner call to
         // borrow from an enclosing handler: keep its ordinary Construct route.
-        if row.sub_case == DeferredResponseSubCase::ContinuationBodyTail {
+        if matches!(row.sub_case, DeferredResponseSubCase::ContinuationBodyTail
+            | DeferredResponseSubCase::EscapedCheckedIhCaller) {
             return Ok(None);
         }
         if let Some(owner) = self.bounded_deferred_response_handler_owner(row)? {
