@@ -1,6 +1,10 @@
 //! PX8-F linked checked `writeAll` reachability through PX8-N bounded Nat.
 
 const WRITE_ALL: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAll)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn body_from_write (outcome : Result ResourceError Unit)
   : ResourceBodyResult Unit Unit =
   match outcome {
@@ -385,9 +389,10 @@ fn assert_retained_unit_call_target_mutation_child() {
         .tempdir()
         .unwrap();
     let result = ken_runtime::with_retained_unit_call_target_mutation(mutation, || {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             WRITE_ALL,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "px8f_write_all_retained_target_control",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -460,9 +465,10 @@ fn assert_retained_result_closure_proof_mutation_child() {
         .tempdir()
         .unwrap();
     let result = ken_runtime::with_retained_result_closure_proof_mutation(mutation, || {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             WRITE_ALL,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "px8f_write_all_retained_result_closure_control",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -516,9 +522,10 @@ fn assert_handler_owned_deferred_response_mutation_child() {
     let preload = build_short_pwrite_preload(dir.path());
     let (compiled, applications) =
         ken_runtime::with_handler_owned_deferred_response_mutation(mutation, || {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 WRITE_ALL,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "px8f_write_all_handler_owned_response_control",
                 dir.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -810,9 +817,10 @@ fn run_linked_checked_write_all() {
     let preload = build_short_pwrite_preload(dir.path());
 
     eprintln!("PX8-F: compiling checked writeAll fixture");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         WRITE_ALL,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px8f_write_all_native",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -911,6 +919,7 @@ fn run_linked_checked_write_all() {
     let virtual_observation = ken_cli::run_program_effect_observation(
         WRITE_ALL,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         b".",
@@ -934,6 +943,7 @@ fn run_linked_checked_write_all() {
     let interpreted = ken_cli::run_program_effect_observation(
         WRITE_ALL,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         dir.path().as_os_str().as_bytes(),
@@ -987,9 +997,10 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
                 ken_runtime::with_grafted_spine_validation_mutation(
                     ken_runtime::GraftedSpineValidationMutation::Exact,
                     || {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             WRITE_ALL,
                             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                             "px8f_grafted_spine_ac3_exact",
                             dir.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -1029,9 +1040,10 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
             };
             let (mutated_compile, mutated_observations, mutated_applications) =
                 ken_runtime::with_grafted_spine_validation_mutation(mutation, || {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         WRITE_ALL,
                         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                         "px8f_grafted_spine_ac3_mutated",
                         dir.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -1118,9 +1130,10 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .unwrap();
             let compile = |package: &str| {
                 ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         WRITE_ALL,
                         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                         package,
                         dir.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

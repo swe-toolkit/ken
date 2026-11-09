@@ -8,9 +8,10 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
     let dir = output_dir(name);
     std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         name,
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -53,8 +54,9 @@ fn run_with_interpreter(name: &str, source: &str) -> (
 ) {
     let dir = output_dir(name);
     std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
-    let output = ken_cli::build_native_program(
-        source, ken_cli::SourceFormat::Ken, name, dir.path(),
+    let output = ken_cli::build_native_program_with_roots(
+        source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], name, dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     ).expect("checked PX7-F program compiles to the linked native artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -68,7 +70,8 @@ fn run_with_interpreter(name: &str, source: &str) -> (
     ).expect("the linked PX7-F native child runs");
     let mut host = ken_interp::PosixHost::new_at(dir.path());
     let interpreted = ken_cli::run_program_effect_observation(
-        source, ken_cli::SourceFormat::Ken, &[], &[],
+        source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], &[], &[],
         dir.path().as_os_str().as_encoded_bytes(), &mut host,
     ).expect("the PX7-F source runs in the interpreter");
     (native, interpreted)
@@ -89,6 +92,8 @@ fn assert_exact_operation_and_terminal_parity(
 }
 
 const ESCAPE_CLOSED: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, resourceMetadata, withResource)
 fn escape_body (resource : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
   host_pure AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
@@ -133,6 +138,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 const RIGHT_NOT_HELD: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, resourceMetadata, withResource)
 fn metadata_after (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
   match outcome {
@@ -198,6 +205,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 const DOUBLE_RELEASE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, release, withResource)
 fn double_release_unexpected (error : ResourceError)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
   host_pure AFull (ResourceBodyResult ResourceError Unit)
@@ -319,9 +328,10 @@ fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
         std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
         let mut profile = starter_smoke_profile();
         profile.runtime.invocation_epochs = limit;
-        let output = ken_cli::build_native_program(
+        let output = ken_cli::build_native_program_with_roots(
             ESCAPE_CLOSED,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "epoch-profile",
             dir.path(),
             profile,
@@ -536,8 +546,9 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
                 ken_runtime::with_pending_vis_owner_frame_observations(|| {
                     ken_runtime::with_returned_vis_capture_observations(|| {
                         ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                            ken_cli::build_native_program(
-                                source, ken_cli::SourceFormat::Ken, label, dir.path(),
+                            ken_cli::build_native_program_with_roots(
+                                source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], label, dir.path(),
                                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                             )
                         })
@@ -697,8 +708,9 @@ fn e4_ordinary_response_owner_reads_two_distinct_source_parameter_slots() {
     let dir = output_dir("e4-double-release-owner-slots");
     let ((compiled, plans), pairs) = ken_runtime::with_rt_seed_response_metadata_observations(|| {
         ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
-                DOUBLE_RELEASE, ken_cli::SourceFormat::Ken, "e4-double-release-owner-slots",
+            ken_cli::build_native_program_with_roots(
+                DOUBLE_RELEASE, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], "e4-double-release-owner-slots",
                 dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         })
@@ -760,8 +772,9 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
             ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
             || ken_runtime::with_pending_vis_owner_frame_observations(|| {
                 ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         DOUBLE_RELEASE, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                         "double-release-unchecked-k-result", dir.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
@@ -801,8 +814,9 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
 fn owner_vis_placeholder_nonowner_target_refuses_at_sole_mint() {
     let build = || {
         let dir = output_dir("right-denial-placeholder-pin");
-        let output = ken_cli::build_native_program(
-            RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken, "right-denial-placeholder-pin",
+        let output = ken_cli::build_native_program_with_roots(
+            RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], "right-denial-placeholder-pin",
             dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         );
         (dir, output)

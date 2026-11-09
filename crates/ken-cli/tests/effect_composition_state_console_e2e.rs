@@ -34,6 +34,9 @@ fn workspace_root() -> PathBuf {
 /// `prog` declares `visits [Console]`: its bind continuation names
 /// `print_line`, and a built closure pays its body's row where it is built.
 const PROG: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
+import Core.Effect.Coproduct (inject_r)
 proc prog : ITree ConsoleOp console_resp (Pair Unit Nat) visits [Console] =
   run_state Nat ConsoleOp console_resp Unit Zero
     (itree_bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit

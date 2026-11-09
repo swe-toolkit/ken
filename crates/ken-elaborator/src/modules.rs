@@ -2729,15 +2729,15 @@ fn elaborate_module_from_roots_with_mode_v1(
     load_unit(elab, entry, &Span::zero(), mode)
 }
 
-/// Strict entry for an isolated source. Unlike the file-unit entry, the
-/// source itself is an in-memory root; only explicit imports load catalog
-/// units. The legacy standalone entries remain unchanged.
-pub fn elaborate_isolated_strict_v1(
+/// Prepare one in-memory root and its explicit catalog imports for Strict.
+/// Production file, runner and native preparation share this env-taking seam;
+/// native preparation retains separate declaration/example identity sets.
+pub(crate) fn prepare_isolated_strict_scope_v1(
     elab: &mut ElabEnv,
     src: &str,
     literate: bool,
     roots: &[PathBuf],
-) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+) -> Result<(), ElabError> {
     require_fixed_proved_identity(&elab.env, &elab.globals)?;
     require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
     if roots.len() > 1 {
@@ -2801,6 +2801,19 @@ pub fn elaborate_isolated_strict_v1(
         scope.private_ids.clone_from(&elab.module_state.private_ids);
         elab.module_state.root_scope = scope;
     }
+    Ok(())
+}
+
+/// Strict entry for an isolated source. Unlike the file-unit entry, the
+/// source itself is an in-memory root; only explicit imports load catalog
+/// units. The legacy standalone entries remain unchanged.
+pub fn elaborate_isolated_strict_v1(
+    elab: &mut ElabEnv,
+    src: &str,
+    literate: bool,
+    roots: &[PathBuf],
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    prepare_isolated_strict_scope_v1(elab, src, literate, roots)?;
     if literate {
         elab.elaborate_ken_md_file_v1(src)
     } else {

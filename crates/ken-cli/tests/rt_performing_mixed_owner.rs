@@ -1,8 +1,8 @@
 //! Distinct provenance owners at one call cannot bypass a later planner guard.
 #![cfg(target_os = "linux")]
 
-/// Promise class: durable invariant. MEASURED: a source-stage fixture whose
-/// interpreter reaches both FsReadFile operations refuses with the typed
+/// Promise class: durable invariant. MEASURED: a Legacy-elaborated fixture
+/// whose core term reaches both FsReadFile operations refuses with the typed
 /// computational-occurrence PlannerInvariant before native object emission.
 /// CLAIMED: W3's instance key does not admit a program that the subsequent
 /// consumer cannot resolve. THE GAP: this fixture's separate provenance
@@ -24,9 +24,13 @@ fn distinct_provenance_stage_refuses_at_unresolved_consumer_before_native_execut
             std::fs::write(root.path().join("source"), b"0123456789abcdef")
                 .expect("the fixture file is readable");
             let mut host = ken_interp::PosixHost::new_at(root.path());
-            let interpreted = ken_cli::run_program_effect_observation(
-                source,
-                ken_cli::SourceFormat::Ken,
+            let mut interpreter_env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+            let interpreter_results = interpreter_env
+                .elaborate_file_v1(source)
+                .expect("the relay elaborates into a checked core term");
+            let interpreted = ken_cli::run_elaborated_program_effect_observation(
+                interpreter_env,
+                interpreter_results,
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),
@@ -42,13 +46,27 @@ fn distinct_provenance_stage_refuses_at_unresolved_consumer_before_native_execut
                 2,
                 "the interpreter must reach both source reads"
             );
-            let built = ken_cli::build_native_program(
-                source,
-                ken_cli::SourceFormat::Ken,
+            let mut native_env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+            let native_results = native_env
+                .elaborate_file_v1(source)
+                .expect("the relay elaborates into a checked core term");
+            let elaborated =
+                ken_elaborator::compiler_driver::ElaboratedNativeProgramV1::from_elaborated_env(
+                    native_env,
+                    ken_elaborator::compiler_driver::CompilerSource::new("src/main.ken", source),
+                    native_results,
+                );
+            let built = ken_elaborator::compiler_driver::prepare_native_program_from_elaborated_v1(
                 "rt_performing_mixed_owner",
-                root.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            );
+                elaborated,
+            )
+            .and_then(|preparation| {
+                ken_elaborator::compiler_driver::complete_native_program_preparation(
+                    preparation,
+                    root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                )
+            });
             let error =
                 built.expect_err("the unresolved consumer must refuse before native execution");
             assert_eq!(error.code().as_str(), "N0003");

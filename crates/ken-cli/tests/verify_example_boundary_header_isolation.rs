@@ -24,6 +24,8 @@ const PRINT_OWN_ABI: &str = "program capabilities FS ANone\n\
     proc main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode visits [Console] = host_program ANone (print_line \"own authority\")";
 const HEADERLESS_ABI: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
 const FULL_WRITER_UNDER_ANONE: &str = r#"program capabilities FS ANone
+import Capability.Filesystem.Authority (writeFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {

@@ -1,7 +1,13 @@
 program capabilities FS APartial
+import Capability.Console.Text (IO, print_line)
+import Capability.Process.Exit (host_program)
+import Core.Classes.LawfulClasses (charToInt, leqChar)
 
-proc write (stream : ConsoleStream) (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
-  ITree.Ret ConsoleOp console_resp (Result IOError Unit) (Ok IOError Unit MkUnit)
+proc write (stream : ConsoleStream) (payload : Bytes)
+    : IO (Result IOError Unit) visits [Console] =
+  ITree.Vis ConsoleOp console_resp (Result IOError Unit)
+    (ConsoleOp.Write stream payload)
+    (\reply. ITree.Ret ConsoleOp console_resp (Result IOError Unit) reply)
 
 proc write_probe (payload : Bytes) : IO (Result IOError Unit) visits [Console] =
   write ConsoleStream.Stdout payload

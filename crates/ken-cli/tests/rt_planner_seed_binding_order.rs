@@ -5,6 +5,8 @@
 //! red/green witness. The response and gather consumers are pinned separately.
 
 const SAME_TYPE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc send_pair (left : Bytes) (right : Bytes)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial (Result IOError Unit) ExitCode
@@ -22,6 +24,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const MIXED_TYPE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc send_and_exit (bytes : Bytes) (code : ExitCode)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial (Result IOError Unit) ExitCode
@@ -41,9 +45,10 @@ fn assert_direct_source(source: &str, label: &str, expected_stdout: &[u8], exit:
         .prefix("ken-rt-planner-seed-")
         .tempdir()
         .expect("fixture directory");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         label,
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -63,6 +68,7 @@ fn assert_direct_source(source: &str, label: &str, expected_stdout: &[u8], exit:
     let reference = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",

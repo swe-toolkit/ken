@@ -75,9 +75,10 @@ fn differential_with_profile(
             || {
                 ken_runtime::with_composed_return_ret_assessments(|| {
                     ken_runtime::with_pending_checked_ret_sink_applications(|| {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             source,
                             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                             &format!("rt_escape_{}", case.replace('-', "_")),
                             root.path(),
                             profile,
@@ -103,6 +104,7 @@ fn differential_with_profile(
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -170,6 +172,8 @@ fn assert_native_matches_interpreter(case: &str, diff: &Differential) {
 // exactly once, on one path.
 #[cfg(target_os = "linux")]
 const ESCAPE_ONE_USED: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, resourceMetadata, withResource)
 proc after_escape (bracket : ResourceBracketResult Unit (Resource ResourceKind.FsHandle))
   : HostIO AFull ExitCode visits [FS] =
   match bracket {
@@ -212,6 +216,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // consumed once.
 #[cfg(target_os = "linux")]
 const ESCAPE_RESOURCE_PLUS_PLAIN: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withResource)
 proc after_b
   (outcome : Result FileError (ResourceBracketResult Unit (Prod (Resource ResourceKind.FsHandle) Unit)))
   : HostIO AFull ExitCode visits [FS] =
@@ -246,6 +252,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // lowering with "checked Runtime frame marker was consumed more than once".
 #[cfg(target_os = "linux")]
 const ESCAPE_FILE_THEN_READAT: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 proc read_body (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
@@ -289,6 +299,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // kind — pre-fix this tripped the identical "consumed more than once".
 #[cfg(target_os = "linux")]
 const ESCAPE_BUFFER_THEN_READAT: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn escape_buffer (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit (BufferHandle)) =
   host_pure AFull (ResourceBodyResult Unit (BufferHandle))
@@ -354,6 +368,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // as a bounds rejection, not buried.
 #[cfg(target_os = "linux")]
 const R2_CROSS_BUFFER_FREEZE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow, freeze)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn body_from_freeze (r : Result ResourceError Bytes) : ResourceBodyResult Unit Unit =
   match r {
     Ok bytes |-> ResourceBodyErr Unit Unit MkUnit;
@@ -975,6 +993,7 @@ fn nat_fanout_reached_live_resource_matches_interpreter() {
             let interpreted = ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -1072,6 +1091,7 @@ fn assert_carried_nat_case(
     let interpreted = ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -1216,9 +1236,10 @@ fn carried_nat_two_leaf_pending_route_stays_typed_unsupported() {
             CarriedNatArm::TwoLeafTwoDeep,
         );
         let root = output_dir("nat-pred-two-leaf-refusal");
-        let error = ken_cli::build_native_program(
+        let error = ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt_carried_nat_two_leaf",
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -1310,8 +1331,9 @@ fn r2_relay_owners_settle_authenticated_successors_without_returning_them() {
     in_large_stack_thread("rt-escape-r2-protocol-exclusion", || {
         let root = output_dir("r2-protocol-exclusion");
         let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 R2_CROSS_BUFFER_FREEZE, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "rt_escape_r2_cross_buffer_freeze", root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
@@ -1373,9 +1395,10 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
         let root = output_dir("r2-process-carrier-owners");
         let (compiled, diagnostics) =
             ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                ken_cli::build_native_program(
+                ken_cli::build_native_program_with_roots(
                     R2_CROSS_BUFFER_FREEZE,
                     ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                     "rt_escape_r2_cross_buffer_freeze",
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -1432,8 +1455,9 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
     in_large_stack_thread("rt-escape-r2-pre-schema", || {
         let root = output_dir("r2-pre-schema");
         let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 R2_CROSS_BUFFER_FREEZE, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "rt_escape_r2_pre_schema", root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )

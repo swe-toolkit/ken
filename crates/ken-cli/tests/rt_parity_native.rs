@@ -76,12 +76,15 @@ fn differential(case: &str, entry: &str) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("source"), b"ab").unwrap();
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
+    let catalog = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")];
 
     let (output, applications) = ken_runtime::with_pending_checked_ret_sink_applications(
         || {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
+                &catalog,
                 &format!("rt_parity_{}", case.replace('-', "_")),
                 root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -109,6 +112,7 @@ fn differential(case: &str, entry: &str) -> Differential {
     let interpreted = ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &catalog,
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -6542,13 +6546,24 @@ ProgramCaps.MkProgramCaps cap |-> host_pure AFull ExitCode ExitCode.Success
   }
 "#;
 
-fn elaborates(span_expression: &str, result_type: &str) -> Result<(), ken_cli::RunError> {
+fn elaborates(
+    span_expression: &str,
+    result_type: &str,
+    imports: &str,
+) -> Result<(), ken_cli::RunError> {
     let source = SPAN_PROBE
         .replace("__RT_PARITY_SPAN__", span_expression)
-        .replace(": BufferSpan", &format!(": {result_type}"));
+        .replace(": BufferSpan", &format!(": {result_type}"))
+        .replacen(
+            "program capabilities FS AFull\n",
+            &format!("program capabilities FS AFull\n{imports}"),
+            1,
+        );
     ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../catalog/packages")],
         &[],
         &[],
         b".",
@@ -6621,7 +6636,7 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
         "PrivateBufferSpan (sub_int 0 1) Zero",
         "PrivateBufferSpan (0 : Int) Zero",
     ] {
-        let error = elaborates(forged, "BufferSpan")
+        let error = elaborates(forged, "BufferSpan", "")
             .err()
             .unwrap_or_else(|| panic!("a source-forged BufferSpan must not elaborate: {forged}"));
         assert!(
@@ -6632,6 +6647,7 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
     let error = elaborates(
         "write_all_advance_span rt_seed_span rt_seed_count",
         "BufferSpan",
+        "",
     )
     .err()
     .expect("the sealed span transform must not elaborate");
@@ -6641,7 +6657,7 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
          that defeated the earlier privacy argument; got {error:?}"
     );
     // Defense in depth, verified but ungated -- see SEAL-2 in the doc comment.
-    let error = elaborates("PrivateTransferCount Zero Zero", "TransferCount")
+    let error = elaborates("PrivateTransferCount Zero Zero", "TransferCount", "")
         .err()
         .expect("a source-forged TransferCount must not elaborate");
     assert!(
@@ -6651,7 +6667,12 @@ fn buffer_freeze_malformed_span_is_unconstructible_at_the_landed_surface() {
 
     // Control: a public constructor of the same shape does elaborate, so the
     // rejections above are about scope and not about the probe's own form.
-    elaborates("MkBufferWindow (sub_int 0 1) (1 : Int)", "BufferWindow")
+    elaborates(
+        "MkBufferWindow (sub_int 0 1) (1 : Int)",
+        "BufferWindow",
+        "import Capability.Process.Exit (host_pure)\n\
+         import Capability.System.Buffer (MkBufferWindow)\n",
+    )
         .expect("control: the public window constructor elaborates from source");
 }
 

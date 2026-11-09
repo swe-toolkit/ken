@@ -1,4 +1,5 @@
 program capabilities FS AFull
+import Capability.Process.Exit (host_pure)
 proc main (input : ProcessInput) (_caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {

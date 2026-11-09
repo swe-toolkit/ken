@@ -49,6 +49,8 @@ fn closed_stdout_is_an_io_failure_not_sigpipe_termination() {
     let payload = "x".repeat(256 * 1024);
     let source = format!(
         "program capabilities FS APartial\n\
+         import Capability.Console.Text (write)\n\
+         import Capability.Process.Exit (host_bind, host_console, host_pure)\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) \
            : HostIO APartial ExitCode visits [Console] = \
            host_bind APartial (Result IOError Unit) ExitCode \

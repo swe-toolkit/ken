@@ -15,6 +15,7 @@
 // object nesting; `two_leaves` has exactly two, so `exactNatTwo` exits Success
 // (0) only when the fold consumes the Pair-nested recursive result.
 const NESTED_TWO_LEAVES: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 data NRose : Type where { NLeaf : NRose ; NNode : List (Pair String NRose) -> NRose }
 
@@ -53,6 +54,7 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 // tail's accumulated result, so it cannot count the Pair-nested leaves — nsize
 // becomes 0 and the process exits Failure 20 instead of Success.
 const NESTED_DROPPED_IH: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 data NRose : Type where { NLeaf : NRose ; NNode : List (Pair String NRose) -> NRose }
 
@@ -96,7 +98,8 @@ fn output_dir() -> tempfile::TempDir {
 fn native_exit(source: &str, name: &str) -> i32 {
     let root = output_dir();
     let output =
-        ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, root.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
+        ken_cli::build_native_program_with_roots(source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], name, root.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
             .unwrap_or_else(|e| panic!("{name}: nested-former fold must reach a native artifact: {e}"));
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
@@ -124,6 +127,7 @@ fn interp_exit(source: &str) -> i32 {
     ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",

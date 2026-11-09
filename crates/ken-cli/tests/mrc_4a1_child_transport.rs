@@ -28,6 +28,8 @@ use std::process::Command;
 /// program already known to elaborate and reach linked native lowering: a
 /// census whose fixture is novel measures the fixture first.
 const CENSUS_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc two_step (label : String) : HostIO APartial Unit visits [Console] =
   host_bind APartial Unit Unit
     (host_console APartial Unit (print_line label))

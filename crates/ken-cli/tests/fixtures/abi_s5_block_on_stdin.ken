@@ -1,4 +1,6 @@
 program capabilities FS APartial
+import Capability.Console.Text (read)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial (Result IOError ReadResult) ExitCode

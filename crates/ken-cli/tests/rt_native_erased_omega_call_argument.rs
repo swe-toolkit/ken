@@ -19,6 +19,7 @@ fn assert_native_and_reference_exit(source: &str, name: &str, expected_exit: i32
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[],
         &[b"ken".to_vec()],
         &[],
         b"/",

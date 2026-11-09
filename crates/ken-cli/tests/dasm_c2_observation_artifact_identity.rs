@@ -20,6 +20,7 @@ const ARTIFACT_OUTPUT: &str = "KEN_DASM_C2_ARTIFACT_OUTPUT";
 const EXPECTED_CONFIGURATION: &str = "KEN_DASM_C2_EXPECTED_CONFIGURATION";
 
 const IDENTITY_SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 fn exit_for_input (input : ProcessInput) : ExitCode = match input {
   MkProcessInput arguments _environment _cwd |-> match arguments {
     Nil |-> ExitCode.Success;
@@ -73,9 +74,10 @@ fn dasm_c2_artifact_identity_worker_impl(output_dir: &Path) {
     );
 
     let compile = || {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             IDENTITY_SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "dasm_c2_artifact_identity_pkg",
             output_dir,
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),

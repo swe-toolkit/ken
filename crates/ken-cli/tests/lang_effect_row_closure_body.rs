@@ -13,6 +13,8 @@ use std::process::{Command, Output};
 use ken_elaborator::{ElabEnv, ElabError};
 
 const ACTION: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -25,7 +27,8 @@ fn with_action(tail: &str) -> String {
 }
 
 fn cli(name: &str, verb: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-closure-body-{}", std::process::id()));
+    let root = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("ken-closure-body-{}", std::process::id()));
     std::fs::create_dir_all(&root).expect("fixture directory");
     let path = root.join(format!("{name}.ken"));
     std::fs::write(&path, source).expect("write checked program");
@@ -42,29 +45,21 @@ fn check(name: &str, source: &str) -> Output {
 
 /// The ACTION prefix is the real source each affected test checks. Its
 /// standalone tails are not programs: `action` is declared by this prefix.
-/// MEASURED: the composed source with ephemeral package imports reaches the
-/// same typed Strict accept/refusal; CLAIMED: the seven former DIVERGE tail
-/// rows do not mask the test's actual effect-row boundary. THE GAP: output
-/// bytes are still checked through the unchanged CLI route until 3b.
+/// MEASURED: the composed source with persisted package imports reaches the
+/// same typed Strict accept/refusal; CLAIMED: the former DIVERGE tail rows do
+/// not mask the actual effect-row boundary. THE GAP: CLI execution remains
+/// a separate check of the same source through its switched route.
 fn recheck_composed_under_strict(source: &str) -> Option<Result<(), ElabError>> {
     if !source.starts_with(ACTION) {
         return None;
     }
-    let imported = source.replacen(
-        "program capabilities FS APartial\n",
-        "program capabilities FS APartial\n\
-         import Capability.Console.Text (write, print_line)\n\
-         import Capability.Process.Exit
-           (host_bind, host_pure, host_console, host_program)\n",
-        1,
-    );
     let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
     let mut env = ElabEnv::new().expect("prelude");
     Some(
-        env.elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        env.elaborate_isolated_file_strict_v1(&[catalog], source)
             .map(|_| ()),
     )
 }
@@ -311,6 +306,9 @@ fn named_proc_return_is_still_charged_at_the_pure_boundary() {
 // The original effect-composition program, before its declaration names the
 // closure body's Console row. A tree-typed result is not an exemption.
 const P8_TREE_VALUE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
+import Core.Effect.Coproduct (inject_r)
 const prog : ITree ConsoleOp console_resp (Pair Unit Nat) =
   run_state Nat ConsoleOp console_resp Unit Zero
     (itree_bind (Coproduct (StateOp Nat) ConsoleOp) (resp_coproduct (StateOp Nat) ConsoleOp (resp_state Nat) console_resp) Nat Unit

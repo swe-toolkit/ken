@@ -1,4 +1,6 @@
 program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)

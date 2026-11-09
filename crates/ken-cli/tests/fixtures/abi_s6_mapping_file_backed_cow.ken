@@ -1,4 +1,8 @@
 program capabilities FS AFull
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
+import Capability.System.Mapping (FileBacked, MappingHandle, MkMappingWindow, mapBytes, mapWrite)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withMapping, withResource)
 
 fn body_err_io (code : UInt8) : HostIO AFull (ResourceBodyResult UInt8 Unit) =
   host_pure AFull (ResourceBodyResult UInt8 Unit)

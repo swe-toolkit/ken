@@ -1,4 +1,6 @@
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 
 -- Rosetta Code: Mutual recursion
 -- https://rosettacode.org/wiki/Mutual_recursion
