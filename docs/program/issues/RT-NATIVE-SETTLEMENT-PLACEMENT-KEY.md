@@ -98,26 +98,48 @@ The candidate also carries nested Deferred settlement (Steward
 - **The product shape** follows the C-20 D0's LIFO-PARITY branch, as
   the Architect rules it.
 
-The C-28 recut (Steward `evt_527p7m4kfdbc0`, Architect
-`evt_3zrg52751abmn`) adds the forwarded-Vis owner. F's region body
-forwards an inner Vis through a carried clause's Vis arm, but no
-response owner is installed for it, so the arm's IH is lowered as an
-in-place header jump and the request is never dispatched.
+The C-28 recut (Steward `evt_527p7m4kfdbc0`) adds the direct-style
+forward, as the Architect ruled it from D2 (`evt_6t5mkjt1y7znx`). F's
+region body returns a `ContinuationBodyTail` Vis into a carried clause,
+not to a drive, so the clause's pure-forward Vis arm executes. That
+arm's IH lowers as a pass-through: it projects field1 (k) of the
+incoming Vis and jumps the header with k under the CHECKED control.
+The op is never performed. Both tags miss, and the checked-answer
+fallback releases Buffer1 early. G and px8ta emit the same arm but
+never execute it. Slice 1's count (`evt_225hennafhaqf`) found 74
+passing seats with no owner at the forwarded Vis, so installing an
+owner there is not the fix.
 
-- **Slice 1 (D0).** Count every forwarding-arm IH lowering across the
-  committed native suites and F, classified by whether the forwarded
-  Vis has an installed owner. The Architect rules a lowering-time
-  refusal or a further ruling from the count. A refusal travels in the
-  one candidate.
-- **Slice 2.** Install the owner row: its K applies k to the response
-  and re-enters the clause's carried header under its checked
-  constructor identity. The IH is lowered as that owner's
-  continuation.
-- **F acceptance.** argv, v-null and live equal the interpreter: exit 0,
-  19, 14 and 17 ordered events, and event 6 is ProcessPlanPush field2.
-  The control-1 fallback count is 0 and a dispatch marker fires for
-  S724 and S165. Smoke 9/9 and both G controls are unchanged. M-D,
-  which restores the header jump, reddens F.
+- **Step 0 (before product code).** Name the two existing functions
+  (file:line on the B1a branch) the drive uses to perform a returned
+  body-tail Vis and to call its K with the response. Show that both can
+  be invoked at the forwarding edge with the values in scope. Count
+  every carried computational clause in the committed native suites
+  whose Vis arm is not the pure-forward shape. Either function missing,
+  or any such handler able to enclose a bracket clause, stops the slice
+  and returns for a recut.
+- **The forward.** At the forwarding edge, decode op (field0) by the
+  Vis node's checked operation layout, perform it through the drive's
+  host-dispatch step, call k with the response through the drive's
+  K-call convention, and jump the header with the result under the
+  ORDINARY control, never CHECKED. Admission is a named fail-closed
+  lowering refusal: the arm must be exactly the checked pure-forward
+  shape at the checked Vis identity, with a host-family op. The
+  checked-answer fallback stays.
+- **F acceptance** (the native result equals the interpreter's):
+  - argv: exit 0, 19 ordered events;
+  - v-null: exit 73, 14 events;
+  - live: exit 0, 17 events.
+
+  In each, event 6 is ProcessPlanPush field2, a dispatch marker fires
+  at S724 and S165 from the forwarding edge, and the fallback executes
+  0 times. Smoke 9/9, both G controls, px8ta 3/3 and the 9 checked_ih
+  rows are unchanged. M-D, which restores the pass-through, and M-E,
+  which performs without calling k, each redden F.
+- **Residual, not in scope.** A recursive non-Unit Nat result used
+  after a later Console effect fails native-build closed with N0003
+  (`BoundaryCarrier`; Architect probe `natrec-inc2/after-effect.ken`,
+  `evt_5b1bpcemby1jm`). It belongs to B1a's runtime half.
 - **WIP2's erasure half** (`erasure.rs`,
   `erasure/performed_call_scrutinee_tests.rs`) is carried by
   `RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT` (`evt_m1tpqnr44meb`). This
