@@ -12,7 +12,9 @@
 > SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10;
 > SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION §11;
 > SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT §12;
-> SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY §13).** The §1–2
+> SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY §13;
+> SPEC-NUMERICAL-INTERVAL-INSIDE-ANTISYMMETRY §14;
+> SPEC-NUMERICAL-INTERVAL-WIDTH §15).** The §1–2
 > operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
@@ -238,13 +240,15 @@ assumptions from imports; they are not a landed trust measurement.
 The §1 module and seed are now present on main, but that D0 did not
 execute a shipped seed or establish CI.
 
-Signed values and subtraction are deferred: signed multiplication
-would require comparing four endpoint products. Division and
-reciprocal intervals, particularly those spanning zero, are
-deferred. Floating point, rounding modes and outward rounding,
-width and diameter, normalized endpoint spellings, and
-sub-distributivity remain outside §§1–3. Section 2 separately
-specifies hull and intersection; §3 specifies inclusion isotonicity.
+Signed values, signed subtraction and interval subtraction remain
+deferred; §15 separately specifies truncated subtraction on
+non-negative `Rational`. Signed multiplication would require
+comparing four endpoint products. Division and reciprocal intervals,
+particularly those spanning zero, are deferred. Floating point,
+rounding modes and outward rounding, width (specified in §15) and
+diameter, normalized endpoint spellings, and sub-distributivity
+remain outside §§1–3. Section 2 separately specifies hull and
+intersection; §3 specifies inclusion isotonicity.
 Neither follows from the six §1 laws alone.
 
 ## 2. Hull and intersection by containment
@@ -402,8 +406,9 @@ check, executed shipped §2 seed, CI result or landed trust measurement.
 
 The §1–2 Rational exports, interval catalog module and two seeds are
 present on main. Signed interval arithmetic, division, floating-point
-rounding, width and normalized endpoint spellings remain deferred.
-Sub-distributivity is specified separately in §4. Arbitrary-pair
+rounding, diameter and normalized endpoint spellings remain deferred.
+Width is specified separately in §15. Sub-distributivity is specified
+separately in §4. Arbitrary-pair
 inclusion isotonicity is specified in §3; §2's four laws alone do not
 supply it.
 
@@ -1386,3 +1391,99 @@ conclusion is true. The accepted equal-value application is the
 same-form control, so refusal tests the missing premise rather than
 rejecting the theorem form. The scratch refusal does not establish
 execution of the separate seed as Ken or by the official runner.
+
+## 15. Truncated rational subtraction and interval width
+
+> **Section 15 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-WIDTH).** Architect's AC-0 on base
+> `22876f808` checked the generic Nat visibility promotion, Rational
+> subtraction and Interval proofs in scratch: no added `Axiom`,
+> unchanged 114-element trusted `GlobalId` identity sets, and public
+> export deltas Nat +1, Rational +4, Interval +3. Accepted and
+> same-form refused value clients ran only in scratch. The direct
+> `interval_width := hi` mutation rejects the provider's point-law
+> proof before a client can load; a separate diagnostic overlay
+> removed the invalid generic gates and showed the closed nonzero
+> value rows refuse on their own. Neither result is a test of this
+> Spec child, official conformance, CI, publication, landing or a
+> measured landed-trust delta.
+
+Rational subtraction here is **truncated at zero**: the existing
+`Rational` carrier represents non-negative values and has no signed
+result. `Data.Numeric.Rational` must export this public operation and
+three public checked laws after `rational_add_mono`:
+
+```ken
+pub fn rational_sub (x : Rational) (y : Rational) : Rational
+
+pub proof self_is_zero for rational_sub (x : Rational)
+    : rational_equiv (rational_sub x x) rational_zero
+
+pub proof add_cancel for rational_sub
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq y x) → rational_equiv (rational_add (rational_sub x y) y) x
+
+pub proof add_distrib for rational_sub
+      (x1 : Rational) (y1 : Rational) (x2 : Rational) (y2 : Rational)
+    : IsTrue (rational_leq y1 x1)
+      → IsTrue (rational_leq y2 x2)
+      → rational_equiv
+          (rational_sub (rational_add x1 x2) (rational_add y1 y2))
+          (rational_add (rational_sub x1 y1) (rational_sub x2 y2))
+```
+
+For `x = n/d` and `y = m/e`, with both denominators positive,
+`rational_sub x y` represents `sub (mul n e) (mul m d)` over the
+positive denominator `d·e`. Thus it represents `max(x − y, 0)` by
+value, without a signed carrier or reduction to a canonical stored
+fraction. `self_is_zero` relates the result of subtracting a value
+from itself to `rational_zero` by `rational_equiv`, not structural
+`Equal Rational`. `add_cancel` states the right-inverse property
+only when `y ≤ x`; `add_distrib` needs each corresponding pair
+ordered. The private cancellation and reshuffle stages of the
+checked proofs introduce no further public law. The existing
+Nat.Arithmetic `add_cancel_r` becomes public under §64 §4 with its
+original checked type and body, as a visibility-only prerequisite.
+
+`Algorithm.Numeric.RationalInterval` must export the following
+public checked operation after `interval_point`, and two public
+Transparent checked laws after `interval_mul_point`:
+
+```ken
+pub fn interval_width (i : Interval) : Rational
+
+pub theorem interval_width_point (x : Rational)
+    : rational_equiv (interval_width (interval_point x)) rational_zero
+
+pub theorem interval_width_add
+      (lo1 : Rational) (hi1 : Rational) (lo2 : Rational) (hi2 : Rational)
+    : IsTrue (rational_leq lo1 hi1)
+      → IsTrue (rational_leq lo2 hi2)
+      → rational_equiv
+          (interval_width (interval_add (MkInterval lo1 hi1) (MkInterval lo2 hi2)))
+          (rational_add (interval_width (MkInterval lo1 hi1)) (interval_width (MkInterval lo2 hi2)))
+```
+
+For `i = MkInterval lo hi`, the operation is **defined** as
+`interval_width i = rational_sub hi lo`, written `hi ∸ lo` here:
+its value is the truncated upper-minus-lower difference. The
+returned `Rational` need not have a canonical stored spelling.
+The point law needs no order premise and gives zero by value. The
+sum law needs **both** displayed ordered-endpoint premises; then
+the width of the pointwise interval sum is equivalent to the sum of
+the widths. It is not a law for arbitrary inverted operands: for
+`[2,1] + [0,5]`, the combined width is 4 while the two widths sum
+to 5. The two theorem bodies reuse Rational's `self_is_zero` and
+`add_distrib` proofs by conversion. They do not assert structural
+`Equal Rational`, require a new Interval helper, or alter any
+§1–§14 operation or law type.
+
+These two laws are **properties** of the stated width definition,
+not a characterization of it. A constant-zero operation also
+satisfies both laws, so a separate closed value check must observe
+a nonzero width with a nonzero lower endpoint, such as `[1,3]`
+giving width 2. A CV-owned seed separately checks the point and
+ordered-sum laws and gives same-form accepting controls for its
+inverted-operand and wrong-width refusals; Foundation's package
+test owns the nonzero value discriminator. Scratch results do not
+establish execution of either committed artifact.

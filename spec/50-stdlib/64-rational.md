@@ -322,6 +322,21 @@ summands respectively. Their proof splits on the written second
 summand: a successor sum cannot equal `Zero`. The laws do not change
 `add` or introduce an axiom, kernel rule or new Nat carrier.
 
+The existing checked Nat addition cancellation theorem is also
+promoted to public visibility without changing its body or type:
+
+```ken
+pub theorem add_cancel_r
+      (a : Nat) (b : Nat)
+    : (c : Nat) → Equal Nat (add a c) (add b c) → Equal Nat a b
+```
+
+It cancels the same right summand from two equal natural sums. The
+private proof of rational addition cancellation needed for §68 §15
+imports this theorem rather than introducing a third Nat copy.
+This promotion adds one Nat.Arithmetic public name; it does not
+turn the private `mul::suc_l` helper into an export.
+
 The same Arithmetic package gains a new **checked** cancellation
 law for multiplication by a positive factor. Its actual proof in
 the AC-0b scratch uses Nat case analysis, `Suc` injectivity, and
@@ -368,10 +383,12 @@ no ruled rational declaration consumes it.
 ## 5. Deliberate exclusions and next consumers
 
 This contract specifies **non-negative exact rational values** only.
-Signed values, subtraction, reciprocals and division, reduced or
-canonical spellings, gcd normalization and Gcd exports, `Float`,
+Signed values, signed subtraction, reciprocals and division, reduced
+or canonical spellings, gcd normalization and Gcd exports, `Float`,
 approximate statistics, and natural-construction homomorphism laws
-remain separate work. Rational addition and multiplication
+remain separate work. Truncated subtraction on the non-negative
+`Rational` carrier is specified separately in §68 §15; it adds no
+signed values to this contract. Rational addition and multiplication
 monotonicity are specified in §68 §1.4 and exported by
 `Data.Numeric.Rational`. A normalized subtype can be built over this
 carrier later; this chapter does not pretend every equivalent spelling
