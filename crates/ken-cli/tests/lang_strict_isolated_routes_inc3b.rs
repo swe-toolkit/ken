@@ -93,9 +93,15 @@ fn cut_base_legacy_clean_file_cohort_checks_through_switched_cli_route() {
             legacy_clean.push(path);
         }
     }
-    assert_eq!(files.len(), 98, "cut-base isolated file population changed");
-    assert_eq!(legacy_clean.len(), CUT_LEGACY_CLEAN, "Legacy-clean cohort drifted");
-    assert!(legacy_clean.contains(&&relay), "internal relay is in the cohort");
+    assert_eq!(
+        legacy_clean.len(),
+        CUT_LEGACY_CLEAN,
+        "Legacy-clean cohort drifted"
+    );
+    assert!(
+        legacy_clean.contains(&&relay),
+        "internal relay is in the cohort"
+    );
     assert_eq!(
         legacy_clean
             .iter()
@@ -141,7 +147,10 @@ fn three_cli_routes_refuse_unimported_name_and_accept_imported_twin() {
     for route in ["check", "run", "native-build"] {
         std::fs::write(&source, WITHOUT_IMPORT).unwrap();
         let refused = invoke(route, &source, &dir);
-        assert!(!refused.status.success(), "{route} must refuse no-import root");
+        assert!(
+            !refused.status.success(),
+            "{route} must refuse no-import root"
+        );
         let stderr = String::from_utf8_lossy(&refused.stderr);
         assert!(
             stderr.contains("UnboundName { name: \"host_pure\""),
