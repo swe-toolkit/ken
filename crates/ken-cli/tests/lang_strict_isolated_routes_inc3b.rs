@@ -80,10 +80,9 @@ fn cut_base_legacy_clean_file_cohort_checks_through_switched_cli_route() {
         // The cut-base bodies predate the selective imports, so remove only
         // import directives for the independent Legacy classification.
         let legacy_source = source
-            .lines()
+            .split_inclusive('\n')
             .filter(|line| !line.starts_with("import "))
-            .collect::<Vec<_>>()
-            .join("\n");
+            .collect::<String>();
         let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
         let result = if path.to_string_lossy().ends_with(".ken.md") {
             env.elaborate_ken_md_file_v1(&legacy_source)
