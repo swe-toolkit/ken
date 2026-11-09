@@ -84,6 +84,10 @@ Step 0.
     and span freeze 2/2;
   - entry 18's row, B-closure's census pin and six-case matrix;
   - AC-1c's committed F production-refusal row.
+- **AC-1a, anchor parity** (Architect `evt_7g3pyn3g8e4kb`). On the
+  committed checked_ih rows, the per-identity transport population,
+  detached-seat dispositions and generated-entry arrivals equal those at
+  `a966f0ee5`, with zero diff, measured by the same observers.
 - **AC-2, mutation.** One consumer recomputes the placement locally
   instead of reading the record, and that consumer's named invariant
   returns on `fs-read-at-offset-single`. A mutation that does not redden
@@ -104,6 +108,10 @@ Each is keyed on "placement re-decided in plane X":
    a specialized constructor.
 5. `1eeac62b4`: the governed generated entry is installed and has zero
    arrivals.
+6. `d2f194984` (one authority): a carried self-emitter result at the
+   detached seat, and an installed generated entry with zero arrivals.
+   Keyed on the record's relocation set versus the anchor's transport
+   population (Architect `evt_7g3pyn3g8e4kb`).
 
 ## Inventory (node §1a)
 
@@ -142,6 +150,7 @@ Each is keyed on "placement re-decided in plane X":
 Checks: 4 fired: AC-1's target state was measured green at `a966f0ee5`
 (`rnspk-d0-bisect-a966f0ee5-three.log`, 3/3), so it is a reached state,
 not an assumed one. 6 fired: the symptom inventory is the five bisection
-observations, one log each, not inferred from commit messages. 8 fired:
+observations, one log each, plus the
+implementation stop, not inferred from commit messages. 8 fired:
 AC-1 runs without F work or the overlay, because every F-only gate in
 this chain was green while the controls were red.
