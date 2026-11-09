@@ -113,7 +113,15 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   It lands as B-closure, then B1 (the F1 and F2 repairs and the starter
   trap-classifier fix, evt_5y7e328rr2wd8), then B2: the Process
   promotion, the gate deletion and the containment deletion, landing
-  with the native parity rows (Architect evt_5vsaybryes08b).
+  with the native parity rows (Architect evt_5vsaybryes08b). B2 also
+  promotes RNSPK's AC-1c row from today's production refusal to what
+  the boundary arm does on B2's base: native parity with
+  RT-NATIVE-FORWARDED-CONTINUATION-REENTRY's A2 route if that node has
+  landed, otherwise the trap's refusal at C986 (argv) and C427 (live)
+  after the inner S1165/S606 Vis case, in M4's order, with fallback 0.
+  It commits the matching mutation rows: REENTRY's A4, or RNSPK's M-T
+  and M-P. Until then the boundary edge has measured evidence only
+  (Architect evt_2q2y8m51jht9v).
 - **Increment B-closure** is dynamic relay forwarding (Architect
   evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own,
   after `RT-NATIVE-IH-CONTINUATION-CLOSED-TEMPLATES`: a first-order

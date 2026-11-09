@@ -1,12 +1,12 @@
 ---
 id: RT-NATIVE-NAT-RECURSION-HOSTIO-COPRODUCT
 title: "A [Console] proc that recurses structurally on Nat, called from a let in main, checks and runs, but native-build refuses it with E0079 host_coproduct_identity: the decoded HostIO operation's outer constructor is neither in_l nor in_r. Its Rose-recursive twin builds and matches. Locate the cause and make the Nat-recursive shape build with exec equal to run"
-status: active
+status: ready
 owner: verify
 size: L
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [PX10-NATIVE-SPAWN-PARITY]
 blocks: []
 github: null
 origin: "Architect SLOTS AC-0 ruling evt_214sk9hkje5k (s23 classified outside LANG-PROC-TREE-ARGUMENT-AND-SCRUTINEE-SLOTS; D0 evt_vvtjn0gjph49). Steward-filed per COORDINATION section 2."
@@ -76,6 +76,17 @@ sites (`core.rs:3581`, `:6873`, `:18421`; `lowering/source.rs:5382`,
   smoke and green-three rows, checked_ih parity, and the SLOTS and FSRA
   native rows. A red committed row stops the WP, which then stacks
   behind B1a.
+
+## Parked behind B1a
+
+AC-3 fired on candidate `2abfcb0f0` (full CI red, run `42622505983`;
+Verify `evt_2x0qd6vvr6ak3`; Steward `evt_50705xx614069`). Base
+`4b6b3aabe` is green and the candidate alone is red, so the regression is
+the candidate's. The px10 planner invariants come from WIP2's erasure
+half without B1a's runtime and planner half. Inc 1 alone enables no AC-1
+row. The WP resumes on B1a with `2abfcb0f0` as its starting point, and
+carries Inc 1's own px7l `host_vis_arity` E0079 regression (Inc1-only
+`054d1ef38`), repaired in Inc 1.
 
 ## Inventory (node §1a)
 
