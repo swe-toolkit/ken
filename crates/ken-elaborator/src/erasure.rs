@@ -108,73 +108,41 @@ fn erase_checked_package_with_host_root(
     let requested_targets = targets.clone();
     let mut prelowered = BTreeMap::new();
     if let Some((root, spine)) = host_root {
-        let root_kind = lower_checked_host_root(
+        // Classify using the same lowering without an authority, then discard
+        // the trial's plans before lowering any caller for real.
+        let mut trial = native_plans.as_deref().cloned();
+        let (_, trial_executable, performing) =
+            lower_host_closure(package, &requested_targets, root, spine, trial.as_mut())?;
+        if let Some(plans) = native_plans.as_deref_mut() {
+            plans.performed_members = Some(PerformedMemberAuthority {
+                members: performing.clone(),
+                ret: spine.ret.clone(),
+            });
+        }
+        let (lowered, executable, lowered_performing) = lower_host_closure(
             package,
             &requested_targets,
             root,
             spine,
             native_plans.as_deref_mut(),
         )?;
-        let mut executable = BTreeSet::from([root.clone()]);
-        let mut queue = runtime_declaration_refs_in_kind(&root_kind)
-            .into_iter()
-            .filter_map(|reference| {
-                requested_targets
-                    .iter()
-                    .find(|symbol| {
-                        symbol.to_string() == reference
-                            && admitted_recursive_member(&package.artifact.semantic, symbol)
-                    })
-                    .cloned()
-            })
-            .collect::<Vec<_>>();
-        prelowered.insert(root.clone(), root_kind);
-        let mut performing = BTreeSet::new();
-        while let Some(symbol) = queue.pop() {
-            if !executable.insert(symbol.clone()) {
-                continue;
-            }
-            let declaration = match lower_checked_host_declaration(
-                package,
-                &requested_targets,
-                &symbol,
-                spine,
-                native_plans.as_deref_mut(),
-            ) {
-                Ok(declaration) => {
-                    performing.insert(symbol.to_string());
-                    declaration
-                }
-                Err(error)
-                    if matches!(
-                        &error,
-                        ErasureError::ExpressionLowering { lane, .. }
-                            if *lane == "unrecognized_checked_host_computation"
-                    ) =>
-                {
-                    lower_symbol(package, &requested_targets, &symbol)?
-                }
-                Err(error) => return Err(error),
-            };
-            queue.extend(
-                runtime_declaration_refs_in_kind(&declaration.kind)
-                    .into_iter()
-                    .filter_map(|reference| {
-                        requested_targets
-                            .iter()
-                            .find(|symbol| {
-                                symbol.to_string() == reference
-                                    && admitted_recursive_member(&package.artifact.semantic, symbol)
-                            })
-                            .cloned()
-                    }),
-            );
-            prelowered.insert(symbol, declaration.kind);
+        if executable != trial_executable || lowered_performing != performing {
+            return Err(expression_lowering_error(
+                root,
+                "performed_member_classification_drift",
+                "direct-style lowering changed which admitted recursive members are \
+                 reached or perform",
+            ));
         }
         let ret = spine.ret.to_string();
+        let performing = performing
+            .iter()
+            .map(ToString::to_string)
+            .collect::<BTreeSet<_>>();
+        prelowered = lowered;
         for (owner, kind) in prelowered.iter_mut() {
             if let RuntimeDeclarationKind::Transparent { body } = kind {
-                wrap_performed_call_scrutinees(owner, body, &performing, &ret)?;
+                refuse_performed_call_scrutinees(owner, body, &performing, &ret)?;
             }
         }
         targets = executable.into_iter().collect();
@@ -466,15 +434,193 @@ fn admitted_recursive_member(
     })
 }
 
-/// A declaration lowered by lower_checked_host_declaration performs its effects
-/// when called and returns its bare Ret payload, not a tree. A computational
-/// match dispatches on a tree, so where a call to such a declaration is a
-/// match's direct scrutinee it is given back its tree as `Ret(call)`: the call
-/// still runs when the match is reached, and its payload enters the Ret case.
-/// `ret` is the host spine's checked Ret constructor, never a case's spelling.
-/// A performed call reached as a case body (a continuation's result) is not a
-/// scrutinee and is left as it is.
-fn wrap_performed_call_scrutinees(
+/// A computational match's scrutinee that is a full-arity direct call to an
+/// emitted recursive member is lowered as a call to that one emission, never
+/// as an inlined first unfolding: a performing member returns its payload, so
+/// inlining its body would run a pure tree beside its performing emission.
+/// Performing calls are consumed in direct style before match planning;
+/// pure members keep this single emitted call form.
+fn lower_emitted_member_scrutinee(
+    term: &CheckedCoreBodyTerm,
+    declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+    stack: &mut Vec<StableSymbol>,
+    root: &StableSymbol,
+    context_depth: usize,
+    branch_remap: Option<&BranchBinderRemap>,
+    path: &[u64],
+    native_plans: &mut NativeLoweringPlanCollector,
+    parent_oriented_frame: Option<u64>,
+) -> Result<Option<RuntimeExpr>, ErasureError> {
+    let Some((symbol, level_args, arguments)) = direct_application_spine(term) else {
+        return Ok(None);
+    };
+    if !admitted_recursive_member(semantic, symbol) {
+        return Ok(None);
+    }
+    let Some(declaration) = declarations.get(symbol) else {
+        return Ok(None);
+    };
+    reject_level_args(root, level_args)?;
+    let mut body = &declaration.body;
+    let mut erased_parameters = Vec::new();
+    while erased_parameters.len() < arguments.len() {
+        let CheckedCoreBodyTerm::Lambda {
+            body: inner,
+            erased_parameter,
+            ..
+        } = body
+        else {
+            break;
+        };
+        erased_parameters.push(*erased_parameter);
+        body = inner;
+    }
+    if erased_parameters.len() != arguments.len() {
+        return Ok(None);
+    }
+    let mut args = Vec::with_capacity(arguments.len());
+    for (index, (argument, erased)) in arguments.iter().zip(&erased_parameters).enumerate() {
+        if *erased {
+            if !matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                return Err(expression_lowering_error(
+                    root,
+                    "erased_argument_not_omega",
+                    "erased binder has an executable argument",
+                ));
+            }
+            continue;
+        }
+        let mut child_path = path.to_vec();
+        child_path.extend([11, index as u64]);
+        args.push(lower_body_term_with_plans(
+            argument,
+            declarations,
+            semantic,
+            stack,
+            root,
+            context_depth,
+            branch_remap,
+            &child_path,
+            native_plans,
+            parent_oriented_frame,
+        )?);
+    }
+    Ok(Some(RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::DeclarationRef {
+            symbol: symbol.to_string(),
+        }),
+        args,
+    }))
+}
+
+/// A discarded case may not contain work consuming another per-owner plan
+/// ordinal. Admit only the checked Vis re-emission shape, fail closed otherwise.
+fn performed_bind_discards_only_reemission(term: &CheckedCoreBodyTerm) -> bool {
+    match term {
+        CheckedCoreBodyTerm::Lambda { body, .. } => performed_bind_discards_only_reemission(body),
+        CheckedCoreBodyTerm::Application { function, argument } => {
+            performed_bind_discards_only_reemission(function)
+                && performed_bind_discards_only_reemission(argument)
+        }
+        CheckedCoreBodyTerm::Variable { .. }
+        | CheckedCoreBodyTerm::ConstructorReference(_)
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => true,
+        _ => false,
+    }
+}
+
+/// Bind a performed member's bare payload through the checked Ret case without
+/// planning the erased tree match or its discarded Vis re-emission cases.
+#[allow(clippy::too_many_arguments)]
+fn performed_bind_call(
+    view: &checked_core::CheckedCoreMatchView,
+    computational: bool,
+    declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+    stack: &mut Vec<StableSymbol>,
+    root: &StableSymbol,
+    context_depth: usize,
+    branch_remap: Option<&BranchBinderRemap>,
+    scrutinee_path: &[u64],
+    native_plans: &mut NativeLoweringPlanCollector,
+    parent_oriented_frame: Option<u64>,
+) -> Result<Option<(RuntimeExpr, usize)>, ErasureError> {
+    if !computational || !view.computational_recursive_hypotheses {
+        return Ok(None);
+    }
+    let Some(authority) = native_plans.performed_members.clone() else {
+        return Ok(None);
+    };
+    let Some((symbol, _, _)) = direct_application_spine(&view.scrutinee) else {
+        return Ok(None);
+    };
+    if !authority.members.contains(symbol) {
+        return Ok(None);
+    }
+    let owner = stack
+        .last()
+        .expect("expression lowering stack always has an owner")
+        .clone();
+    let mut ret_branch = None;
+    for (index, branch) in view.branches.iter().enumerate() {
+        if branch.constructor.symbol == authority.ret {
+            if branch.constructor.argument_count != 1
+                || !branch.constructor.recursive_positions.is_empty()
+                || ret_branch.replace(index).is_some()
+            {
+                return Err(expression_lowering_error(
+                    root,
+                    "performed_bind_ret_case",
+                    "a performed call's bind needs exactly one one-argument checked Ret case",
+                ));
+            }
+        } else if !performed_bind_discards_only_reemission(&branch.method) {
+            return Err(expression_lowering_error(
+                root,
+                "performed_bind_discarded_branch",
+                format!(
+                    "the {} case of a performed call's bind is not a pure re-emission",
+                    branch.constructor.symbol
+                ),
+            ));
+        }
+    }
+    let Some(ret_branch) = ret_branch else {
+        return Err(expression_lowering_error(
+            root,
+            "performed_call_scrutinee_without_ret_case",
+            "a performed call is a computational match's scrutinee, but the match \
+             has no one-argument case for the checked Ret constructor",
+        ));
+    };
+    native_plans.retire_performed_bind_match(&owner, view)?;
+    let call = lower_emitted_member_scrutinee(
+        &view.scrutinee,
+        declarations,
+        semantic,
+        stack,
+        root,
+        context_depth,
+        branch_remap,
+        scrutinee_path,
+        native_plans,
+        parent_oriented_frame,
+    )?
+    .ok_or_else(|| {
+        expression_lowering_error(
+            root,
+            "performed_bind_call_shape",
+            "a performing member scrutinee is not one full-arity emitted call",
+        )
+    })?;
+    Ok(Some((call, ret_branch)))
+}
+
+/// A performed call left in a computational-match scrutinee indicates that
+/// direct-style lowering missed it; never patch a plan after it was collected.
+fn refuse_performed_call_scrutinees(
     owner: &StableSymbol,
     expression: &mut RuntimeExpr,
     performing: &BTreeSet<String>,
@@ -493,26 +639,12 @@ fn wrap_performed_call_scrutinees(
                 )
         );
         if performed {
-            if !cases.iter().any(|case| {
-                case.constructor == ret
-                    && case.argument_binders == 1
-                    && case.recursive_positions.is_empty()
-            }) {
-                return Err(expression_lowering_error(
-                    owner,
-                    "performed_call_scrutinee_without_ret_case",
-                    "a performed call is a computational match's scrutinee, but the match \
-                     has no one-argument case for the checked Ret constructor",
-                ));
-            }
-            let call = std::mem::replace(
-                scrutinee.as_mut(),
-                RuntimeExpr::Value(RuntimeValue::Unknown),
-            );
-            **scrutinee = RuntimeExpr::Construct {
-                constructor: ret.to_string(),
-                args: vec![call],
-            };
+            return Err(expression_lowering_error(
+                owner,
+                "performed_call_scrutinee_not_direct",
+                "a performed call is a computational match's scrutinee that B1a \
+                 direct-style lowering did not consume",
+            ));
         }
     }
 
@@ -525,61 +657,61 @@ fn wrap_performed_call_scrutinees(
         | RuntimeExpr::CheckedComputationalIHInvocation { body, .. }
         | RuntimeExpr::Project { record: body, .. }
         | RuntimeExpr::Closure { body, .. } => {
-            wrap_performed_call_scrutinees(owner, body, performing, ret)
+            refuse_performed_call_scrutinees(owner, body, performing, ret)
         }
         RuntimeExpr::LexicalClosure { captures, body, .. } => {
             for capture in captures {
-                wrap_performed_call_scrutinees(owner, capture, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, capture, performing, ret)?;
             }
-            wrap_performed_call_scrutinees(owner, body, performing, ret)
+            refuse_performed_call_scrutinees(owner, body, performing, ret)
         }
         RuntimeExpr::Let { value, body } => {
-            wrap_performed_call_scrutinees(owner, value, performing, ret)?;
-            wrap_performed_call_scrutinees(owner, body, performing, ret)
+            refuse_performed_call_scrutinees(owner, value, performing, ret)?;
+            refuse_performed_call_scrutinees(owner, body, performing, ret)
         }
         RuntimeExpr::If {
             scrutinee,
             then_expr,
             else_expr,
         } => {
-            wrap_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
-            wrap_performed_call_scrutinees(owner, then_expr, performing, ret)?;
-            wrap_performed_call_scrutinees(owner, else_expr, performing, ret)
+            refuse_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
+            refuse_performed_call_scrutinees(owner, then_expr, performing, ret)?;
+            refuse_performed_call_scrutinees(owner, else_expr, performing, ret)
         }
         RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
             for argument in args {
-                wrap_performed_call_scrutinees(owner, argument, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, argument, performing, ret)?;
             }
             Ok(())
         }
         RuntimeExpr::Match {
             scrutinee, cases, ..
         } => {
-            wrap_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
+            refuse_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
             for case in cases {
-                wrap_performed_call_scrutinees(owner, &mut case.body, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, &mut case.body, performing, ret)?;
             }
             Ok(())
         }
         RuntimeExpr::ComputationalMatch {
             scrutinee, cases, ..
         } => {
-            wrap_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
+            refuse_performed_call_scrutinees(owner, scrutinee, performing, ret)?;
             for case in cases {
-                wrap_performed_call_scrutinees(owner, &mut case.body, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, &mut case.body, performing, ret)?;
             }
             Ok(())
         }
         RuntimeExpr::Record { fields } => {
             for (_, field) in fields {
-                wrap_performed_call_scrutinees(owner, field, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, field, performing, ret)?;
             }
             Ok(())
         }
         RuntimeExpr::Call { callee, args } => {
-            wrap_performed_call_scrutinees(owner, callee, performing, ret)?;
+            refuse_performed_call_scrutinees(owner, callee, performing, ret)?;
             for argument in args {
-                wrap_performed_call_scrutinees(owner, argument, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, argument, performing, ret)?;
             }
             Ok(())
         }
@@ -587,10 +719,10 @@ fn wrap_performed_call_scrutinees(
             capability, args, ..
         } => {
             if let Some(capability) = capability {
-                wrap_performed_call_scrutinees(owner, &mut capability.value, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, &mut capability.value, performing, ret)?;
             }
             for argument in args {
-                wrap_performed_call_scrutinees(owner, argument, performing, ret)?;
+                refuse_performed_call_scrutinees(owner, argument, performing, ret)?;
             }
             Ok(())
         }
@@ -600,6 +732,79 @@ fn wrap_performed_call_scrutinees(
         | RuntimeExpr::ImportedDeclarationRef { .. }
         | RuntimeExpr::Trap(_) => Ok(()),
     }
+}
+
+/// Lower the host root and the admitted recursive members it reaches, in the
+/// order its references queue them. The performing set is the classification.
+fn lower_host_closure(
+    package: &CheckedCorePackage,
+    requested_targets: &[StableSymbol],
+    root: &StableSymbol,
+    spine: &CheckedHostSpineV1,
+    mut native_plans: Option<&mut NativeLoweringPlanCollector>,
+) -> Result<
+    (
+        BTreeMap<StableSymbol, RuntimeDeclarationKind>,
+        BTreeSet<StableSymbol>,
+        BTreeSet<StableSymbol>,
+    ),
+    ErasureError,
+> {
+    let root_kind = lower_checked_host_root(
+        package,
+        requested_targets,
+        root,
+        spine,
+        native_plans.as_deref_mut(),
+    )?;
+    let admitted_refs = |kind: &RuntimeDeclarationKind| {
+        runtime_declaration_refs_in_kind(kind)
+            .into_iter()
+            .filter_map(|reference| {
+                requested_targets
+                    .iter()
+                    .find(|symbol| {
+                        symbol.to_string() == reference
+                            && admitted_recursive_member(&package.artifact.semantic, symbol)
+                    })
+                    .cloned()
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut executable = BTreeSet::from([root.clone()]);
+    let mut queue = admitted_refs(&root_kind);
+    let mut lowered = BTreeMap::from([(root.clone(), root_kind)]);
+    let mut performing = BTreeSet::new();
+    while let Some(symbol) = queue.pop() {
+        if !executable.insert(symbol.clone()) {
+            continue;
+        }
+        let declaration = match lower_checked_host_declaration(
+            package,
+            requested_targets,
+            &symbol,
+            spine,
+            native_plans.as_deref_mut(),
+        ) {
+            Ok(declaration) => {
+                performing.insert(symbol.clone());
+                declaration
+            }
+            Err(error)
+                if matches!(
+                    &error,
+                    ErasureError::ExpressionLowering { lane, .. }
+                        if *lane == "unrecognized_checked_host_computation"
+                ) =>
+            {
+                lower_symbol(package, requested_targets, &symbol)?
+            }
+            Err(error) => return Err(error),
+        };
+        queue.extend(admitted_refs(&declaration.kind));
+        lowered.insert(symbol, declaration.kind);
+    }
+    Ok((lowered, executable, performing))
 }
 
 fn runtime_declaration_refs_in_kind(kind: &RuntimeDeclarationKind) -> Vec<String> {
@@ -895,8 +1100,16 @@ struct BoundBracketMark {
     constructor: StableSymbol,
 }
 
+/// The single pre-lowering classification of emitted recursive members.
+#[derive(Clone)]
+struct PerformedMemberAuthority {
+    members: BTreeSet<StableSymbol>,
+    ret: StableSymbol,
+}
+
 #[derive(Clone)]
 struct NativeLoweringPlanCollector {
+    performed_members: Option<PerformedMemberAuthority>,
     joins: Option<NativeJoinPlanCollector>,
     oriented: OrientedSubcontinuationPlanCollector,
     bracket_constructor: Option<StableSymbol>,
@@ -1092,6 +1305,7 @@ impl NativeLoweringPlanCollector {
             .map(|seed| ((seed.slot_template_id, seed.occurrence_ordinal), seed))
             .collect();
         Self {
+            performed_members: None,
             joins: answer_symbols.map(NativeJoinPlanCollector::new),
             oriented: OrientedSubcontinuationPlanCollector::default(),
             bracket_constructor: None,
@@ -1402,6 +1616,60 @@ impl NativeLoweringPlanCollector {
         self.pending_recursive_calls
             .push((seed.clone(), occurrence_path.to_vec(), parent_frame));
         Ok(seed.call_template_id)
+    }
+
+    /// A direct-style bind emits no match. Retire that match's checked seeds
+    /// and advance its ordinal exactly as the ordinary match route would.
+    fn retire_performed_bind_match(
+        &mut self,
+        owner: &StableSymbol,
+        view: &checked_core::CheckedCoreMatchView,
+    ) -> Result<(), ErasureError> {
+        let ordinal = self
+            .next_computational_match_ordinal
+            .entry(owner.clone())
+            .or_default();
+        let match_ordinal = *ordinal;
+        *ordinal = ordinal
+            .checked_add(1)
+            .expect("compiler-private computational match ordinal exhausted");
+        let mut retired = BTreeSet::new();
+        for (branch_ordinal, branch) in view.branches.iter().enumerate() {
+            for (method_binder_ordinal, recursive_position) in branch
+                .constructor
+                .recursive_positions
+                .iter()
+                .copied()
+                .enumerate()
+            {
+                let key = (
+                    owner.clone(),
+                    match_ordinal,
+                    branch_ordinal,
+                    method_binder_ordinal,
+                );
+                let seed = self.computational_ih_slots.remove(&key).ok_or_else(|| {
+                    expression_lowering_error(
+                        owner,
+                        "performed_bind_slot_missing",
+                        format!("direct-style bind binder {key:?} has no checked slot template"),
+                    )
+                })?;
+                if seed.constructor != branch.constructor.symbol
+                    || seed.recursive_position != recursive_position
+                {
+                    return Err(expression_lowering_error(
+                        owner,
+                        "performed_bind_slot_mismatch",
+                        "direct-style bind slot constructor/recursive-position binding is stale",
+                    ));
+                }
+                retired.insert(seed.slot_template_id);
+            }
+        }
+        self.computational_ih_calls
+            .retain(|(slot_template_id, _), _| !retired.contains(slot_template_id));
+        Ok(())
     }
 
     fn consume_computational_ih_slots(
@@ -3495,6 +3763,61 @@ fn lower_body_term_with_plans(
                 ));
             }
             let computational = match_uses_computational_recursive_hypothesis(view, root)?;
+            let mut direct_path = path.to_vec();
+            direct_path.push(19);
+            if let Some((call, ret_branch)) = performed_bind_call(
+                view,
+                computational,
+                declarations,
+                semantic,
+                stack,
+                root,
+                context_depth,
+                branch_remap,
+                &direct_path,
+                native_plans,
+                parent_oriented_frame,
+            )? {
+                let branch = &view.branches[ret_branch];
+                let method =
+                    peel_match_branch_method(&branch.method, 1, root, &branch.constructor.symbol)?;
+                let (method, convoy_binders) = peel_convoy_proof_method(
+                    method,
+                    view.convoy_erased_proof_binder,
+                    root,
+                    &branch.constructor.symbol,
+                )?;
+                let mut remap = branch_remap.cloned().unwrap_or_default().enter_match(
+                    1,
+                    0,
+                    computational,
+                    Vec::new(),
+                );
+                if convoy_binders != 0 {
+                    remap = remap.enter_binding(true);
+                }
+                let mut branch_path = path.to_vec();
+                branch_path.extend([20, ret_branch as u64]);
+                if convoy_binders != 0 {
+                    branch_path.push(14);
+                }
+                let body = lower_body_term_with_plans(
+                    method,
+                    declarations,
+                    semantic,
+                    stack,
+                    root,
+                    context_depth + 1 + convoy_binders,
+                    Some(&remap),
+                    &branch_path,
+                    native_plans,
+                    parent_oriented_frame,
+                )?;
+                return Ok(RuntimeExpr::Let {
+                    value: Box::new(call),
+                    body: Box::new(body),
+                });
+            }
             let pending = if computational {
                 native_plans
                     .oriented
@@ -3513,18 +3836,37 @@ fn lower_body_term_with_plans(
             };
             let mut scrutinee_path = path.to_vec();
             scrutinee_path.push(19);
-            let scrutinee = Box::new(lower_body_term_with_plans(
-                &view.scrutinee,
-                declarations,
-                semantic,
-                stack,
-                root,
-                context_depth,
-                branch_remap,
-                &scrutinee_path,
-                native_plans,
-                nested_parent,
-            )?);
+            let emitted_call = if computational {
+                lower_emitted_member_scrutinee(
+                    &view.scrutinee,
+                    declarations,
+                    semantic,
+                    stack,
+                    root,
+                    context_depth,
+                    branch_remap,
+                    &scrutinee_path,
+                    native_plans,
+                    nested_parent,
+                )?
+            } else {
+                None
+            };
+            let scrutinee = Box::new(match emitted_call {
+                Some(call) => call,
+                None => lower_body_term_with_plans(
+                    &view.scrutinee,
+                    declarations,
+                    semantic,
+                    stack,
+                    root,
+                    context_depth,
+                    branch_remap,
+                    &scrutinee_path,
+                    native_plans,
+                    nested_parent,
+                )?,
+            });
             let mut cases = Vec::with_capacity(view.branches.len());
             for (branch_index, branch) in view.branches.iter().enumerate() {
                 let constructor = &branch.constructor;
@@ -3785,6 +4127,54 @@ fn lower_checked_host_computation(
             ));
         }
         let computational = match_uses_computational_recursive_hypothesis(view, root)?;
+        if let Some(plans) = native_plans.as_deref_mut() {
+            let mut scrutinee_path = path.to_vec();
+            scrutinee_path.push(0);
+            if let Some((call, ret_branch)) = performed_bind_call(
+                view,
+                computational,
+                declarations,
+                semantic,
+                stack,
+                root,
+                context_depth,
+                branch_remap,
+                &scrutinee_path,
+                plans,
+                parent_oriented_frame,
+            )? {
+                let branch = &view.branches[ret_branch];
+                let method =
+                    peel_match_branch_method(&branch.method, 1, root, &branch.constructor.symbol)?;
+                let remap = branch_remap.cloned().unwrap_or_default().enter_match(
+                    1,
+                    0,
+                    computational,
+                    Vec::new(),
+                );
+                let body = lower_checked_host_computation(
+                    method,
+                    declarations,
+                    semantic,
+                    stack,
+                    root,
+                    context_depth + 1,
+                    spine,
+                    Some(&remap),
+                    &{
+                        let mut p = path.to_vec();
+                        p.extend([1, ret_branch as u64]);
+                        p
+                    },
+                    native_plans.as_deref_mut(),
+                    parent_oriented_frame,
+                )?;
+                return Ok(RuntimeExpr::Let {
+                    value: Box::new(call),
+                    body: Box::new(body),
+                });
+            }
+        }
         let pending_oriented_frame = if computational {
             native_plans
                 .as_deref_mut()
@@ -3812,18 +4202,37 @@ fn lower_checked_host_computation(
         let scrutinee = if let Some(plans) = native_plans.as_deref_mut() {
             let mut scrutinee_path = path.to_vec();
             scrutinee_path.push(0);
-            lower_body_term_with_plans(
-                &view.scrutinee,
-                declarations,
-                semantic,
-                stack,
-                root,
-                context_depth,
-                branch_remap,
-                &scrutinee_path,
-                plans,
-                nested_oriented_parent,
-            )?
+            let emitted_call = if computational {
+                lower_emitted_member_scrutinee(
+                    &view.scrutinee,
+                    declarations,
+                    semantic,
+                    stack,
+                    root,
+                    context_depth,
+                    branch_remap,
+                    &scrutinee_path,
+                    plans,
+                    nested_oriented_parent,
+                )?
+            } else {
+                None
+            };
+            match emitted_call {
+                Some(call) => call,
+                None => lower_body_term_with_plans(
+                    &view.scrutinee,
+                    declarations,
+                    semantic,
+                    stack,
+                    root,
+                    context_depth,
+                    branch_remap,
+                    &scrutinee_path,
+                    plans,
+                    nested_oriented_parent,
+                )?,
+            }
         } else {
             lower_body_term_inner(
                 &view.scrutinee,
