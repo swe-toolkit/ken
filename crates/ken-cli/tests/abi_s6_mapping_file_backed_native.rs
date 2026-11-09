@@ -24,9 +24,10 @@ fn differential(
         std::fs::write(root.join("mapped.bin"), b"KENFILE!")
             .map_err(|error| format!("seed mapping file: {error}"))?;
     }
-    let built = ken_cli::build_native_program(
+    let built = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         "abi_s6_mapping_file_backed",
         build.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -46,7 +47,7 @@ fn differential(
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
         &[],
         &[],
         interpreted_root.path().as_os_str().as_encoded_bytes(),
@@ -97,4 +98,9 @@ fn inner_resource_bracket_ok_arm_is_not_skipped_or_reapplied() {
     assert_eq!(interpreted.exit_status, 0);
     assert_eq!(native.exit_status, 0);
     assert_eq!(interpreted.effect_trace, native.effect_trace);
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

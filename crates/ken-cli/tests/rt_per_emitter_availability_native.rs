@@ -22,9 +22,10 @@ fn one_and_two_brackets_run_natively_with_exact_emitter_census() {
                     .tempdir()
                     .expect("unique native output root");
                 let (built, reports) = ken_runtime::with_per_emitter_availability_diagnostics(|| {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         source,
                         ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         label,
                         root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -83,4 +84,9 @@ fn capture_counts(
     let unfinalizable = point.captures.len() - finalized;
     assert_eq!(w + c, finalized + unfinalizable);
     (w, c, finalized, unfinalizable)
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

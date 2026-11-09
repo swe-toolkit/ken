@@ -50,9 +50,10 @@ fn checked_literal_view_codes_match_interpreter_and_native() {
     );
     assert_eq!(interpreted.stdout, b"codes:Az\n");
 
-    let built = ken_cli::build_native_program(
+    let built = ken_cli::build_native_program_with_roots(
         PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         "k3-literal-char-native",
         &dir.join("native"),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -70,4 +71,9 @@ fn checked_literal_view_codes_match_interpreter_and_native() {
         native.stdout, interpreted.stdout,
         "native view/code output must match interpreter and kernel's checked 65/122 codes"
     );
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }
