@@ -22,9 +22,10 @@ fn issued_set_refuses_second_pending_route_authority() {
         .spawn(|| {
             let dir = tempfile::tempdir().expect("guard output directory");
             let (result, rows) = ken_runtime::with_selected_pending_call_admissions(|| {
-                ken_cli::build_native_program(
+                ken_cli::build_native_program_with_roots(
                     SOURCE,
                     ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     "px10_native_tested_pending_overlap",
                     dir.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -66,4 +67,9 @@ fn issued_set_refuses_second_pending_route_authority() {
         .expect("guard worker")
         .join()
         .expect("guard worker completed");
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

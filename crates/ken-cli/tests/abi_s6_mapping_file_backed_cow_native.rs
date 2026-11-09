@@ -23,9 +23,10 @@ fn differential(source: &str) -> Result<(Observation, Observation, Vec<u8>, Vec<
         std::fs::write(root.join("mapped.bin"), ORIGINAL)
             .map_err(|error| format!("seed mapping file: {error}"))?;
     }
-    let built = ken_cli::build_native_program(
+    let built = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         "abi_s6_mapping_file_backed_cow",
         build.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -45,7 +46,7 @@ fn differential(source: &str) -> Result<(Observation, Observation, Vec<u8>, Vec<
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
-        &[],
+        &checked_catalog_roots(),
         &[],
         &[],
         interpreted_root.path().as_os_str().as_encoded_bytes(),
@@ -142,4 +143,9 @@ fn file_backed_mapping_write_is_private_on_both_engines() {
     );
     assert_eq!(interpreted.effect_trace, native.effect_trace);
     assert_eq!(interpreted.filesystem_delta, native.filesystem_delta);
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }
