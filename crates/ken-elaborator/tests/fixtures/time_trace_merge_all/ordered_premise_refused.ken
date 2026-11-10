@@ -1,0 +1,96 @@
+import Data.Time.EventTrace
+  (Event, MkEvent, trace_merge_all, trace_merge_all_ordered,
+    trace_merge_all_member_complete, trace_merge_all_member_sound,
+    time_ordered, event_before)
+
+import Data.Collections.Derived
+  (list_elem, list_elem_head, list_elem_later, list_concat)
+
+import Core.Logic.Transport (sym)
+
+import Core.Logic.Conjunction (and_intro)
+
+import Core.Logic.Or (Or, Inl, Inr)
+
+theorem merge_all_nil (p : Type)
+    : Equal (List (Event p)) (trace_merge_all p (Nil (List (Event p)))) (Nil (Event p)) =
+  Proved
+
+const one : Nat = Suc Zero
+const two : Nat = Suc one
+const three : Nat = Suc two
+const four : Nat = Suc three
+const five : Nat = Suc four
+const six : Nat = Suc five
+
+const a : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool one True)
+    (Cons (Event Bool) (MkEvent Bool four True) (Nil (Event Bool)))
+
+const b : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool five False)
+    (Cons (Event Bool) (MkEvent Bool two False) (Nil (Event Bool)))
+
+const c : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool three True)
+    (Cons (Event Bool) (MkEvent Bool six False) (Nil (Event Bool)))
+
+const abc : List (List (Event Bool)) =
+  Cons (List (Event Bool)) a
+    (Cons (List (Event Bool)) b
+      (Cons (List (Event Bool)) c (Nil (List (Event Bool)))))
+
+theorem ordered_a : time_ordered Bool a =
+  and_intro
+    (Equal Bool (event_before Bool (MkEvent Bool one True) (MkEvent Bool four True)) True)
+    (time_ordered Bool (Cons (Event Bool) (MkEvent Bool four True) (Nil (Event Bool))))
+    Proved Proved
+
+theorem ordered_b : time_ordered Bool b =
+  and_intro
+    (Equal Bool (event_before Bool (MkEvent Bool five False) (MkEvent Bool two False)) True)
+    (time_ordered Bool (Cons (Event Bool) (MkEvent Bool two False) (Nil (Event Bool))))
+    Proved Proved
+
+theorem ordered_c : time_ordered Bool c =
+  and_intro
+    (Equal Bool (event_before Bool (MkEvent Bool three True) (MkEvent Bool six False)) True)
+    (time_ordered Bool (Cons (Event Bool) (MkEvent Bool six False) (Nil (Event Bool))))
+    Proved Proved
+
+theorem every_abc_ordered (t : List (Event Bool))
+    : list_elem (List (Event Bool)) t abc → time_ordered Bool t =
+  λmember.
+    elim_trunc
+      (time_ordered Bool t)
+      (λcase.
+        match case {
+          Inl same_a ↦
+            J (λu _. time_ordered Bool u) ordered_a
+              (sym (List (Event Bool)) t a same_a);
+          Inr later_a ↦
+            elim_trunc
+              (time_ordered Bool t)
+              (λcase_b.
+                match case_b {
+                  Inl same_b ↦
+                    J (λu _. time_ordered Bool u) ordered_b
+                      (sym (List (Event Bool)) t b same_b);
+                  Inr later_b ↦
+                    elim_trunc
+                      (time_ordered Bool t)
+                      (λcase_c.
+                        match case_c {
+                          Inl same_c ↦
+                            J (λu _. time_ordered Bool u) ordered_c
+                              (sym (List (Event Bool)) t c same_c);
+                          Inr later_c ↦ absurd later_c
+                        })
+                      later_b
+                })
+              later_a
+        })
+      member
+
+theorem c1_abc_ordered : time_ordered Bool (trace_merge_all Bool abc) =
+  trace_merge_all_ordered Bool abc every_abc_ordered

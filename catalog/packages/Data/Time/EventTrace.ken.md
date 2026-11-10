@@ -1,9 +1,10 @@
 # Finite event traces
 
-Finite events with natural-number times support half-open windows and a
-left-biased two-list merge with checked ordering, count, membership,
-window/merge distribution, window composition and commutation, and an
-adjacent-window split. Merge membership holds even for unordered inputs.
+Finite events with natural-number times support half-open windows, a
+left-biased two-list merge, and a right-fold merge of multiple traces.
+Checked laws cover ordering, count, membership, window/merge distribution,
+window composition and commutation, and an adjacent-window split. Merge
+membership holds even for unordered inputs.
 
 ## Contents
 
@@ -22,18 +23,22 @@ or unordered input without wrapping it in another type. Each event records
 a given `Nat` timestamp and an arbitrary payload. Windowing filters the
 existing trace; checked membership laws characterize which events remain.
 Merging compares current heads and preserves each input's relative order.
-Neither operation reads a clock or sorts unordered input.
+`trace_merge_all` folds that merge from the right over a list of traces,
+so equal-time events from earlier ordered traces precede those from later
+ones. None of these operations reads a clock or sorts unordered input.
 
 ## 2. Definition
 
-The public carrier, operations and the first five generic laws lead the
-checked source, followed by their private recursive merge helper and proof
-lemmas. The window/merge distribution, composition and commutation laws, the
-three merge membership laws, merge associativity and adjacent-window split
-lead their private lemmas later in the source. The separated-merge law
-follows the right empty-merge unit and leads its private head-comparison
-helper. The inverted-window law follows window append; its private decision
-lemma sits beside the split's bound lemmas.
+The public carrier and operations lead the checked source; `trace_merge_all`
+follows `trace_merge` as a direct right fold. The first five generic laws
+follow, then their private recursive merge helper and proof lemmas. The
+window/merge distribution, composition and commutation laws, the three
+merge membership laws, merge associativity and adjacent-window split lead
+their private lemmas later in the source. The three merge-all laws follow
+the associativity helper family, in ordered, complete, sound order.
+The separated-merge law follows the right empty-merge unit and leads its
+private head-comparison helper. The inverted-window law follows window
+append; its private decision lemma sits beside the split's bound lemmas.
 The all-in-window identity follows it and reuses the existing private
 `window_keep` and public list membership lemmas without a new helper.
 The no-member window law follows the identity with the same membership
@@ -66,6 +71,9 @@ import Data.Collections.Derived
     list_elem,
     list_elem_head,
     list_elem_later,
+    list_concat,
+    list_elem_append_left,
+    list_elem_append_right,
     list_elem_filter_sound,
     list_elem_filter_complete,
     starts_after,
@@ -109,6 +117,12 @@ pub fn trace_merge (p : Type) (xs : List (Event p)) (ys : List (Event p)) : List
   match xs {
     Nil ↦ ys;
     Cons x xt ↦ trace_merge_into p x xt (trace_merge p xt) ys
+  }
+
+pub fn trace_merge_all (p : Type) (traces : List (List (Event p))) : List (Event p) =
+  match traces {
+    Nil ↦ Nil (Event p);
+    Cons t rest ↦ trace_merge p t (trace_merge_all p rest)
   }
 
 pub theorem trace_window_ordered
@@ -2451,6 +2465,81 @@ theorem trace_merge_assoc_right_last
           (trace_merge p (Cons (Event p) y b) c)
           xz)))
 
+pub theorem trace_merge_all_ordered
+      (p : Type) (traces : List (List (Event p)))
+    : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
+      → time_ordered p (trace_merge_all p traces) =
+  match traces {
+    Nil ↦ λall. Proved;
+    Cons t rest ↦
+      λall.
+        trace_merge_ordered
+          p
+          t
+          (trace_merge_all p rest)
+          (all t (list_elem_head (List (Event p)) t rest))
+          (trace_merge_all_ordered
+            p
+            rest
+            (λu. λmember. all u (list_elem_later (List (Event p)) u t rest member)))
+  }
+
+pub theorem trace_merge_all_member_complete
+      (p : Type) (e : Event p) (t : List (Event p)) (traces : List (List (Event p)))
+    : list_elem (List (Event p)) t traces
+      → list_elem (Event p) e t
+      → list_elem (Event p) e (trace_merge_all p traces) =
+  match traces {
+    Nil ↦ λmember. λevent_member. absurd member;
+    Cons s rest ↦
+      λmember.
+        λevent_member.
+          elim_trunc
+            (list_elem (Event p) e (trace_merge_all p (Cons (List (Event p)) s rest)))
+            (λcase.
+              match case {
+                Inl same ↦
+                  trace_merge_member_left
+                    p
+                    e
+                    s
+                    (trace_merge_all p rest)
+                    (J (λu _. list_elem (Event p) e u) event_member same);
+                Inr later ↦
+                  trace_merge_member_right
+                    p
+                    e
+                    s
+                    (trace_merge_all p rest)
+                    (trace_merge_all_member_complete p e t rest later event_member)
+              })
+            member
+  }
+
+pub theorem trace_merge_all_member_sound
+      (p : Type) (e : Event p) (traces : List (List (Event p)))
+    : list_elem (Event p) e (trace_merge_all p traces)
+      → list_elem (Event p) e (list_concat (Event p) traces) =
+  match traces {
+    Nil ↦ λmember. absurd member;
+    Cons t rest ↦
+      λmember.
+        elim_trunc
+          (list_elem (Event p) e (list_concat (Event p) (Cons (List (Event p)) t rest)))
+          (λcase.
+            match case {
+              Inl left ↦ list_elem_append_left (Event p) e t (list_concat (Event p) rest) left;
+              Inr right ↦
+                list_elem_append_right
+                  (Event p)
+                  e
+                  t
+                  (list_concat (Event p) rest)
+                  (trace_merge_all_member_sound p e rest right)
+            })
+          (trace_merge_member_sound p e t (trace_merge_all p rest) member)
+  }
+
 theorem event_before_skip
       (p : Type)
       (x : Event p)
@@ -3254,6 +3343,19 @@ and transitivity determine the same first event under either grouping.
 A timestamp tie is taken from the left input in both groupings, so
 the final list retains the same stored events in the same order.
 
+The right-fold merge-all operation has an empty result for no input traces.
+Its ordered law inducts over those traces and applies the checked two-way
+merge-order law to the head and recursively ordered tail. Its complete law
+carries membership in any input trace through `list_elem_head` or
+`list_elem_later`; equality of a member trace is transported with `J` into
+the Ω-valued event-membership goal. Its sound law eliminates the two-way
+truncated membership choice into Ω and lifts either branch through public
+list-append membership. The conclusion identifies a result member with the
+flattened input traces via `list_concat`, without a new helper, ordering
+premise, or public existential. Soundness excludes added events, but ordered
+and sound alone do not characterize this merge: a constant empty result
+satisfies both while violating completeness.
+
 When every left event is at or before every right event, merge equals
 append, even if the individual traces are unordered. The checked
 `trace_merge_separated` proof inducts on the left trace, using
@@ -3306,7 +3408,9 @@ non-decreasing, admitting tied events. `trace_window` is half-open; its checked
 empty-window law covers equal and inverted bounds on every finite trace.
 Membership in a window supplies two separate facts: its timestamp meets the
 inclusive lower and strict upper bound. The merge's tie rule is part of its
-computation, not a consequence of the count law. No clock, duration, signed
+computation, not a consequence of the count law. A right fold carries that
+left bias across ordered input traces: an earlier trace wins an equal-time
+tie against a later trace, without deduplication. No clock, duration, signed
 time, infinite stream, or causality property is provided here. Membership
 claims occurrence without counting duplicates; the separate count law concerns
 merging, not window multiplicity.
@@ -3327,7 +3431,8 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the twenty-one laws form the package surface.
+   `trace_merge`, `trace_merge_all`, and the twenty-four laws form the
+   package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -3339,7 +3444,10 @@ merging, not window multiplicity.
    both half-open timestamp bounds. Window/merge distribution also uses
    the public filtered-head-order proof from the collections provider.
    Merge membership reuses `list_elem_later` and ordinary truncated `Or`;
-   the one-way window-of-merge consequence composes the two checked soundness
+   merge-all reuses the two-way order and membership laws, Derived
+   `list_elem_head`/`list_elem_later`, `list_concat`, append membership,
+   and Ω-valued `J` transport. Its three proofs add no helper. The one-way
+   window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
    `max`/`min` bounds and structurally fuses generic list filters. Window
    commutation reuses fusion in both orders and the public commutativity
@@ -3361,7 +3469,7 @@ merging, not window multiplicity.
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
    The no-member law reuses those same lemmas and `window_keep` to delete
    each missed head, without an additional helper or import.
-4. **Trusted-base delta.** Zero: all twenty-one exported laws have checked proof
+4. **Trusted-base delta.** Zero: all twenty-four exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3404,5 +3512,9 @@ merging, not window multiplicity.
    The `cat_time_merge_separated_append` package test checks the generic
    separated-merge law, its private helper and complete accepted seed; a
    same-form separated `Refl` control accepts while an isolated interleaved
-   `Refl` claim refuses. These tests are not official conformance-runner
-   execution or CI.
+   `Refl` claim refuses. The `cat_time_trace_merge_all` package test checks
+   all three open laws and the right fold at zero new trust; its closed client
+   checks Nil, three-trace interleaving, an earlier-trace tie and both
+   membership laws, while an unordered middle trace refuses at its false
+   ordering premise. These tests are not official conformance-runner execution
+   or CI.

@@ -33,10 +33,11 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Legacy-clean and Strict-UnboundName at `host_bind`. That WP's boundary
 /// was 97/63/12/51. PX10-NATIVE-BRANCH-ALTERNATIVES Increment 2 adds
 /// px10_native_tested_pending_overlap.ken, which is Legacy-clean and
-/// Strict-UnboundName. The boundary is now 98/64/12/52. Future homes and
-/// source migrations turn this sentinel red by design. Increment 3's strict
-/// route switch and migration retire it in favor of AC-3a's acceptance gate
-/// for every cut-base Legacy-clean isolated file.
+/// Strict-UnboundName. The boundary was 98/64/12/52.
+/// Time's {accepted,ordered_premise_refused}.ken are non-Legacy: 100/64/12/52.
+/// Future homes and source migrations turn this sentinel red by design.
+/// Increment 3's strict route switch and migration retire it in favor of
+/// AC-3a's acceptance gate for every cut-base Legacy-clean isolated file.
 #[test]
 fn strict_isolated_frontier_before_increment_three_route_switch() {
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -91,6 +92,6 @@ fn strict_isolated_frontier_before_increment_three_route_switch() {
     eprintln!("isolated strict frontier: files={} legacy_clean={legacy_clean} strict_clean={strict_clean} strict_unbound={strict_unbound}", files.len());
     assert_eq!(
         (files.len(), legacy_clean, strict_clean, strict_unbound),
-        (98, 64, 12, 52)
+        (100, 64, 12, 52)
     );
 }
