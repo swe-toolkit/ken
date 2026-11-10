@@ -2539,7 +2539,11 @@ fn prepare_native_program_from_elaborated(
         admitted_ids.extend(result.auxiliary_ids.iter().copied());
         admitted_ids.push(result.def_id);
     }
-    let root_results = if report { declarations.clone() } else { Vec::new() };
+    let root_results = if report {
+        declarations.clone()
+    } else {
+        Vec::new()
+    };
     let mut results = declarations;
     results.extend(examples);
     let obligations = owned_v2_obligations(&results);
