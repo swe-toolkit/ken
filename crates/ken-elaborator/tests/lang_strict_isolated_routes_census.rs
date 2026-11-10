@@ -93,6 +93,6 @@ fn strict_isolated_frontier_before_increment_three_route_switch() {
     eprintln!("isolated strict frontier: files={} legacy_clean={legacy_clean} strict_clean={strict_clean} strict_unbound={strict_unbound}", files.len());
     assert_eq!(
         (files.len(), legacy_clean, strict_clean, strict_unbound),
-        (100, 64, 12, 52)
+        (101, 65, 12, 53)
     );
 }
