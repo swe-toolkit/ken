@@ -436,9 +436,15 @@ fn c2_source_mixed_branch_walk_gates_one_to_three() {
 #[test]
 fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
     let package_name = "r3_c2_mixed_native_pkg";
+    let native_source = C2_MIXED_SOURCE.replacen(
+        "program capabilities FS APartial\n",
+        "program capabilities FS APartial\nimport Capability.Process.Exit (host_pure)\n",
+        1,
+    );
+    let roots = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
     let preparation = prepare_native_program_sources(
         package_name,
-        vec![CompilerSource::new("src/main.ken", C2_MIXED_SOURCE)],
+        vec![CompilerSource::new("src/main.ken", native_source).with_roots(roots)],
     )
     .expect("input-dependent C2 reaches an immutable pre-object preparation");
 
@@ -541,7 +547,11 @@ fn r3_4b_feature_artifact_worker_impl() {
     let compile = || {
         compile_native_program_sources(
             "r3_4b_feature_identity_pkg",
-            vec![CompilerSource::new("src/main.ken", R3_4B_IDENTITY_SOURCE)],
+            vec![
+                CompilerSource::new("src/main.ken", R3_4B_IDENTITY_SOURCE).with_roots(vec![
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+                ]),
+            ],
             &output_dir,
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )

@@ -45,9 +45,13 @@ fn assert_fixture_census_on_thread(package: &str, raw: &str, arity_one: usize) {
             env!("CARGO_BIN_EXE_px10-child-probe"),
         )
         .replace("PX10_READY_FILE", "closed-ih-census-ready");
-    let preparation =
-        prepare_native_program_sources(package, vec![CompilerSource::new("main.ken", &source)])
-            .expect("checked Process preparation precedes the unavailable native gate");
+    let roots =
+        vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
+    let preparation = prepare_native_program_sources(
+        package,
+        vec![CompilerSource::new("main.ken", &source).with_roots(roots)],
+    )
+    .expect("checked Process preparation precedes the unavailable native gate");
     let plans: Vec<_> = preparation
         .runtime_program()
         .erased_core
@@ -116,9 +120,15 @@ fn argv_has_six_checked_host_vis_ih_templates_before_process_gate() {
 
 #[test]
 fn null_stdout_has_six_checked_host_vis_ih_templates_before_process_gate() {
-    let source = ARGV.replacen("        ChildPipe)", "        ChildNull)", 1);
-    assert_ne!(
-        source, ARGV,
+    let source = ARGV
+        .replacen("        ChildPipe)", "        ChildNull)", 1)
+        .replacen(
+            "import Capability.Process.Child (ChildPipe,",
+            "import Capability.Process.Child (ChildNull,",
+            1,
+        );
+    assert!(
+        source.contains("        ChildNull)"),
         "variant must change the child's stdout disposition"
     );
     assert_fixture_census("rt_closedk_v_null", source, 2);
