@@ -4,6 +4,8 @@
 use std::process::Command;
 
 const PROGRAM: &str = "program capabilities FS APartial\n\
+    import Capability.Console.Text (print_line)\n\
+    import Capability.Process.Exit (host_program)\n\
     fn u1 (x : Nat) : Nat = ((λu. x) : (u : Nat) → Nat) Zero\n";
 
 /// MEASURED: `ken run` checks the applied ascribed λ and drives opposite
@@ -12,7 +14,9 @@ const PROGRAM: &str = "program capabilities FS APartial\n\
 /// this is the reference CLI, not native lowering or cross-target parity.
 #[test]
 fn applied_ascribed_lambda_runs_and_controls_output() {
-    let fixture = tempfile::tempdir().expect("isolated Ken source");
+    let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    let fixture = tempfile::tempdir_in(parent).expect("isolated Ken source");
     let path = fixture.path().join("ascription_inference.ken");
     for (arg, expected) in [
         ("Zero", b"wrong\n".as_slice()),

@@ -45,10 +45,45 @@ fn app_spine(mut term: &Term) -> (&Term, Vec<&Term>) {
 }
 
 fn cli(case: &str, subcommand: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-fsra-inc1-{}", std::process::id()));
-    std::fs::create_dir_all(&root).expect("create fixture root");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-fsra-inc1-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("create rooted fixture directory");
     let path = root.join(format!("{case}.ken"));
-    std::fs::write(&path, source).expect("write fixture");
+    let identifiers: std::collections::BTreeSet<_> = source
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .collect();
+    let console = ["IO", "print_line"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let mut imports = String::new();
+    if !console.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Console.Text ({})\n",
+            console.join(", ")
+        ));
+    }
+    if source.contains("read_bytes") {
+        imports.push_str("import Capability.Filesystem.Authority (read_bytes)\n");
+    }
+    if source.contains("host_program") {
+        imports.push_str("import Capability.Process.Exit (host_program)\n");
+    }
+    let selected = if let Some(header_end) = source.find('\n') {
+        if source.starts_with("program capabilities FS ") {
+            format!(
+                "{}\n{imports}{}",
+                &source[..header_end],
+                &source[header_end + 1..]
+            )
+        } else {
+            format!("{imports}{source}")
+        }
+    } else {
+        format!("{imports}{source}")
+    };
+    std::fs::write(&path, selected).expect("write fixture");
     Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg(subcommand)
         .arg(path)

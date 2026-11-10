@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
+import Core.Classes.LawfulClasses (charToInt)
 fn codes_correct (cs : List Char) : Bool =
   match cs {
     Nil |-> False;

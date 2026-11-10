@@ -403,9 +403,9 @@ fn rosetta_program_source(slug: &str, ken_src_path: &Path) -> String {
             "import Core.Classes.LawfulClasses (leqChar)",
         );
     }
-    let other_imports = "import Capability.Console.Text (print_line)\n\
-                         import Capability.Process.Exit (host_program)\n\
-                         import Core.Classes.LawfulClasses (leqChar)\n";
+    // Each runnable Rosetta file owns its Console/Process imports. The
+    // flattened provider still needs leqChar before its declarations.
+    let other_imports = "import Core.Classes.LawfulClasses (leqChar)\n";
     format!(
         "program capabilities FS APartial\n\
          import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)\n\
@@ -418,7 +418,11 @@ fn run_example(slug: &str, ken_src_path: &Path, tmp_dir: &Path) -> Option<(Strin
     let full_src = rosetta_program_source(slug, ken_src_path);
     let source_dir = workspace_root()
         .join("target/tmp/rosetta-strict-sources")
-        .join(tmp_dir.file_name().expect("named example scratch directory"));
+        .join(
+            tmp_dir
+                .file_name()
+                .expect("named example scratch directory"),
+        );
     fs::create_dir_all(&source_dir).expect("catalog-rooted example scratch directory");
     let concat_path = source_dir.join(format!("{slug}.ken"));
     fs::write(&concat_path, full_src)

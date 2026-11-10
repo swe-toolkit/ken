@@ -86,7 +86,7 @@ fn state_console_source_rechecks_under_strict_without_internal_effect_names() {
 
 #[test]
 fn state_console_pairing_runs_through_run_state_then_run_io() {
-    let tmp_dir = std::env::temp_dir().join("ken-effect-composition-e2e");
+    let tmp_dir = workspace_root().join("target/tmp/ken-effect-composition-e2e");
     std::fs::create_dir_all(&tmp_dir).expect("create tmp dir");
     let path = tmp_dir.join("state_console.ken");
     std::fs::write(&path, PROG).expect("write program");

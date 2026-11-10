@@ -1,6 +1,6 @@
 //! Increment 2: the checked HostIO composition must drive both host actions.
-//! The CLI route remains Legacy until Increment 3; the Strict import/control
-//! for the same composition is exercised by the elaborator's named target.
+//! The CLI route is Strict in Increment 3; this source imports its checked
+//! host and console names so the sequencing observation remains reachable.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -13,6 +13,8 @@ use std::process::Command;
 #[test]
 fn host_bind_drives_two_print_lines_before_host_pure_exit() {
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial Unit ExitCode
