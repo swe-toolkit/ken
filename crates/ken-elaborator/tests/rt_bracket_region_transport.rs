@@ -11,7 +11,10 @@ use ken_runtime::{
 fn prepare(source: &str) -> NativeProgramPreparationV1 {
     prepare_native_program_sources(
         "rt-bracket-region-transport",
-        vec![CompilerSource::new("region.ken", source)],
+        vec![CompilerSource::new("region.ken", source)
+            .with_roots(vec![
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+            ])],
     )
     .unwrap_or_else(|error| panic!("checked bracket preparation: {error:?}"))
 }
