@@ -16,7 +16,8 @@ proc action (x : Unit) : HostIO APartial Unit visits [Console] =
 data Box = MkBox (Unit ->[Console] HostIO APartial Unit)
 data PBox = MkPBox (Unit -> HostIO APartial Unit)
 data Tag (a : Type) : Type where { MkTag : PBox -> Tag a }
-data Hold (a : Type) : Type where { MkHold : a -> Hold a }
+data HoldP (a : Type) : Type where { MkHoldP : a -> PBox -> HoldP a }
+data NestP (a : Type) : Type where { MkNestP : List a -> PBox -> NestP a }
 fn quiet (x : Unit) : HostIO APartial Unit = host_pure APartial Unit MkUnit
 "#;
 const MAIN: &str = r#"proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
@@ -53,18 +54,29 @@ fn assert_prints_b(name: &str, src: &str) {
     assert_eq!(out.stdout, b"b\n", "{name}: unexpected output");
 }
 
-fn assert_escape(name: &str, src: &str) {
+fn assert_carried_row_refusal(name: &str, src: &str) {
+    // The exact base Tag Box repro refuses at this pure callback's let.
+    // E0087 alone is insufficient: an unrelated effectful Box callback
+    // also yields E0087 at a different site.
+    const SITE: &str = "ignored = g MkUnit in MkUnit";
+    let start = src.find(SITE).expect("one PBox callback let");
+    assert_eq!(src.rfind(SITE), Some(start), "{name}: ambiguous site");
     let out = cli(name, src);
     let err = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{name}: {err}");
     assert!(out.stdout.is_empty(), "{name}: refused program ran");
     assert!(
-        err.starts_with("error[E0038]"),
+        err.starts_with("error[E0087]"),
         "{name}: wrong refusal: {err}"
     );
+    assert!(err.contains("UnsupportedEffectInclusion"), "{name}: {err}");
+    let span = format!(
+        "span: Span {{ start: {start}, end: {} }}",
+        start + SITE.len()
+    );
     assert!(
-        err.contains("this let's right-hand side performs an action"),
-        "{name}: wrong phase: {err}"
+        err.contains(&span),
+        "{name}: refusal missed carried-row site {span}: {err}"
     );
 }
 
@@ -94,11 +106,17 @@ fn phantom_argument_four_forms_are_byte_equal_to_tag_unit() {
 }
 
 #[test]
-fn held_box_and_list_box_callbacks_still_refuse_e0038() {
-    for (name, scrutinee) in [
-        ("hold-box", "match MkHold Box (MkBox action) { MkHold b ↦ match b { MkBox f ↦ let ignored = f MkUnit in MkUnit } }"),
-        ("list-box", "match Cons Box (MkBox action) (Nil Box) { Nil ↦ MkUnit ; Cons b bs ↦ match b { MkBox f ↦ let ignored = f MkUnit in MkUnit } }"),
-    ] {
-        assert_escape(name, &source(scrutinee));
-    }
+fn hold_box_field_charges_row_at_pbox_callback_let() {
+    assert_carried_row_refusal("hold-box", &source(
+        "match MkHoldP Box (MkBox action) (MkPBox quiet) { MkHoldP b p ↦ match p { MkPBox g ↦ let ignored = g MkUnit in MkUnit } }"));
+    assert_prints_b("hold-unit", &source(
+        "match MkHoldP Unit MkUnit (MkPBox quiet) { MkHoldP b p ↦ match p { MkPBox g ↦ let ignored = g MkUnit in MkUnit } }"));
+}
+
+#[test]
+fn nest_box_field_charges_row_at_pbox_callback_let() {
+    assert_carried_row_refusal("nest-box", &source(
+        "match MkNestP Box (Cons Box (MkBox action) (Nil Box)) (MkPBox quiet) { MkNestP bs p ↦ match p { MkPBox g ↦ let ignored = g MkUnit in MkUnit } }"));
+    assert_prints_b("nest-unit", &source(
+        "match MkNestP Unit (Cons Unit MkUnit (Nil Unit)) (MkPBox quiet) { MkNestP bs p ↦ match p { MkPBox g ↦ let ignored = g MkUnit in MkUnit } }"));
 }
