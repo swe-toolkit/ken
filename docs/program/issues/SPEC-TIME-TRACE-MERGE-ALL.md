@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-TRACE-MERGE-ALL
 title: "Spec 69 defers k-way merge (69-time-and-events.md:229), so a client holding several time-ordered event traces, one per source, can merge only two at a time and has no checked statement that the combined trace is ordered or keeps every input event. Add trace_merge_all over a list of traces, folding the existing two-way trace_merge, with checked laws at zero trust: ordered inputs give an ordered result, and an event of any input trace is a member of the result, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
@@ -17,11 +17,12 @@ origin: "Operator 2026-10-08: \"start l3 on the establish catalog program\"; ope
 ## Objective
 
 `Data.Time.EventTrace` exports `trace_merge_all`, which merges a list of
-traces by folding the existing two-way `trace_merge`. Two public checked
-laws hold. **Ordered:** if every input trace is `time_ordered`, so is the
-result. **Complete:** an event that is a member of some input trace is a
-member of the result. Spec 69 states the operation and laws by their
-public types.
+traces by folding the existing two-way `trace_merge`. Three public
+checked laws hold. **Ordered:** if every input trace is `time_ordered`, so
+is the result. **Complete:** an event that is a member of some input trace
+is a member of the result. **Sound:** an event of the result is a member
+of the concatenated inputs (D0 `evt_3wnwj0c3pan5v`). Spec 69 states the
+operation and laws by their public types.
 
 ## Settled inputs (main `22876f808`)
 
@@ -54,7 +55,7 @@ base, stop and report the mismatch; do not build around it.
 ## Deliverable
 
 One candidate:
-- `trace_merge_all` and the two laws in `Data.Time.EventTrace`, with
+- `trace_merge_all` and the three laws in `Data.Time.EventTrace`, with
   names, fold direction and placement as AC-0 rules them;
 - a §15 in spec 69, and the deferral at `:229` narrowed to what is still
   deferred;
@@ -73,8 +74,8 @@ One candidate:
     is public here, and its form, given the truncated `Or` of the two-way
     law;
   - that no §1 to §14 operation or law type changes.
-- **AC-1.** §15 states `trace_merge_all` and both laws by their public
-  types. The Spec Leader and CV review it.
+- **AC-1.** §15 states `trace_merge_all` and the three laws by their
+  public types. The Spec Leader and CV review it.
 - **AC-2.** The seed's accepted client merges three closed ordered
   traces, checks the result ordered through the ordered law, and checks a
   third-trace event's membership through the complete law. Its refused

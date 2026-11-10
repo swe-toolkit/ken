@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER
 title: "Spec 66's Expr has EAdd and EMul but no power, so a client writing x^n must nest n multiplications by hand and has no checked statement of how a power differentiates or how exponents add. Add expr_pow over Expr and Nat, with checked laws at zero trust, both by canonical poly_eq: the power rule, that deriv of e^(n+1) equals (n+1) times e^n times deriv e, and exponent addition, that e^(m+n) equals e^m times e^n, with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1

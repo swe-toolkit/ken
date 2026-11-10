@@ -1,7 +1,7 @@
 ---
 id: LANG-EFFECT-ROW-PHANTOM-TYPE-ARGUMENT
 title: "type_carried_row charges every type argument of a checked type, so a scrutinee or lambda binder of type `Tag Box`, whose family never stores its parameter, inherits Box's Console row, and a pure callback applied in its arm is refused E0038. Charge a type argument only when its family's constructor fields can hold a value of it, on the binder planes and the annotation plane alike, so a phantom row argument is free and every held row is still charged"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -82,13 +82,15 @@ is computed are AC-0's.
   name.
 - **AC-2, held rows still charged.** In the same file, with
   `data Hold (a : Type) : Type where { MkHold : a -> Hold a }`, a
-  `Hold Box` scrutinee whose arm runs the Box callback still refuses
-  E0038. So does a `List Box` scrutinee, and so does each position AC-0
-  keeps charged. A candidate that charges nothing passes AC-1 and fails
+  `Hold Box` scrutinee whose arm runs the Box callback still refuses,
+  with the E0087 carried-row refusal (Architect `evt_247ynwz3gmv50`). So
+  does a `List Box` scrutinee, and so does each position AC-0 keeps
+  charged. A candidate that charges nothing passes AC-1 and fails
   here.
 - **AC-3, mutation.** Restore the unconditional argument walk: AC-1
-  reddens and AC-2 stays green. A mutation that does not redden is
-  reported as non-discriminating, not replaced.
+  reddens and AC-2 stays green, reported per assertion (Steward
+  `evt_7jd0chpyyh6yj`). A mutation that does not redden is reported as
+  non-discriminating, not replaced.
 - **AC-4.** Every committed effect-row test that passed before still
   passes, and full-workspace CI is green on the exact candidate.
 
