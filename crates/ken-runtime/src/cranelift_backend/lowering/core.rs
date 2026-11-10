@@ -16492,35 +16492,6 @@ impl<'a> Lowering<'a> {
                 children = vec![LoweringOperand::Carried(returned)];
             }
 
-            // The inner forwarding clause still returns its newly constructed
-            // Vis by value to the enclosing clause. At the outermost carried
-            // clause of this emitting function, however, the same in-place IH
-            // would apply a non-callable field as a tree and bypass the caller's
-            // genuine handler. Refuse exactly that Vis arm before its IH edge;
-            // the checked-answer fallback below remains unchanged.
-            if case.constructor == self.process_symbols.itree_vis {
-                let owner = self.checked_placement_owner(self.emitting_function_owner)?
-                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
-                        "a carried forwarding clause has no emission owner".to_string()))?;
-                if self.bracket_view.is_boundary_forwarding_arm(
-                    &self.static_transition_plan,
-                    eliminator.static_origin,
-                    index,
-                    owner,
-                )? {
-                    let refused = LoweringOperand::Specialized(Lowered::Trap(
-                        crate::cranelift_backend::planning::forwarding_boundary_trap(),
-                    ));
-                    if !self.seal_source_trap_branch(builder, &refused)? {
-                        return Err(unsupported(LoweringCause::PlannerInvariant,
-                            "ForwardedContinuationReentry",
-                            "the boundary forwarding IH trap did not seal its Vis arm"));
-                    }
-                    builder.switch_to_block(next);
-                    continue;
-                }
-            }
-
             // ── ⭐⭐ `AC-C4` — the induction hypotheses over carried children ──
             //
             // ⚠ **Order is load-bearing and matches the specialized composed

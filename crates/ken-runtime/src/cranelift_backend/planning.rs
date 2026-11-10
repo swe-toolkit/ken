@@ -98,7 +98,7 @@ pub(in crate::cranelift_backend) use static_transition::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
     FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
     PendingVisRecordProtocol, PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume,
-    ResponseOwnerSettlement, BracketSettlement, forwarding_boundary_trap,
+    ResponseOwnerSettlement, BracketSettlement,
     BracketSettlementControlView,
     BracketSettlementId, BracketSettlementMode, PlannedHandlerResumptionCall,
     PlannedResumptionExecution, PlannedResumptionParameter,

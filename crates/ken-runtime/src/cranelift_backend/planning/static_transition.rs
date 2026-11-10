@@ -16,7 +16,7 @@ pub use alternatives::{
 };
 mod brackets;
 pub(in crate::cranelift_backend) use brackets::{
-    forwarding_boundary_trap, BracketSettlement, BracketSettlementControlView, BracketSettlementId,
+    BracketSettlement, BracketSettlementControlView, BracketSettlementId,
     BracketSettlementMode,
 };
 mod closure;

@@ -1663,7 +1663,6 @@ impl<'src> Planner<'src> {
         // A forwarded Vis escaping its outermost carried bracket clause has
         // no generated re-entry unit yet. Its fail-closed outcome is issued by
         // the same catalog as source and other compiler-generated traps.
-        self.intern_trap(&super::brackets::forwarding_boundary_trap())?;
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;
