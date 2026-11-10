@@ -6,7 +6,9 @@ semantic equality. Substitution replaces variables in a single pass and
 preserves evaluation and a positive equality decision under every total
 environment. Substitutions also compose in a fixed order and have the variable
 constructor as their identity map. Formal differentiation preserves equality
-of polynomial functions. These operations have kernel-checked generic laws.
+of polynomial functions. Expression powers are repeated products, with checked
+differentiation and exponent-addition laws. These operations have kernel-checked
+generic laws.
 
 ## Contents
 
@@ -66,7 +68,9 @@ the distinguished replacement has slope one and all other replacements have
 slope zero at the given environment. Three further public laws state that the
 ordered normalization is transparent to `poly_eq` itself, to differentiation,
 and to substitution. The latter two follow from the first and the existing
-`poly_eq`-preservation laws.
+`poly_eq`-preservation laws. `expr_pow` gives the unit constant at Zero and
+accumulates products on the left. Its two checked laws state the power rule
+for differentiation and exponent addition through canonical `poly_eq`.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -1317,6 +1321,31 @@ pub theorem poly_eq_normalize
     (normalize e2)
     (poly_eq_trans (normalize e1) e1 e2 (normalize_poly_eq e1) h)
     (poly_eq_sym (normalize e2) e2 (normalize_poly_eq e2))
+
+pub fn expr_pow (e : Expr) (n : Nat) : Expr =
+  match n {
+    Zero ↦ EConst (Suc Zero);
+    Suc k ↦ EMul (expr_pow e k) e
+  }
+
+pub theorem deriv_expr_pow
+      (v : Nat) (e : Expr) (n : Nat)
+    : IsTrue
+        (poly_eq
+          (deriv v (expr_pow e (Suc n)))
+          (EMul (EMul (EConst (Suc n)) (expr_pow e n)) (deriv v e))) =
+  poly_eq_complete
+    (deriv v (expr_pow e (Suc n)))
+    (EMul (EMul (EConst (Suc n)) (expr_pow e n)) (deriv v e))
+    (λenv. eval_deriv_expr_pow v e n env)
+
+pub theorem expr_pow_add
+      (e : Expr) (m : Nat) (n : Nat)
+    : IsTrue (poly_eq (expr_pow e (add m n)) (EMul (expr_pow e m) (expr_pow e n))) =
+  poly_eq_complete
+    (expr_pow e (add m n))
+    (EMul (expr_pow e m) (expr_pow e n))
+    (λenv. eval_expr_pow_add e m env n)
 
 theorem expr_add_cong
       (a1 : Expr)
@@ -2911,6 +2940,111 @@ theorem deriv_extract
               h
               (cong Nat Nat a2 a1 (λu. add u (mul t (add d2 (mul t r2)))) (sym Nat a1 a2 h0))))
           ((proof comm for mul) t (add d2 (mul t r2))))))
+
+theorem eval_deriv_expr_pow
+      (v : Nat) (e : Expr) (n : Nat) (env : Nat → Nat)
+    : Equal Nat
+        (eval env (deriv v (expr_pow e (Suc n))))
+        (mul (mul (Suc n) (eval env (expr_pow e n))) (eval env (deriv v e))) =
+  match n {
+    Zero ↦
+      trans
+        Nat
+        (add (mul Zero (eval env e)) (mul (Suc Zero) (eval env (deriv v e))))
+        (add Zero (mul (Suc Zero) (eval env (deriv v e))))
+        (mul (Suc Zero) (eval env (deriv v e)))
+        (cong
+          Nat
+          Nat
+          (mul Zero (eval env e))
+          Zero
+          (λt. add t (mul (Suc Zero) (eval env (deriv v e))))
+          ((proof zero_l for mul) (eval env e)))
+        ((proof zero_l for add) (mul (Suc Zero) (eval env (deriv v e))));
+    Suc k ↦
+      trans
+        Nat
+        (add
+          (mul (eval env (deriv v (expr_pow e (Suc k)))) (eval env e))
+          (mul (mul (eval env (expr_pow e k)) (eval env e)) (eval env (deriv v e))))
+        (add
+          (mul
+            (mul (mul (Suc k) (eval env (expr_pow e k))) (eval env (deriv v e)))
+            (eval env e))
+          (mul (mul (eval env (expr_pow e k)) (eval env e)) (eval env (deriv v e))))
+        (mul
+          (mul (Suc (Suc k)) (mul (eval env (expr_pow e k)) (eval env e)))
+          (eval env (deriv v e)))
+        (cong
+          Nat
+          Nat
+          (eval env (deriv v (expr_pow e (Suc k))))
+          (mul (mul (Suc k) (eval env (expr_pow e k))) (eval env (deriv v e)))
+          (λt.
+            add
+              (mul t (eval env e))
+              (mul (mul (eval env (expr_pow e k)) (eval env e)) (eval env (deriv v e))))
+          (eval_deriv_expr_pow v e k env))
+        (power_rule_identity
+          (Suc k)
+          (eval env (expr_pow e k))
+          (eval env (deriv v e))
+          (eval env e))
+  }
+
+theorem power_rule_identity
+      (c : Nat) (p : Nat) (d : Nat) (x : Nat)
+    : Equal Nat
+        (add (mul (mul (mul c p) d) x) (mul (mul p x) d))
+        (mul (mul (Suc c) (mul p x)) d) =
+  poly_eq_sound
+    (EAdd
+      (EMul
+        (EMul (EMul (EVar Zero) (EVar (Suc Zero))) (EVar (Suc (Suc Zero))))
+        (EVar (Suc (Suc (Suc Zero)))))
+      (EMul (EMul (EVar (Suc Zero)) (EVar (Suc (Suc (Suc Zero))))) (EVar (Suc (Suc Zero)))))
+    (EMul
+      (EMul
+        (EAdd (EVar Zero) (EConst (Suc Zero)))
+        (EMul (EVar (Suc Zero)) (EVar (Suc (Suc (Suc Zero))))))
+      (EVar (Suc (Suc Zero))))
+    Proved
+    (ring_env c p d x Zero Zero Zero)
+
+theorem eval_expr_pow_add
+      (e : Expr) (m : Nat) (env : Nat → Nat) (n : Nat)
+    : Equal Nat
+        (eval env (expr_pow e (add m n)))
+        (mul (eval env (expr_pow e m)) (eval env (expr_pow e n))) =
+  match n {
+    Zero ↦
+      sym
+        Nat
+        (mul (eval env (expr_pow e m)) (Suc Zero))
+        (eval env (expr_pow e m))
+        ((proof one_r for mul) (eval env (expr_pow e m)));
+    Suc k ↦
+      trans
+        Nat
+        (mul (eval env (expr_pow e (add m k))) (eval env e))
+        (mul (mul (eval env (expr_pow e m)) (eval env (expr_pow e k))) (eval env e))
+        (mul (eval env (expr_pow e m)) (mul (eval env (expr_pow e k)) (eval env e)))
+        (cong
+          Nat
+          Nat
+          (eval env (expr_pow e (add m k)))
+          (mul (eval env (expr_pow e m)) (eval env (expr_pow e k)))
+          (λt. mul t (eval env e))
+          (eval_expr_pow_add e m env k))
+        (sym
+          Nat
+          (mul (eval env (expr_pow e m)) (mul (eval env (expr_pow e k)) (eval env e)))
+          (mul (mul (eval env (expr_pow e m)) (eval env (expr_pow e k))) (eval env e))
+          ((proof assoc for mul)
+            (eval env (expr_pow e m))
+            (eval env (expr_pow e k))
+            (eval env e)))
+  }
 ```
 
 ## 3. Using it
@@ -3055,6 +3189,13 @@ rule leaves a zero-left product that does not reduce for a variable environment;
 zero-right product and sum reduce definitionally. Neither form claims that the
 expression trees are structurally equal.
 
+The power-rule and exponent-addition proofs induct on the exponent at the
+evaluation level and close through `poly_eq_complete`. The non-trivial
+arithmetic step in the power rule reflects a closed expression identity
+through `poly_eq_sound` at `ring_env`. The remaining steps use the existing
+multiplication associativity, unit, and zero class proofs; no new Nat law is
+required.
+
 `normalize_poly_eq` composes `normalize_sound` with `poly_eq_complete` to show
 that the normalized expression and its source have the same polynomial
 function. `deriv_normalize` and `substitute_normalize` apply the existing
@@ -3108,7 +3249,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–15 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–16 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3119,6 +3260,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [absent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-absent-variable.md),
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
+[expression-power seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
@@ -3128,8 +3270,8 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
-`Expr`, `Monomial`, `Poly`, their exported constructors, fourteen operations,
-and thirty-one checked theorems; Horner, substitution and differentiation
+`Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
+and thirty-three checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
