@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-LOCAL-BINDER-BUILTIN-REFUSAL
 title: "Spec 33 forbids any binder from introducing a built-in name, local binders included, but Strict refuses one only at module scope (E0058 from reject_decl_prelude_bindings); every lambda, let, parameter, pattern, Pi/Sigma, where and record-field or class-method binder is pushed through Scope::push_spanned with no check, so `fn lexical (pair_fst : Bool)` is accepted and shadows the floor. Refuse a built-in name at every binder introduction under Strict, migrating the source binders that use one"
-status: ready
+status: active
 owner: verify
 size: L
 tier: T1
@@ -71,8 +71,11 @@ error it raises, the migrated sources, and the inverted controls.
     `resolve_raw_scoped_decl` (`modules.rs:4743`);
   - the rename for each migrated binder.
 - **AC-1.** Under Strict, one named row per binder form refuses a B name
-  at the binder's span. The row for `fn lexical (pair_fst : Bool)` is
-  refused if AC-0 puts companions in B.
+  with `BuiltinNameBinding` naming the binder. The span is the binder's
+  own span where the AST carries one, else the span of the AST node that
+  introduces it (Architect `evt_1sh8x5mv3sgka`). The row for `fn lexical
+  (pair_fst : Bool)` is refused, since AC-0 puts the Pair companions in
+  B (`evt_33gztz2nfhktq`).
 - **AC-2.** A local binder spelled outside B still shadows lawfully, and
   qualified use of a floor name is not a binding. Every module-scope
   E0058 row still passes.
