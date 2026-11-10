@@ -4259,6 +4259,21 @@ fn register_obligation_holes(elab: &mut ElabEnv, result: &crate::elab::ElabResul
     }
 }
 
+// A spelling can refer to more than one checked declaration. Absence is a
+// new name; an existing None is a permanent charge-all collision witness.
+pub(crate) fn join_charged_name_mask(
+    prior: Option<&Option<Vec<bool>>>,
+    next: Option<Vec<bool>>,
+) -> Option<Vec<bool>> {
+    match (prior, next) {
+        (None, next) => next,
+        (Some(Some(old)), Some(next)) if old.len() == next.len() => {
+            Some(old.iter().zip(next).map(|(a, b)| *a || b).collect())
+        }
+        _ => None,
+    }
+}
+
 fn register_effect_row(
     elab: &mut ElabEnv,
     rdecl: &RDecl,
@@ -4289,19 +4304,8 @@ fn register_effect_row(
     if let Some(mask) = &mask {
         elab.type_charged_args_by_id.insert(result.def_id, mask.clone());
     }
-    use std::collections::hash_map::Entry;
-    match elab.type_charged_args.entry(result.name.clone()) {
-        Entry::Vacant(entry) => { entry.insert(mask); }
-        Entry::Occupied(mut entry) => {
-            let joined = match (entry.get(), mask) {
-                (Some(old), Some(next)) if old.len() == next.len() => {
-                    Some(old.iter().zip(next).map(|(a, b)| *a || b).collect())
-                }
-                _ => None,
-            };
-            entry.insert(joined);
-        }
-    }
+    let joined = join_charged_name_mask(elab.type_charged_args.get(&result.name), mask);
+    elab.type_charged_args.insert(result.name.clone(), joined);
     if carried != crate::effects::RowType::empty() {
         elab.type_carried_rows.insert(result.name.clone(), carried.clone());
         elab.type_carried_rows_by_id.insert(result.def_id, carried);

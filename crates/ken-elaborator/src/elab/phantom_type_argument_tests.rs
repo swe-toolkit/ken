@@ -16,10 +16,11 @@ const PREFIX: &str = "data Box = MkBox (Unit ->[Console] HostIO APartial Unit)\n
     data Tag (a : Type) : Type where { MkTag : PBox -> Tag a }\n";
 
 // P1/P2: durable name-plane soundness invariants. MEASURED: the pre-source
-// type-former spellings are charge-all, and remain so after a same-spelling
-// phantom family is checked. CLAIMED: an RCon written annotation cannot
-// borrow a different checked family's mask. GAP: these three prelude heads
-// and this one shadowing path do not enumerate every future globals writer.
+// type-former spellings are charge-all, and merging a same-spelling phantom
+// mask keeps that entry charge-all. CLAIMED: an RCon written annotation cannot
+// borrow a different checked family's mask. GAP: neither file elaboration nor
+// session elaboration admits a same-spelling Coproduct declaration here; P2
+// exercises the registration merge, not an end-to-end source shadow.
 #[test]
 fn prelude_type_former_spellings_seed_charge_all_masks() {
     let env = ElabEnv::new().expect("complete prelude");
@@ -38,18 +39,25 @@ fn prelude_type_former_spellings_seed_charge_all_masks() {
 }
 
 #[test]
-fn phantom_shadow_cannot_uncharged_prelude_coproduct_by_spelling() {
+fn seeded_coproduct_spelling_survives_phantom_name_merge() {
     let mut env = ElabEnv::new().expect("complete prelude");
-    env.elaborate_file(&format!(
-        "{PREFIX}data Coproduct (a : Type) (b : Type) : Type where {{ MkC : Unit -> Coproduct a b }}"
-    ))
-    .expect("checked phantom shadow");
-    let checked_shadow_id = env.globals["Coproduct"];
-    assert_eq!(
-        env.type_charged_args_by_id.get(&checked_shadow_id),
-        Some(&vec![false, false])
+    env.elaborate_file(PREFIX).expect("Box, PBox, Tag controls");
+    // Same mask as `data Coproduct a b = MkC Unit`, supplied directly because
+    // both file and session resolution refuse this shadow before registration.
+    let joined = crate::modules::join_charged_name_mask(
+        env.type_charged_args.get("Coproduct"),
+        Some(vec![false, false]),
     );
-    assert_eq!(env.type_charged_args.get("Coproduct"), Some(&None));
+    assert_eq!(
+        env.type_charged_args.get("Coproduct"),
+        Some(&None),
+        "P2 pre-source entry"
+    );
+    assert_eq!(
+        joined, None,
+        "phantom collision lowered the pre-source mask"
+    );
+    env.type_charged_args.insert("Coproduct".into(), joined);
     let rows = CheckedEffectRows::new(
         &env.effect_rows,
         &env.effect_rows_by_id,
