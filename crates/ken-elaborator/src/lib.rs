@@ -209,6 +209,10 @@ pub struct ElabEnv {
     /// field types. The identity map survives later spelling overwrites.
     pub(crate) type_carried_rows: HashMap<String, effects::RowType>,
     pub(crate) type_carried_rows_by_id: HashMap<ken_kernel::GlobalId, effects::RowType>,
+    /// Family argument positions that can carry a row. A name collision is
+    /// fail-safe: None means every argument is charged. IDs stay exact.
+    pub(crate) type_charged_args: HashMap<String, Option<Vec<bool>>>,
+    pub(crate) type_charged_args_by_id: HashMap<ken_kernel::GlobalId, Vec<bool>>,
     /// Generated initial-state definitions for surface `space` blocks.
     ///
     /// These are elaboration metadata, not source-visible `Space.initial`
@@ -276,6 +280,8 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
         effect_rows_by_id: _,
         type_carried_rows: _,
         type_carried_rows_by_id: _,
+        type_charged_args: _,
+        type_charged_args_by_id: _,
         space_metadata: _,
         prelude_env: _,
         class_env: _,
@@ -416,6 +422,8 @@ impl ElabEnv {
             effect_rows_by_id: HashMap::new(),
             type_carried_rows: HashMap::new(),
             type_carried_rows_by_id: HashMap::new(),
+            type_charged_args: HashMap::new(),
+            type_charged_args_by_id: HashMap::new(),
             space_metadata: SpaceElaborationMetadata::default(),
             // placeholder; `register_prelude` fills it (and needs `&mut self`).
             prelude_env: prelude::empty_prelude_env(),
@@ -1121,7 +1129,7 @@ impl ElabEnv {
                     &env.refinement_facts,
                     elab::CheckedEffectRows::new(
                         &env.effect_rows, &env.effect_rows_by_id,
-                        &env.type_carried_rows, &env.type_carried_rows_by_id,
+                        &env.type_carried_rows, &env.type_carried_rows_by_id, &env.type_charged_args, &env.type_charged_args_by_id
                     ),
                     owner_label,
                     &rexpr,
