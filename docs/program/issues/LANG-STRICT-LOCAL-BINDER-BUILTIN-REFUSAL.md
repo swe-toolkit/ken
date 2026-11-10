@@ -70,12 +70,22 @@ error it raises, the migrated sources, and the inverted controls.
   - where the check sits: in `Scope`, or in a binder walk in
     `resolve_raw_scoped_decl` (`modules.rs:4743`);
   - the rename for each migrated binder.
+
+  Ruled (`evt_3p283vkpsqmkb`): B is the 72 `prelude_binding_names`;
+  the error is `BuiltinNameBinding`, E0089 (re-check it is free on the
+  landed base); the locus is the `resolve.rs` `Scope`. The measured
+  reach is the two controls only, with no source renames.
 - **AC-1.** Under Strict, one named row per binder form refuses a B name
   with `BuiltinNameBinding` naming the binder. The span is the binder's
   own span where the AST carries one, else the span of the AST node that
   introduces it (Architect `evt_1sh8x5mv3sgka`). The row for `fn lexical
   (pair_fst : Bool)` is refused, since AC-0 puts the Pair companions in
-  B (`evt_33gztz2nfhktq`).
+  B (`evt_33gztz2nfhktq`). Each inverted control gets an accepted
+  renamed twin.
+- **AC-1b.** Under Strict, a law whose derived `{law}_{field}` name is
+  in B is refused with E0058 like any module-scope introduction, and a
+  law whose derived names are outside B is accepted (Steward
+  `evt_109zb7as3tr2`).
 - **AC-2.** A local binder spelled outside B still shadows lawfully, and
   qualified use of a floor name is not a binding. Every module-scope
   E0058 row still passes.

@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-SELF-EMITTER-RESPONSE-ELIGIBILITY
 title: "F's checked-IH caller of owner2 is a transport source transported to its own emitter, so the detached seat consumes it as payload and no Function emits the call, while the response plane still gives the identity a forward-declared static response owner that waits for it; the lowering audit refuses F before object emission. Make the two planes agree on that identity, so F's three rows emit an object under the C-28 overlay with no PlannerInvariant and every authority control stays green"
-status: ready
+status: closed
 owner: runtime
 size: L
 tier: T1
@@ -13,6 +13,22 @@ origin: "Architect ruling evt_57f2n3vsn34qm on the boundary-trap AC-0 continuati
 ---
 
 # One answer for the self-emitter caller
+
+**Closed without a product repair (Steward, on Architect R-ERASURE
+`evt_76yd7z7p2g8pj`).** The isolation D0 split the C-28 overlay by file.
+With the Process-gate and host hunks alone, F builds natively on
+`5a3c931fe` with zero owned self transports and no 9807 refusal. The
+erasure hunks alone, a direct-style performed-call lowering that no WP
+carries, create the 21 owned self transports and the refusal. The
+defect does not exist on main. The carries:
+- C1 (delete the no-caller ledger check and `record_relocated_exit`)
+  and C3 (correct the two docs) move to
+  `RT-NATIVE-FORWARDED-BOUNDARY-TRAP`.
+- The B invariant (a caller whose `k_call_placement` is Transported to
+  its own emission owner gets no static response owner, independent of
+  the producer-result count, Architect `evt_3r6qqp4k8ff36`) and the
+  three G-ERASURE rows as its committed failing observation are
+  acceptance criteria for any WP that lands direct-style erasure.
 
 ## Objective
 
