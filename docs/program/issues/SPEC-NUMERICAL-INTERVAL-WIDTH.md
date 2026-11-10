@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-WIDTH
 title: "Spec 68 defers interval width (68-numerical.md:245, :405), so a client using RationalInterval as an error bound cannot state how wide an enclosure is or how addition grows it, and Rational has no subtraction to define it with. Add a truncated rational subtraction, an interval width, and checked laws at zero trust: a point has width zero, and the width of an ordered sum equals the sum of the widths by value, with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

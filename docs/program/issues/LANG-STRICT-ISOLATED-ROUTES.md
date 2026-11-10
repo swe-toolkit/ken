@@ -169,7 +169,10 @@ Increment 3:
   cases for 33 §3.2 root discovery from the source file, including a
   relative spelling and a `..` spelling, and for 70 §1.4: a root-owned
   `= Axiom`, `axiom` and `ensures` hole each report as
-  `source-declared`.
+  `source-declared`. They land as a conformance-only child, Inc 3e, on
+  main after Inc 3b (Steward `evt_87gch6btv5sw`): the spec-author authors
+  it, the Spec Leader reviews it, and the CV votes `/conformance`.
+  Increment 3 closes when Inc 3e lands.
 
 Increment 2:
 

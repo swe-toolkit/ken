@@ -1,12 +1,12 @@
 ---
 id: RT-NATIVE-FORWARDED-CONTINUATION-REENTRY
-title: "A pure-forward carried clause at a function's outermost carried position jumps its own header with k in place, so a body-tail request forwarded out of a recursive worker never reaches the enclosing genuine handler, and RNSPK traps that edge fail-closed. Lower the boundary arm as a return of Vis(op, K2') through the function's normal-return path, with K2' one generated continuation specialization per forwarding chain that re-runs the request's K body and the chain's clauses, so PX10 B1a's F rows reach native parity"
+title: "A pure-forward carried clause at a function's outermost carried position jumps its own header with k in place, so a body-tail request forwarded out of a recursive worker never reaches the enclosing genuine handler, and RT-NATIVE-FORWARDED-BOUNDARY-TRAP traps that edge fail-closed. Lower the boundary arm as a return of Vis(op, K2') through the function's normal-return path, with K2' one generated continuation specialization per forwarding chain that re-runs the request's K body and the chain's clauses, so PX10 B1a's F rows reach native parity"
 status: ready
 owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [RT-NATIVE-SETTLEMENT-PLACEMENT-KEY]
+depends_on: [RT-NATIVE-FORWARDED-BOUNDARY-TRAP]
 blocks: [PX10-NATIVE-SPAWN-PARITY]
 github: null
 origin: "Architect S0b ruling (RE-ENTRY-ABSENT, one composed re-entry per chain) on implementer evt_6cww96v9b0vf2, RNSPK thread; Steward recut 14:50Z 2026-11-09 moved F native parity out of RT-NATIVE-SETTLEMENT-PLACEMENT-KEY into this node. L1 objective: the Linux ABI program. Steward-filed per COORDINATION section 2."
@@ -18,7 +18,8 @@ origin: "Architect S0b ruling (RE-ENTRY-ABSENT, one composed re-entry per chain)
 
 F's body-tail request reaches the enclosing genuine handler and resumes
 through the forwarding chain, so the three F rows match the interpreter.
-This replaces the named trap that RNSPK places at the boundary arm.
+This replaces the named trap that RT-NATIVE-FORWARDED-BOUNDARY-TRAP
+places at the boundary arm.
 
 ## Settled inputs (S0b, on F base `0d4199e26` plus the C-28 patch)
 
@@ -44,11 +45,11 @@ This replaces the named trap that RNSPK places at the boundary arm.
   freeze (`rt_span_prov_native.rs:358`).
 
 Treat anchors as perishable. If a settled input is false on the landed
-RNSPK base, stop and report the mismatch.
+trap node, stop and report the mismatch.
 
 ## Deliverable
 
-One candidate on the landed RNSPK. It is the Architect's planner
+One candidate on the landed trap node. It is the Architect's planner
 obligation, one composed re-entry per chain:
 
 1. **Where.** A pure-forward arm (`brackets.rs:429`
@@ -57,7 +58,7 @@ obligation, one composed re-entry per chain:
    clauses keep their by-value forward.
 2. **Lowering.** The boundary arm returns Vis(op, K2') through the
    function's normal-return path (the Result slot load, then the caller's
-   carried header), never an in-place jump. It replaces RNSPK's trap.
+   carried header), never an in-place jump. It replaces the trap node's trap.
 3. **K2'** is a new generated continuation specialization, keyed in
    `ContinuationSpecializationKey` vocabulary (`continuations.rs` ~6438):
    - worker body: the request K's body (S1665, from LexicalClosure
@@ -89,7 +90,7 @@ obligation, one composed re-entry per chain:
   (file:line) and show it can call a generated specialization. If it
   cannot, stop back to the Architect.
 - **Posture.** Until B2 opens the Process gate, A1, A2 and A4 are
-  measured under the uncommitted C-28 diagnostic overlay, as in RNSPK's
+  measured under the uncommitted C-28 diagnostic overlay, as in the trap node's
   AC-1, and their committed rows are promoted in B2. A3 and A6 are
   committed and production-gated.
 - **A1, parity.** argv exits 0 with 19 events, v-null exits 73 with 14,
