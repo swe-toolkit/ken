@@ -256,7 +256,7 @@ fn with_home_imports(source: &str, code: &str, literate: bool) -> String {
 /// Lexical selection ignores comments, literals, and literate prose; the
 /// assertions concern checker outcomes, not source-text occurrence counts.
 #[test]
-fn seven_legacy_clean_remainder_sources_have_measured_strict_frontier() {
+fn eight_legacy_clean_remainder_sources_have_measured_strict_frontier() {
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
@@ -289,11 +289,15 @@ fn seven_legacy_clean_remainder_sources_have_measured_strict_frontier() {
             continue;
         }
         remainder_sources += 1;
+        let legacy_source = source
+            .split_inclusive('\n')
+            .filter(|line| !line.starts_with("import "))
+            .collect::<String>();
         let mut legacy = ElabEnv::new().expect("checked prelude");
         let checked = if literate {
-            legacy.elaborate_ken_md_file_v1(&source)
+            legacy.elaborate_ken_md_file_v1(&legacy_source)
         } else {
-            legacy.elaborate_file_v1(&source)
+            legacy.elaborate_file_v1(&legacy_source)
         };
         if checked.is_err() {
             continue;
