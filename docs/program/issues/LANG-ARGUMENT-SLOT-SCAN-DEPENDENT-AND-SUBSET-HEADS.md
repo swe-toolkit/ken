@@ -1,7 +1,7 @@
 ---
 id: LANG-ARGUMENT-SLOT-SCAN-DEPENDENT-AND-SUBSET-HEADS
 title: "SLOTS's argument-slot scan (application_slot_candidate) has two residuals on main: at a parameter whose codomain depends on it, the scan checks the argument and the real path checks it again, so a nest of held trees under a dependent head elaborates exponentially (3x per level, 1390 s at depth 14, against 0.009 s at depth 10 before SLOTS); and the scan reads the head's Pi without forgetting a subset, so a subset-typed head is refused NotAFunction where its let twin checks. Make the scan linear on dependent heads and agree with the real path on subset heads"
-status: ready
+status: merged
 owner: verify
 size: M
 tier: T1

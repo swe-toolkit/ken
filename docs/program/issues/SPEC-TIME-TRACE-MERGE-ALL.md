@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-TRACE-MERGE-ALL
 title: "Spec 69 defers k-way merge (69-time-and-events.md:229), so a client holding several time-ordered event traces, one per source, can merge only two at a time and has no checked statement that the combined trace is ordered or keeps every input event. Add trace_merge_all over a list of traces, folding the existing two-way trace_merge, with checked laws at zero trust: ordered inputs give an ordered result, and an event of any input trace is a member of the result, with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
