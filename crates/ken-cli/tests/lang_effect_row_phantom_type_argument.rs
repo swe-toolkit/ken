@@ -8,6 +8,8 @@
 use std::process::{Command, Output};
 
 const PREFIX: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -26,7 +28,9 @@ const MAIN: &str = r#"proc main (_input : ProcessInput) (_caps : ProgramCaps APa
 "#;
 
 fn cli(name: &str, source: &str) -> Output {
-    let dir = std::env::temp_dir().join(format!("ken-phantom-row-{}", std::process::id()));
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-phantom-row-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("fixture directory");
     let path = dir.join(format!("{name}.ken"));
     std::fs::write(&path, source).expect("write inline Ken source");

@@ -344,16 +344,16 @@ fn unterminated_console_bytes_reach_native_stdout_at_finish() {
     // stderr and exceptional finishers rely on the shared finalize_resources.
     let dir = output_dir("unterminated-console");
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 
 proc console_then
     (action : HostIO APartial (Result IOError Unit))
     (next : Unit -> HostIO APartial ExitCode)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode action
+  host_bind APartial (Result IOError Unit) ExitCode action
     (\response. match response {
-      Err _ |-> host_exit APartial (ExitCode.Failure 73);
+      Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 73);
       Ok _ |-> next MkUnit
     })
 
@@ -366,11 +366,12 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   console_then (console_write "open")
     (\_. console_then (console_write "next")
-      (\_. host_exit APartial ExitCode.Success))
+      (\_. host_pure APartial ExitCode ExitCode.Success))
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-unterminated-console",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
