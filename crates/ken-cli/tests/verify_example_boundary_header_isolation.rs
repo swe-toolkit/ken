@@ -12,17 +12,21 @@ use ken_elaborator::compiler_driver::{
 };
 use ken_elaborator::program_admission::{admit_checked_main, ProgramAdmissionError};
 use ken_elaborator::ElabEnv;
-use tempfile::tempdir;
+use tempfile::{tempdir, tempdir_in, TempDir};
 
 const FULL_EXAMPLE: &str = "program capabilities FS AFull\nconst zz_example_probe : Nat = Zero";
 const BARE_EXAMPLE: &str = "const zz_example_probe : Nat = Zero";
 const WRONG_ABI: &str = "program capabilities FS ANone\n\
+    import Capability.Process.Exit (host_pure)\n\
     fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
 const OWN_ABI: &str = "program capabilities FS ANone\n\
+    import Capability.Process.Exit (host_pure)\n\
     fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_pure ANone ExitCode ExitCode.Success";
 const PRINT_OWN_ABI: &str = "program capabilities FS ANone\n\
+    import Capability.Console.Text (print_line)\n\
+    import Capability.Process.Exit (host_program)\n\
     proc main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode visits [Console] = host_program ANone (print_line \"own authority\")";
-const HEADERLESS_ABI: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
+const HEADERLESS_ABI: &str = "import Capability.Process.Exit (host_pure)\nfn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
 const FULL_WRITER_UNDER_ANONE: &str = r#"program capabilities FS ANone
 import Capability.Filesystem.Authority (writeFile)
 import Capability.Process.Exit (host_bind, host_fs, host_pure)
@@ -44,6 +48,22 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
       }
   }
 "#;
+
+fn catalog_roots() -> Vec<std::path::PathBuf> {
+    vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
+}
+
+fn local_own_abi() -> String {
+    // This module-loader/Legacy example row uses its own catalog root only;
+    // isolated runner and native rows retain the explicit package import.
+    OWN_ABI.replacen("import Capability.Process.Exit (host_pure)\n", "", 1)
+}
+
+fn rooted_tempdir() -> TempDir {
+    let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    fs::create_dir_all(&parent).expect("fixture parent under catalog root");
+    tempdir_in(parent).expect("rooted fixture directory")
+}
 
 fn literate(program: &str, example: Option<&str>) -> String {
     let mut text = format!("```ken\n{program}\n```\n");
@@ -75,7 +95,7 @@ fn assert_same_run(without: &Output, with: &Output) {
 /// absence makes an incidental exit error unable to mask a live write.
 #[test]
 fn ken_run_example_header_cannot_mint_a_full_fs_write() {
-    let dir = tempdir().expect("fixture root");
+    let dir = rooted_tempdir();
     let source = dir.path().join("entry.ken.md");
     let target = dir.path().join("forbidden.txt");
     let run_writer = |example| {
@@ -112,7 +132,7 @@ fn ken_run_example_header_cannot_mint_a_full_fs_write() {
 /// cannot satisfy both.
 #[test]
 fn ken_run_cannot_admit_a_full_main_from_an_example_header() {
-    let dir = tempdir().expect("fixture root");
+    let dir = rooted_tempdir();
     let path = dir.path().join("entry.ken.md");
     let control = run(&path, &literate(WRONG_ABI, None));
     let with = run(&path, &literate(WRONG_ABI, Some(FULL_EXAMPLE)));
@@ -131,7 +151,7 @@ fn ken_run_cannot_admit_a_full_main_from_an_example_header() {
 /// opposing discriminator for an illegitimate AFull substitution.
 #[test]
 fn ken_run_keeps_its_own_anone_main_with_a_full_example() {
-    let dir = tempdir().expect("fixture root");
+    let dir = rooted_tempdir();
     let path = dir.path().join("entry.ken.md");
     let control = run(&path, &literate(PRINT_OWN_ABI, None));
     let with = run(&path, &literate(PRINT_OWN_ABI, Some(FULL_EXAMPLE)));
@@ -158,6 +178,10 @@ fn native_error(program: &str, example: Option<&str>, dependency: bool) -> Nativ
             literate(program, example),
         ));
     }
+    let sources = sources
+        .into_iter()
+        .map(|source| source.with_roots(catalog_roots()))
+        .collect();
     prepare_native_program_sources("example_boundary_isolation", sources)
         .expect_err("native admission must refuse without a valid program boundary")
 }
@@ -205,7 +229,7 @@ fn roots_entry_checked_example_cannot_replace_entry_boundary() {
     let root = tempdir().expect("catalog-like module root");
     let path = root.path().join("Entry.ken.md");
     for example in [None, Some(FULL_EXAMPLE)] {
-        fs::write(&path, literate(OWN_ABI, example)).expect("write catalog-like entry");
+        fs::write(&path, literate(&local_own_abi(), example)).expect("write catalog-like entry");
         let mut env = ElabEnv::new().expect("prelude");
         env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")
             .expect("entry with its own ANone program header");
@@ -231,7 +255,7 @@ fn roots_entry_checked_example_cannot_replace_entry_boundary() {
 /// the roots route above exercises another caller of the shared executor.
 #[test]
 fn headerless_example_keeps_ken_run_result_unchanged() {
-    let dir = tempdir().expect("fixture root");
+    let dir = rooted_tempdir();
     let path = dir.path().join("entry.ken.md");
     let control = run(&path, &literate(PRINT_OWN_ABI, None));
     let with = run(&path, &literate(PRINT_OWN_ABI, Some(BARE_EXAMPLE)));
@@ -246,7 +270,7 @@ fn headerless_example_keeps_ken_run_result_unchanged() {
 /// a single failing headed example would leave the header untouched anyway.
 #[test]
 fn failed_after_headed_example_restores_program_boundary() {
-    let mut source = literate(OWN_ABI, Some(FULL_EXAMPLE));
+    let mut source = literate(&local_own_abi(), Some(FULL_EXAMPLE));
     source.push_str("```ken example\nconst zz_bad : Nat = zz_unbound\n```\n");
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_ken_md_file_v1(&source)
