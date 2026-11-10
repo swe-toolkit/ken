@@ -62,6 +62,18 @@ over-match is closed one of two ways, as AC-0 rules: (i) the predicate
 excludes an arm that carries a generated-entry invocation, or (ii) the
 arm traps at run time while its body is still lowered.
 
+The same candidate closes three carries from the Architect's review of
+the authority (`evt_kac366kxewtv`), anchored at `0883f8ebe`:
+- **C1.** `record_relocated_exit` (`units.rs:9315`) has no caller, so
+  the relocated-exit check in its ledger's `close` can never fire.
+  Delete the ledger, or give it a caller and a mutation that reddens it.
+- **C2.** The E3 seed in `escaped_checked_ih_callers`
+  (`responses.rs:4102`) is unreachable. Pin it empty or delete it.
+- **C3.** Correct the stale prose in the `checked_ih_self_emitter_source`
+  doc (`aggregates.rs:6308`), the `EscapedCheckedIhCaller` doc
+  (`responses.rs:803`) and the orphaned trap comment at
+  `construction.rs:1663`-`1665`.
+
 ## Acceptance
 
 - **AC-0 (D0, before product code).** The Architect rules (i) or (ii)
