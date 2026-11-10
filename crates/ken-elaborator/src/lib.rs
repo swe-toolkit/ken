@@ -1060,6 +1060,8 @@ impl ElabEnv {
             effect_rows_by_id,
             type_carried_rows,
             type_carried_rows_by_id,
+            type_charged_args,
+            type_charged_args_by_id,
             space_metadata,
             prelude_env,
             class_env,
@@ -1092,6 +1094,8 @@ impl ElabEnv {
         effect_rows_by_id.retain(|id, _| !removed_ids.contains(id));
         type_carried_rows.retain(|name, _| !removed_names.contains(name));
         type_carried_rows_by_id.retain(|id, _| !removed_ids.contains(id));
+        type_charged_args.retain(|name, _| !removed_names.contains(name));
+        type_charged_args_by_id.retain(|id, _| !removed_ids.contains(id));
         space_metadata
             .initial_states
             .retain(|_, id| !removed_ids.contains(id));

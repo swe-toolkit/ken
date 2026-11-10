@@ -120,6 +120,27 @@ fn contains_parameter(ty: &RType, name: &str) -> bool {
     false
 }
 
+/// Constructor results forward parameters, but index expressions may use
+/// them to constrain the family's type. A malformed result spine is scanned
+/// in full rather than treated as a valid forwarding occurrence.
+fn result_index_arguments<'a>(
+    result: &'a RType,
+    param_count: usize,
+    index_count: usize,
+) -> Vec<&'a RType> {
+    let mut args = Vec::new();
+    let mut head = result;
+    while let RType::RApp(f, arg, _) = head {
+        args.push(arg.as_ref());
+        head = f;
+    }
+    if args.len() != param_count + index_count {
+        return vec![result];
+    }
+    args.reverse();
+    args.into_iter().skip(param_count).collect()
+}
+
 /// One checked-family mask. `None` denotes a non-family (charge everything).
 /// The caller checks the mask's arity against the checked former's Pi telescope
 /// before registering it under either identity or spelling.
@@ -141,21 +162,6 @@ pub(crate) fn family_charged_positions(rdecl: &RDecl) -> Option<Vec<bool>> {
             ctors,
             ..
         } => {
-            let result_indices = |result: &RType| {
-                let mut args = Vec::new();
-                let mut head = result;
-                while let RType::RApp(f, arg, _) = head {
-                    args.push(arg.as_ref());
-                    head = f;
-                }
-                if args.len() != params.len() + indices.len() {
-                    // Unrecognized result shape: conservatively charge on the
-                    // whole expression, never discard a possible occurrence.
-                    return vec![result];
-                }
-                args.reverse();
-                args.into_iter().skip(params.len()).collect::<Vec<_>>()
-            };
             let mut charged = Vec::with_capacity(params.len() + indices.len());
             for (i, param) in params.iter().enumerate() {
                 let Some(name) = &param.name else {
@@ -175,7 +181,7 @@ pub(crate) fn family_charged_positions(rdecl: &RDecl) -> Option<Vec<bool>> {
                                 .iter()
                                 .any(|entry| contains_parameter(&entry.ty, name))
                                 || ctor.result.as_ref().is_some_and(|result| {
-                                    result_indices(result)
+                                    result_index_arguments(result, params.len(), indices.len())
                                         .into_iter()
                                         .any(|ty| contains_parameter(ty, name))
                                 })
