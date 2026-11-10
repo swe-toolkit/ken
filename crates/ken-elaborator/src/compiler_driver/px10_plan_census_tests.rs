@@ -656,10 +656,15 @@ fn live_child_dropped_return_clause_refuses_at_lowering() {
 /// Promise class: durable invariant; the null-stdout row of the pin above.
 #[test]
 fn null_stdout_dropped_return_clause_refuses_at_lowering() {
-    let null = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
+    let null_body = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
     assert_ne!(
-        null, ARGV_ENV_PIPE,
+        null_body, ARGV_ENV_PIPE,
         "the argv fixture's stdout disposition moved"
+    );
+    let null = null_body.replacen(
+        "import Capability.Process.Child (ChildPipe,",
+        "import Capability.Process.Child (ChildNull,",
+        1,
     );
     assert_dropped_return_clause_refuses("px10_return_clause_null_stdout", null);
 }
