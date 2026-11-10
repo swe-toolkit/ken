@@ -6,7 +6,7 @@ owner: runtime
 size: M
 tier: T1
 gate: architect
-depends_on: [RT-NATIVE-SETTLEMENT-PLACEMENT-KEY]
+depends_on: [RT-NATIVE-SETTLEMENT-PLACEMENT-KEY, RT-NATIVE-SELF-EMITTER-RESPONSE-ELIGIBILITY]
 blocks: [RT-NATIVE-FORWARDED-CONTINUATION-REENTRY]
 github: null
 origin: "Steward recut 2026-11-09 20:45Z (evt_1g0fjah621vx3) on the Architect's bisection ruling (evt_3jatzr9kk7e11): the fail-closed trap leaves RT-NATIVE-SETTLEMENT-PLACEMENT-KEY and returns as its own node, re-based on the placement authority. The trap's design is the Steward's 14:50Z recut (evt_6rkw3hdx6m2jn) on S0b RE-ENTRY-ABSENT (evt_6cww96v9b0vf2). L1 objective: the Linux ABI program. Steward-filed per COORDINATION section 2."
@@ -52,34 +52,32 @@ authority, stop and report the mismatch.
 One candidate on the landed `RT-NATIVE-SETTLEMENT-PLACEMENT-KEY`,
 stacked under B1a. The boundary arm's in-place IH edge, jump header(k,
 1), becomes the named trap. The boundary arm is the pure-forward arm
-(`brackets.rs:429` `forwarding_vis_arm`) whose clause is the outermost
-carried ComputationalMatch of its emitting function: C986 in argv, C427
-in live. Inner pure-forward clauses keep their by-value forward, and the
-checked-answer fallback stays untrapped. The boundary decision is read
-from the placement authority's record, never re-derived in a plane, and
-the trap is interned only when a program has a trapped arm. The S427
-over-match is closed one of two ways, as AC-0 rules: (i) the predicate
-excludes an arm that carries a generated-entry invocation, or (ii) the
-arm traps at run time while its body is still lowered.
+(`brackets.rs:449` `forwarding_vis_arm`, at `f32af2a0b`) whose clause is
+the outermost carried ComputationalMatch of its emitting function: C986
+in argv, C427 in live. Inner pure-forward clauses keep their by-value
+forward, and the checked-answer fallback stays untrapped. The boundary
+decision is read from the placement authority's record, never re-derived
+in a plane, and the trap is interned only when a program has a trapped
+arm. The trapped arm traps at run time while its body is still lowered
+((ii), Architect `evt_6p74c8r51ayk1`).
 
-The same candidate closes three carries from the Architect's review of
-the authority (`evt_kac366kxewtv`), anchored at `0883f8ebe`:
-- **C1.** `record_relocated_exit` (`units.rs:9315`) has no caller, so
-  the relocated-exit check in its ledger's `close` can never fire.
-  Delete the ledger, or give it a caller and a mutation that reddens it.
-- **C2.** The E3 seed in `escaped_checked_ih_callers`
-  (`responses.rs:4102`) is unreachable. Pin it empty or delete it.
-- **C3.** Correct the stale prose in the `checked_ih_self_emitter_source`
-  doc (`aggregates.rs:6308`), the `EscapedCheckedIhCaller` doc
-  (`responses.rs:803`) and the orphaned trap comment at
-  `construction.rs:1663`-`1665`.
+**Held for re-frame (Architect `evt_57f2n3vsn34qm`).** F does not reach
+object emission on `f32af2a0b`, so no arm key can be checked against
+F. `RT-NATIVE-SELF-EMITTER-RESPONSE-ELIGIBILITY` makes F emit, and
+carries C1 to C3. This node is re-framed on that node's measured F
+outcome. The re-frame asks first whether a trap is still needed: if
+F now takes the dynamic resume path, it may not be. What stands is
+repair shape (ii), a run-time trap with the body still lowered, and
+interning only when a program has a trapped arm. S4 (the region is
+not nested) is necessary but not sufficient.
 
 ## Acceptance
 
-- **AC-0 (D0, before product code).** The Architect rules (i) or (ii)
-  from the trapped-arm population measured on the landed authority: every
-  arm the predicate selects, on F and on every control, with whether it
-  carries a generated-entry invocation.
+- **AC-0 (D0, before product code).** The Architect rules the arm key
+  from the tag outcome after the in-place jump, measured on an F that
+  emits: F's boundary arm against entry 18's C427, px8ta's S427 and the
+  C440 rows, all of which forward lawfully today. Structural keys S1 to
+  S4 over-matched each of these and are not sufficient.
 - **AC-1 (measured under the overlay).** Each F row refuses natively by
   the trap's name at the boundary clause, after the inner S1165 or S606
   Vis case, in S0b M4's order, shown by ordered markers. The fallback

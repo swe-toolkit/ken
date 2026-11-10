@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-SETTLEMENT-PLACEMENT-KEY
 title: "RNSPK's settlement placement key is a second authority for where a checked-IH K call's work happens, beside the emission owner, transport sources and generated-entry installation the existing planes already read. Since its first product commit (03a82e1c5) the committed checked_ih controls have been red, on a different invariant at each commit, as each repair synchronized one more consumer. Decide each checked-IH K call's emission placement once, record it, and have every plane read the record, so the controls are green again with the key present"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
