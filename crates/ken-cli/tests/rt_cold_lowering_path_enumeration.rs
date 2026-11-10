@@ -444,13 +444,24 @@ fn strict_rechecks_every_generated_cold_entry_after_r_template_rewrite() {
             Err(error) => panic!("{entry}: strict verdict shifted: {error:?}"),
         }
     }
-    let without_wrappers = format!(
-        "program capabilities FS AFull\n{}{}",
-        imports.replace(
+    let with_wrappers = format!("program capabilities FS AFull\n{imports}{body}")
+        .replace("__RT_PARITY_ENTRY__", ENTRIES[0]);
+    let without_wrappers = with_wrappers
+        .replace(
             "import Capability.Process.Exit (host_pure, host_bind)\n",
-            ""
-        ),
-        body.replace("__RT_PARITY_ENTRY__", ENTRIES[0])
+            "",
+        )
+        .replace(
+            "import Capability.Process.Exit (host_bind, host_pure)\n",
+            "",
+        );
+    assert_ne!(
+        without_wrappers, with_wrappers,
+        "negative must remove the wrapper imports"
+    );
+    assert!(
+        !without_wrappers.contains("import Capability.Process.Exit"),
+        "negative must retain no HostIO wrapper import"
     );
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {

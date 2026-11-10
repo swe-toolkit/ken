@@ -145,8 +145,15 @@ fn process_program_requires_its_declared_fs_authority() {
         no_fs, source,
         "control must remove the declared FS authority"
     );
+    // This is an independent Legacy admission control: imports persisted for
+    // the switched CLI source route must not turn it into a module-load test.
+    let legacy_no_fs = no_fs
+        .split_inclusive('\n')
+        .filter(|line| !line.starts_with("import "))
+        .collect::<String>();
+    assert_ne!(legacy_no_fs, no_fs, "the Legacy control removes imports");
     let mut env = ken_elaborator::ElabEnv::new().expect("checked prelude");
-    env.elaborate_file_v1(&no_fs)
+    env.elaborate_file_v1(&legacy_no_fs)
         .expect("the Process-only program still elaborates");
     assert!(
         ken_elaborator::program_admission::admit_checked_main(&env).is_err(),

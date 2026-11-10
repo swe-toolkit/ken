@@ -5197,7 +5197,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         let outcome = ken_cli::run_program(
             source,
             ken_cli::SourceFormat::Ken,
-        &[],
+            &fixture_catalog_roots(),
             &[b"capture-control".to_vec()],
             &[],
             b"/",
