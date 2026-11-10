@@ -538,6 +538,11 @@ impl ElabEnv {
                 "pre-source ITree bind alias conflicts with its checked identity".into(),
             ));
         }
+        // Report the alias's canonical source spelling without changing the
+        // pre-source snapshot (which also fixes its native stable symbol).
+        elab.prelude_env
+            .pre_source_display_names
+            .insert(checked_bind_id, "itree_bind".into());
         // The checked Console carrier was declared as `Stream` so its native
         // stable symbol and the three constructor symbols stay unchanged.
         // Source alone now names that same parent `ConsoleStream`, with the
