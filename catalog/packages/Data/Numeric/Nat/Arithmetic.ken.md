@@ -307,7 +307,7 @@ theorem mul_cancel_core
       }
   }
 
-theorem add_cancel_r
+pub theorem add_cancel_r
       (a : Nat) (b : Nat)
     : (c : Nat) → Equal Nat (add a c) (add b c) → Equal Nat a b =
   λc.

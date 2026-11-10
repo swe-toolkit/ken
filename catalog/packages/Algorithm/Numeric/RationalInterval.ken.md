@@ -29,8 +29,10 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. The checked inverted-emptiness and two
-ordered-endpoint membership laws make the endpoint boundary explicit.
+source; their operations follow. The width operation and two checked laws use
+Rational's truncated subtraction, not a subtraction of intervals. The checked
+inverted-emptiness and two ordered-endpoint membership laws make the endpoint
+boundary explicit.
 Enclosure uses both membership premises and the checked Rational monotonicity
 laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
@@ -63,6 +65,7 @@ import Data.Numeric.Rational
   (Rational,
     MkRational,
     rational_add,
+    rational_sub,
     rational_mul,
     rational_leq,
     rational_equiv,
@@ -260,6 +263,22 @@ pub theorem interval_mul_point
         (interval_point (rational_mul x y)) =
   Refl
 
+pub theorem interval_width_point
+      (x : Rational)
+    : rational_equiv (interval_width (interval_point x)) rational_zero =
+  (proof self_is_zero for rational_sub) x
+
+pub theorem interval_width_add
+      (lo1 : Rational) (hi1 : Rational) (lo2 : Rational) (hi2 : Rational)
+    : IsTrue (rational_leq lo1 hi1)
+      → IsTrue (rational_leq lo2 hi2)
+      → rational_equiv
+        (interval_width (interval_add (MkInterval lo1 hi1) (MkInterval lo2 hi2)))
+        (rational_add
+          (interval_width (MkInterval lo1 hi1))
+          (interval_width (MkInterval lo2 hi2))) =
+  (proof add_distrib for rational_sub) hi1 lo1 hi2 lo2
+
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
     MkInterval lo hi ↦ bool_and (rational_leq lo x) (rational_leq x hi)
@@ -282,6 +301,11 @@ pub fn interval_mul (i : Interval) (j : Interval) : Interval =
   }
 
 pub fn interval_point (x : Rational) : Interval = MkInterval x x
+
+pub fn interval_width (i : Interval) : Rational =
+  match i {
+    MkInterval lo hi ↦ rational_sub hi lo
+  }
 
 pub theorem interval_hull_contains_left
       (i : Interval) (j : Interval) (x : Rational)
@@ -1483,8 +1507,10 @@ theorem interval_unit_inside_itself
 non-negative rational values and does not apply unchanged to signed values.
 An inverted input still has a well-defined arithmetic result: it need not
 produce another empty interval because the enclosure laws require members
-of both inputs. An inverted interval may pass the endpoint-inclusion test for
-a wider interval, but vacuous inclusion of empty member sets does not prove
+of both inputs. `interval_width` subtracts the stored lower endpoint from the
+upper endpoint by value, truncating an inverted interval's width at zero.
+An inverted interval may pass the endpoint-inclusion test for a wider interval,
+but vacuous inclusion of empty member sets does not prove
 endpoint inclusion without a member witness.
 
 ## 4. Laws & proofs
@@ -1590,6 +1616,14 @@ no separate converse law or new premise is exported. Endpoint-wise arithmetic
 of two point intervals constructs exactly the same interval as the point at
 the arithmetic result; those final equations use structural `Equal Interval`.
 
+The point-width proof is Rational subtraction's checked self-zero proof after
+unfolding `interval_point` and `interval_width`. For addition, both intervals'
+endpoints must be ordered: Rational's checked two-input subtraction law proves
+that width distributes over the endpoint-wise sum. Both results compare
+rational values through `rational_equiv`, not stored fraction spellings.
+The two laws do not determine width on their own; the definition uses
+`rational_sub hi lo`, and a nonzero-width value checks that formula separately.
+
 ## 5. Design notes
 
 Bounds use `rational_leq`, not structural equality of `Rational`: different
@@ -1607,9 +1641,10 @@ convertible. Inclusion does not equate empty intervals or normalize rational
 spellings; its converse requires an actual inner member.
 Both distributive directions hold for inverted inputs without asserting
 structural `Equal Interval`: different endpoint spellings may denote equal
-Rational values. Subtraction, signed arithmetic, division near zero,
-floating rounding and width remain outside this non-negative exact interval
-API.
+Rational values. Interval subtraction, signed arithmetic, division near zero
+and floating rounding remain outside this non-negative exact interval API.
+Truncated Rational subtraction and interval width are present; signed and
+interval subtraction are not.
 
 ## 6. References
 
@@ -1626,15 +1661,16 @@ API.
 ## 7. Trust & derivation
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
-   `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and fifty-two checked interval
-   laws form the public contract.
+   `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
+   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-four
+   checked interval laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
    including endpoint inclusion, its witnessed converse, the four
    distributivity/factoring inclusions, hull/intersection regrouping, the
-   four point-unit inclusions and two point-zero absorption inclusions.
+   four point-unit inclusions, two point-zero absorption inclusions,
+   and the point and ordered-addition width proofs.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -1657,7 +1693,7 @@ API.
    Inverted emptiness composes the member's two checked comparisons against
    the false endpoint order; each ordered endpoint uses reflexivity and
    conjunction introduction. Neither family adds a helper.
-4. **Trusted-base delta.** Zero: all fifty-two laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all fifty-four laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The

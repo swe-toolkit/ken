@@ -52,6 +52,7 @@ fn entry_elaborates_and_registers_the_free_laws() {
         "Data.Numeric.Nat.Arithmetic.mul::comm",
         "Data.Numeric.Nat.Arithmetic.mul_add_distrib_l",
         "Data.Numeric.Nat.Arithmetic.mul_add_distrib_r",
+        "Data.Numeric.Nat.Arithmetic.add_cancel_r",
     ] {
         assert!(
             env.globals.contains_key(name),
@@ -72,6 +73,22 @@ fn attached_zero_sum_proofs_check_at_generic_curried_types() {
     load_arithmetic(&mut env);
     env.elaborate_file(ZERO_SUM_GENERIC_CLIENT)
         .expect("both attached proofs apply at exact generic types");
+}
+
+/// Promise class: durable invariant. A selective client consumes the public
+/// additive-cancellation theorem at its unchanged generic Nat type. Its checked
+/// body belongs to Arithmetic; the package's trust check covers its closure.
+#[test]
+fn additive_cancellation_is_public_at_its_generic_type() {
+    let mut env = ElabEnv::new().expect("base environment");
+    load_arithmetic(&mut env);
+    env.elaborate_file(
+        "import Data.Numeric.Nat.Arithmetic (add, add_cancel_r)\n\
+         theorem cancellation_client (a : Nat) (b : Nat) (c : Nat)\n\
+           : Equal Nat (add a c) (add b c) → Equal Nat a b =\n\
+             add_cancel_r a b c",
+    )
+    .expect("promoted Nat additive cancellation has its unchanged generic type");
 }
 
 #[test]
