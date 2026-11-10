@@ -9,7 +9,7 @@ use crate::effects::RowType;
 use crate::error::Span;
 use crate::resolve::RType;
 use crate::ElabEnv;
-use ken_kernel::{Decl, Term};
+use ken_kernel::{declare_postulate, Decl, Level, Term};
 
 const PREFIX: &str = "data Box = MkBox (Unit ->[Console] HostIO APartial Unit)\n\
     data PBox = MkPBox Unit\n\
@@ -19,6 +19,14 @@ fn check_position(decl: &str, head: &str, args: &[&str], expect_console: bool) {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(&format!("{PREFIX}{decl}"))
         .unwrap_or_else(|err| panic!("{head}: checked declaration required: {err:?}"));
+    if head == "OpaqueHead" {
+        // A checked opaque function head with no family declaration mask.
+        // The row test is about applying its type, not its postulate body.
+        let ty = Term::pi(Term::Type(Level::zero()), Term::Type(Level::zero()));
+        let id = declare_postulate(&mut env.env, "OpaqueHead".into(), vec![], ty)
+            .expect("well-formed checked opaque type constructor");
+        env.globals.insert(head.into(), id);
+    }
     let rows = CheckedEffectRows::new(
         &env.effect_rows,
         &env.effect_rows_by_id,
@@ -166,12 +174,7 @@ fn result_index_occurrence_keeps_parameter_charged() {
 
 #[test]
 fn opaque_head_keeps_every_argument_charged() {
-    check_position(
-        "const OpaqueHead : Type -> Type = Axiom",
-        "OpaqueHead",
-        &["Box"],
-        true,
-    );
+    check_position("", "OpaqueHead", &["Box"], true);
 }
 
 #[test]
