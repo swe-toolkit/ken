@@ -246,10 +246,13 @@ fn with_home_imports(source: &str, code: &str, literate: bool) -> String {
 }
 
 /// Promise class: transition sentinel for the 3a vocabulary / 3b route split.
-/// Seven isolated files using D0's remainder vocabulary still check under
+/// Eight isolated files using D0's remainder vocabulary still check under
 /// Legacy and now check under Strict with ephemeral checked-home imports.
-/// Increment 3a rewrote their compiler-internal FSOp/bind use but did not
-/// switch their real entry routes or persist imports in unrooted sources.
+/// rnspk_v_argv_stdout_null.ken (RNSPK): Legacy-clean, Strict-clean with
+/// checked-home imports.
+/// Increment 3a rewrote the preceding seven's compiler-internal FSOp/bind use;
+/// RNSPK migrated the eighth. Neither switched real entry routes or persisted
+/// imports in unrooted sources.
 /// Lexical selection ignores comments, literals, and literate prose; the
 /// assertions concern checker outcomes, not source-text occurrence counts.
 #[test]
@@ -328,6 +331,6 @@ fn seven_legacy_clean_remainder_sources_have_measured_strict_frontier() {
         "isolated remainder sources={remainder_sources} legacy_clean={legacy_clean} \
          strict_clean={strict_clean} strict_unbound={strict_unbound}"
     );
-    assert_eq!(legacy_clean, 7);
-    assert_eq!((strict_clean, strict_unbound), (7, 0));
+    assert_eq!(legacy_clean, 8);
+    assert_eq!((strict_clean, strict_unbound), (8, 0));
 }
