@@ -1,7 +1,7 @@
 ---
 id: LANG-RESOLUTION-REPORT-ITREE-BIND-NAME
 title: "Under Strict, the resolution report names the floor ITree sequencer `bind`, a spelling Strict leaves unbound or gives to the user's own declaration, because the itree_bind alias is installed after the pre-source name snapshot without a report display name. Give the checked bind identity the display name `itree_bind`, so a Strict report names the spelling that resolves to it and a user `fn bind` is never confused with it"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T2
