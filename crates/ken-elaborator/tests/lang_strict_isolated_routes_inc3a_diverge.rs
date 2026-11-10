@@ -22,12 +22,14 @@ fn missing_observation(
     }
 }
 
-/// Promise class: transition sentinel, retired with the 3b route switch
-/// that removes the Legacy side of the comparison. MEASURED: each static
+/// Promise class: transition sentinel for the 3b migration, retired when
+/// Legacy-to-Strict source comparisons are no longer needed. MEASURED: each static
 /// invalid-source fixture reaches Legacy E0027 on its own missing name and
-/// Strict E0012 on that same name after only its required imports. Report raw
-/// spans and compare the normalized Strict span to the Legacy span: an import
-/// changes absolute byte positions but not the error's source location. CLAIMED: vocabulary changes
+/// Strict E0012 on that same name after only its required imports. For Rosetta
+/// examples, remove the new Strict-only H imports from the Legacy comparison
+/// but retain them in Strict. Report raw spans and compare the normalized
+/// Strict span to the Legacy span: imports change absolute byte positions but
+/// not the error's source location. CLAIMED: vocabulary changes
 /// do not mask or shift these intentional refusals. THE GAP: generated Rust
 /// sources and the six FSOp template cases are separate populations, not
 /// claimed by this file-source subset.
@@ -67,13 +69,25 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         } else {
             original.clone()
         };
-        let shift = strict_source.len() - original.len();
+        let legacy_source = if path.starts_with("examples/rosetta/") {
+            original
+                .split_inclusive('\n')
+                .filter(|line| {
+                    let import = line.trim_start();
+                    !import.starts_with("import Capability.Console.Text ")
+                        && !import.starts_with("import Capability.Process.Exit ")
+                })
+                .collect::<String>()
+        } else {
+            original.clone()
+        };
+        let shift = strict_source.len() - legacy_source.len();
         let literate = path.ends_with(".ken.md");
         let mut legacy = ElabEnv::new().expect("checked prelude");
         let legacy = if literate {
-            legacy.elaborate_ken_md_file_v1(&original).map(|_| ())
+            legacy.elaborate_ken_md_file_v1(&legacy_source).map(|_| ())
         } else {
-            legacy.elaborate_file_v1(&original).map(|_| ())
+            legacy.elaborate_file_v1(&legacy_source).map(|_| ())
         };
         let old = match missing_observation(legacy) {
             Ok(observation) => observation,

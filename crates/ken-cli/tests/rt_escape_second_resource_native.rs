@@ -1059,7 +1059,21 @@ fn carried_nat_predecessor_source(offset: i64, scrutinee: &str, arm: CarriedNatA
     );
     let original_cont = "(\\_ignored. second_read file buffer)";
     let replacement_cont = "(\\_ignored. host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))";
-    let source = NAT_FANOUT_REACHED_LIVE_RESOURCE;
+    let source = match scrutinee {
+        "transfer_count_remaining count" => Some("transfer_count_remaining"),
+        "transfer_count_predecessor count" => Some("transfer_count_predecessor"),
+        _ => None,
+    }
+    .map(|name| {
+        let import = "import Capability.System.Buffer (";
+        assert_eq!(
+            NAT_FANOUT_REACHED_LIVE_RESOURCE.matches(import).count(),
+            1,
+            "the Buffer import must be unique"
+        );
+        NAT_FANOUT_REACHED_LIVE_RESOURCE.replacen(import, &format!("{import}{name}, "), 1)
+    })
+    .unwrap_or_else(|| NAT_FANOUT_REACHED_LIVE_RESOURCE.to_owned());
     for old in [original_read, original_nat, original_cont] {
         assert_eq!(
             source.matches(old).count(),
