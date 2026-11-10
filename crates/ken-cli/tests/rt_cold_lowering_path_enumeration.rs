@@ -564,7 +564,7 @@ fn entry_outcome(entry: &str) -> String {
         match ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
-        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
+            &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &format!("rt_cold_enum_{entry}"),
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
