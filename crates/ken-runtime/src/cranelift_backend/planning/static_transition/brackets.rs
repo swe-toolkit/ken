@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::closure::CaseEmissionStatus;
+use super::continuations::ContinuationEmissionOwner;
 use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticOriginId,
     StaticTransitionPlan};
 use crate::{CheckedBracketMarkRole, CheckedBracketRegionMarker,
@@ -172,6 +173,7 @@ pub(in crate::cranelift_backend) enum BracketSettlementMode {
 #[derive(Clone, Debug)]
 pub(in crate::cranelift_backend) struct BracketSettlement {
     id: BracketSettlementId,
+    parent: Option<BracketSettlementId>,
     settlement: StaticOriginId,
     clause_origin: Option<StaticOriginId>,
     clause_scrutinee: BTreeSet<StaticOriginId>,
@@ -180,13 +182,19 @@ pub(in crate::cranelift_backend) struct BracketSettlement {
     resume: StaticOriginId,
     mode: BracketSettlementMode,
     row: Option<super::responses::StaticResponseContinuation>,
-    /// Nearest owner of the region's own or an ancestor's returned exit.
-    response_owner: Option<super::responses::StaticResponseContinuationId>,
+    /// Where the row's K call is emitted, read once from the placement
+    /// authority. The settlement gate compares against this alone.
+    k_placement: Option<ContinuationEmissionOwner>,
+    /// Every returned-exit owner at the nearest region, own or ancestor, that
+    /// has any. Each one returns into this one settlement.
+    response_owners: BTreeSet<super::responses::StaticResponseContinuationId>,
 }
 
 impl BracketSettlement {
     pub(in crate::cranelift_backend) fn id(&self) -> BracketSettlementId { self.id }
+    pub(in crate::cranelift_backend) fn is_nested(&self) -> bool { self.parent.is_some() }
     pub(in crate::cranelift_backend) fn settlement(&self) -> StaticOriginId { self.settlement }
+    pub(in crate::cranelift_backend) fn k_placement(&self) -> Option<ContinuationEmissionOwner> { self.k_placement }
     pub(in crate::cranelift_backend) fn clause_origin(&self) -> Option<StaticOriginId> { self.clause_origin }
     pub(in crate::cranelift_backend) fn clause_scrutinee_contains(&self, head: StaticOriginId) -> bool {
         self.clause_scrutinee.contains(&head)
@@ -198,8 +206,8 @@ impl BracketSettlement {
     pub(in crate::cranelift_backend) fn row(&self) -> Option<&super::responses::StaticResponseContinuation> {
         self.row.as_ref()
     }
-    pub(in crate::cranelift_backend) fn response_owner(&self)
-        -> Option<super::responses::StaticResponseContinuationId> { self.response_owner }
+    pub(in crate::cranelift_backend) fn response_owners(&self)
+        -> &BTreeSet<super::responses::StaticResponseContinuationId> { &self.response_owners }
 }
 
 impl BracketSettlementControlView {
@@ -248,26 +256,22 @@ impl BracketSettlementControlView {
                 }
             }
             let mut cursor = Some(region.id);
-            let mut owner = None;
+            let mut owners = BTreeSet::new();
             while let Some(id) = cursor {
                 let current = plan.bracket_settlements.regions.iter()
                     .find(|candidate| candidate.id == id)
                     .ok_or_else(|| planner_error("a bracket ancestor has no region"))?;
-                let owners = plan.pending_vis_settlements.bracket_exits.iter()
-                    .filter(|(_, exits)| exits.contains(&id))
-                    .map(|(owner, _)| *owner).collect::<Vec<_>>();
-                match owners.as_slice() {
-                    [] => {}
-                    [unique] if owner.is_none() => owner = Some(*unique),
-                    [_] => {}
-                    _ => return Err(planner_error("a bracket region has two returned-exit owners")),
+                if owners.is_empty() {
+                    owners.extend(plan.pending_vis_settlements.bracket_exits.iter()
+                        .filter(|(_, exits)| exits.contains(&id))
+                        .map(|(owner, _)| *owner));
                 }
                 cursor = current.parent;
             }
-            let mode = if owner.is_some() {
-                BracketSettlementMode::InPlace
-            } else {
+            let mode = if owners.is_empty() {
                 BracketSettlementMode::Deferred
+            } else {
+                BracketSettlementMode::InPlace
             };
             #[cfg(feature = "px8-ds-test-support")]
             let mode = if std::env::var_os("RT_RECUT_FORCE_DEFERRED").is_some() {
@@ -275,15 +279,19 @@ impl BracketSettlementControlView {
             } else {
                 mode
             };
-            // A nested Deferred region has no in-place owner to order its
-            // settlement against the parent. Refuse it before lowering.
-            if mode == BracketSettlementMode::Deferred && region.parent.is_some() {
-                return Err(planner_error(
-                    "a nested bracket region has no in-place settlement owner; \
-                     deferred settlement order is not planned for nested regions",
-                ));
-            }
             let row = plan.bracket_rows.get(&region.id).cloned();
+            // A nested Deferred region settles at its own marked S only when
+            // a checked continuation row names this same Vis and identity.
+            // Root Deferred retains the driver route; it cannot borrow this
+            // local settlement just because its source has an ancestor.
+            if mode == BracketSettlementMode::Deferred && region.parent.is_some()
+                && !matches!((&region.context, &row),
+                    (BracketResponseContextKey::Continuation(identity), Some(row))
+                        if row.vis_origin() == region.settlement
+                            && row.k_identity() == identity)
+            {
+                return Err(planner_error("nested region has no settlement row"));
+            }
             match (&region.context, &row) {
                 (BracketResponseContextKey::Continuation(identity), Some(row))
                     if row.vis_origin() == region.settlement && row.k_identity() == identity => {}
@@ -291,11 +299,15 @@ impl BracketSettlementControlView {
                     if mode == BracketSettlementMode::Deferred => {}
                 _ => return Err(planner_error("bracket row disagrees with its checked region")),
             }
+            let k_placement = row
+                .as_ref()
+                .map(|row| plan.k_emission_placement(row.k_identity()))
+                .transpose()?;
             if view.regions.insert(region.id, BracketSettlement {
-                id: region.id, settlement: region.settlement,
-                clause_origin, clause_scrutinee,
+                id: region.id, parent: region.parent,
+                settlement: region.settlement, clause_origin, clause_scrutinee,
                 body_exit: region.body_exit, outcome_merge: region.outcome_merge,
-                resume: region.resume, mode, row, response_owner: owner,
+                resume: region.resume, mode, row, k_placement, response_owners: owners,
             }).is_some() {
                 return Err(planner_error("two bracket regions share one identity"));
             }
@@ -323,14 +335,22 @@ impl BracketSettlementControlView {
     }
 
     pub(in crate::cranelift_backend) fn settlement_at(
-        &self, origin: StaticOriginId,
+        &self, origin: StaticOriginId, placement: Option<ContinuationEmissionOwner>,
     ) -> Result<Option<&BracketSettlement>, CraneliftBackendError> {
         let Some(ids) = self.by_settlement.get(&origin) else { return Ok(None) };
         let [id] = ids.as_slice() else {
             return Err(planner_error("one settlement origin names two bracket instances"));
         };
-        self.regions.get(id).map(Some).ok_or_else(||
-            planner_error("a bracket settlement identity has no validated region"))
+        let region = self.regions.get(id).ok_or_else(||
+            planner_error("a bracket settlement identity has no validated region"))?;
+        // A marked S is lowered where its K call is emitted. A lowering
+        // anywhere else would claim the settlement from another code identity.
+        if region.row.is_some() && placement != region.k_placement {
+            return Err(planner_error(
+                "a marked bracket settlement is lowered outside its K call's emission placement",
+            ));
+        }
+        Ok(Some(region))
     }
 }
 

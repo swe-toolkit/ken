@@ -323,6 +323,57 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 }
 
 #[test]
+fn unterminated_console_bytes_reach_native_stdout_at_finish() {
+    // Promise class: durable invariant. Std stdout is line-buffered and the
+    // starter's C main returns without Rust runtime cleanup, so the host's
+    // finish must deliver bytes written with no trailing newline and no
+    // explicit ConsoleFlush, matching the interpreter.
+    // MEASURED: the linked native artifact emits the fixture's exact bytes.
+    // CLAIMED: finish delivers buffered console bytes without an explicit
+    // flush operation. THE GAP: this covers stdout on normal termination;
+    // stderr and exceptional finishers rely on the shared finalize_resources.
+    let dir = output_dir("unterminated-console");
+    let source = r#"program capabilities FS APartial
+
+proc console_then
+    (action : HostIO APartial (Result IOError Unit))
+    (next : Unit -> HostIO APartial ExitCode)
+  : HostIO APartial ExitCode visits [Console] =
+  bind (Coproduct (FSOp APartial) AmbientOp)
+    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
+    (Result IOError Unit) ExitCode action
+    (\response. match response {
+      Err _ |-> host_exit APartial (ExitCode.Failure 73);
+      Ok _ |-> next MkUnit
+    })
+
+proc console_write (label : String)
+  : HostIO APartial (Result IOError Unit) visits [Console] =
+  host_console APartial (Result IOError Unit)
+    (write ConsoleStream.Stdout (bytes_encode label))
+
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  console_then (console_write "open")
+    (\_. console_then (console_write "next")
+      (\_. host_exit APartial ExitCode.Success))
+"#;
+    let output = ken_cli::build_native_program(
+        source,
+        ken_cli::SourceFormat::Ken,
+        "px5-unterminated-console",
+        &dir,
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+    .expect("console-only program reaches the native artifact lane");
+    let ran = Command::new(&output.artifact.executable_path)
+        .output()
+        .expect("linked host-effect artifact runs");
+    assert_eq!(ran.status.code(), Some(0), "stderr: {:?}", ran.stderr);
+    assert_eq!(ran.stdout, b"opennext");
+}
+
+#[test]
 fn two_vis_nodes_resume_once_in_source_order() {
     let dir = output_dir("two-vis");
     let source = r#"program capabilities FS APartial

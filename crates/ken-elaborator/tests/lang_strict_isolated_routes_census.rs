@@ -35,6 +35,7 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 /// px10_native_tested_pending_overlap.ken, which is Legacy-clean and
 /// Strict-UnboundName. The boundary was 98/64/12/52.
 /// Time's {accepted,ordered_premise_refused}.ken are non-Legacy: 100/64/12/52.
+/// rnspk_v_argv_stdout_null.ken: Legacy-clean, Strict-UnboundName; 99/65/12/53.
 /// Future homes and source migrations turn this sentinel red by design.
 /// Increment 3's strict route switch and migration retire it in favor of
 /// AC-3a's acceptance gate for every cut-base Legacy-clean isolated file.
@@ -92,6 +93,6 @@ fn strict_isolated_frontier_before_increment_three_route_switch() {
     eprintln!("isolated strict frontier: files={} legacy_clean={legacy_clean} strict_clean={strict_clean} strict_unbound={strict_unbound}", files.len());
     assert_eq!(
         (files.len(), legacy_clean, strict_clean, strict_unbound),
-        (100, 64, 12, 52)
+        (101, 65, 12, 53)
     );
 }

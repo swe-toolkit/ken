@@ -5644,7 +5644,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
             .collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
         let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
         let token_scope = CheckedTokenFunctionScope::open(compiler)?;
-        let ambient = AmbientBodyAuthority::bind(
+        let ambient = AmbientBodyAuthority::bind_body(
             compiler,
             emission.owner.base_owner(),
             emission.row.effect_source_owner(),
@@ -6876,7 +6876,7 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         // ambient fields. The owner is exactly the planner's identity for this
         // specialization; the unit is the owner of the source body it lowers,
         // which is the continuation's own consumer.
-        let ambient = AmbientBodyAuthority::bind(
+        let ambient = AmbientBodyAuthority::bind_body(
             compiler,
             ContinuationEmissionOwner::Specialization(unit.id),
             unit.consumer_owner,
@@ -7532,7 +7532,7 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             // owner, which is the distinction the two fields exist to keep.
             // ⛔ After `open_aggregate_events`, so the observation this binding
             // writes is labelled with the Function it belongs to.
-            let ambient = AmbientBodyAuthority::bind(compiler, emission_owner, context.raw_owner);
+            let ambient = AmbientBodyAuthority::bind_body(compiler, emission_owner, context.raw_owner);
             // `D8o` — a generated CONTEXT body, whose owner is a Specialization
             // and whose kind is not.
             #[cfg(test)]
@@ -9234,6 +9234,10 @@ pub(super) struct ContinuationCandidateLedger {
     /// writer of each variant.
     settled: BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
     transport_candidates: BTreeSet<ContinuationCallIdentity>,
+    /// Relocated calls a source seat passed through, and relocated calls a
+    /// destination emitted. The first must be contained in the second.
+    relocated_exits: BTreeSet<ContinuationCallIdentity>,
+    relocated_answers: BTreeSet<ContinuationCallIdentity>,
 }
 
 impl ContinuationCandidateLedger {
@@ -9270,6 +9274,8 @@ impl ContinuationCandidateLedger {
             candidates,
             settled: BTreeMap::new(),
             transport_candidates,
+            relocated_exits: BTreeSet::new(),
+            relocated_answers: BTreeSet::new(),
         })
     }
 
@@ -9306,6 +9312,14 @@ impl ContinuationCandidateLedger {
         Ok(())
     }
 
+    pub(super) fn record_relocated_exit(&mut self, identity: &ContinuationCallIdentity) {
+        self.relocated_exits.insert(identity.clone());
+    }
+
+    pub(super) fn record_relocated_answer(&mut self, identity: &ContinuationCallIdentity) {
+        self.relocated_answers.insert(identity.clone());
+    }
+
     pub(super) fn is_settled(&self, identity: &ContinuationCallIdentity) -> bool {
         self.settled.contains_key(identity)
     }
@@ -9328,6 +9342,20 @@ impl ContinuationCandidateLedger {
     /// success path, so plan-only rows and `Err` compilations are absent **by
     /// construction** rather than removed after the fact.
     fn close(mut self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let unanswered = self
+            .relocated_exits
+            .difference(&self.relocated_answers)
+            .count();
+        if unanswered > 0 {
+            return Err(backend_module(
+                LoweringCause::PlannerInvariant,
+                format!(
+                    "{unanswered} relocated K calls were passed through at their source seat \
+                 but emitted by no destination; a relocated call is dormant only when no \
+                 seat passed it through"
+                ),
+            ));
+        }
         for identity in &self.transport_candidates {
             self.settled
                 .entry(identity.clone())
@@ -11126,7 +11154,7 @@ fn define_unit_body<M: Module>(
     // `D8o` — bound for this body's lifetime and released on exit, so no later
     // Function inherits it. ⛔ The domain is unchanged: `D5a`'s rule that an
     // ordinary predeclared unit body emits as itself.
-    let ambient = AmbientBodyAuthority::bind(
+    let ambient = AmbientBodyAuthority::bind_body(
         compiler,
         ContinuationEmissionOwner::Predeclared(unit.function),
         unit.function,

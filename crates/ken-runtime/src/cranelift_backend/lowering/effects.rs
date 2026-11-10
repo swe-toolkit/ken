@@ -2882,11 +2882,15 @@ impl<'a> Lowering<'a> {
         // Recut §7 total match (AC-2) over the response classify verdict. No
         // catch-all: adding a ResponseDisposition variant reddens the build here.
         use crate::cranelift_backend::planning::{ResponseDisposition, StaticResponseSite};
-        let bracket_claim = if let Some((id, origin)) = self.bracket_effect_claim {
+        let bracket_claim = if let Some((id, origin, claimed_owner)) = self.bracket_effect_claim {
             if origin == static_origin {
+                let physical = self.checked_placement_owner(self.emitting_function_owner)?;
                 let matches = self.bracket_view.region(id).is_some_and(|region|
-                    region.mode() == BracketSettlementMode::InPlace
-                    && region.row().is_some_and(|row| row.effect_origin() == origin));
+                    (region.mode() == BracketSettlementMode::InPlace
+                        || (region.mode() == BracketSettlementMode::Deferred && region.is_nested()))
+                    && region.row().is_some_and(|row| row.effect_origin() == origin)
+                    && physical == Some(claimed_owner)
+                    && region.k_placement() == physical);
                 if !matches {
                     return Err(backend_module(LoweringCause::PlannerInvariant,
                         "an InPlace S effect claim disagrees with its validated view".to_string()));

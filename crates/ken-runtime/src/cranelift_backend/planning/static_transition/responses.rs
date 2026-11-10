@@ -259,6 +259,7 @@ pub(in crate::cranelift_backend) struct CheckedIhDetachedCallerCut {
     consumed_continuation_origin: StaticOriginId,
     selected_body_origin: StaticOriginId,
     checked_frame_id: Option<u64>,
+    placement: ContinuationEmissionOwner,
     consumed_caller_suffix: Vec<CheckedIhDetachedConsumedFrame>,
     producer_transport: CheckedIhEnvironmentTransport,
     caller_transport: CheckedIhEnvironmentTransport,
@@ -283,6 +284,10 @@ impl CheckedIhDetachedCallerCut {
 
     pub(in crate::cranelift_backend) fn checked_frame_id(&self) -> Option<u64> {
         self.checked_frame_id
+    }
+
+    pub(in crate::cranelift_backend) fn placement(&self) -> ContinuationEmissionOwner {
+        self.placement
     }
 
     pub(in crate::cranelift_backend) fn consumed_caller_suffix(
@@ -484,6 +489,7 @@ fn checked_ih_post_call_caller_exit_index(
             step.occurrence().eliminator_origin()
                 == caller_cut.consumed_continuation_origin()
                 && step.checked_frame_id() == caller_cut.checked_frame_id()
+                && step.placement() == caller_cut.placement()
         });
     let Some((index, _)) = matching.next() else {
         return Err(planner_error(
@@ -516,7 +522,7 @@ fn checked_ih_caller_completed_required_consumer_edge_index(
         .iter()
         .enumerate()
         .filter(|(_, step)| {
-            (step.occurrence().eliminator_origin(), step.checked_frame_id())
+            (step.occurrence().eliminator_origin(), step.checked_frame_id(), step.placement())
                 == consumer_occurrence
         })
         .map(|(index, _)| index)
@@ -791,6 +797,10 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// body root. It returns a Vis without an enclosing consumer seat, so no
     /// selected response-owner call can be recorded in that function.
     ContinuationBodyTail,
+    /// A checked-IH result escapes into the worker that already emits its
+    /// call. No self-relocation is issued and no response owner can assume
+    /// that the escaped result returns through an ordinary call seat.
+    EscapedCheckedIhCaller,
 }
 
 /// One response `Vis` classified `Deferred` (recut amendment
@@ -4081,6 +4091,67 @@ impl StaticTransitionPlan<'_> {
         Ok(specialized.into_iter().map(|demand| demand.k_identity).collect())
     }
 
+    /// Close a non-relocatable checked-IH source over the exact worker and
+    /// emission graph before assigning any response owner. The sole source
+    /// seed prevents a sibling fan-out from inventing a response owner for a
+    /// result that returns inside its own emitting worker. A consumer whose
+    /// worker body is that result, its same-result siblings, and calls emitted
+    /// in an already affected worker (E3) all remain on the residual route.
+    /// This is re-derived by installation and validation from identical
+    /// phase-A demands; it never depends on an already-installed owner.
+    fn escaped_checked_ih_callers(
+        &self,
+        demands: &[StaticResponseContextDemand],
+        transport_sources: &BTreeSet<ContinuationCallIdentity>,
+        units: &[super::continuations::ContinuationUnitView<'_>],
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let mut counts = BTreeMap::new();
+        for demand in demands {
+            *counts.entry(demand.k_identity.producer_result_origin()).or_insert(0usize) += 1;
+        }
+        let mut closed = BTreeSet::new();
+        for demand in demands {
+            let identity = &demand.k_identity;
+            if counts.get(&identity.producer_result_origin()) == Some(&1)
+                && !transport_sources.contains(identity)
+                && super::aggregates::checked_ih_self_emitter_source(self, identity)?
+            {
+                closed.insert(identity.clone());
+            }
+        }
+        loop {
+            let results = closed.iter().map(ContinuationCallIdentity::producer_result_origin)
+                .collect::<BTreeSet<_>>();
+            let targets = closed.iter().map(ContinuationCallIdentity::target)
+                .collect::<BTreeSet<_>>();
+            let before = closed.len();
+            for demand in demands {
+                let identity = &demand.k_identity;
+                let body = units.iter().find(|unit| unit.id() == identity.target())
+                    .ok_or_else(|| planner_error("an escaped response caller has no target unit"))?
+                    .worker_body_origin();
+                let emitted_in_affected = match identity.emission_owner() {
+                    ContinuationEmissionOwner::Specialization(owner) =>
+                        targets.contains(&owner) || self.continuation_contexts.iter().any(|context|
+                            context.enclosing_specialization == owner
+                                && demands.iter().any(|member|
+                                    closed.contains(&member.k_identity)
+                                        && member.k_body_origin == context.worker_body_origin)),
+                    ContinuationEmissionOwner::Predeclared(_)
+                    | ContinuationEmissionOwner::Fusion(_) => false,
+                };
+                if results.contains(&body)
+                    || results.contains(&identity.producer_result_origin())
+                    || emitted_in_affected
+                {
+                    closed.insert(identity.clone());
+                }
+            }
+            if closed.len() == before { break; }
+        }
+        Ok(closed)
+    }
+
     fn static_response_phase_b_split_over(
         &self,
         demands: Vec<StaticResponseContextDemand>,
@@ -4138,9 +4209,24 @@ impl StaticTransitionPlan<'_> {
         }
         let requires_execute_then_resume = ordinary_stage_count >= 2 || pending_checked_ret_sink;
         let units = self.continuation_units()?;
+        let escaped = self.escaped_checked_ih_callers(&demands, transport_sources, &units)?;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
+            if escaped.contains(&demand.k_identity) {
+                deferred.push(DeferredResponseRow {
+                    vis_origin: demand.vis_origin,
+                    producer_call_origin: demand.producer_call_origin,
+                    operation_root_origin: demand.operation_root_origin,
+                    selected_operation_origin: demand.selected_operation_origin,
+                    effect_origin: demand.effect_origin,
+                    operation: demand.operation,
+                    sub_case: DeferredResponseSubCase::EscapedCheckedIhCaller,
+                    capture_count: demand.captures.len(),
+                    continuation_input_count: demand.continuation_inputs.len(),
+                });
+                continue;
+            }
             // A construct returned as the emitting worker's body root has no
             // enclosing eliminator in that Function: neither the direct claim
             // nor the bypassed-candidate bridge can settle its selected call.
@@ -4756,7 +4842,8 @@ impl StaticTransitionPlan<'_> {
             };
             match row.sub_case {
                 DeferredResponseSubCase::NoContinuationUnit
-                | DeferredResponseSubCase::ContinuationBodyTail => continue,
+                | DeferredResponseSubCase::ContinuationBodyTail
+                | DeferredResponseSubCase::EscapedCheckedIhCaller => continue,
                 DeferredResponseSubCase::UnconsumedTransportCaller => {}
             }
             if !visited.insert(row.vis_origin()) {
@@ -4814,7 +4901,8 @@ impl StaticTransitionPlan<'_> {
         match row.sub_case {
             DeferredResponseSubCase::UnconsumedTransportCaller => {}
             DeferredResponseSubCase::NoContinuationUnit
-            | DeferredResponseSubCase::ContinuationBodyTail => return Ok(None),
+            | DeferredResponseSubCase::ContinuationBodyTail
+            | DeferredResponseSubCase::EscapedCheckedIhCaller => return Ok(None),
         }
         let mut owners = Vec::new();
         for response in &self.static_response_continuations {
@@ -4871,7 +4959,8 @@ impl StaticTransitionPlan<'_> {
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
         // A continuation-body-root Vis has no selected incoming owner call to
         // borrow from an enclosing handler: keep its ordinary Construct route.
-        if row.sub_case == DeferredResponseSubCase::ContinuationBodyTail {
+        if matches!(row.sub_case, DeferredResponseSubCase::ContinuationBodyTail
+            | DeferredResponseSubCase::EscapedCheckedIhCaller) {
             return Ok(None);
         }
         if let Some(owner) = self.bounded_deferred_response_handler_owner(row)? {
@@ -6775,25 +6864,31 @@ fn checked_ih_detached_caller_cut_for_consumer(
         target.key.continuation_origin,
         1 + target.key.producer_alternative as usize,
     )?;
-    let consumer_index = row
+    let matching = row
         .selected_case_exits
         .iter()
-        .position(|step| {
+        .enumerate()
+        .filter(|(_, step)| {
             step.occurrence().eliminator_origin() == target.key.continuation_origin
+                && step.placement() == ContinuationEmissionOwner::Specialization(identity.target())
         })
-        .ok_or_else(|| {
-            planner_error(
-                "a detached checked-IH caller cut did not consume its selecting continuation",
-            )
-        })?;
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [consumer_index] = matching.as_slice() else {
+        return Err(planner_error(
+            "a detached checked-IH caller cut must consume its selecting continuation exactly once",
+        ));
+    };
+    let consumer_index = *consumer_index;
     let consumer_step = row
         .selected_case_exits
         .get(consumer_index)
         .ok_or_else(|| planner_error("a detached checked-IH caller cut lost its consumer"))?;
-    if !row.selected_case_exits[..consumer_index]
-        .iter()
-        .all(|step| step.occurrence().eliminator_origin() != target.key.continuation_origin)
-    {
+    if row.selected_case_exits.iter().filter(|step| {
+        step.occurrence().eliminator_origin() == target.key.continuation_origin
+            && step.checked_frame_id() == consumer_step.checked_frame_id()
+            && step.placement() == consumer_step.placement()
+    }).count() != 1 {
         return Err(planner_error(
             "a detached checked-IH caller cut exits its selecting continuation more than once",
         ));
@@ -6825,6 +6920,7 @@ fn checked_ih_detached_caller_cut_for_consumer(
             consumed_continuation_origin: target.key.continuation_origin,
             selected_body_origin,
             checked_frame_id: consumer_step.checked_frame_id(),
+            placement: consumer_step.placement(),
             consumed_caller_suffix,
             producer_transport: row.transport().clone(),
             caller_transport: caller_transport.clone(),
@@ -6884,9 +6980,10 @@ pub(super) fn build_checked_ih_post_call_consumers(
         let detached_return_context = plan
             .detached_return_context_for(transport.source_call_identity())
             .cloned();
-        let frame_origins = if let Some(context) = &detached_return_context {
-            let mut frames = Vec::new();
-            detached_post_call_consumer_frames(plan, context, &mut frames)?;
+        let frames = if let Some(context) = &detached_return_context {
+            let frames = detached_post_call_consumer_frames(
+                plan, context, transport.source_call_identity(),
+            )?;
             if frames.is_empty() {
                 return Err(planner_error(
                     "a detached checked-IH return context has no exact source consumer exit",
@@ -6894,15 +6991,19 @@ pub(super) fn build_checked_ih_post_call_consumers(
             }
             frames
         } else {
-            let Some(frames) = checked_ih_post_call_consumer_frames(plan, transport)? else {
+            let Some(origins) = checked_ih_post_call_consumer_frames(plan, transport)? else {
                 continue;
             };
-            frames
+            origins.into_iter().map(|origin| DetachedPostCallFrame {
+                origin,
+                placement: transport.source_call_identity().emission_owner(),
+                computational_match: true,
+            }).collect()
         };
         let Some(derived_steps) = derive_checked_ih_post_call_consumer_chain(
             plan,
             transport.source_call_identity(),
-            &frame_origins,
+            &frames.iter().map(|frame| (frame.origin, frame.placement)).collect::<Vec<_>>(),
             actual,
             demanded,
         )?
@@ -6916,7 +7017,7 @@ pub(super) fn build_checked_ih_post_call_consumers(
         }
         let exact_transport = match detached_return_context.as_ref() {
             Some(context) => CheckedIhPostCallTransport::Required(
-                pair_detached_required_consumer(plan, transport, context)?,
+                pair_detached_required_consumer(plan, transport, &frames)?,
             ),
             None => CheckedIhPostCallTransport::Ordinary(transport.clone()),
         };
@@ -7027,6 +7128,7 @@ fn attach_required_consumer_incoming_edges(
                 (
                     step.occurrence().eliminator_origin(),
                     step.checked_frame_id(),
+                    step.placement(),
                 ) == consumer_occurrence
             })
             .map(|(index, _)| index)
@@ -7053,50 +7155,90 @@ fn attach_required_consumer_incoming_edges(
     Ok(())
 }
 
-fn detached_post_call_consumer_frames(
+/// One member of the single detached-return walk used for both the exit chain
+/// and the required consumer. A source ComputationalMatch step qualifies as
+/// the required consumer, and so does the worker boundary's selecting
+/// continuation when its occurrence is a ComputationalMatch: a worker's result
+/// returns through that continuation before it reaches the caller's steps.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct DetachedPostCallFrame {
+    pub(super) origin: StaticOriginId,
+    pub(super) placement: ContinuationEmissionOwner,
+    pub(super) computational_match: bool,
+}
+
+fn is_computational_match(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    Ok(matches!(
+        plan.planned_occurrence_expr(origin)?,
+        RuntimeExpr::ComputationalMatch { .. }
+    ))
+}
+
+pub(super) fn detached_post_call_consumer_frames(
     plan: &StaticTransitionPlan<'_>,
     context: &SourceReturnContextTemplate,
-    frames: &mut Vec<StaticOriginId>,
-) -> Result<(), CraneliftBackendError> {
-    for step in context.steps().iter().rev() {
-        if matches!(
-            step.role(),
-            SourceReturnContextRole::ComputationalMatchCase(_)
-        ) {
-            frames.push(step.parent_origin());
-        }
-    }
-    if let Some(boundary) = context.worker_return() {
-        let selecting = boundary.selecting_call();
-        let target = plan
-            .continuation_specializations
-            .get(selecting.target().0 as usize)
-            .ok_or_else(|| {
-                planner_error(
-                    "a detached return context names an uninstalled selecting specialization",
-                )
-            })?;
-        if target.key.worker.body_origin != context.root_origin()
-            || target.key.producer_construct_origin != boundary.caller_context().result_origin()
-        {
-            return Err(planner_error(
-                "a detached return context does not join its worker root to the selecting call's exact caller result position",
-            ));
-        }
-        frames.push(target.key.continuation_origin);
-        if let Some(source) = target.key.consuming_occurrence {
-            if frames.last().copied() != Some(source.eliminator_origin()) {
-                frames.push(source.eliminator_origin());
+    defining_call: &ContinuationCallIdentity,
+) -> Result<Vec<DetachedPostCallFrame>, CraneliftBackendError> {
+    fn walk(
+        plan: &StaticTransitionPlan<'_>,
+        context: &SourceReturnContextTemplate,
+        placement: ContinuationEmissionOwner,
+        frames: &mut Vec<DetachedPostCallFrame>,
+    ) -> Result<(), CraneliftBackendError> {
+        for step in context.steps().iter().rev() {
+            if matches!(step.role(), SourceReturnContextRole::ComputationalMatchCase(_)) {
+                frames.push(DetachedPostCallFrame {
+                    origin: step.parent_origin(), placement, computational_match: true,
+                });
             }
-            if let Some(RequiredConsumerProjection::DirectOuter { required, .. }) =
-                plan.required_consumer_projections.get(selecting)
+        }
+        if let Some(boundary) = context.worker_return() {
+            let selecting = boundary.selecting_call();
+            let target = plan.continuation_specializations
+                .get(selecting.target().0 as usize)
+                .ok_or_else(|| planner_error(
+                    "a detached return context names an uninstalled selecting specialization",
+                ))?;
+            if target.key.worker.body_origin != context.root_origin()
+                || target.key.producer_construct_origin != boundary.caller_context().result_origin()
             {
-                if frames.last().copied() != Some(required.eliminator_origin()) {
-                    frames.push(required.eliminator_origin());
+                return Err(planner_error(
+                    "a detached return context does not join its worker root to the selecting call's exact caller result position",
+                ));
+            }
+            frames.push(DetachedPostCallFrame {
+                origin: target.key.continuation_origin,
+                placement: ContinuationEmissionOwner::Specialization(selecting.target()),
+                computational_match: is_computational_match(
+                    plan, target.key.continuation_origin,
+                )?,
+            });
+            let caller_placement = selecting.emission_owner();
+            if let Some(source) = target.key.consuming_occurrence {
+                let mut push_distinct = |origin| {
+                    if !frames.last().is_some_and(|frame|
+                        frame.origin == origin && frame.placement == caller_placement)
+                    {
+                        frames.push(DetachedPostCallFrame {
+                            origin, placement: caller_placement, computational_match: false,
+                        });
+                    }
+                };
+                push_distinct(source.eliminator_origin());
+                if let Some(RequiredConsumerProjection::DirectOuter { required, .. }) =
+                    plan.required_consumer_projections.get(selecting)
+                {
+                    push_distinct(required.eliminator_origin());
                 }
             }
+            walk(plan, boundary.caller_context(), caller_placement, frames)?;
         }
-        detached_post_call_consumer_frames(plan, boundary.caller_context(), frames)?;
+        Ok(())
     }
-    Ok(())
+    let mut frames = Vec::new();
+    walk(plan, context, defining_call.emission_owner(), &mut frames)?;
+    Ok(frames)
 }

@@ -3,7 +3,7 @@
 //! Closure of this ledger establishes representation closure, not semantic
 //! equivalence. Interpreter/native D0 observes the latter independently.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::super::planning::{
     BracketSettlementControlView, BracketSettlementId, BracketSettlementMode, StaticOriginId,
@@ -11,14 +11,14 @@ use super::super::planning::{
 };
 use super::{backend_module, CraneliftBackendError, LoweringCause};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Claim {
     mode: BracketSettlementMode,
     body_exit_origin: StaticOriginId,
     settlement_origin: StaticOriginId,
     outcome_merge_origin: StaticOriginId,
     resume_origin: StaticOriginId,
-    response_owner: Option<StaticResponseContinuationId>,
+    response_owners: BTreeSet<StaticResponseContinuationId>,
     settlement: u32,
     outcome_merge: u32,
     resume: u32,
@@ -39,7 +39,7 @@ impl BracketSettlementLedger {
                         region.id(),
                         Claim {
                             mode: region.mode(),
-                            response_owner: region.response_owner(),
+                            response_owners: region.response_owners().clone(),
                             body_exit_origin: region.body_exit(),
                             settlement_origin: region.settlement(),
                             outcome_merge_origin: region.outcome_merge(),
@@ -127,7 +127,7 @@ impl BracketSettlementLedger {
         owner: StaticResponseContinuationId,
     ) -> Result<(), CraneliftBackendError> {
         if let Some((id, claim)) = self.claims.iter().find(|(_, claim)| {
-            claim.response_owner == Some(owner)
+            claim.response_owners.contains(&owner)
                 && claim.mode == BracketSettlementMode::InPlace
                 && (claim.settlement == 0
                     || claim.settlement != claim.outcome_merge
