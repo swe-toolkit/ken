@@ -54,6 +54,8 @@ const IO_KEN_MD: &str = r#"A runnable program.
 
 ```ken
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] = host_program APartial (print_line "check mode ran main? no.")
 ```
 "#;

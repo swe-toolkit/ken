@@ -3,7 +3,7 @@
 //! about diagnostic message wording.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 fn run(args: &[&str]) -> Output {
@@ -11,6 +11,12 @@ fn run(args: &[&str]) -> Output {
         .args(args)
         .output()
         .expect("run ken")
+}
+
+fn rooted_tempdir() -> tempfile::TempDir {
+    let parent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    fs::create_dir_all(&parent).expect("fixture parent under catalog root");
+    tempfile::tempdir_in(parent).expect("rooted Ken source")
 }
 
 fn write_source(dir: &Path, name: &str, source: &str) -> String {
@@ -22,6 +28,8 @@ fn write_source(dir: &Path, name: &str, source: &str) -> String {
 fn host_exit_source(bytes: &str, exit: &str) -> String {
     format!(
         "program capabilities FS APartial\n\
+         import Capability.Console.Text (write)\n\
+         import Capability.Process.Exit (host_program_then)\n\
          proc act : Unit visits [Console] =\n\
            let _ = write ConsoleStream.Stderr (bytes_encode {bytes}) in MkUnit\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
@@ -60,7 +68,7 @@ fn assert_whole_line_after_program_bytes(output: &Output, program_bytes: &[u8], 
 
 #[test]
 fn post_execution_host_diagnostic_starts_on_its_own_line() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = rooted_tempdir();
     let source = write_source(
         dir.path(),
         "malformed-exit.ken",
@@ -84,20 +92,13 @@ fn strict_stuck_tree_requires_its_fixed_width_import() {
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let body = STUCK_TREE
-        .strip_prefix("program capabilities FS APartial\n")
-        .expect("stuck-tree header");
-    let common = "import Capability.Console.Text (write)\n\
-                  import Capability.Process.Exit (host_bind, host_console, host_pure)\n";
-    let imported = format!(
-        "program capabilities FS APartial\n{common}\
-         import Data.Numeric.FixedWidth (intToInt8)\n{body}"
-    );
+    let imported = STUCK_TREE;
     let mut selected = ken_elaborator::ElabEnv::new().expect("prelude");
     selected
-        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], imported)
         .expect("the checked narrowing import preserves the stuck continuation");
-    let without_conversion = format!("program capabilities FS APartial\n{common}{body}");
+    let without_conversion =
+        STUCK_TREE.replacen("import Data.Numeric.FixedWidth (intToInt8)\n", "", 1);
     let mut negative = ken_elaborator::ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_conversion) {
         Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, "intToInt8"),
@@ -108,7 +109,7 @@ fn strict_stuck_tree_requires_its_fixed_width_import() {
 
 #[test]
 fn post_execution_x_diagnostic_starts_on_its_own_line() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = rooted_tempdir();
     // A checked continuation becomes stuck after the Console write, so run_io
     // returns X0003 rather than an admitted program outcome.
     let source = write_source(dir.path(), "stuck-tree.ken", STUCK_TREE);
@@ -118,7 +119,7 @@ fn post_execution_x_diagnostic_starts_on_its_own_line() {
 
 #[test]
 fn finished_program_line_adds_no_blank_line_and_success_keeps_exact_stderr() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = rooted_tempdir();
     let malformed = write_source(
         dir.path(),
         "finished-line.ken",

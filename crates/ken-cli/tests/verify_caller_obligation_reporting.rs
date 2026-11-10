@@ -5,6 +5,8 @@ use std::process::{Command, Output, Stdio};
 use tempfile::TempDir;
 
 const OPEN: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 const ac0_need : String requires Equal Int 0 0 = "ac0-run"
 const ac0_use : String = ac0_need
 proc main
@@ -15,6 +17,8 @@ proc main
 "#;
 
 const NONE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 const ac0_use : String = "ac0-run"
 proc main
       (_input : ProcessInput) (_caps : ProgramCaps APartial)
@@ -24,6 +28,8 @@ proc main
 "#;
 
 const DISCHARGED: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 const ac0_need : String requires Equal Int 0 0 = "ac0-run"
 fn ac0_use (p : Top) : String = ac0_need
 proc main
@@ -34,6 +40,12 @@ proc main
 "#;
 
 const PROFILE: &str = r#"{"runtime":{"invocation_epochs":18446744073709551615},"call_events":{"event_generations":18446744073709551615,"live_pending_slots":64},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#;
+
+fn rooted_tempdir() -> TempDir {
+    let parent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    TempDir::new_in(parent).expect("rooted source directory")
+}
 
 fn fixture(root: &Path, name: &str, source: &str) -> PathBuf {
     let path = root.join(name);
@@ -123,7 +135,7 @@ fn assert_native_build_row(
 /// check alone would miss an omitted or duplicate diagnostic.
 #[test]
 fn check_reports_open_requires_and_succeeds() {
-    let root = TempDir::new().expect("scratch fixture directory");
+    let root = rooted_tempdir();
     let open_path = fixture(root.path(), "open.ken", OPEN);
     let checked = run("check", &[open_path.as_os_str()]);
     assert_eq!(
@@ -144,7 +156,7 @@ fn check_reports_open_requires_and_succeeds() {
 /// the exit code alone would miss a silent obligation.
 #[test]
 fn run_reports_open_requires_and_succeeds() {
-    let root = TempDir::new().expect("scratch fixture directory");
+    let root = rooted_tempdir();
     let open_path = fixture(root.path(), "open.ken", OPEN);
     let ran = run("run", &[open_path.as_os_str()]);
     assert_eq!(ran.status.code(), Some(0), "stderr: {:?}", ran.stderr);
@@ -206,7 +218,7 @@ fn repl_reports_open_requires_and_succeeds_for_expanded_declarations() {
 /// THE GAP: a successful build alone would allow silence.
 #[test]
 fn native_build_reports_open_requires_and_succeeds() {
-    let root = TempDir::new().expect("scratch fixture directory");
+    let root = rooted_tempdir();
     let open_path = fixture(root.path(), "open.ken", OPEN);
     let profile_path = root.path().join("resource-profile.json");
     std::fs::write(&profile_path, PROFILE).expect("write resource profile");
@@ -221,7 +233,7 @@ fn native_build_reports_open_requires_and_succeeds() {
 /// ken-elaborator tests.
 #[test]
 fn cli_and_repl_closed_controls_remain_silent_and_keep_products_unchanged() {
-    let root = TempDir::new().expect("scratch fixture directory");
+    let root = rooted_tempdir();
     let none_path = fixture(root.path(), "none.ken", NONE);
     let discharged_path = fixture(root.path(), "discharged.ken", DISCHARGED);
 

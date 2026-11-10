@@ -24,9 +24,36 @@ fn invoke(command: &str, source: &Path, extra: &[&Path]) -> Output {
 }
 
 fn assert_run(name: &str, source: &str, expected: &[u8], native: bool) {
-    let dir = tempfile::tempdir().expect("isolated fixture");
+    let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    let dir = tempfile::tempdir_in(parent).expect("isolated fixture");
     let path = dir.path().join("program.ken");
-    std::fs::write(&path, source).expect("write Ken source");
+    let identifiers: std::collections::BTreeSet<_> = source
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .collect();
+    let console = ["print_line", "write"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let exit = ["host_bind", "host_console", "host_program", "host_pure"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let mut imports = String::new();
+    if !console.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Console.Text ({})\n",
+            console.join(", ")
+        ));
+    }
+    if !exit.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Process.Exit ({})\n",
+            exit.join(", ")
+        ));
+    }
+    let selected = source.replacen(HEAD, &format!("{HEAD}{imports}"), 1);
+    std::fs::write(&path, selected).expect("write Ken source");
     let interpreted = invoke("run", &path, &[]);
     assert_eq!(
         interpreted.status.code(),
