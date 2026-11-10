@@ -4,6 +4,9 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use ken_elaborator::resolution_report::resolution_report;
+use ken_elaborator::ElabEnv;
+
 const ACCEPTED: &str = include_str!("fixtures/resolution_report/accepted.ken");
 const SHADOW: &str = include_str!("fixtures/resolution_report/shadow.ken");
 const PROFILE: &str = r#"{"runtime":{"invocation_epochs":18446744073709551615},"call_events":{"event_generations":18446744073709551615,"live_pending_slots":64},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#;
@@ -67,6 +70,79 @@ fn refs<'a>(doc: &'a serde_json::Value, declaration: &str) -> &'a [serde_json::V
 
 fn has(refs: &[serde_json::Value], class: &str, field: &str, name: &str) -> bool {
     refs.iter().any(|r| r["class"] == class && r[field] == name)
+}
+
+fn itree_seq(callee: &str) -> String {
+    format!(
+        "fn seq (tree : ITree ConsoleOp console_resp Unit)
+         : ITree ConsoleOp console_resp Unit =
+           {callee} ConsoleOp console_resp Unit Unit tree
+             (λv. ITree.Ret ConsoleOp console_resp Unit v)\n"
+    )
+}
+
+fn itree_report(source: &str, strict: bool) -> (ElabEnv, serde_json::Value) {
+    let mut env = ElabEnv::new().expect("pre-source checked identities");
+    let results = if strict {
+        let catalog = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        env.elaborate_isolated_file_strict_v1(&[catalog], source)
+            .expect("Strict source checks")
+    } else {
+        env.elaborate_file_v1(source).expect("Legacy source checks")
+    };
+    let text =
+        resolution_report(&env, &results, "check", None).expect("report from checked identities");
+    (
+        env,
+        serde_json::from_str(&text).expect("resolution report JSON"),
+    )
+}
+
+/// AC-1: Strict exposes the alias's checked identity, not its hidden snapshot
+/// spelling. This observes the emitted report rather than the source text.
+#[test]
+fn strict_itree_bind_reports_its_pre_source_alias_name_only() {
+    let (_env, doc) = itree_report(&itree_seq("itree_bind"), true);
+    assert!(has(refs(&doc, "seq"), "pre-source", "name", "itree_bind"));
+    assert!(
+        doc["declarations"].as_array().unwrap().iter().all(|decl| {
+            decl["references"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|r| r["name"] != "bind")
+        }),
+        "Strict report must not expose the hidden pre-source spelling"
+    );
+}
+
+/// AC-2: a user bind is a different checked identity; the report preserves
+/// both provenance classes instead of renaming every occurrence of "bind".
+#[test]
+fn strict_user_bind_and_itree_bind_keep_distinct_report_identities() {
+    let source = format!(
+        "fn bind (n : Nat) : Nat = n\nfn use_user (n : Nat) : Nat = bind n\n{}",
+        itree_seq("itree_bind")
+    );
+    let (_env, doc) = itree_report(&source, true);
+    assert!(has(
+        refs(&doc, "use_user"),
+        "source-declared",
+        "declaration",
+        "bind"
+    ));
+    assert!(has(refs(&doc, "seq"), "pre-source", "name", "itree_bind"));
+    assert!(!has(refs(&doc, "seq"), "pre-source", "name", "bind"));
+}
+
+/// The display map is keyed by checked identity and shared by both routes.
+/// Legacy still resolves the bare `bind`, but displays that ID as `itree_bind`.
+#[test]
+fn legacy_bare_bind_reports_itree_bind_without_changing_resolution() {
+    let (env, doc) = itree_report(&itree_seq("bind"), false);
+    assert_eq!(env.globals["bind"], env.prelude_env.bind_id);
+    assert!(has(refs(&doc, "seq"), "pre-source", "name", "itree_bind"));
+    assert!(!has(refs(&doc, "seq"), "pre-source", "name", "bind"));
 }
 
 #[test]
