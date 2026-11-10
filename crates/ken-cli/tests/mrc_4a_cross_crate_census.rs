@@ -13,6 +13,8 @@
 /// a program already known to elaborate and reach linked native lowering. A
 /// census whose fixture is novel measures the fixture first.
 const CENSUS_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc two_step (label : String) : HostIO APartial Unit visits [Console] =
   host_bind APartial Unit Unit
     (host_console APartial Unit (print_line label))
@@ -47,9 +49,10 @@ fn output_dir(case: &str) -> std::path::PathBuf {
 
 fn build(case: &str) -> bool {
     let dir = output_dir(case);
-    ken_cli::build_native_program(
+    ken_cli::build_native_program_with_roots(
         CENSUS_PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "mrc_4a_census",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

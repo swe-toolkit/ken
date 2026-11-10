@@ -23,9 +23,10 @@ fn bound_process_nat_retries_only_newly_refused_joins() {
             let root = tempfile::tempdir().expect("isolated checked program root");
             std::fs::write(root.path().join("held.bin"), b"held resource").expect("fixture file");
             let (build, observations) = ken_runtime::with_scalar_join_feedback_attempts(|| {
-                ken_cli::build_native_program(
+                ken_cli::build_native_program_with_roots(
                     include_str!("rt_nat_fanout_escaped_resource.ken"),
                     ken_cli::SourceFormat::Ken,
+                    &checked_catalog_roots(),
                     "rt_escape_nat_fanout_escaped",
                     root.path(),
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -54,4 +55,9 @@ fn bound_process_nat_retries_only_newly_refused_joins() {
         .expect("Nat test-local 256 MiB compiler thread")
         .join()
         .expect("Nat diagnostic thread did not abort");
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

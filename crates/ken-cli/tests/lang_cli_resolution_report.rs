@@ -105,6 +105,21 @@ fn three_routes_report_exact_checked_identity_and_shadow_without_touching_proces
                     !has(write_refs, "pre-source", "name", "write"),
                     "{route}: no all-pre-source or spelling-keyed classifier"
                 );
+                for name in [
+                    "IO",
+                    "ITree.Vis",
+                    "ITree.Ret",
+                    "ConsoleOp.Write",
+                    "console_resp",
+                    "Result",
+                    "IOError",
+                    "Unit",
+                ] {
+                    assert!(
+                        has(refs(&json, "write"), "pre-source", "name", name),
+                        "{route}: locally declared write uses checked {name}"
+                    );
+                }
             }
             // The flag changes no channel or exit status, not even native's
             // stdout artifact path or check's open-obligation stderr.
@@ -326,7 +341,7 @@ fn axiom_sugar_reports_its_own_checked_root_identity() {
 
 /// Promise class: durable invariant. Root-minted opaque identities in an
 /// Axiom theorem, an axiom declaration and an ensures obligation belong to
-/// their checked source result on every unchanged Legacy CLI route. A theorem
+/// their checked source result on all three Strict isolated CLI routes. A theorem
 /// proved by Proved and a prove hole are controls against reclassifying all
 /// postulates or changing their already-owned report bytes.
 #[test]

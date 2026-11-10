@@ -42,6 +42,9 @@ const PRIMITIVE_REGISTRY_REF: &str = "spec/10-kernel/18a-primitive-registry.md:c
 pub struct CompilerSource {
     pub name: String,
     pub text: String,
+    /// Explicit catalog roots for a pathless native source, or roots derived
+    /// from its actual source path by the CLI caller.
+    pub roots: Vec<std::path::PathBuf>,
 }
 
 impl CompilerSource {
@@ -49,7 +52,13 @@ impl CompilerSource {
         Self {
             name: name.into(),
             text: text.into(),
+            roots: Vec::new(),
         }
+    }
+
+    pub fn with_roots(mut self, roots: Vec<std::path::PathBuf>) -> Self {
+        self.roots = roots;
+        self
     }
 }
 
@@ -2406,18 +2415,50 @@ pub fn prepare_native_program_sources_with_resolution_report(
     prepare_native_program_sources_inner(package_name, sources, true)
 }
 
-#[inline(always)]
-fn prepare_native_program_sources_inner(
-    package_name: &str,
-    sources: Vec<CompilerSource>,
-    report: bool,
-) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
-    let manifest = CompilerManifest::new(package_name, Vec::new());
+fn require_native_package_name(package_name: &str) -> Result<(), NativeProgramBuildError> {
     if package_name.is_empty() {
         return Err(NativeProgramBuildError::Driver(
             CompilerDriverError::EmptyPackageName,
         ));
     }
+    Ok(())
+}
+
+/// Checked elaboration output consumed by native preparation. Production
+/// constructs it from source text; the single fixture caller supplies the
+/// unchanged Legacy-elaborated program with compiler-internal identities.
+/// It carries no plan, marker, seed, or independently authored admission.
+#[doc(hidden)]
+pub struct ElaboratedNativeProgramV1 {
+    env: ElabEnv,
+    sources: Vec<CompilerSource>,
+    declarations: Vec<ElabResult>,
+    examples: Vec<ElabResult>,
+    example_ids: BTreeSet<GlobalId>,
+}
+
+impl ElaboratedNativeProgramV1 {
+    /// The returned declarations must be the unfiltered results of the call
+    /// that mutated `env`; all admission and production remain downstream.
+    #[doc(hidden)]
+    pub fn from_elaborated_env(
+        env: ElabEnv,
+        source: CompilerSource,
+        declarations: Vec<ElabResult>,
+    ) -> Self {
+        Self {
+            env,
+            sources: vec![source],
+            declarations,
+            examples: Vec::new(),
+            example_ids: BTreeSet::new(),
+        }
+    }
+}
+
+fn elaborate_native_program_sources(
+    sources: Vec<CompilerSource>,
+) -> Result<ElaboratedNativeProgramV1, NativeProgramBuildError> {
     if sources.is_empty() {
         return Err(NativeProgramBuildError::Driver(
             CompilerDriverError::EmptySourceSet,
@@ -2426,26 +2467,81 @@ fn prepare_native_program_sources_inner(
     let mut env = ElabEnv::new()
         .map_err(CompilerDriverError::Elaboration)
         .map_err(NativeProgramBuildError::Driver)?;
-    let mut admitted_ids = Vec::new();
+    let mut declarations = Vec::new();
+    let mut examples = Vec::new();
     let mut example_ids = BTreeSet::new();
-    let mut results = Vec::new();
-    let mut root_results = Vec::new();
     let mut headed_source = None;
     for source in &sources {
-        let (declarations, examples, source_example_ids) =
+        env.prepare_isolated_source_strict_v1(
+            &source.roots,
+            &source.text,
+            source.name.ends_with(".ken.md"),
+        )
+        .map_err(CompilerDriverError::Elaboration)
+        .map_err(NativeProgramBuildError::Driver)?;
+        let (source_declarations, source_examples, source_example_ids) =
             elaborate_package_source(&mut env, source, &mut headed_source)
                 .map_err(NativeProgramBuildError::Driver)?;
-        for result in &declarations {
-            admitted_ids.extend(result.auxiliary_ids.iter().copied());
-            admitted_ids.push(result.def_id);
-        }
+        declarations.extend(source_declarations);
+        examples.extend(source_examples);
         example_ids.extend(source_example_ids);
-        if report {
-            root_results.extend(declarations.iter().cloned());
-        }
-        results.extend(declarations);
-        results.extend(examples);
     }
+    Ok(ElaboratedNativeProgramV1 {
+        env,
+        sources,
+        declarations,
+        examples,
+        example_ids,
+    })
+}
+
+#[inline(always)]
+fn prepare_native_program_sources_inner(
+    package_name: &str,
+    sources: Vec<CompilerSource>,
+    report: bool,
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    require_native_package_name(package_name)?;
+    prepare_native_program_from_elaborated(
+        package_name,
+        elaborate_native_program_sources(sources)?,
+        report,
+    )
+}
+
+/// Continue the ordinary native preparation with an already elaborated
+/// environment. Only the held compiler-internal relay fixture calls this
+/// separately from production's source-text path.
+#[doc(hidden)]
+pub fn prepare_native_program_from_elaborated_v1(
+    package_name: &str,
+    elaborated: ElaboratedNativeProgramV1,
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    prepare_native_program_from_elaborated(package_name, elaborated, false)
+}
+
+fn prepare_native_program_from_elaborated(
+    package_name: &str,
+    elaborated: ElaboratedNativeProgramV1,
+    report: bool,
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    let ElaboratedNativeProgramV1 {
+        env,
+        sources,
+        declarations,
+        examples,
+        example_ids,
+    } = elaborated;
+    let manifest = CompilerManifest::new(package_name, Vec::new());
+    require_native_package_name(package_name)?;
+    let mut admitted_ids = Vec::new();
+    for result in &declarations {
+        admitted_ids.extend(result.auxiliary_ids.iter().copied());
+        admitted_ids.push(result.def_id);
+    }
+    let root_results = if report { declarations.clone() } else { Vec::new() };
+    let mut results = declarations;
+    results.extend(examples);
     let obligations = owned_v2_obligations(&results);
     let open_obligation_reports = crate::render_open_obligations(&results);
     let checked = admit_checked_main(&env).map_err(NativeProgramBuildError::Admission)?;
@@ -6222,6 +6318,21 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
+fn native_fixture_roots() -> Vec<std::path::PathBuf> {
+    vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
+}
+
+#[cfg(test)]
+fn native_fixture_source(name: &str, source: &str, imports: &str) -> CompilerSource {
+    let (header, body) = source
+        .split_once('\n')
+        .expect("native fixture has a header");
+    assert!(header.starts_with("program capabilities "));
+    CompilerSource::new(name, format!("{header}\n{imports}{body}"))
+        .with_roots(native_fixture_roots())
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::checked_core::{
@@ -6683,7 +6794,11 @@ proc main
         let package_name = "caller_reporting_open_native";
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE)],
+            vec![native_fixture_source(
+                "src/main.ken",
+                CALLER_OPEN_SOURCE,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            )],
         )
         .expect("native preparation accepts open obligations");
         let report =
@@ -6760,7 +6875,11 @@ proc main
     fn native_control_core_semantic_hash(package_name: &str, source: &str) -> u64 {
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new("src/main.ken", source)],
+            vec![native_fixture_source(
+                "src/main.ken",
+                source,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            )],
         )
         .expect("control native preparation succeeds");
         assert!(preparation.package.artifact.semantic.obligations.is_empty());
@@ -6917,7 +7036,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let package_name = "r3_gate_4a_equality";
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new("src/main.ken", GATE_4A_EQUALITY_SOURCE)],
+            vec![native_fixture_source(
+                "src/main.ken",
+                GATE_4A_EQUALITY_SOURCE,
+                "import Capability.Process.Exit (host_pure)\n",
+            )],
         )
         .expect("the already-green recursive native source reaches preparation");
 
@@ -9408,8 +9531,12 @@ mod native_program_example_exclusion {
 
     fn sources(first: &str, main: &str) -> Vec<CompilerSource> {
         vec![
-            CompilerSource::new("src/dependency.ken.md", first),
-            CompilerSource::new("src/main.ken", main),
+            CompilerSource::new("src/dependency.ken.md", first).with_roots(native_fixture_roots()),
+            native_fixture_source(
+                "src/main.ken",
+                main,
+                "import Capability.Process.Exit (host_pure)\n",
+            ),
         ]
     }
 

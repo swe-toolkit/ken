@@ -3,6 +3,12 @@
 
 use super::*;
 
+fn bracket_native_source(source: impl Into<String>) -> crate::compiler_driver::CompilerSource {
+    crate::compiler_driver::CompilerSource::new("region.ken", source).with_roots(vec![
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+    ])
+}
+
 fn owner() -> StableSymbol {
     StableSymbol::declaration("rt-bracket-transport", &[], "main")
 }
@@ -458,8 +464,8 @@ fn production_static_acquire_deletion_refuses_three_real_brackets() {
         OMIT_STATIC_ACQUIRE_MARK.with(|flag| flag.set(true));
         let result = crate::compiler_driver::prepare_native_program_sources(
             &format!("rt-acquire-deletion-{index}"),
-            vec![crate::compiler_driver::CompilerSource::new(
-                "region.ken", template.replace("__ROOT_BODY__", body),
+            vec![bracket_native_source(
+                template.replace("__ROOT_BODY__", body),
             )],
         );
         OMIT_STATIC_ACQUIRE_MARK.with(|flag| flag.set(false));
@@ -473,11 +479,10 @@ fn production_static_acquire_deletion_refuses_three_real_brackets() {
     }
     crate::compiler_driver::prepare_native_program_sources(
         "rt-acquire-restored",
-        vec![crate::compiler_driver::CompilerSource::new(
-            "region.ken", template.replace(
-                "__ROOT_BODY__", "(\\resource. leaf_body terminal resource)"
-            ),
-        )],
+        vec![bracket_native_source(template.replace(
+            "__ROOT_BODY__",
+            "(\\resource. leaf_body terminal resource)",
+        ))],
     ).expect("restored production acquisition binds again");
 }
 
@@ -492,10 +497,7 @@ fn nested_two_ordinal_swap_does_not_bind_the_inner_binder_to_outer_finalizer() {
     );
     let prepared = crate::compiler_driver::prepare_native_program_sources(
         "rt-bracket-region-ordinal",
-        vec![crate::compiler_driver::CompilerSource::new(
-            "region.ken",
-            source,
-        )],
+        vec![bracket_native_source(source)],
     )
     .expect("nested checked source prepares");
     let regions = prepared.bracket_regions();
@@ -747,10 +749,9 @@ fn count_release_host_op_constructs(
 fn release_host_op_selector_overmarks_early_public_releases() {
     let prepared = crate::compiler_driver::prepare_native_program_sources(
         "rt-bracket-region-overmark",
-        vec![crate::compiler_driver::CompilerSource::new(
-            "region.ken",
-            include_str!("../../tests/fixtures/rt_bracket_region_early_release.ken"),
-        )],
+        vec![bracket_native_source(include_str!(
+            "../../tests/fixtures/rt_bracket_region_early_release.ken"
+        ))],
     )
     .expect("early-release checked source prepares");
     let spine = prepared.bracket_host_spine_for_test();

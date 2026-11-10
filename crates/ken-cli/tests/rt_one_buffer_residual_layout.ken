@@ -1,4 +1,7 @@
 program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketResult, withBuffer)
 proc buffer_body (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   host_pure AFull (ResourceBodyResult Unit Unit)

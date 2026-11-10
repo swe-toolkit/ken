@@ -1,4 +1,8 @@
 program capabilities FS AFull, Process
+import Capability.Process.Child (ChildPipe, read_pipe, spawn_plan, take_stdout, wait_child, withChild, with_environment, with_stdin, with_stdout)
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withBuffer)
 
 proc child_body
       (buffer : BufferHandle) (child : Resource ResourceKind.ChildProcess)

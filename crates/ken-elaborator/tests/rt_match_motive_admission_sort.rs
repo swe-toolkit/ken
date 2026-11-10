@@ -13,6 +13,7 @@ use ken_elaborator::compiler_driver::{
 use ken_elaborator::omega_erasure::OmegaErasurePlan;
 
 const HOST_AND_PROOF: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 theorem proof_match (b : Bool) : Top =
   match b { True |-> Proved; False |-> Proved }
@@ -32,6 +33,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const COMPUTATIONAL_PROOF: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 fn computational_prop (b : Bool) : Nat =
   let p : Top = match b { True |-> Proved; False |-> Proved } in Zero
@@ -44,6 +46,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const DEPENDENT_TYPE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 fn result_type (b : Bool) : Type =
   match b { True |-> Nat; False |-> Bool }
@@ -66,9 +69,12 @@ fn selected_package(
     StableSymbol,
 ) {
     let owner = StableSymbol::declaration(package_name, &[], name);
+    // This generic package route remains Legacy; only native preparation
+    // consumes the imported Strict source and its explicit catalog root.
+    let legacy_source = source.replacen("import Capability.Process.Exit (host_pure)\n", "", 1);
     let compiled = compile_ken_package_sources(
         &CompilerManifest::new(package_name, Vec::new()),
-        vec![CompilerSource::new("src/main.ken", source)],
+        vec![CompilerSource::new("src/main.ken", legacy_source)],
         TargetSelector::StableSymbol {
             package_identity: StableSymbol::new(
                 SymbolNamespace::Module,
@@ -120,7 +126,9 @@ fn elaborated_match_sort_and_selected_delivery_boundary() {
         .spawn(|| {
             let preparation = prepare_native_program_sources(
                 "rt_motive_host",
-                vec![CompilerSource::new("src/main.ken", HOST_AND_PROOF)],
+                vec![CompilerSource::new("src/main.ken", HOST_AND_PROOF)
+                    .with_roots(vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../catalog/packages")])],
             )
             .expect("normalized non-dependent Type match admits this host");
             assert!(

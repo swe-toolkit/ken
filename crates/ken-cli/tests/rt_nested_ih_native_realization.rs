@@ -13,6 +13,7 @@ fn observations_agree(
 }
 
 const NESTED_NAT_THREE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 data Bag (a : Type) : Type where {
   Empty : Bag a;
@@ -72,9 +73,10 @@ fn nested_checked_ih_native_result_is_exactly_interpreter_nat_three() {
     // THE GAP: the process boundary observes the result through an injective
     // classifier around 3 rather than exporting the opaque Nat itself.
     let root = output_dir();
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         NESTED_NAT_THREE,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "rt-nested-ih-native-realization",
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -84,6 +86,7 @@ fn nested_checked_ih_native_result_is_exactly_interpreter_nat_three() {
     let interpreted = ken_cli::run_program_effect_observation(
         NESTED_NAT_THREE,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",

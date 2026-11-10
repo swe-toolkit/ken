@@ -33,6 +33,7 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
             let interpreted = ken_cli::run_program_effect_observation(
                 source,
                 ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),
@@ -75,9 +76,10 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
             let owner_of = {
                 let (_, diagnostics) =
                     ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             source,
                             ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             "rt_performing_underived",
                             root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -107,9 +109,10 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
             // row changes only the protocol classification of that same source.
             for forced_owner in [None, Some(allocate_owner), Some(read_owner)] {
                 let build = || {
-                    ken_cli::build_native_program(
+                    ken_cli::build_native_program_with_roots(
                         source,
                         ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         "rt_performing_underived",
                         root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -212,4 +215,9 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
         .expect("spawn stated-stack Underived fixture")
         .join()
         .expect("Underived fixture thread");
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

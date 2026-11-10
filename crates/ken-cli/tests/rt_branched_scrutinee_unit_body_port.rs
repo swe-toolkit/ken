@@ -82,9 +82,10 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
 fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1_body() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let (result, route1) = ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             BRANCHED_SCRUTINEE_SOURCE,
             ken_cli::SourceFormat::Ken,
+            &checked_catalog_roots(),
             "rt_branched_scrutinee_unit_body",
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -143,9 +144,10 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
             ken_runtime::with_static_response_feasibility_diagnostics(|| {
                 ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
                     ken_runtime::with_branched_scrutinee_unit_body_match_branch_entry_suppressed(|| {
-                        ken_cli::build_native_program(
+                        ken_cli::build_native_program_with_roots(
                             BRANCHED_SCRUTINEE_SOURCE,
                             ken_cli::SourceFormat::Ken,
+                            &checked_catalog_roots(),
                             "rt_branched_scrutinee_unit_body_mutation",
                             root.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -272,9 +274,10 @@ fn branched_scrutinee_forwarded_read_matches_interpreter_body() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     std::fs::write(root.path().join("source"), b"0123456789abcdef")
         .expect("the fixture source file is readable");
-    let compiled = ken_cli::build_native_program(
+    let compiled = ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         "rt_branched_scrutinee_forwarded_read",
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -294,6 +297,7 @@ fn branched_scrutinee_forwarded_read_matches_interpreter_body() {
     let interpreted = ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &[],
         &[],
         root.path().as_os_str().as_bytes(),
@@ -364,9 +368,10 @@ fn suppressing_relay_promotion_refuses_the_forwarded_read_before_lowering() {
     assert_ne!(source, BRANCHED_SCRUTINEE_SOURCE);
     let root = tempfile::tempdir().expect("temporary native-build root");
     let (result, applications) = ken_runtime::with_suppressed_relay_promotion(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
+            &checked_catalog_roots(),
             "rt_branched_relay_promotion_suppressed",
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -400,8 +405,10 @@ fn lowering_relay_source_without_entering_owner_refuses_coverage() {
         let inert_root = tempfile::tempdir().expect("suppression-only native-build root");
         let (inert_result, inert_applications) = ken_runtime::with_result_contract_layer_mutation(
             ken_runtime::ResultContractLayerMutation::SuppressMissingContractRefusal,
-            || ken_cli::build_native_program(
-                &source, ken_cli::SourceFormat::Ken,
+            || ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
                 "rt_relay_suppression_inert", inert_root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             ),
@@ -416,8 +423,10 @@ fn lowering_relay_source_without_entering_owner_refuses_coverage() {
             let run = || ken_runtime::with_relay_owner_coverage_refusal_observations(|| {
                 ken_runtime::with_static_response_caller_retarget_mutation(
                     ken_runtime::StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget,
-                    || ken_cli::build_native_program(
-                        &source, ken_cli::SourceFormat::Ken,
+                    || ken_cli::build_native_program_with_roots(
+                        &source,
+                        ken_cli::SourceFormat::Ken,
+                        &checked_catalog_roots(),
                         "rt_relay_lowered_without_owner", root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     ),
@@ -467,4 +476,9 @@ fn lowering_relay_source_without_entering_owner_refuses_coverage() {
             }
         }
     });
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

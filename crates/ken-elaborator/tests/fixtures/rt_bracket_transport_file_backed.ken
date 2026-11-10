@@ -1,4 +1,7 @@
 program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Mapping (FileBacked, MappingHandle)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withMapping, withResource)
 
 fn mapping_body (_mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =

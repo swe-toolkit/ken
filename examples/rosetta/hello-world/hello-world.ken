@@ -1,5 +1,9 @@
 program capabilities FS APartial
 
+import Capability.Console.Text (print_line)
+
+import Capability.Process.Exit (host_program)
+
 -- Rosetta Code: Hello world
 -- https://rosettacode.org/wiki/Hello_world/Text
 --

@@ -1,4 +1,6 @@
 program capabilities FS APartial
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc read_byte (cap : Cap APartial) (chosen : UInt8)
   : HostIO APartial UInt8 visits [FS] =
   host_bind APartial (Result FileError Bytes) UInt8

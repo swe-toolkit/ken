@@ -1,4 +1,8 @@
 program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow, buffer_span_budget)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 proc second_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)

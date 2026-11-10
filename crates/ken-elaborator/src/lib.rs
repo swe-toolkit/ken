@@ -677,6 +677,19 @@ impl ElabEnv {
         modules::expand_and_elaborate(self, &decls)
     }
 
+    /// Prepare one Strict in-memory root, importing only its explicit catalog
+    /// dependencies. The same seam serves direct files and native preparation,
+    /// which must preserve separate declaration and checked-example results.
+    #[doc(hidden)]
+    pub fn prepare_isolated_source_strict_v1(
+        &mut self,
+        roots: &[std::path::PathBuf],
+        src: &str,
+        literate: bool,
+    ) -> Result<(), ElabError> {
+        modules::prepare_isolated_strict_scope_v1(self, src, literate, roots)
+    }
+
     /// Elaborate an isolated `.ken` source with explicit Strict catalog roots.
     /// Callers with a source path can obtain the nearest root through
     /// [`modules::isolated_catalog_root`]; pathless callers supply their roots.

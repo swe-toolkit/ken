@@ -41,6 +41,23 @@ fn package(sources: Vec<CompilerSource>) -> Result<CompilerDriverOutput, Compile
 fn native(
     sources: Vec<CompilerSource>,
 ) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    let roots =
+        vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
+    let sources = sources
+        .into_iter()
+        .map(|mut source| {
+            // The generic package route retains its original Legacy fixture.
+            // Only native preparation requires this checked identity's import.
+            if source.name == "full.ken" {
+                source.text = source.text.replacen(
+                    "program capabilities FS AFull\n",
+                    "program capabilities FS AFull\nimport Capability.Process.Exit (host_pure)\n",
+                    1,
+                );
+            }
+            source.with_roots(roots.clone())
+        })
+        .collect();
     prepare_native_program_sources(PKG, sources)
 }
 

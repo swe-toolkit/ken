@@ -1,5 +1,7 @@
 program capabilities FS APartial
 
+import Core.Classes.LawfulClasses (leqChar)
+
 -- Rosetta Code: Sorting algorithms/Merge sort
 -- https://rosettacode.org/wiki/Sorting_algorithms/Merge_sort
 --

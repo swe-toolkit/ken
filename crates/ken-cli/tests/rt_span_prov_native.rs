@@ -38,9 +38,10 @@ fn differential(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
 
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &format!("rt_span_prov_{}", case.replace('-', "_")),
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -61,6 +62,7 @@ fn differential(case: &str, source: &str) -> Differential {
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -88,6 +90,7 @@ fn interpret_only(case: &str, source: &str) -> ken_runtime::EffectObservation {
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -113,6 +116,7 @@ fn interpret_reading(
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -180,6 +184,10 @@ fn assert_freeze_sequence(case: &str, engine: &str, freezes: &[ken_runtime::Cano
 // bytes; a foreign then an own freeze on B, both results discarded in-program.
 #[cfg(target_os = "linux")]
 const SP_A_FREEZE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow, freeze)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn ok_body (unit : Unit) : ResourceBodyResult Unit Unit = ResourceBodyOk Unit Unit MkUnit
 
 fn body_from_alloc (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
@@ -317,8 +325,9 @@ fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
         let root = output_dir("sp-a-freeze");
         std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
         let (built, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
-            ken_cli::build_native_program(
+            ken_cli::build_native_program_with_roots(
                 SP_A_FREEZE, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                 "rt_span_prov_sp_a_freeze", root.path(),
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
@@ -380,6 +389,10 @@ fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
 // FsWriteAt = InvalidBounds on both executors.
 #[cfg(target_os = "linux")]
 const SP_A_WRITE_FOREIGN: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn ok_body (unit : Unit) : ResourceBodyResult Unit Unit = ResourceBodyOk Unit Unit MkUnit
 
 fn from_buffer_alloc (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
@@ -499,6 +512,10 @@ fn sp_a_foreign_span_write_rejects_before_backend_interp() {
 // foreign arm's zero-backend/empty-destination is asserted separately above.
 #[cfg(target_os = "linux")]
 const SP_A_WRITE_OWN: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn ok_body (unit : Unit) : ResourceBodyResult Unit Unit = ResourceBodyOk Unit Unit MkUnit
 
 fn from_buffer_alloc (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
@@ -613,6 +630,10 @@ fn sp_a_own_span_write_succeeds_with_bytes_interp() {
 // write B span_old (InvalidBounds), write B span_b (Wrote).
 #[cfg(target_os = "linux")]
 const SP_C_FULL: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow, freeze)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn ok_body (unit : Unit) : ResourceBodyResult Unit Unit = ResourceBodyOk Unit Unit MkUnit
 
 fn ret_body (b : ResourceBodyResult Unit Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
@@ -798,6 +819,10 @@ fn sp_c_released_span_not_revived_by_slot_reuse_interp() {
 // write span_b0. Native half is BLOCKED-ON-NATIVE-REACHABILITY.
 #[cfg(target_os = "linux")]
 const SP_B_VALIDITY: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow, freeze)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn ok_body (unit : Unit) : ResourceBodyResult Unit Unit = ResourceBodyOk Unit Unit MkUnit
 
 fn from_buffer_alloc (outcome : Result ResourceError (ResourceBracketResult Unit Unit))
@@ -954,6 +979,10 @@ fn sp_b_foreign_and_stale_window_reject_with_no_effect_interp() {
 // foreign@-1 -> InvalidOffset]. Native half is BLOCKED-ON-NATIVE-REACHABILITY.
 #[cfg(target_os = "linux")]
 const SP_B_PRECEDENCE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
 fn is_invalid_bounds (e : ResourceError) : Bool =
   match e {
     ResourceError.ResourceHostIO io |-> False; ResourceError.Closed |-> False; ResourceError.MalformedResource |-> False;

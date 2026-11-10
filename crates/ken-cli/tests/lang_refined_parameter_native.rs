@@ -6,6 +6,7 @@
 use std::process::Command;
 
 const SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 def AnyNat = { x : Nat | Top }
 fn classify (n : Nat) : ExitCode = match n {
   Zero |-> ExitCode.Failure 100;
