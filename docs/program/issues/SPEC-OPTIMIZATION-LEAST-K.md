@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-LEAST-K
 title: "Spec 72 selects one least-cost or greatest-cost candidate, and its own deferral list says it supplies no top-k selection, so a client needing the k cheapest candidates has no checked operation. Add least_k over a Nat cost and a List, with checked laws at zero trust and no equality decision on candidates: the result has min k (length xs) members, each is a member of xs, no unselected candidate is cheaper than a selected one, and at k = 1 it agrees with argmin_option, with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: L
 tier: T1
