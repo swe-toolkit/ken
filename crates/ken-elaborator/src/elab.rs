@@ -17243,7 +17243,7 @@ pub(crate) fn elaborate_rdecl(
         &mut sentinel,
         &mut discarded_provenance,
         &no_standard_operators,
-        &CheckedEffectRows::new(&no_names, &no_checked_ids, &no_names, &no_checked_ids),
+        &CheckedEffectRows::new(&no_names, &no_checked_ids, &no_names, &no_checked_ids, &HashMap::new(), &HashMap::new()),
         rdecl,
     )?;
     Ok(result.def_id)
@@ -18504,6 +18504,8 @@ pub(crate) struct CheckedEffectRows<'a> {
     ids: &'a HashMap<GlobalId, crate::effects::RowType>,
     carried_names: &'a HashMap<String, crate::effects::RowType>,
     carried_ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+    charged_names: &'a HashMap<String, Option<Vec<bool>>>,
+    charged_ids: &'a HashMap<GlobalId, Vec<bool>>,
 }
 
 impl<'a> CheckedEffectRows<'a> {
@@ -18512,8 +18514,10 @@ impl<'a> CheckedEffectRows<'a> {
         ids: &'a HashMap<GlobalId, crate::effects::RowType>,
         carried_names: &'a HashMap<String, crate::effects::RowType>,
         carried_ids: &'a HashMap<GlobalId, crate::effects::RowType>,
+        charged_names: &'a HashMap<String, Option<Vec<bool>>>,
+        charged_ids: &'a HashMap<GlobalId, Vec<bool>>,
     ) -> Self {
-        Self { names, ids, carried_names, carried_ids }
+        Self { names, ids, carried_names, carried_ids, charged_names, charged_ids }
     }
 }
 
@@ -18529,7 +18533,28 @@ pub(crate) fn written_type_row(
             written_latent_row(latent).join(row(domain)).join(row(codomain))
         }
         RType::RPi(_, a, b, _) | RType::RSigma(_, a, b, _)
-        | RType::RArr(a, b, _) | RType::RApp(a, b, _) => row(a).join(row(b)),
+        | RType::RArr(a, b, _) => row(a).join(row(b)),
+        RType::RApp(..) => {
+            let mut args = Vec::new();
+            let mut head = ty;
+            while let RType::RApp(f, arg, _) = head {
+                args.push(arg.as_ref());
+                head = f;
+            }
+            let mask = match head {
+                RType::RCheckedGlobal { id, .. } => rows.charged_ids.get(id),
+                RType::RCon(name, _) => rows.charged_names.get(name).and_then(Option::as_ref),
+                _ => None,
+            };
+            args.reverse();
+            args.into_iter().enumerate().fold(row(head), |acc, (i, arg)| {
+                if mask.is_none_or(|mask| mask.get(i).copied().unwrap_or(true)) {
+                    acc.join(row(arg))
+                } else {
+                    acc
+                }
+            })
+        }
         RType::RRefine(_, carrier, _, _) | RType::RTrunc(carrier, _) => row(carrier),
         RType::RCon(name, _) => rows.carried_names.get(name).cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
@@ -18539,6 +18564,13 @@ pub(crate) fn written_type_row(
         | RType::RProj(..) => crate::effects::RowType::empty(),
     }
 }
+
+#[path = "elab/phantom_type_arguments.rs"]
+mod phantom_type_arguments;
+pub(crate) use phantom_type_arguments::family_charged_positions;
+#[cfg(test)]
+#[path = "elab/phantom_type_argument_tests.rs"]
+mod phantom_type_argument_tests;
 
 /// The one admission calculation for every named data, record and type
 /// alias. Only successful declarations are registered by the module sink.
@@ -18858,20 +18890,39 @@ fn bound_value_latent_from_row(
 /// The carried rows a checked type names, through its head, its arguments
 /// and its Sigma components.
 fn type_carried_row(cx: &ElabCtx<'_>, ty: &Term) -> crate::effects::RowType {
-    let mut carried = crate::effects::RowType::empty();
     let Some(rows) = cx.effect_rows else {
-        return carried;
+        return crate::effects::RowType::empty();
     };
-    let mut pending = vec![cx.metas.zonk_term(ty)];
+    type_carried_row_in(cx.metas.zonk_term(ty), &rows)
+}
+
+fn type_carried_row_in(ty: Term, rows: &CheckedEffectRows<'_>) -> crate::effects::RowType {
+    let mut carried = crate::effects::RowType::empty();
+    let mut pending = vec![ty];
     while let Some(ty) = pending.pop() {
         match ty {
             Term::Sigma(a, b) => {
                 pending.push(*a);
                 pending.push(*b);
             }
-            Term::App(f, a) => {
-                pending.push(*f);
-                pending.push(*a);
+            Term::App(..) => {
+                let mut args = Vec::new();
+                let mut head = ty;
+                while let Term::App(f, a) = head {
+                    args.push(*a);
+                    head = *f;
+                }
+                let mask = match &head {
+                    Term::IndFormer { id, .. } => rows.charged_ids.get(id),
+                    _ => None,
+                };
+                args.reverse();
+                for (i, arg) in args.into_iter().enumerate() {
+                    if mask.is_none_or(|mask| mask.get(i).copied().unwrap_or(true)) {
+                        pending.push(arg);
+                    }
+                }
+                pending.push(head);
             }
             Term::Const { id, .. } | Term::IndFormer { id, .. } => {
                 if let Some(row) = rows.carried_ids.get(&id) {
@@ -19089,6 +19140,8 @@ pub(crate) fn check_surface_purity(
     effect_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
     carried_rows: &HashMap<String, crate::effects::RowType>,
     carried_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
+    charged_names: &HashMap<String, Option<Vec<bool>>>,
+    charged_ids: &HashMap<GlobalId, Vec<bool>>,
     env: &GlobalEnv,
     refinement_facts: &RefinementFacts,
     globals: &HashMap<String, GlobalId>,
@@ -19115,7 +19168,7 @@ pub(crate) fn check_surface_purity(
         local_constraints: constraints,
         bound_dict_classes: &bound_dict_classes,
     };
-    let rows = CheckedEffectRows::new(effect_rows, effect_rows_by_id, carried_rows, carried_rows_by_id);
+    let rows = CheckedEffectRows::new(effect_rows, effect_rows_by_id, carried_rows, carried_rows_by_id, charged_names, charged_ids);
     let mut scope = LatentScope::new(&|_, _| crate::effects::RowType::empty());
     scope.entered = declaration_param_latents(rdecl.ty.as_ref(), &rdecl.body, &rows)
         .into_iter().map(|(name, latent)| (Some(name), latent)).collect();
@@ -22606,7 +22659,7 @@ pub(crate) fn elaborate_space_decl(
         )
         .with_preconditions(&elab.preconditions, PremiseHoles::Reported)
         .with_effect_rows(
-            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
+            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id),
             Vec::new(),
         );
         let cell_type = elab_type(&mut cx, &cell.ty)?;
@@ -22630,6 +22683,9 @@ pub(crate) fn elaborate_space_decl(
         }
     })?;
     elab.globals.insert(space.name.clone(), state_id);
+    // A generated space type bypasses register_effect_row. Name-plane masks
+    // must stay charge-all even if a phantom family later shares its spelling.
+    elab.type_charged_args.insert(space.name.clone(), None);
     let mut results = vec![ElabResult {
         postulate_ids: Vec::new(),
         name: space.name.clone(),
@@ -22666,7 +22722,7 @@ pub(crate) fn elaborate_space_decl(
             &elab.effect_rows,
             &elab.effect_rows_by_id,
             &elab.type_carried_rows,
-            &elab.type_carried_rows_by_id,
+            &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id
         );
         space
             .cells
@@ -22709,7 +22765,7 @@ pub(crate) fn elaborate_space_decl(
         let mut scope = LatentScope::new(&outer).with_cells(&cell_latents);
         let rows = CheckedEffectRows::new(
             &elab.effect_rows, &elab.effect_rows_by_id,
-            &elab.type_carried_rows, &elab.type_carried_rows_by_id,
+            &elab.type_carried_rows, &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id
         );
         // The parameters' written rows, as a top-level proc's are.
         let param_latents: Vec<(String, crate::effects::RowType)> = operation
@@ -22748,7 +22804,7 @@ pub(crate) fn elaborate_space_decl(
             &elab.class_env,
             &mut elab.resolution_provenance,
             &elab.standard_operators,
-            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
+            CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id),
             param_latents,
         )
         .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
@@ -32234,7 +32290,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &standard_operators,
-            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id, &env.type_charged_args, &env.type_charged_args_by_id),
             &rdecl,
         )
         .expect("const with concrete D1 visits row must elaborate");
@@ -32268,7 +32324,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &no_standard_operators(src),
-            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id, &env.type_charged_args, &env.type_charged_args_by_id),
             &rdecl,
         ).expect("standalone V1 elaborates").def_id;
         let (_, body) = env.env.transparent_body(id).expect("checked definition");
@@ -32301,7 +32357,7 @@ mod surf1_visits_row_production_path {
             &mut env.class_env,
             &mut env.resolution_provenance,
             &standard_operators,
-            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id),
+            &CheckedEffectRows::new(&env.effect_rows, &env.effect_rows_by_id, &env.type_carried_rows, &env.type_carried_rows_by_id, &env.type_charged_args, &env.type_charged_args_by_id),
             &rdecl,
         )
         .expect_err("unbound visits row variable must reject fail-closed");

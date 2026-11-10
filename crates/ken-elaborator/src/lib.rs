@@ -209,6 +209,10 @@ pub struct ElabEnv {
     /// field types. The identity map survives later spelling overwrites.
     pub(crate) type_carried_rows: HashMap<String, effects::RowType>,
     pub(crate) type_carried_rows_by_id: HashMap<ken_kernel::GlobalId, effects::RowType>,
+    /// Family argument positions that can carry a row. A name collision is
+    /// fail-safe: None means every argument is charged. IDs stay exact.
+    pub(crate) type_charged_args: HashMap<String, Option<Vec<bool>>>,
+    pub(crate) type_charged_args_by_id: HashMap<ken_kernel::GlobalId, Vec<bool>>,
     /// Generated initial-state definitions for surface `space` blocks.
     ///
     /// These are elaboration metadata, not source-visible `Space.initial`
@@ -276,6 +280,8 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
         effect_rows_by_id: _,
         type_carried_rows: _,
         type_carried_rows_by_id: _,
+        type_charged_args: _,
+        type_charged_args_by_id: _,
         space_metadata: _,
         prelude_env: _,
         class_env: _,
@@ -329,6 +335,24 @@ fn restore_program_binding<V>(table: &mut HashMap<String, V>, name: &str, saved:
             table.remove(name);
         }
     }
+}
+
+/// Identify type-former spellings bound outside ordinary source declaration
+/// registration. Constructor IDs have no top-level `Decl` and are not heads.
+fn is_globals_type_former(env: &GlobalEnv, id: GlobalId) -> bool {
+    let Some(decl) = env.lookup(id) else {
+        return false;
+    };
+    let mut ty = match decl {
+        KernelDecl::Inductive(_) => return true,
+        KernelDecl::Transparent { ty, .. }
+        | KernelDecl::Opaque { ty, .. }
+        | KernelDecl::Primitive { ty, .. } => ty,
+    };
+    while let Term::Pi(_, codomain) = ty {
+        ty = codomain;
+    }
+    matches!(ken_kernel::whnf(env, &Context::new(), ty), Term::Type(_) | Term::Omega(_))
 }
 
 impl ElabEnv {
@@ -416,6 +440,8 @@ impl ElabEnv {
             effect_rows_by_id: HashMap::new(),
             type_carried_rows: HashMap::new(),
             type_carried_rows_by_id: HashMap::new(),
+            type_charged_args: HashMap::new(),
+            type_charged_args_by_id: HashMap::new(),
             space_metadata: SpaceElaborationMetadata::default(),
             // placeholder; `register_prelude` fills it (and needs `&mut self`).
             prelude_env: prelude::empty_prelude_env(),
@@ -562,6 +588,14 @@ impl ElabEnv {
         // package's duplicate-name set; prelude names keep their own guards.
         elab.module_state.package_definitions.clear();
         elab.module_state.finish_prelude_source_registration();
+        // Prelude and compiler registrars bind type formers without passing
+        // through register_effect_row. A spelling-only written annotation must
+        // never inherit a later phantom mask under one of these names.
+        for (name, id) in &elab.globals {
+            if is_globals_type_former(&elab.env, *id) {
+                elab.type_charged_args.entry(name.clone()).or_insert(None);
+            }
+        }
         Ok(elab)
     }
 
@@ -600,6 +634,11 @@ impl ElabEnv {
         let id = declare_postulate(&mut self.env, name.to_string(), vec![], ty)
             .map_err(|e| ElabError::Internal(format!("declare_postulate failed: {}", e)))?;
         self.globals.insert(name.to_string(), id);
+        if is_globals_type_former(&self.env, id) {
+            // Raw postulates bypass register_effect_row too. Preserve a
+            // charge-all spelling if a later phantom family shadows it.
+            self.type_charged_args.insert(name.to_string(), None);
+        }
         Ok(id)
     }
 
@@ -1052,6 +1091,8 @@ impl ElabEnv {
             effect_rows_by_id,
             type_carried_rows,
             type_carried_rows_by_id,
+            type_charged_args,
+            type_charged_args_by_id,
             space_metadata,
             prelude_env,
             class_env,
@@ -1084,6 +1125,8 @@ impl ElabEnv {
         effect_rows_by_id.retain(|id, _| !removed_ids.contains(id));
         type_carried_rows.retain(|name, _| !removed_names.contains(name));
         type_carried_rows_by_id.retain(|id, _| !removed_ids.contains(id));
+        type_charged_args.retain(|name, _| !removed_names.contains(name));
+        type_charged_args_by_id.retain(|id, _| !removed_ids.contains(id));
         space_metadata
             .initial_states
             .retain(|_, id| !removed_ids.contains(id));
@@ -1121,7 +1164,7 @@ impl ElabEnv {
                     &env.refinement_facts,
                     elab::CheckedEffectRows::new(
                         &env.effect_rows, &env.effect_rows_by_id,
-                        &env.type_carried_rows, &env.type_carried_rows_by_id,
+                        &env.type_carried_rows, &env.type_carried_rows_by_id, &env.type_charged_args, &env.type_charged_args_by_id
                     ),
                     owner_label,
                     &rexpr,

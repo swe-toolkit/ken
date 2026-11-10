@@ -4259,6 +4259,21 @@ fn register_obligation_holes(elab: &mut ElabEnv, result: &crate::elab::ElabResul
     }
 }
 
+// A spelling can refer to more than one checked declaration. Absence is a
+// new name; an existing None is a permanent charge-all collision witness.
+pub(crate) fn join_charged_name_mask(
+    prior: Option<&Option<Vec<bool>>>,
+    next: Option<Vec<bool>>,
+) -> Option<Vec<bool>> {
+    match (prior, next) {
+        (None, next) => next,
+        (Some(Some(old)), Some(next)) if old.len() == next.len() => {
+            Some(old.iter().zip(next).map(|(a, b)| *a || b).collect())
+        }
+        _ => None,
+    }
+}
+
 fn register_effect_row(
     elab: &mut ElabEnv,
     rdecl: &RDecl,
@@ -4269,8 +4284,28 @@ fn register_effect_row(
         &crate::elab::CheckedEffectRows::new(
             &elab.effect_rows, &elab.effect_rows_by_id,
             &elab.type_carried_rows, &elab.type_carried_rows_by_id,
+            &elab.type_charged_args, &elab.type_charged_args_by_id,
         ),
     );
+    // Only a checked inductive former supplies a trustworthy argument
+    // telescope. Any mismatch charges all positions rather than guessing.
+    let mask = crate::elab::family_charged_positions(rdecl).filter(|mask| {
+        let Some(ken_kernel::Decl::Inductive(family)) = elab.env.lookup(result.def_id) else {
+            return false;
+        };
+        let mut pi_count = 0;
+        let mut former = &family.former_type;
+        while let ken_kernel::Term::Pi(_, body) = former {
+            pi_count += 1;
+            former = body;
+        }
+        pi_count == mask.len()
+    });
+    if let Some(mask) = &mask {
+        elab.type_charged_args_by_id.insert(result.def_id, mask.clone());
+    }
+    let joined = join_charged_name_mask(elab.type_charged_args.get(&result.name), mask);
+    elab.type_charged_args.insert(result.name.clone(), joined);
     if carried != crate::effects::RowType::empty() {
         elab.type_carried_rows.insert(result.name.clone(), carried.clone());
         elab.type_carried_rows_by_id.insert(result.def_id, carried);
@@ -4620,6 +4655,8 @@ fn elaborate_checked_spine_free(
         &elab.effect_rows_by_id,
         &elab.type_carried_rows,
         &elab.type_carried_rows_by_id,
+        &elab.type_charged_args,
+        &elab.type_charged_args_by_id,
         &elab.env,
         &elab.refinement_facts,
         &elab.globals,
@@ -4635,7 +4672,7 @@ fn elaborate_checked_spine_free(
         &mut elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_here,
-        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
@@ -4660,6 +4697,8 @@ fn elaborate_checked_with_fixity(
         &elab.effect_rows_by_id,
         &elab.type_carried_rows,
         &elab.type_carried_rows_by_id,
+        &elab.type_charged_args,
+        &elab.type_charged_args_by_id,
         &elab.env,
         &elab.refinement_facts,
         &elab.globals,
@@ -4675,7 +4714,7 @@ fn elaborate_checked_with_fixity(
         &mut elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_here,
-        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
@@ -5469,7 +5508,7 @@ fn elaborate_mutual_group_with_fixities(
         &elab.class_env,
         &mut elab.resolution_provenance,
         &standard_operators_for_group,
-        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id),
+        &crate::elab::CheckedEffectRows::new(&elab.effect_rows, &elab.effect_rows_by_id, &elab.type_carried_rows, &elab.type_carried_rows_by_id, &elab.type_charged_args, &elab.type_charged_args_by_id),
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.refinement_facts,
@@ -6092,6 +6131,8 @@ fn expand_scope(
                                 &elab.effect_rows_by_id,
                                 &elab.type_carried_rows,
                                 &elab.type_carried_rows_by_id,
+                                &elab.type_charged_args,
+                                &elab.type_charged_args_by_id,
                                 &elab.env,
                                 &elab.refinement_facts,
                                 &elab.globals,

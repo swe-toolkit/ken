@@ -131,6 +131,8 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         effect_rows_by_id,  // checked GlobalId -> effect row — carries no Term
         type_carried_rows, // written type carried rows — no kernel Term
         type_carried_rows_by_id, // checked GlobalId -> carried row — no Term
+        type_charged_args, // spelling -> optional boolean mask — no Term
+        type_charged_args_by_id, // checked GlobalId -> boolean mask — no Term
         space_metadata: _,  // private GlobalId index — types live in global_env
         prelude_env,        // GlobalIds for prelude decls — types live in global_env
         module_state,       // surface-name -> canonical-name aliases into global_env
@@ -158,6 +160,8 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         effect_rows_by_id,
         type_carried_rows,
         type_carried_rows_by_id,
+        type_charged_args,
+        type_charged_args_by_id,
         prelude_env,
         module_state,
         resolution_provenance,
