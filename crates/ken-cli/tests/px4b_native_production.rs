@@ -893,7 +893,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 #[test]
 fn native_build_subcommand_reaches_the_same_public_producer() {
     let dir = output_dir("cli");
-    let source_path = dir.join("main.ken");
+    let source_parent =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&source_parent).expect("catalog-rooted source parent");
+    let source_dir = tempfile::tempdir_in(source_parent).expect("catalog-rooted CLI source");
+    let source_path = source_dir.path().join("main.ken");
     let artifact_dir = dir.join("artifact");
     let profile_path = dir.join("resource-profile.json");
     std::fs::write(&source_path, PURE_PROGRAM).unwrap();

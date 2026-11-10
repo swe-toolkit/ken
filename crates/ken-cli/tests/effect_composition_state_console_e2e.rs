@@ -62,20 +62,19 @@ fn state_console_source_rechecks_under_strict_without_internal_effect_names() {
         .join("catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let body = PROG
-        .strip_prefix("program capabilities FS APartial\n")
-        .expect("source program header");
-    let other_imports = "import Capability.Console.Text (print_line)\n\
-                         import Capability.Process.Exit (host_console, host_bind, host_pure)\n";
-    let complete = format!(
-        "program capabilities FS APartial\n{other_imports}\
-         import Core.Effect.Coproduct (inject_r)\n{body}"
-    );
     let mut strict = ElabEnv::new().expect("prelude");
     strict
-        .elaborate_isolated_file_strict_v1(&[root.clone()], &complete)
+        .elaborate_isolated_file_strict_v1(&[root.clone()], PROG)
         .expect("State-Console source with checked effect imports");
-    let without_inject = format!("program capabilities FS APartial\n{other_imports}{body}");
+    let without_inject = PROG.replacen("import Core.Effect.Coproduct (inject_r)\n", "", 1);
+    assert_ne!(
+        without_inject, PROG,
+        "negative must remove the inclusion import"
+    );
+    assert!(
+        !without_inject.contains("import Core.Effect.Coproduct (inject_r)"),
+        "negative must retain no inclusion import"
+    );
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[root], &without_inject) {
         Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "inject_r"),

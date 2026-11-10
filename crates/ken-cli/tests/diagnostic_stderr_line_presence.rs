@@ -99,6 +99,14 @@ fn strict_stuck_tree_requires_its_fixed_width_import() {
         .expect("the checked narrowing import preserves the stuck continuation");
     let without_conversion =
         STUCK_TREE.replacen("import Data.Numeric.FixedWidth (intToInt8)\n", "", 1);
+    assert_ne!(
+        without_conversion, STUCK_TREE,
+        "negative must remove FixedWidth import"
+    );
+    assert!(
+        !without_conversion.contains("import Data.Numeric.FixedWidth (intToInt8)"),
+        "negative must retain no narrowing import"
+    );
     let mut negative = ken_elaborator::ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_conversion) {
         Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, "intToInt8"),

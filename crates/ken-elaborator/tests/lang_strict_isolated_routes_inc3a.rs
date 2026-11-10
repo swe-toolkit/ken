@@ -430,6 +430,14 @@ fn rewritten_nested_read_fixture_checks_at_strict_entry_with_persisted_imports()
         "",
         1,
     );
+    assert_ne!(
+        without_wrapper_imports, fixture,
+        "negative must remove the HostIO import"
+    );
+    assert!(
+        !without_wrapper_imports.contains("import Capability.Process.Exit"),
+        "negative must retain no HostIO import"
+    );
     match strict(&without_wrapper_imports) {
         Err(ElabError::UnboundName { name, .. }) => {
             assert!(

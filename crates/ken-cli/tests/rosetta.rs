@@ -502,6 +502,14 @@ fn fizzbuzz_changed_proc_keeps_output_and_strict_import_boundary() {
         .elaborate_isolated_file_strict_v1(&[catalog.clone()], &original)
         .expect("changed-result FizzBuzz with persisted imports");
     let without_write = original.replacen("import Capability.Console.Text (write)\n", "", 1);
+    assert_ne!(
+        without_write, original,
+        "negative must remove Console write import"
+    );
+    assert!(
+        !without_write.contains("import Capability.Console.Text (write)"),
+        "negative must retain no Console write import"
+    );
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_write) {
         Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "write"),
@@ -541,6 +549,14 @@ fn read_file_lines_rewrite_keeps_oracle_and_strict_import_boundary() {
         "import Capability.Process.Exit (host_bind, host_console, host_fs, host_program_then, host_pure)\n",
         "",
         1,
+    );
+    assert_ne!(
+        without_wrappers, original,
+        "negative must remove HostIO imports"
+    );
+    assert!(
+        !without_wrappers.contains("import Capability.Process.Exit"),
+        "negative must retain no HostIO import"
     );
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {
@@ -619,6 +635,14 @@ fn collections_users_recheck_with_explicit_conjunction_import_under_strict() {
         env.elaborate_isolated_file_strict_v1(&[root.clone()], &composed)
             .unwrap_or_else(|error| panic!("{slug}: strict conjunction import: {error:?}"));
         let without_conjunction = composed.replacen(imports, "", 1);
+        assert_ne!(
+            without_conjunction, composed,
+            "{slug}: negative must remove the conjunction import"
+        );
+        assert!(
+            !without_conjunction.contains(imports),
+            "{slug}: negative must retain no conjunction import"
+        );
         let mut negative = ElabEnv::new().expect("prelude");
         match negative.elaborate_isolated_file_strict_v1(&[root.clone()], &without_conjunction) {
             Err(ElabError::UnboundName { name, .. }) => assert!(
