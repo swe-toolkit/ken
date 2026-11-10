@@ -507,7 +507,7 @@ fn fizzbuzz_changed_proc_keeps_output_and_strict_import_boundary() {
         "negative must remove Console write import"
     );
     assert!(
-        !without_write.contains("import Capability.Console.Text (write)"),
+        !without_write.contains("Capability.Console.Text (write)"),
         "negative must retain no Console write import"
     );
     let mut negative = ElabEnv::new().expect("prelude");
