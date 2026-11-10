@@ -11,10 +11,46 @@ use std::process::{Command, Output};
 use ken_elaborator::{ElabEnv, ElabError};
 
 fn cli(name: &str, subcommand: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-proc-nontree-let-{}", std::process::id()));
-    std::fs::create_dir_all(&root).expect("create fixture root");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-proc-nontree-let-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("create rooted fixture directory");
     let path = root.join(format!("{name}.ken"));
-    std::fs::write(&path, source).expect("write inline source");
+    let identifiers: std::collections::BTreeSet<_> = source
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .collect();
+    let console = ["IO", "print_line", "write"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let exit = ["host_program"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let mut imports = String::new();
+    if !console.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Console.Text ({})\n",
+            console.join(", ")
+        ));
+    }
+    if !exit.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Process.Exit ({})\n",
+            exit.join(", ")
+        ));
+    }
+    let selected = source.replacen(
+        "program capabilities FS APartial\n",
+        &format!("program capabilities FS APartial\n{imports}"),
+        1,
+    );
+    let selected = if selected == source {
+        format!("{imports}{source}")
+    } else {
+        selected
+    };
+    std::fs::write(&path, selected).expect("write inline source");
     Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg(subcommand)
         .arg(path)

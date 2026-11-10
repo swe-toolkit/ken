@@ -29,12 +29,24 @@ impl Fence {
 
 fn fixture(main: &str, fence: Fence, name: &str) -> String {
     let shadow = format!("const {name} : Nat = Zero\n");
+    let imports = if main == PRINT_MAIN {
+        "import Capability.Console.Text (print_line)\n\
+         import Capability.Process.Exit (host_program)\n"
+    } else {
+        "import Capability.Process.Exit (host_pure)\n"
+    };
     match fence {
         Fence::Example => format!(
-            "```ken\nprogram capabilities FS ANone\n{main}\n```\n```ken example\n{shadow}```\n"
+            "```ken\nprogram capabilities FS ANone\n{imports}{main}\n```\n```ken example\n{shadow}```\n"
         ),
-        Fence::Plain => format!("```ken\nprogram capabilities FS ANone\n{main}\n{shadow}```\n"),
+        Fence::Plain => format!("```ken\nprogram capabilities FS ANone\n{imports}{main}\n{shadow}```\n"),
     }
+}
+
+fn rooted_tempdir() -> TempDir {
+    let parent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    fs::create_dir_all(&parent).expect("rooted fixture parent");
+    TempDir::new_in(parent).expect("rooted fixture directory")
 }
 
 fn write_fixture(dir: &Path, label: &str, source: &str) -> PathBuf {
@@ -79,7 +91,7 @@ fn native_run(input: &Path, output_dir: &Path, profile: &Path) -> Output {
 /// THE GAP: native admission's separate descriptor is exercised below.
 #[test]
 fn run_uses_captured_prelude_roles_for_every_reported_shadow() {
-    let temp = TempDir::new().expect("fixture directory");
+    let temp = rooted_tempdir();
     for fence in [Fence::Example, Fence::Plain] {
         let control = write_fixture(
             temp.path(),
@@ -143,7 +155,7 @@ fn run_uses_captured_prelude_roles_for_every_reported_shadow() {
 /// `&PreludeEnv` signature, not by this pair of constructor fixtures.
 #[test]
 fn runner_main_arguments_use_checked_prelude_constructors() {
-    let temp = TempDir::new().expect("fixture directory");
+    let temp = rooted_tempdir();
     for fence in [Fence::Example, Fence::Plain] {
         let control = write_fixture(
             temp.path(),
@@ -192,7 +204,7 @@ fn runner_main_arguments_use_checked_prelude_constructors() {
 /// still refuses native Stdout, pinned in its own control below.
 #[test]
 fn native_admission_and_execution_keep_the_success_identity() {
-    let temp = TempDir::new().expect("native fixture directory");
+    let temp = rooted_tempdir();
     let profile = temp.path().join("profile.json");
     fs::write(&profile, PROFILE).expect("native resource profile");
     for (main_kind, main, fence) in [
@@ -259,7 +271,7 @@ fn native_admission_and_execution_keep_the_success_identity() {
 /// which the floor's strict-and-legacy refusal rows cover separately.
 #[test]
 fn plain_success_shadow_cannot_retarget_qualified_main() {
-    let temp = TempDir::new().expect("fixture directory");
+    let temp = rooted_tempdir();
     let profile = temp.path().join("profile.json");
     fs::write(&profile, PROFILE).expect("native resource profile");
     let control = write_fixture(
@@ -297,7 +309,7 @@ fn plain_success_shadow_cannot_retarget_qualified_main() {
 /// test checks the exact symbols; this test observes the native consumer.
 #[test]
 fn native_stdout_and_stream_shadows_run_like_unrelated_control() {
-    let temp = TempDir::new().expect("native fixture directory");
+    let temp = rooted_tempdir();
     let profile = temp.path().join("profile.json");
     fs::write(&profile, PROFILE).expect("native resource profile");
     for fence in [Fence::Example, Fence::Plain] {

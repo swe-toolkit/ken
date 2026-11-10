@@ -19,12 +19,18 @@ const EFFECT_DEADLINE: Duration = Duration::from_secs(30);
 const GONE_DEADLINE: Duration = Duration::from_secs(2);
 
 fn deep_program(with_main: bool) -> (tempfile::TempDir, PathBuf) {
-    let dir = tempfile::tempdir().expect("deep program directory");
+    let parent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    let dir = tempfile::tempdir_in(parent).expect("deep program directory");
     let path = dir.path().join("deep.ken");
     let depth = 4000;
     let mut source = String::with_capacity(6 * depth + 400);
     if with_main {
-        source.push_str("program capabilities FS APartial\n");
+        source.push_str(
+            "program capabilities FS APartial\n\
+                         import Capability.Console.Text (print_line)\n\
+                         import Capability.Process.Exit (host_program)\n",
+        );
     }
     source.push_str("const deep : Nat = ");
     for _ in 0..depth {

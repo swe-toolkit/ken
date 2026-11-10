@@ -20,10 +20,26 @@ const P8: &str = include_str!("fixtures/lang_effect_row_local_latent/p8_subsumpt
 const QA_LET: &str = include_str!("fixtures/lang_effect_row_local_latent/qa_higher_order_let.ken");
 
 fn cli(name: &str, verb: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-local-latent-{}", std::process::id()));
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-local-latent-{}", std::process::id()));
     std::fs::create_dir_all(&root).expect("fixture directory");
     let path = root.join(format!("{name}.ken"));
-    std::fs::write(&path, source).expect("write checked program");
+    let selected =
+        if source.contains("host_pure") && !source.contains("import Capability.Process.Exit") {
+            if source.starts_with("program capabilities FS APartial\n") {
+                source.replacen(
+                "program capabilities FS APartial\n",
+                "program capabilities FS APartial\nimport Capability.Process.Exit (host_pure)\n",
+                1,
+            )
+            } else {
+                format!("import Capability.Process.Exit (host_pure)\n{source}")
+            }
+        } else {
+            source.to_owned()
+        };
+    std::fs::write(&path, selected).expect("write checked program");
     Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg(verb)
         .arg(&path)

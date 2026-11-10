@@ -8,11 +8,15 @@
 use std::process::{Command, Output};
 
 const PREFIX: &str = "program capabilities FS APartial\n\
+import Capability.Console.Text (write)\n\
+import Capability.Process.Exit (host_bind, host_console, host_pure)\n\
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
   : HostIO APartial ExitCode visits [Console] =\n";
 
 fn run_source(name: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-let-hostio-{}", std::process::id()));
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-let-hostio-{}", std::process::id()));
     std::fs::create_dir_all(&root).expect("create fixture root");
     let path = root.join(format!("{name}.ken"));
     std::fs::write(&path, source).expect("write fixture");
@@ -24,7 +28,22 @@ fn run_source(name: &str, source: &str) -> Output {
 }
 
 fn run(name: &str, body: &str) -> Output {
-    run_source(name, &format!("{PREFIX}{body}\n"))
+    let prefix = if body.contains("host_program") {
+        PREFIX
+            .replacen(
+                "import Capability.Console.Text (write)",
+                "import Capability.Console.Text (print_line, write)",
+                1,
+            )
+            .replacen(
+                "import Capability.Process.Exit (host_bind, host_console, host_pure)",
+                "import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)",
+                1,
+            )
+    } else {
+        PREFIX.to_owned()
+    };
+    run_source(name, &format!("{prefix}{body}\n"))
 }
 
 fn expect_stdout(name: &str, body: &str, expected: &[u8]) {
@@ -78,7 +97,11 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (\_. host_pure APartial ExitCode ExitCode.Success)"#;
     let output = run_source(
         "io-proc",
-        &format!("program capabilities FS APartial\n{io_proc}\n"),
+        &format!(
+            "program capabilities FS APartial\n\
+                  import Capability.Console.Text (IO, write)\n\
+                  import Capability.Process.Exit (host_bind, host_console, host_pure)\n{io_proc}\n"
+        ),
     );
     assert_eq!(
         output.status.code(),
@@ -117,6 +140,8 @@ fn annotated_let_binds_the_performed_result_not_the_action() {
 #[test]
 fn nested_action_result_is_bound_and_then_run_in_the_continuation() {
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc make_outer : HostIO APartial (HostIO APartial Unit) visits [Console] =
   host_bind APartial (Result IOError Unit) (HostIO APartial Unit)
     (host_console APartial (Result IOError Unit)

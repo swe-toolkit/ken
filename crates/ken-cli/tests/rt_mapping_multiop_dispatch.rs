@@ -11,8 +11,6 @@ use std::os::unix::ffi::OsStrExt;
 use ken_elaborator::{ElabEnv, ElabError};
 
 const SOURCE_TEMPLATE: &str = r#"program capabilities FS AFull
-import Capability.Process.Exit (host_pure)
-import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult)
 const body_ok_io : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)
     (ResourceBodyOk Unit Unit MkUnit)
@@ -48,6 +46,12 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
+const RESOURCE_IMPORT: &str = "import Capability.System.Resource\n\
+      (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult,\n\
+       ResourceBracketOk, ResourceBracketBodyError, ResourceBracketReleaseError,\n\
+       ResourceBracketBodyAndReleaseError, withResource, resourceMetadata)\n";
+const WRAPPERS_IMPORT: &str = "import Capability.Process.Exit (host_pure, host_bind)\n";
+
 const TWO_CHAIN: &str = r#"  host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
     (resourceMetadata AFull file)
     (\first. host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult Unit Unit)
@@ -71,7 +75,11 @@ const FS_REPEAT_STACK_BYTES: usize =
     FS_REPEAT_STACK_MEASURED_PEAK_BYTES + FS_REPEAT_STACK_HEADROOM_BYTES;
 
 fn run_case(case: &str, chain: &str, repeats: usize) {
-    let source = SOURCE_TEMPLATE.replace("__CHAIN__", chain);
+    let bare = SOURCE_TEMPLATE.replace("__CHAIN__", chain);
+    let body = bare
+        .strip_prefix("program capabilities FS AFull\n")
+        .expect("header");
+    let source = format!("program capabilities FS AFull\n{RESOURCE_IMPORT}{WRAPPERS_IMPORT}{body}");
     let root = tempfile::Builder::new()
         .prefix(&format!("ken-rt-multiop-{case}-"))
         .tempdir()
@@ -157,22 +165,18 @@ fn strict_rechecks_both_generated_metadata_chains_with_explicit_imports() {
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let resource_import = "import Capability.System.Resource\n\
-      (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult,\n\
-       ResourceBracketOk, ResourceBracketBodyError, ResourceBracketReleaseError,\n\
-       ResourceBracketBodyAndReleaseError, withResource, resourceMetadata)\n";
-    let wrappers = "import Capability.Process.Exit (host_pure, host_bind)\n";
     for (label, chain) in [("two", TWO_CHAIN), ("three", THREE_CHAIN)] {
         let source = SOURCE_TEMPLATE.replace("__CHAIN__", chain);
         let body = source
             .strip_prefix("program capabilities FS AFull\n")
             .expect("generated source header");
-        let imported = format!("program capabilities FS AFull\n{resource_import}{wrappers}{body}");
+        let imported =
+            format!("program capabilities FS AFull\n{RESOURCE_IMPORT}{WRAPPERS_IMPORT}{body}");
         let mut selected = ElabEnv::new().expect("prelude");
         selected
             .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
             .unwrap_or_else(|error| panic!("{label} stage: {error:?}"));
-        let no_wrappers = format!("program capabilities FS AFull\n{resource_import}{body}");
+        let no_wrappers = format!("program capabilities FS AFull\n{RESOURCE_IMPORT}{body}");
         let mut negative = ElabEnv::new().expect("prelude");
         match negative.elaborate_isolated_file_strict_v1(&[catalog.clone()], &no_wrappers) {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "host_pure"),

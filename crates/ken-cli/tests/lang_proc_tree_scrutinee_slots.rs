@@ -12,6 +12,8 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 const PRE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -44,7 +46,9 @@ fn invoke(cmd: &str, source: &Path, extra: &[&Path]) -> Output {
 }
 
 fn assert_run(case: &str, source: &str, expected: &[u8], native: bool) {
-    let dir = tempfile::tempdir().expect("isolated test fixture");
+    let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    let dir = tempfile::tempdir_in(parent).expect("isolated test fixture");
     let input = dir.path().join("program.ken");
     std::fs::write(&input, source).expect("write Ken source");
     let interpreted = invoke("run", &input, &[]);

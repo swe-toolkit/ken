@@ -18,6 +18,8 @@ fn ken_bin() -> PathBuf {
 }
 
 const FIXTURE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
   match xs { Nil |-> ys ; Cons x xs2 |-> Cons a x (list_append a xs2 ys) }
 

@@ -13,6 +13,8 @@
 use std::process::{Command, Output};
 
 const HEADER: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -41,6 +43,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 const MATCH_B: &str = "  match b { MkBox f ↦ let ignored = f MkUnit in\n    host_program APartial (print_line \"b\") }\n";
 
 const SPACE_HEADER: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_program, host_pure)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -59,7 +63,9 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 fn cli(name: &str, verb: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-let-bound-scrutinee-{}", std::process::id()));
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-let-bound-scrutinee-{}", std::process::id()));
     std::fs::create_dir_all(&root).expect("fixture directory");
     let path = root.join(format!("{name}.ken"));
     std::fs::write(&path, source).expect("write inline checked source");

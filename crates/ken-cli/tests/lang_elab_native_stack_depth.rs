@@ -24,7 +24,12 @@ fn r1_program(depth: usize, with_main: bool) -> String {
          theorem r1 (a : Type) (m : Nat) (xs : DualEnv a (Suc m)) (ys : DualEnv a (Suc m)) : Equal (Tri a) ({left}) ({left}) = match xs {{ DualCons k x rest ↦ match ys {{ DualCons k2 y rest2 ↦ Refl }} }}\n"
     );
     if with_main {
-        source.insert_str(0, "program capabilities FS APartial\n");
+        source.insert_str(
+            0,
+            "program capabilities FS APartial\n\
+             import Capability.Console.Text (print_line)\n\
+             import Capability.Process.Exit (host_program)\n",
+        );
         source.push_str(
             "proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] = host_program APartial (print_line \"stack worker reached main\")\n",
         );
@@ -64,7 +69,9 @@ fn invoke(command: &str, path: &Path, additional_paths: &[&Path]) -> Output {
 }
 
 fn fixture(depth: usize, with_main: bool) -> (tempfile::TempDir, std::path::PathBuf) {
-    let dir = tempfile::tempdir().expect("fixture directory");
+    let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    let dir = tempfile::tempdir_in(parent).expect("fixture directory");
     let path = dir.path().join("deep_goal.ken");
     std::fs::write(&path, r1_program(depth, with_main)).expect("write Ken fixture");
     (dir, path)

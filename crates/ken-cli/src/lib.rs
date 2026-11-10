@@ -1005,6 +1005,19 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         )
     }
 
+    fn strict_root_program(allow_root: bool) -> String {
+        root_program(allow_root).replacen(
+            "\nproc main",
+            "\nimport Capability.Console.Text (write)\n\
+             import Capability.Process.Exit (host_bind, host_console, host_pure)\nproc main",
+            1,
+        )
+    }
+
+    fn strict_roots() -> [std::path::PathBuf; 1] {
+        [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
+    }
+
     fn run_with_scripted_uid(
         effective_uid: u32,
         allow_root: bool,
@@ -1013,9 +1026,9 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     ) -> (ken_runtime::EffectObservation, ken_interp::CaptureHost) {
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         let (_, observation) = run_program_inner(
-            &root_program(allow_root),
+            &strict_root_program(allow_root),
             SourceFormat::Ken,
-            &[],
+            &strict_roots(),
             arguments,
             environment,
             b".",
@@ -1059,9 +1072,9 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         let mut lines = Vec::new();
         let (outcome, observation) = run_program_inner(
-            &root_program(false),
+            &strict_root_program(false),
             SourceFormat::Ken,
-            &[],
+            &strict_roots(),
             &[],
             &[],
             b".",
@@ -1083,7 +1096,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     #[cfg(target_os = "linux")]
     #[test]
     fn missing_effective_user_home_reports_h_code_and_status_one() {
-        let source = root_program(false).replacen(
+        let source = strict_root_program(false).replacen(
             "program capabilities FS APartial",
             "program capabilities FS APartial \"~/unavailable\"",
             1,
@@ -1093,7 +1106,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         let (outcome, observation) = run_program_inner(
             &source,
             SourceFormat::Ken,
-            &[],
+            &strict_roots(),
             &[],
             &[],
             b".",
