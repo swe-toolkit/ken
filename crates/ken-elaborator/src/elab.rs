@@ -22683,6 +22683,9 @@ pub(crate) fn elaborate_space_decl(
         }
     })?;
     elab.globals.insert(space.name.clone(), state_id);
+    // A generated space type bypasses register_effect_row. Name-plane masks
+    // must stay charge-all even if a phantom family later shares its spelling.
+    elab.type_charged_args.insert(space.name.clone(), None);
     let mut results = vec![ElabResult {
         postulate_ids: Vec::new(),
         name: space.name.clone(),

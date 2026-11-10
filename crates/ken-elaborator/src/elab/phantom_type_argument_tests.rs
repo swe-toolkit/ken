@@ -15,6 +15,66 @@ const PREFIX: &str = "data Box = MkBox (Unit ->[Console] HostIO APartial Unit)\n
     data PBox = MkPBox Unit\n\
     data Tag (a : Type) : Type where { MkTag : PBox -> Tag a }\n";
 
+// P1/P2: durable name-plane soundness invariants. MEASURED: the pre-source
+// type-former spellings are charge-all, and remain so after a same-spelling
+// phantom family is checked. CLAIMED: an RCon written annotation cannot
+// borrow a different checked family's mask. GAP: these three prelude heads
+// and this one shadowing path do not enumerate every future globals writer.
+#[test]
+fn prelude_type_former_spellings_seed_charge_all_masks() {
+    let env = ElabEnv::new().expect("complete prelude");
+    for name in ["ITree", "Coproduct", "Pair"] {
+        let id = env.globals[name];
+        assert!(
+            super::super::is_globals_type_former(&env.env, id),
+            "{name} is a checked type former"
+        );
+        assert_eq!(
+            env.type_charged_args.get(name),
+            Some(&None),
+            "{name}: unseeded spelling"
+        );
+    }
+}
+
+#[test]
+fn phantom_shadow_cannot_uncharged_prelude_coproduct_by_spelling() {
+    let mut env = ElabEnv::new().expect("complete prelude");
+    env.elaborate_file(&format!(
+        "{PREFIX}data Coproduct (a : Type) (b : Type) : Type where {{ MkC : Unit -> Coproduct a b }}"
+    ))
+    .expect("checked phantom shadow");
+    let checked_shadow_id = env.globals["Coproduct"];
+    assert_eq!(
+        env.type_charged_args_by_id.get(&checked_shadow_id),
+        Some(&vec![false, false])
+    );
+    assert_eq!(env.type_charged_args.get("Coproduct"), Some(&None));
+    let rows = CheckedEffectRows::new(
+        &env.effect_rows,
+        &env.effect_rows_by_id,
+        &env.type_carried_rows,
+        &env.type_carried_rows_by_id,
+        &env.type_charged_args,
+        &env.type_charged_args_by_id,
+    );
+    let written = RType::RApp(
+        Box::new(RType::RApp(
+            Box::new(RType::RCon("Coproduct".into(), Span::zero())),
+            Box::new(RType::RCon("Box".into(), Span::zero())),
+            Span::zero(),
+        )),
+        Box::new(RType::RCon("Unit".into(), Span::zero())),
+        Span::zero(),
+    );
+    assert!(
+        written_type_row(&written, &rows)
+            .concrete_effects()
+            .contains("Console"),
+        "ambiguous prelude Coproduct annotation must retain Box's Console"
+    );
+}
+
 fn check_position(decl: &str, head: &str, args: &[&str], expect_console: bool) {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(&format!("{PREFIX}{decl}"))

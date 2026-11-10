@@ -337,6 +337,24 @@ fn restore_program_binding<V>(table: &mut HashMap<String, V>, name: &str, saved:
     }
 }
 
+/// Identify type-former spellings bound outside ordinary source declaration
+/// registration. Constructor IDs have no top-level `Decl` and are not heads.
+fn is_globals_type_former(env: &GlobalEnv, id: GlobalId) -> bool {
+    let Some(decl) = env.lookup(id) else {
+        return false;
+    };
+    let mut ty = match decl {
+        KernelDecl::Inductive(_) => return true,
+        KernelDecl::Transparent { ty, .. }
+        | KernelDecl::Opaque { ty, .. }
+        | KernelDecl::Primitive { ty, .. } => ty,
+    };
+    while let Term::Pi(_, codomain) = ty {
+        ty = codomain;
+    }
+    matches!(ken_kernel::whnf(env, &Context::new(), ty), Term::Type(_) | Term::Omega(_))
+}
+
 impl ElabEnv {
     pub fn empty() -> Result<Self, ElabError> {
         let mut env = GlobalEnv::new();
@@ -570,6 +588,14 @@ impl ElabEnv {
         // package's duplicate-name set; prelude names keep their own guards.
         elab.module_state.package_definitions.clear();
         elab.module_state.finish_prelude_source_registration();
+        // Prelude and compiler registrars bind type formers without passing
+        // through register_effect_row. A spelling-only written annotation must
+        // never inherit a later phantom mask under one of these names.
+        for (name, id) in &elab.globals {
+            if is_globals_type_former(&elab.env, *id) {
+                elab.type_charged_args.entry(name.clone()).or_insert(None);
+            }
+        }
         Ok(elab)
     }
 
@@ -608,6 +634,11 @@ impl ElabEnv {
         let id = declare_postulate(&mut self.env, name.to_string(), vec![], ty)
             .map_err(|e| ElabError::Internal(format!("declare_postulate failed: {}", e)))?;
         self.globals.insert(name.to_string(), id);
+        if is_globals_type_former(&self.env, id) {
+            // Raw postulates bypass register_effect_row too. Preserve a
+            // charge-all spelling if a later phantom family shadows it.
+            self.type_charged_args.insert(name.to_string(), None);
+        }
         Ok(id)
     }
 
