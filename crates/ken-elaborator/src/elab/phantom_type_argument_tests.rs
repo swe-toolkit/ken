@@ -46,14 +46,17 @@ fn check_position(decl: &str, head: &str, args: &[&str], expect_console: bool) {
         let id = env.globals[*name];
         Term::app(term, Term::indformer(id, vec![]))
     });
-    let assert_row = |row: RowType, plane: &str| {
-        assert_eq!(
-            row.concrete_effects().contains("Console"),
-            expect_console,
-            "{head} {args:?}: {plane} lost/gained Console: {row:?}",
-        );
-    };
-    assert_row(type_carried_row_in(checked, &rows), "checked binder");
+    // Compute every observation before asserting any, so a mutation reports
+    // retained-position and phantom-control results independently even when
+    // both are housed in one test function.
+    let mut observations = Vec::new();
+    observations.push((
+        "retained checked binder",
+        type_carried_row_in(checked, &rows)
+            .concrete_effects()
+            .contains("Console"),
+        expect_console,
+    ));
     for checked_identity in [false, true] {
         let written_head = if checked_identity {
             RType::RCheckedGlobal {
@@ -71,34 +74,45 @@ fn check_position(decl: &str, head: &str, args: &[&str], expect_console: bool) {
                 Span::zero(),
             )
         });
-        assert_row(
-            written_type_row(&written, &rows),
+        observations.push((
             if checked_identity {
-                "written checked ID"
+                "retained written ID"
             } else {
-                "written name"
+                "retained written name"
             },
-        );
+            written_type_row(&written, &rows)
+                .concrete_effects()
+                .contains("Console"),
+            expect_console,
+        ));
     }
-    // Every retained-position pin has the same independent phantom control.
     let tag = Term::app(
         Term::indformer(env.globals["Tag"], vec![]),
         Term::indformer(env.globals["Box"], vec![]),
     );
-    assert_eq!(
-        type_carried_row_in(tag, &rows),
-        RowType::empty(),
-        "Tag Box checked"
-    );
+    observations.push((
+        "phantom checked",
+        type_carried_row_in(tag, &rows) == RowType::empty(),
+        true,
+    ));
     let tag_ty = RType::RApp(
         Box::new(RType::RCon("Tag".into(), Span::zero())),
         Box::new(RType::RCon("Box".into(), Span::zero())),
         Span::zero(),
     );
-    assert_eq!(
-        written_type_row(&tag_ty, &rows),
-        RowType::empty(),
-        "Tag Box written"
+    observations.push((
+        "phantom written",
+        written_type_row(&tag_ty, &rows) == RowType::empty(),
+        true,
+    ));
+    let deviations: Vec<_> = observations
+        .iter()
+        .copied()
+        .filter(|(_, actual, expected)| actual != expected)
+        .collect();
+    assert!(
+        deviations.is_empty(),
+        "{head} {args:?}: {deviations:?}; all {observations:?}"
     );
 }
 

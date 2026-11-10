@@ -86,23 +86,35 @@ const NESTED_PATTERN: &str =
     "match MkTag Box (MkPBox quiet) { MkTag (MkPBox g) ↦ let ignored = g MkUnit in MkUnit }";
 const ANNOTATED_LET: &str = "let t : Tag Box = MkTag Box (MkPBox quiet) in match t { MkTag p ↦ match p { MkPBox g ↦ let ignored = g MkUnit in MkUnit } }";
 
+fn assert_phantom_pair(name: &str, body: &str) {
+    let candidate = source(body);
+    let control = source(
+        &body
+            .replace("Tag Box", "Tag Unit")
+            .replace("MkTag Box", "MkTag Unit"),
+    );
+    assert_prints_b(name, &candidate);
+    assert_prints_b(&format!("{name}-unit-control"), &control);
+}
+
 #[test]
-fn phantom_argument_four_forms_are_byte_equal_to_tag_unit() {
-    for (name, body) in [
-        ("scrutinee", SCRUTINEE),
-        ("lambda-binder", LAMBDA_BINDER),
-        ("nested-pattern", NESTED_PATTERN),
-        ("annotated-let", ANNOTATED_LET),
-    ] {
-        let candidate = source(body);
-        let control = source(
-            &body
-                .replace("Tag Box", "Tag Unit")
-                .replace("MkTag Box", "MkTag Unit"),
-        );
-        assert_prints_b(name, &candidate);
-        assert_prints_b(&format!("{name}-unit-control"), &control);
-    }
+fn phantom_scrutinee_prints_b_like_tag_unit() {
+    assert_phantom_pair("scrutinee", SCRUTINEE);
+}
+
+#[test]
+fn phantom_lambda_binder_prints_b_like_tag_unit() {
+    assert_phantom_pair("lambda-binder", LAMBDA_BINDER);
+}
+
+#[test]
+fn phantom_nested_pattern_prints_b_like_tag_unit() {
+    assert_phantom_pair("nested-pattern", NESTED_PATTERN);
+}
+
+#[test]
+fn phantom_annotated_let_prints_b_like_tag_unit() {
+    assert_phantom_pair("annotated-let", ANNOTATED_LET);
 }
 
 #[test]
