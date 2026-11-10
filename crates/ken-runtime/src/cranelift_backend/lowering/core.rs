@@ -13192,36 +13192,15 @@ impl<'a> Lowering<'a> {
             edge.recursive_position,
             edge.identity.target()
         ));
-        let placement = self
-            .static_transition_plan
-            .k_emission_placement(&edge.identity)?;
-        let physical = self.checked_placement_owner(self.emitting_function_owner)?;
-        if physical == Some(placement)
-            && self
-                .static_transition_plan
-                .checked_ih_environment_transport_source(&edge.identity)
-                .is_some()
-        {
-            return Err(unsupported(LoweringCause::PlannerInvariant,
-                "CheckedIhEnvironmentTransport",
-                "a K call is relocated into the owner that plans it; a self-relocation is \
-                 identity and is never issued",
-            ));
-        }
         if self
             .static_transition_plan
             .checked_ih_environment_transport_source(&edge.identity)
             .is_some()
-            && physical.is_some_and(|owner| owner != placement)
             && matches!(&lowered, LoweringOperand::Carried(_))
         {
-            // The call is relocated into another owner, whose destination
-            // constructor emits it; the carried word is the source's result.
-            // A relocation into this same owner is no relocation: the seat
-            // below emits the call.
-            if let Some(ledger) = self.continuation_candidates.as_mut() {
-                ledger.record_relocated_exit(&edge.identity);
-            }
+            // The source specialization's carried result is the transport
+            // payload, including when the destination unit's owner is the
+            // call's planner emitter. Membership, not owner equality, decides.
             return Ok(lowered);
         }
         // Contract 4, first clause: validate the specialized result's PLANNED

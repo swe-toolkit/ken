@@ -280,7 +280,7 @@ pub(in crate::cranelift_backend) use aggregates::{
 };
 use aggregates::{
     lifetime_referent_affinity, CheckedIhGeneratedEntryConfluence,
-    CheckedIhGeneratedEntryCoordinate,
+    CheckedIhGeneratedEntryCoordinate, KCallPlacement,
 };
 #[cfg(test)]
 use aggregates::{
@@ -664,7 +664,7 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// The single emission owner of each planned causal K call. Issued from
     /// closed continuation identities and escape geometry before response
     /// planning; later ownership records validate rather than select it.
-    k_call_placements: BTreeMap<ContinuationCallIdentity, ContinuationEmissionOwner>,
+    k_call_placements: BTreeMap<ContinuationCallIdentity, KCallPlacement>,
     /// Handler-owned Deferred drives have a separate, post-response-B identity domain.
     handler_resumptions: Vec<PlannedHandlerResumptionCall>,
     /// One independently validated consumer-level occurrence per continuation
