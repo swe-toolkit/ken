@@ -1293,3 +1293,84 @@ application to `EVar Zero` and `EVar (Suc Zero)` has a false
 a fresh fully accepted prefix. Both probes distinguish the premise
 rather than an `Equal Expr` assertion (§9.2); they are finite clients,
 not the generic proof or official conformance evidence.
+
+## 16. Expression powers and their canonical laws
+
+> **Section 16 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER).** Architect's isolated D0 on
+> landed base `8c39d80a0` checked the proposed generic bodies in a
+> scratch package: the 13 named package targets passed 35/35, no new
+> `Axiom` appeared, and the `trusted_base()` GlobalId identity sets
+> were equal before and after loading (114 → 114). These observations
+> establish feasibility, not an implementation candidate, official
+> conformance execution, CI, publication, landing or measured landed
+> trust. This section states the contract for a separately authored
+> implementation and seed; neither is in this `/spec` child.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export the following
+pure operation. Its `Zero` case is the multiplicative unit, represented
+by `EConst (Suc Zero)`; each successor step appends one copy of `e`
+on the **right** of the previous power. Thus the equations are
+`expr_pow e Zero = EConst (Suc Zero)` and
+`expr_pow e (Suc k) = EMul (expr_pow e k) e`. The second equation fixes
+the expression-tree order, not merely its evaluated value.
+
+```ken
+pub fn expr_pow (e : Expr) (n : Nat) : Expr =
+  match n {
+    Zero ↦ EConst (Suc Zero);
+    Suc k ↦ EMul (expr_pow e k) e
+  }
+```
+
+The module must export checked proof bodies for exactly these two new
+public laws, with the displayed names, binder order and result types:
+
+```ken
+pub theorem deriv_expr_pow
+      (v : Nat) (e : Expr) (n : Nat)
+    : IsTrue (poly_eq (deriv v (expr_pow e (Suc n))) (EMul (EMul (EConst (Suc n)) (expr_pow e n)) (deriv v e)))
+
+pub theorem expr_pow_add
+      (e : Expr) (m : Nat) (n : Nat)
+    : IsTrue (poly_eq (expr_pow e (add m n)) (EMul (expr_pow e m) (expr_pow e n)))
+```
+
+The first law is the power rule for every derivative index `v`,
+expression `e` and exponent `n`: differentiating the successor
+power agrees canonically with the coefficient `Suc n`, the previous
+power, then `deriv v e`, in that multiplication order. The second
+law identifies a power of the sum of exponents with the product
+of the two powers. Both conclusions use §2's Boolean canonical
+`poly_eq` decision, **not** structural `Equal Expr` or definitional
+equality of the resulting trees. Neither law adds an environment,
+positivity, nonzero, or syntactic-shape premise. `expr_pow` is an
+ordinary recursive builder over `Nat`, not a new `Expr` constructor,
+kernel primitive, or general exponentiation operation on arbitrary
+coefficient domains.
+
+The checked proof route establishes evaluation equality for every
+total `Nat → Nat` environment by induction on the exponent, then
+uses the existing `poly_eq_complete`. The successor step for the
+addition law uses the existing `(proof assoc for mul)`; its zero
+step uses `(proof one_r for mul)`. The derivative law uses §5's
+product rule, the existing zero-left laws for `mul` and `add`, and
+a private reflected natural-arithmetic identity. Its coefficient
+is `Suc n`, not `n`: for `e = EVar Zero` and `n = Suc Zero`, at an
+environment sending `Zero` to one the derivative of `e²` evaluates
+to two, whereas replacing `Suc n` with `n` on the right evaluates
+to one. A same-form `Proved` positive control and false-coefficient
+refusal belong in the separate closed seed; finite values do not
+replace either generic checked body.
+
+No previously specified §§1–15 operation or law changes. In
+particular, §1's ordered-list `normalize` remains noncanonical,
+§2's `poly_eq` remains the canonical decision, and §5's `deriv`
+keeps its fixed-order product rule. The arithmetic associativity
+and unit facts are existing class proofs, not new Nat exports.
+No `Axiom`, signed coefficient, division, factoring, analytic
+differentiation, kernel rule or surface extension is implied.
+Architect's D0 refusals after dropping the successor factor,
+replacing the unit base by zero, or falsifying the reflected
+identity were scratch observations only; they are not tests of
+this `/spec` child or of a future assembled candidate.
