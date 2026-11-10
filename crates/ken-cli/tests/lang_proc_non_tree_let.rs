@@ -276,7 +276,7 @@ fn tree_result_sequences_and_binds_the_action_result() {
 
 /// Promise class: durable invariant. MEASURED: this same space/proof source
 /// checks with the explicit Core.Logic.Not import at the strict entry and
-/// rejects without it, while the Legacy CLI check remains unchanged.
+/// rejects without it, while the switched CLI checks the imported twin.
 /// CLAIMED: replacing the pre-source Not with the checked package definition
 /// leaves this proof-position verdict intact. THE GAP: execution is not the
 /// subject of this proof-only fixture.
@@ -295,17 +295,15 @@ space T {
   mut cell : Int = d 0 0
 }
 "#;
-    assert_checks("omega-proof-let", source);
+    let imported = format!("import Core.Logic.Not (Not)\n{source}");
+    assert_checks("omega-proof-let", &imported);
     let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
     let mut selected = ElabEnv::new().expect("prelude");
     selected
-        .elaborate_isolated_file_strict_v1(
-            &[catalog.clone()],
-            &format!("import Core.Logic.Not (Not)\n{source}"),
-        )
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
         .expect("the imported checked negation preserves the proof-position verdict");
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], source) {
