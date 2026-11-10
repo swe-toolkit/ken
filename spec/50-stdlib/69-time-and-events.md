@@ -12,7 +12,9 @@
 > SPEC-TIME-WINDOW-ALL-IDENTITY §10;
 > SPEC-TIME-WINDOW-COMMUTATION §11;
 > SPEC-TIME-WINDOW-LENGTH-BOUND §12;
-> SPEC-TIME-MERGE-SEPARATED-APPEND §13).** The §1–2 EventTrace
+> SPEC-TIME-MERGE-SEPARATED-APPEND §13;
+> SPEC-TIME-WINDOW-NONE-EMPTY §14;
+> SPEC-TIME-TRACE-MERGE-ALL §15).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -226,9 +228,9 @@ A timestamp here is **given data**, not a reading of a clock.
 `ClockWallNow` is a host effect outside this pure interface.
 Wall-clock time, durations and units, and causality between processes
 (including vector and Lamport clocks) are deferred. Infinite or
-lazy streams, strictly increasing traces, deduplication, k-way
-merge and time over an arbitrary `Ord` are deferred too. None is
-implicitly proved by the three finite-list laws.
+lazy streams, strictly increasing traces, deduplication and time
+over an arbitrary `Ord` are deferred too. Finite-list k-way merge
+is specified separately in §15, not by the three §1 laws.
 
 ## 2. Exact membership in a time window
 
@@ -1247,3 +1249,90 @@ premise theorem, then attributed its failing event through the expected type
 and control; it did not show an arm-local diagnostic. The CV seed can separate
 per-member miss lemmas to make the time-1 refusal local. Seed authoring and
 execution belong to CV and the package owner, not this Spec-only child.
+
+## 15. Merging a finite list of event traces
+
+> **Section 15 status: DRAFT v0
+> (SPEC-TIME-TRACE-MERGE-ALL).** Architect's AC-0 on base `ea5842524`
+> checked the operation and three public laws in scratch without a
+> new `Axiom`: trusted `GlobalId` identity sets stayed 114 → 114,
+> public exports grew 30 → 34 and public theorems 21 → 24. The
+> Foundation implementation parent `2d278b635` separately contains
+> the checked exports and package-owned tests; neither the D0 nor
+> that parent is this assembled Spec-and-seed candidate, official
+> conformance, CI, publication, landing or measured landed trust.
+> Direct operation mutants first broke the ordered provider proof;
+> a separate overlay without those proof gates made the exact-output
+> V1 control refuse at its own `Refl`. This is not a claim that the
+> direct mutation itself reached that client.
+
+`Data.Time.EventTrace` must export this public pure operation directly
+after `trace_merge`:
+
+```ken
+pub fn trace_merge_all
+      (p : Type) (traces : List (List (Event p))) : List (Event p)
+```
+
+The definition is a **right fold** of the existing left-biased
+`trace_merge`: `trace_merge_all p (Nil (List (Event p)))` computes to
+`Nil (Event p)`. The `Cons t rest` case is
+`trace_merge p t (trace_merge_all p rest)`. Earlier input traces
+win ties against later ones under §1.2's left-biased two-way merge;
+no arbitrary `Ord` time, deduplication, stream processing or new
+carrier is introduced. The operation is total even for unordered
+inputs, but the ordered-result law below requires an explicit
+premise for every listed trace.
+
+The following public Transparent checked laws follow the existing
+`trace_merge_assoc` proof-helper family, in the order ordered,
+complete, sound:
+
+```ken
+pub theorem trace_merge_all_ordered
+      (p : Type) (traces : List (List (Event p)))
+    : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
+      → time_ordered p (trace_merge_all p traces)
+
+pub theorem trace_merge_all_member_complete
+      (p : Type) (e : Event p) (t : List (Event p)) (traces : List (List (Event p)))
+    : list_elem (List (Event p)) t traces
+      → list_elem (Event p) e t
+      → list_elem (Event p) e (trace_merge_all p traces)
+
+pub theorem trace_merge_all_member_sound
+      (p : Type) (e : Event p) (traces : List (List (Event p)))
+    : list_elem (Event p) e (trace_merge_all p traces)
+      → list_elem (Event p) e (list_concat (Event p) traces)
+```
+
+The ordered law quantifies over **all** traces appearing in the
+outer list; it does not infer that premise from sorted output or
+only from the first trace. The empty result is ordered by `Proved`.
+Completeness takes both a membership of `t` in the outer list and
+a membership of `e` in that trace before concluding membership in
+the merged result. Soundness concludes membership in the
+**flattened input list**; it does not return a chosen input trace
+or an untruncated witness of which occurrence supplied the event.
+All membership propositions are the existing truncated `list_elem`,
+and the complete proof's `J` transports a trace equality into the
+Ω-valued event-membership motive rather than asserting structural
+identity of alternative occurrences. The checked laws reuse the
+existing two-way merge ordering and membership laws, with no new
+public helper, axiom, kernel or surface rule and no change to any
+§1–§14 operation or law type.
+
+The operation's right-fold definition and left-bias rule fix the
+actual event sequence; the laws alone do not characterize it. In
+particular, a constant-`Nil` operation would satisfy the ordered
+and sound laws without retaining any input event. The separate
+package test must compare an explicit nonempty three-trace result
+and a cross-input equal-time tie (V1 and V3) so both the retained
+events and the earlier-input tie priority are observed. The
+CV-reviewed conformance child separately checks an accepted
+three-trace ordering and third-trace membership and pairs an
+unordered-input premise refusal with a same-form accepting control.
+Closed cases do not replace these generic checked proofs. A
+fabricating operation that is still ordered and complete remains a
+soundness discriminator to review; no soundness-isolating mutation
+was measured by the AC-0 report.
