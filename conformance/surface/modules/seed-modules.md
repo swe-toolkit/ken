@@ -2057,8 +2057,12 @@ multiple roots.
   process directory or a default machine root
 - spec: `33 §3.2` (isolated source-path ancestor discovery; no-root
   behavior), `39 §2.0` (strict isolated loader entry)
-- fixture: create directory `C` without `C/catalog/packages`.
-  Its descendant `R/catalog/packages/SourceChoice.ken` contains
+- fixture: create `C` under a fresh isolated temporary location.
+  Before running either no-root control, verify that neither `C`
+  nor **any ancestor of `C` through the filesystem root** has a
+  `catalog/packages` directory. Do not place `C` beneath an existing
+  catalog checkout. Its descendant
+  `R/catalog/packages/SourceChoice.ken` contains
   `pub const marker : Bool = False`. The *nearer* qualifying ancestor
   of the source, `R/app`, has its own
   `R/app/catalog/packages/SourceChoice.ken` containing:
