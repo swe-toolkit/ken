@@ -1687,6 +1687,70 @@ duplicates a checked definition.
   distinguishes array sorting and deduplication from the report's complete
   ordered outer shape.
 
+### surface/modules/isolated-root-owned-postulates-report-source-declared
+
+- promise class: **durable invariant** — a root's checked opaque identities
+  retain their source owner on every isolated CLI route
+- spec: `33 §3.2` (isolated source path and discovered root);
+  `70 §1.4` (checked-identity ownership and complete report)
+- given: use a project root `R` with the checked in-repo catalog at
+  `R/catalog/packages`. Place the standalone source at `R/app/Entry.ken`,
+  outside `catalog/packages`, so its source path discovers `R`.
+  Do not hand-feed exports or insert a root flag. Use one identical
+  program for `ken check`, `ken run` and `ken native-build`, with the
+  ordinary Console and Exit imports needed by its accepted `main`:
+
+  ```ken
+  program capabilities FS APartial
+  import Capability.Console.Text (print_line)
+  import Capability.Process.Exit (host_program)
+
+  theorem assumed : Equal Nat Zero (Suc Zero) = Axiom
+  axiom assumed_named : Equal Nat Zero (Suc Zero)
+  fn constrained (n : Nat) : Nat ensures Equal Nat result Zero = n
+  theorem proved : Equal Nat Zero Zero = Proved
+  prove deferred : Equal Nat (Suc Zero) Zero
+
+  proc main
+        (_input : ProcessInput) (_caps : ProgramCaps APartial)
+      : HostIO APartial ExitCode
+      visits [Console] =
+    host_program APartial (print_line "probe")
+  ```
+
+  Invoke all three routes with a fresh
+  `--resolution-report=<new-path>` immediately after the subcommand;
+  supply the resource profile to `native-build`. Run the same accepted
+  source on each route without the report option as the route control.
+  Read each complete `ken.resolution/v1` document, not the source text
+  or a reconstructed identity map.
+- expect: the three flagged and three unflagged CLI invocations
+  return status 0; the `constrained.ensures` and `deferred.prove`
+  obligations remain open/`unknown`, not proved. For each report,
+  `module` is JSON `null` and the `route` field names the
+  invoking route. Each of the `assumed`, `assumed_named` and
+  `constrained` root rows has a `references` entry
+  `{"class":"source-declared","declaration":"<same-root-name>"}`:
+  substitute the respective row's declaration name, not a shared
+  label. The `axiom` root is a row of its own; neither `= Axiom` nor
+  the open `ensures` hole adds an extra root row. The `proved` and
+  `deferred` rows have no `source-declared` opaque entry. No report
+  contains an unattributed checked identity or a raw numeric ID.
+  Each flagged route's ordinary stdout, stderr and status agree with
+  its unflagged control; only the flagged route creates its complete
+  report. Native-build success here means its source/preparation
+  succeeds, not that a produced native artifact was executed.
+- why: three independently introduced opaque identities reach the
+  checked-identity ownership classifier; classifying by source spelling
+  alone or attributing only the explicit `axiom` would miss two of
+  them. The `Proved` theorem and `prove` declaration hold the same
+  route and report mechanism live without laundering every root into
+  `source-declared`. The case reuses the established report schema
+  and route controls above; it does not repin their unrelated imported
+  identity inventory.
+- evidence boundary: this is the expected oracle, not an official
+  conformance-runner result or a CI/landing claim.
+
 ### surface/modules/resolution-report-option-token-boundaries
 
 - promise class: **durable invariant** — only one leading equals-form token is
@@ -1985,6 +2049,72 @@ multiple roots.
   preferring `.ken` over `.ken.md`, treating a path as both leaf and directory,
   normalizing a lowercase component, or falling through after no leaf makes its
   row accept or reach the wrong phase.
+
+### surface/modules/isolated-file-discovers-catalog-root-from-source-path
+
+- promise class: **durable invariant** — a standalone source's own
+  nearest qualifying ancestor selects its one catalog root, not the
+  process directory or a default machine root
+- spec: `33 §3.2` (isolated source-path ancestor discovery; no-root
+  behavior), `39 §2.0` (strict isolated loader entry)
+- fixture: create `C` under a fresh isolated temporary location.
+  Before running either no-root control, verify that neither `C`
+  nor **any ancestor of `C` through the filesystem root** has a
+  `catalog/packages` directory. Do not place `C` beneath an existing
+  catalog checkout. Its descendant
+  `R/catalog/packages/SourceChoice.ken` contains
+  `pub const marker : Bool = False`. The *nearer* qualifying ancestor
+  of the source, `R/app`, has its own
+  `R/app/catalog/packages/SourceChoice.ken` containing:
+
+  ```ken
+  pub const marker : Bool = True
+  ```
+
+  Place `R/app/sub/Entry.ken` with the unchanged body:
+
+  ```ken
+  import SourceChoice
+  theorem marker_true : Equal Bool SourceChoice.marker True = Proved
+  ```
+
+  From working directory `C`, invoke `ken check R/app/sub/Entry.ken`
+  using that **relative** source spelling. From sibling directory
+  `C/outside`, which has no `catalog/packages`, invoke
+  `ken check ../R/app/sub/Entry.ken`, containing a literal `..`
+  component. Do not pass a root flag or environment override. For a
+  no-root control, copy `Entry.ken` byte-identically to
+  `C/no-root/app/sub/Entry.ken`; from working directory `C/R` invoke
+  `ken check ../no-root/app/sub/Entry.ken`. Also check a separate
+  `C/no-root/app/sub/Local.ken` containing only
+  `const local : Bool = True`.
+- expect: both spellings of the source under `R` accept, and its
+  `marker_true` checks using **the nearer**
+  `R/app/catalog/packages/SourceChoice.ken`, not the outer
+  `R/catalog/packages/SourceChoice.ken` whose `marker` is `False`.
+  The byte-identical source copied under `no-root` rejects with
+  `UnboundName` for `SourceChoice` at its `import` dependency edge,
+  before `marker_true` is admitted; no machine/cwd catalog root is
+  used. The no-import `Local.ken` accepts without a discovered root.
+  In every accepted arm the CLI uses Strict isolated resolution;
+  neither spelling changes module identity or the resulting theorem.
+- why: the same import and independent theorem value are reached
+  from a relative path and a path containing `..`, with the process
+  directory outside `R` on the second arm. The contradictory
+  `SourceChoice` providers make nearest-source-ancestor selection
+  observable: a loader choosing the outer root reaches the wrong
+  value and refuses the otherwise-valid theorem. A loader using the
+  process directory, or interpreting the `..` spelling as a different
+  source, fails an acceptance arm. Conversely the no-root source
+  invoked **from inside** `R` must refuse at its
+  import, so a cwd-root fallback cannot satisfy all arms. The
+  no-import control distinguishes missing-root dependency refusal
+  from a blanket rejection of standalone files. The fixture pins
+  source-root discovery only; it does not choose precedence among
+  simultaneously supplied catalog roots or duplicate the existing
+  `A → B` cycle and one-root-list tests.
+- evidence boundary: these are conformance expectations, not an
+  official runner or CI observation.
 
 ### surface/modules/unimported-poison-is-lazy-imported-poison-rejects
 
