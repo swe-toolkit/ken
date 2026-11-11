@@ -104,7 +104,7 @@ Four increments, each its own candidate, in order.
        family, `console_resp`, `itree_bind` and `resp_coproduct`
        (Steward `evt_7r7x0wsxapftg`, `evt_tccj1bnqn8em`; Architect
        `evt_75k6f97trqvx3`).
-   - **3b, route switches and roots** (released `evt_1nk07jvrampbt`).
+   - **3b, route switches and roots** (merged `4f7b64631`).
      The strict entries and the root threading above. It also carries two items:
      - the imports for every on-disk source that a no-root route checks
        today and whose body 3a rewrote (Architect `evt_5rd10s2g7cr6z`,

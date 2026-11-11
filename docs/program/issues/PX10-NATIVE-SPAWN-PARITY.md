@@ -379,9 +379,9 @@ same cut as those hunks:
 ## Stop conditions
 
 - A repair that needs a kernel or trust change, or a post-fork callback.
-- A sixth advancing stop on the native-lowering chain. Its §1a count is
-  5 at this recut (evt_146ymmv8mz9py), and a sixth gets the Architect's
-  marginal-value re-ask to Research.
+- The next Research re-ask on the native-lowering chain. Its §1a count is
+  18 (Architect `evt_3p0edzr9keddc` §5), and the re-ask to Research comes
+  at 21.
 
 Checks: 4 fired: the fold search and the settlement refusal were read at
 `brackets.rs:583` and `returned_vis.rs:491` on `903b06068`. The up-walk's
