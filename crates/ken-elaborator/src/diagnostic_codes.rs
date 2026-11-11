@@ -89,6 +89,7 @@ ken_diagnostic::define_error_codes! {
     Self::InstanceHeadSpellingsShareAnIdentity { .. } => ("E0055", "elab.instance_head_spellings_share_an_identity"),
     Self::InstanceCarrierIdentityMismatch { .. } => ("E0056", "elab.instance_carrier_identity_mismatch"),
     Self::NonTerminatingInstances { .. } => ("E0057", "elab.non_terminating_instances"),
+    Self::BuiltinNameBinding { .. } => ("E0089", "elab.builtin_name_binding"),
     Self::AmbiguousReference { .. } => ("E0058", "elab.ambiguous_reference"),
     Self::ReExportCollision { .. } => ("E0059", "elab.re_export_collision"),
     Self::Internal(..) => ("E0060", "elab.internal"),

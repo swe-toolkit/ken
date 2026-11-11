@@ -439,8 +439,8 @@ fn assert_collision(source: &str, name: &str) {
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
-/// Every Pair binding is immutable at top level, while renamed declarations and
-/// narrower lexical shadowing remain ordinary source behavior.
+/// Every Pair binding is immutable at top level and under Strict local binders;
+/// renamed declarations and non-B lexical names remain ordinary source.
 #[test]
 fn pair_floor_binding_collisions_reject_before_allocation() {
     assert_collision("data Pair a b = LocalPairCtor a b", "Pair");
@@ -455,8 +455,18 @@ fn pair_floor_binding_collisions_reject_before_allocation() {
          const local_pair_snd : Bool = True",
     )
     .expect("all-renamed Pair lookalikes must remain lawful");
-    strict_one("fn lexical (pair_fst : Bool) : Bool = pair_fst")
-        .expect("narrow lexical binder must retain ordinary shadowing");
+    let source = "fn lexical (pair_fst : Bool) : Bool = pair_fst";
+    let binder_start = source.find("(pair_fst : Bool)").expect("binder fixture");
+    let binder_end = binder_start + "(pair_fst : Bool)".len();
+    let error = match strict_one(source) {
+        Err(error) => error,
+        Ok(_) => panic!("Strict local built-in binder must refuse"),
+    };
+    assert!(matches!(error,
+        ElabError::BuiltinNameBinding { name, span }
+        if name == "pair_fst" && span.start == binder_start && span.end == binder_end));
+    strict_one("fn lexical (local_pair_fst : Bool) : Bool = local_pair_fst")
+        .expect("renamed non-B lexical binder remains lawful");
 }
 
 /// Promise class: durable invariant.

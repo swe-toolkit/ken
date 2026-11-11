@@ -461,6 +461,8 @@ pub enum ElabError {
     /// chain — i.e. search would not terminate (`39 §6.4`, `17 §4.2`).
     /// Detected at admission time; never a search-time hang.
     NonTerminatingInstances { span: Span },
+    /// A Strict source binder tried to introduce a reserved built-in spelling.
+    BuiltinNameBinding { name: String, span: Span },
     /// An unqualified import clash (`33 §3.3`): a top-level local and a
     /// selective import, or two selective imports, bind distinct declarations.
     /// `sources` names every colliding qualified origin (the reject must
@@ -990,6 +992,9 @@ impl fmt::Display for ElabError {
                  reified resolution group (cyclic or non-decreasing)",
                 span.start, span.end,
             ),
+            ElabError::BuiltinNameBinding { name, span } => {
+                write!(f, "built-in binder {name} at {}-{}", span.start, span.end)
+            }
             ElabError::AmbiguousReference { name, sources, span } => {
                 let mut sorted = sources.clone();
                 sorted.sort();

@@ -545,6 +545,7 @@ struct Scope {
     /// Shared by cloned branch scopes so discovering a spine anywhere in one
     /// declaration remains an O(1) resolution-side fact.
     contains_infix_spine: Rc<Cell<bool>>,
+    builtin_binders: Option<Rc<HashSet<String>>>,
 }
 
 impl Scope {
@@ -554,7 +555,14 @@ impl Scope {
             local_dictionaries: std::collections::HashSet::new(),
             space_cells: std::collections::HashMap::new(),
             contains_infix_spine: Rc::new(Cell::new(false)),
+            builtin_binders: None,
         }
+    }
+
+    fn with_builtins(builtin_binders: Option<Rc<HashSet<String>>>) -> Self {
+        let mut scope = Self::new();
+        scope.builtin_binders = builtin_binders;
+        scope
     }
 
     fn saw_infix_spine(&self) {
@@ -565,24 +573,44 @@ impl Scope {
         self.contains_infix_spine.get()
     }
 
-    fn push(&mut self, name: &str) {
-        self.push_spanned(name, Span::zero());
+    fn bind_source(&mut self, name: &str, span: Span) -> Result<(), ElabError> {
+        self.check_builtin(name, &span)?;
+        self.bindings.push((vec![name.to_string()], span, None));
+        Ok(())
     }
 
-    fn push_spanned(&mut self, name: &str, span: Span) {
-        self.bindings.push((vec![name.to_string()], span, None));
+    fn check_builtin(&self, name: &str, span: &Span) -> Result<(), ElabError> {
+        if self
+            .builtin_binders
+            .as_ref()
+            .is_some_and(|b| b.contains(name))
+        {
+            return Err(ElabError::BuiltinNameBinding {
+                name: name.to_string(),
+                span: span.clone(),
+            });
+        }
+        Ok(())
+    }
+
+    fn push_synthesized(&mut self, name: &'static str) {
+        self.bindings
+            .push((vec![name.to_string()], Span::zero(), None));
     }
 
     fn push_anonymous(&mut self, span: Span) {
         self.bindings.push((Vec::new(), span, None));
     }
 
-    fn push_pattern_alias(&mut self, name: &str, span: Span, slot: usize) {
+    fn bind_pattern_alias(&mut self, name: &str, span: Span, slot: usize) -> Result<(), ElabError> {
+        self.check_builtin(name, &span)?;
         self.bindings
             .push((vec![name.to_string()], span, Some(slot)));
+        Ok(())
     }
 
-    fn push_alias(&mut self, alias: &str, name: &str) {
+    fn bind_alias(&mut self, alias: &str, name: &str, span: Span) -> Result<(), ElabError> {
+        self.check_builtin(alias, &span)?;
         if let Some((names, _, _)) = self
             .bindings
             .iter_mut()
@@ -591,6 +619,7 @@ impl Scope {
         {
             names.push(alias.to_string());
         }
+        Ok(())
     }
 
     fn pop(&mut self) {
@@ -635,6 +664,7 @@ impl Scope {
 
     fn install_space_cells(&mut self, cells: &[SpaceCell]) -> Result<(), ElabError> {
         for (index, cell) in cells.iter().enumerate() {
+            self.check_builtin(&cell.name, &cell.span)?;
             if self.space_cells.insert(cell.name.clone(), index).is_some() {
                 return Err(ElabError::DuplicateDefinition {
                     name: cell.name.clone(),
@@ -645,8 +675,10 @@ impl Scope {
         Ok(())
     }
 
-    fn bind_local_dictionary(&mut self, name: &str) {
+    fn bind_local_dictionary_checked(&mut self, name: &str, span: Span) -> Result<(), ElabError> {
+        self.check_builtin(name, &span)?;
         self.local_dictionaries.insert(name.to_string());
+        Ok(())
     }
 
     fn is_local_dictionary(&self, name: &str) -> bool {
@@ -676,6 +708,7 @@ fn resolve_instance_constraints(
     constraints: &[InstanceConstraint],
     bind_as_core_variables: bool,
     allow_legacy_sole_bare_d: bool,
+    introducing_span: &Span,
 ) -> Result<Vec<RInstanceConstraint>, ElabError> {
     let mut resolved = Vec::with_capacity(constraints.len());
     let mut binder_names = std::collections::HashSet::new();
@@ -706,18 +739,24 @@ fn resolve_instance_constraints(
         });
     }
 
-    for constraint in &resolved {
+    for (constraint, surface) in resolved.iter().zip(constraints) {
         if bind_as_core_variables {
-            scope.push(&constraint.binder);
+            if surface.binder.is_some() {
+                scope.bind_source(&constraint.binder, introducing_span.clone())?;
+            } else {
+                scope.bind_source(&constraint.binder, introducing_span.clone())?;
+            }
+        } else if surface.binder.is_some() {
+            scope.bind_local_dictionary_checked(&constraint.binder, introducing_span.clone())?;
         } else {
-            scope.bind_local_dictionary(&constraint.binder);
+            scope.bind_local_dictionary_checked(&constraint.binder, introducing_span.clone())?;
         }
     }
     if resolved.len() == 1 && resolved[0].binder != "d" {
         if bind_as_core_variables {
-            scope.push_alias("d", &resolved[0].binder);
+            scope.bind_alias("d", &resolved[0].binder, introducing_span.clone())?;
         } else {
-            scope.bind_local_dictionary("d");
+            scope.bind_local_dictionary_checked("d", introducing_span.clone())?;
         }
     }
     Ok(resolved)
@@ -857,7 +896,7 @@ fn resolve_explicit_family_indices(
         Type::TArr(domain, codomain, span) | Type::TEffectArr(domain, _, codomain, span) => {
             let domain_r = resolve_type(scope, domain)?;
             let name = format!("_index{}", scope.depth());
-            scope.push(&name);
+            scope.bind_source(&name, span.clone())?;
             let (mut rest, level) = resolve_explicit_family_indices(scope, codomain)?;
             scope.pop();
             let entry = RTelescopeEntry {
@@ -870,7 +909,7 @@ fn resolve_explicit_family_indices(
         }
         Type::TPi(name, domain, codomain, span) => {
             let domain_r = resolve_type(scope, domain)?;
-            scope.push(name);
+            scope.bind_source(name, span.clone())?;
             let (mut rest, level) = resolve_explicit_family_indices(scope, codomain)?;
             scope.pop();
             let entry = RTelescopeEntry {
@@ -907,7 +946,7 @@ fn resolve_explicit_ctor(
                     span: ty.span().clone(),
                 });
                 let name = format!("_arg{}", scope.depth());
-                scope.push(&name);
+                scope.bind_source(&name, c.span.clone())?;
             }
             Ok(RExplicitCtorDecl {
                 name: c.name.clone(),
@@ -933,7 +972,7 @@ fn resolve_explicit_ctor(
                         )?;
                         let rty = resolve_type(&mut scope, &binder.ty)?;
                         let name = binder.names[0].clone();
-                        scope.push(&name);
+                        scope.bind_source(&name, binder.span.clone())?;
                         args.push(RTelescopeEntry {
                             name: Some(name),
                             ty: rty,
@@ -949,7 +988,7 @@ fn resolve_explicit_ctor(
                             span: expr.span().clone(),
                         });
                         let name = format!("_arg{}", scope.depth());
-                        scope.push(&name);
+                        scope.bind_source(&name, expr.span().clone())?;
                     }
                 }
             }
@@ -1065,13 +1104,13 @@ pub(crate) fn resolve_decls(decls: &[Decl]) -> Result<Vec<RDecl>, ElabError> {
     let mut out = Vec::new();
     let mut unit_definitions = HashSet::new();
     for d in decls {
-        out.push(resolve_decl_in_unit(d, &mut unit_definitions, None)?);
+        out.push(resolve_decl_in_unit(d, &mut unit_definitions, None, None)?);
     }
     Ok(out)
 }
 
 pub(crate) fn resolve_decl(decl: &Decl) -> Result<RDecl, ElabError> {
-    resolve_decl_in_unit(decl, &mut HashSet::new(), None)
+    resolve_decl_in_unit(decl, &mut HashSet::new(), None, None)
 }
 
 pub(crate) fn resolve_space_decl(
@@ -1079,14 +1118,15 @@ pub(crate) fn resolve_space_decl(
     cells: &[SpaceCell],
     operations: &[SpaceOperation],
     span: &Span,
+    builtin_binders: Option<Rc<HashSet<String>>>,
 ) -> Result<RSpaceDecl, ElabError> {
-    let mut cell_scope = Scope::new();
+    let mut cell_scope = Scope::with_builtins(builtin_binders.clone());
     cell_scope.install_space_cells(cells)?;
 
     let mut contains_infix_spine = false;
     let mut resolved_cells = Vec::with_capacity(cells.len());
     for cell in cells {
-        let mut scope = Scope::new();
+        let mut scope = Scope::with_builtins(builtin_binders.clone());
         resolved_cells.push(RSpaceCell {
             name: cell.name.clone(),
             ty: resolve_type(&mut scope, &cell.ty)?,
@@ -1117,7 +1157,7 @@ pub(crate) fn resolve_space_decl(
                     });
                 }
                 params.push((param.clone(), ty.clone()));
-                scope.push(param);
+                scope.bind_source(param, binder.span.clone())?;
             }
         }
         let requires = operation
@@ -1127,7 +1167,7 @@ pub(crate) fn resolve_space_decl(
             .collect::<Result<Vec<_>, _>>()?;
         let ret_ty = resolve_type(&mut scope, &operation.ret_ty)?;
         let body = resolve_expr(&mut scope, &operation.body)?;
-        scope.push("result");
+        scope.push_synthesized("result");
         let ensures = operation
             .ensures
             .iter()
@@ -1160,6 +1200,7 @@ pub(crate) fn resolve_decl_in_unit(
     decl: &Decl,
     unit_definitions: &mut HashSet<String>,
     definition_name: Option<&str>,
+    builtin_binders: Option<Rc<HashSet<String>>>,
 ) -> Result<RDecl, ElabError> {
     // The single decl-kind-uniform funnel every fn/const/proc/def/data/class/
     // instance declaration passes through — guard the produced decl's own
@@ -1229,14 +1270,14 @@ pub(crate) fn resolve_decl_in_unit(
             is_space_op,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
 
             let mut single_binders: Vec<(String, RType)> = Vec::new();
             for b in params {
                 let a = resolve_type(&mut scope, &b.ty)?;
                 for name_str in &b.names {
                     single_binders.push((name_str.clone(), a.clone()));
-                    scope.push(name_str);
+                    scope.bind_source(name_str, b.span.clone())?;
                 }
             }
 
@@ -1244,7 +1285,7 @@ pub(crate) fn resolve_decl_in_unit(
             // declaration-local expression. Def-path names resolve as local
             // dictionary constants, so they do not alter parameter indices.
             let resolved_constraints =
-                resolve_instance_constraints(&mut scope, constraints, false, true)?;
+                resolve_instance_constraints(&mut scope, constraints, false, true, span)?;
 
             // Resolve `requires` clauses — `result` and `old` are NOT in scope
             let resolved_requires = requires
@@ -1268,7 +1309,7 @@ pub(crate) fn resolve_decl_in_unit(
                 PropCtx::PureViewEnsures
             };
             // Bind `result` in scope for ensures resolution
-            scope.push("result");
+            scope.push_synthesized("result");
             let resolved_ensures = ensures
                 .iter()
                 .map(|psi| resolve_prop(&mut scope, psi, prop_ctx))
@@ -1319,7 +1360,7 @@ pub(crate) fn resolve_decl_in_unit(
             val,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let resolved_ty = match ty {
                 Some(t) => Some(resolve_type(&mut scope, t)?),
                 None => None,
@@ -1338,7 +1379,7 @@ pub(crate) fn resolve_decl_in_unit(
         }
 
         Decl::ProveDecl { name, prop, span } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let resolved_prop = resolve_expr(&mut scope, prop)?;
             Ok(RDecl {
                 name: name.clone(),
@@ -1359,13 +1400,13 @@ pub(crate) fn resolve_decl_in_unit(
             intros,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let mut single_binders: Vec<(String, RType)> = Vec::new();
             for b in params {
                 let a = resolve_type(&mut scope, &b.ty)?;
                 for name_str in &b.names {
                     single_binders.push((name_str.clone(), a.clone()));
-                    scope.push(name_str);
+                    scope.bind_source(name_str, b.span.clone())?;
                 }
             }
             let resolved_ret = resolve_type(&mut scope, ret_ty)?;
@@ -1408,7 +1449,7 @@ pub(crate) fn resolve_decl_in_unit(
             body,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let (full_ty, full_body) =
                 resolve_checked_proof_decl(params, theorem, body, &mut scope)?;
             Ok(RDecl {
@@ -1428,7 +1469,7 @@ pub(crate) fn resolve_decl_in_unit(
             theorem,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let body = Expr::ECon(SUGAR_AXIOM.to_string(), span.clone());
             let (full_ty, full_body) =
                 resolve_checked_proof_decl(&[], theorem, &body, &mut scope)?;
@@ -1452,7 +1493,7 @@ pub(crate) fn resolve_decl_in_unit(
             body,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let (full_ty, full_body) =
                 resolve_checked_proof_decl(params, theorem, body, &mut scope)?;
             Ok(RDecl {
@@ -1476,9 +1517,9 @@ pub(crate) fn resolve_decl_in_unit(
             fields,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             // `param` is in scope for each field proposition
-            scope.push(param);
+            scope.bind_source(param, span.clone())?;
             let resolved_fields = fields
                 .iter()
                 .map(|(fname, phi)| {
@@ -1509,9 +1550,9 @@ pub(crate) fn resolve_decl_in_unit(
             span,
         } => {
             // Each type param is in scope (as a type variable) for the ctor args.
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             for p in type_params {
-                scope.push(p);
+                scope.bind_source(p, span.clone())?;
             }
             let mut rctors = Vec::new();
             for c in ctors {
@@ -1558,13 +1599,13 @@ pub(crate) fn resolve_decl_in_unit(
             ctors,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let mut rparams = Vec::new();
             for binder in params {
                 require_single_binder(&binder.names, &binder.span, "explicit data parameter")?;
                 let rty = resolve_type(&mut scope, &binder.ty)?;
                 let pname = binder.names[0].clone();
-                scope.push(&pname);
+                scope.bind_source(&pname, binder.span.clone())?;
                 rparams.push(RTelescopeEntry {
                     name: Some(pname),
                     ty: rty,
@@ -1604,7 +1645,7 @@ pub(crate) fn resolve_decl_in_unit(
         }
 
         Decl::TypeAlias { name, ty, span } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let rty = resolve_type(&mut scope, ty)?;
             Ok(RDecl {
                 name: name.clone(),
@@ -1627,7 +1668,7 @@ pub(crate) fn resolve_decl_in_unit(
             visits,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let rty = resolve_type(&mut scope, ty)?;
             Ok(RDecl {
                 name: name.clone(),
@@ -1673,7 +1714,7 @@ pub(crate) fn resolve_decl_in_unit(
             // Record fields form the same real Sigma telescope as class
             // projection metadata: later field types may reference earlier
             // field values by name.
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let mut resolved_fields = Vec::new();
             for (field_name, field_ty) in fields {
                 let ty = resolve_type(&mut scope, field_ty)?;
@@ -1681,7 +1722,7 @@ pub(crate) fn resolve_decl_in_unit(
                     name: field_name.clone(),
                     ty,
                 });
-                scope.push(field_name);
+                scope.bind_source(field_name, span.clone())?;
             }
             Ok(RDecl {
                 name: name.clone(),
@@ -1711,13 +1752,13 @@ pub(crate) fn resolve_decl_in_unit(
             // right after resolving it, so it's a bound `RVarTy`/`RVar`
             // reference (matching the Sigma-chain's own binder depth) for
             // every subsequent field — never a stray global lookup.
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let resolved_param_kind = param_kind
                 .as_ref()
                 .map(|k| resolve_type(&mut scope, k))
                 .transpose()?;
             if let Some(p) = param {
-                scope.push(p);
+                scope.bind_source(p, span.clone())?;
             }
             let mut resolved_fields = Vec::new();
             for ClassField {
@@ -1732,7 +1773,7 @@ pub(crate) fn resolve_decl_in_unit(
                     name: fname.clone(),
                     ty: rty,
                 });
-                scope.push(fname);
+                scope.bind_source(fname, span.clone())?;
             }
             Ok(RDecl {
                 name: name.clone(),
@@ -1757,14 +1798,14 @@ pub(crate) fn resolve_decl_in_unit(
             fields,
             span,
         } => {
-            let mut scope = Scope::new();
+            let mut scope = Scope::with_builtins(builtin_binders.clone());
             let mut head_params = Vec::new();
             collect_instance_head_params(head_type, &mut head_params);
             for param in &head_params {
-                scope.push(param);
+                scope.bind_source(param, head_type.span().clone())?;
             }
             let rhead = resolve_type(&mut scope, head_type)?;
-            let rconstraints = resolve_instance_constraints(&mut scope, constraints, true, false)?;
+            let rconstraints = resolve_instance_constraints(&mut scope, constraints, true, false, span)?;
             let rfields = fields
                 .iter()
                 .map(|(fname, expr)| {
@@ -1829,7 +1870,7 @@ fn resolve_checked_proof_decl(
         let a = resolve_type(scope, &b.ty)?;
         for name_str in &b.names {
             single_binders.push((name_str.clone(), a.clone()));
-            scope.push(name_str);
+            scope.bind_source(name_str, b.span.clone())?;
         }
     }
     let resolved_theorem = resolve_type(scope, theorem)?;
@@ -1975,7 +2016,7 @@ fn resolve_expr_ctx_elam(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result
     {
         let depth_before = scope.depth();
         for n in names {
-            scope.push(n);
+            scope.bind_source(n, expr.span().clone())?;
         }
         let rb = resolve_expr_ctx(scope, body, ctx)?;
         for _ in names {
@@ -2021,7 +2062,7 @@ fn resolve_expr_ctx_elet(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result
                     resolved_value,
                     binding.span.clone(),
                 ));
-                scope.push_spanned(&binding.name, binding.name_span.clone());
+                scope.bind_source(&binding.name, binding.name_span.clone())?;
             }
             let mut resolved_body = resolve_expr_ctx(scope, body, ctx)?;
             for (name, ty, value, binding_span) in resolved.into_iter().rev() {
@@ -2251,7 +2292,7 @@ fn resolve_expr_ctx_epi(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<
     };
     {
         let ra = resolve_type(scope, a)?;
-        scope.push(x);
+        scope.bind_source(x, expr.span().clone())?;
         let rb = resolve_expr_ctx(scope, b, ctx)?;
         scope.pop();
         Ok(RExpr::RPi(
@@ -2274,7 +2315,7 @@ fn resolve_expr_ctx_esigma(
     };
     {
         let ra = resolve_type(scope, a)?;
-        scope.push(x);
+        scope.bind_source(x, expr.span().clone())?;
         let rb = resolve_expr_ctx(scope, b, ctx)?;
         scope.pop();
         Ok(RExpr::RSigma(
@@ -2416,15 +2457,15 @@ fn resolve_expr_ctx_ematch(
             let depth_before = scope.depth();
             for binding in &bound_names {
                 if let Some(slot) = binding.alias_slot {
-                    scope.push_pattern_alias(&binding.name, binding.span.clone(), slot);
+                    scope.bind_pattern_alias(&binding.name, binding.span.clone(), slot)?;
                 } else if binding.name == "_" {
                     scope.push_anonymous(binding.span.clone());
                 } else {
-                    scope.push_spanned(&binding.name, binding.span.clone());
+                    scope.bind_source(&binding.name, binding.span.clone())?;
                 }
             }
             if let Some(equation) = equation {
-                scope.push(equation);
+                scope.bind_source(equation, expr.span().clone())?;
             }
             let rguard = arm
                 .guard
@@ -2840,7 +2881,7 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
 
         Type::TPi(x, a, b, span) => {
             let ra = resolve_type(scope, a)?;
-            scope.push(x);
+            scope.bind_source(x, span.clone())?;
             let rb = resolve_type(scope, b)?;
             scope.pop();
             Ok(RType::RPi(
@@ -2853,7 +2894,7 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
 
         Type::TSigma(x, a, b, span) => {
             let ra = resolve_type(scope, a)?;
-            scope.push(x);
+            scope.bind_source(x, span.clone())?;
             let rb = resolve_type(scope, b)?;
             scope.pop();
             Ok(RType::RSigma(
@@ -2866,7 +2907,7 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
 
         Type::TRefine(x, a, phi, span) => {
             let ra = resolve_type(scope, a)?;
-            scope.push(x);
+            scope.bind_source(x, span.clone())?;
             let rphi = resolve_expr_ctx(scope, phi, PropCtx::None)?;
             scope.pop();
             Ok(RType::RRefine(

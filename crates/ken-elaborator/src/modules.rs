@@ -4748,8 +4748,9 @@ fn resolve_scoped_decl(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     unit_definitions: &mut HashSet<String>,
+    binder_names: &HashSet<String>,
 ) -> Result<RDecl, ElabError> {
-    let rdecl = resolve_raw_scoped_decl(decl, scope, exports, unit_definitions)?;
+    let rdecl = resolve_raw_scoped_decl(decl, scope, exports, unit_definitions, binder_names)?;
     rewrite_rdecl(scope, exports, rdecl)
 }
 
@@ -4758,6 +4759,7 @@ fn resolve_raw_scoped_decl(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     unit_definitions: &mut HashSet<String>,
+    binder_names: &HashSet<String>,
 ) -> Result<RDecl, ElabError> {
     let attached_name = if let Decl::AttachedProofDecl {
         subject,
@@ -4773,7 +4775,12 @@ fn resolve_raw_scoped_decl(
     } else {
         None
     };
-    resolve::resolve_decl_in_unit(decl, unit_definitions, attached_name.as_deref())
+    resolve::resolve_decl_in_unit(
+        decl,
+        unit_definitions,
+        attached_name.as_deref(),
+        (scope.mode == ResolutionMode::Strict).then(|| std::rc::Rc::new(binder_names.clone())),
+    )
 }
 
 fn reject_prelude_binding(
@@ -4805,6 +4812,11 @@ enum DeclNamespaceEffect<'a> {
         parent: &'a str,
         parent_span: &'a Span,
         constructors: ConstructorNameSource<'a>,
+    },
+    LawDerivedNames {
+        law: &'a str,
+        fields: &'a [(String, crate::ast::Expr)],
+        span: &'a Span,
     },
     QualifiedIdentity {
         subject: &'a str,
@@ -4953,12 +4965,18 @@ fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
         | Decl::PropDecl { name, span, .. }
         | Decl::TheoremDecl { name, span, .. }
         | Decl::AxiomDecl { name, span, .. }
-        | Decl::LawDecl { name, span, .. }
         | Decl::TypeAlias { name, span, .. }
         | Decl::ForeignDecl { name, span, .. }
         | Decl::TemporalDecl { name, span, .. }
         | Decl::RecordDecl { name, span, .. }
         | Decl::ClassDecl { name, span, .. } => DeclNamespaceEffect::TopLevelName { name, span },
+        Decl::LawDecl {
+            name, fields, span, ..
+        } => DeclNamespaceEffect::LawDerivedNames {
+            law: name,
+            fields,
+            span,
+        },
         Decl::DataDecl {
             name, ctors, span, ..
         } => DeclNamespaceEffect::ConstructorNames {
@@ -5016,12 +5034,22 @@ fn reject_decl_prelude_bindings(
     decl: &Decl,
     prefix: &str,
     prelude_binding_names: &HashSet<String>,
+    mode: ResolutionMode,
 ) -> Result<(), ElabError> {
     let reject = |bare: &str, span: &Span| {
         reject_prelude_binding(bare, &qualify(prefix, bare), span, prelude_binding_names)
     };
     match decl_namespace_effect(decl) {
         DeclNamespaceEffect::TopLevelName { name, span } => reject(name, span),
+        DeclNamespaceEffect::LawDerivedNames { law, fields, span } => {
+            reject(law, span)?;
+            if mode == ResolutionMode::Strict {
+                for (field, _) in fields {
+                    reject(&format!("{law}_{field}"), span)?;
+                }
+            }
+            Ok(())
+        }
         DeclNamespaceEffect::ConstructorNames {
             parent,
             parent_span,
@@ -5104,7 +5132,7 @@ fn prebind_scope_declarations(
     // or elaborating any declaration so refusal cannot allocate or replace a
     // canonical global.
     for decl in decls {
-        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names)?;
+        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names, scope.mode)?;
     }
 
     // Collect locals before imports so collisions are source-order independent.
@@ -5806,8 +5834,14 @@ fn expand_scope(
                         Some(unit_definitions),
                     )?;
                 }
-                let resolved =
-                    resolve::resolve_space_decl(&qualified_name, cells, operations, span)?;
+                let resolved = resolve::resolve_space_decl(
+                    &qualified_name,
+                    cells,
+                    operations,
+                    span,
+                    (scope.mode == ResolutionMode::Strict)
+                        .then(|| std::rc::Rc::new(elab.module_state.prelude_binding_names.clone())),
+                )?;
                 let mut declared = vec![DeclaredIdentity {
                     key: resolved.name.clone(),
                     provenance: IdentityProvenance::Source,
@@ -5920,6 +5954,7 @@ fn expand_scope(
                         scope,
                         &elab.module_state.exports,
                         unit_definitions,
+                        &elab.module_state.prelude_binding_names,
                     )?;
                     let rdecl = rewrite_rdecl(scope, &elab.module_state.exports, raw.clone())?;
                     node_names.insert(rdecl.name.clone(), index);
@@ -6313,6 +6348,7 @@ fn expand_scope(
                         scope,
                         &elab.module_state.exports,
                         unit_definitions,
+                        &elab.module_state.prelude_binding_names,
                     )?;
                     // An instance or derived dictionary owns its allocations
                     // and obligation IDs under its own canonical dictionary
@@ -6861,10 +6897,50 @@ mod namespace_effect_tests {
         }
 
         let mut lexical = ElabEnv::new().expect("base environment");
+        assert_eq!(
+            lexical.module_state.root_scope.mode,
+            super::ResolutionMode::Legacy
+        );
         lexical
             .elaborate_file("fn keep (Proved : Nat) : Nat = Zero")
-            .expect("a narrow lexical binder is not a global redeclaration");
+            .expect("Legacy local binder remains accepted");
+        assert_eq!(
+            lexical.module_state.root_scope.mode,
+            super::ResolutionMode::Legacy
+        );
         assert_eq!(lexical.globals["Proved"], lexical.env.tt_id());
+    }
+
+    /// Promise class: durable invariant (spec 33, Strict built-in binders).
+    /// The same lexical Proved source checks under Legacy above, but is refused
+    /// by Strict at its parameter Binder span. A non-B rename remains lawful.
+    #[test]
+    fn strict_local_proved_refuses_and_localproved_renames_lawfully() {
+        let source = "fn keep (Proved : Nat) : Nat = Zero";
+        let ast = crate::parser::parse_decls(source).expect("source parses");
+        let binder_span = match &ast[0] {
+            Decl::ViewDecl { params, .. } => params[0].span.clone(),
+            other => panic!("expected function, got {other:?}"),
+        };
+        let root = tempfile::tempdir().expect("Strict source root");
+        fs::write(root.path().join("Entry.ken"), source).expect("write Strict source");
+        let mut strict = ElabEnv::new().expect("base environment");
+        let error = strict
+            .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+            .expect_err("Strict Proved binder must refuse");
+        assert!(matches!(error,
+            ElabError::BuiltinNameBinding { name, span }
+            if name == "Proved" && span == binder_span));
+
+        fs::write(
+            root.path().join("Entry.ken"),
+            "fn keep (LocalProved : Nat) : Nat = Zero",
+        )
+        .expect("write non-B renamed twin");
+        ElabEnv::new()
+            .unwrap()
+            .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+            .expect("Strict non-B renamed twin must check");
     }
 
     /// Promise class: durable invariant (spec 16 §1.4; 33 §§3.2–3.3).
@@ -6959,6 +7035,11 @@ mod namespace_effect_tests {
             parent_span: Span,
             constructors: Vec<(String, Span)>,
         },
+        LawDerivedNames {
+            law: String,
+            fields: Vec<String>,
+            span: Span,
+        },
         QualifiedIdentity {
             subject: String,
             proof_name: String,
@@ -7007,6 +7088,13 @@ mod namespace_effect_tests {
                     parent: parent.to_string(),
                     parent_span: parent_span.clone(),
                     constructors,
+                }
+            }
+            DeclNamespaceEffect::LawDerivedNames { law, fields, span } => {
+                OwnedNamespaceEffect::LawDerivedNames {
+                    law: law.to_string(),
+                    fields: fields.iter().map(|(name, _)| name.clone()).collect(),
+                    span: span.clone(),
                 }
             }
             DeclNamespaceEffect::QualifiedIdentity {
