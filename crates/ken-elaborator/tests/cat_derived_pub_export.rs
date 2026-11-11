@@ -8,8 +8,8 @@
 //! `list_append::length`), the `map::{id, fusion, append}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
 //! their subjects.
-//! The generic `Perm`, `insert`, `sort` and their four checked laws are
-//! exported; their proof helpers and the `List Bool` sort carrier remain private.
+//! Generic `Perm`, `insert`, `sort`, public `take` and their attached proofs
+//! are exported; proof helpers and the `List Bool` carrier remain private.
 //! Generic Ω-list membership and its nine checked lift/transport laws are
 //! public beside their Derived-owned providers, including filter soundness
 //! and completeness. Structural `is_sorted` is Derived-owned and public.
@@ -87,6 +87,7 @@ fn derived_exports_all_authorized_operation_identities() {
         ("list_concat", "cat_derived_pub_list_concat"),
         ("list_all", "cat_derived_pub_list_all"),
         ("nth", "cat_derived_pub_nth"),
+        ("take", "cat_derived_pub_take"),
         ("length", "cat_derived_pub_length"),
         ("reverse", "cat_derived_pub_reverse"),
         ("concat_map", "cat_derived_pub_concat_map"),
@@ -118,7 +119,7 @@ fn derived_exports_all_authorized_operation_identities() {
     );
     env.elaborate_file(
         "import Data.Collections.Derived \
-           (map, filter, is_sorted as catalog_is_sorted, list_append, list_concat, list_all, nth, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
+           (map, filter, is_sorted as catalog_is_sorted, list_append, list_concat, list_all, nth, take, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
          import Core.Function.Combinators (comp, idf)\n\
          fn cat_derived_pub_map (xs : List Bool) : List Bool = \
            map Bool Bool (\\x. x) xs\n\
@@ -145,6 +146,7 @@ fn derived_exports_all_authorized_operation_identities() {
          fn cat_derived_pub_list_all (p : Bool → Omega) (xs : List Bool) : Omega = \
            list_all Bool p xs\n\
          fn cat_derived_pub_nth (n : Nat) (xs : List Bool) : Option Bool = nth Bool n xs\n\
+         fn cat_derived_pub_take (n : Nat) (xs : List Bool) : List Bool = take Bool n xs\n\
          fn cat_derived_pub_length (xs : List Bool) : Nat = length Bool xs\n\
          fn cat_derived_pub_reverse (xs : List Bool) : List Bool = reverse Bool xs\n\
          fn cat_derived_pub_singleton (x : Bool) : List Bool = Cons Bool x (Nil Bool)\n\
@@ -255,8 +257,10 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
         let theorem = theorem_and_separator[..separator].trim_end();
         let probe = format!("cat_derived_export_probe_{}", queries.len());
         let attached = format!("{subject}::{proof_name}");
-        let theorem = if matches!(attached.as_str(), "insert::sorted" | "sort::sorted")
-            || subject == "is_sorted"
+        let theorem = if matches!(
+            attached.as_str(),
+            "insert::sorted" | "sort::sorted" | "take::sorted"
+        ) || subject == "is_sorted"
         {
             catalog_or::rename_sorted_token(theorem, false)
         } else {
@@ -281,7 +285,20 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
             "filter::length" => "import Data.Collections.Derived (length)\n",
             "insert::count" => "import Data.Collections.Derived (count)\n",
             "sort::perm" => "import Data.Collections.Derived (Perm)\n",
-            "insert::sorted" | "sort::sorted" => {
+            "take::length" => {
+                "import Data.Collections.Derived (length)\n\
+                 import Data.Numeric.Nat.Order (min)\n"
+            }
+            "take::member" | "insert::member" | "sort::member" | "filter::empty_if_none" => {
+                "import Data.Collections.Derived (list_elem)\n"
+            }
+            "take::filter_prefix" => "import Data.Collections.Derived (filter, length)\n",
+            "insert::length" | "sort::length" => "import Data.Collections.Derived (length)\n",
+            "insert::stable_class" | "sort::stable_class" => {
+                "import Data.Collections.Derived (filter, eq_from_ord)\n\
+                 import Core.Classes.LawfulClasses (bool_or)\n"
+            }
+            "insert::sorted" | "sort::sorted" | "take::sorted" => {
                 "import Data.Collections.Derived (is_sorted as catalog_is_sorted)\n\
                  import Core.Classes.LawfulClasses (bool_or)\n"
             }
@@ -313,8 +330,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// bound proofs, four `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
 /// operations (`Perm`, `insert`, `sort`), their four attached sort proofs,
-/// structural `is_sorted`, and generic Ω-list membership with nine public
-/// checked lemmas.
+/// structural `is_sorted`, public `take` and its four attached laws, the
+/// generic insert/sort laws, and Ω-list membership with checked lemmas.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
@@ -362,6 +379,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "filter".to_owned(),
             "filter::append".to_owned(),
             "filter::length".to_owned(),
+            "filter::empty_if_none".to_owned(),
             "filter_sorted".to_owned(),
             "filter_starts_after".to_owned(),
             "length".to_owned(),
@@ -393,18 +411,30 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "insert".to_owned(),
             "insert::count".to_owned(),
             "insert::sorted".to_owned(),
+            "insert::member".to_owned(),
+            "insert::length".to_owned(),
+            "insert::stable_class".to_owned(),
             "is_sorted".to_owned(),
             "sort".to_owned(),
             "sort::perm".to_owned(),
             "sort::sorted".to_owned(),
+            "sort::length".to_owned(),
+            "sort::member".to_owned(),
+            "sort::stable_class".to_owned(),
+            "take".to_owned(),
+            "take::length".to_owned(),
+            "take::member".to_owned(),
+            "take::sorted".to_owned(),
+            "take::filter_prefix".to_owned(),
             "list_sorted_cons".to_owned(),
             "list_sorted_head".to_owned(),
+            "list_sorted_head_bounded".to_owned(),
             "list_sorted_tail".to_owned(),
             "starts_after".to_owned(),
             "reverse".to_owned(),
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         collection operations, attached proofs, sort laws and ten membership names"
+         collection operations, attached proofs, sort/prefix laws and membership names"
     );
 }

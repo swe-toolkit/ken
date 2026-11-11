@@ -651,10 +651,11 @@ fn slice_width_is_end_minus_start_through_production_slice() {
 /// Promise class: durable checked-proof invariant.
 ///
 /// MEASURED: owner-checked concrete examples cite the loader-owned three D1
-/// laws in their bodies and private take/drop/mem in their types; a fresh
-/// client imports public `map` but refuses private `take` as UnboundName.
-/// CLAIMED: D1 proofs and private operations work in the owner without the
-/// flat door, while only the declared public name is importable by a client.
+/// laws in their bodies and owner-local take/drop/mem in their types; a
+/// fresh client imports public `map`/`take` but refuses private `drop` as
+/// UnboundName.
+/// CLAIMED: D1 proofs and operations work in the owner without the flat
+/// door, while private `drop` remains inaccessible to a client.
 /// THE GAP: these examples instantiate, rather than re-prove, the generic
 /// laws. A fresh import test does not detect post-fence root_scope leakage;
 /// the executor's separate bare-scope and Err tests guard that boundary.
@@ -674,23 +675,23 @@ fn cat3_d1_positive_surfaces_check_against_real_package_defs() {
     ] {
         assert_cat3_example_reference(&env, &owned, example, private, true);
     }
-    for private in ["take", "drop"] {
-        assert_cat3_example_reference(&env, &owned, names[0], private, false);
+    for owner_symbol in ["take", "drop"] {
+        assert_cat3_example_reference(&env, &owned, names[0], owner_symbol, false);
     }
     assert_cat3_example_reference(&env, &owned, names[3], "mem", false);
 
-    // MEASURED: a fresh client accepts selective `map` and refuses `take`.
-    // CLAIMED: owner-local take does not become a public Derived export.
-    // THE GAP: fresh-client privacy is blind to post-fence root_scope changes;
-    // the executor's bare-name control tests the fenced env independently.
+    // MEASURED: a fresh client imports the public operations but refuses
+    // private `drop` at its selective import. CLAIMED: a checked fence does
+    // not leak an owner-private name. THE GAP: this import probes client
+    // visibility, not the post-fence root_scope (tested separately).
     let (mut client, _) = derived_cat3_owner();
     client
-        .elaborate_file("import Data.Collections.Derived (map)")
-        .expect("the existing public map stays selectively importable");
-    match client.elaborate_file("import Data.Collections.Derived (take)") {
-        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, format!("{DERIVED}.take")),
-        Err(other) => panic!("private take must refuse import as UnboundName: {other:?}"),
-        Ok(_) => panic!("private take must not become an export"),
+        .elaborate_file("import Data.Collections.Derived (map, take)")
+        .expect("public map and take remain selectively importable");
+    match client.elaborate_file("import Data.Collections.Derived (drop)") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, format!("{DERIVED}.drop")),
+        Err(other) => panic!("private drop must refuse import as UnboundName: {other:?}"),
+        Ok(_) => panic!("private drop must not become an export"),
     }
 }
 
@@ -733,8 +734,8 @@ fn cat3_d1_wrong_take_drop_witness_rejected() {
     let example = "derived_example_cat3_take_drop_negative_control";
     let (env, owned) = cat3_owner_examples(&[example]);
     assert_cat3_example_reference(&env, &owned, example, "take_drop_decomposition", true);
-    for private in ["take", "drop"] {
-        assert_cat3_example_reference(&env, &owned, example, private, false);
+    for owner_symbol in ["take", "drop"] {
+        assert_cat3_example_reference(&env, &owned, example, owner_symbol, false);
     }
 }
 
