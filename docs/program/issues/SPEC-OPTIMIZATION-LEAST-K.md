@@ -44,8 +44,11 @@ Spec 72 states the operation and its laws by their public types.
   (`List.ken.md:26`). `Data.Collections.Derived` has `sort` over a
   Boolean `le` (`:1640`), `insert` (`:1630`), `is_sorted` (`:636`) and
   `Perm` (`:1627`); `Perm` counts with an equality function, so this
-  node does not state its laws through it. There is no `take` or
-  `min` on lists anywhere under `catalog/packages`.
+  node does not state its laws through it. Derived has a private
+  `take` (`:127`) and a private `length_take_min` (`:1164`), whose
+  statement is take's length law; the candidate publishes that `take`
+  rather than adding a second one (Architect `evt_6mvst2shcc9m2`).
+  There is no `min` on lists anywhere under `catalog/packages`.
 - **Seeds and tests.** Seeds go under `conformance/stdlib/optimization/`;
   tests are named `crates/ken-elaborator/tests/cat_optimization_<slug>.rs`.
 
@@ -100,7 +103,8 @@ Checks: 4 fired: `argmin`, `argmin_option` and their membership and
 least laws were read at the cited lines on `f32af2a0b`, as were `length`,
 `sort`, `is_sorted` and `Perm`. `Perm` needs an equality function, so
 the frame states no law through it, and AC-0 rules the statements.
-3 fired: `take`, `least_k`, `top_k` and `topk` were grepped over
-`catalog`, `spec` and the issues, with no hit. 8 fired: AC-3's
+3 fired: `least_k`, `top_k` and `topk` were grepped over `catalog`,
+`spec` and the issues, with no hit. The `take` grep read only public
+names and missed Derived's private `take`; corrected above. 8 fired: AC-3's
 first-k-by-position mutant passes Length and Member, so only
 Separation and the seed's refused claim reject it.
