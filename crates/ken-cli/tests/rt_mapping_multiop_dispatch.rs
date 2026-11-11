@@ -177,6 +177,16 @@ fn strict_rechecks_both_generated_metadata_chains_with_explicit_imports() {
             .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
             .unwrap_or_else(|error| panic!("{label} stage: {error:?}"));
         let no_wrappers = format!("program capabilities FS AFull\n{RESOURCE_IMPORT}{body}");
+        assert_ne!(
+            no_wrappers, imported,
+            "negative must differ from imported source"
+        );
+        assert!(
+            !no_wrappers
+                .lines()
+                .any(|line| line.starts_with("import Capability.Process.Exit")),
+            "{label}: negative source must not import HostIO wrappers: {no_wrappers}"
+        );
         let mut negative = ElabEnv::new().expect("prelude");
         match negative.elaborate_isolated_file_strict_v1(&[catalog.clone()], &no_wrappers) {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "host_pure"),

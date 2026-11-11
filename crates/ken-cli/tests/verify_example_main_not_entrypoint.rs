@@ -55,6 +55,12 @@ fn strict_example_only_main_requires_import_then_still_is_not_entrypoint() {
     // It does not manufacture a different program header or import context.
     let body_start = extracted.source.len() + 1;
     let plain = format!("{}\n{}", extracted.source, &EXAMPLE_ONLY[range.clone()]);
+    assert!(
+        !plain
+            .lines()
+            .any(|line| line.starts_with("import Capability.Process.Exit")),
+        "unimported example body must not import host_pure: {plain}"
+    );
     let mut body_check = ElabEnv::new().expect("prelude");
     match body_check.elaborate_isolated_file_strict_v1(&roots, &plain) {
         Err(ken_elaborator::ElabError::UnboundName { name, span }) => {

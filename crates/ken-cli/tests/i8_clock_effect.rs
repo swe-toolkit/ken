@@ -44,17 +44,24 @@ fn strict_clock_user_requires_homes_and_still_checks_the_clock_row() {
         .canonicalize()
         .expect("catalog root");
     let composed = |visits: &str, wall: &str| clock_program(visits, HOST_IMPORT, wall);
+    let imported = composed("visits [Clock]", WALL_IMPORT);
     let mut accepted = ken_elaborator::ElabEnv::new().expect("prelude");
     accepted
-        .elaborate_isolated_file_strict_v1(
-            &[catalog.clone()],
-            &composed("visits [Clock]", WALL_IMPORT),
-        )
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
         .expect("both checked Clock homes import");
+    let without_wall = composed("visits [Clock]", "");
+    assert_ne!(
+        without_wall, imported,
+        "negative must differ from imported source"
+    );
+    assert!(
+        !without_wall
+            .lines()
+            .any(|line| line.starts_with("import Capability.Time.WallClock")),
+        "negative source must not import wall_now: {without_wall}"
+    );
     let mut absent = ken_elaborator::ElabEnv::new().expect("prelude");
-    match absent
-        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &composed("visits [Clock]", ""))
-    {
+    match absent.elaborate_isolated_file_strict_v1(&[catalog.clone()], &without_wall) {
         Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, "wall_now"),
         Err(error) => panic!("missing wall_now: wrong refusal {error:?}"),
         Ok(_) => panic!("wall_now available without import"),
@@ -78,8 +85,7 @@ fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
     let outcome = run_program(
         &clock_program("visits [Clock]", HOST_IMPORT, WALL_IMPORT),
         SourceFormat::Ken,
-        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../catalog/packages")],
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         b"",
