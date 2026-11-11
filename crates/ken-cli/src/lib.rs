@@ -30,15 +30,30 @@ pub fn build_native_program(
     ken_elaborator::compiler_driver::NativeProgramBuildOutput,
     ken_elaborator::compiler_driver::NativeProgramBuildError,
 > {
+    build_native_program_with_roots(source, format, &[], package_name, output_dir, profile)
+}
+
+/// Path-bearing callers supply the root discovered from the source file;
+/// pathless callers supply their chosen catalog roots explicitly.
+pub fn build_native_program_with_roots(
+    source: &str,
+    format: SourceFormat,
+    roots: &[std::path::PathBuf],
+    package_name: &str,
+    output_dir: impl AsRef<std::path::Path>,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+) -> Result<
+    ken_elaborator::compiler_driver::NativeProgramBuildOutput,
+    ken_elaborator::compiler_driver::NativeProgramBuildError,
+> {
     let name = match format {
         SourceFormat::Ken => "src/main.ken",
         SourceFormat::LiterateKen => "src/main.ken.md",
     };
     ken_elaborator::compiler_driver::compile_native_program_sources(
         package_name,
-        vec![ken_elaborator::compiler_driver::CompilerSource::new(
-            name, source,
-        )],
+        vec![ken_elaborator::compiler_driver::CompilerSource::new(name, source)
+            .with_roots(roots.to_vec())],
         output_dir,
         profile,
     )
@@ -68,12 +83,13 @@ pub enum RunError {
 pub fn run_program<H: ken_interp::HostHandler>(
     source: &str,
     format: SourceFormat,
+    roots: &[std::path::PathBuf],
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
     host: &mut H,
 ) -> Result<ProgramOutcome, RunError> {
-    run_program_with_obligations(source, format, arguments, environment, cwd, host, |_| {})
+    run_program_with_obligations(source, format, roots, arguments, environment, cwd, host, |_| {})
 }
 
 /// Elaborate and run one Ken application, delivering open-obligation reports
@@ -81,6 +97,7 @@ pub fn run_program<H: ken_interp::HostHandler>(
 pub fn run_program_with_obligations<H, F>(
     source: &str,
     format: SourceFormat,
+    roots: &[std::path::PathBuf],
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
@@ -96,6 +113,7 @@ where
     run_program_inner(
         source,
         format,
+        roots,
         arguments,
         environment,
         cwd,
@@ -114,6 +132,7 @@ where
 pub fn run_program_with_resolution_report<H, F, R>(
     source: &str,
     format: SourceFormat,
+    roots: &[std::path::PathBuf],
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
@@ -129,7 +148,7 @@ where
     let effective_uid = ken_runtime::observe_effective_uid_v1()
         .map_err(|_| RunError::RootExecutionObservationUnavailable)?;
     run_program_inner(
-        source, format, arguments, environment, cwd, host, false,
+        source, format, roots, arguments, environment, cwd, host, false,
         effective_uid, report_obligations, |line| eprintln!("{line}"), report_resolution,
     )
     .map(|(outcome, _)| outcome)
@@ -144,6 +163,7 @@ where
 pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
     source: &str,
     format: SourceFormat,
+    roots: &[std::path::PathBuf],
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
@@ -154,6 +174,37 @@ pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
     run_program_inner(
         source,
         format,
+        roots,
+        arguments,
+        environment,
+        cwd,
+        host,
+        true,
+        effective_uid,
+        |_| {},
+        |_| {},
+        |_, _| Ok(()),
+    )
+    .map(|(_, observation)| observation.expect("observation requested"))
+}
+
+/// Drive a previously elaborated program through the ordinary checked-main
+/// admission and host-effect observation path. The held relay fixture uses
+/// Legacy elaboration for compiler-internal identities (spec 30 §4, I row).
+#[doc(hidden)]
+pub fn run_elaborated_program_effect_observation<H: ken_interp::HostHandler>(
+    elab_env: ken_elaborator::ElabEnv,
+    results: Vec<ken_elaborator::ElabResult>,
+    arguments: &[Vec<u8>],
+    environment: &[(Vec<u8>, Vec<u8>)],
+    cwd: &[u8],
+    host: &mut H,
+) -> Result<ken_runtime::EffectObservation, RunError> {
+    let effective_uid = ken_runtime::observe_effective_uid_v1()
+        .map_err(|_| RunError::RootExecutionObservationUnavailable)?;
+    run_elaborated_inner(
+        elab_env,
+        results,
         arguments,
         environment,
         cwd,
@@ -170,6 +221,61 @@ pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
 fn run_program_inner<H, F, G, R>(
     source: &str,
     format: SourceFormat,
+    roots: &[std::path::PathBuf],
+    arguments: &[Vec<u8>],
+    environment: &[(Vec<u8>, Vec<u8>)],
+    cwd: &[u8],
+    host: &mut H,
+    observe_effects: bool,
+    effective_uid: ken_runtime::EffectiveUidSnapshotV1,
+    report_obligations: F,
+    report_terminal_error: G,
+    report_resolution: R,
+) -> Result<(ProgramOutcome, Option<ken_runtime::EffectObservation>), RunError>
+where
+    H: ken_interp::HostHandler,
+    F: FnMut(&[String]),
+    G: FnMut(&str),
+    R: FnMut(&ken_elaborator::ElabEnv, &[ken_elaborator::ElabResult]) -> Result<(), RunError>,
+{
+    let mut elab_env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
+    let results = match format {
+        SourceFormat::Ken => elab_env.elaborate_isolated_file_strict_v1(roots, source),
+        SourceFormat::LiterateKen => {
+            elab_env.elaborate_isolated_ken_md_file_strict_v1(roots, source)
+        }
+    };
+    let results = match results {
+        Ok(results) => results,
+        Err(error) => {
+            return match error {
+                ken_elaborator::ElabError::DuplicateDefinition { ref name, .. }
+                    if name == "main" =>
+                {
+                    Err(RunError::DuplicateEntrypoint)
+                }
+                other => Err(RunError::Elaboration(other)),
+            };
+        }
+    };
+    run_elaborated_inner(
+        elab_env,
+        results,
+        arguments,
+        environment,
+        cwd,
+        host,
+        observe_effects,
+        effective_uid,
+        report_obligations,
+        report_terminal_error,
+        report_resolution,
+    )
+}
+
+fn run_elaborated_inner<H, F, G, R>(
+    elab_env: ken_elaborator::ElabEnv,
+    results: Vec<ken_elaborator::ElabResult>,
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
@@ -186,24 +292,6 @@ where
     G: FnMut(&str),
     R: FnMut(&ken_elaborator::ElabEnv, &[ken_elaborator::ElabResult]) -> Result<(), RunError>,
 {
-    let mut elab_env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
-    let results = match format {
-        SourceFormat::Ken => elab_env.elaborate_file_v1(source),
-        SourceFormat::LiterateKen => elab_env.elaborate_ken_md_file_v1(source),
-    };
-    let results = match results {
-        Ok(results) => results,
-        Err(error) => {
-            return match error {
-                ken_elaborator::ElabError::DuplicateDefinition { ref name, .. }
-                    if name == "main" =>
-                {
-                    Err(RunError::DuplicateEntrypoint)
-                }
-                other => Err(RunError::Elaboration(other)),
-            };
-        }
-    };
     let reports = ken_elaborator::render_open_obligations(&results);
     report_obligations(&reports);
 
@@ -917,6 +1005,19 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         )
     }
 
+    fn strict_root_program(allow_root: bool) -> String {
+        root_program(allow_root).replacen(
+            "\nproc main",
+            "\nimport Capability.Console.Text (write)\n\
+             import Capability.Process.Exit (host_bind, host_console, host_pure)\nproc main",
+            1,
+        )
+    }
+
+    fn strict_roots() -> [std::path::PathBuf; 1] {
+        [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
+    }
+
     fn run_with_scripted_uid(
         effective_uid: u32,
         allow_root: bool,
@@ -925,8 +1026,9 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     ) -> (ken_runtime::EffectObservation, ken_interp::CaptureHost) {
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         let (_, observation) = run_program_inner(
-            &root_program(allow_root),
+            &strict_root_program(allow_root),
             SourceFormat::Ken,
+            &strict_roots(),
             arguments,
             environment,
             b".",
@@ -970,8 +1072,9 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         let mut lines = Vec::new();
         let (outcome, observation) = run_program_inner(
-            &root_program(false),
+            &strict_root_program(false),
             SourceFormat::Ken,
+            &strict_roots(),
             &[],
             &[],
             b".",
@@ -993,7 +1096,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     #[cfg(target_os = "linux")]
     #[test]
     fn missing_effective_user_home_reports_h_code_and_status_one() {
-        let source = root_program(false).replacen(
+        let source = strict_root_program(false).replacen(
             "program capabilities FS APartial",
             "program capabilities FS APartial \"~/unavailable\"",
             1,
@@ -1003,6 +1106,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         let (outcome, observation) = run_program_inner(
             &source,
             SourceFormat::Ken,
+            &strict_roots(),
             &[],
             &[],
             b".",

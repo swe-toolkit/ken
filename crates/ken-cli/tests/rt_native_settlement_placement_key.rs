@@ -51,9 +51,10 @@ fn check_production_process_refusal(name: &str, raw: &str) {
         !source.contains("PX10_READY_FILE"),
         "{name}: unresolved ready path"
     );
-    let error = ken_cli::build_native_program(
+    let error = ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         name,
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

@@ -5,6 +5,7 @@ use ken_elaborator::checked_core::{CheckedCoreBodyViewError, StableSymbol, Symbo
 use ken_elaborator::compiler_driver::{CompilerDriverError, NativeProgramBuildError};
 
 const INDEXED_INT_CONVOY: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 data Vec (A : Type) : Nat -> Type where {
   VNil : Vec A 0;
@@ -44,9 +45,10 @@ fn indexed_int_convoy_native_refusal_waits_for_compared_native_rows() {
         .prefix("ken-rt-c5-indexed-")
         .tempdir()
         .expect("isolated artifact directory");
-    let err = ken_cli::build_native_program(
+    let err = ken_cli::build_native_program_with_roots(
         INDEXED_INT_CONVOY,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "rt-c5-indexed",
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

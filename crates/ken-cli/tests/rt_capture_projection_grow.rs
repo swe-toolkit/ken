@@ -15,6 +15,10 @@
 #![cfg(target_os = "linux")]
 
 const WITNESS_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketResult, withBuffer, withResource)
 fn rt_branched_body (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
@@ -132,9 +136,10 @@ fn the_conditional_join_grows_the_projection_and_records_every_deferral() {
 fn the_conditional_join_grows_the_projection_and_records_every_deferral_body() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let (result, deferrals) = ken_runtime::with_worker_prefix_deferrals(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             WITNESS_SOURCE,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "rt_capture_projection_grow",
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),

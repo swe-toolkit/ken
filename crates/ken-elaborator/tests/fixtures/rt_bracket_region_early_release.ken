@@ -1,4 +1,6 @@
 program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyOk, ResourceBodyResult, ResourceBracketResult, release, withResource)
 
 fn body_done (_second : Result ResourceError Unit)
   : HostIO AFull (ResourceBodyResult Unit Unit) =

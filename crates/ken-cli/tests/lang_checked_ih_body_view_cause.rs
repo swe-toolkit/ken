@@ -34,6 +34,7 @@
 // Nat sums this test produces (2..6) to `Failure <n>`, so the exit code equals
 // the observed sum and discriminates every recursive position.
 const D5_TEMPLATE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 
 data D5Tree : Type where { D5Leaf : D5Tree ; D5Node : D5Tree -> Nat -> D5Tree -> D5Tree }
 
@@ -82,7 +83,15 @@ fn d5_source(inorder_arm: &str) -> String {
 
 fn native_exit(source: &str, package: &str) -> i32 {
     let root = tempfile::tempdir().expect("temporary native-build root");
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, package, root.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
+    let output = ken_cli::build_native_program_with_roots(
+        source,
+        ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../catalog/packages")],
+        package,
+        root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
         .unwrap_or_else(|e| {
             panic!("{package}: two-recursive-position traversal must reach a native artifact: {e:#?}")
         });

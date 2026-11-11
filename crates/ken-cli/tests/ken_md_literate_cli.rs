@@ -15,6 +15,8 @@ fn ken_run_accepts_exact_ken_md_fence() {
 
 ```ken
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] = host_program APartial (print_line "literate ok")
 ```
 "#,
@@ -40,7 +42,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO AParti
 fn ken_run_reports_original_offset_for_fenced_error() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
     let path = dir.join("literate_error.ken.md");
-    let fixture = "Prose before the program.\n```ken\nproc main : IO Unit visits [Console] = print_line missing_name\n```\n";
+    let fixture = "Prose before the program.\n```ken\nimport Capability.Console.Text (IO, print_line)\nproc main : IO Unit visits [Console] = print_line missing_name\n```\n";
     std::fs::write(&path, fixture).expect("write fixture");
     let expected_offset = fixture
         .find("missing_name")
@@ -105,6 +107,8 @@ fn ken_run_accepts_a_correctly_failing_reject_block() {
         &path,
         r#"```ken
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] = host_program APartial (print_line "reject ok")
 ```
 ```ken reject
@@ -136,6 +140,8 @@ fn ken_run_rejects_a_stale_reject_block() {
     let path = dir.join("literate_reject_stale.ken.md");
     let fixture = r#"```ken
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] = host_program APartial (print_line "unreachable")
 ```
 ```ken reject
@@ -193,6 +199,8 @@ fn plain_ken_run_path_still_executes() {
     std::fs::write(
         &path,
         r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] = host_program APartial (print_line "plain ok")
 "#,
     )

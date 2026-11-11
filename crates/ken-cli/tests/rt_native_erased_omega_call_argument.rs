@@ -19,6 +19,7 @@ fn assert_native_and_reference_exit(source: &str, name: &str, expected_exit: i32
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &[b"ken".to_vec()],
         &[],
         b"/",
@@ -38,9 +39,10 @@ fn assert_native_and_reference_exit(source: &str, name: &str, expected_exit: i32
         .prefix("ken-rt-native-erased-omega-")
         .tempdir()
         .expect("native output directory");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         name,
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -128,4 +130,9 @@ fn refined_parameter_nonrecursive_control_exits_three() {
 #[test]
 fn explicit_omega_recursive_call_exits_four() {
     assert_native_and_reference_exit(EXPLICIT_OMEGA, "rt-erased-omega-explicit", 4);
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

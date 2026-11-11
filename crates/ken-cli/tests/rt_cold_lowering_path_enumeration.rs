@@ -66,6 +66,11 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::KernelError;
 
 const RT_PARITY_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withBuffer, withResource)
+import Data.Numeric.FixedWidth (intToUInt64)
 fn rt_body_ok (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
@@ -439,13 +444,24 @@ fn strict_rechecks_every_generated_cold_entry_after_r_template_rewrite() {
             Err(error) => panic!("{entry}: strict verdict shifted: {error:?}"),
         }
     }
-    let without_wrappers = format!(
-        "program capabilities FS AFull\n{}{}",
-        imports.replace(
+    let with_wrappers = format!("program capabilities FS AFull\n{imports}{body}")
+        .replace("__RT_PARITY_ENTRY__", ENTRIES[0]);
+    let without_wrappers = with_wrappers
+        .replace(
             "import Capability.Process.Exit (host_pure, host_bind)\n",
-            ""
-        ),
-        body.replace("__RT_PARITY_ENTRY__", ENTRIES[0])
+            "",
+        )
+        .replace(
+            "import Capability.Process.Exit (host_bind, host_pure)\n",
+            "",
+        );
+    assert_ne!(
+        without_wrappers, with_wrappers,
+        "negative must remove the wrapper imports"
+    );
+    assert!(
+        !without_wrappers.contains("import Capability.Process.Exit"),
+        "negative must retain no HostIO wrapper import"
     );
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], &without_wrappers) {
@@ -545,9 +561,10 @@ fn entry_outcome(entry: &str) -> String {
         let root = tempfile::tempdir().expect("temporary native-build root");
         std::fs::write(root.path().join("source"), b"ab").unwrap();
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", &entry);
-        match ken_cli::build_native_program(
+        match ken_cli::build_native_program_with_roots(
             &source,
             ken_cli::SourceFormat::Ken,
+            &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             &format!("rt_cold_enum_{entry}"),
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),

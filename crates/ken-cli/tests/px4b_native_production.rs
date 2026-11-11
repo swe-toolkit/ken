@@ -1,12 +1,14 @@
 use std::process::Command;
 
 const PURE_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 fn unused_sibling (_input : ProcessInput) : ExitCode = ExitCode.Success
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode = host_pure APartial ExitCode ExitCode.Success
 "#;
 
 const PROCESS_BYTES_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 fn process_discriminator (input : ProcessInput) : UInt8 =
   match input {
     MkProcessInput arguments environment cwd |->
@@ -88,12 +90,14 @@ fn output_dir(name: &str) -> ScratchDir {
 fn linked_home_root_uses_only_production_account_database_boundary() {
     let dir = output_dir("px16-home-root");
     let source = r#"program capabilities FS APartial "~/", RootExecution Allow
+import Capability.Process.Exit (host_pure)
 fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode = host_pure APartial ExitCode ExitCode.Success
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px16-home-root",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -125,9 +129,10 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 #[test]
 fn real_source_builds_one_identity_bound_linked_process_artifact() {
     let dir = output_dir("pure");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         PURE_PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px4b-pure",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -240,9 +245,10 @@ fn public_source_observes_raw_argv_environment_cwd_bytes_in_field_order() {
     use std::os::unix::ffi::OsStringExt;
 
     let dir = output_dir("process-bytes");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         PROCESS_BYTES_PROGRAM,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px4b-process-bytes",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -282,9 +288,10 @@ fn public_source_observes_raw_argv_environment_cwd_bytes_in_field_order() {
 fn authority_mismatch_fails_before_any_artifact_is_written() {
     let dir = output_dir("mismatch");
     let source = PURE_PROGRAM.replace("ProgramCaps APartial", "ProgramCaps AFull");
-    let error = ken_cli::build_native_program(
+    let error = ken_cli::build_native_program_with_roots(
         &source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px4b-mismatch",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -303,13 +310,16 @@ fn authority_mismatch_fails_before_any_artifact_is_written() {
 fn one_vis_reaches_the_px5_native_host_dispatch() {
     let dir = output_dir("vis");
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program APartial (print_line "px5")
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-vis",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -334,16 +344,16 @@ fn unterminated_console_bytes_reach_native_stdout_at_finish() {
     // stderr and exceptional finishers rely on the shared finalize_resources.
     let dir = output_dir("unterminated-console");
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 
 proc console_then
     (action : HostIO APartial (Result IOError Unit))
     (next : Unit -> HostIO APartial ExitCode)
   : HostIO APartial ExitCode visits [Console] =
-  bind (Coproduct (FSOp APartial) AmbientOp)
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
-    (Result IOError Unit) ExitCode action
+  host_bind APartial (Result IOError Unit) ExitCode action
     (\response. match response {
-      Err _ |-> host_exit APartial (ExitCode.Failure 73);
+      Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 73);
       Ok _ |-> next MkUnit
     })
 
@@ -356,11 +366,12 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   console_then (console_write "open")
     (\_. console_then (console_write "next")
-      (\_. host_exit APartial ExitCode.Success))
+      (\_. host_pure APartial ExitCode ExitCode.Success))
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-unterminated-console",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -377,6 +388,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 fn two_vis_nodes_resume_once_in_source_order() {
     let dir = output_dir("two-vis");
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program_then)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program_then APartial
@@ -385,9 +398,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
       (\_. print_line "two"))
     ExitCode.Success
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-two-vis",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -408,6 +422,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     let interpreted = ken_cli::run_program(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",
@@ -478,6 +493,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 fn host_reply_selects_the_continuation_outcome() {
     let dir = output_dir("reply-dependent");
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (is_terminal)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_bind APartial Bool ExitCode
@@ -487,9 +504,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
       True |-> host_pure APartial ExitCode (ExitCode.Failure 24)
     })
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-reply-dependent",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -517,6 +535,8 @@ fn linked_console_broken_pipe_reaches_ken_instead_of_signal_termination() {
 
     let dir = output_dir("broken-pipe");
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   match input {
@@ -549,9 +569,10 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
     }
   }
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-broken-pipe",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -597,6 +618,9 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 fn fs_write_and_read_resume_through_the_native_capability() {
     let dir = output_dir("fs-roundtrip");
     let source = r#"program capabilities FS AFull
+import Capability.Console.Text (flush)
+import Capability.Filesystem.Authority (readFile, writeFile)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
@@ -633,9 +657,10 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
   }
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-fs-roundtrip",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -702,6 +727,8 @@ fn canonical_fs_identity_exactly_matches_across_real_producers_and_drift_fails()
     let contents = vec![17, 0xff, 0];
     std::fs::write(dir.join("shared.bin"), &contents).unwrap();
     let source = r#"program capabilities FS APartial
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS, Console] =
   match input {
@@ -726,9 +753,10 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   }
 "#;
 
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5c-fs-identity",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -750,6 +778,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec(), path.to_vec()],
         &[],
         b"/",
@@ -805,6 +834,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
 fn fs_scope_denial_reaches_ken_as_the_named_error() {
     let dir = output_dir("fs-denial");
     let source = r#"program capabilities FS AFull
+import Capability.Filesystem.Authority (writeFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
@@ -841,9 +872,10 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
   }
 "#;
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "px5-fs-denial",
         &dir,
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -861,7 +893,11 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 #[test]
 fn native_build_subcommand_reaches_the_same_public_producer() {
     let dir = output_dir("cli");
-    let source_path = dir.join("main.ken");
+    let source_parent =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&source_parent).expect("catalog-rooted source parent");
+    let source_dir = tempfile::tempdir_in(source_parent).expect("catalog-rooted CLI source");
+    let source_path = source_dir.path().join("main.ken");
     let artifact_dir = dir.join("artifact");
     let profile_path = dir.join("resource-profile.json");
     std::fs::write(&source_path, PURE_PROGRAM).unwrap();

@@ -17,6 +17,7 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
     let observed = ken_cli::run_program_effect_observation(
         SMOKE,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -64,9 +65,10 @@ fn native_process_op_is_unavailable_before_object_emission() {
     use ken_elaborator::compiler_driver::NativeProgramBuildError;
 
     let root = tempfile::tempdir().expect("isolated native output root");
-    let error = ken_cli::build_native_program(
+    let error = ken_cli::build_native_program_with_roots(
         SMOKE,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         "px10_spawn_plan_wait_smoke",
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -110,6 +112,7 @@ fn ac1_checked_interpreter_wait_reports_signaled_sigterm() {
     let observed = ken_cli::run_program_effect_observation(
         &source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &[],
         &[],
         root.path().as_os_str().as_encoded_bytes(),
@@ -162,6 +165,7 @@ fn ac1_checked_interpreter_stdout_pipe_preserves_argv_and_environment() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -266,6 +270,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -365,6 +370,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
     let failed = ken_cli::run_program_effect_observation(
         &failed_source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &[],
         &[],
         failed_root.path().as_os_str().as_encoded_bytes(),
@@ -601,6 +607,7 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),
@@ -745,7 +752,13 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
 /// `visits [Process]` only.
 fn exported_process_resource_lifetime_obligation(
 ) -> ken_elaborator::export::ResourceLifetimeObligation {
-    let source = LIVE_CHILD.to_owned();
+    // The checked-target export API is not an isolated CLI route. It still
+    // elaborates standalone in Legacy without catalog roots; remove only the
+    // route's import directives, leaving the program body and effects intact.
+    let source = LIVE_CHILD
+        .split_inclusive('\n')
+        .filter(|line| !line.starts_with("import "))
+        .collect::<String>();
     // Elaborating the program needs the fixture stack the interpreter runs use:
     // 3292 KiB resident on AC-1, provisioned at 16 MiB.
     std::thread::Builder::new()
@@ -862,4 +875,9 @@ fn assert_exported_resource_lifetime_template_holds(trace: &[ken_host::EffectEve
             }
         }
     }
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

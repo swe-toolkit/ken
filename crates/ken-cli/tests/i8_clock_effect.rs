@@ -21,9 +21,12 @@ const CLOCK_BODY: &str = r#"
       })
 "#;
 
-fn clock_program(visits: &str) -> String {
+const HOST_IMPORT: &str = "import Capability.Process.Exit (host_bind, host_pure, host_clock)\n";
+const WALL_IMPORT: &str = "import Capability.Time.WallClock (wall_now)\n";
+
+fn clock_program(visits: &str, host_import: &str, wall_import: &str) -> String {
     format!(
-        "program capabilities FS APartial\n\
+        "program capabilities FS APartial\n{host_import}{wall_import}\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode {visits} =\n{CLOCK_BODY}"
     )
@@ -40,32 +43,31 @@ fn strict_clock_user_requires_homes_and_still_checks_the_clock_row() {
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let root_import = "import Capability.Process.Exit (host_bind, host_pure, host_clock)\n";
-    let wall_import = "import Capability.Time.WallClock (wall_now)\n";
-    let composed = |visits: &str, wall: &str| {
-        clock_program(visits).replacen(
-            "program capabilities FS APartial\n",
-            &format!("program capabilities FS APartial\n{root_import}{wall}"),
-            1,
-        )
-    };
+    let composed = |visits: &str, wall: &str| clock_program(visits, HOST_IMPORT, wall);
+    let imported = composed("visits [Clock]", WALL_IMPORT);
     let mut accepted = ken_elaborator::ElabEnv::new().expect("prelude");
     accepted
-        .elaborate_isolated_file_strict_v1(
-            &[catalog.clone()],
-            &composed("visits [Clock]", wall_import),
-        )
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
         .expect("both checked Clock homes import");
+    let without_wall = composed("visits [Clock]", "");
+    assert_ne!(
+        without_wall, imported,
+        "negative must differ from imported source"
+    );
+    assert!(
+        !without_wall
+            .lines()
+            .any(|line| line.starts_with("import Capability.Time.WallClock")),
+        "negative source must not import wall_now: {without_wall}"
+    );
     let mut absent = ken_elaborator::ElabEnv::new().expect("prelude");
-    match absent
-        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &composed("visits [Clock]", ""))
-    {
+    match absent.elaborate_isolated_file_strict_v1(&[catalog.clone()], &without_wall) {
         Err(ken_elaborator::ElabError::UnboundName { name, .. }) => assert_eq!(name, "wall_now"),
         Err(error) => panic!("missing wall_now: wrong refusal {error:?}"),
         Ok(_) => panic!("wall_now available without import"),
     }
     let mut unrowed = ken_elaborator::ElabEnv::new().expect("prelude");
-    match unrowed.elaborate_isolated_file_strict_v1(&[catalog], &composed("", wall_import)) {
+    match unrowed.elaborate_isolated_file_strict_v1(&[catalog], &composed("", WALL_IMPORT)) {
         Err(ken_elaborator::ElabError::TypeMismatch { reason, .. }) => {
             assert!(
                 reason.contains("EffectEscapes") && reason.contains("Clock"),
@@ -81,8 +83,9 @@ fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
     let mut host = CaptureHost::new(Vec::new());
     host.set_clock_script([1_700_000_000_000_000_123, 1_700_000_000_000_000_456]);
     let outcome = run_program(
-        &clock_program("visits [Clock]"),
+        &clock_program("visits [Clock]", HOST_IMPORT, WALL_IMPORT),
         SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
         &[],
         b"",
@@ -141,7 +144,7 @@ fn fixed_clock_repeats_one_value_and_traces_each_read() {
 fn undeclared_clock_row_is_a_named_effect_escape() {
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
     let error = env
-        .elaborate_file(&clock_program(""))
+        .elaborate_file(&clock_program("", "", ""))
         .expect_err("calling wall_now without Clock in the row must reject");
     match error {
         ken_elaborator::ElabError::TypeMismatch { reason, .. } => {

@@ -52,6 +52,8 @@ pub struct CheckedProgramEntry {
     pub identity: String,
     pub package_name: String,
     pub source: String,
+    /// Source catalog roots used identically by both compilation lanes.
+    pub catalog_roots: Vec<std::path::PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -671,9 +673,10 @@ fn execute_scenario_on_compiler_stack(
 ) -> Result<CanonicalDifferentialRun, HarnessError> {
     validate_native_ambient(&scenario.ambient)?;
     let roots = TwinRealRoots::create(&scenario.initial_filesystem)?;
-    let build = ken_cli::build_native_program(
+    let build = ken_cli::build_native_program_with_roots(
         &scenario.entry.source,
         ken_cli::SourceFormat::Ken,
+        &scenario.entry.catalog_roots,
         &scenario.entry.package_name,
         roots.artifacts(),
         scenario.boundary_resource_profile,
@@ -701,6 +704,7 @@ fn execute_scenario_on_compiler_stack(
     let mut interpreter = ken_cli::run_program_effect_observation(
         &scenario.entry.source,
         ken_cli::SourceFormat::Ken,
+        &scenario.entry.catalog_roots,
         &arguments,
         &scenario.process_input.environment,
         &cwd,
@@ -1787,9 +1791,17 @@ mod tests {
         PX5_PLANNED_NATIVE_TARGETS,
     };
 
+    fn fixture_catalog_roots() -> Vec<std::path::PathBuf> {
+        vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../catalog/packages")]
+    }
+
     const MAPPING_FILE_SOURCE: &str = include_str!("../../ken-cli/tests/fixtures/abi_s6_mapping_file_backed.ken");
 
     const FIVE_OP_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Console.Text (flush, is_terminal, write)
+import Capability.Filesystem.Authority (readFile, writeFile)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS, Console] =
   match input {
@@ -1841,6 +1853,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
     const CLOCK_WALL_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_clock, host_pure)
+import Capability.Time.WallClock (wall_now)
 proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [Clock] =
   host_bind AFull Instant ExitCode
@@ -1866,6 +1880,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
 "#;
 
     const CONSOLE_READ_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Console.Text (read)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [Console] =
   host_bind AFull (Result IOError ReadResult) ExitCode
@@ -1908,6 +1924,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
 "#;
 
     const FS_APPEND_SOURCE: &str = r#"program capabilities FS AFull "./data"
+import Capability.Filesystem.Authority (append_file)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -1934,6 +1952,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
     const FS_METADATA_SOURCE: &str = r#"program capabilities FS APartial "./data"
+import Capability.Filesystem.Authority (file_metadata)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match input {
@@ -1990,6 +2010,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
     // two-result success program three additional times.
     const FS_METADATA_POLICY_SOURCE: &str =
         r#"program capabilities FS APartial "./data"
+import Capability.Filesystem.Authority (file_metadata)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match input {
@@ -2013,6 +2035,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
 "#;
 
     const FS_RENAME_SOURCE: &str = r#"program capabilities FS AFull "./data"
+import Capability.Filesystem.Authority (rename_file)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2040,6 +2064,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_READ_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
+import Capability.Filesystem.Authority (read_directory)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2109,6 +2135,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_CREATE_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
+import Capability.Filesystem.Authority (create_directory)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2166,6 +2194,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_REMOVE_FILE_SOURCE: &str = r#"program capabilities FS AFull "./data"
+import Capability.Filesystem.Authority (remove_file)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2222,6 +2252,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_REMOVE_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
+import Capability.Filesystem.Authority (remove_directory)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2278,6 +2310,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
     const DENIAL_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Filesystem.Authority (writeFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2316,6 +2350,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
     const RAW_COLLISION_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2347,6 +2383,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
     const CHANGE_MODE_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Filesystem.Authority (change_mode)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match input {
@@ -2381,6 +2419,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "px6-five-op-real-artifact".to_string(),
                 package_name: "px6-five-op-real-artifact".to_string(),
                 source: FIVE_OP_SOURCE.to_string(),
@@ -2410,6 +2449,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             },
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "abi-a1-clock-wall-real-artifact".to_string(),
                 package_name: "abi-a1-clock-wall-real-artifact".to_string(),
                 source: CLOCK_WALL_SOURCE.to_string(),
@@ -2429,6 +2469,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             },
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "abi-a1-console-read-real-artifact".to_string(),
                 package_name: "abi-a1-console-read-real-artifact".to_string(),
                 source: CONSOLE_READ_SOURCE.to_string(),
@@ -2461,6 +2502,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 symlink: SymlinkPolicy::NoFollow,
             },
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: identity.to_string(),
                 package_name: identity.to_string(),
                 source,
@@ -2584,6 +2626,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 symlink: SymlinkPolicy::NoFollow,
             },
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: identity.to_string(),
                 package_name: identity.to_string(),
                 source: source.to_string(),
@@ -2714,6 +2757,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 symlink: SymlinkPolicy::NoFollow,
             },
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: identity.to_string(),
                 package_name: identity.to_string(),
                 source: program_source,
@@ -2885,6 +2929,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 symlink: SymlinkPolicy::NoFollow,
             },
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: identity.to_string(),
                 package_name: identity.to_string(),
                 source,
@@ -3150,6 +3195,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "px6-denial-real-artifact".to_string(),
                 package_name: "px6-denial-real-artifact".to_string(),
                 source: DENIAL_SOURCE.to_string(),
@@ -3208,6 +3254,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "px6-raw-descriptor-collision".to_string(),
                 package_name: "px6-raw-descriptor-collision".to_string(),
                 source: RAW_COLLISION_SOURCE.to_string(),
@@ -3236,6 +3283,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "px15-execution-start-cwd-root".to_string(),
                 package_name: "px15-execution-start-cwd-root".to_string(),
                 source: RAW_COLLISION_SOURCE.replacen(
@@ -3272,6 +3320,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "px13-change-mode-real-artifact".to_string(),
                 package_name: "px13-change-mode-real-artifact".to_string(),
                 source: CHANGE_MODE_SOURCE.to_string(),
@@ -3291,6 +3340,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "abi-s6-mapping-file-backed-real-artifact".to_string(),
                 package_name: "abi-s6-mapping-file-backed-real-artifact".to_string(),
                 source: MAPPING_FILE_SOURCE.to_string(),
@@ -3314,6 +3364,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ambient: AmbientScript::default(),
             program_caps: ProgramCapsShape::default(),
             entry: CheckedProgramEntry {
+                catalog_roots: fixture_catalog_roots(),
                 identity: "px13-change-directory-mode-real-artifact".to_string(),
                 package_name: "px13-change-directory-mode-real-artifact".to_string(),
                 source: CHANGE_MODE_SOURCE.to_string(),
@@ -4937,11 +4988,14 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             1,
         );
         let arguments = vec![b"px15".to_vec(), b"x".to_vec(), b"x".to_vec()];
+        let catalog = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../catalog/packages")];
         let cwd_bytes = root.as_os_str().as_bytes();
         let mut cwd_host = ken_interp::PosixHost::new_at(&root);
         let cwd_observation = ken_cli::run_program_effect_observation(
             &cwd_source,
             ken_cli::SourceFormat::Ken,
+            &catalog,
             &arguments,
             &[],
             cwd_bytes,
@@ -4952,6 +5006,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         let absolute_observation = ken_cli::run_program_effect_observation(
             &absolute_source,
             ken_cli::SourceFormat::Ken,
+            &catalog,
             &arguments,
             &[],
             cwd_bytes,
@@ -5132,6 +5187,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     #[test]
     fn capture_host_is_explicitly_insufficient_negative_control() {
         let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [Console] =
   host_program APartial (print_line "capture-only")
@@ -5140,6 +5197,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         let outcome = ken_cli::run_program(
             source,
             ken_cli::SourceFormat::Ken,
+            &fixture_catalog_roots(),
             &[b"capture-control".to_vec()],
             &[],
             b"/",

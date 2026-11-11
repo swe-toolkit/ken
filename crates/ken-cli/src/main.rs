@@ -318,6 +318,9 @@ fn native_build_file(
     } else {
         ken_cli::SourceFormat::Ken
     };
+    let roots = ken_elaborator::modules::isolated_catalog_root(Path::new(path))
+        .into_iter()
+        .collect::<Vec<_>>();
     let output = if let Some(report) = &mut report {
         let name = match format {
             ken_cli::SourceFormat::Ken => "src/main.ken",
@@ -326,7 +329,8 @@ fn native_build_file(
         let preparation =
             ken_elaborator::compiler_driver::prepare_native_program_sources_with_resolution_report(
                 "native-program",
-                vec![ken_elaborator::compiler_driver::CompilerSource::new(name, &source)],
+                vec![ken_elaborator::compiler_driver::CompilerSource::new(name, &source)
+                    .with_roots(roots.clone())],
             );
         preparation.and_then(|preparation| {
             report.write(preparation.resolution_report().expect("report requested"));
@@ -335,8 +339,8 @@ fn native_build_file(
             )
         })
     } else {
-        ken_cli::build_native_program(
-            &source, format, "native-program", PathBuf::from(output_dir), profile,
+        ken_cli::build_native_program_with_roots(
+            &source, format, &roots, "native-program", PathBuf::from(output_dir), profile,
         )
     };
     match output {
@@ -520,10 +524,15 @@ fn elaborate_cli_file(
                 );
                 Ok(results)
             })
-    } else if path.to_string_lossy().ends_with(".ken.md") {
-        elab_env.elaborate_ken_md_file_v1(&src)
     } else {
-        elab_env.elaborate_file_v1(&src)
+        let roots = ken_elaborator::modules::isolated_catalog_root(Path::new(path))
+            .into_iter()
+            .collect::<Vec<_>>();
+        if path.to_string_lossy().ends_with(".ken.md") {
+            elab_env.elaborate_isolated_ken_md_file_strict_v1(&roots, &src)
+        } else {
+            elab_env.elaborate_isolated_file_strict_v1(&roots, &src)
+        }
     };
 
     let results = match results_result {
@@ -619,9 +628,13 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>], mut report: Option<resolution_r
         std::process::exit(1);
     });
     let mut host = ken_interp::PosixHost::new();
+    let roots = ken_elaborator::modules::isolated_catalog_root(Path::new(path))
+        .into_iter()
+        .collect::<Vec<_>>();
     match ken_cli::run_program_with_resolution_report(
         &source,
         format,
+        &roots,
         arguments,
         &environment,
         &os_bytes(cwd.as_os_str()),

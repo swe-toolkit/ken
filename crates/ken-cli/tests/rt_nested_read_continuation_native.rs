@@ -55,9 +55,10 @@ fn assert_row_on_stated_stack(
     console: bool,
 ) {
     let dir = tempfile::tempdir().expect("private test directory");
-    let build = ken_cli::build_native_program(
+    let build = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &format!("rt-nested-read-{row}"),
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -88,6 +89,7 @@ fn assert_row_on_stated_stack(
         let interpreted = ken_cli::run_program_effect_observation(
             source,
             ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
             &[b"ken".to_vec(), vec![2u8]],
             &[],
             dir.path().as_os_str().as_encoded_bytes(),
@@ -193,4 +195,9 @@ fn landed_single_read_control() {
         1,
         true,
     );
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

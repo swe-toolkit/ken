@@ -12,7 +12,7 @@ use std::process::{Command, Output};
 use ken_elaborator::ElabEnv;
 
 fn cli(name: &str, command: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!(
+    let root = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
         "ken-proc-returned-tree-infer-entry-{}",
         std::process::id()
     ));
@@ -28,7 +28,9 @@ fn cli(name: &str, command: &str, source: &str) -> Output {
 
 fn source(declarations: &str) -> String {
     format!(
-        "program capabilities FS APartial\n{declarations}\n\
+        "program capabilities FS APartial\n\
+         import Capability.Console.Text (IO, print_line)\n\
+         import Capability.Process.Exit (host_program)\n{declarations}\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
            : HostIO APartial ExitCode visits [Console] =\n\
            host_program APartial (print_line \"done\")\n"
@@ -47,25 +49,18 @@ fn assert_refusal(name: &str, command: &str, program: &str, code: &str) {
 }
 
 /// The typed Strict verdict must repeat the existing CLI oracle's kind.
-/// MEASURED: the same generated source with only ephemeral H imports reaches
-/// the stated K0004/E0013 arm; CLAIMED: ConsoleOp's scoped floor entry
-/// preserves each pure-position control; THE GAP: the CLI route stays Legacy
-/// until 3b and is measured by the unchanged `assert_refusal` calls.
+/// MEASURED: the same generated source with persisted checked imports reaches
+/// the stated K0004/E0013 arm through both the CLI and direct Strict entry.
+/// CLAIMED: ConsoleOp's scoped floor entry preserves each pure-position
+/// control; THE GAP: these generated forms do not exhaust inference contexts.
 fn assert_strict_refusal(program: &str, expected: &str) {
     let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
-    let imported = program.replacen(
-        "program capabilities FS APartial\n",
-        "program capabilities FS APartial\n\
-         import Capability.Console.Text (IO, print_line)\n\
-         import Capability.Process.Exit (host_program)\n",
-        1,
-    );
     let mut env = ElabEnv::new().expect("prelude");
     let error = env
-        .elaborate_isolated_file_strict_v1(&[catalog], &imported)
+        .elaborate_isolated_file_strict_v1(&[catalog], program)
         .expect_err("pure-position Console tree must still refuse");
     assert_eq!(error.code().as_str(), expected, "{error:?}");
 }
@@ -123,6 +118,8 @@ fn if_condition_does_not_inherit_returned_tree_mode() {
 fn run_form(choice: &str) -> String {
     format!(
         "program capabilities FS APartial\n\
+         import Capability.Console.Text (IO, print_line)\n\
+         import Capability.Process.Exit (host_program)\n\
          proc p (b : Bool) : String visits [Console] =\n\
            let r = match b {{ True ↦ (print_line \"t\" : IO Unit); \
            False ↦ MkUnit }} in \"done\"\n\

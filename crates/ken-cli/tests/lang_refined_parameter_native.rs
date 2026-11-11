@@ -6,6 +6,7 @@
 use std::process::Command;
 
 const SOURCE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
 def AnyNat = { x : Nat | Top }
 fn classify (n : Nat) : ExitCode = match n {
   Zero |-> ExitCode.Failure 100;
@@ -36,7 +37,9 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 /// this observes reference execution only, not native support or all inputs.
 #[test]
 fn refined_parameter_worker_runs_through_public_wrapper() {
-    let directory = tempfile::tempdir().expect("isolated Ken source");
+    let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    std::fs::create_dir_all(&parent).expect("rooted fixture parent");
+    let directory = tempfile::tempdir_in(parent).expect("isolated Ken source");
     let source = directory.path().join("refined_recursion.ken");
     std::fs::write(&source, SOURCE).expect("write checked source");
     let run = Command::new(env!("CARGO_BIN_EXE_ken"))

@@ -24,15 +24,17 @@ fn assert_bracket_body_observation(
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &[],
         &[],
         dir.path().as_os_str().as_bytes(),
         &mut host,
     )
     .expect("checked bracket executes in the interpreter");
-    let output = ken_cli::build_native_program(
+    let output = ken_cli::build_native_program_with_roots(
         source,
         ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
         &format!("rt-bracket-body-once-{name}"),
         dir.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
@@ -160,4 +162,9 @@ fn unbracketed_two_prints_do_not_acquire_or_release() {
         &[b"x\n", b"y\n"],
         0,
     );
+}
+
+fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")]
 }

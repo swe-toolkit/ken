@@ -39,6 +39,10 @@
 #![cfg(target_os = "linux")]
 
 const WITNESS_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketResult, withBuffer, withResource)
 fn rt_branched_body (_buffer : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
@@ -94,9 +98,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 #[test]
 fn the_positioned_int_seats_decode_carried_and_complete_native_construction() {
     let root = tempfile::tempdir().expect("temporary native-build root");
-    let result = ken_cli::build_native_program(
+    let result = ken_cli::build_native_program_with_roots(
         WITNESS_SOURCE,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         "rt_exactint_carried_observe",
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),

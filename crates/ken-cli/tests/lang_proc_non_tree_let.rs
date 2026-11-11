@@ -11,10 +11,46 @@ use std::process::{Command, Output};
 use ken_elaborator::{ElabEnv, ElabError};
 
 fn cli(name: &str, subcommand: &str, source: &str) -> Output {
-    let root = std::env::temp_dir().join(format!("ken-proc-nontree-let-{}", std::process::id()));
-    std::fs::create_dir_all(&root).expect("create fixture root");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp")
+        .join(format!("ken-proc-nontree-let-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("create rooted fixture directory");
     let path = root.join(format!("{name}.ken"));
-    std::fs::write(&path, source).expect("write inline source");
+    let identifiers: std::collections::BTreeSet<_> = source
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .collect();
+    let console = ["IO", "print_line", "write"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let exit = ["host_program"]
+        .into_iter()
+        .filter(|name| identifiers.contains(name))
+        .collect::<Vec<_>>();
+    let mut imports = String::new();
+    if !console.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Console.Text ({})\n",
+            console.join(", ")
+        ));
+    }
+    if !exit.is_empty() {
+        imports.push_str(&format!(
+            "import Capability.Process.Exit ({})\n",
+            exit.join(", ")
+        ));
+    }
+    let selected = source.replacen(
+        "program capabilities FS APartial\n",
+        &format!("program capabilities FS APartial\n{imports}"),
+        1,
+    );
+    let selected = if selected == source {
+        format!("{imports}{source}")
+    } else {
+        selected
+    };
+    std::fs::write(&path, selected).expect("write inline source");
     Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg(subcommand)
         .arg(path)
@@ -163,6 +199,8 @@ fn function_result_outer_let_refuses_but_inner_lambda_sequences() {
 #[test]
 fn ensured_changed_proc_checks_with_all_ret_post() {
     let source = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
 proc one : Int visits [Console] = 1
 proc alias : Int ensures Equal Int result 1 visits [Console] = one
 proc main (_input : ProcessInput) (_caps : ProgramCaps APartial) : HostIO APartial ExitCode visits [Console] =
@@ -238,7 +276,7 @@ fn tree_result_sequences_and_binds_the_action_result() {
 
 /// Promise class: durable invariant. MEASURED: this same space/proof source
 /// checks with the explicit Core.Logic.Not import at the strict entry and
-/// rejects without it, while the Legacy CLI check remains unchanged.
+/// rejects without it, while the switched CLI checks the imported twin.
 /// CLAIMED: replacing the pre-source Not with the checked package definition
 /// leaves this proof-position verdict intact. THE GAP: execution is not the
 /// subject of this proof-only fixture.
@@ -257,17 +295,15 @@ space T {
   mut cell : Int = d 0 0
 }
 "#;
-    assert_checks("omega-proof-let", source);
+    let imported = format!("import Core.Logic.Not (Not)\n{source}");
+    assert_checks("omega-proof-let", &imported);
     let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../catalog/packages")
         .canonicalize()
         .expect("catalog root");
     let mut selected = ElabEnv::new().expect("prelude");
     selected
-        .elaborate_isolated_file_strict_v1(
-            &[catalog.clone()],
-            &format!("import Core.Logic.Not (Not)\n{source}"),
-        )
+        .elaborate_isolated_file_strict_v1(&[catalog.clone()], &imported)
         .expect("the imported checked negation preserves the proof-position verdict");
     let mut negative = ElabEnv::new().expect("prelude");
     match negative.elaborate_isolated_file_strict_v1(&[catalog], source) {

@@ -12,7 +12,7 @@ use ken_elaborator::compiler_driver::{
 use ken_elaborator::program_admission::{admit_checked_main, ProgramAdmissionError};
 use ken_elaborator::ElabEnv;
 use ken_interp::PosixHost;
-use tempfile::tempdir;
+use tempfile::{tempdir_in, TempDir};
 
 const MAIN: &str = "fn main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode = host_pure ANone ExitCode ExitCode.Success";
 // The first fence has a valid program boundary but no main; only the
@@ -55,6 +55,12 @@ fn strict_example_only_main_requires_import_then_still_is_not_entrypoint() {
     // It does not manufacture a different program header or import context.
     let body_start = extracted.source.len() + 1;
     let plain = format!("{}\n{}", extracted.source, &EXAMPLE_ONLY[range.clone()]);
+    assert!(
+        !plain
+            .lines()
+            .any(|line| line.starts_with("import Capability.Process.Exit")),
+        "unimported example body must not import host_pure: {plain}"
+    );
     let mut body_check = ElabEnv::new().expect("prelude");
     match body_check.elaborate_isolated_file_strict_v1(&roots, &plain) {
         Err(ken_elaborator::ElabError::UnboundName { name, span }) => {
@@ -85,8 +91,28 @@ fn strict_example_only_main_requires_import_then_still_is_not_entrypoint() {
     );
 }
 
+fn catalog_roots() -> Vec<PathBuf> {
+    vec![PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
+}
+
+fn imported_example_only() -> String {
+    EXAMPLE_ONLY.replacen(
+        "program capabilities FS ANone\n",
+        "program capabilities FS ANone\nimport Capability.Process.Exit (host_pure)\n",
+        1,
+    )
+}
+
+fn rooted_tempdir() -> TempDir {
+    let parent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    fs::create_dir_all(&parent).expect("fixture parent under catalog root");
+    tempdir_in(parent).expect("rooted fixture directory")
+}
+
 fn with_program_main(example: Option<&str>) -> String {
-    let mut source = format!("```ken\nprogram capabilities FS ANone\n{MAIN}\n```\n");
+    let mut source = format!(
+        "```ken\nprogram capabilities FS ANone\nimport Capability.Process.Exit (host_pure)\n{MAIN}\n```\n"
+    );
     if let Some(example) = example {
         source.push_str(&format!("```ken example\n{example}\n```\n"));
     }
@@ -94,7 +120,7 @@ fn with_program_main(example: Option<&str>) -> String {
 }
 
 fn run_cli(source: &str) -> std::process::Output {
-    let dir = tempdir().expect("fixture directory");
+    let dir = rooted_tempdir();
     let path = dir.path().join("entry.ken.md");
     fs::write(&path, source).expect("write fixture");
     Command::new(env!("CARGO_BIN_EXE_ken"))
@@ -104,7 +130,7 @@ fn run_cli(source: &str) -> std::process::Output {
         .expect("spawn ken run")
 }
 
-/// Promise: durable invariant. MEASURED: the exact AC-0 input returns the
+/// Promise: durable invariant. MEASURED: the imported AC-0 input returns the
 /// typed missing-entry errors at the real runner and native preparation paths,
 /// and the CLI refuses it. CLAIMED: a checked example cannot provide the
 /// program's entry. THE GAP: this one input has no earlier elaboration error;
@@ -112,9 +138,11 @@ fn run_cli(source: &str) -> std::process::Output {
 #[test]
 fn example_only_main_refused_before_either_entrypoint_admission() {
     let mut host = PosixHost::new();
+    let imported = imported_example_only();
     let run = run_program(
-        EXAMPLE_ONLY,
+        &imported,
         SourceFormat::LiterateKen,
+        &catalog_roots(),
         &[],
         &[],
         b"/",
@@ -127,7 +155,7 @@ fn example_only_main_refused_before_either_entrypoint_admission() {
 
     let native = prepare_native_program_sources(
         "example_main_ac1",
-        vec![CompilerSource::new("entry.ken.md", EXAMPLE_ONLY)],
+        vec![CompilerSource::new("entry.ken.md", &imported).with_roots(catalog_roots())],
     );
     assert!(
         matches!(
@@ -139,7 +167,7 @@ fn example_only_main_refused_before_either_entrypoint_admission() {
         "native must refuse during admission, not on a missing package target: {native:?}"
     );
 
-    let cli = run_cli(EXAMPLE_ONLY);
+    let cli = run_cli(&imported);
     assert!(!cli.status.success(), "checked-only entry must not run");
     assert!(
         cli.stdout.is_empty(),
@@ -160,9 +188,9 @@ fn example_only_main_refused_before_either_entrypoint_admission() {
 #[test]
 fn checked_only_main_cannot_print_but_own_main_can() {
     let printable = "proc main (_input : ProcessInput) (_caps : ProgramCaps ANone) : HostIO ANone ExitCode visits [Console] = host_program ANone (print_line \"entered main\")";
-    let checked =
-        format!("```ken\nprogram capabilities FS ANone\n```\n```ken example\n{printable}\n```\n");
-    let own = format!("```ken\nprogram capabilities FS ANone\n{printable}\n```\n");
+    let header = "program capabilities FS ANone\nimport Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n";
+    let checked = format!("```ken\n{header}```\n```ken example\n{printable}\n```\n");
+    let own = format!("```ken\n{header}{printable}\n```\n");
     let checked_result = run_cli(&checked);
     assert!(
         !checked_result.status.success(),
@@ -201,18 +229,27 @@ fn own_main_followed_by_unrelated_example_keeps_both_admissions() {
     let mut outcomes = Vec::new();
     for source in [&plain, &with] {
         let mut env = ElabEnv::new().expect("prelude");
-        env.elaborate_ken_md_file_v1(source)
+        let legacy = source.replacen("import Capability.Process.Exit (host_pure)\n", "", 1);
+        env.elaborate_ken_md_file_v1(&legacy)
             .expect("own main and unrelated example must elaborate");
         own_ids.push(admit_checked_main(&env).expect("own main must admit").main);
         let mut host = PosixHost::new();
         outcomes.push(
-            run_program(source, SourceFormat::LiterateKen, &[], &[], b"/", &mut host)
-                .expect("reference runner must admit own main")
-                .exit_status,
+            run_program(
+                source,
+                SourceFormat::LiterateKen,
+                &catalog_roots(),
+                &[],
+                &[],
+                b"/",
+                &mut host,
+            )
+            .expect("reference runner must admit own main")
+            .exit_status,
         );
         let preparation = prepare_native_program_sources(
             "example_main_ac2",
-            vec![CompilerSource::new("entry.ken.md", source)],
+            vec![CompilerSource::new("entry.ken.md", source).with_roots(catalog_roots())],
         )
         .expect("native must prepare own main");
         plans.push(preparation.plan().main().clone());

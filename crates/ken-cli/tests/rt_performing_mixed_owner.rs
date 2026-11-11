@@ -25,9 +25,13 @@ fn distinct_provenance_stage_matches_interpreter_natively() {
             std::fs::write(root.path().join("source"), b"0123456789abcdef")
                 .expect("the fixture file is readable");
             let mut host = ken_interp::PosixHost::new_at(root.path());
-            let interpreted = ken_cli::run_program_effect_observation(
-                source,
-                ken_cli::SourceFormat::Ken,
+            let mut interpreter_env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+            let interpreter_results = interpreter_env
+                .elaborate_file_v1(source)
+                .expect("the relay elaborates into a checked core term");
+            let interpreted = ken_cli::run_elaborated_program_effect_observation(
+                interpreter_env,
+                interpreter_results,
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),
@@ -43,16 +47,31 @@ fn distinct_provenance_stage_matches_interpreter_natively() {
                 2,
                 "the interpreter must reach both source reads"
             );
-            let compiled = ken_cli::build_native_program(
-                source,
-                ken_cli::SourceFormat::Ken,
-                "rt_performing_mixed_owner",
-                root.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-            .expect(
-                "the distinct-provenance stage resolves its consumer at the selecting continuation",
-            );
+            let mut native_env = ken_elaborator::ElabEnv::new().expect("checked prelude");
+            let native_results = native_env
+                .elaborate_file_v1(source)
+                .expect("the relay elaborates into a checked core term");
+            let elaborated =
+                ken_elaborator::compiler_driver::ElaboratedNativeProgramV1::from_elaborated_env(
+                    native_env,
+                    ken_elaborator::compiler_driver::CompilerSource::new("src/main.ken", source),
+                    native_results,
+                );
+            let compiled =
+                ken_elaborator::compiler_driver::prepare_native_program_from_elaborated_v1(
+                    "rt_performing_mixed_owner",
+                    elaborated,
+                )
+                .and_then(|preparation| {
+                    ken_elaborator::compiler_driver::complete_native_program_preparation(
+                        preparation,
+                        root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    )
+                })
+                .expect(
+                    "the distinct-provenance stage resolves its consumer at the selecting continuation",
+                );
             let native = ken_runtime::run_bound_process_effect_observation(
                 &compiled.artifact,
                 &ken_runtime::NativeEffectRunOptionsV1 {

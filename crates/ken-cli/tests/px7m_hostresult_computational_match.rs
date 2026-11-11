@@ -4,6 +4,8 @@ fn output_dir(name: &str) -> tempfile::TempDir {
 }
 
 const OK_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (flush, print_line, write)
+import Capability.Process.Exit (host_bind, host_console, host_pure)
 proc two_step (label : String) : HostIO APartial Unit visits [Console] =
   host_bind APartial Unit Unit
     (host_console APartial Unit (print_line label))
@@ -30,6 +32,9 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 const ERR_PROGRAM: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_pure)
 proc write_bytes_then_line (bytes : Bytes) (label : String)
   : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
@@ -77,7 +82,8 @@ fn assert_agreement(
     let ((output, admissions), match_emissions) =
         ken_runtime::with_selected_pending_match_emissions(|| {
             ken_runtime::with_selected_pending_call_admissions(|| {
-                ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
+                ken_cli::build_native_program_with_roots(source, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], name, dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile())
             })
         });
     let output = output.expect("dynamic HostResult producer reaches the linked artifact");
@@ -123,6 +129,7 @@ fn assert_agreement(
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[b"ken".to_vec()],
         &[],
         b"/",
@@ -222,8 +229,9 @@ fn owner_nonmember_c2_ingress_reaches_inner_vis_trap_natively() {
                 ken_runtime::with_selected_pending_match_emissions(|| {
                     ken_runtime::with_static_response_owner_body_mutation(
                         ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
-                        || ken_cli::build_native_program(
+                        || ken_cli::build_native_program_with_roots(
                             OK_PROGRAM, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                             "px7m-owner-vis-bypass", dir.path(),
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         ),
@@ -257,8 +265,9 @@ fn owner_nonmember_c2_ingress_reaches_inner_vis_trap_natively() {
 fn owner_vis_verifier_bypass_drives_a_returned_member() {
     let run = |label: &str, mutated: bool| {
         let dir = output_dir(label);
-        let build = || ken_cli::build_native_program(
-            OK_PROGRAM, ken_cli::SourceFormat::Ken, "px7m-owner-loop-member",
+        let build = || ken_cli::build_native_program_with_roots(
+            OK_PROGRAM, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")], "px7m-owner-loop-member",
             dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         );
         let output = if mutated {
@@ -308,8 +317,9 @@ fn owner_nonmember_refuses_at_the_loop_before_c2() {
             ken_runtime::PendingVisNonmemberMutation::Refuse, || {
                 ken_runtime::with_static_response_owner_body_mutation(
                     ken_runtime::StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis,
-                    || ken_cli::build_native_program(
+                    || ken_cli::build_native_program_with_roots(
                         OK_PROGRAM, ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
                         "px7m-unknown-member-refusal", dir.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     ),
@@ -390,9 +400,10 @@ fn dynamic_err_pending_route_accounts_joins_in_both_emissions() {
     let dir = output_dir("err-admission");
     let scope = ken_runtime::checked_ih_realization_observation_scope();
     let (result, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
-        ken_cli::build_native_program(
+        ken_cli::build_native_program_with_roots(
             ERR_PROGRAM,
             ken_cli::SourceFormat::Ken,
+        &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
             "px7m-err-admission",
             dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),

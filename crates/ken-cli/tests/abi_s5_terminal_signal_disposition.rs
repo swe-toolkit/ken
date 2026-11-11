@@ -178,6 +178,12 @@ fn assert_reader_exits(mut child: Child) {
     );
 }
 
+fn rooted_tempdir() -> tempfile::TempDir {
+    let parent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
+    fs::create_dir_all(&parent).expect("fixture parent under catalog root");
+    tempfile::tempdir_in(parent).expect("rooted Ken source")
+}
+
 fn fixture(dir: &Path) -> PathBuf {
     let source = dir.join("blocked-reader.ken");
     fs::write(&source, BLOCKED_READER).expect("write checked Ken reader");
@@ -186,7 +192,7 @@ fn fixture(dir: &Path) -> PathBuf {
 
 #[test]
 fn ken_run_worker_signal_posture_is_exact() {
-    let dir = tempfile::tempdir().expect("isolated Ken source");
+    let dir = rooted_tempdir();
     let source = fixture(dir.path());
     let mut command = Command::new(ken_bin());
     command.arg("run").arg(source);
@@ -204,7 +210,7 @@ fn ken_run_worker_signal_posture_is_exact() {
 
 #[test]
 fn native_artifact_signal_posture_is_exact() {
-    let dir = tempfile::tempdir().expect("isolated native build");
+    let dir = rooted_tempdir();
     let source = fixture(dir.path());
     let profile = dir.path().join("resource-profile.json");
     fs::write(&profile, RESOURCE_PROFILE).expect("write native resource profile");
