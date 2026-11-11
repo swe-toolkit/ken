@@ -11,7 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
 use super::aggregates::{
-    checked_ih_post_call_consumer_frames, pair_detached_required_consumer, RequiredConsumerCall,
+    checked_ih_post_call_consumer_frames, pair_detached_required_consumer, KCallPlacement,
+    RequiredConsumerCall,
 };
 use super::continuations::{
     checked_frame_for_consumer, continuation_call_selected_result_identity_opt,
@@ -797,9 +798,15 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// body root. It returns a Vis without an enclosing consumer seat, so no
     /// selected response-owner call can be recorded in that function.
     ContinuationBodyTail,
-    /// A checked-IH result escapes into the worker that already emits its
-    /// call. No self-relocation is issued and no response owner can assume
-    /// that the escaped result returns through an ordinary call seat.
+    /// No response owner may assume this caller's result returns through an
+    /// ordinary call seat, so it keeps the ordinary Construct route. Two
+    /// populations land here:
+    /// - a checked-IH result that escapes into the worker that already emits
+    ///   its call (the escaped-caller closure); no self-relocation is issued;
+    /// - a self transport (its call placement is `Transported` to its own
+    ///   emission owner) that no earlier residual arm deferred. It returns
+    ///   into its own emitting worker, so it never gets a static response
+    ///   owner (B invariant).
     EscapedCheckedIhCaller,
 }
 
@@ -4301,6 +4308,25 @@ impl StaticTransitionPlan<'_> {
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,
                     sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
+                    capture_count: demand.captures.len(),
+                    continuation_input_count: demand.continuation_inputs.len(),
+                });
+            } else if matches!(
+                self.k_call_placement(&demand.k_identity)?,
+                KCallPlacement::Transported { destination, .. }
+                    if destination == demand.k_identity.emission_owner()
+            ) {
+                // A self transport returns into its own emitting worker, so it never
+                // gets a static response owner (B invariant). Only a caller that would
+                // otherwise be specialized is re-routed; existing deferrals stand.
+                deferred.push(DeferredResponseRow {
+                    vis_origin: demand.vis_origin,
+                    producer_call_origin: demand.producer_call_origin,
+                    operation_root_origin: demand.operation_root_origin,
+                    selected_operation_origin: demand.selected_operation_origin,
+                    effect_origin: demand.effect_origin,
+                    operation: demand.operation,
+                    sub_case: DeferredResponseSubCase::EscapedCheckedIhCaller,
                     capture_count: demand.captures.len(),
                     continuation_input_count: demand.continuation_inputs.len(),
                 });

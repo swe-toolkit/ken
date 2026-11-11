@@ -1288,6 +1288,13 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub bracket_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub bracket_settlement_vis_origins: Vec<u32>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
+    /// Exact response-demand call placements, independently of their owner rows.
+    pub self_transport_vis_origins: Vec<u32>,
+    /// A self transport selected as a response owner violates the B invariant.
+    pub owned_self_transport_vis_origins: Vec<u32>,
+    /// Installed relay pairs and the pairs covered by at least one exact route.
+    pub relay_pair_sources: Vec<(u32, String)>,
+    pub routed_relay_pair_sources: Vec<(u32, String)>,
     /// Each actual lowering query, not just a planner row: `(context, contract)`.
     /// A missing boundary must record `None`, and a completed one `Some(Ret)`.
     pub generated_context_result_contracts: Vec<(u32, Option<String>)>,
@@ -1459,28 +1466,70 @@ fn record_static_response_feasibility_diagnostic(
     if bracket_infeasible.is_some() {
         return Err(planner_error("installed bracket row is infeasible"));
     }
-    let static_response_owners = match plan.static_response_owner_specializations()? {
-        Ok(owners) => owners
-            .iter()
-            .map(|owner| StaticResponseOwnerObservation {
-                owner: owner.id().ordinal(),
-                base_owner: format!("{:?}", owner.base_owner()),
-                response: owner.response().ordinal(),
-                selected_caller: format!("{:?}", owner.selected_caller()),
-                k_context: owner.k_context().0,
-                context_was_preexisting: owner.context_was_preexisting(),
-                parameters: owner.header().parameters,
-                captures: owner.header().captures,
-                frame_bytes: owner.header().frame_bytes,
-                slots: owner
-                    .slots()
+    // A placement is a response-demand transport only when its construct is
+    // actually classified in the response ledger. Other checked-IH calls can
+    // be self-placed without belonging to the G-ERASURE response population.
+    let demand_vis = all_static_response_rows
+        .iter()
+        .map(|row| row.vis_origin)
+        .chain(
+            plan.static_response_deferred()
+                .iter()
+                .map(|row| row.vis_origin().0),
+        )
+        .collect::<BTreeSet<_>>();
+    let self_transport_vis_origins = plan
+        .k_call_placements
+        .iter()
+        .filter_map(|(identity, placement)| {
+            let vis = identity.producer_construct_origin().0;
+            (demand_vis.contains(&vis)
+                && matches!(placement,
+                    KCallPlacement::Transported { destination, .. }
+                        if *destination == identity.emission_owner()
+                ))
+            .then_some(vis)
+        })
+        .collect::<Vec<_>>();
+    let (static_response_owners, owned_self_transport_vis_origins) =
+        match plan.static_response_owner_specializations()? {
+            Ok(owners) => {
+                let owned_self_transports = owners
                     .iter()
-                    .map(|slot| (format!("{:?}", slot.kind), slot.ordinal))
-                    .collect(),
-            })
-            .collect(),
-        Err(_) => Vec::new(),
-    };
+                    .filter_map(|owner| {
+                        matches!(
+                            plan.k_call_placements.get(owner.selected_caller()),
+                            Some(KCallPlacement::Transported { destination, .. })
+                                if *destination == owner.selected_caller().emission_owner()
+                        )
+                        .then_some(owner.selected_caller().producer_construct_origin().0)
+                    })
+                    .collect();
+                (
+                    owners
+                        .iter()
+                        .map(|owner| StaticResponseOwnerObservation {
+                            owner: owner.id().ordinal(),
+                            base_owner: format!("{:?}", owner.base_owner()),
+                            response: owner.response().ordinal(),
+                            selected_caller: format!("{:?}", owner.selected_caller()),
+                            k_context: owner.k_context().0,
+                            context_was_preexisting: owner.context_was_preexisting(),
+                            parameters: owner.header().parameters,
+                            captures: owner.header().captures,
+                            frame_bytes: owner.header().frame_bytes,
+                            slots: owner
+                                .slots()
+                                .iter()
+                                .map(|slot| (format!("{:?}", slot.kind), slot.ordinal))
+                                .collect(),
+                        })
+                        .collect(),
+                    owned_self_transports,
+                )
+            }
+            Err(_) => (Vec::new(), Vec::new()),
+        };
     let static_response_deferred = plan
         .static_response_deferred()
         .iter()
@@ -1582,6 +1631,18 @@ fn record_static_response_feasibility_diagnostic(
                     .map(|region| region.settlement.0).collect::<BTreeSet<_>>()
                     .into_iter().collect(),
                 static_response_owners,
+                self_transport_vis_origins,
+                owned_self_transport_vis_origins,
+                relay_pair_sources: plan
+                    .relay_drive_pairs
+                    .keys()
+                    .map(|(source, owner)| (source.0, format!("{owner:?}")))
+                    .collect(),
+                routed_relay_pair_sources: plan
+                    .relay_routes
+                    .keys()
+                    .map(|(source, owner, _)| (source.0, format!("{owner:?}")))
+                    .collect(),
                 generated_context_result_contracts: Vec::new(),
                 pre_schema_transport_sources: plan.pre_schema_transport_sources.iter()
                     .map(|identity| format!("{identity:?}")).collect(),
