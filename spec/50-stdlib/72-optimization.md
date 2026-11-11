@@ -12,7 +12,8 @@
 > SPEC-OPTIMIZATION-ARGMAX §3;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
 > SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
-> SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT §3.6).** Section 1 specifies
+> SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT §3.6;
+> SPEC-OPTIMIZATION-LEAST-K §4).** Section 1 specifies
 > the non-empty least-cost selector and seven initial laws; its catalog
 > module and seed are present on main. Section 1.4's Option selector,
 > four laws and seed are also present on main. Section 1.5's checked
@@ -227,11 +228,13 @@ Greatest-cost selection (`argmax`) on `NonEmpty a` under a `Nat` cost
 is specified in §3, not deferred. Real-valued and continuous
 optimization, infinite or implicit search spaces, heuristics and
 approximation guarantees, costs into an arbitrary `Ord`,
-multi-objective and lexicographic costs, and top-k and stable
-multi-result selection remain deferred. The Option-returning selector
-for a possibly empty `List` is specified in §1.4, not deferred. The
-right-fold description is not a machine-checked complexity result;
-all asymptotic and resource claims remain deferred.
+multi-objective and lexicographic costs, greatest-cost top-k,
+and top-k over arbitrary candidate orders remain deferred. Stable
+least-cost selection of multiple results under a `Nat` cost is
+specified in §4; the Option-returning single selector over a
+possibly empty `List` is specified in §1.4. The right-fold
+description is not a machine-checked complexity result; all
+asymptotic and resource claims remain deferred.
 
 ### 1.4 Option selector over a possibly empty list
 
@@ -1050,8 +1053,9 @@ Option-returning maximization on a possibly empty input is specified
 in §3.4, and append-split selection in §3.6; neither is deferred.
 Arbitrary candidate orders or equality decisions, multiple sorted
 results, continuous optimization, approximation guarantees and
-performance bounds remain outside §3.
-In particular, §3 supplies no top-k selection.
+performance bounds remain outside §3. Section 4 separately specifies
+stable least-cost top-k under a `Nat` cost; §3 still supplies no
+greatest-cost top-k selection.
 
 ### 3.4 Greatest-cost Option selector over a possibly empty list
 
@@ -1392,3 +1396,175 @@ helper is added. Neither law makes a claim for an empty input or
 changes any existing §3 operation or law type. The Architect's D0
 checks only scratch feasibility; official conformance, CI and landed
 trust remain separate gates.
+
+## 4. Stable selection of the k least-cost candidates
+
+> **Section 4 status: DRAFT v0 (SPEC-OPTIMIZATION-LEAST-K).** Architect's
+> isolated AC-0 on `20406f350` found the generic definition and eight
+> public law types feasible: 15 named consumer test binaries passed
+> 43/43 rows, no new `Axiom` appeared, and the exact 114-element scratch
+> `trusted_base()` GlobalId sets agreed. Architect's subsequent B1–B8
+> correction requires reusing `Data.Collections.Derived.take` instead of
+> the D0's duplicate `list_take`. The D0 and ruling establish design
+> feasibility; they do not test the corrected implementation or this
+> spec child, a CV seed, an assembled tip, official conformance, CI,
+> publication, landing or measured landed trust.
+
+### 4.1 Carrier, operation and stable order
+
+`Algorithm.Optimization.Argmin` must export `cost_le` and `least_k`
+with these public types and defining equations. `cost_le` compares
+only the natural costs of two candidates. `least_k` returns a prefix
+of the stable, non-decreasing cost sort of the entire input:
+
+```ken
+pub fn cost_le (a : Type) (cost : a → Nat) (x : a) (y : a) : Bool =
+  leq_nat (cost x) (cost y)
+
+pub fn least_k (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) : List a =
+  take a k (sort a (cost_le a cost) xs)
+```
+
+The list is the existing `List a`, and `take`, `sort`, `filter`,
+`eq_from_ord`, `is_sorted` and `list_elem` belong to the existing
+`Data.Collections.Derived` package. `take` already has the required
+recursive body on this base but is private; this contract publishes
+that **same** operation rather than adding `list_take`. On `Zero`
+it returns `Nil a`; on a positive count and `Cons h t`, it retains
+`h` and takes the remaining count from `t`; on `Nil`, it returns
+`Nil a` for every count. `sort` uses `cost_le` so a cheaper value
+precedes a costlier one. When costs tie, the earlier input occurrence
+precedes the later one. This fixes the returned list's order, not
+merely its length or collection of costs. It is an exact finite-list
+selection, not a complexity or resource guarantee. The candidate
+type `a` needs no `DecEq a`, order, or position witness.
+
+### 4.2 Eight checked public laws
+
+The module must export checked, public Transparent bodies for all
+eight theorem interfaces below. They have the stated argument order
+and types. In particular the two class laws quantify over **values**
+and use `eq_from_ord` on natural-cost order, not an equality decision
+on the candidate type.
+
+```ken
+pub theorem least_k_length
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a)
+    : Equal Nat (length a (least_k a cost k xs)) (min k (length a xs))
+
+pub theorem least_k_member
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (y : a)
+    : list_elem a y (least_k a cost k xs) → list_elem a y xs
+
+pub theorem least_k_sorted
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a)
+    : is_sorted a (cost_le a cost) (least_k a cost k xs)
+
+pub theorem least_k_ties_earliest
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (w : a)
+    : Equal
+        (List a)
+        (filter a (eq_from_ord a (cost_le a cost) w) (least_k a cost k xs))
+        (take
+          a
+          (length a (filter a (eq_from_ord a (cost_le a cost) w) (least_k a cost k xs)))
+          (filter a (eq_from_ord a (cost_le a cost) w) xs))
+
+pub theorem least_k_cheaper_class_selected
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (y : a) (z : a)
+    : list_elem a y (least_k a cost k xs)
+      → list_elem a z xs
+      → Equal Bool (lt_nat (cost z) (cost y)) True
+      → Equal
+        (List a)
+        (filter a (eq_from_ord a (cost_le a cost) z) (least_k a cost k xs))
+        (filter a (eq_from_ord a (cost_le a cost) z) xs)
+
+pub theorem least_k_separation
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (y : a) (z : a)
+    : list_elem a y (least_k a cost k xs)
+      → list_elem a z xs
+      → (list_elem a z (least_k a cost k xs) → Bottom)
+      → IsTrue (leq_nat (cost y) (cost z))
+
+pub theorem least_k_one_nil
+      (a : Type) (cost : a → Nat)
+    : Equal (List a) (least_k a cost (Suc Zero) (Nil a)) (Nil a)
+
+pub theorem least_k_one_cons
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : Equal
+        (List a)
+        (least_k a cost (Suc Zero) (Cons a x rest))
+        (Cons a (argmin a cost (nonempty_cons a x rest)) (Nil a))
+```
+
+`least_k_length` takes exactly the smaller of `k` and the input
+length; `least_k_member` rules out invented selected values.
+`list_elem` is the existing Ω-valued, propositionally truncated
+membership, not an equality algorithm on `a` and not an occurrence
+index. `least_k_sorted` constrains the adjacent cost order.
+For a fixed `w`, `eq_from_ord` compares both cost directions, and
+`filter` extracts the values in `w`'s cost class, retaining their
+input order. `least_k_ties_earliest` says the selected class is an
+**initial segment** of that input class, including repeated values;
+a later tied occurrence cannot precede an earlier one. When any
+selected `y` costs strictly more than an input `z`,
+`least_k_cheaper_class_selected` says the **entire** cheaper class,
+not just one value of that class, occurs in the result. The two
+classes are compared without deciding equality of candidates.
+
+`least_k_separation` bounds every selected cost by that of every
+input value absent from the result. Its third premise is the
+negation of value membership, not a claim about an unselected
+occurrence of a value also present elsewhere in the result. This
+law alone does not determine multiplicity or earliest-tie order;
+length, sortedness and the class laws retain those obligations.
+At `k = 1`, `least_k_one_nil` gives the empty list, corresponding
+to `argmin_option`'s `None`, and `least_k_one_cons` gives the
+singleton list of the existing `argmin` choice, corresponding to
+`argmin_option`'s `Some`. The two constructor cases express unit
+agreement without adding a ninth public law or a new Option/List
+adapter. Every theorem requires a checked body, not an `Axiom`,
+postulate, proof hole or assumption about candidate equality.
+
+### 4.3 Finite discriminator, proof boundary and deferrals
+
+On distinct labels `A, B, C, D` with respective costs `2, 1, 2, 3`,
+`least_k` on `[A, B, C, D]` returns `[]` at `k = 0`, `[B, A]` at
+`k = 2`, `[B, A, C]` at `k = 3`, and `[B, A, C, D]` at `k = 9`.
+The result `[B, D]` at `k = 2` wrongly skips cheaper `A`; `[B, C]`
+at `k = 2` wrongly prefers a later tied value to `A`. A closed
+accepted client for `k = 0` uses `Proved`: the equality of empty
+lists reduces to `Top`, where `Refl` refuses. The accepted `k = 2`,
+`k = 3`, `k = 9` controls and both refused twins use `Refl` on their
+respective list equalities. The twins are checked after fully
+accepted same-form prefixes; their rejection at their own claim
+must not be mistaken for an import or fixture failure. Architect's
+D0 measured these forms in scratch. The CV-owned closed seed and
+official conformance are separate evidence, not supplied by §4.
+
+The corrected proof factoring publishes the existing `take` body
+unchanged, with attached public `length`, `member`, `sorted` and
+`filter_prefix` proofs; `length` delegates to the existing private
+`length_take_min`, which remains private. The `filter` proof
+`empty_if_none`, the public `list_sorted_head_bounded` helper, and
+public insert/sort laws live in `Data.Collections.Derived` where
+their operations live. The stable cost-class proof uses the totality
+and transitivity already proved for natural `leq_nat`, not new
+premises on callers. The shared `bool_false_of_not_true` lemma
+belongs to `Core.Classes.LawfulClasses`; neither package duplicates
+it. In `Argmin` the public `cost_le`, `least_k` and eight laws lead,
+and private induction helpers follow. These are package-factoring
+and proof-boundary requirements, not new optimization law types.
+`Perm`'s equality function is not used to impose `DecEq a`.
+
+Architect's D0 found all eight generic types feasible with no added
+trust and observed mutations of position-only selection, duplicated
+cheapest output, skipped cost classes and later-tie selection fail
+in scratch; its B1–B8 correction was not a candidate run. This
+section adds no `argmin`, `argmin_option`, `argmax`, `argmax_option`
+or `find_below` operation or law type change in §§1–3. Greatest-cost
+top-k, arbitrary candidate-order or non-`Nat` cost variants, infinite
+or implicit search, heuristic or approximate results, and runtime
+complexity or memory bounds remain outside §4.
