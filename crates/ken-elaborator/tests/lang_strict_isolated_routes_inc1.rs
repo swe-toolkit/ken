@@ -192,11 +192,14 @@ fn completed_empty_legacy_unit_cannot_switch_to_strict() {
     }
 }
 
-/// Promise class: durable invariant. A continuing strict scope retains
-/// imports and locals. Root changes, multiple roots and a prior Legacy unit
-/// refuse before a second source can reinterpret checked identities.
+/// Promise class: durable invariant (spec 33 §3.3). Each Strict isolated
+/// source on one environment starts from a fresh scope: a later source sees
+/// neither an earlier source's imports nor its top-level declarations. The
+/// environment-level locks persist: a root change, multiple roots and a
+/// prior Legacy unit refuse before a second source can reinterpret checked
+/// identities.
 #[test]
-fn strict_scope_continues_but_root_or_mode_cannot_change_mid_run() {
+fn strict_env_keeps_root_and_mode_locks_but_each_source_starts_fresh() {
     let (_dir, root) = root_with_lib();
     let mut env = ElabEnv::new().unwrap();
     load(
@@ -205,8 +208,18 @@ fn strict_scope_continues_but_root_or_mode_cannot_change_mid_run() {
         "import Lib (other)\nconst first : Nat = other\n",
     )
     .unwrap();
-    load(&mut env, &[root.clone()], "const second : Nat = first\n").unwrap();
-    assert!(env.globals.contains_key("second"));
+    load(
+        &mut env,
+        &[root.clone()],
+        "import Lib (other)\nconst imported_second : Nat = other\n",
+    )
+    .unwrap();
+    assert!(env.globals.contains_key("imported_second"));
+    match load(&mut env, &[root.clone()], "const second : Nat = first\n") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "first"),
+        other => panic!("expected missing earlier-source name, got {other:?}"),
+    }
+    assert!(!env.globals.contains_key("second"));
     let wrong = root.parent().unwrap().join("other-packages");
     std::fs::create_dir_all(&wrong).unwrap();
     match load(&mut env, &[wrong], "const new : Nat = Zero\n") {
