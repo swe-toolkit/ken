@@ -2879,44 +2879,11 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
             ))
         }
 
-        Type::TPi(x, a, b, span) => {
-            let ra = resolve_type(scope, a)?;
-            scope.bind_source(x, span.clone())?;
-            let rb = resolve_type(scope, b)?;
-            scope.pop();
-            Ok(RType::RPi(
-                x.clone(),
-                Box::new(ra),
-                Box::new(rb),
-                span.clone(),
-            ))
-        }
+        Type::TPi(x, a, b, span) => resolve_pi_type(scope, x, a, b, span),
 
-        Type::TSigma(x, a, b, span) => {
-            let ra = resolve_type(scope, a)?;
-            scope.bind_source(x, span.clone())?;
-            let rb = resolve_type(scope, b)?;
-            scope.pop();
-            Ok(RType::RSigma(
-                x.clone(),
-                Box::new(ra),
-                Box::new(rb),
-                span.clone(),
-            ))
-        }
+        Type::TSigma(x, a, b, span) => resolve_sigma_type(scope, x, a, b, span),
 
-        Type::TRefine(x, a, phi, span) => {
-            let ra = resolve_type(scope, a)?;
-            scope.bind_source(x, span.clone())?;
-            let rphi = resolve_expr_ctx(scope, phi, PropCtx::None)?;
-            scope.pop();
-            Ok(RType::RRefine(
-                x.clone(),
-                Box::new(ra),
-                Box::new(rphi),
-                span.clone(),
-            ))
-        }
+        Type::TRefine(x, a, phi, span) => resolve_refinement_type(scope, x, a, phi, span),
 
         Type::TApp(f, a, span) => {
             let rf = resolve_type(scope, f)?;
@@ -2940,4 +2907,67 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
             Ok(RType::RProj(Box::new(rbase), field.clone(), span.clone()))
         }
     }
+}
+
+// Keep the fallible binder introductions out of resolve_type's recursive
+// frame: each extra local there is repeated at every level of a type tower.
+// The stated-stack T row exercises that recursion without widening its stack.
+#[inline(never)]
+fn resolve_pi_type(
+    scope: &mut Scope,
+    x: &str,
+    a: &Type,
+    b: &Type,
+    span: &Span,
+) -> Result<RType, ElabError> {
+    let ra = resolve_type(scope, a)?;
+    scope.bind_source(x, span.clone())?;
+    let rb = resolve_type(scope, b)?;
+    scope.pop();
+    Ok(RType::RPi(
+        x.to_string(),
+        Box::new(ra),
+        Box::new(rb),
+        span.clone(),
+    ))
+}
+
+#[inline(never)]
+fn resolve_sigma_type(
+    scope: &mut Scope,
+    x: &str,
+    a: &Type,
+    b: &Type,
+    span: &Span,
+) -> Result<RType, ElabError> {
+    let ra = resolve_type(scope, a)?;
+    scope.bind_source(x, span.clone())?;
+    let rb = resolve_type(scope, b)?;
+    scope.pop();
+    Ok(RType::RSigma(
+        x.to_string(),
+        Box::new(ra),
+        Box::new(rb),
+        span.clone(),
+    ))
+}
+
+#[inline(never)]
+fn resolve_refinement_type(
+    scope: &mut Scope,
+    x: &str,
+    a: &Type,
+    phi: &Expr,
+    span: &Span,
+) -> Result<RType, ElabError> {
+    let ra = resolve_type(scope, a)?;
+    scope.bind_source(x, span.clone())?;
+    let rphi = resolve_expr_ctx(scope, phi, PropCtx::None)?;
+    scope.pop();
+    Ok(RType::RRefine(
+        x.to_string(),
+        Box::new(ra),
+        Box::new(rphi),
+        span.clone(),
+    ))
 }
