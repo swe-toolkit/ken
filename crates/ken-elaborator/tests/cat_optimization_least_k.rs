@@ -1,5 +1,9 @@
 //! Public least-k selection and its checked list-prefix providers.
 //!
+//! Source: `spec/50-stdlib/72-optimization.md` §4 and
+//! `conformance/stdlib/optimization/seed-least-k.md` (accepted prefixes,
+//! eight public law instances and two isolated false-result refusals).
+//!
 //! Promise class: durable semantic invariant. The public selector is a stable
 //! cost-ordered prefix, not a candidate-equality decision or a new trust root.
 //! The closed vectors are fixed examples; the generic public laws are the

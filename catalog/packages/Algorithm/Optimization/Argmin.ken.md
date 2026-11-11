@@ -1929,9 +1929,13 @@ selectors add no axiom, primitive, postulate or opaque constant.
 `trusted_base()` must stay unchanged relative to the provider closure;
 this does not erase inherited assumptions.
 
-**Validation:** The `cat_optimization_least_k` package test roots-loads the
-public laws and closed sorted-prefix controls, checks exact trusted-base
-identities, and distinguishes the wrong costlier and later-tie results.
+**Validation:** The
+[§4 least-k seed](../../../../conformance/stdlib/optimization/seed-least-k.md)
+records accepted stable prefixes, eight public law instances and the two
+false-result refusals specified by `spec/50-stdlib/72-optimization.md` §4.
+The `cat_optimization_least_k` package test roots-loads the public laws and
+closed sorted-prefix controls, checks exact trusted-base identities, and
+distinguishes the wrong costlier and later-tie results.
 `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
 instances and false-result refusals. Its scoped acceptance target checks the
