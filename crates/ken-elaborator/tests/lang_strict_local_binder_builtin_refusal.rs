@@ -252,6 +252,43 @@ fn strict_isolated(source: &str) -> Result<ElabEnv, ElabError> {
     Ok(env)
 }
 
+// Promise class: durable invariant (spec 33 §3.3, module-scope B refusal).
+// MEASURED: each mode refuses the law's own B name Pair with E0058, while
+// its derived Pair_fst is outside B. CLAIMED: the new LawDerivedNames arm
+// retains the prior own-name refusal. THE GAP: a derived-B-only test cannot
+// see a removed own-name check; removing it must redden both named rows.
+fn assert_law_own_builtin_name(error: &ElabError, source: &str, local_origin: &str) {
+    assert_eq!(error.code().as_str(), "E0058", "{error:?}");
+    assert!(
+        matches!(error,
+        ElabError::AmbiguousReference { name, sources, span }
+        if name == "Pair"
+            && sources.iter().map(String::as_str).eq(["<prelude>.Pair", local_origin])
+            && *span == Span::new(0, source.len())),
+        "law's own B name must refuse before derived name: {error:?}"
+    );
+}
+
+#[test]
+fn law_own_builtin_name_refuses_before_non_builtin_derived_name_strict() {
+    let source = "law Pair (x) { fst : Top }";
+    let error = match strict_roots(source) {
+        Err(error) => error,
+        Ok(_) => panic!("Strict own-name B introduction must refuse"),
+    };
+    assert_law_own_builtin_name(&error, source, "Entry.Pair");
+}
+
+#[test]
+fn law_own_builtin_name_retains_legacy_e0058() {
+    let source = "law Pair (x) { fst : Top }";
+    let error = ElabEnv::new()
+        .unwrap()
+        .elaborate_file_v1(source)
+        .expect_err("Legacy own-name B introduction must keep its E0058 refusal");
+    assert_law_own_builtin_name(&error, source, "Pair");
+}
+
 // Promise class: durable invariant. The refusing law would bind the exact
 // prelude pair_fst through its derived identity if the module prebind guard
 // ignored derived names; the outside-B law checks through the same route.
