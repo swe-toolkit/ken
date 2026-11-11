@@ -114,14 +114,13 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   trap-classifier fix, evt_5y7e328rr2wd8), then B2: the Process
   promotion, the gate deletion and the containment deletion, landing
   with the native parity rows (Architect evt_5vsaybryes08b). B2 also
-  promotes RNSPK's AC-1c row from today's production refusal to what
-  the boundary arm does on B2's base: native parity with
-  RT-NATIVE-FORWARDED-CONTINUATION-REENTRY's A2 route if that node has
-  landed, otherwise the trap's refusal at C986 (argv) and C427 (live)
-  after the inner S1165/S606 Vis case, in M4's order, with fallback 0.
-  It commits the matching mutation rows: REENTRY's A4, or RNSPK's M-T
-  and M-P. Until then the boundary edge has measured evidence only
-  (Architect evt_2q2y8m51jht9v).
+  promotes RNSPK's AC-1c row from today's production refusal to native
+  parity. F's native outcome matches the interpreter on main below the
+  gate (Architect evt_r2abprmhd4zf), so no trap landed. The promoted
+  test states its capacity profile: argv needs 269 Invocation Words
+  against the starter smoke profile's 256. If B1a reopens the trap
+  (below), B2 promotes to the trap's refusal and its M-T and M-P rows
+  instead.
 - **Increment B-closure** is dynamic relay forwarding (Architect
   evt_146ymmv8mz9py, on Research evt_91y97hbf0w06). It lands on its own,
   after `RT-NATIVE-IH-CONTINUATION-CLOSED-TEMPLATES`: a first-order
@@ -350,6 +349,32 @@ restated to assert that
 the suppressed artifact fails closed. r4's per-copy (origin, owner)
 relay keys close entries 16 and 17's predicate (Steward
 evt_1chyed3wcanq8).
+
+### B1a carries (Steward, on Architect evt_76yd7z7p2g8pj and evt_r2abprmhd4zf)
+
+B1a's WIP2 `erasure.rs` hunks are the C-28 overlay's direct-style
+erasure (Steward evt_5srjz8rwc2wtm). Two closed nodes measured that
+erasure as the cause of their defects, so the B1a candidate owes, in the
+same cut as those hunks:
+- **The B invariant.** A selected caller whose `k_call_placement` is
+  Transported to its own emission owner gets no static response owner,
+  independent of the producer-result count (evt_3r6qqp4k8ff36). Its
+  committed observation is the three G-ERASURE rows: 9807 on owner2,
+  context 0, without the repair, and `Ok` with zero owned self
+  transports with it.
+- **F's parity.** F's three rows, under the gate/host subset plus B1a,
+  reproduce the interpreter's event records and terminal outcomes,
+  release Buffer1 last, and report fallback and carried-Vis counts
+  against the baseline (checked 2, default 0, carried-Vis 0). They run
+  without scratch markers. A selected carried Vis followed by an early
+  Buffer1 release is D2: it reopens `RT-NATIVE-FORWARDED-BOUNDARY-TRAP`'s
+  trap design, gated on B1a. The baseline is under
+  `/workspaces/ken/tmp/rt-forwarded-trap-ac0-97f-evidence/`.
+- **C1.** Delete the no-caller ledger check (`units.rs:9344`-`9357`)
+  and `record_relocated_exit` (`:9315`).
+- **C3.** Correct the `checked_ih_self_emitter_source` doc
+  (`aggregates.rs:6308`) and the `EscapedCheckedIhCaller` doc
+  (`responses.rs:803`).
 
 ## Stop conditions
 

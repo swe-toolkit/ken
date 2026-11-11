@@ -1,18 +1,24 @@
 ---
 id: RT-NATIVE-FORWARDED-CONTINUATION-REENTRY
 title: "A pure-forward carried clause at a function's outermost carried position jumps its own header with k in place, so a body-tail request forwarded out of a recursive worker never reaches the enclosing genuine handler, and RT-NATIVE-FORWARDED-BOUNDARY-TRAP traps that edge fail-closed. Lower the boundary arm as a return of Vis(op, K2') through the function's normal-return path, with K2' one generated continuation specialization per forwarding chain that re-runs the request's K body and the chain's clauses, so PX10 B1a's F rows reach native parity"
-status: ready
+status: draft
 owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [RT-NATIVE-FORWARDED-BOUNDARY-TRAP]
-blocks: [PX10-NATIVE-SPAWN-PARITY]
+depends_on: [PX10-NATIVE-SPAWN-PARITY]
+blocks: []
 github: null
 origin: "Architect S0b ruling (RE-ENTRY-ABSENT, one composed re-entry per chain) on implementer evt_6cww96v9b0vf2, RNSPK thread; Steward recut 14:50Z 2026-11-09 moved F native parity out of RT-NATIVE-SETTLEMENT-PLACEMENT-KEY into this node. L1 objective: the Linux ABI program. Steward-filed per COORDINATION section 2."
 ---
 
 # Forward a request out of its function, then re-enter
+
+**Draft, conditional on B1a (Steward, on Architect `evt_r2abprmhd4zf`).**
+Its premise, the boundary sequence that jumps the header in place, is
+not observed on main: F matches the interpreter below the gate. It was
+measured only with B1a's erasure hunks. This node is re-released only
+if B1a's F parity rows show D2.
 
 ## Objective
 

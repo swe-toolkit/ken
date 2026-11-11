@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-FORWARDED-BOUNDARY-TRAP
 title: "A pure-forward carried clause at its function's outermost carried position lowers its IH in place, jumping its own header with k, so F's body-tail request never reaches the enclosing genuine handler and the checked-answer fallback releases Buffer1 early. Until the re-entry continuation exists, replace that one edge with a named trap, so F refuses natively by name at the boundary clause and every control stays green"
-status: ready
+status: closed
 owner: runtime
 size: M
 tier: T1
@@ -13,6 +13,13 @@ origin: "Steward recut 2026-11-09 20:45Z (evt_1g0fjah621vx3) on the Architect's 
 ---
 
 # Trap the boundary edge
+
+**Closed with no trap (Architect AC-0 LAWFUL `evt_r2abprmhd4zf`).** On
+`97f303d6a` under the gate/host-only subset, F's three rows match fresh
+interpreter runs, Buffer1 is released last, and no carried Vis case is
+selected. D2 occurs only with B1a's erasure hunks, so this design
+reopens only if B1a measures D2. C1, C3 and F's parity rows move to
+`PX10-NATIVE-SPAWN-PARITY`'s B1a carries.
 
 ## Objective
 
