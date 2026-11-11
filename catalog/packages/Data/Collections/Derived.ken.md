@@ -1790,70 +1790,6 @@ explicit when extending an adjacent order fact to a later list member.
 pub fn eq_from_ord (a : Type) (le : a → a → Bool) (x : a) (y : a) : Bool =
   bool_and (le x y) (le y x)
 
-theorem derived_class_order
-      (a : Type)
-      (le : a → a → Bool)
-      (transitive : (x : a)
-        → (y : a)
-        → (z : a)
-        → Equal
-        Bool
-        (le x y)
-        True
-        → Equal
-        Bool
-        (le y z)
-        True
-        → Equal
-        Bool
-        (le x z)
-        True)
-      (w : a)
-      (x : a)
-      (h : a)
-    : IsTrue (eq_from_ord a le w x) → IsTrue (eq_from_ord a le w h) → Equal Bool (le x h) True =
-  λpx.
-    λph.
-      transitive
-        x
-        w
-        h
-        ((proof right for bool_and) (le w x) (le x w) px)
-        ((proof left for bool_and) (le w h) (le h w) ph)
-
-theorem derived_class_exclusive
-      (a : Type)
-      (le : a → a → Bool)
-      (transitive : (x : a)
-        → (y : a)
-        → (z : a)
-        → Equal
-        Bool
-        (le x y)
-        True
-        → Equal
-        Bool
-        (le y z)
-        True
-        → Equal
-        Bool
-        (le x z)
-        True)
-      (w : a)
-      (x : a)
-      (h : a)
-      (cmp_false : Equal Bool (le x h) False)
-    : IsTrue (eq_from_ord a le w x) → IsTrue (eq_from_ord a le w h) → Bottom =
-  λpx.
-    λph.
-      trans
-        Bool
-        False
-        (le x h)
-        True
-        (sym Bool (le x h) False cmp_false)
-        (derived_class_order a le transitive w x h px ph)
-
 pub fn count (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Nat =
   match xs {
     Nil ↦ Zero;
@@ -1862,23 +1798,6 @@ pub fn count (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Nat =
         True ↦ Suc (count a eqf x t);
         False ↦ count a eqf x t
       }
-  }
-
-fn derived_always_true (a : Type) (x : a) (y : a) : Bool = True
-
-theorem derived_count_true_length
-      (a : Type) (q : a) (xs : List a)
-    : Equal Nat (count a (derived_always_true a) q xs) (length a xs) =
-  match xs {
-    Nil ↦ Proved;
-    Cons h t ↦
-      cong
-        Nat
-        Nat
-        (count a (derived_always_true a) q t)
-        (length a t)
-        Suc
-        (derived_count_true_length a q t)
   }
 
 pub fn Perm (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) : Prop =
@@ -2130,6 +2049,87 @@ pub proof stable_class for sort
           (filter a (eq_from_ord a le w) t)
           (λselected. filter_keep_step a h selected (eq_from_ord a le w h))
           ((proof stable_class for sort) a le total transitive w t))
+  }
+
+theorem derived_class_order
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (h : a)
+    : IsTrue (eq_from_ord a le w x) → IsTrue (eq_from_ord a le w h) → Equal Bool (le x h) True =
+  λpx.
+    λph.
+      transitive
+        x
+        w
+        h
+        ((proof right for bool_and) (le w x) (le x w) px)
+        ((proof left for bool_and) (le w h) (le h w) ph)
+
+theorem derived_class_exclusive
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (h : a)
+      (cmp_false : Equal Bool (le x h) False)
+    : IsTrue (eq_from_ord a le w x) → IsTrue (eq_from_ord a le w h) → Bottom =
+  λpx.
+    λph.
+      trans
+        Bool
+        False
+        (le x h)
+        True
+        (sym Bool (le x h) False cmp_false)
+        (derived_class_order a le transitive w x h px ph)
+
+fn derived_always_true (a : Type) (x : a) (y : a) : Bool = True
+
+theorem derived_count_true_length
+      (a : Type) (q : a) (xs : List a)
+    : Equal Nat (count a (derived_always_true a) q xs) (length a xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      cong
+        Nat
+        Nat
+        (count a (derived_always_true a) q t)
+        (length a t)
+        Suc
+        (derived_count_true_length a q t)
   }
 
 theorem derived_keep_commutes
