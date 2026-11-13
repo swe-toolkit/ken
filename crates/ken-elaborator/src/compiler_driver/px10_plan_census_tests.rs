@@ -449,7 +449,12 @@ fn assert_region_exit_owners(
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
 /// recording one feasibility diagnostic with no returned-Vis protocol error,
 /// and builds an artifact beneath the separate Process admission gate. Its
-/// settlement 647 resumes through fold 12 and is returned by Vis 682.
+/// settlement 623 resumes through fold 12 and is returned by Vis 658.
+/// MEASURED (B1a D0-7, D0-1-to-D0-7-attribution.txt): region-0 acquire
+/// 710→686, body-entry Construct 682→658, outcome merge 641→617, and
+/// settlement Construct 647→623 preserve producer and order. The ReturnFold
+/// producer remains computational match 12; the ReturnedVisSettlement
+/// producer is the same region-0 body-entry Construct, not the fold.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -476,7 +481,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 647, 12), (ReturnedVisSettlement, 647, 682)],
+            &[(ReturnFold, 623, 12), (ReturnedVisSettlement, 623, 658)],
         );
         let _built = built.expect("smoke emits an artifact beneath the Process gate");
     });
