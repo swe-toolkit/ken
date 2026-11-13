@@ -1,7 +1,7 @@
 ---
 id: LANG-DELETE-LEGACY-RESOLUTION
 title: "The elaborator still has two resolution modes. ResolutionMode::Legacy is the default of every fresh ElabEnv, and its passthrough returns an untracked bare name unchanged to the flat global table, so the REPL, the proof-erasure checker and every standalone elaborate_file, elaborate_decl and elaborate_module_from_roots caller still resolve names Strict refuses. Delete Legacy and its passthrough so every entry resolves Strict, migrating the sources that relied on it"
-status: ready
+status: active
 owner: language
 size: L
 tier: T1

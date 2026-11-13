@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-NAT-ORIENTATION
 title: "Spec 67 defers orientation, so a client cannot ask whether three points turn left, turn right or are collinear, and convex hulls and segment tests have no checked primitive to build on. Over natural points the sign of the cross product is an exact comparison of two Nat sums and needs no signed carrier. Rule from a checked D0 at zero trust an orient operation on three Points with its swap, rotation and repeated-point laws, and state them with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
