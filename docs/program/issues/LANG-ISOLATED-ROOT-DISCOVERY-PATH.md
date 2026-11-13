@@ -1,7 +1,7 @@
 ---
 id: LANG-ISOLATED-ROOT-DISCOVERY-PATH
 title: "Isolated catalog-root discovery breaks two spec 33 §3.2 rules. It resolves `..` lexically, so a spelling through a symlink takes its root from a directory that is not an ancestor of the file the OS reads. And ken run and ken native-build skip the catalog-unit path rule that ken check applies first, so a catalog entry is reloaded as its own dependency and its import cycle is rooted at the wrong unit. Discover from the file actually read, and apply the catalog-unit rule first on every route"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

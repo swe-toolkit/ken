@@ -362,14 +362,16 @@ same cut as those hunks:
   committed observation is the three G-ERASURE rows: 9807 on owner2,
   context 0, without the repair, and `Ok` with zero owned self
   transports with it.
-- **F's parity.** F's three rows, under the gate/host subset plus B1a,
-  reproduce the interpreter's event records and terminal outcomes,
-  release Buffer1 last, and report fallback and carried-Vis counts
-  against the baseline (checked 2, default 0, carried-Vis 0). They run
-  without scratch markers. A selected carried Vis followed by an early
-  Buffer1 release is D2: it reopens `RT-NATIVE-FORWARDED-BOUNDARY-TRAP`'s
-  trap design, gated on B1a. The baseline is under
-  `/workspaces/ken/tmp/rt-forwarded-trap-ac0-97f-evidence/`.
+- **F's parity.** F's three rows (argv, live, null), under the
+  gate/host subset plus B1a, match a fresh interpreter reference: the
+  same terminal, the same ordered canonical events, 7 ProcessPlanPush
+  events, and Buffer1 released last. The candidate tree has no marker
+  emission site, so fallback and carried-Vis marker counts are not
+  measured and are not a criterion (Architect `evt_16d2p4ewqdptm`).
+  An early Buffer1 release is D2: it reopens
+  `RT-NATIVE-FORWARDED-BOUNDARY-TRAP`'s trap design, gated on B1a.
+  Committed native F parity under the real Process promotion is B2's.
+  B1a `a24682bc9` met this (Runtime QA `evt_6cq8g7gsqh13p`).
 - **C1.** Delete the no-caller ledger check (`units.rs:9344`-`9357`)
   and `record_relocated_exit` (`:9315`).
 - **C3.** Correct the `checked_ih_self_emitter_source` doc
