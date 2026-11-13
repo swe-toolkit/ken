@@ -9655,9 +9655,6 @@ impl<'a> Lowering<'a> {
         self.function_local
             .checked_ih_transport_emissions
             .push((transport.clone(), call));
-        if let Some(ledger) = self.continuation_candidates.as_mut() {
-            ledger.record_relocated_answer(transport.source_call_identity());
-        }
         if !self.continuation_candidate_is_consumed(&identity) {
             self.settle_continuation_candidate(
                 &identity,
@@ -10173,9 +10170,6 @@ impl<'a> Lowering<'a> {
         self.function_local
             .checked_ih_transport_emissions
             .push((transport.clone(), call));
-        if let Some(ledger) = self.continuation_candidates.as_mut() {
-            ledger.record_relocated_answer(transport.source_call_identity());
-        }
         if !self.continuation_candidate_is_consumed(&identity) {
             self.settle_continuation_candidate(
                 &identity,
@@ -10476,9 +10470,6 @@ impl<'a> Lowering<'a> {
         self.function_local
             .checked_ih_transport_emissions
             .push((transport.clone(), call));
-        if let Some(ledger) = self.continuation_candidates.as_mut() {
-            ledger.record_relocated_answer(transport.source_call_identity());
-        }
         if !self.continuation_candidate_is_consumed(&identity) {
             self.settle_continuation_candidate(
                 &identity,
