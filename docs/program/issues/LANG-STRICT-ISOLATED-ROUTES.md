@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-ISOLATED-ROUTES
 title: "After the catalog route is strict, ken check on an isolated .ken or .ken.md file, ken run and ken native-build still elaborate in Legacy, and 50 of the 62 isolated files that check today refuse under Strict: isolated files have no import loader, and the program vocabulary (host_program, host_exit, bind, FSOp, the State family and others) has no import home. Add strict file entries and an isolated-file import loader, home the program vocabulary under the 2026-09-25 rule, migrate the refusing files, and move the isolated routes to Strict"
-status: active
+status: closed
 owner: language
 size: L
 tier: T1
@@ -172,7 +172,7 @@ Increment 3:
   `source-declared`. They land as a conformance-only child, Inc 3e, on
   main after Inc 3b (Steward `evt_87gch6btv5sw`): the spec-author authors
   it, the Spec Leader reviews it, and the CV votes `/conformance`.
-  Increment 3 closes when Inc 3e lands.
+  Inc 3e merged (`5a3cc337b`); Increment 3 and this node are closed.
 
 Increment 2:
 
