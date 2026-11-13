@@ -1,7 +1,7 @@
 ---
 id: CONF-GEOMETRY-BOX-SEED-ISTRUE-IMPORT
 title: "The box monotonicity seed's accepted client states IsTrue but imports only Algorithm.Geometry.NatBox, so ken check refuses it with UnboundName under Strict. It was accepted only through the Legacy passthrough, and no Rust test loads the seed, so CI never saw the refusal. Import IsTrue from Core.Classes.LawfulClasses and re-check the client and its refusals"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T2
