@@ -213,3 +213,9 @@ fn d0_i_two_decl_calls_import_then_use() {
         "{message}"
     );
 }
+
+/// Measurement-only census commit: red by construction, never landed.
+#[test]
+fn census_commit_never_lands() {
+    panic!("LEGACY_CENSUS_SENTINEL measurement-only commit; close, never land");
+}

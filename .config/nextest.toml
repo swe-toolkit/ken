@@ -1,3 +1,7 @@
+[profile.default]
+fail-fast = false
+slow-timeout = { period = "120s", terminate-after = 20 }
+
 # Test scheduling hints for cargo-nextest (priority needs nextest >= 0.9.91).
 #
 # Priority changes only the order in which selected tests start, never which
