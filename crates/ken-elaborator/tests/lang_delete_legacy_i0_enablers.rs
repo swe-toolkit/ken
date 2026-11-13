@@ -149,27 +149,13 @@ fn raw_checked_root_identity_cannot_be_replaced_by_an_import() {
     assert_eq!(raw_first.env.next_global_id(), next_id);
     assert_eq!(raw_first.globals["raw_piece"], raw_id);
 
-    // This is the discriminating R-RAW arm: Strict has NO flat-global
-    // fallback. Only the new checked root binding can admit this use.
-    let mut strict = ElabEnv::new().unwrap();
-    strict
-        .prepare_isolated_source_strict_v1(&[], "const strict_raw : Int = raw_piece", false)
-        .unwrap();
-    let int_id = strict.globals["Int"];
-    let strict_id = strict
-        .declare_postulate_raw("raw_piece", Term::const_(int_id, vec![]))
-        .unwrap();
-    let strict_client = strict
-        .elaborate_decl_v1("const strict_raw : Int = raw_piece")
-        .unwrap();
-    assert_eq!(checked_head(&strict, strict_client.def_id), strict_id);
-
     let mut imported_first = ElabEnv::new().unwrap();
     imported_first.set_catalog_roots_v1(&roots).unwrap();
     imported_first
         .elaborate_decl_results_v1("import Provider (raw_piece)")
         .unwrap();
     let provider_id = imported_first.globals["Provider.raw_piece"];
+    let int_id = imported_first.globals["Int"];
     let next_id = imported_first.env.next_global_id();
     match imported_first.declare_postulate_raw("raw_piece", Term::const_(int_id, vec![])) {
         Err(ElabError::AmbiguousReference { name, .. }) => assert_eq!(name, "raw_piece"),
@@ -180,6 +166,27 @@ fn raw_checked_root_identity_cannot_be_replaced_by_an_import() {
         .elaborate_decl_v1("const still_provider : Int = raw_piece")
         .unwrap();
     assert_eq!(checked_head(&imported_first, selected.def_id), provider_id);
+}
+
+/// MEASURED: the raw postulate's returned ID resolves through a Strict source
+/// entry that has no flat-global fallback. CLAIMED: R-RAW binds a checked ID
+/// in the continuing root scope, not merely in the mutable globals table.
+/// THE GAP: a scratch run with bind_raw_root disabled must refuse with
+/// UnboundName raw_piece at this use, not pass via the mutable flat table.
+#[test]
+fn raw_postulate_checked_id_is_available_without_strict_fallback() {
+    let mut strict = ElabEnv::new().unwrap();
+    strict
+        .prepare_isolated_source_strict_v1(&[], "const strict_raw : Int = raw_piece", false)
+        .unwrap();
+    let int_id = strict.globals["Int"];
+    let raw_id = strict
+        .declare_postulate_raw("raw_piece", Term::const_(int_id, vec![]))
+        .unwrap();
+    let client = strict
+        .elaborate_decl_v1("const strict_raw : Int = raw_piece")
+        .unwrap();
+    assert_eq!(checked_head(&strict, client.def_id), raw_id);
 }
 
 /// MEASURED: N2 and changed-root requests fail without replacing the root.
