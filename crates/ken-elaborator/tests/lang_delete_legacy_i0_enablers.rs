@@ -182,11 +182,11 @@ fn raw_checked_root_identity_cannot_be_replaced_by_an_import() {
     assert_eq!(checked_head(&imported_first, selected.def_id), provider_id);
 }
 
-/// MEASURED: N2, changed-root and opposite-mode requests fail without
-/// replacing a checked provider. CLAIMED: the setter shares the roots cache
-/// and its mode lock with the other entries, not a second mutable root plane.
+/// MEASURED: N2 and changed-root requests fail without replacing the root.
+/// CLAIMED: the setter shares the roots cache with the other entries, not a
+/// second mutable root plane. Existing Legacy mode-lock tests stay for I4.
 #[test]
-fn ordinary_roots_setting_is_single_and_mode_locked() {
+fn ordinary_roots_setting_is_single_and_root_locked() {
     let mut env = ElabEnv::new().unwrap();
     let roots = [catalog_root()];
     assert!(matches!(
@@ -205,8 +205,6 @@ fn ordinary_roots_setting_is_single_and_mode_locked() {
     ));
     env.elaborate_file_v1("import Capability.Process.Exit (host_pure)\n")
         .unwrap();
-    match env.elaborate_isolated_file_strict_v1(&roots, "const after : Nat = Zero\n") {
-        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
-        other => panic!("Legacy roots must not switch to Strict: {other:?}"),
-    }
+    env.set_catalog_roots_v1(&roots)
+        .expect("a later equal-root request keeps the checked closure");
 }
