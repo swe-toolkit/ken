@@ -20,8 +20,49 @@
 //! unit-local collision admission) → rewrite (qualify free `RCon`/pattern-ctor
 //! references via the active import scope) → `elaborate_rdecl_v1` (unchanged).
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+// AC-0 measurement only. A scoped tag survives nested public entries and
+// unwinding; a negative test cannot turn a census panic into an ordinary Err.
+thread_local! {
+    static CENSUS_ENTRIES: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
+}
+
+pub(crate) struct CensusEntry;
+impl Drop for CensusEntry {
+    fn drop(&mut self) {
+        CENSUS_ENTRIES.with(|entries| { entries.borrow_mut().pop(); });
+    }
+}
+pub(crate) fn census_entry(name: &'static str) -> CensusEntry {
+    CENSUS_ENTRIES.with(|entries| entries.borrow_mut().push(name));
+    CensusEntry
+}
+fn census_direct_entry() -> Option<CensusEntry> {
+    CENSUS_ENTRIES.with(|entries| entries.borrow().is_empty())
+        .then(|| census_entry("expand_and_elaborate"))
+}
+fn census_panic(scope: &Scope, site: &str, name: &str) {
+    if !scope.census_was_legacy { return; }
+    let raw = scope.census_raw_names.contains(name);
+    let entry = CENSUS_ENTRIES.with(|entries| entries.borrow().last().copied());
+    let entry = entry.unwrap_or("other");
+    if entry == "other" {
+        eprintln!("LEGACY_CENSUS other_first_frame={:?}", std::backtrace::Backtrace::force_capture().to_string().lines().nth(1));
+    }
+    panic!("LEGACY_CENSUS site={site} entry={entry} name={name} raw={raw} root={}",
+        scope.census_root.as_deref().unwrap_or("<in-memory>"));
+}
+fn census_panic_error(scope: &Scope, site: &str, error: &ElabError) {
+    let name = match error {
+        ElabError::UnboundName { name, .. } => name.as_str(),
+        ElabError::AmbiguousReference { name, .. } => name.as_str(),
+        _ => "<other-refusal>",
+    };
+    census_panic(scope, site, name);
+}
 
 use crate::ast::{
     BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, Fixity, ImportItem, ImportKind,
@@ -143,6 +184,9 @@ pub struct ModuleState {
     /// One roots-loader run cannot mix legacy and strict units: the loaded-unit
     /// cache records elaborated results rather than unresolved source.
     roots_resolution_mode: Option<ResolutionMode>,
+    /// AC-0 scratch: names installed through raw postulates (not source).
+    census_raw_names: HashSet<String>,
+    census_in_prelude_phase: bool,
     /// Home module -> checked pre-source package identities bound in that
     /// module's scope, never in unrelated clients or the strict ambient set.
     package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>>,
@@ -207,6 +251,31 @@ impl ModuleState {
 
     pub(crate) fn finish_prelude_source_registration(&mut self) {
         self.legacy_in_memory_source_started = false;
+        self.census_in_prelude_phase = false;
+    }
+
+    pub(crate) fn census_begin_prelude_phase(&mut self) {
+        self.census_in_prelude_phase = true;
+    }
+    pub(crate) fn census_prelude_phase(&self) -> bool {
+        self.census_in_prelude_phase
+    }
+    pub(crate) fn census_refresh_prelude_scope(
+        &mut self, globals: &HashMap<String, ken_kernel::GlobalId>,
+    ) {
+        self.root_scope = Scope::with_mode(ResolutionMode::Strict, globals.keys().cloned().collect());
+    }
+
+    pub(crate) fn install_census_root_scope(&mut self) {
+        let mut scope = Scope::with_mode(ResolutionMode::Strict, self.strict_builtin_names.clone());
+        scope.private_ids.clone_from(&self.private_ids);
+        scope.census_was_legacy = true;
+        self.root_scope = scope;
+    }
+
+    pub(crate) fn census_record_raw_name(&mut self, name: &str) {
+        self.census_raw_names.insert(name.to_string());
+        self.root_scope.census_raw_names.insert(name.to_string());
     }
 
     pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
@@ -909,6 +978,11 @@ enum ResolutionMode {
 #[derive(Default, Clone)]
 struct Scope {
     mode: ResolutionMode,
+    /// Scratch-only: Strict scope representing a formerly Legacy entry.
+    census_was_legacy: bool,
+    /// Scratch-only: located file unit, or None for an in-memory source.
+    census_root: Option<String>,
+    census_raw_names: HashSet<String>,
     /// Compiler-installed vocabulary captured before package source can speak.
     /// This excludes later ambient postulates while preserving primitive names.
     kernel_names: HashSet<String>,
@@ -1143,6 +1217,7 @@ fn resolve_ref(
                 }
             }
             if scope.mode == ResolutionMode::Strict && scope.bindings.contains_key(subject) {
+                census_panic(scope, "S-SELECTOR", name);
                 return Err(ElabError::UnboundName {
                     name: name.to_string(),
                     span: span.clone(),
@@ -1215,6 +1290,7 @@ fn resolve_ref(
                 && !scope.kernel_names.contains(name)
                 && !is_unshadowable_kernel_name(name) =>
             {
+                census_panic(scope, "S-BARE", name);
                 Err(ElabError::UnboundName {
                     name: name.to_string(),
                     span: span.clone(),
@@ -1386,6 +1462,9 @@ fn resolve_attached_ref(
         && !subject.contains('.')
     {
         return Ok((format!("{canonical_subject}::{proof_name}"), None));
+    }
+    if !scope.bindings.contains_key(subject) && !subject.contains('.') {
+        census_panic(scope, "S-AMBIENT-PROOF", &format!("{canonical_subject}::{proof_name}"));
     }
     Err(ElabError::UnboundName {
         name: format!("{canonical_subject}::{proof_name}"),
@@ -2390,6 +2469,7 @@ fn load_unit(
     module: &str,
     span: &Span,
     mode: ResolutionMode,
+    census_flag: bool,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     if let Some(start) = elab
         .module_state
@@ -2468,7 +2548,7 @@ fn load_unit(
             // declared later: the ordered pass will reject its premature use
             // at the import. An unrelated global export is not a file load.
             if declared_inline_import(&owner, Some(module), &dependency, &local_modules).is_none() {
-                let (_, results) = load_unit(elab, &dependency, &import_span, mode)?;
+                let (_, results) = load_unit(elab, &dependency, &import_span, mode, census_flag)?;
                 loaded_dependencies.push(dependency.clone());
                 dependency_results.extend(results);
             }
@@ -2486,6 +2566,9 @@ fn load_unit(
         elab.class_env.next_module();
 
         let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
+        scope.census_was_legacy = census_flag;
+        scope.census_root = Some(path.display().to_string());
+        scope.census_raw_names.clone_from(&elab.module_state.census_raw_names);
         scope.private_ids.clone_from(&elab.module_state.private_ids);
         // Only the approved file unit owns these pre-source IDs. An ordinary
         // export publishes them through its provider table; other units must
@@ -2656,7 +2739,7 @@ pub fn elaborate_module_from_roots(
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
     // Direct entry-unit IDs, exactly as on main and as the strict entry returns.
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, true)
         .map(|(ids, _)| ids)
 }
 
@@ -2668,7 +2751,7 @@ pub fn elaborate_module_from_roots_v1(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, true)
         .map(|(_, results)| results)
 }
 
@@ -2678,7 +2761,7 @@ pub fn elaborate_module_from_roots_strict_v1(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, false)
         .map(|(_, results)| results)
 }
 
@@ -2688,7 +2771,7 @@ pub fn elaborate_module_from_roots_strict(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, false)
         .map(|(ids, _)| ids)
 }
 
@@ -2697,12 +2780,17 @@ fn elaborate_module_from_roots_with_mode_v1(
     roots: &[PathBuf],
     entry: &str,
     mode: ResolutionMode,
+    census_flag: bool,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     // The public globals map may change after the pre-source capture. Recheck
     // before loading or reusing any strict unit; do not heal a forged map.
     if mode == ResolutionMode::Strict {
-        require_fixed_proved_identity(&elab.env, &elab.globals)?;
-        require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
+        let fixed = require_fixed_proved_identity(&elab.env, &elab.globals)
+            .and_then(|_| require_pre_source_floor_identities(&elab.module_state, &elab.globals));
+        if let Err(ref error) = fixed {
+            if census_flag { census_panic_error(&elab.module_state.root_scope, "S-FIXED", error); }
+        }
+        fixed?;
     }
     if roots.len() != 1 {
         return Err(ElabError::ParseError {
@@ -2726,7 +2814,7 @@ fn elaborate_module_from_roots_with_mode_v1(
             "roots resolution mode cannot change during one elaboration run".to_string(),
         ));
     }
-    load_unit(elab, entry, &Span::zero(), mode)
+    load_unit(elab, entry, &Span::zero(), mode, census_flag)
 }
 
 /// Prepare one in-memory root and its explicit catalog imports for Strict.
@@ -2790,10 +2878,12 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
     }
     for (dependency, owner, span) in imports {
         if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
-            load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
+            load_unit(elab, &dependency, &span, ResolutionMode::Strict, false)?;
         }
     }
-    if elab.module_state.root_scope.mode != ResolutionMode::Strict {
+    if elab.module_state.root_scope.mode != ResolutionMode::Strict
+        || elab.module_state.root_scope.census_was_legacy
+    {
         let mut scope = Scope::with_mode(
             ResolutionMode::Strict,
             elab.module_state.strict_builtin_names.clone(),
@@ -4775,12 +4865,16 @@ fn resolve_raw_scoped_decl(
     } else {
         None
     };
-    resolve::resolve_decl_in_unit(
+    let resolved = resolve::resolve_decl_in_unit(
         decl,
         unit_definitions,
         attached_name.as_deref(),
         (scope.mode == ResolutionMode::Strict).then(|| std::rc::Rc::new(binder_names.clone())),
-    )
+    );
+    if let Err(ElabError::BuiltinNameBinding { name, .. }) = &resolved {
+        census_panic(scope, "S-BINDER", name);
+    }
+    resolved
 }
 
 fn reject_prelude_binding(
@@ -5035,6 +5129,7 @@ fn reject_decl_prelude_bindings(
     prefix: &str,
     prelude_binding_names: &HashSet<String>,
     mode: ResolutionMode,
+    scope: &Scope,
 ) -> Result<(), ElabError> {
     let reject = |bare: &str, span: &Span| {
         reject_prelude_binding(bare, &qualify(prefix, bare), span, prelude_binding_names)
@@ -5045,7 +5140,11 @@ fn reject_decl_prelude_bindings(
             reject(law, span)?;
             if mode == ResolutionMode::Strict {
                 for (field, _) in fields {
-                    reject(&format!("{law}_{field}"), span)?;
+                    let name = format!("{law}_{field}");
+                    if let Err(error) = reject(&name, span) {
+                        census_panic(scope, "S-LAWFIELD", &name);
+                        return Err(error);
+                    }
                 }
             }
             Ok(())
@@ -5132,7 +5231,7 @@ fn prebind_scope_declarations(
     // or elaborating any declaration so refusal cannot allocate or replace a
     // canonical global.
     for decl in decls {
-        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names, scope.mode)?;
+        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names, scope.mode, scope)?;
     }
 
     // Collect locals before imports so collisions are source-order independent.
@@ -5677,6 +5776,9 @@ fn expand_scope(
                 elab.module_state
                     .require_module_path_available(&child_prefix, unit_owner, span)?;
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
+                child_scope.census_was_legacy = scope.census_was_legacy;
+                child_scope.census_root.clone_from(&scope.census_root);
+                child_scope.census_raw_names.clone_from(&scope.census_raw_names);
                 child_scope.private_ids.clone_from(&scope.private_ids);
                 let (child_ids, child_exports) = expand_scope(
                     elab,
@@ -5841,7 +5943,12 @@ fn expand_scope(
                     span,
                     (scope.mode == ResolutionMode::Strict)
                         .then(|| std::rc::Rc::new(elab.module_state.prelude_binding_names.clone())),
-                )?;
+                ).or_else(|error| {
+                    if let ElabError::BuiltinNameBinding { name, .. } = &error {
+                        census_panic(scope, "S-SPACE", name);
+                    }
+                    Err(error)
+                })?;
                 let mut declared = vec![DeclaredIdentity {
                     key: resolved.name.clone(),
                     provenance: IdentityProvenance::Source,
@@ -6563,6 +6670,7 @@ pub fn expand_and_elaborate(
     elab: &mut ElabEnv,
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    let _direct_entry = census_direct_entry();
     let boundary = admission_boundary(decls)?;
     // A failed file can leave an earlier declaration admitted without ever
     // committing its in-memory unit counter. An empty file can commit a unit
@@ -10631,5 +10739,52 @@ mod cat_numeric_interval_public_export_tests {
             actual, expected,
             "the entire public interval surface needs review"
         );
+    }
+
+    /// Scratch-only base observation; its independent digest is pinned in R-NEW.
+    #[test]
+    fn legacy_d0_new_identity_matches_base() {
+        let env = ElabEnv::new().expect("census pre-source environment");
+        let trusted: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+        let names = &env.prelude_env.pre_source_names;
+        println!("D0_BASE_TRUSTED={trusted:?}");
+        println!("D0_BASE_NAMES={names:?}");
+        let mut reversed = std::collections::BTreeMap::<_, Vec<_>>::new();
+        for (name, id) in &env.globals {
+            reversed.entry(*id).or_default().push(name.clone());
+        }
+        for aliases in reversed.values_mut() {
+            aliases.sort();
+        }
+        let by_name_kind: std::collections::BTreeSet<_> = trusted
+            .iter()
+            .map(|id| {
+                let decl = env.env.lookup(*id).expect("trusted declaration");
+                let kind = match decl {
+                    ken_kernel::Decl::Opaque { .. } => "opaque",
+                    ken_kernel::Decl::Transparent { .. } => "transparent",
+                    ken_kernel::Decl::Primitive { .. } => "primitive",
+                    ken_kernel::Decl::Inductive(_) => "inductive",
+                };
+                let name = match decl {
+                    ken_kernel::Decl::Opaque { name, .. } => name.clone(),
+                    _ => reversed.get(id).and_then(|names| names.first()).cloned()
+                        .unwrap_or_else(|| format!("<no-source-spelling:{id:?}>")),
+                };
+                (name, kind)
+            })
+            .collect();
+        assert_eq!(by_name_kind.len(), trusted.len(), "trusted name/kind map must be injective");
+        println!("D0_BASE_KIND={by_name_kind:?}");
+        println!("D0_BASE_HOST_PURE={:?}", env.globals.get("host_pure"));
+        assert_eq!(trusted, env.prelude_env.native_trusted_base);
+        let baseline = include_str!("../tests/fixtures/lang_delete_legacy_d0_base.txt");
+        let mut rows = baseline.lines();
+        let raw_trusted = rows.next().unwrap() == format!("TRUSTED={trusted:?}");
+        let raw_names = rows.next().unwrap() == format!("NAMES={names:?}");
+        let named_kind = rows.next().unwrap() == format!("KIND={by_name_kind:?}");
+        assert!(rows.next().is_none(), "base identity snapshot has three typed rows");
+        println!("D0_NEW_COMPARE raw_trusted={raw_trusted} raw_names={raw_names} name_kind={named_kind}");
+        assert!(named_kind && raw_trusted && raw_names, "R-NEW differs from exact base; both raw and named-kind observations are reported");
     }
 }
