@@ -205,6 +205,7 @@ pub fn run_elaborated_program_effect_observation<H: ken_interp::HostHandler>(
     run_elaborated_inner(
         elab_env,
         results,
+        ken_elaborator::program_admission::MainSelection::Isolated,
         arguments,
         environment,
         cwd,
@@ -216,6 +217,56 @@ pub fn run_elaborated_program_effect_observation<H: ken_interp::HostHandler>(
         |_, _| Ok(()),
     )
     .map(|(_, observation)| observation.expect("observation requested"))
+}
+
+/// Load a catalog entry once and run the checked main owned by that entry.
+/// Dependency main declarations cannot become the selected entrypoint.
+pub fn run_loaded_catalog_unit_with_resolution_report<H, F, R>(
+    unit: &ken_elaborator::modules::CatalogModulePath,
+    arguments: &[Vec<u8>],
+    environment: &[(Vec<u8>, Vec<u8>)],
+    cwd: &[u8],
+    host: &mut H,
+    report_obligations: F,
+    report_resolution: R,
+) -> Result<ProgramOutcome, RunError>
+where
+    H: ken_interp::HostHandler,
+    F: FnMut(&[String]),
+    R: FnMut(&ken_elaborator::ElabEnv, &[ken_elaborator::ElabResult]) -> Result<(), RunError>,
+{
+    let effective_uid = ken_runtime::observe_effective_uid_v1()
+        .map_err(|_| RunError::RootExecutionObservationUnavailable)?;
+    let mut env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
+    env.elaborate_module_from_roots_strict_v1(&[unit.root.clone()], &unit.entry)
+        .map_err(|error| match error {
+            ken_elaborator::ElabError::DuplicateDefinition { ref name, .. }
+                if name == &format!("{}.main", unit.entry) =>
+            {
+                RunError::DuplicateEntrypoint
+            }
+            other => RunError::Elaboration(other),
+        })?;
+    let results = env
+        .module_state
+        .root_results_for_report(&unit.entry)
+        .ok_or(RunError::MissingEntrypoint)?
+        .to_vec();
+    run_elaborated_inner(
+        env,
+        results,
+        ken_elaborator::program_admission::MainSelection::LoadedUnit(&unit.entry),
+        arguments,
+        environment,
+        cwd,
+        host,
+        false,
+        effective_uid,
+        report_obligations,
+        |line| eprintln!("{line}"),
+        report_resolution,
+    )
+    .map(|(outcome, _)| outcome)
 }
 
 fn run_program_inner<H, F, G, R>(
@@ -261,6 +312,7 @@ where
     run_elaborated_inner(
         elab_env,
         results,
+        ken_elaborator::program_admission::MainSelection::Isolated,
         arguments,
         environment,
         cwd,
@@ -276,6 +328,7 @@ where
 fn run_elaborated_inner<H, F, G, R>(
     elab_env: ken_elaborator::ElabEnv,
     results: Vec<ken_elaborator::ElabResult>,
+    selection: ken_elaborator::program_admission::MainSelection<'_>,
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
@@ -295,7 +348,7 @@ where
     let reports = ken_elaborator::render_open_obligations(&results);
     report_obligations(&reports);
 
-    let admitted = ken_elaborator::program_admission::admit_checked_main(&elab_env)
+    let admitted = ken_elaborator::program_admission::admit_selected_main(&elab_env, selection)
         .map_err(map_program_admission_error)?;
     if ken_runtime::admit_root_execution(effective_uid, admitted.allow_root_execution).is_err() {
         let terminal_error = ken_runtime::TerminalErrorV1::RootExecutionDenied;

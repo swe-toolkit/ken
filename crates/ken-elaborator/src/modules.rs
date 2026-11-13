@@ -2182,34 +2182,47 @@ pub struct CatalogModulePath {
     pub entry: String,
 }
 
+/// Discovery result for the file actually read, not its CLI spelling.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SourcePathKind {
+    CatalogUnit(CatalogModulePath),
+    Isolated(Option<PathBuf>),
+}
+
+/// One canonical source path shared by reading, catalog mapping, and root
+/// discovery. A failed canonicalization is a source-read error at each CLI
+/// route, never a reason to fall back to lexical discovery.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiscoveredSourcePath {
+    pub canonical: PathBuf,
+    pub kind: SourcePathKind,
+}
+
+pub fn discover_source_path(path: &Path) -> std::io::Result<DiscoveredSourcePath> {
+    let canonical = std::fs::canonicalize(path)?;
+    let kind = match catalog_module_from_path(&canonical) {
+        Some(unit) => SourcePathKind::CatalogUnit(unit),
+        None => SourcePathKind::Isolated(isolated_catalog_root(&canonical)),
+    };
+    Ok(DiscoveredSourcePath { canonical, kind })
+}
+
+/// The nearest catalog root from an already-canonical isolated source path.
+/// Callers must enter through `discover_source_path` to fail closed.
+fn isolated_catalog_root(canonical: &Path) -> Option<PathBuf> {
+    canonical
+        .parent()?
+        .ancestors()
+        .map(|dir| dir.join("catalog").join("packages"))
+        .find(|root| root.is_dir())
+}
+
 /// Invert the catalog-root path mapping used by [`source_path`].
 ///
 /// The nearest `catalog/packages` ancestor is the root. Paths outside such a
 /// root, paths without a source extension, and paths containing an invalid
 /// module component are not catalog module paths and return `None` so callers
 /// can retain their isolated-file behavior.
-/// Find the nearest in-repo catalog root from an isolated source path alone.
-/// Catalog source paths retain their separate `catalog_module_from_path` entry.
-pub fn isolated_catalog_root(path: &Path) -> Option<PathBuf> {
-    // Ancestors are those of the absolute path: a relative path continues
-    // above the working directory, and `..` removes a component lexically
-    // rather than naming a child directory as an ancestor.
-    let mut parent = PathBuf::new();
-    for component in std::path::absolute(path).ok()?.parent()?.components() {
-        match component {
-            std::path::Component::ParentDir => {
-                parent.pop();
-            }
-            std::path::Component::CurDir => {}
-            other => parent.push(other),
-        }
-    }
-    parent
-        .ancestors()
-        .map(|dir| dir.join("catalog").join("packages"))
-        .find(|root| root.is_dir())
-}
-
 pub fn catalog_module_from_path(path: &Path) -> Option<CatalogModulePath> {
     let parent = path.parent()?;
     let root = parent.ancestors().find(|ancestor| {

@@ -458,7 +458,7 @@ fn rewritten_nested_read_fixture_checks_at_strict_entry_with_persisted_imports()
 /// exercised by their own Rust-held consumer tests, not by this file census.
 #[test]
 fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
-    use ken_elaborator::modules::isolated_catalog_root;
+    use ken_elaborator::modules::{discover_source_path, SourcePathKind};
 
     const USERS: [&str; 40] = [
         "crates/ken-cli/tests/fixtures/abi_s5_block_on_stdin.ken",
@@ -516,7 +516,13 @@ fn rewritten_hostio_fixtures_recheck_from_the_same_disk_sources_under_strict() {
     for path in USERS {
         let source_path = repo.join(path);
         let source = std::fs::read_to_string(&source_path).expect("actual R user source");
-        let roots: Vec<_> = isolated_catalog_root(&source_path).into_iter().collect();
+        let roots: Vec<_> = match discover_source_path(&source_path)
+            .expect("existing fixture path")
+            .kind
+        {
+            SourcePathKind::Isolated(root) => root.into_iter().collect(),
+            SourcePathKind::CatalogUnit(unit) => panic!("fixture is a catalog unit: {unit:?}"),
+        };
         let mut env = ElabEnv::new().expect("prelude");
         let result = env.elaborate_isolated_file_strict_v1(&roots, &source);
         if let Some((_, marker)) = templates.iter().find(|(suffix, _)| path.ends_with(suffix)) {

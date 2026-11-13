@@ -2435,6 +2435,14 @@ pub struct ElaboratedNativeProgramV1 {
     declarations: Vec<ElabResult>,
     examples: Vec<ElabResult>,
     example_ids: BTreeSet<GlobalId>,
+    selection: NativeMainSelection,
+}
+
+/// The carrier owns the entry spelling; admission borrows it only while
+/// preparing the checked environment.
+enum NativeMainSelection {
+    Isolated,
+    LoadedUnit(String),
 }
 
 impl ElaboratedNativeProgramV1 {
@@ -2452,7 +2460,32 @@ impl ElaboratedNativeProgramV1 {
             declarations,
             examples: Vec::new(),
             example_ids: BTreeSet::new(),
+            selection: NativeMainSelection::Isolated,
         }
+    }
+
+    /// Retain the already-loaded entry's own results, excluding dependencies
+    /// and document fences; source text is not elaborated a second time.
+    pub fn from_loaded_unit(
+        env: ElabEnv,
+        source: CompilerSource,
+        entry: &str,
+    ) -> Result<Self, NativeProgramBuildError> {
+        let declarations = env
+            .module_state
+            .root_results_for_report(entry)
+            .ok_or(NativeProgramBuildError::Admission(
+                ProgramAdmissionError::MissingMain,
+            ))?
+            .to_vec();
+        Ok(Self {
+            env,
+            sources: vec![source],
+            declarations,
+            examples: Vec::new(),
+            example_ids: BTreeSet::new(),
+            selection: NativeMainSelection::LoadedUnit(entry.to_string()),
+        })
     }
 }
 
@@ -2492,6 +2525,7 @@ fn elaborate_native_program_sources(
         declarations,
         examples,
         example_ids,
+        selection: NativeMainSelection::Isolated,
     })
 }
 
@@ -2520,6 +2554,16 @@ pub fn prepare_native_program_from_elaborated_v1(
     prepare_native_program_from_elaborated(package_name, elaborated, false)
 }
 
+/// Continue native preparation from one already-loaded catalog entry, with
+/// the ordinary optional resolution report at the existing write point.
+pub fn prepare_native_program_from_loaded_unit_v1(
+    package_name: &str,
+    elaborated: ElaboratedNativeProgramV1,
+    report: bool,
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
+    prepare_native_program_from_elaborated(package_name, elaborated, report)
+}
+
 fn prepare_native_program_from_elaborated(
     package_name: &str,
     elaborated: ElaboratedNativeProgramV1,
@@ -2531,6 +2575,7 @@ fn prepare_native_program_from_elaborated(
         declarations,
         examples,
         example_ids,
+        selection,
     } = elaborated;
     let manifest = CompilerManifest::new(package_name, Vec::new());
     require_native_package_name(package_name)?;
@@ -2548,11 +2593,20 @@ fn prepare_native_program_from_elaborated(
     results.extend(examples);
     let obligations = owned_v2_obligations(&results);
     let open_obligation_reports = crate::render_open_obligations(&results);
-    let checked = admit_checked_main(&env).map_err(NativeProgramBuildError::Admission)?;
+    let selected = match &selection {
+        NativeMainSelection::Isolated => crate::program_admission::MainSelection::Isolated,
+        NativeMainSelection::LoadedUnit(entry) => {
+            crate::program_admission::MainSelection::LoadedUnit(entry)
+        }
+    };
+    let checked = crate::program_admission::admit_selected_main(&env, selected)
+        .map_err(NativeProgramBuildError::Admission)?;
     let resolution_report = if report {
-        Some(crate::resolution_report::resolution_report(&env, &root_results, "native-build", None)
-            .map_err(CompilerDriverError::Elaboration)
-            .map_err(NativeProgramBuildError::Driver)?)
+        Some(
+            crate::resolution_report::resolution_report(&env, &root_results, "native-build", None)
+                .map_err(CompilerDriverError::Elaboration)
+                .map_err(NativeProgramBuildError::Driver)?,
+        )
     } else {
         None
     };

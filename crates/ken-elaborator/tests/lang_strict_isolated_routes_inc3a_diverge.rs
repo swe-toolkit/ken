@@ -149,9 +149,15 @@ fn merge_sort_still_refuses_on_its_unhomed_eq_after_ordering_import() {
     let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/rosetta/merge-sort/merge-sort.ken");
     let source = std::fs::read_to_string(&source_path).expect("example source");
-    let roots: Vec<_> = ken_elaborator::modules::isolated_catalog_root(&source_path)
-        .into_iter()
-        .collect();
+    let roots: Vec<_> = match ken_elaborator::modules::discover_source_path(&source_path)
+        .expect("existing example source")
+        .kind
+    {
+        ken_elaborator::modules::SourcePathKind::Isolated(root) => root.into_iter().collect(),
+        ken_elaborator::modules::SourcePathKind::CatalogUnit(unit) => {
+            panic!("example unexpectedly became a catalog unit: {unit:?}")
+        }
+    };
     let mut env = ElabEnv::new().expect("prelude");
     match env.elaborate_isolated_file_strict_v1(&roots, &source) {
         Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "eq"),
