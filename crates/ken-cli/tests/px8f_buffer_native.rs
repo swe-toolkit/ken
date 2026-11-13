@@ -711,12 +711,15 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
 /// SuppressUnitlessDrive child has zero applications because its sole P1 row
 /// descended from retired main slot 7; the independent unmutated native/
 /// interpreter parity row still writes three short-progress events. The
-/// bracket-local drive is independently mutated and refuses an unmatched InPlace settlement.
+/// bracket-local drive applies 18 times on B1a versus 1 on M-B1A and
+/// refuses an unmatched InPlace settlement.
 /// CLAIMED: B1a's direct-style performed write no longer needs a unitless P1
-/// drive, but a live handler-local K still cannot cross the boundary.
-/// THE GAP: the unitless-drive guard has no known B1a population; Steward
-/// decides deletion versus a witness. Scratch M-B1A restores one application
-/// and its original no-write Result trap.
+/// drive; suppressing a live bracket-local K leaves settlement unmatched.
+/// THE GAP: the unitless-drive guard has no known B1a population; the
+/// closure-boundary refusal is not reached by this bracket-local mutation
+/// under B1a. Steward decides deletion versus a witness for the dead guard.
+/// Scratch M-B1A restores one unitless application and its original no-write
+/// Result trap.
 #[test]
 fn handler_owned_deferred_response_controls_are_load_bearing() {
     for mode in ["suppress-unitless-drive", "suppress-bracket-in-place-continuation"] {
@@ -1063,12 +1066,19 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
 /// FsWriteAt P1 Vis 1257 descends from retired WRITE_ALL slot 7. The exact
 /// candidate projection has zero FsWriteAt owners and no Deferred rows;
 /// ordinary FsReadAt/BufferAllocate owners compile beside three distinct
-/// authenticated bracket settlements.
-/// Suppression restores the ordinary read to P2 without moving any S. Inserting
-/// each marked row, one at a time, into ordinary ownership is independently
-/// refused by plan close. CLAIMED: bracket authority never borrows ordinary
-/// ownership. THE GAP: plan-close exclusion does not establish the held parent
-/// carry WP's successful `ReadSome` runtime body.
+/// authenticated bracket settlements. On the candidate, suppressing
+/// execute-then-resume leaves FsReadAt Specialized alongside BufferAllocate
+/// and FsOpen, with zero UnconsumedTransportCaller P2 rows and the same three
+/// bracket S rows. On M-B1A, the original row instead sees only
+/// [BufferAllocate, FsOpen] Specialized and one FsReadAt P2; its parent
+/// assertions passed in px10-b1a-r1-mb1a-whole-px8f-original.log.
+/// CLAIMED: bracket authority never borrows ordinary ownership; on this
+/// fixture suppressing execute-then-resume reopens no ordinary P2 veto.
+/// THE GAP: no known positive-controlled B1a fixture witnesses the ordinary
+/// execute-then-resume P2 veto; Steward decides deletion versus a witness.
+/// Plan-close exclusion does not establish the held parent carry WP's
+/// successful `ReadSome` runtime body. Inserting each marked row, one at a
+/// time, into ordinary ownership is independently refused by plan close.
 #[test]
 fn write_all_classifies_mixed_specialized_and_deferred_responses() {
     std::thread::Builder::new()

@@ -745,7 +745,7 @@ fn live_child_has_no_carried_return_clause_drop_under_b1a() {
     assert_dropped_return_clause_refuses("px10_return_clause_live_child", LIVE_CHILD.to_owned());
 }
 
-/// Promise class: durable invariant; the null-stdout row of the pin above.
+/// Promise class: transition sentinel; the null-stdout row of the pin above.
 #[test]
 fn null_stdout_has_no_carried_return_clause_drop_under_b1a() {
     let null_body = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
