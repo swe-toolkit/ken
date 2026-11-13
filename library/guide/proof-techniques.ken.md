@@ -32,6 +32,9 @@ strand's examples are self-contained:
 
 ```ken
 program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
+import Core.Classes.LawfulClasses (IsTrue)
 
 fn bool_and (a : Bool) (b : Bool) : Bool =
   match a {
