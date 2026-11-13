@@ -317,12 +317,14 @@ fn assert_nested_depth_on_existing_test_thread(depth: usize) {
 // closure-environment transfers under both ordinary and retired flat order;
 // base Vis 686/733 descended from the retired main slots 2/3. The unchanged
 // native path still exercises the false branch and releases its resource.
-// CLAIMED: the test-only retired flat order gains no M4 crossing authority.
-// THE GAP: that refusal has no known B1a population. Scratch M-B1A restores
-// the two transfers and the original retired-flat closure refusal. This row
-// cannot claim the guard fires on a B1a closure crossing.
+// CLAIMED: the retired flat order gains no M4 crossing authority; with the
+// unchanged flag, Ok means zero closure-env
+// values reached either M4 site; every such value would take the raw-closure
+// admissibility refusal. THE GAP: this guard has no B1a crossing population;
+// Steward must decide deletion versus a new positive witness. Scratch M-B1A
+// restores the two transfers and the original exact closure refusal.
 #[test]
-fn px8ds_retired_flat_order_does_not_gain_m4_representation() {
+fn px8ds_retired_flat_original_fixture_has_no_m4_crossing_under_b1a() {
     std::thread::Builder::new()
         .name("px8ds-retired-flat".to_string())
         .stack_size(256 * 1024 * 1024)
@@ -334,8 +336,11 @@ fn px8ds_retired_flat_order_does_not_gain_m4_representation() {
 
 #[cfg(target_os = "linux")]
 fn run_px8ds_retired_flat_control() {
-    const REFUSAL: &str = "unsupported runtime-IR lowering: Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane";
-
+    let (native, _) = observe_px8ds_p1_parity(
+        PX8DS_SIBLING_RECURSION_PROGRAM,
+        "px8ds-retired-flat-positive",
+    );
+    assert_px8ds_p1_effect_trace(&native, 1);
     let retired_dir = output_dir("px8ds-retired-flat");
     let retired = ken_runtime::with_px8ds_retired_flat_order(|| {
         ken_cli::build_native_program_with_roots(
@@ -346,18 +351,8 @@ fn run_px8ds_retired_flat_control() {
             retired_dir.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
-    })
-    .expect_err("the retired flat-order plan must retain the closure refusal");
-    let retired = format!("{retired:?}");
-    assert!(
-        retired.contains(REFUSAL),
-        "the retired plan must reach the exact closure refusal: {retired}"
-    );
-    assert_eq!(
-        retired.matches(REFUSAL).count(),
-        1,
-        "the retired plan must report one exact closure refusal: {retired}"
-    );
+    });
+    retired.expect("the original fixture has no M4 crossing in the B1a retired-flat plan");
 }
 
 #[cfg(target_os = "linux")]
