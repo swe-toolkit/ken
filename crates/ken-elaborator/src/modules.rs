@@ -2793,14 +2793,14 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
             load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
         }
     }
-    if elab.module_state.root_scope.mode != ResolutionMode::Strict {
-        let mut scope = Scope::with_mode(
-            ResolutionMode::Strict,
-            elab.module_state.strict_builtin_names.clone(),
-        );
-        scope.private_ids.clone_from(&elab.module_state.private_ids);
-        elab.module_state.root_scope = scope;
-    }
+    // Each Strict isolated source is its own unit (33 §3.3): it starts from
+    // a fresh scope and never inherits another source's imports or locals.
+    let mut scope = Scope::with_mode(
+        ResolutionMode::Strict,
+        elab.module_state.strict_builtin_names.clone(),
+    );
+    scope.private_ids.clone_from(&elab.module_state.private_ids);
+    elab.module_state.root_scope = scope;
     Ok(())
 }
 

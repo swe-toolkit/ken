@@ -9594,10 +9594,11 @@ mod native_program_example_exclusion {
     }
 
     /// Promise class: durable invariant. MEASURED: a main in the second source
-    /// naming a checked example in the first receives the typed outside-package
-    /// refusal before native preparation can return a package. CLAIMED: no
+    /// cannot resolve a checked example declared only in the first; native
+    /// preparation returns UnboundName rather than a package. CLAIMED: no
     /// dangling example dependency is laundered into native output. THE GAP:
-    /// the companion admission test proves ordinary two-source main succeeds.
+    /// the E0073 package-closure guard remains covered by the separate Legacy
+    /// package path in verify_package_example_binding_scope.rs.
     #[test]
     fn native_main_referencing_example_refuses_before_emit() {
         on_native_stack(|| {
@@ -9605,19 +9606,15 @@ mod native_program_example_exclusion {
                 "host_pure APartial ExitCode ExitCode.Success",
                 "host_pure APartial ExitCode (match zz_ex { True |-> ExitCode.Success; False |-> ExitCode.Failure 1 })",
             );
+            assert_ne!(main, MAIN, "example-reference fixture must change main");
             let error = prepare_native_program_sources(PKG, sources(WITH_EXAMPLE, &main))
-                .expect_err("a main cannot depend on an unshipped example");
-            let NativeProgramBuildError::Driver(
-                CompilerDriverError::PackageReferenceOutsidePackage {
-                    declaration,
-                    referenced,
-                },
-            ) = error
-            else {
-                panic!("expected typed package closure refusal, got {error:?}");
-            };
-            assert_eq!(declaration, StableSymbol::declaration(PKG, &[], "main"));
-            assert_eq!(referenced, StableSymbol::declaration(PKG, &[], "zz_ex"));
+                .expect_err("a main cannot resolve another source's example");
+            match error {
+                NativeProgramBuildError::Driver(CompilerDriverError::Elaboration(
+                    ElabError::UnboundName { name, .. },
+                )) => assert_eq!(name, "zz_ex"),
+                other => panic!("expected missing example name, got {other:?}"),
+            }
         });
     }
 }
