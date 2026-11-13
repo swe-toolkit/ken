@@ -62,6 +62,7 @@ importing the latter under the same spelling changes the goal.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue)
+import Core.Logic.Conjunction (And)
 import Algorithm.Geometry.NatBox
   (Point, MkPoint, Box, MkBox, axis_contains, contains, intersect,
    hull, manhattan, intersect_sound, intersect_complete,

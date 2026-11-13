@@ -23,6 +23,7 @@ claim; do not accumulate the refusals in one source.
 import Algorithm.Geometry.NatBox
   (Box, MkPoint, MkBox, inside, intersect, hull,
    intersect_monotone, hull_monotone)
+import Core.Classes.LawfulClasses (IsTrue)
 
 const one : Nat = Suc Zero
 const two : Nat = Suc one

@@ -40,7 +40,7 @@ import Algorithm.Optimization.Argmin
     least_k_one_nil,
     least_k_one_cons)
 
-import Core.Classes.LawfulClasses (leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, leq_nat)
 
 import Core.Logic.Or (Inl, Inr)
 
