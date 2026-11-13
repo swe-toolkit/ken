@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-11-13 13:35:29Z — from 1240 issue file(s) in `docs/program/issues/`.
+2026-11-13 13:48:59Z — from 1241 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -262,6 +262,7 @@ the committed file matches the generator's output.
 | `CONF-BLOCKER-OWNER-RESOLVABILITY` | 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all | ready | spec-enclave | M | none | — |
 | `CONF-EVAL-COMPUTED-BOOL-ELIM` | The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together | merged | spec-enclave | S | none | — |
 | `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | merged | spec-enclave | S | none | — |
+| `CONF-GEOMETRY-BOX-SEED-ISTRUE-IMPORT` | The box monotonicity seed's accepted client states IsTrue but imports only Algorithm.Geometry.NatBox, so ken check refuses it with UnboundName under Strict. It was accepted only through the Legacy passthrough, and no Rust test loads the seed, so CI never saw the refusal. Import IsTrue from Core.Classes.LawfulClasses and re-check the client and its refusals | ready | spec | S | spec-leader | — |
 | `CONF-PROVER-SEED-KRIPKE-DRIFT` | Clear what the Kripke chapter merge left behind: a conformance seed asserting a settled trusted-base outcome the chapter re-opens, two sibling drift sites, and the one-clause witness-direction fix | merged | spec-enclave | S | none | https://github.com/swe-toolkit/ken/pull/2328 |
 | `CONF-SEC4-REFL-PAIR` | Sec4's C1/C2 refl pair is stale against ADR-0013: the suite half of the repair landed with SEC4-TCB, the seed half did not | merged | spec-enclave | S | none | — |
 | `CONF-STALE-RED-DISPOSITIONS` | Eleven conformance sites assert RED-UNTIL-BUILT or BLOCKED-ON against producers that have already landed -- the mirror of the unproducible-fixture defect, and it makes finished work read as outstanding | merged | spec-enclave | M | none | — |
@@ -1278,6 +1279,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
+- `CONF-GEOMETRY-BOX-SEED-ISTRUE-IMPORT` — The box monotonicity seed's accepted client states IsTrue but imports only Algorithm.Geometry.NatBox, so ken check refuses it with UnboundName under Strict. It was accepted only through the Legacy passthrough, and no Rust test loads the seed, so CI never saw the refusal. Import IsTrue from Core.Classes.LawfulClasses and re-check the client and its refusals
 - `DOC-WRAP-RULE-EXEMPTION-COLOCATION` — the 80-column rule and its exemption list are stated at different levels in five documents, three of which state the rule with no exemption at all and two of which carry lists that disagree, so two seats applied the rule to exempt front matter and one was about to degrade a file that held the refuting measurement
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `PUB-DOC-ONLY-UNVALIDATED-AGAINST-ITS-DIFF` — `--doc-only` names a content class and is never checked against the actual content class of the diff, so the publisher accepts an assertion ABOUT the tree in place of the tree and merges a crates/ change with zero CI; the closure is one refusal, not a policy change or a discipline reminder
@@ -1341,6 +1343,7 @@ for every item, gated or not):
 - **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (merged) `LANG-RECORD-INDEX-REFINEMENT` (merged)
 - **runtime**: `RT-MAPPING-MULTIOP-DISPATCH` (merged)
 - **runtime-qa+architect**: `RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT` (closed) `RT-COMPOSED-RETURN-RUNTIME-CLOSURE` (draft) `RT-COMPOSED-RETURN-SSA-SPECIALIZATION` (merged)
+- **spec-leader**: `CONF-GEOMETRY-BOX-SEED-ISTRUE-IMPORT` (ready)
 - **verify-qa**: `CI-TEST-BUILD-PER-SHARD` (closed)
 
 ## Archive & diary
