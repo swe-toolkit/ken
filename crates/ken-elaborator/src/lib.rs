@@ -735,8 +735,9 @@ impl ElabEnv {
     }
 
     /// Elaborate an isolated `.ken` source with explicit Strict catalog roots.
-    /// Callers with a source path can obtain the nearest root through
-    /// [`modules::isolated_catalog_root`]; pathless callers supply their roots.
+    /// Path-bearing callers obtain a canonical source and its catalog-first
+    /// route through [`modules::discover_source_path`]; pathless callers supply
+    /// their roots.
     pub fn elaborate_isolated_file_strict_v1(
         &mut self,
         roots: &[std::path::PathBuf],
