@@ -14,7 +14,8 @@
 > SPEC-LINEAR-ALGEBRA-MATRIX-ZERO-UNIT §12;
 > SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO §13;
 > SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO §14;
-> SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY §15).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY §15;
+> SPEC-LINEAR-ALGEBRA-MATRIX-SCALE §16).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -34,14 +35,13 @@
 > four checked laws, authored seed and package-owned test are on main:
 > nine operations and thirty laws, thirty-nine public names. Architect's
 > §10 AC-0 checked generic proofs in scratch with equal trusted identity
-> sets 109 → 109. This assembled candidate contains §11's three
-> checked catalog laws, CV's authored seed and a package-owned test.
-> Foundation reports the named `cat_linear_algebra_nat_matrix` target
-> passed 7/7 on the assembled content. Separately, Architect AC-0 on
-> `a39d385c8` checked proposed bodies in scratch with no new `Axiom`
-> and equal trusted identities 109 → 109. These candidate-local and
-> scratch checks are not official §11 conformance-runner execution,
-> CI, publication, landing or a measured landed trust result.
+> sets 109 → 109. Sections 11–15's checked catalog exports, seeds
+> and package-owned tests are now on main. Their isolated D0s and
+> candidate-local tests are not official conformance-runner or
+> landed-trust measurements. Section 16 states the matrix-scaling
+> contract. Its isolated AC-0 checked the operation and eight generic
+> laws with equal scratch trusted-base identity sets 109 → 109; that
+> D0 is not an official conformance run or a landed-trust measurement.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -1343,10 +1343,139 @@ Each already-checked proof composes public `dot_comm` with its
 first-argument sibling and transports the result using `trans` and
 `cong`. Promoting the two laws does not expose their other private
 callers, change their definitions, introduce a new `Axiom` or change
-any §1–§14 operation or law type. The §15 public roster is **ten
-operations and forty-two laws, fifty-two public names**: two more
-public laws than §14's historical forty, with no new operation.
-A closed conformance seed may independently calculate both sides of
-each equality and apply the public laws; such instances do not
-replace the generic checked proofs. CV owns that separate seed and
-its accepted and refused cases.
+any §1–§14 operation or law type. The roster through §15 is **ten operations and forty-two laws,
+fifty-two public names**: two more public laws than §14's historical
+forty, with no new operation. Section 16 adds one operation and eight
+laws, making the §16 roster eleven operations and fifty laws,
+sixty-one public names. A closed conformance seed may independently
+calculate both sides of each equality and apply the public laws; such
+instances do not replace the generic checked proofs. CV owns that
+separate seed and its accepted and refused cases.
+
+## 16. Scaling a matrix by a natural factor
+
+> Section 16 status: DRAFT v0 (SPEC-LINEAR-ALGEBRA-MATRIX-SCALE).
+> The isolated AC-0 D0 on `38796115f` checked the operation and eight
+> generic laws with no new local `Axiom` and equal scratch
+> `trusted_base()` identity sets 109 → 109. This scratch evidence
+> establishes neither an official conformance result, CI nor a
+> measured landed-trust delta.
+
+### 16.1 Operation and eight public checked-law obligations
+
+`Algorithm.LinearAlgebra.NatMatrix` adds `matrix_scale` immediately after
+`matrix_zero`. It scales each row of an `m`-row, `n`-column matrix by
+`vector_scale n factor`, preserving both indexed dimensions. It then
+exports eight public Transparent checked theorems together after
+`transpose_identity` and before the private `matrix_add_assoc_cons`.
+The order is dimensions, natural factors, then matrices. No existing
+operation or law type from §§1–15 changes.
+
+```ken
+pub fn matrix_scale
+    (m : Nat) (n : Nat) (factor : Nat) (rows : Vec (Vec Nat n) m)
+  : Vec (Vec Nat n) m
+
+pub theorem matrix_scale_distrib
+    (m : Nat) (n : Nat) (x : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+  : Equal
+      (Vec (Vec Nat n) m)
+      (matrix_scale m n x (matrix_add m n a b))
+      (matrix_add m n (matrix_scale m n x a) (matrix_scale m n x b))
+
+pub theorem matrix_scale_factor_distrib
+    (m : Nat) (n : Nat) (x : Nat) (y : Nat) (a : Vec (Vec Nat n) m)
+  : Equal
+      (Vec (Vec Nat n) m)
+      (matrix_scale m n (add x y) a)
+      (matrix_add m n (matrix_scale m n x a) (matrix_scale m n y a))
+
+pub theorem matrix_scale_compose
+    (m : Nat) (n : Nat) (x : Nat) (y : Nat) (a : Vec (Vec Nat n) m)
+  : Equal
+      (Vec (Vec Nat n) m)
+      (matrix_scale m n (mul x y) a)
+      (matrix_scale m n x (matrix_scale m n y a))
+
+pub theorem matrix_scale_one
+    (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+  : Equal (Vec (Vec Nat n) m) (matrix_scale m n (Suc Zero) a) a
+
+pub theorem matrix_scale_zero
+    (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+  : Equal (Vec (Vec Nat n) m) (matrix_scale m n Zero a) (matrix_zero m n)
+
+pub theorem transpose_scale
+    (m : Nat) (n : Nat) (x : Nat) (a : Vec (Vec Nat n) m)
+  : Equal
+      (Vec (Vec Nat m) n)
+      (transpose m n (matrix_scale m n x a))
+      (matrix_scale n m x (transpose m n a))
+
+pub theorem matrix_product_scale
+    (m : Nat) (n : Nat) (p : Nat) (x : Nat)
+    (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n)
+  : Equal
+      (Vec (Vec Nat p) m)
+      (matrix_product m n p (matrix_scale m n x a) b)
+      (matrix_scale m p x (matrix_product m n p a b))
+
+pub theorem matrix_product_scale_right
+    (m : Nat) (n : Nat) (p : Nat) (x : Nat)
+    (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n)
+  : Equal
+      (Vec (Vec Nat p) m)
+      (matrix_product m n p a (matrix_scale n p x b))
+      (matrix_scale m p x (matrix_product m n p a b))
+```
+
+The distributivity laws distinguish scaling a sum of matrices from
+scaling by a sum of factors; the latter holds one matrix fixed.
+Composition follows the `vector_scale` order, with `mul x y` on the
+left and the `x` action outside the `y` action on the right. The last
+two laws scale the first and second product arguments respectively;
+transpose exchanges the dimensions. All eight are premise-free
+indexed equalities, including when either dimension is zero.
+
+### 16.2 Proof boundary and closed discriminator
+
+Each inductive head step uses a checked vector or dot law already
+owned by the module: §9's `vector_scale_distrib`,
+`vector_scale_factor_distrib`, `vector_scale_compose` and
+`vector_scale_one`; §11's `vector_scale_zero`; §15's public
+`dot_scale_right`; or the existing private `columns_scale` for a
+scaled left product row. The right product route first uses
+`transpose_scale`, then the new private `columns_scale_right`, whose
+head invokes `dot_scale_right`. The transpose route uses the existing
+private `zero_width_repeat` at zero rows and the new private
+`zip_prepend_scale` for the inductive row. Both new helpers remain
+private; clients import the operation and eight laws, not the helpers.
+This needs no new import, axiom, premise, primitive, kernel or surface
+rule. The proposed roster grows from **ten operations and forty-two
+laws (fifty-two public names)** to **eleven operations and fifty laws
+(sixty-one public names)**. That count is a public-export contract,
+not a claim that adding proofs removes trust inherited from imports.
+
+For the closed discriminator, take the non-square matrix
+`A = [[1,2,3],[4,5,6]]` and factor `3`. Row-wise scaling gives
+`matrix_scale 2 3 3 A = [[3,6,9],[12,15,18]]`. Scaling only the first
+row gives `[[3,6,9],[4,5,6]]`; adding three to every entry gives
+`[[4,5,6],[7,8,9]]`. Both alternatives disagree with the true
+output. A separate false claim for each alternative must refuse at
+its own proof term after a fresh accepted prefix carrying the true
+claim in the same form. The checked generic laws are distinct from
+these finite computations.
+
+The isolated D0 measured each of the eight law statements at closed
+instances under three operation-only alternatives, with the original
+generic proof bodies removed. Its factor-ignoring alternative returned
+the unscaled matrix: the factor-distribution and zero laws failed on
+the D0 inputs, while the other six closed instances passed. Thus the
+law set rules out that alternative through these two statements, but
+the measured table neither proves the other six laws generically for
+a mutant nor uniquely determines `matrix_scale`. Proof bodies failing
+when a definition changes do not by themselves show that a law
+statement is false. The correct operation passed all eight closed
+instances, and its eight generic proofs checked in that separate D0.
+This is not an official conformance run, a catalog package test on the
+assembled candidate or a measured landed-trust result.
