@@ -101,6 +101,13 @@ theorem ord_result_elim2
       }
   }
 
+pub fn ord_result_flip (r : OrdResult) : OrdResult =
+  match r {
+    Lt ↦ Gt;
+    Eq ↦ Eq;
+    Gt ↦ Lt
+  }
+
 export OrdResult,
   Lt,
   Eq,
@@ -111,7 +118,8 @@ export OrdResult,
   ord_result_leq,
   ord_result_dispatch2,
   ord_result_elim,
-  ord_result_elim2
+  ord_result_elim2,
+  ord_result_flip
 ```
 
 The type, constructors, aliases, and eliminators form one public interface.
