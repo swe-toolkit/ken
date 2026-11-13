@@ -635,6 +635,29 @@ impl ModuleState {
         self.package_home_ids.get(module).map_or(&[], Vec::as_slice)
     }
 
+    /// A raw declaration is a checked local of the continuing root scope.
+    /// Reject a collision before allocating its ID: an earlier selective
+    /// import or local must never be replaced by an unrelated raw postulate.
+    pub(crate) fn check_raw_root_binding(&self, name: &str) -> Result<(), ElabError> {
+        if let Some(existing) = self.root_scope.bindings.get(name) {
+            return Err(ElabError::AmbiguousReference {
+                name: name.to_string(),
+                sources: vec![existing.clone(), format!("{name} (raw postulate)")],
+                span: Span::zero(),
+            });
+        }
+        Ok(())
+    }
+
+    pub(crate) fn bind_raw_root(&mut self, name: &str, id: ken_kernel::GlobalId) {
+        self.root_scope
+            .bindings
+            .insert(name.to_string(), name.to_string());
+        self.root_scope.binding_ids.insert(name.to_string(), id);
+        self.root_scope.raw_root_ids.insert(name.to_string(), id);
+        self.root_scope.locals.insert(name.to_string());
+    }
+
     /// Checked identities `package` publishes in this run, including selected
     /// facade identities; empty for a package the run has not loaded.
     pub(crate) fn package_export_ids(&self, package: &str) -> HashSet<ken_kernel::GlobalId> {
@@ -927,6 +950,9 @@ struct Scope {
     /// Bare selective aliases are separate: their spelling has no prefix.
     qualified_ids: HashMap<String, ken_kernel::GlobalId>,
     binding_ids: HashMap<String, ken_kernel::GlobalId>,
+    /// Raw checked postulates are root locals whose checked identity cannot
+    /// be silently taken over by a later source declaration of the same name.
+    raw_root_ids: HashMap<String, ken_kernel::GlobalId>,
     /// Export-name ID overrides for facade/in-scope republishing. A canonical
     /// spelling alone can no longer recover the imported provider's ID.
     exported_ids: HashMap<String, ken_kernel::GlobalId>,
@@ -971,6 +997,7 @@ impl Scope {
     fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
         self.qualified_ids.retain(|_, id| !removed.contains(id));
         self.binding_ids.retain(|_, id| !removed.contains(id));
+        self.raw_root_ids.retain(|_, id| !removed.contains(id));
         self.exported_ids.retain(|_, id| !removed.contains(id));
         self.checked_local_ids.retain(|_, id| !removed.contains(id));
         self.floor_type_ids.retain(|_, id| !removed.contains(id));
@@ -1016,6 +1043,10 @@ impl Scope {
                     .copied(),
             };
             if local_id == Some(selected_id) {
+                // A pre-source local and its exporting home can be the same
+                // checked declaration. Keep that ID in the root binding even
+                // under Legacy: the flat globals spelling may be rebound.
+                self.binding_ids.insert(bare.to_string(), selected_id);
                 return Ok(());
             }
             let local_source = local_binding
@@ -1075,6 +1106,13 @@ impl Scope {
     /// elaboration call. Same-file locals are pre-collected before imports, so
     /// `bind_import` supplies the symmetric arm.
     fn bind_local(&mut self, bare: &str, qualified: &str, span: &Span) -> Result<(), ElabError> {
+        if let Some(id) = self.raw_root_ids.get(bare) {
+            return Err(ElabError::AmbiguousReference {
+                name: bare.to_string(),
+                sources: vec![format!("{bare} (raw {id:?})"), qualified.to_string()],
+                span: span.clone(),
+            });
+        }
         if let Some(binding) = self.bindings.get(bare) {
             if binding != qualified {
                 let mut sources = vec![binding.clone()];
@@ -2692,19 +2730,21 @@ pub fn elaborate_module_from_roots_strict(
         .map(|(ids, _)| ids)
 }
 
-fn elaborate_module_from_roots_with_mode_v1(
+/// Configure the one N2 catalog root for an ordinary in-memory source or a
+/// file-backed roots entry. The roots cache and its resolution mode are one
+/// run-wide selection; a repeated equal setting is harmless, a changed
+/// setting cannot reinterpret already checked imports.
+fn set_catalog_roots_for_mode_v1(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
-    entry: &str,
     mode: ResolutionMode,
-) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
-    // The public globals map may change after the pre-source capture. Recheck
-    // before loading or reusing any strict unit; do not heal a forged map.
+    allow_rootless_strict: bool,
+) -> Result<(), ElabError> {
     if mode == ResolutionMode::Strict {
         require_fixed_proved_identity(&elab.env, &elab.globals)?;
         require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
     }
-    if roots.len() != 1 {
+    if roots.len() != 1 && !(allow_rootless_strict && roots.is_empty()) {
         return Err(ElabError::ParseError {
             msg: format!(
                 "N2 requires exactly one populated catalog root, found {}",
@@ -2713,7 +2753,9 @@ fn elaborate_module_from_roots_with_mode_v1(
             span: Span::zero(),
         });
     }
-    if elab.module_state.catalog_roots.is_empty() {
+    if elab.module_state.catalog_roots.is_empty()
+        && elab.module_state.roots_resolution_mode.is_none()
+    {
         elab.module_state.catalog_roots = roots.to_vec();
         elab.module_state.roots_resolution_mode = Some(mode);
     } else if elab.module_state.catalog_roots != roots {
@@ -2726,6 +2768,26 @@ fn elaborate_module_from_roots_with_mode_v1(
             "roots resolution mode cannot change during one elaboration run".to_string(),
         ));
     }
+    Ok(())
+}
+
+/// Set catalog roots for ordinary `elaborate_file_v1` and
+/// `elaborate_decl_v1` calls without selecting the isolated-source route.
+/// An empty selection is rejected; an env with no selected roots keeps its
+/// existing import refusal. The current mode is preserved, including Legacy until
+/// the I4 deletion.
+pub fn set_catalog_roots_v1(elab: &mut ElabEnv, roots: &[PathBuf]) -> Result<(), ElabError> {
+    let mode = elab.module_state.root_scope.mode;
+    set_catalog_roots_for_mode_v1(elab, roots, mode, false)
+}
+
+fn elaborate_module_from_roots_with_mode_v1(
+    elab: &mut ElabEnv,
+    roots: &[PathBuf],
+    entry: &str,
+    mode: ResolutionMode,
+) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
+    set_catalog_roots_for_mode_v1(elab, roots, mode, false)?;
     load_unit(elab, entry, &Span::zero(), mode)
 }
 
@@ -2784,10 +2846,7 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
             });
         }
     }
-    if elab.module_state.roots_resolution_mode.is_none() {
-        elab.module_state.catalog_roots = roots.to_vec();
-        elab.module_state.roots_resolution_mode = Some(ResolutionMode::Strict);
-    }
+    set_catalog_roots_for_mode_v1(elab, roots, ResolutionMode::Strict, true)?;
     for (dependency, owner, span) in imports {
         if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
             load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
@@ -6577,6 +6636,25 @@ pub fn expand_and_elaborate(
         None => ModuleUnitOwner::InMemory(elab.module_state.next_in_memory_unit),
     };
     precheck_module_paths(&elab.module_state, decls, "", &owner)?;
+    // Ordinary roots use the same file-unit dependency loader as the catalog
+    // entry and isolated-source routes. A declared inline sibling stays on the
+    // ordered pass (including its premature-import refusal); with no roots the
+    // existing absent-provider refusal is unchanged.
+    if !elab.module_state.catalog_roots.is_empty() && elab.module_state.active_imports.is_empty() {
+        let mode = elab.module_state.root_scope.mode;
+        if elab.module_state.roots_resolution_mode != Some(mode) {
+            return Err(ElabError::Internal(
+                "roots resolution mode cannot change during one elaboration run".to_string(),
+            ));
+        }
+        let mut imports = Vec::new();
+        imported_module_paths(decls, "", &mut imports);
+        for (dependency, import_owner, span) in imports {
+            if declared_inline_import(&import_owner, None, &dependency, &local_modules).is_none() {
+                load_unit(elab, &dependency, &span, mode)?;
+            }
+        }
+    }
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();
     let previous_package = elab.class_env.current_package.clone();
     let previous_direct_use = elab.class_env.direct_use_packages.clone();
