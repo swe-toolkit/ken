@@ -312,9 +312,15 @@ fn assert_nested_depth_on_existing_test_thread(depth: usize) {
 }
 
 #[cfg(target_os = "linux")]
-// Durable invariant: the test-only retired flat-order plan has no M4 crossing
-// authority. It must remain on the ordinary fail-closed closure refusal rather
-// than acquiring the production plan's captured-environment representation.
+// Promise class: transition sentinel for the exact B1a fixture projection.
+// MEASURED (D0-3, PX10 B1a): the original sibling-recursion fixture has zero
+// closure-environment transfers under both ordinary and retired flat order;
+// base Vis 686/733 descended from the retired main slots 2/3. The unchanged
+// native path still exercises the false branch and releases its resource.
+// CLAIMED: the test-only retired flat order gains no M4 crossing authority.
+// THE GAP: that refusal has no known B1a population. Scratch M-B1A restores
+// the two transfers and the original retired-flat closure refusal. This row
+// cannot claim the guard fires on a B1a closure crossing.
 #[test]
 fn px8ds_retired_flat_order_does_not_gain_m4_representation() {
     std::thread::Builder::new()
@@ -565,16 +571,18 @@ fn px8ds_p1_swapped_tail_call_exits_match_reference() {
         .expect("swapped P1 linked observation thread");
 }
 
-/// Promise class: normative compatibility vector for the unchanged original
-/// checked program. MEASURED: native and interpreter observe one Console
-/// effect on the false arm, and the planner projects both P1 rows onto the
-/// same specialization owner. CLAIMED: new tail-call admission does not
-/// perturb the original path or RELAY classification. THE GAP: the public
-/// projection does not expose all RELAY row details; existing roster controls
-/// retain that independent job.
+/// Promise class: normative compatibility vector for the original checked
+/// program under B1a. MEASURED (D0-5): both former Console P1 rows descend
+/// from retired main slots 2/3; the candidate has no NoContinuationUnit row,
+/// but one Specialized ConsoleIsTerminal Vis 656 owned by specialization 0.
+/// Native and interpreter still observe one Console effect on the false arm.
+/// CLAIMED: Let lowering removes those deferred P1 rows while preserving the
+/// original program's observable path. THE GAP: no known P1 deferral population
+/// remains under B1a, so its handler-owner projection is not exercised; the
+/// scratch M-B1A restores both rows and makes the absence assertion red.
 #[cfg(target_os = "linux")]
 #[test]
-fn px8ds_p1_original_false_arm_and_handler_owner_remain_stable() {
+fn px8ds_original_false_arm_and_console_response_projection_are_stable() {
     std::thread::Builder::new()
         .name("px8ds-p1-original".to_string())
         .stack_size(PX8DS_THREAD_STACK_BYTES)
@@ -582,30 +590,28 @@ fn px8ds_p1_original_false_arm_and_handler_owner_remain_stable() {
             let (native, plans) =
                 observe_px8ds_p1_parity(PX8DS_SIBLING_RECURSION_PROGRAM, "px8ds-p1-original");
             assert_px8ds_p1_effect_trace(&native, 1);
-            let with_p1 = plans
-                .iter()
-                .filter_map(|plan| {
-                    let rows = plan
-                        .static_response_deferred
-                        .iter()
-                        .filter(|row| {
-                            row.sub_case == "NoContinuationUnit"
-                                && row.operation == "ConsoleIsTerminal"
-                        })
-                        .collect::<Vec<_>>();
-                    (rows.len() == 2).then_some(rows)
-                })
-                .collect::<Vec<_>>();
-            let [rows] = with_p1.as_slice() else {
-                panic!("one response plan carries the original two Console P1 rows: {plans:?}");
+            let [plan] = plans.as_slice() else {
+                panic!("the original program publishes one response plan: {plans:?}");
             };
-            for row in rows {
-                assert_eq!(
-                    row.handler_owner.as_deref(),
-                    Some("Specialization(ContinuationSpecializationId(0))"),
-                    "P1 row: {row:?}"
-                );
-            }
+            let p1 = plan
+                .static_response_deferred
+                .iter()
+                .filter(|row| row.sub_case == "NoContinuationUnit")
+                .collect::<Vec<_>>();
+            assert_eq!(p1.len(), 0, "B1a removes the two former Console P1 rows: {p1:?}");
+            let console = plan
+                .all_static_response_rows
+                .iter()
+                .filter(|row| row.operation == "ConsoleIsTerminal")
+                .collect::<Vec<_>>();
+            let [console] = console.as_slice() else {
+                panic!("one Console response is Specialized: {console:?}");
+            };
+            assert_eq!(console.vis_origin, 656);
+            assert_eq!(
+                console.base_owner,
+                "Specialization(ContinuationSpecializationId(0))"
+            );
         })
         .expect("spawn with existing stated px8ds stack provision")
         .join()

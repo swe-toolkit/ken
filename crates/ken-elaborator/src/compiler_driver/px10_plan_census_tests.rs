@@ -729,23 +729,25 @@ fn px10_relays_are_numbered_protocol_members() {
     }
 }
 
-/// Promise class: durable invariant (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1).
-/// MEASURED: on the live child and the null-stdout argv program, dropping
-/// region 0's return clause from the stack a carried match lowers under is
-/// refused at lowering as BracketReturnClause, and the unmutated build emits.
-/// CLAIMED: a claim inside a bracket body whose return clause is absent from
-/// the eliminator stack cannot pass as an ordinary native build.
-/// THE GAP: one mutation seat, the carried-remaining choice, and the planner's
-/// region-to-clause map is read on both sides. Other ways of losing the
-/// clause reach the same check but are not exercised here.
+/// Promise class: transition sentinel for B1a's exact original-fixture
+/// projection (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1). MEASURED (B1a D0-4):
+/// the live carried-stack seats Vis 1307/1429 and null seats Vis 1806/1928
+/// descend from retired main matches. Their DropBracketReturnClause mutation
+/// applies zero times on each B1a fixture; the unmutated Let-body build emits.
+/// CLAIMED: a performed bind lowers its Ret body under the original region
+/// eliminators, without a carried re-emission stack. THE GAP: the Let route's
+/// BracketReturnClause check reads the clause with its frame present, but this
+/// projection does not inject a missing Let-route clause. F native/interpreter
+/// parity and Buffer1 release order were measured, not committed, in B1a.
+/// Scratch M-B1A restores the old carried seats and their exact refusal.
 #[test]
-fn live_child_dropped_return_clause_refuses_at_lowering() {
+fn live_child_has_no_carried_return_clause_drop_under_b1a() {
     assert_dropped_return_clause_refuses("px10_return_clause_live_child", LIVE_CHILD.to_owned());
 }
 
 /// Promise class: durable invariant; the null-stdout row of the pin above.
 #[test]
-fn null_stdout_dropped_return_clause_refuses_at_lowering() {
+fn null_stdout_has_no_carried_return_clause_drop_under_b1a() {
     let null_body = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
     assert_ne!(
         null_body, ARGV_ENV_PIPE,
@@ -767,36 +769,12 @@ fn assert_dropped_return_clause_refuses(name: &'static str, source: String) {
             ken_runtime::HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
             || emit_below_gate(name, &source),
         );
-        assert!(
-            applications >= 1,
-            "{name}: the mutation must reach the carried stack"
+        assert_eq!(
+            applications, 0,
+            "{name}: the retired carried stack must not provide a drop seat"
         );
         let dropped = ken_runtime::dropped_bracket_return_clauses();
-        assert!(
-            !dropped.is_empty(),
-            "{name}: the mutation must record the clause frames it drops"
-        );
-        let error = built.expect_err("a dropped return clause cannot emit an artifact");
-        let NativeProgramBuildError::Packaging(error) = error else {
-            panic!("expected a packaging refusal, got {error:?}");
-        };
-        assert_eq!(
-            error.stage,
-            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
-        );
-        assert_eq!(
-            error.source_cause,
-            Some(ken_runtime::LoweringCause::PlannerInvariant)
-        );
-        assert!(error.reason.contains("BracketReturnClause"), "{error:?}");
-        assert!(
-            dropped
-                .iter()
-                .any(|(region, clause)| error.reason.contains(&format!(
-                    "a claim inside region {region}'s body runs without its return clause {clause} ("
-                ))),
-            "{name}: the refusal must name a region and clause the mutation dropped, \
-             {dropped:?}: {error:?}"
-        );
+        assert!(dropped.is_empty(), "{name}: no carried return clause was dropped: {dropped:?}");
+        built.expect("the no-op carried-stack mutation leaves the Let-body build available");
     });
 }
