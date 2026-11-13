@@ -678,6 +678,8 @@ sources = [
   "spec/30-surface/32-grammar.md#3-expressions",
   "catalog/packages/Core/Logic/Transport.ken.md",
   "catalog/packages/Core/Classes/LawfulClasses.ken.md",
+  "catalog/packages/Capability/Console/Text.ken.md",
+  "catalog/packages/Capability/Process/Exit.ken.md",
   "docs/PRINCIPLES.md#16-a-package-is-finished-only-when-proven--tests-are-not-part-of-it",
 ]
 validation = [
@@ -709,6 +711,8 @@ sources = [
   "spec/50-stdlib/51-lawful-classes.md#2-the-three-classes",
   "catalog/packages/Data/Collections/Derived.ken.md",
   "catalog/packages/Core/Classes/LawfulClasses.ken.md",
+  "catalog/packages/Capability/Console/Text.ken.md",
+  "catalog/packages/Capability/Process/Exit.ken.md",
 ]
 validation = [
   "manifest-coverage",

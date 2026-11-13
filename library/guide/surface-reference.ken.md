@@ -43,6 +43,8 @@ catalog *package* entry, a library rather than a runnable file, carries none):
 
 ```ken
 program capabilities FS APartial
+import Capability.Console.Text (IO, print_line)
+import Capability.Process.Exit (host_program)
 
 data Color = Red | Green | Blue
 
