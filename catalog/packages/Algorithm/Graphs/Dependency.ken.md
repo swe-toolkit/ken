@@ -475,6 +475,56 @@ pub theorem walk_reverse_involutive
           (walk_reverse_involutive q step s prev prefix))
   }
 
+pub fn graph_union (q : Type) (g : Graph q) (h : Graph q) : Graph q =
+  MkGraph q (λs. λt. bool_or (edge q g s t) (edge q h s t))
+
+pub theorem graph_union_edge
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_union q g h) s t) (bool_or (edge q g s t) (edge q h s t)) =
+  Refl
+
+pub theorem graph_union_edge_left
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q g s t) True → Equal Bool (edge q (graph_union q g h) s t) True =
+  or_left (edge q g s t) (edge q h s t)
+
+pub theorem graph_union_edge_right
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q h s t) True → Equal Bool (edge q (graph_union q g h) s t) True =
+  or_right (edge q g s t) (edge q h s t)
+
+pub fn graph_union_edge_cases
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_union q g h) s t) True
+      → Or (Equal Bool (edge q g s t) True) (Equal Bool (edge q h s t) True) =
+  bool_or_true_cases (edge q g s t) (edge q h s t)
+
+pub theorem graph_union_reachable_left
+      (q : Type) (fq : Finite q) (g : Graph q) (h : Graph q) (s : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq g s target) True
+      → Equal Bool (graph_reachable q fq (graph_union q g h) s target) True =
+  graph_reachable_graph_monotone
+    q
+    fq
+    g
+    (graph_union q g h)
+    s
+    target
+    (graph_union_edge_left q g h)
+
+pub theorem graph_union_reachable_right
+      (q : Type) (fq : Finite q) (g : Graph q) (h : Graph q) (s : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq h s target) True
+      → Equal Bool (graph_reachable q fq (graph_union q g h) s target) True =
+  graph_reachable_graph_monotone
+    q
+    fq
+    h
+    (graph_union q g h)
+    s
+    target
+    (graph_union_edge_right q g h)
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -847,6 +897,13 @@ walk: `WalkHere` closes through `walk_reverse_involutive_here`, and each step
 uses `walk_reverse_prepend` to expose the original last edge before lifting
 the prefix induction hypothesis under `WalkStep`.
 
+The union's edge equation reduces to `bool_or` at the two input edges.
+Left and right inclusion reuse `or_left` and `or_right` at those edge terms.
+The private Boolean case split constructs an untruncated `Or` for
+`graph_union_edge_cases`: `Or` is Type-sorted, while `or_cases` eliminates
+only into Omega. Both reachability laws reuse graph monotonicity with the
+corresponding inclusion law as its edge-inclusion premise.
+
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
 vertices using `Finite.covers`. An edge strictly increases the count of
@@ -1210,6 +1267,14 @@ fn walk_lift
     WalkHere ↦ WalkHere q h s;
     WalkStep prev end e prefix ↦
       WalkStep q h s prev end (included prev end e) (walk_lift q g h included s prev prefix)
+  }
+
+fn bool_or_true_cases
+      (b : Bool) (c : Bool)
+    : Equal Bool (bool_or b c) True → Or (Equal Bool b True) (Equal Bool c True) =
+  match b {
+    True ↦ λh. Inl (Equal Bool True True) (Equal Bool c True) Proved;
+    False ↦ λh. Inr (Equal Bool False True) (Equal Bool c True) h
   }
 
 fn named (q : Type) (d : DecEq q) (x : q) (v : q) : Bool = d.eq v x
@@ -2772,13 +2837,14 @@ removes a shortcut edge while keeping the ordered list and refuses inclusion
 of an added backward edge. The public API exports six data families (`Graph`,
 `Walk`, `Cycle`, `ReachWitness`, `TopoOrder`, `OrderOrCycle`) and eight
 constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
-`MkTopoOrder`, `HasOrder`, `HasCycle`). Its fifteen functions are `edge`,
+`MkTopoOrder`, `HasOrder`, `HasCycle`). Its seventeen functions are `edge`,
 `walk_append`, `graph_reachable`, `graph_find_walk`, `graph_reverse`,
-`walk_reverse`, `contains`, `before`, `no_duplicates`, `all_vertices`,
-`all_edges_forward`, `ordered_vertices`, `topo_order_edge_antitone`,
-`dependency_order_or_cycle`, and `graph_from_successors`. Twenty-five
-kernel-checked theorems expose their laws, including successor-list soundness
-and completeness. Every other helper is private to this package.
+`walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
+`no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
+`topo_order_edge_antitone`, `dependency_order_or_cycle`, and
+`graph_from_successors`. Thirty kernel-checked theorems expose their laws,
+including successor-list soundness and completeness. Every other helper is
+private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -2813,6 +2879,8 @@ from imports. The §11 package test checks the generic transitivity law, a
 reflexive client derived from public `graph_reachable_complete`, and the §11
 seed's accepted and refused rows, with zero local trust delta. The §14
 package test checks the generic successor-list exports and listed and unlisted
-edges on a closed three-vertex client, including a false-edge refusal. These
-package tests do not stand in for official conformance-runner execution or CI,
-and do not establish execution of the §2 seed.
+edges on a closed three-vertex client, including a false-edge refusal. The
+union package test exercises the seven new generic exports, independent
+closed reachability values, and both false-edge claims on a shared carrier.
+These package tests do not stand in for official conformance-runner execution
+or CI, and do not establish execution of the §2 seed.
