@@ -15,7 +15,9 @@
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-IDEMPOTENCE §13;
 > SPEC-GEOMETRY-BOX-POINT-AREA §14;
 > SPEC-GEOMETRY-BOX-POINT-SINGLETON §15;
-> SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL §16).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL §16;
+> SPEC-GEOMETRY-BOX-INTERSECT-HULL-MONOTONE §17;
+> SPEC-GEOMETRY-NAT-ORIENTATION §18).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -202,8 +204,9 @@ client. The §1 catalog and seed have since landed; that historical
 scratch check alone does not establish shipped seed-harness execution,
 CI, or a measured landed trust delta.
 
-Signed coordinates and signed-dependent orientation, cross products
-and rotation are deferred. Euclidean and floating-point distances,
+Section 18 specifies orientation over natural-coordinate points. Signed
+coordinates, signed-dependent orientation, cross-product values and
+rotation of points remain deferred. Euclidean and floating-point distances,
 dimensions other than two, a canonical empty-box representation and
 point-set equality of boxes are also deferred. Box area is specified
 in §4; the §1 distance operation is not an area calculation. Section
@@ -1429,3 +1432,100 @@ match, Nat lemma, import, new axiom or change to any §1–§16 operation
 or law type is required. Closed applications test the interfaces but
 do not substitute for the generic checked bodies; CV owns the
 separate accepted and refused conformance seed.
+
+## 18. Orientation of three natural points
+
+> Section 18 status: DRAFT v0 (SPEC-GEOMETRY-NAT-ORIENTATION).
+> The AC-0 design review checked a scratch development of the operation and
+> four generic laws. That development is feasibility evidence, not a catalog
+> landing, an official conformance run, CI or a landed trust measurement.
+
+`Algorithm.Geometry.NatOrientation` owns `orient` and its four public laws.
+It imports `Point` and `MkPoint` from `Algorithm.Geometry.NatBox`; it does
+not change the box carrier or any operation or law from §§1–17. The result
+is the canonical `OrdResult` from `Core.Logic.OrdResult`, whose public
+`ord_result_flip` maps `Lt` to `Gt`, `Eq` to `Eq`, and `Gt` to `Lt`.
+`Data.Numeric.Nat.Order` supplies `compare : Nat → Nat → OrdResult`,
+its public `swap for compare` proof and its existing `self_eq for compare`
+proof made public without changing that proof's type. These visibility
+changes belong to their owning modules, not to copies in geometry.
+
+### 18.1 Exact natural-coordinate turn
+
+```ken
+pub fn orient (a : Point) (b : Point) (c : Point) : OrdResult
+```
+
+For `a = MkPoint xa ya`, `b = MkPoint xb yb`, and `c = MkPoint xc yc`,
+let the two natural sums be:
+
+```text
+L = add (add (mul xa yb) (mul xb yc)) (mul xc ya)
+R = add (add (mul ya xb) (mul yb xc)) (mul yc xa)
+```
+
+`orient a b c` is `compare L R`. `Gt` denotes a counter-clockwise turn
+when x increases rightward and y upward; `Lt` denotes a clockwise turn;
+`Eq` denotes collinearity, including every repeated-point triple. This
+uses only natural addition, multiplication and comparison; it does not
+construct a signed cross-product value. For example, `(0,0), (1,0),
+(0,1)` gives `L = 1`, `R = 0` and `Gt`; reversing the first two points
+gives `Lt`. The zero-free collinear triple `(1,1), (2,2), (3,3)` gives
+`L = R = 11` and `Eq`.
+
+### 18.2 Four public checked-law obligations
+
+```ken
+pub theorem orient_swap (a : Point) (b : Point) (c : Point) :
+  Equal OrdResult (orient b a c) (ord_result_flip (orient a b c))
+
+pub theorem orient_rotation (a : Point) (b : Point) (c : Point) :
+  Equal OrdResult (orient a b c) (orient b c a)
+
+pub theorem orient_repeated_point (a : Point) (c : Point) :
+  Equal OrdResult (orient a a c) Eq
+
+pub theorem orient_cross
+    (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) :
+  Equal OrdResult
+    (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+    (compare
+      (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+      (add (add (mul ya xb) (mul yb xc)) (mul yc xa)))
+```
+
+`orient_cross` fixes the definition at public types; the first three
+laws alone do not determine the turn. Both a constant-`Eq` function
+and a function comparing `R` with `L` satisfy swap, rotation and the
+repeated-point equation as mathematical statements, but disagree with
+`orient_cross` and the counter-clockwise example. Rotation and the
+repeated-point law also yield `orient a b b = Eq` and
+`orient a b a = Eq`. Combining swap with rotation flips every odd
+permutation's result. These consequences add no separate public laws.
+
+The AC-0 scratch development checked the four generic laws for the actual
+`orient`, with no new local `Axiom`; `orient_cross` closed by `Refl` under
+the checked definition. The constant-`Eq` function satisfies swap, rotation
+and the repeated-point equation because `ord_result_flip Eq` is `Eq`. The
+reversed comparison satisfies them because swapping the first two points
+exchanges `L` and `R` up to commuting each product, rotation permutes the
+summands of each sum, and a repeated point makes the two sums equal. That
+derivation is by hand; the measured evidence covers **closed instances
+only** and must not be represented as a checked generic proof. Each
+measured alternative falsifies `orient_cross`, as its closed outputs show.
+Constant `Eq` and reversed comparison give `Eq` and `Lt` on the
+counter-clockwise example, where `compare L R` is `Gt`. Dropping the third
+summand of `L` gives `Lt` on the collinear example, where `compare L R` is
+`Eq`. A mutated provider rejecting the original `orient_cross` proof is not
+itself that evidence, since any change to `orient` breaks a proof written
+against its definition.
+
+The scratch trusted-base identity set was unchanged when the new
+checked definitions and laws loaded. As in §1.4, this does not remove
+assumptions transitively loaded through dependencies, and a scratch
+check is neither an official conformance result nor a measured landed
+trust delta. This section adds no primitive, axiom, premise, signed
+carrier or surface rule. Signed coordinates, a signed cross-product
+value, rotation of points, segment intersection and convex hulls remain
+deferred; the cyclic permutation law above is not a point-rotation
+operation.

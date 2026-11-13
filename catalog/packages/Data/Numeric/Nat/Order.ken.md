@@ -38,6 +38,8 @@ import Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 
 import Core.Logic.Transport (cong, sym, trans)
 
+import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_result_flip)
+
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l)
 
 export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
@@ -48,13 +50,11 @@ join proofs split structural inputs before binding the order premises.
 The paired-successor branches reuse those premises at smaller
 arguments; a positive bound against `Zero` contradicts its premise.
 `sub` is saturating natural-number subtraction; `compare` returns the
-three-way result `OrdResult`. Strict `lt_nat` recurses on its right
+three-way result `OrdResult` from `Core.Logic.OrdResult`. Strict `lt_nat` recurses on its right
 argument so the checked
 successor-order bridge has the same reduction order:
 
 ```ken
-data OrdResult = Lt | Eq | Gt
-
 pub fn min (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ Zero;
@@ -410,7 +410,25 @@ pub fn lt_nat (a : Nat) (b : Nat) : Bool =
       }
   }
 
-proof self_eq for compare (n : Nat) : Equal OrdResult (compare n n) Eq =
+pub proof swap for compare
+      (a : Nat)
+    : (b : Nat) → Equal OrdResult (compare b a) (ord_result_flip (compare a b)) =
+  match a {
+    Zero ↦
+      λb.
+        match b {
+          Zero ↦ Proved;
+          Suc b2 ↦ Proved
+        };
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ Proved;
+          Suc b2 ↦ (proof swap for compare) a2 b2
+        }
+  }
+
+pub proof self_eq for compare (n : Nat) : Equal OrdResult (compare n n) Eq =
   match n {
     Zero ↦ Proved;
     Suc n2 ↦ proof self_eq for compare n2
@@ -1071,7 +1089,7 @@ argument and its bridge exposes the canonical successor relation.
    and their eight selectors (`comm`, `assoc`, `absorb`, and `distrib` for each);
    the three `compare` agreements;
    and the five inductive `sub` proofs, including `sub::add_cancel`.
-   `OrdResult` remains package-local.
+   `compare` returns the canonical `Core.Logic.OrdResult` identity.
 2. **Source map.**
 
    | Task | Section |
