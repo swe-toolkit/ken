@@ -1436,8 +1436,8 @@ separate accepted and refused conformance seed.
 ## 18. Orientation of three natural points
 
 > Section 18 status: DRAFT v0 (SPEC-GEOMETRY-NAT-ORIENTATION).
-> Architect's AC-0 checked a scratch development of the operation and four
-> generic laws. That development is feasibility evidence, not a catalog
+> The AC-0 design review checked a scratch development of the operation and
+> four generic laws. That development is feasibility evidence, not a catalog
 > landing, an official conformance run, CI or a landed trust measurement.
 
 `Algorithm.Geometry.NatOrientation` owns `orient` and its four public laws.
@@ -1503,16 +1503,22 @@ repeated-point law also yield `orient a b b = Eq` and
 `orient a b a = Eq`. Combining swap with rotation flips every odd
 permutation's result. These consequences add no separate public laws.
 
-Architect's scratch checked the four generic laws for the actual
-`orient`, with no new local `Axiom`; `orient_cross` closed by `Refl`
-under the checked definition. The mutation measurements of laws 1–3
-under the constant-`Eq` and reversed-comparison alternatives covered
-**closed instances only**. Their generic truth under those alternatives
-rests on the hand derivation in AC-0 §1(a), not a checked generic proof;
-closed instances must not be represented as such a proof. All three
-mutated full providers refused first at `orient_cross`, so the fourth
-law discriminates them even though a failed original proof body alone
-would not establish that its law statement is false.
+The AC-0 scratch development checked the four generic laws for the actual
+`orient`, with no new local `Axiom`; `orient_cross` closed by `Refl` under
+the checked definition. The constant-`Eq` function satisfies swap, rotation
+and the repeated-point equation because `ord_result_flip Eq` is `Eq`. The
+reversed comparison satisfies them because swapping the first two points
+exchanges `L` and `R` up to commuting each product, rotation permutes the
+summands of each sum, and a repeated point makes the two sums equal. That
+derivation is by hand; the measured evidence covers **closed instances
+only** and must not be represented as a checked generic proof. Each
+measured alternative falsifies `orient_cross`, as its closed outputs show.
+Constant `Eq` and reversed comparison give `Eq` and `Lt` on the
+counter-clockwise example, where `compare L R` is `Gt`. Dropping the third
+summand of `L` gives `Lt` on the collinear example, where `compare L R` is
+`Eq`. A mutated provider rejecting the original `orient_cross` proof is not
+itself that evidence, since any change to `orient` breaks a proof written
+against its definition.
 
 The scratch trusted-base identity set was unchanged when the new
 checked definitions and laws loaded. As in §1.4, this does not remove
