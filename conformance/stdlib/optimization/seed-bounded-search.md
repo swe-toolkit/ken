@@ -31,6 +31,8 @@ by `find_below` itself.
 import Algorithm.Optimization.BoundedSearch
   (find_below, find_below_sound, find_below_least, find_below_complete)
 
+import Core.Logic.Conjunction (And)
+
 import Data.Numeric.Nat.Order (lt_nat)
 
 const two : Nat = Suc (Suc Zero)
