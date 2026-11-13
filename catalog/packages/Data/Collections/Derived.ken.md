@@ -54,7 +54,9 @@ The first four of the seven floor combinators follow: `list_append`
 (deliberately a distinct name from the landed `Bytes`-domain `append`,
 FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 `List a -> List a -> List a` op and must not shadow or be shadowed by it),
-`nth`, `take`, and `drop`. The canonical `length` comes from the trust-free
+`nth`, public `take`, and private `drop`. Public `take` retains the original
+structural recursion and has attached length, membership, sorted-prefix, and
+filtered-prefix proofs. The canonical `length` comes from the trust-free
 `Data.Collections.List` module and is re-exported here with the same checked
 identity. `list_eq` and `list_compare` are imported from
 the canonical comparison provider; `sub` is imported from the canonical Nat
@@ -69,7 +71,8 @@ import Data.Numeric.Nat.Order (leq_nat_weaken_right, min, sub)
 
 import Core.Logic.Compare (list_compare, list_eq)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat, leqChar)
+import Core.Classes.LawfulClasses
+  (IsTrue, bool_and, bool_or, bool_leq, bool_false_of_not_true, leq_nat, leqChar)
 
 import Core.Logic.And (And as Conj)
 
@@ -124,7 +127,7 @@ pub fn nth (a : Type) (n : Nat) (xs : List a) : Option a =
       }
   }
 
-fn take (a : Type) (n : Nat) (xs : List a) : List a =
+pub fn take (a : Type) (n : Nat) (xs : List a) : List a =
   match n {
     Zero ↦ Nil a;
     Suc m ↦
@@ -511,6 +514,9 @@ before this file.
 Ordinary transparent recursive definitions over `List`/`Nat`; no primitive
 or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `length_take_min` are the three original proof-returning laws. The public
+`take::length` delegates to the unchanged private `length_take_min`; public
+`take::member`, `take::sorted` and `take::filter_prefix` characterize its
+ordered prefix without testing value equality. The public
 `list_append::length` and private `length_drop` laws hold for any element type
 and list. The append law uses the canonical addition laws because `add`
 recurses on its second argument. The private `mem_filter` theorem characterizes
@@ -632,6 +638,47 @@ pub proof length for filter
         ((proof length for filter) a keep tail)
         (keep head)
   }
+
+pub proof empty_if_none for filter
+      (a : Type) (p : a → Bool) (xs : List a)
+    : ((y : a) → list_elem a y xs → Equal Bool (p y) False)
+      → Equal (List a) (filter a p xs) (Nil a) =
+  match xs {
+    Nil ↦ λnone. Proved;
+    Cons h t ↦
+      λnone.
+        derived_filter_none_cons
+          a
+          p
+          h
+          t
+          (none h (list_elem_head a h t))
+          ((proof empty_if_none for filter)
+            a
+            p
+            t
+            (λy. λmember. none y (list_elem_later a y h t member)))
+  }
+
+theorem derived_filter_none_cons
+      (a : Type)
+      (p : a → Bool)
+      (h : a)
+      (t : List a)
+      (skip : Equal Bool (p h) False)
+      (tail_empty : Equal (List a) (filter a p t) (Nil a))
+    : Equal (List a) (filter a p (Cons a h t)) (Nil a) =
+  trans
+    (List a)
+    (filter a p (Cons a h t))
+    (filter a p t)
+    (Nil a)
+    (J
+      (λdecision _.
+        Equal (List a) (filter_keep_step a h (filter a p t) decision) (filter a p t))
+      Refl
+      (sym Bool (p h) False skip))
+    tail_empty
 
 pub fn is_sorted (a : Type) (leq : a → a → Bool) (xs : List a) : Omega =
   match xs {
@@ -1173,6 +1220,131 @@ theorem length_take_min
           cong Nat Nat (length a (take a m t)) (min m (length a t)) Suc (length_take_min a m t)
       }
   }
+
+pub proof length for take
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal Nat (length a (take a n xs)) (min n (length a xs)) =
+  length_take_min a n xs
+
+pub proof member for take
+      (a : Type) (n : Nat) (xs : List a) (y : a)
+    : list_elem a y (take a n xs) → list_elem a y xs =
+  match n {
+    Zero ↦ λmember. absurd member;
+    Suc m ↦
+      match xs {
+        Nil ↦ λmember. absurd member;
+        Cons h t ↦
+          λmember.
+            elim_trunc
+              (list_elem a y (Cons a h t))
+              (λcase.
+                match case {
+                  Inl same ↦ trunc_intro (Inl (Equal a y h) (list_elem a y t) same);
+                  Inr later ↦ list_elem_later a y h t ((proof member for take) a m t y later)
+                })
+              member
+      }
+  }
+
+pub proof sorted for take
+      (a : Type) (le : a → a → Bool) (n : Nat) (xs : List a)
+    : is_sorted a le xs → is_sorted a le (take a n xs) =
+  match n {
+    Zero ↦ λsorted_xs. Proved;
+    Suc m ↦
+      match xs {
+        Nil ↦ λsorted_xs. Proved;
+        Cons h t ↦
+          λsorted_xs.
+            derived_take_sorted_cons
+              a
+              le
+              h
+              t
+              m
+              sorted_xs
+              ((proof sorted for take) a le m t (derived_take_sorted_tail a le h t sorted_xs))
+      }
+  }
+
+pub proof filter_prefix for take
+      (a : Type) (p : a → Bool) (n : Nat) (xs : List a)
+    : Equal
+        (List a)
+        (filter a p (take a n xs))
+        (take a (length a (filter a p (take a n xs))) (filter a p xs)) =
+  match n {
+    Zero ↦ Proved;
+    Suc m ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons h t ↦
+          derived_take_filter_step
+            a
+            h
+            (filter a p (take a m t))
+            (filter a p t)
+            ((proof filter_prefix for take) a p m t)
+            (p h)
+      }
+  }
+
+theorem derived_take_sorted_tail
+      (a : Type) (le : a → a → Bool) (h : a) (t : List a)
+    : is_sorted a le (Cons a h t) → is_sorted a le t =
+  match t {
+    Nil ↦ λsorted_xs. Proved;
+    Cons j rest ↦
+      λsorted_xs. and_snd (Equal Bool (le h j) True) (is_sorted a le (Cons a j rest)) sorted_xs
+  }
+
+theorem derived_take_sorted_cons
+      (a : Type) (le : a → a → Bool) (h : a) (t : List a) (n : Nat)
+    : is_sorted a le (Cons a h t)
+      → is_sorted a le (take a n t)
+      → is_sorted a le (Cons a h (take a n t)) =
+  match n {
+    Zero ↦ λsorted_xs. λsorted_tail. Proved;
+    Suc m ↦
+      match t {
+        Nil ↦ λsorted_xs. λsorted_tail. Proved;
+        Cons j rest ↦
+          λsorted_xs.
+            λsorted_tail.
+              and_intro
+                (Equal Bool (le h j) True)
+                (is_sorted a le (take a (Suc m) (Cons a j rest)))
+                (and_fst (Equal Bool (le h j) True) (is_sorted a le (Cons a j rest)) sorted_xs)
+                sorted_tail
+      }
+  }
+
+theorem derived_take_filter_step
+      (a : Type)
+      (h : a)
+      (selected : List a)
+      (all : List a)
+      (prefix : Equal (List a) selected (take a (length a selected) all))
+      (decision : Bool)
+    : Equal
+        (List a)
+        (filter_keep_step a h selected decision)
+        (take
+          a
+          (length a (filter_keep_step a h selected decision))
+          (filter_keep_step a h all decision)) =
+  match decision {
+    True ↦
+      cong
+        (List a)
+        (List a)
+        selected
+        (take a (length a selected) all)
+        (λrest. Cons a h rest)
+        prefix;
+    False ↦ prefix
+  }
 ```
 
 ```ken example
@@ -1606,9 +1778,13 @@ specialize them to `List Bool` under `bool_leq`, showing the specialized
 `sort_bool` (a direct case-split implementation, not `sort` applied to
 `bool_leq`) is both order-preserving (`sort_bool_sorted`) and a genuine
 permutation of its input (`sort_bool_perm`, via the two count-preservation
-lemmas for `True`/`False`). The generic `insert` preserves every count for
-any comparator, and `sort` preserves counts and is sorted when the comparator
-is total; no transitivity or comparator-indexed equality is required.
+lemmas for `True`/`False`). The generic `insert` preserves every count
+for any comparator, and `sort` preserves counts and is sorted when the
+comparator is total. Their new
+membership and length laws hold without comparator hypotheses; stable-class
+laws preserve each equal-cost class's input order when the comparator is
+also transitive. `list_sorted_head_bounded` makes the transitivity premise
+explicit when extending an adjacent order fact to a later list member.
 
 ```ken
 pub fn eq_from_ord (a : Type) (le : a → a → Bool) (x : a) (y : a) : Bool =
@@ -1717,6 +1893,539 @@ pub proof perm for sort
             final_count
             tail_counts_equal
             insertion_counts_equal
+  }
+
+pub proof member for insert
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a) (y : a)
+    : list_elem a y (insert a le x xs) → list_elem a y (Cons a x xs) =
+  match xs {
+    Nil ↦ λmember. member;
+    Cons h t ↦
+      derived_insert_member_cons_case
+        a
+        le
+        x
+        h
+        t
+        y
+        ((proof member for insert) a le x t y)
+        (le x h)
+        Refl
+  }
+
+pub proof length for insert
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : Equal Nat (length a (insert a le x xs)) (Suc (length a xs)) =
+  derived_length_from_equal_count
+    a
+    x
+    (insert a le x xs)
+    (Cons a x xs)
+    (sym
+      Nat
+      (count a (derived_always_true a) x (Cons a x xs))
+      (count a (derived_always_true a) x (insert a le x xs))
+      ((proof count for insert) a le x xs (derived_always_true a) x))
+
+pub proof length for sort
+      (a : Type) (le : a → a → Bool) (xs : List a)
+    : Equal Nat (length a (sort a le xs)) (length a xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      derived_length_from_equal_count
+        a
+        h
+        (sort a le (Cons a h t))
+        (Cons a h t)
+        (sym
+          Nat
+          (count a (derived_always_true a) h (Cons a h t))
+          (count a (derived_always_true a) h (sort a le (Cons a h t)))
+          ((proof perm for sort) a le (Cons a h t) (derived_always_true a) h))
+  }
+
+pub proof member for sort
+      (a : Type) (le : a → a → Bool) (xs : List a) (y : a)
+    : list_elem a y (sort a le xs) → list_elem a y xs =
+  match xs {
+    Nil ↦ λmember. absurd member;
+    Cons h t ↦
+      λmember.
+        derived_sort_member_cons
+          a
+          h
+          t
+          (sort a le t)
+          y
+          ((proof member for sort) a le t y)
+          ((proof member for insert) a le h (sort a le t) y member)
+  }
+
+pub proof stable_class for insert
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (xs : List a)
+    : Equal
+        (List a)
+        (filter a (eq_from_ord a le w) (insert a le x xs))
+        (filter a (eq_from_ord a le w) (Cons a x xs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      derived_filter_insert_class_cons_case
+        a
+        le
+        transitive
+        w
+        x
+        h
+        t
+        ((proof stable_class for insert) a le total transitive w x t)
+        (le x h)
+        Refl
+  }
+
+pub proof stable_class for sort
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (xs : List a)
+    : Equal
+        (List a)
+        (filter a (eq_from_ord a le w) (sort a le xs))
+        (filter a (eq_from_ord a le w) xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      trans
+        (List a)
+        (filter a (eq_from_ord a le w) (insert a le h (sort a le t)))
+        (filter_keep_step
+          a
+          h
+          (filter a (eq_from_ord a le w) (sort a le t))
+          (eq_from_ord a le w h))
+        (filter_keep_step a h (filter a (eq_from_ord a le w) t) (eq_from_ord a le w h))
+        ((proof stable_class for insert) a le total transitive w h (sort a le t))
+        (cong
+          (List a)
+          (List a)
+          (filter a (eq_from_ord a le w) (sort a le t))
+          (filter a (eq_from_ord a le w) t)
+          (λselected. filter_keep_step a h selected (eq_from_ord a le w h))
+          ((proof stable_class for sort) a le total transitive w t))
+  }
+
+theorem derived_class_order
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (h : a)
+    : IsTrue (eq_from_ord a le w x) → IsTrue (eq_from_ord a le w h) → Equal Bool (le x h) True =
+  λpx.
+    λph.
+      transitive
+        x
+        w
+        h
+        ((proof right for bool_and) (le w x) (le x w) px)
+        ((proof left for bool_and) (le w h) (le h w) ph)
+
+theorem derived_class_exclusive
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (h : a)
+      (cmp_false : Equal Bool (le x h) False)
+    : IsTrue (eq_from_ord a le w x) → IsTrue (eq_from_ord a le w h) → Bottom =
+  λpx.
+    λph.
+      trans
+        Bool
+        False
+        (le x h)
+        True
+        (sym Bool (le x h) False cmp_false)
+        (derived_class_order a le transitive w x h px ph)
+
+fn derived_always_true (a : Type) (x : a) (y : a) : Bool = True
+
+theorem derived_count_true_length
+      (a : Type) (q : a) (xs : List a)
+    : Equal Nat (count a (derived_always_true a) q xs) (length a xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      cong
+        Nat
+        Nat
+        (count a (derived_always_true a) q t)
+        (length a t)
+        Suc
+        (derived_count_true_length a q t)
+  }
+
+theorem derived_keep_commutes
+      (a : Type) (x : a) (h : a) (ys : List a) (first : Bool)
+    : (second : Bool)
+      → (IsTrue first → IsTrue second → Bottom)
+      → Equal
+        (List a)
+        (filter_keep_step a h (filter_keep_step a x ys first) second)
+        (filter_keep_step a x (filter_keep_step a h ys second) first) =
+  match first {
+    True ↦
+      λsecond.
+        match second {
+          True ↦ λexclusive. absurd (exclusive Proved Proved);
+          False ↦ λexclusive. Refl
+        };
+    False ↦ λsecond. λexclusive. Refl
+  }
+
+theorem derived_length_from_equal_count
+      (a : Type)
+      (q : a)
+      (xs : List a)
+      (ys : List a)
+      (same_count : Equal
+        Nat
+        (count a (derived_always_true a) q xs)
+        (count a (derived_always_true a) q ys))
+    : Equal Nat (length a xs) (length a ys) =
+  trans
+    Nat
+    (length a xs)
+    (count a (derived_always_true a) q xs)
+    (length a ys)
+    (sym
+      Nat
+      (count a (derived_always_true a) q xs)
+      (length a xs)
+      (derived_count_true_length a q xs))
+    (trans
+      Nat
+      (count a (derived_always_true a) q xs)
+      (count a (derived_always_true a) q ys)
+      (length a ys)
+      same_count
+      (derived_count_true_length a q ys))
+
+theorem derived_insert_member_swap
+      (a : Type) (x : a) (h : a) (t : List a) (y : a)
+    : list_elem a y (Cons a x t) → list_elem a y (Cons a x (Cons a h t)) =
+  λmember.
+    elim_trunc
+      (list_elem a y (Cons a x (Cons a h t)))
+      (λcase.
+        match case {
+          Inl same_x ↦ trunc_intro (Inl (Equal a y x) (list_elem a y (Cons a h t)) same_x);
+          Inr later ↦ list_elem_later a y x (Cons a h t) (list_elem_later a y h t later)
+        })
+      member
+
+theorem derived_insert_member_false
+      (a : Type)
+      (le : a → a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (y : a)
+      (ih : list_elem a y (insert a le x t) → list_elem a y (Cons a x t))
+    : list_elem a y (Cons a h (insert a le x t)) → list_elem a y (Cons a x (Cons a h t)) =
+  λmember.
+    elim_trunc
+      (list_elem a y (Cons a x (Cons a h t)))
+      (λcase.
+        match case {
+          Inl same_h ↦
+            list_elem_later
+              a
+              y
+              x
+              (Cons a h t)
+              (trunc_intro (Inl (Equal a y h) (list_elem a y t) same_h));
+          Inr later ↦ derived_insert_member_swap a x h t y (ih later)
+        })
+      member
+
+theorem derived_insert_member_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (y : a)
+      (ih : list_elem a y (insert a le x t) → list_elem a y (Cons a x t))
+      (decision : Bool)
+    : Equal Bool (le x h) decision
+      → list_elem a y (insert a le x (Cons a h t))
+      → list_elem a y (Cons a x (Cons a h t)) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λd _.
+            list_elem
+              a
+              y
+              (match d {
+                True ↦ Cons a x (Cons a h t);
+                False ↦ Cons a h (insert a le x t)
+              })
+            → list_elem a y (Cons a x (Cons a h t)))
+          (λmember. member)
+          (sym Bool (le x h) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λd _.
+            list_elem
+              a
+              y
+              (match d {
+                True ↦ Cons a x (Cons a h t);
+                False ↦ Cons a h (insert a le x t)
+              })
+            → list_elem a y (Cons a x (Cons a h t)))
+          (derived_insert_member_false a le x h t y ih)
+          (sym Bool (le x h) False comparison)
+  }
+
+theorem derived_sort_member_cons
+      (a : Type)
+      (h : a)
+      (t : List a)
+      (sorted_tail : List a)
+      (y : a)
+      (ih : list_elem a y sorted_tail → list_elem a y t)
+    : list_elem a y (Cons a h sorted_tail) → list_elem a y (Cons a h t) =
+  λmember.
+    elim_trunc
+      (list_elem a y (Cons a h t))
+      (λcase.
+        match case {
+          Inl same_h ↦ trunc_intro (Inl (Equal a y h) (list_elem a y t) same_h);
+          Inr later ↦ list_elem_later a y h t (ih later)
+        })
+      member
+
+theorem derived_filter_insert_class_false
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (ih : Equal
+        (List a)
+        (filter a (eq_from_ord a le w) (insert a le x t))
+        (filter_keep_step a x (filter a (eq_from_ord a le w) t) (eq_from_ord a le w x)))
+      (comparison : Equal Bool (le x h) False)
+    : Equal
+        (List a)
+        (filter_keep_step
+          a
+          h
+          (filter a (eq_from_ord a le w) (insert a le x t))
+          (eq_from_ord a le w h))
+        (filter_keep_step
+          a
+          x
+          (filter a (eq_from_ord a le w) (Cons a h t))
+          (eq_from_ord a le w x)) =
+  trans
+    (List a)
+    (filter_keep_step
+      a
+      h
+      (filter a (eq_from_ord a le w) (insert a le x t))
+      (eq_from_ord a le w h))
+    (filter_keep_step
+      a
+      h
+      (filter_keep_step a x (filter a (eq_from_ord a le w) t) (eq_from_ord a le w x))
+      (eq_from_ord a le w h))
+    (filter_keep_step
+      a
+      x
+      (filter_keep_step a h (filter a (eq_from_ord a le w) t) (eq_from_ord a le w h))
+      (eq_from_ord a le w x))
+    (cong
+      (List a)
+      (List a)
+      (filter a (eq_from_ord a le w) (insert a le x t))
+      (filter_keep_step a x (filter a (eq_from_ord a le w) t) (eq_from_ord a le w x))
+      (λselected. filter_keep_step a h selected (eq_from_ord a le w h))
+      ih)
+    (derived_keep_commutes
+      a
+      x
+      h
+      (filter a (eq_from_ord a le w) t)
+      (eq_from_ord a le w x)
+      (eq_from_ord a le w h)
+      (derived_class_exclusive a le transitive w x h comparison))
+
+theorem derived_filter_insert_class_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (w : a)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (ih : Equal
+        (List a)
+        (filter a (eq_from_ord a le w) (insert a le x t))
+        (filter_keep_step a x (filter a (eq_from_ord a le w) t) (eq_from_ord a le w x)))
+      (decision : Bool)
+    : Equal Bool (le x h) decision
+      → Equal
+        (List a)
+        (filter a (eq_from_ord a le w) (insert a le x (Cons a h t)))
+        (filter_keep_step
+          a
+          x
+          (filter a (eq_from_ord a le w) (Cons a h t))
+          (eq_from_ord a le w x)) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λd _.
+            Equal
+              (List a)
+              (filter
+                a
+                (eq_from_ord a le w)
+                (match d {
+                  True ↦ Cons a x (Cons a h t);
+                  False ↦ Cons a h (insert a le x t)
+                }))
+              (filter_keep_step
+                a
+                x
+                (filter a (eq_from_ord a le w) (Cons a h t))
+                (eq_from_ord a le w x)))
+          Refl
+          (sym Bool (le x h) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λd _.
+            Equal
+              (List a)
+              (filter
+                a
+                (eq_from_ord a le w)
+                (match d {
+                  True ↦ Cons a x (Cons a h t);
+                  False ↦ Cons a h (insert a le x t)
+                }))
+              (filter_keep_step
+                a
+                x
+                (filter a (eq_from_ord a le w) (Cons a h t))
+                (eq_from_ord a le w x)))
+          (derived_filter_insert_class_false a le transitive w x h t ih comparison)
+          (sym Bool (le x h) False comparison)
   }
 
 fn derived_sort_head_ordered (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : Prop =
@@ -2279,7 +2988,9 @@ theorem sort_bool_perm
 Filtered order and occurrence counting are generic properties of lists, not of
 event timestamps. `filter_sorted` preserves sorting across dropped elements
 when the comparator is transitive. The public `filter_starts_after` proof
-retains the head-order fact through filtering a sorted tail; EventTrace
+retains the head-order fact through filtering a sorted tail; the public
+`list_sorted_head_bounded` lifts head order to any tail member when the
+comparator is transitive. EventTrace
 uses it when distributing a window across a merge. The public sorted-cons,
 tail and head bridges reuse the existing private sorted-head proof family.
 `count_cons`,
@@ -2305,6 +3016,73 @@ pub theorem list_sorted_head
       (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
     : is_sorted a le (Cons a x xs) → starts_after a le x xs =
   derived_sort_sorted_head a le x xs
+
+pub theorem list_sorted_head_bounded
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (head : a)
+      (tail : List a)
+    : is_sorted a le (Cons a head tail)
+      → (y : a)
+      → list_elem a y tail
+      → Equal Bool (le head y) True =
+  match tail {
+    Nil ↦ λordered. λy. λmember. absurd member;
+    Cons next rest ↦
+      λordered.
+        λy.
+          λmember.
+            elim_trunc
+              (Equal Bool (le head y) True)
+              (λcase.
+                match case {
+                  Inl same ↦
+                    J
+                      (λv _. Equal Bool (le head v) True)
+                      (and_fst
+                        (Equal Bool (le head next) True)
+                        (is_sorted a le (Cons a next rest))
+                        ordered)
+                      (sym a y next same);
+                  Inr later ↦
+                    transitive
+                      head
+                      next
+                      y
+                      (and_fst
+                        (Equal Bool (le head next) True)
+                        (is_sorted a le (Cons a next rest))
+                        ordered)
+                      (list_sorted_head_bounded
+                        a
+                        le
+                        transitive
+                        next
+                        rest
+                        (and_snd
+                          (Equal Bool (le head next) True)
+                          (is_sorted a le (Cons a next rest))
+                          ordered)
+                        y
+                        later)
+                })
+              member
+  }
 
 theorem starts_after_trans
       (a : Type)
@@ -3515,16 +4293,21 @@ reference implementation.
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
    `eq_from_ord`, `filter`, `length`, `list_append`, `list_concat`, `list_all`,
-   `map`, `nth`, `reverse`.
+   `map`, `nth`, `reverse`, `take`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
    `list_append::right_unit`, `list_append::length`, `map::append`,
-   `map::fusion`, `map::id`, `filter::append`, `nth::at_or_beyond_is_none`,
-   `nth::some_below_length`,
-   `reverse::involutive`. Generic sorting adds the operations `Perm`, `insert`,
-   and `sort`, with attached proofs `insert::sorted`, `insert::count`,
-   `sort::sorted`, and `sort::perm`. All other definitions in this package are
-   package-local; `cat_derived_pub_export.rs` is the authoritative inventory,
-   and publishing another name is a separate change to both.
+   `map::fusion`, `map::id`, `filter::append`, `filter::length`,
+   `filter::empty_if_none`, `take::length`, `take::member`, `take::sorted`,
+   `take::filter_prefix`, `nth::at_or_beyond_is_none`,
+   `nth::some_below_length`, `reverse::involutive`. Generic sorting adds
+   the operations `Perm`, `insert`, and `sort`, with attached proofs
+   `insert::sorted`, `insert::count`, `insert::member`, `insert::length`,
+   `insert::stable_class`, `sort::sorted`, `sort::perm`, `sort::length`,
+   `sort::member`, and `sort::stable_class`. The public
+   `list_sorted_head_bounded` carries its transitivity premise. All other
+   definitions in this package are package-local;
+   `cat_derived_pub_export.rs` is the authoritative inventory, and
+   publishing another name is a separate change to both.
 3. **Source map.**
 
    | Task | Section |
@@ -3549,9 +4332,9 @@ reference implementation.
    `StringBijection`'s `string_to_list_char_retraction`. The private
    `concat_map_append` proof uses structural induction and the checked
    `list_append::assoc`, `cong`, `sym`, and `trans` proofs, not these axioms.
-   The generic sort proofs consume an explicit totality premise only for
-   sortedness; they neither add an axiom nor invoke the inherited `Ord Int`
-   assumptions.
+   The generic sort's sortedness proof consumes an explicit totality premise;
+   the stable-class proofs also consume transitivity. Neither adds an axiom
+   nor invokes the inherited `Ord Int` assumptions.
 6. **Proof families.** `map::id`, `map::fusion`, and `map::append` induct
    over `List`, lifting the tail proof under `Cons` with `cong`. `§4.1`/`§4.2`
    also use structural induction + `cong`/`trans` under the head constructor.
@@ -3570,8 +4353,12 @@ reference implementation.
    length, and order reduce together. `§4.3`:
    generic `insert::count` preserves every count with any comparator and
    `sort::perm` composes the tail and insertion equalities. The generic
-   `insert::sorted` and `sort::sorted` use only comparator totality; private
-   decision-variable helpers rewrite applied comparator branches without
+   `insert::sorted` and `sort::sorted` use only comparator totality; public
+   insert/sort member, length and stable-class proofs supply the sorted-prefix
+   selector with a reusable checked foundation. The `take` proofs induct on
+   the bound and input, delegating length to `length_take_min` and commuting
+   filtering with the selected prefix. Private decision-variable helpers
+   rewrite applied comparator branches without
    relying on a proof-side match to refine the goal. The separate `List Bool`
    proofs case-split under `bool_leq`, closing by `Proved`/`Refl`/`cong`/
    `trans`/`sym`. `§4.4`: every law field closes by
@@ -3585,8 +4372,10 @@ reference implementation.
    these and `map::append` through a qualified alias, while
    `Capability.Parsing.Parsing` uses `map::append` for byte-code lists.
    Derived's `map_length` and filter-membership laws use its structural
-   operations locally. `Algorithm.FormalLanguages.Regex` imports
-   `list_concat` and `list_all` for concatenation and repetition evidence.
+   operations locally. `Algorithm.Optimization.Argmin` imports the public
+   `take`/`sort` and their laws for stable least-k selection.
+   `Algorithm.FormalLanguages.Regex` imports `list_concat` and `list_all`
+   for concatenation and repetition evidence.
    `Application.Configuration.Decoder` imports this module wholesale.
    `catalog/packages/Data/Collections/Map.ken` (the proved `Map`/`Set`
    BST) depends on its `list_append`.
@@ -3619,5 +4408,6 @@ reference implementation.
    `View`-style declaration reintroduced).
    `crates/ken-elaborator/tests/ds4_list_combinators_acceptance.rs` —
    confirms the DS-4 combinators register as real globals and the file
-   postulates nothing. `crates/ken-elaborator/tests/l3_strings_surface_acceptance.rs` —
+   postulates nothing.
+   `crates/ken-elaborator/tests/l3_strings_surface_acceptance.rs` —
    confirms the 5 derived `String` ops reduce over the real round trip.

@@ -3,8 +3,10 @@
 `argmin` and `argmax` select existing candidates with the least and greatest
 natural-number costs, respectively, retaining the earliest candidate on a
 tie. `argmin_option` and `argmax_option` select from possibly empty lists,
-returning `None` for `Nil`. Both nonempty choices are unchanged by a cost
-transform that preserves and reflects every strict natural-cost comparison.
+returning `None` for `Nil`. `least_k` takes up to `k` candidates in ascending
+cost order, retaining input order among equal-cost candidates. Both nonempty
+choices are unchanged by a cost transform that preserves and reflects every
+strict natural-cost comparison.
 
 ## Contents
 
@@ -23,28 +25,50 @@ without requiring an equality operation on its values. Strictly comparing
 each tail candidate against the current head retains the head whenever two
 costs are equal. The existing `NonEmpty` carrier supplies the head and ordered
 tail. On a possibly empty `List`, each Option selector returns no value on
-`Nil` and delegates `Cons` to its corresponding nonempty selector.
+`Nil` and delegates `Cons` to its corresponding nonempty selector. For a
+multi-result choice, stable sorting by natural cost and taking a prefix
+preserves every tied cost class in its original input order, without testing
+candidate equality.
 
 ## Definition
 
 The minimum selector and its ten laws lead, followed by its Option selector
-and seven laws. The maximum selector and its ten laws follow, then its Option
-selector and seven laws. Private shared selection helpers, inductive proofs and
-Option proof helpers close the definition. Two generic Nat-order facts come
-from their canonical owner, `Data.Numeric.Nat.Order`.
+and seven laws. `cost_le`, `least_k` and their public laws follow before the
+maximum selector and its ten laws, then its Option selector and seven laws.
+Private selection and least-k helpers close the definition. Natural-order
+facts come from `Data.Numeric.Nat.Order`; stable sorting, `take` and their
+proofs come from `Data.Collections.Derived`.
 
 ```ken
-import Core.Classes.LawfulClasses (IsTrue, leq_nat)
+import Core.Classes.LawfulClasses
+  (IsTrue, bool_and, bool_or, or_cases, bool_false_of_not_true, leq_nat)
 
 import Core.Function.Combinators (comp)
+
+import Core.Logic.Conjunction (and_fst)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Numeric.Nat.Order (lt_nat)
+import Data.Numeric.Nat.Order (lt_nat, min)
 
-import Data.Collections.Derived (list_append, list_elem, list_elem_head, list_elem_later)
+import Data.Collections.Derived
+  (list_append,
+    list_elem,
+    list_elem_head,
+    list_elem_later,
+    take,
+    insert,
+    sort,
+    filter,
+    is_sorted,
+    eq_from_ord,
+    length,
+    list_sorted_head_bounded,
+    list_sorted_tail,
+    list_elem_filter_complete,
+    list_elem_filter_sound)
 
 import Data.Collections.NonEmpty
   (NonEmpty,
@@ -275,6 +299,190 @@ pub theorem argmin_option_append_takes_right
       (argmin a cost (nonempty_cons a y ys))
       (Some a)
       (argmin_append_takes_right a cost (nonempty_cons a x xs) (nonempty_cons a y ys) h)
+
+pub fn cost_le (a : Type) (cost : a → Nat) (x : a) (y : a) : Bool = leq_nat (cost x) (cost y)
+
+pub fn least_k (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) : List a =
+  take a k (sort a (cost_le a cost) xs)
+
+pub theorem least_k_length
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a)
+    : Equal Nat (length a (least_k a cost k xs)) (min k (length a xs)) =
+  trans
+    Nat
+    (length a (take a k (sort a (cost_le a cost) xs)))
+    (min k (length a (sort a (cost_le a cost) xs)))
+    (min k (length a xs))
+    ((proof length for take) a k (sort a (cost_le a cost) xs))
+    (cong
+      Nat
+      Nat
+      (length a (sort a (cost_le a cost) xs))
+      (length a xs)
+      (min k)
+      ((proof length for sort) a (cost_le a cost) xs))
+
+pub theorem least_k_member
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (y : a)
+    : list_elem a y (least_k a cost k xs) → list_elem a y xs =
+  λmember.
+    (proof member for sort)
+      a
+      (cost_le a cost)
+      xs
+      y
+      ((proof member for take) a k (sort a (cost_le a cost) xs) y member)
+
+pub theorem least_k_sorted
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a)
+    : is_sorted a (cost_le a cost) (least_k a cost k xs) =
+  (proof sorted for take)
+    a
+    (cost_le a cost)
+    k
+    (sort a (cost_le a cost) xs)
+    ((proof sorted for sort)
+      a
+      (cost_le a cost)
+      (λx. λy. (proof total for leq_nat) (cost x) (cost y))
+      xs)
+
+pub theorem least_k_ties_earliest
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (w : a)
+    : Equal
+        (List a)
+        (filter a (eq_from_ord a (cost_le a cost) w) (least_k a cost k xs))
+        (take
+          a
+          (length a (filter a (eq_from_ord a (cost_le a cost) w) (least_k a cost k xs)))
+          (filter a (eq_from_ord a (cost_le a cost) w) xs)) =
+  trans
+    (List a)
+    (filter a (eq_from_ord a (cost_le a cost) w) (take a k (sort a (cost_le a cost) xs)))
+    (take
+      a
+      (length
+        a
+        (filter a (eq_from_ord a (cost_le a cost) w) (take a k (sort a (cost_le a cost) xs))))
+      (filter a (eq_from_ord a (cost_le a cost) w) (sort a (cost_le a cost) xs)))
+    (take
+      a
+      (length
+        a
+        (filter a (eq_from_ord a (cost_le a cost) w) (take a k (sort a (cost_le a cost) xs))))
+      (filter a (eq_from_ord a (cost_le a cost) w) xs))
+    ((proof filter_prefix for take)
+      a
+      (eq_from_ord a (cost_le a cost) w)
+      k
+      (sort a (cost_le a cost) xs))
+    (cong
+      (List a)
+      (List a)
+      (filter a (eq_from_ord a (cost_le a cost) w) (sort a (cost_le a cost) xs))
+      (filter a (eq_from_ord a (cost_le a cost) w) xs)
+      (λclass_members.
+        take
+          a
+          (length a (filter a (eq_from_ord a (cost_le a cost) w) (least_k a cost k xs)))
+          class_members)
+      ((proof stable_class for sort)
+        a
+        (cost_le a cost)
+        (λx. λy. (proof total for leq_nat) (cost x) (cost y))
+        (λx. λy. λz. λxy. λyz. (proof trans for leq_nat) (cost x) (cost y) (cost z) xy yz)
+        w
+        xs))
+
+pub theorem least_k_cheaper_class_selected
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (y : a) (z : a)
+    : list_elem a y (least_k a cost k xs)
+      → list_elem a z xs
+      → Equal Bool (lt_nat (cost z) (cost y)) True
+      → Equal
+        (List a)
+        (filter a (eq_from_ord a (cost_le a cost) z) (least_k a cost k xs))
+        (filter a (eq_from_ord a (cost_le a cost) z) xs) =
+  λselected.
+    λz_member.
+      λcheaper.
+        trans
+          (List a)
+          (filter a (eq_from_ord a (cost_le a cost) z) (take a k (sort a (cost_le a cost) xs)))
+          (filter a (eq_from_ord a (cost_le a cost) z) (sort a (cost_le a cost) xs))
+          (filter a (eq_from_ord a (cost_le a cost) z) xs)
+          (least_k_cheaper_prefix
+            a
+            cost
+            k
+            (sort a (cost_le a cost) xs)
+            ((proof sorted for sort)
+              a
+              (cost_le a cost)
+              (λx. λq. (proof total for leq_nat) (cost x) (cost q))
+              xs)
+            y
+            selected
+            z
+            cheaper)
+          ((proof stable_class for sort)
+            a
+            (cost_le a cost)
+            (λx. λq. (proof total for leq_nat) (cost x) (cost q))
+            (λx. λq. λv. λxq. λqv. (proof trans for leq_nat) (cost x) (cost q) (cost v) xq qv)
+            z
+            xs)
+
+pub theorem least_k_separation
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (y : a) (z : a)
+    : list_elem a y (least_k a cost k xs)
+      → list_elem a z xs
+      → (list_elem a z (least_k a cost k xs) → Bottom)
+      → IsTrue (leq_nat (cost y) (cost z)) =
+  λselected.
+    λinput_member.
+      λunselected.
+        or_cases
+          (leq_nat (cost y) (cost z))
+          (lt_nat (cost z) (cost y))
+          (IsTrue (leq_nat (cost y) (cost z)))
+          (least_k_order_or_reverse_lt (cost y) (cost z))
+          (λbound. bound)
+          (λcheaper.
+            absurd
+              (unselected
+                (least_k_member_from_class_equal
+                  a
+                  cost
+                  z
+                  (least_k a cost k xs)
+                  xs
+                  (least_k_cheaper_class_selected a cost k xs y z selected input_member cheaper)
+                  input_member)))
+
+pub theorem least_k_one_nil
+      (a : Type) (cost : a → Nat)
+    : Equal (List a) (least_k a cost (Suc Zero) (Nil a)) (Nil a) =
+  Proved
+
+pub theorem least_k_one_cons
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : Equal
+        (List a)
+        (least_k a cost (Suc Zero) (Cons a x rest))
+        (Cons a (argmin a cost (nonempty_cons a x rest)) (Nil a)) =
+  match rest {
+    Nil ↦ Refl;
+    Cons y ys ↦
+      least_k_sort_cons_step
+        a
+        cost
+        x
+        y
+        ys
+        (sort a (cost_le a cost) (Cons a y ys))
+        (least_k_one_cons a cost y ys)
+  }
 
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
@@ -1143,6 +1351,385 @@ theorem argmax_option_greatest_base
     Nil ↦ Proved;
     Cons x rest ↦ argmax_greatest a cost (nonempty_cons a x rest)
   }
+
+theorem least_k_sorted_head_bound
+      (a : Type)
+      (cost : a → Nat)
+      (h : a)
+      (t : List a)
+      (ordered : is_sorted a (cost_le a cost) (Cons a h t))
+    : (q : a) → list_elem a q (Cons a h t) → Equal Bool (leq_nat (cost h) (cost q)) True =
+  λq.
+    λmember.
+      elim_trunc
+        (Equal Bool (leq_nat (cost h) (cost q)) True)
+        (λcase.
+          match case {
+            Inl same ↦
+              J
+                (λv _. Equal Bool (leq_nat (cost h) (cost v)) True)
+                ((proof refl for leq_nat) (cost h))
+                (sym a q h same);
+            Inr later ↦
+              list_sorted_head_bounded
+                a
+                (cost_le a cost)
+                (λx.
+                  λy. λz. λxy. λyz. (proof trans for leq_nat) (cost x) (cost y) (cost z) xy yz)
+                h
+                t
+                ordered
+                q
+                later
+          })
+        member
+
+theorem least_k_class_is_not_cheaper
+      (a : Type)
+      (cost : a → Nat)
+      (z : a)
+      (h : a)
+      (q : a)
+      (head_le_q : Equal Bool (leq_nat (cost h) (cost q)) True)
+      (z_lt_h : Equal Bool (lt_nat (cost z) (cost h)) True)
+    : Equal Bool (eq_from_ord a (cost_le a cost) z q) True → Bottom =
+  λsame_cost.
+    trans
+      Bool
+      True
+      (lt_nat (cost z) (cost h))
+      False
+      (sym Bool (lt_nat (cost z) (cost h)) True z_lt_h)
+      ((proof leq_not_lt for lt_nat)
+        (cost h)
+        (cost z)
+        ((proof trans for leq_nat)
+          (cost h)
+          (cost q)
+          (cost z)
+          head_le_q
+          ((proof right for bool_and)
+            (leq_nat (cost z) (cost q))
+            (leq_nat (cost q) (cost z))
+            same_cost)))
+
+theorem least_k_no_cheaper_sorted_class
+      (a : Type)
+      (cost : a → Nat)
+      (z : a)
+      (h : a)
+      (t : List a)
+      (ordered : is_sorted a (cost_le a cost) (Cons a h t))
+      (z_lt_h : Equal Bool (lt_nat (cost z) (cost h)) True)
+    : Equal (List a) (filter a (eq_from_ord a (cost_le a cost) z) (Cons a h t)) (Nil a) =
+  (proof empty_if_none for filter)
+    a
+    (eq_from_ord a (cost_le a cost) z)
+    (Cons a h t)
+    (λq.
+      λmember.
+        bool_false_of_not_true
+          (eq_from_ord a (cost_le a cost) z q)
+          (least_k_class_is_not_cheaper
+            a
+            cost
+            z
+            h
+            q
+            (least_k_sorted_head_bound a cost h t ordered q member)
+            z_lt_h))
+
+fn least_k_filter_step (a : Type) (h : a) (tail : List a) (keep : Bool) : List a =
+  match keep {
+    True ↦ Cons a h tail;
+    False ↦ tail
+  }
+
+theorem least_k_cheaper_prefix
+      (a : Type) (cost : a → Nat) (k : Nat) (sorted : List a)
+    : is_sorted a (cost_le a cost) sorted
+      → (y : a)
+      → list_elem a y (take a k sorted)
+      → (z : a)
+      → Equal Bool (lt_nat (cost z) (cost y)) True
+      → Equal
+        (List a)
+        (filter a (eq_from_ord a (cost_le a cost) z) (take a k sorted))
+        (filter a (eq_from_ord a (cost_le a cost) z) sorted) =
+  match k {
+    Zero ↦ λordered. λy. λmember. λz. λcheaper. absurd member;
+    Suc m ↦
+      match sorted {
+        Nil ↦ λordered. λy. λmember. λz. λcheaper. absurd member;
+        Cons h t ↦
+          λordered.
+            λy.
+              λmember.
+                λz.
+                  λcheaper.
+                    elim_trunc
+                      (Equal
+                        (List a)
+                        (filter
+                          a
+                          (eq_from_ord a (cost_le a cost) z)
+                          (take a (Suc m) (Cons a h t)))
+                        (filter a (eq_from_ord a (cost_le a cost) z) (Cons a h t)))
+                      (λcase.
+                        match case {
+                          Inl same_yh ↦
+                            trans
+                              (List a)
+                              (filter
+                                a
+                                (eq_from_ord a (cost_le a cost) z)
+                                (take a (Suc m) (Cons a h t)))
+                              (Nil a)
+                              (filter a (eq_from_ord a (cost_le a cost) z) (Cons a h t))
+                              (least_k_no_cheaper_sorted_class
+                                a
+                                cost
+                                z
+                                h
+                                (take a m t)
+                                ((proof sorted for take)
+                                  a
+                                  (cost_le a cost)
+                                  (Suc m)
+                                  (Cons a h t)
+                                  ordered)
+                                (J
+                                  (λv _. Equal Bool (lt_nat (cost z) (cost v)) True)
+                                  cheaper
+                                  same_yh))
+                              (sym
+                                (List a)
+                                (filter a (eq_from_ord a (cost_le a cost) z) (Cons a h t))
+                                (Nil a)
+                                (least_k_no_cheaper_sorted_class
+                                  a
+                                  cost
+                                  z
+                                  h
+                                  t
+                                  ordered
+                                  (J
+                                    (λv _. Equal Bool (lt_nat (cost z) (cost v)) True)
+                                    cheaper
+                                    same_yh)));
+                          Inr later ↦
+                            cong
+                              (List a)
+                              (List a)
+                              (filter a (eq_from_ord a (cost_le a cost) z) (take a m t))
+                              (filter a (eq_from_ord a (cost_le a cost) z) t)
+                              (λclass_tail.
+                                least_k_filter_step
+                                  a
+                                  h
+                                  class_tail
+                                  (eq_from_ord a (cost_le a cost) z h))
+                              (least_k_cheaper_prefix
+                                a
+                                cost
+                                m
+                                t
+                                (list_sorted_tail a (cost_le a cost) h t ordered)
+                                y
+                                later
+                                z
+                                cheaper)
+                        })
+                      member
+      }
+  }
+
+theorem least_k_order_or_reverse_lt
+      (m : Nat) (n : Nat)
+    : IsTrue (bool_or (leq_nat m n) (lt_nat n m)) =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ least_k_order_or_reverse_lt m2 n2
+      }
+  }
+
+theorem least_k_member_from_class_equal
+      (a : Type)
+      (cost : a → Nat)
+      (z : a)
+      (selected : List a)
+      (xs : List a)
+      (same_class : Equal
+        (List a)
+        (filter a (eq_from_ord a (cost_le a cost) z) selected)
+        (filter a (eq_from_ord a (cost_le a cost) z) xs))
+      (member : list_elem a z xs)
+    : list_elem a z selected =
+  and_fst
+    (list_elem a z selected)
+    (Equal Bool (eq_from_ord a (cost_le a cost) z z) True)
+    (list_elem_filter_sound
+      a
+      (eq_from_ord a (cost_le a cost) z)
+      z
+      selected
+      (J
+        (λselected_class _. list_elem a z selected_class)
+        (list_elem_filter_complete
+          a
+          (eq_from_ord a (cost_le a cost) z)
+          z
+          xs
+          member
+          ((proof intro for bool_and)
+            (leq_nat (cost z) (cost z))
+            (leq_nat (cost z) (cost z))
+            ((proof refl for leq_nat) (cost z))
+            ((proof refl for leq_nat) (cost z))))
+        (sym
+          (List a)
+          (filter a (eq_from_ord a (cost_le a cost) z) selected)
+          (filter a (eq_from_ord a (cost_le a cost) z) xs)
+          same_class)))
+
+fn least_k_le_pick (a : Type) (x : a) (y : a) (m : Nat) (n : Nat) : a =
+  match leq_nat m n {
+    True ↦ x;
+    False ↦ y
+  }
+
+fn least_k_lt_pick (a : Type) (x : a) (y : a) (m : Nat) (n : Nat) : a =
+  match lt_nat n m {
+    True ↦ y;
+    False ↦ x
+  }
+
+theorem least_k_bool_choice_equiv
+      (a : Type) (x : a) (y : a) (m : Nat) (n : Nat)
+    : Equal a (least_k_le_pick a x y m n) (least_k_lt_pick a x y m n) =
+  match m {
+    Zero ↦ Refl;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Refl;
+        Suc n2 ↦ least_k_bool_choice_equiv a x y m2 n2
+      }
+  }
+
+fn least_k_bool_pick (a : Type) (x : a) (h : a) (decision : Bool) : a =
+  match decision {
+    True ↦ x;
+    False ↦ h
+  }
+
+theorem least_k_take1_insert_cons
+      (a : Type) (cost : a → Nat) (x : a) (h : a) (t : List a) (decision : Bool)
+    : Equal Bool (cost_le a cost x h) decision
+      → Equal
+        (List a)
+        (take a (Suc Zero) (insert a (cost_le a cost) x (Cons a h t)))
+        (Cons a (least_k_bool_pick a x h decision) (Nil a)) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λd _.
+            Equal
+              (List a)
+              (take
+                a
+                (Suc Zero)
+                (match d {
+                  True ↦ Cons a x (Cons a h t);
+                  False ↦ Cons a h (insert a (cost_le a cost) x t)
+                }))
+              (Cons a x (Nil a)))
+          Refl
+          (sym Bool (cost_le a cost x h) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λd _.
+            Equal
+              (List a)
+              (take
+                a
+                (Suc Zero)
+                (match d {
+                  True ↦ Cons a x (Cons a h t);
+                  False ↦ Cons a h (insert a (cost_le a cost) x t)
+                }))
+              (Cons a h (Nil a)))
+          Refl
+          (sym Bool (cost_le a cost x h) False comparison)
+  }
+
+theorem least_k_take1_insert_choice
+      (a : Type) (cost : a → Nat) (x : a) (h : a) (t : List a)
+    : Equal
+        (List a)
+        (take a (Suc Zero) (insert a (cost_le a cost) x (Cons a h t)))
+        (Cons a (least_k_lt_pick a x h (cost x) (cost h)) (Nil a)) =
+  trans
+    (List a)
+    (take a (Suc Zero) (insert a (cost_le a cost) x (Cons a h t)))
+    (Cons a (least_k_le_pick a x h (cost x) (cost h)) (Nil a))
+    (Cons a (least_k_lt_pick a x h (cost x) (cost h)) (Nil a))
+    (least_k_take1_insert_cons a cost x h t (leq_nat (cost x) (cost h)) Refl)
+    (cong
+      a
+      (List a)
+      (least_k_le_pick a x h (cost x) (cost h))
+      (least_k_lt_pick a x h (cost x) (cost h))
+      (λchoice. Cons a choice (Nil a))
+      (least_k_bool_choice_equiv a x h (cost x) (cost h)))
+
+fn least_k_head_or (a : Type) (fallback : a) (xs : List a) : a =
+  match xs {
+    Nil ↦ fallback;
+    Cons h t ↦ h
+  }
+
+theorem least_k_list_singleton_head
+      (a : Type) (h : a) (t : List a) (tail_choice : a)
+    : Equal (List a) (take a (Suc Zero) (Cons a h t)) (Cons a tail_choice (Nil a))
+      → Equal a h tail_choice =
+  λsame_first.
+    cong
+      (List a)
+      a
+      (Cons a h (Nil a))
+      (Cons a tail_choice (Nil a))
+      (least_k_head_or a h)
+      same_first
+
+theorem least_k_sort_cons_step
+      (a : Type) (cost : a → Nat) (x : a) (y : a) (ys : List a) (sorted_tail : List a)
+    : Equal (List a) (take a (Suc Zero) sorted_tail) (Cons a (argmin_from a cost y ys) (Nil a))
+      → Equal
+        (List a)
+        (take a (Suc Zero) (insert a (cost_le a cost) x sorted_tail))
+        (Cons a (argmin_from a cost x (Cons a y ys)) (Nil a)) =
+  match sorted_tail {
+    Nil ↦ λtail_first. absurd tail_first;
+    Cons h t ↦
+      λtail_first.
+        J
+          (λv _.
+            Equal
+              (List a)
+              (take a (Suc Zero) (insert a (cost_le a cost) x (Cons a v t)))
+              (Cons a (argmin_from a cost x (Cons a y ys)) (Nil a)))
+          (least_k_take1_insert_choice a cost x (argmin_from a cost y ys) t)
+          (sym
+            a
+            h
+            (argmin_from a cost y ys)
+            (least_k_list_singleton_head a h t (argmin_from a cost y ys) tail_first))
+  }
 ```
 
 ## Using it
@@ -1169,6 +1756,11 @@ costlier, so a tie across the split keeps the earlier left choice. When both
 parts are constructed as `Cons` lists, the four corresponding Option laws
 select `Some` of the same winner without first exposing the `NonEmpty` view.
 The left law covers ties; the right law requires a strict improvement.
+
+Call `least_k a cost k xs` on an ordinary list when several least-cost
+candidates are needed. It returns at most `k` members; `Zero` returns `Nil`,
+while a bound beyond the list length returns the entire stable cost order.
+The one-result laws agree with the existing nonempty `argmin` selection.
 
 ## Laws & proofs
 
@@ -1222,6 +1814,16 @@ Option endpoints reduce to the sibling's `Some`-lifted endpoints. The single
 strict-comparison premise and the left-on-tie choice are inherited from the
 non-empty laws, without an additional selector helper.
 
+`least_k_length` combines the public `take::length` and `sort::length`
+proofs. `least_k_member` composes their membership proofs, while
+`least_k_sorted` restricts the sorted list to its prefix. Stable-class sorting
+and `take::filter_prefix` preserve the input order of every equal-cost class.
+The cheaper-class law selects an entire class whenever a more costly result
+has been selected, and separation bounds selected costs against excluded
+ones. The zero and singleton laws agree with `argmin` on a nonempty input.
+Private helpers carry the head-order and Boolean comparisons; none decides
+candidate equality or adds an assumption.
+
 `argmax_member` transports the shared private selection-membership proof to
 the public list view. `argmax_greatest` inducts over the ordered tail and
 eliminates truncated membership only into `IsTrue`, bounding every member's
@@ -1270,7 +1872,9 @@ selector's tie behavior or the minimum law's public type. The append-split
 helpers are shared the same way: one combination proof serves both selectors,
 given the comparison's two transitivity facts. Each Option
 selector handles an empty list by returning `None`, without another selection
-algorithm.
+algorithm. `least_k` reuses the checked stable `sort` and public `take`
+instead of adding another prefix operation. Its order and class laws describe
+which members survive without promising a complexity bound.
 
 ## References
 
@@ -1283,7 +1887,11 @@ algorithm.
 
 ## Trust & derivation
 
-**Public API:** `argmin`, its seven §1.2 theorems,
+**Public API:** `cost_le`, `least_k` and its eight declarations for seven
+law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
+`least_k_ties_earliest`, `least_k_cheaper_class_selected`,
+`least_k_separation`, `least_k_one_nil`, `least_k_one_cons`);
+`argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
 `argmin_append_takes_right`; `argmin_option` and its seven laws:
 `argmin_option_nil`, `argmin_option_cons`, `argmin_option_member`,
@@ -1310,7 +1918,9 @@ Nat order retain their provider identities.
 
 **Derivation:** `NonEmpty` and its checked list-view equality are provided by
 `Data.Collections.NonEmpty`; `list_elem` and its introduction lemmas by
-`Data.Collections.Derived`; `nonempty_append` and its list-view proof by
+`Data.Collections.Derived`, along with stable `sort`, `take`, filtering and
+their checked public laws; the shared Boolean false-of-not-true lemma by
+`Core.Classes.LawfulClasses`; `nonempty_append` and its list-view proof by
 `Data.Collections.NonEmpty`; `cong`, `sym` and `trans` by
 `Core.Logic.Transport`; `IsTrue` and `leq_nat` by
 `Core.Classes.LawfulClasses`; `comp` by `Core.Function.Combinators`; and
@@ -1319,7 +1929,14 @@ selectors add no axiom, primitive, postulate or opaque constant.
 `trusted_base()` must stay unchanged relative to the provider closure;
 this does not erase inherited assumptions.
 
-**Validation:** `conformance/stdlib/optimization/seed-argmin.md` names
+**Validation:** The
+[§4 least-k seed](../../../../conformance/stdlib/optimization/seed-least-k.md)
+records accepted stable prefixes, eight public law instances and the two
+false-result refusals specified by `spec/50-stdlib/72-optimization.md` §4.
+The `cat_optimization_least_k` package test roots-loads the public laws and
+closed sorted-prefix controls, checks exact trusted-base identities, and
+distinguishes the wrong costlier and later-tie results.
+`conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
 instances and false-result refusals. Its scoped acceptance target checks the
 client programs and the generic seven law types. The

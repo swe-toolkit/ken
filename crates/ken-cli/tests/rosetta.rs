@@ -269,6 +269,8 @@ fn collections_prelude() -> String {
             [
                 "pub fn bool_leq",
                 "pub fn bool_and",
+                "pub proof left for bool_and",
+                "pub proof right for bool_and",
                 "pub fn bool_or",
                 "pub fn leq_nat",
             ]
@@ -329,7 +331,7 @@ fn collections_prelude() -> String {
     // cannot also import the package's same-spelled declarations by module.
     for import in [
         "import Core.Function.Combinators (comp, idf)",
-        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat, leqChar)",
+        "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, bool_false_of_not_true, leq_nat, leqChar)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)",
         "import Core.Logic.Or (Or, Inl, Inr)",

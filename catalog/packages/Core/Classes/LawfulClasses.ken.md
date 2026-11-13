@@ -345,7 +345,10 @@ collapses to `Bottom` under K7). No `Axiom` remains in either instance.
 `Eq Bool`'s `sym`/`trans` are ALSO real, kernel-checked, zero-delta proofs
 — via the SAME full case-split technique as `antisym`/`sound`/`complete`
 above, no further kernel capability needed. Getting here took a real
-correction, worth recording (`§6`).
+correction, worth recording (`§6`). The public
+`bool_false_of_not_true` proof uses a checked `Bool` case split: a
+refuted `True` decision must be `False`. Collection proofs reuse this
+single lemma rather than each declaring a local copy.
 
 ```ken
 pub fn bool_leq (a : Bool) (b : Bool) : Bool =
@@ -477,6 +480,14 @@ pub theorem bool_cases
   match b {
     True ↦ yes;
     False ↦ no
+  }
+
+pub theorem bool_false_of_not_true
+      (decision : Bool) (forbidden : Equal Bool decision True → Bottom)
+    : Equal Bool decision False =
+  match decision eqn : occurrence {
+    True ↦ absurd (forbidden occurrence);
+    False ↦ Proved
   }
 
 fn compare_bool_cases (b : Bool) : Or (Equal Bool b True) (Equal Bool b False) =
@@ -2799,8 +2810,9 @@ Ken-native; no external reference implementation informed its source.
 2. **Public API.** `IsTrue`, `class DecEq`, `bool_eq`, `bool_and`,
    `bool_and::intro`, `bool_and::comm`, `bool_and::assoc`,
    `bool_and::idempotent`, `bool_and::left_identity`,
-   `bool_and::right_identity`, `bool_or`, `bool_not`, `or_left`, `or_right`,
-   `or_cases`, `and_true`, `and_cases`, `class Ord`, `leq_nat`,
+   `bool_and::right_identity`, `bool_or`, `bool_not`, `bool_cases`,
+   `bool_false_of_not_true`, `or_left`, `or_right`, `or_cases`, `and_true`,
+   `and_cases`, `class Ord`, `leq_nat`,
    `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,

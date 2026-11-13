@@ -822,7 +822,8 @@ on main; earlier candidate-local checks are not official conformance,
 CI, publication, landing or landed trust. Earlier D0 alone established
 no CI or landed trust measurement. Continuous or implicit search,
 heuristics, approximation, arbitrary-order or
-multi-objective costs, top-k and complexity claims remain deferred.
+multi-objective costs, greatest-cost top-k and complexity claims remain
+deferred. The LEAST-K candidate delivers `least_k` and eight checked laws.
 
 The **finite bounded-search contract** is pinned in
 **`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH;
