@@ -3,7 +3,7 @@ id: LANG-ISOLATED-ROOT-DISCOVERY-PATH
 title: "Isolated catalog-root discovery breaks two spec 33 §3.2 rules. It resolves `..` lexically, so a spelling through a symlink takes its root from a directory that is not an ancestor of the file the OS reads. And ken run and ken native-build skip the catalog-unit path rule that ken check applies first, so a catalog entry is reloaded as its own dependency and its import cycle is rooted at the wrong unit. Discover from the file actually read, and apply the catalog-unit rule first on every route"
 status: active
 owner: verify
-size: M
+size: L
 tier: T1
 gate: architect
 depends_on: [LANG-STRICT-ISOLATED-ROUTES]
@@ -60,6 +60,14 @@ base, stop and report the mismatch; do not build around it.
 conformance row if AC-0 changes the case's contract. The module-path
 rule and Strict resolution do not move.
 
+The entry-main selection the D0 found AC-2 needs is in scope (Steward
+`evt_5etfmh9fdtfqm` on Architect `evt_46129mgxnhcpm`, rulings 3 and 4):
+`MainSelection` and `admit_selected_main` in `program_admission.rs`, the
+loaded-unit native carrier and entry in `compiler_driver.rs`, a
+loaded-unit run entry in `ken-cli` `lib.rs`, the discovery choke point
+in `modules.rs` with `isolated_catalog_root` made non-pub, and the
+migration of its 11 test calls.
+
 ## Deliverable
 
 One candidate: discovery over the path of the file actually read, the
@@ -83,6 +91,15 @@ rows below.
 - **AC-3.** Restoring lexical `..` makes AC-1's symlink row accept, and
   removing the catalog-rule call from `run` restores the
   wrong-rooted cycle.
+- **AC-3a (Architect rows).** R-a: a cycle-free headed catalog entry
+  admits on `run` and `native-build`, the admitted main is the unit's
+  own (by `GlobalId`), and `run` matches the same program as an
+  isolated file. R-b: a unit with no main gives MissingEntrypoint. R-c:
+  with a dependency that also declares a main, the entry's own main is
+  admitted. R-d: the DuplicateDefinition a duplicate-main entry
+  produces is reported, and `run` maps it to DuplicateEntrypoint.
+  Replacing `LoadedUnit` with `Isolated` on the `run` arm gives
+  MissingMain on R-a.
 - **AC-4.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
@@ -91,6 +108,11 @@ rows below.
   answer changes spec 70's report contract. That is a Spec enclave
   turn first.
 - A change to Strict resolution or to the module-path rule.
+- Unit-route admission returns MissingProgramBoundary for a headed
+  catalog entry; any isolated-route row changes its observation; or the
+  selection or carrier needs a change to
+  `elaborate_module_from_roots_strict_v1` or `load_unit`. Each is a
+  stop to the Architect.
 
 Checks: 2 fired: the three discovery call sites and
 `isolated_catalog_root` were read at `5a3cc337b`. 8 fired: each AC row
