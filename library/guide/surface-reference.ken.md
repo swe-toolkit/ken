@@ -251,6 +251,9 @@ Bool)`, which is the class **applied to its head**, i.e. the dictionary's
 *type*, not a value, so projecting a field off it fails immediately:
 
 ```ken reject
+class Describe a {
+  describe : a → String
+}
 const wrong : String = (Describe Bool).describe True
 ```
 
