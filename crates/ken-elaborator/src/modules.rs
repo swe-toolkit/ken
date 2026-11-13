@@ -2813,9 +2813,14 @@ pub fn elaborate_module_from_roots(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
+    let mut census = census_entry("elaborate_module_from_roots");
     // Direct entry-unit IDs, exactly as on main and as the strict entry returns.
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, true)
-        .map(|(ids, _)| ids)
+    let result = elaborate_module_from_roots_with_mode_v1(
+        elab, roots, entry, ResolutionMode::Strict, true,
+    )
+    .map(|(ids, _)| ids);
+    census.finish(&result);
+    result
 }
 
 /// Elaborate a roots-loaded unit and return the V1 results of its whole
@@ -2826,8 +2831,13 @@ pub fn elaborate_module_from_roots_v1(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, true)
-        .map(|(_, results)| results)
+    let mut census = census_entry("elaborate_module_from_roots_v1");
+    let result = elaborate_module_from_roots_with_mode_v1(
+        elab, roots, entry, ResolutionMode::Strict, true,
+    )
+    .map(|(_, results)| results);
+    census.finish(&result);
+    result
 }
 
 /// Strict roots entry returning the checked V1 results of the whole closure.
