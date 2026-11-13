@@ -3,8 +3,18 @@
 
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::modules::{catalog_module_from_path, isolated_catalog_root};
+use ken_elaborator::modules::{catalog_module_from_path, discover_source_path, SourcePathKind};
 use ken_elaborator::{ElabEnv, ElabError};
+
+fn discovered_isolated_root(path: &Path) -> Option<PathBuf> {
+    match discover_source_path(path)
+        .expect("existing source path")
+        .kind
+    {
+        SourcePathKind::Isolated(root) => root,
+        SourcePathKind::CatalogUnit(unit) => panic!("unexpected catalog unit: {unit:?}"),
+    }
+}
 
 fn load(env: &mut ElabEnv, roots: &[PathBuf], src: &str) -> Result<(), ElabError> {
     env.elaborate_isolated_file_strict_v1(roots, src)
@@ -42,10 +52,17 @@ fn nearest_source_ancestor_discovers_root_without_changing_catalog_path_routing(
     std::fs::create_dir_all(&nested).unwrap();
     let isolated = dir.path().join("nested/src/root.ken.md");
     std::fs::create_dir_all(isolated.parent().unwrap()).unwrap();
-    assert_eq!(isolated_catalog_root(&isolated), Some(nested.clone()));
+    std::fs::write(&isolated, "const local : Nat = Zero\n").unwrap();
+    assert_eq!(discovered_isolated_root(&isolated), Some(nested.clone()));
     let outer_file = dir.path().join("src/root.ken");
-    assert_eq!(isolated_catalog_root(&outer_file), Some(outer));
-    assert!(isolated_catalog_root(Path::new("/tmp/ken-no-catalog/root.ken")).is_none());
+    std::fs::create_dir_all(outer_file.parent().unwrap()).unwrap();
+    std::fs::write(&outer_file, "const local : Nat = Zero\n").unwrap();
+    assert_eq!(discovered_isolated_root(&outer_file), Some(outer));
+    let missing = dir.path().join("never-created/root.ken");
+    assert_eq!(
+        discover_source_path(&missing).unwrap_err().kind(),
+        std::io::ErrorKind::NotFound
+    );
     let catalog = catalog_module_from_path(&nested.join("Lib.ken")).unwrap();
     assert_eq!(catalog.root, nested);
     assert_eq!(catalog.entry, "Lib");
@@ -73,7 +90,8 @@ fn no_root_refuses_only_external_edges_and_literate_edges_are_extracted() {
         "# Import text is not Ken\n\n```ken\nimport Lib (other)\nconst own : Nat = other\n```\n";
     let (dir, root) = root_with_lib();
     let source_path = dir.path().join("example.ken.md");
-    let discovered = isolated_catalog_root(&source_path).unwrap();
+    std::fs::write(&source_path, literate).unwrap();
+    let discovered = discovered_isolated_root(&source_path).unwrap();
     assert_eq!(discovered, root);
     env.elaborate_isolated_ken_md_file_strict_v1(&[discovered], literate)
         .unwrap();
@@ -93,7 +111,13 @@ fn no_root_refuses_only_external_edges_and_literate_edges_are_extracted() {
 fn discovered_root_loads_selected_provider_and_missing_unit_refuses() {
     let (dir, root) = root_with_lib();
     let source_path = dir.path().join("src/main.ken");
-    let roots = vec![isolated_catalog_root(&source_path).unwrap()];
+    std::fs::create_dir_all(source_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &source_path,
+        "import Lib (other)\nconst answer : Nat = other\n",
+    )
+    .unwrap();
+    let roots = vec![discovered_isolated_root(&source_path).unwrap()];
     assert_eq!(roots, vec![root]);
     let mut env = ElabEnv::new().unwrap();
     load(
@@ -262,15 +286,18 @@ fn discovery_never_takes_a_child_directory_through_parent_components() {
     std::fs::create_dir_all(&child_root).unwrap();
     // The file is <dir>/a/x.ken; <dir>/a/b is a child of its directory, so
     // discovery answers exactly as it does for the file's own spelling.
-    let through_parent = isolated_catalog_root(&dir.path().join("a/b/../x.ken"));
+    std::fs::create_dir_all(dir.path().join("a/b/src")).unwrap();
+    std::fs::write(dir.path().join("a/x.ken"), "const x : Nat = Zero\n").unwrap();
+    std::fs::write(dir.path().join("a/b/x.ken"), "const x : Nat = Zero\n").unwrap();
+    let through_parent = discovered_isolated_root(&dir.path().join("a/b/../x.ken"));
     assert_ne!(through_parent.as_ref(), Some(&child_root));
     assert_eq!(
         through_parent,
-        isolated_catalog_root(&dir.path().join("a/x.ken"))
+        discovered_isolated_root(&dir.path().join("a/x.ken"))
     );
     // The file is <dir>/a/b/x.ken, whose own directory holds the root.
     assert_eq!(
-        isolated_catalog_root(&dir.path().join("a/b/src/../x.ken")),
+        discovered_isolated_root(&dir.path().join("a/b/src/../x.ken")),
         Some(child_root)
     );
 }
@@ -286,7 +313,16 @@ fn discovery_from_a_relative_path_climbs_past_the_working_directory() {
         .canonicalize()
         .unwrap();
     assert_eq!(
-        isolated_catalog_root(Path::new("tests/root.ken")).map(|root| root.canonicalize().unwrap()),
-        Some(repo_root)
+        discover_source_path(Path::new("tests/root.ken"))
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::NotFound
     );
+    let dir = tempfile::Builder::new()
+        .prefix("relative-source-root-")
+        .tempdir_in(env!("CARGO_MANIFEST_DIR"))
+        .unwrap();
+    let relative = PathBuf::from(dir.path().file_name().unwrap()).join("root.ken");
+    std::fs::write(&relative, "const root : Nat = Zero\n").unwrap();
+    assert_eq!(discovered_isolated_root(&relative), Some(repo_root));
 }
