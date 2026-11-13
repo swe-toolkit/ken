@@ -24,44 +24,119 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-// AC-0 measurement only. A scoped tag survives nested public entries and
-// unwinding; a negative test cannot turn a census panic into an ordinary Err.
+// AC-0 measurement only. Resolution can speculatively return an Err that its
+// caller discards. Observe ordinary Strict results at the outermost entry,
+// before a negative test can swallow a terminal refusal.
 thread_local! {
     static CENSUS_ENTRIES: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
+    static CENSUS_HITS: RefCell<Vec<CensusHit>> = const { RefCell::new(Vec::new()) };
 }
 
-pub(crate) struct CensusEntry;
+struct CensusHit {
+    site: &'static str,
+    entry: &'static str,
+    name: String,
+    raw: bool,
+    root: String,
+    span: Span,
+    caller: String,
+}
+
+pub(crate) struct CensusEntry {
+    outermost: bool,
+    finished: bool,
+}
+impl CensusEntry {
+    pub(crate) fn finish<T>(&mut self, result: &Result<T, ElabError>) {
+        self.finished = true;
+        if !self.outermost {
+            return;
+        }
+        let hits = CENSUS_HITS.with(|hits| std::mem::take(&mut *hits.borrow_mut()));
+        if let (Err(error), Some(hit)) = (result, hits.last()) {
+            let matched = match census_error_name_span(error) {
+                Some((name, span)) if name == hit.name && span == &hit.span => "exact",
+                Some((name, _)) if name == hit.name => "name",
+                _ => "none",
+            };
+            panic!("LEGACY_CENSUS site={} entry={} name={} raw={} root={} span={}..{} matched={matched}",
+                hit.site, hit.entry, hit.name, hit.raw, hit.root, hit.span.start, hit.span.end);
+        }
+        for hit in hits {
+            eprintln!("LEGACY_CENSUS_DISCARDED site={} entry={} name={} raw={} root={} span={}..{} caller={}",
+                hit.site, hit.entry, hit.name, hit.raw, hit.root,
+                hit.span.start, hit.span.end, hit.caller);
+        }
+    }
+}
 impl Drop for CensusEntry {
     fn drop(&mut self) {
         CENSUS_ENTRIES.with(|entries| { entries.borrow_mut().pop(); });
+        if self.outermost && !self.finished && !std::thread::panicking() {
+            panic!("LEGACY_CENSUS_INSTRUMENT outermost entry exited without classifying its result");
+        }
     }
 }
 pub(crate) fn census_entry(name: &'static str) -> CensusEntry {
-    CENSUS_ENTRIES.with(|entries| entries.borrow_mut().push(name));
-    CensusEntry
+    let outermost = CENSUS_ENTRIES.with(|entries| {
+        let mut entries = entries.borrow_mut();
+        let outermost = entries.is_empty();
+        entries.push(name);
+        outermost
+    });
+    if outermost {
+        CENSUS_HITS.with(|hits| hits.borrow_mut().clear());
+    }
+    CensusEntry { outermost, finished: false }
 }
 fn census_direct_entry() -> Option<CensusEntry> {
     CENSUS_ENTRIES.with(|entries| entries.borrow().is_empty())
         .then(|| census_entry("expand_and_elaborate"))
 }
-fn census_panic(scope: &Scope, site: &str, name: &str) {
-    if !scope.census_was_legacy { return; }
-    let raw = scope.census_raw_names.contains(name);
-    let entry = CENSUS_ENTRIES.with(|entries| entries.borrow().last().copied());
-    let entry = entry.unwrap_or("other");
-    if entry == "other" {
-        eprintln!("LEGACY_CENSUS other_first_frame={:?}", std::backtrace::Backtrace::force_capture().to_string().lines().nth(1));
+fn census_error_name_span(error: &ElabError) -> Option<(&str, &Span)> {
+    match error {
+        ElabError::UnboundName { name, span }
+        | ElabError::AmbiguousReference { name, span, .. }
+        | ElabError::BuiltinNameBinding { name, span } => Some((name, span)),
+        _ => None,
     }
-    panic!("LEGACY_CENSUS site={site} entry={entry} name={name} raw={raw} root={}",
-        scope.census_root.as_deref().unwrap_or("<in-memory>"));
 }
-fn census_panic_error(scope: &Scope, site: &str, error: &ElabError) {
-    let name = match error {
-        ElabError::UnboundName { name, .. } => name.as_str(),
-        ElabError::AmbiguousReference { name, .. } => name.as_str(),
-        _ => "<other-refusal>",
-    };
-    census_panic(scope, site, name);
+fn census_caller() -> String {
+    let backtrace = std::backtrace::Backtrace::force_capture().to_string();
+    backtrace.lines().find_map(|line| {
+        let symbol = line.split_once(": ")?.1.trim();
+        if symbol.contains("ken_elaborator::modules::")
+            && !symbol.contains("::census_caller")
+            && !symbol.contains("::census_record")
+            && !symbol.contains("::resolve_ref")
+            && !symbol.contains("::resolve_class_ref")
+        {
+            Some(symbol.to_string())
+        } else {
+            None
+        }
+    }).unwrap_or_else(|| "<unknown>".to_string())
+}
+fn census_record(scope: &Scope, site: &'static str, name: &str, span: &Span) {
+    if !scope.census_was_legacy { return; }
+    let entry = CENSUS_ENTRIES.with(|entries| entries.borrow().last().copied())
+        .unwrap_or_else(|| panic!("LEGACY_CENSUS_INSTRUMENT unguarded site={site} name={name}"));
+    CENSUS_HITS.with(|hits| hits.borrow_mut().push(CensusHit {
+        site,
+        entry,
+        name: name.to_string(),
+        raw: scope.census_raw_names.contains(name),
+        root: scope.census_root.clone().unwrap_or_else(|| "<in-memory>".to_string()),
+        span: span.clone(),
+        caller: census_caller(),
+    }));
+}
+fn census_record_error(scope: &Scope, site: &'static str, error: &ElabError) {
+    if let Some((name, span)) = census_error_name_span(error) {
+        census_record(scope, site, name, span);
+    } else {
+        census_record(scope, site, "<other-refusal>", &Span::zero());
+    }
 }
 
 use crate::ast::{
@@ -1217,7 +1292,7 @@ fn resolve_ref(
                 }
             }
             if scope.mode == ResolutionMode::Strict && scope.bindings.contains_key(subject) {
-                census_panic(scope, "S-SELECTOR", name);
+                census_record(scope, "S-SELECTOR", name, span);
                 return Err(ElabError::UnboundName {
                     name: name.to_string(),
                     span: span.clone(),
@@ -1290,7 +1365,7 @@ fn resolve_ref(
                 && !scope.kernel_names.contains(name)
                 && !is_unshadowable_kernel_name(name) =>
             {
-                census_panic(scope, "S-BARE", name);
+                census_record(scope, "S-BARE", name, span);
                 Err(ElabError::UnboundName {
                     name: name.to_string(),
                     span: span.clone(),
@@ -1464,7 +1539,7 @@ fn resolve_attached_ref(
         return Ok((format!("{canonical_subject}::{proof_name}"), None));
     }
     if !scope.bindings.contains_key(subject) && !subject.contains('.') {
-        census_panic(scope, "S-AMBIENT-PROOF", &format!("{canonical_subject}::{proof_name}"));
+        census_record(scope, "S-AMBIENT-PROOF", &format!("{canonical_subject}::{proof_name}"), span);
     }
     Err(ElabError::UnboundName {
         name: format!("{canonical_subject}::{proof_name}"),
@@ -2788,7 +2863,7 @@ fn elaborate_module_from_roots_with_mode_v1(
         let fixed = require_fixed_proved_identity(&elab.env, &elab.globals)
             .and_then(|_| require_pre_source_floor_identities(&elab.module_state, &elab.globals));
         if let Err(ref error) = fixed {
-            if census_flag { census_panic_error(&elab.module_state.root_scope, "S-FIXED", error); }
+            if census_flag { census_record_error(&elab.module_state.root_scope, "S-FIXED", error); }
         }
         fixed?;
     }
@@ -4871,8 +4946,8 @@ fn resolve_raw_scoped_decl(
         attached_name.as_deref(),
         (scope.mode == ResolutionMode::Strict).then(|| std::rc::Rc::new(binder_names.clone())),
     );
-    if let Err(ElabError::BuiltinNameBinding { name, .. }) = &resolved {
-        census_panic(scope, "S-BINDER", name);
+    if let Err(error @ ElabError::BuiltinNameBinding { .. }) = &resolved {
+        census_record_error(scope, "S-BINDER", error);
     }
     resolved
 }
@@ -5142,7 +5217,7 @@ fn reject_decl_prelude_bindings(
                 for (field, _) in fields {
                     let name = format!("{law}_{field}");
                     if let Err(error) = reject(&name, span) {
-                        census_panic(scope, "S-LAWFIELD", &name);
+                        census_record(scope, "S-LAWFIELD", &name, span);
                         return Err(error);
                     }
                 }
@@ -5944,8 +6019,8 @@ fn expand_scope(
                     (scope.mode == ResolutionMode::Strict)
                         .then(|| std::rc::Rc::new(elab.module_state.prelude_binding_names.clone())),
                 ).or_else(|error| {
-                    if let ElabError::BuiltinNameBinding { name, .. } = &error {
-                        census_panic(scope, "S-SPACE", name);
+                    if let error @ ElabError::BuiltinNameBinding { .. } = &error {
+                        census_record_error(scope, "S-SPACE", error);
                     }
                     Err(error)
                 })?;
@@ -6670,7 +6745,8 @@ pub fn expand_and_elaborate(
     elab: &mut ElabEnv,
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    let _direct_entry = census_direct_entry();
+    let mut direct_entry = census_direct_entry();
+    let result = (|| {
     let boundary = admission_boundary(decls)?;
     // A failed file can leave an earlier declaration admitted without ever
     // committing its in-memory unit counter. An empty file can commit a unit
@@ -6763,6 +6839,11 @@ pub fn expand_and_elaborate(
         elab.module_state.next_in_memory_unit += 1;
     }
     Ok(results)
+    })();
+    if let Some(census) = &mut direct_entry {
+        census.finish(&result);
+    }
+    result
 }
 
 #[cfg(test)]
