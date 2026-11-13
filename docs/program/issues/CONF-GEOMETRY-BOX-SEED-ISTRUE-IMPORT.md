@@ -1,7 +1,7 @@
 ---
 id: CONF-GEOMETRY-BOX-SEED-ISTRUE-IMPORT
 title: "The box monotonicity seed's accepted client states IsTrue but imports only Algorithm.Geometry.NatBox, so ken check refuses it with UnboundName under Strict. It was accepted only through the Legacy passthrough, and no Rust test loads the seed, so CI never saw the refusal. Import IsTrue from Core.Classes.LawfulClasses and re-check the client and its refusals"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T2
@@ -13,6 +13,21 @@ origin: "Architect evt_1c4w34tgp0y3a on the SPEC-GEOMETRY-NAT-ORIENTATION D0 (Fo
 ---
 
 # The box seed names what it uses
+
+**Widened to four seeds** (Steward `evt_5j3wwjdrmrwfd`, on Architect
+`evt_6vbm5mwm3mq74` §5). The orientation D0 measured three more accepted
+fences refusing on base with UnboundName, by the same mechanism, each
+re-rooted under a separate base catalog:
+
+- `conformance/stdlib/geometry/seed-nat-box.md`: `And`, 2403..2406;
+- `conformance/stdlib/optimization/seed-bounded-search.md`: `And`,
+  854..857;
+- `conformance/stdlib/optimization/seed-least-k.md`: `IsTrue`,
+  5366..5372.
+
+AC-1 to AC-3 apply to each of the four seeds. Import each missing name
+from the module that publishes it, and name that module in the handoff.
+The scope is the four seed files.
 
 ## Objective
 
@@ -41,9 +56,9 @@ base, stop and report the mismatch; do not build around it.
 
 ## Scope
 
-The seed file only: add `IsTrue` to the accepted client's imports from
-`Core.Classes.LawfulClasses`. No catalog, spec or crate change. NatBox is
-unchanged.
+The four seed files only. For this seed, add `IsTrue` to the accepted
+client's imports from `Core.Classes.LawfulClasses`. No catalog, spec or
+crate change. NatBox is unchanged.
 
 ## Acceptance
 
@@ -58,7 +73,7 @@ unchanged.
 ## Stop conditions
 
 - A refusal changes its reason for any cause other than the unbound name.
-- Any change outside the seed file is needed.
+- Any change outside the four seed files is needed.
 
 Checks: 3 fired: the seed's consumers were grepped across `crates/`, with
 0 hits. 8 fired: AC-3 pairs the import's presence with its absence on the
