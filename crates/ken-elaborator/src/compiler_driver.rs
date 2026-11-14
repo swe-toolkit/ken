@@ -3115,34 +3115,12 @@ pub fn complete_native_program_preparation(
     output_dir: impl AsRef<Path>,
     profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
-    // Every public Process and pipe-stream operation requires the checked
-    // Process grant; no FS-only program has it. Refuse on that stable authority
-    // before object emission, not on generic host response alternatives (which
-    // include all operations) or on a particular bracket-lowering shape.
-    if preparation.plan.process_declared {
-        let unavailable = ken_host::HostOpV1::ALL
-            .into_iter()
-            .filter(|operation| {
-                operation.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
-                    && operation.executor_admits()
-            })
-            .map(|operation| format!("{operation:?}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
-            "host_effect_lowering_unavailable",
-            format!(
-                "declared Process capability requires host operations {unavailable}, \
-                 which are RepresentedUnavailable for native build"
-            ),
-        )));
-    }
     emit_native_program_preparation(preparation, output_dir, profile)
 }
 
-/// Object emission for a preparation the Process gate has admitted. Kept
-/// separate so the PX10 plan census can plan a gated program without a
-/// production route around the gate.
+/// Object emission for a checked native preparation. Separate from public
+/// completion so the PX10 plan census can inspect planner invariants while
+/// production uses the same admitted object-emission route.
 #[inline(always)]
 fn emit_native_program_preparation(
     preparation: NativeProgramPreparationV1,

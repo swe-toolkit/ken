@@ -1139,7 +1139,6 @@ pub fn build_bound_process_starter_executable_artifact(
         &adapter,
         &entrypoint.process_symbols,
         STARTER_ENTRY_SYMBOL,
-        entrypoint.process_declared,
     )
     .map_err(|err| {
         packaging_error_with_cause(

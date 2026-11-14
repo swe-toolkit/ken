@@ -553,6 +553,9 @@ fn host_effect_seat_contract(
         // Int decoder and bounds lane handle the widened seat.
         (Op::MappingAcquireFile, 1) => Some(carried_exact_int),
         (Op::MappingAcquireFile, 2) => Some(tag),
+        // PROVED carried, per seat (PX10 B2): narrowing only Open Argument(0)
+        // to SPECIALIZED_ONLY makes F argv/null/live and R-NODES refuse
+        // precisely this BytesPointerLength seat in CarriedWord.
         (Op::ProcessPlanOpen, 0) => Some(carried_bytes),
         (Op::ProcessPlanPush, 0)
         | (Op::ProcessSpawn, 0)
@@ -570,6 +573,10 @@ fn host_effect_seat_contract(
         | (Op::ResourceStreamRead, 3)
         | (Op::ResourceStreamWrite, 2)
         | (Op::ResourceStreamWrite, 3) => Some(carried_exact_int),
+        // PROVED carried, per seat (PX10 B2): narrowing Push Argument(2)
+        // or Argument(3) independently makes the native smoke, operation-pair,
+        // and F argv/null/live rows refuse precisely that BytesPointerLength
+        // seat in CarriedWord. Both slices have their own narrowing witness.
         (Op::ProcessPlanPush, 2) | (Op::ProcessPlanPush, 3) => Some(carried_bytes),
         (Op::BufferAllocate, 0) | (Op::MappingAllocate, 0) => Some(carried_exact_int),
         (Op::MappingAllocate, 1) => Some(tag),

@@ -14,7 +14,7 @@ use std::mem;
 use cranelift_jit::JITModule;
 use cranelift_module::FuncId;
 
-use super::surface::{backend, backend_module, unsupported, BackendFailure, CraneliftBackendError};
+use super::surface::{backend, backend_module, BackendFailure, CraneliftBackendError};
 use crate::{RuntimeGroundValue, RuntimeObservation, RuntimeTrap};
 
 pub(super) struct CompiledModule<M> {
@@ -28,9 +28,6 @@ pub(super) struct CompiledModule<M> {
     pub(super) verifier_passed: bool,
     pub(super) assumptions: BTreeSet<String>,
     pub(super) unsupported: Vec<String>,
-    /// Labelled alternative transports the plan issued; read only by
-    /// `require_alternative_transport_contained`.
-    alternative_transport_sets: usize,
 }
 
 pub(super) type CompiledExpr = CompiledModule<JITModule>;
@@ -64,18 +61,10 @@ pub(crate) fn root_trap_catalog_index(magnitude: u64) -> Option<usize> {
         .and_then(|identity| usize::try_from(identity - 1).ok())
 }
 
-/// The bound-process exemption from the labelled-transport containment: a
-/// plan whose Process bit the driver's gate refuses, in a build with the PX10
-/// census feature. No normal build enables that feature, so a caller-filled
-/// bit on the public bound-process builder cannot exempt a product artifact.
-pub(super) const fn bound_process_transport_exempt(process_declared: bool) -> bool {
-    process_declared && cfg!(feature = "px8-ds-test-support")
-}
-
 impl<M> CompiledModule<M> {
     /// Transparent one-to-one packing seam (RT-SPLIT §10.4a). Exists so the
-    /// five construction-only fields (`func_id`, `decoder`, `result_table`,
-    /// `trap`, `alternative_transport_sets`) can stay private to this module
+    /// four construction-only fields (`func_id`, `decoder`, `result_table`,
+    /// `trap`) can stay private to this module
     /// while the three existing construction sites live outside it. No validation, no defaults, no
     /// clones, no reordering, no policy -- adding any would make this a
     /// behavior change rather than wiring.
@@ -91,7 +80,6 @@ impl<M> CompiledModule<M> {
         verifier_passed: bool,
         assumptions: BTreeSet<String>,
         unsupported: Vec<String>,
-        alternative_transport_sets: usize,
     ) -> Self {
         Self {
             module,
@@ -104,7 +92,6 @@ impl<M> CompiledModule<M> {
             verifier_passed,
             assumptions,
             unsupported,
-            alternative_transport_sets,
         }
     }
 
@@ -112,24 +99,6 @@ impl<M> CompiledModule<M> {
         &self.trap_catalog
     }
 
-    /// PX10 Increment 2 containment: labelled alternative transport has no
-    /// native execution evidence yet (PX10-NATIVE-SPAWN-PARITY Increment B
-    /// deletes this). `process_gated` is `bound_process_transport_exempt`'s
-    /// result on the bound-process route and false on every other route.
-    pub(super) fn require_alternative_transport_contained(
-        &self,
-        process_gated: bool,
-    ) -> Result<(), CraneliftBackendError> {
-        if self.alternative_transport_sets == 0 || process_gated {
-            return Ok(());
-        }
-        Err(unsupported(
-            LoweringCause::Fragment,
-            "ProducerAlternativeSet",
-            "labelled alternative transport has no native execution evidence yet \
-             (PX10-NATIVE-SPAWN-PARITY)",
-        ))
-    }
 }
 
 impl CompiledModule<JITModule> {
@@ -138,7 +107,6 @@ impl CompiledModule<JITModule> {
         process_root: Option<*const std::ffi::c_void>,
         profile: crate::boundary_resource_profile::BoundaryResourceProfileV3,
     ) -> Result<(RuntimeObservation, Option<i64>), CraneliftBackendError> {
-        self.require_alternative_transport_contained(false)?;
         if let Some(trap) = self.trap {
             return Ok((RuntimeObservation::Trapped(trap), None));
         }

@@ -60,7 +60,7 @@ ALLOWED: tuple[tuple[str, str, str, str], ...] = (
     ("crates/ken-runtime-support/src/boundary_value.rs", "13", "subject-owned count", "unit fixture's boundary value cases"),
     ("crates/ken-elaborator/tests/px3_abi_scalars.rs", "12", "subject-owned count", "test-named type IDs and PX3 scalar conversion IDs"),
     ("crates/ken-runtime/src/cranelift_backend/lowering/boundary.rs", "22", "subject-owned count", "module-owned LoweredVariant::ALL enum"),
-    ("crates/ken-runtime/src/cranelift_backend/lowering/core/tests/effects.rs", "16", "subject-owned count", "test-enumerated host_effect_seat_contract_of byte-span seats"),
+    ("crates/ken-runtime/src/cranelift_backend/lowering/core/tests/effects.rs", "19", "subject-owned count", "test-enumerated host_effect_seat_contract_of byte-span seats"),
     ("crates/ken-runtime/src/boundary_value_clif.rs", "30", "subject-owned count", "module-owned BOUNDARY_LOCAL_HELPERS inventory"),
 )
 

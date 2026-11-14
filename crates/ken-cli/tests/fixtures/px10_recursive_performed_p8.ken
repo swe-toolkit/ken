@@ -1,0 +1,43 @@
+program capabilities FS APartial
+
+import Capability.Console.Text (print_line)
+
+import Capability.Process.Exit (host_bind, host_console, host_program_then, host_pure)
+
+const Compose (r : Type) : Type = HostIO APartial r
+
+proc ticks (n : Nat) : Compose Unit visits [Console] =
+  match n {
+    Zero ↦ host_pure APartial Unit MkUnit;
+    Suc m ↦
+      host_bind APartial Unit Unit
+        (host_console APartial Unit (print_line "tick"))
+        (λ_. ticks m)
+  }
+
+proc count (n : Nat) : Compose Nat visits [Console] =
+  match n {
+    Zero ↦ host_pure APartial Nat Zero;
+    Suc m ↦
+      host_bind APartial Unit Nat
+        (host_console APartial Unit (print_line "count"))
+        (λ_. host_bind APartial Nat Nat (count m) (λk. host_pure APartial Nat (Suc (Suc k))))
+  }
+
+
+proc outer (n : Nat) : Compose Nat visits [Console] =
+  match n {
+    Zero ↦ host_pure APartial Nat Zero;
+    Suc m ↦
+      host_bind APartial Unit Nat
+        (ticks (Suc Zero))
+        (λ_. outer m)
+  }
+
+proc main
+      (_input : ProcessInput) (_caps : ProgramCaps APartial)
+    : HostIO APartial ExitCode
+    visits [Console] =
+  host_bind APartial Nat ExitCode
+    (outer (Suc Zero))
+    (λk. host_program_then APartial (print_line "end") ExitCode.Success)

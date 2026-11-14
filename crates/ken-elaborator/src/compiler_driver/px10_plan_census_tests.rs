@@ -1,8 +1,8 @@
 //! PX10-NATIVE-SITE-IDENTITY AC-2: how far the three px10 programs plan.
 //!
-//! The Process gate refuses all three before object emission, so this census
-//! hands each preparation straight to the emission the gate guards. Nothing
-//! here runs a native program; emission beneath that gate establishes no parity.
+//! The checked Process grant is now native-admitted. This module still
+//! checks planning and emitted-object invariants; PX10's native/interpreter
+//! execution parity lives in the named CLI smoke and F rows.
 
 use super::*;
 
@@ -51,7 +51,7 @@ fn emit_below_gate(
         .expect("the px10 program prepares");
     assert!(
         preparation.plan.process_declared,
-        "the census must plan a program the Process gate refuses"
+        "the census must retain the program's declared Process authority"
     );
     let root = tempfile::tempdir().expect("census output root");
     emit_native_program_preparation(
@@ -61,50 +61,8 @@ fn emit_below_gate(
     )
 }
 
-/// Promise class: transition sentinel, retired when PX10-NATIVE-SPAWN-PARITY
-/// promotes Process and removes the labelled-transport containment.
-/// MEASURED: removing the Process bit from the checked smoke preparation
-/// refuses its issued transport before object finish, on the named construct.
-/// CLAIMED: the census-only emission route cannot ship unexecuted transport
-/// merely because a caller mistakenly treats the plan as Process-free.
-/// THE GAP: this test does not establish labelled-transport execution parity.
-#[test]
-fn px10_set_issuing_smoke_without_process_gate_refuses_containment() {
-    in_census_thread("px10-containment-without-process-bit", || {
-        let mut preparation = prepare_native_program_sources(
-            "px10_containment_without_process_bit",
-            vec![px10_native_source(SMOKE)],
-        )
-        .expect("smoke prepares");
-        assert!(
-            preparation.plan.process_declared,
-            "the original plan is gated"
-        );
-        preparation.plan.process_declared = false;
-        let root = tempfile::tempdir().expect("census output root");
-        let error = emit_native_program_preparation(
-            preparation,
-            root.path(),
-            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-        )
-        .expect_err("an ungated set-issuing plan cannot emit an artifact");
-        let NativeProgramBuildError::Packaging(error) = error else {
-            panic!("expected a packaging refusal, got {error:?}");
-        };
-        assert_eq!(
-            error.stage,
-            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
-        );
-        assert_eq!(
-            error.source_cause,
-            Some(ken_runtime::LoweringCause::Fragment)
-        );
-        assert!(error.reason.contains("ProducerAlternativeSet"), "{error:?}");
-    });
-}
-
 /// Promise class: durable invariant. MEASURED: a real smoke
-/// planner issues two-member sets, builds beneath the Process gate, and
+/// planner issues two-member sets, builds with declared Process authority, and
 /// rejects readers that add one foreign same-result identity or drop a
 /// member. CLAIMED: a reader cannot interpret an issued labelled word with
 /// a different member set. THE GAP: these two probes do not enumerate every
@@ -117,7 +75,7 @@ fn px10_issued_set_reader_mismatch_refuses_at_planning() {
             ken_runtime::with_producer_alternative_reader_negative_observations(|| {
                 emit_below_gate("px10_reader_member_mismatch", SMOKE)
             });
-        built.expect("the unchanged smoke fixture builds beneath its Process gate");
+        built.expect("the unchanged smoke fixture builds with Process authority");
         assert_eq!(readers.len(), 3, "smoke must issue three reader sets");
         for reader in readers {
             assert_eq!(
@@ -147,25 +105,25 @@ fn px10_issued_set_reader_mismatch_refuses_at_planning() {
     });
 }
 
-/// Promise class: transition sentinel. MEASURED: the unavailable Process
-/// operation reaches native dispatch only on this census route, not through
-/// a product program (emission or the Process gate refuses first). Its host
-/// status is decoded as ProcessPlanOpen, and the executable names the operation
-/// rather than reporting malformed borrowed input. CLAIMED: when this refusal
-/// reaches a native process, the diagnostic preserves its cause. THE GAP: no
-/// labelled-transport execution parity or product admission is established.
+/// Promise class: transition sentinel from the pre-B2 unavailable Process
+/// diagnostic. MEASURED: the root-admitted smoke emits a native artifact and
+/// completes ProcessPlanOpen and wait with no terminal error. CLAIMED: native
+/// Process admission is executable, not an availability label alone. THE GAP:
+/// exact engine parity and ordered settlements are pinned by the CLI B2 rows.
+/// The earlier unavailable-operation census cannot issue ResourceStreamWrite:
+/// checked source has no import home for write_pipe. Native ABI availability
+/// still refuses it, but that route's observable arm is UnboundName during
+/// elaboration, not a native OperationUnavailable witness. The separate
+/// spec/catalog source-home node owns a reaching refusal/parity row.
 #[test]
-fn unavailable_process_operation_names_its_host_refusal() {
-    in_census_thread("px10-unavailable-native-diagnostic", || {
+fn native_process_smoke_runs_from_emitted_artifact() {
+    in_census_thread("px10-native-process-smoke", || {
         let preparation = prepare_native_program_sources(
-            "px10_unavailable_native_diagnostic",
+            "px10_native_process_smoke",
             vec![px10_native_source(&root_allowed_smoke())],
         )
         .expect("px10 smoke prepares");
-        assert!(
-            preparation.plan.process_declared,
-            "the Process gate still owns admission"
-        );
+        assert!(preparation.plan.process_declared);
         assert_admitted_as_root(&preparation.plan);
         let root = tempfile::tempdir().expect("census output root");
         let output = emit_native_program_preparation(
@@ -173,8 +131,8 @@ fn unavailable_process_operation_names_its_host_refusal() {
             root.path(),
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
-        .expect("smoke emits only beneath its Process gate");
-        let error = ken_runtime::run_bound_process_effect_observation(
+        .expect("native Process smoke emits");
+        let observed = ken_runtime::run_bound_process_effect_observation(
             &output.artifact,
             &ken_runtime::NativeEffectRunOptionsV1 {
                 arguments: Vec::new(),
@@ -183,33 +141,18 @@ fn unavailable_process_operation_names_its_host_refusal() {
                 plan_hash: output.plan_transport_hash,
             },
         )
-        .expect_err("the unavailable operation cannot run natively");
-        let ran = std::process::Command::new(&output.artifact.executable_path)
-            .current_dir(root.path())
-            .output()
-            .expect("linked census artifact runs");
-        assert!(
-            matches!(
-                &error,
-                ken_runtime::NativeEffectRunErrorV1::OperationUnavailable {
-                    operation: ken_host::HostOpV1::ProcessPlanOpen
-                }
-            ),
-            "the exact host refusal must survive: {error:?}; stderr: {:?}",
-            String::from_utf8_lossy(&ran.stderr)
-        );
-        assert_eq!(ran.status.code(), Some(1), "stderr: {:?}", ran.stderr);
-        assert_eq!(
-            ran.stderr,
-            b"ken native trap: host operation ProcessPlanOpen (0x0601) is unavailable to native code\n"
-        );
-        assert!(!String::from_utf8_lossy(&ran.stderr).contains("malformed borrowed process input"));
+        .expect("emitted Process smoke executes");
+        assert_eq!(observed.exit_status, 0);
+        assert_eq!(observed.terminal_error, None);
+        assert!(observed.effect_trace.iter().any(|event|
+            event.operation == ken_host::HostOpV1::ProcessPlanOpen));
+        assert!(observed.effect_trace.iter().any(|event|
+            event.operation == ken_host::HostOpV1::ProcessWait));
     });
 }
 
 /// Promise class: regression. A NativeTested ConsoleWrite still completes and
-/// yields its one unchanged event. The unavailable-op refusal has no product
-/// witness today: emission or the Process gate refuses first.
+/// yields its one unchanged event independently of the Process promotion.
 #[test]
 fn native_tested_console_write_retains_its_single_event() {
     const SOURCE: &str = r#"program capabilities FS APartial, RootExecution Allow
@@ -227,7 +170,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         .expect("NativeTested Console program prepares");
         assert!(
             !preparation.plan.process_declared,
-            "Console does not use the Process gate"
+            "Console does not require a Process grant"
         );
         assert_admitted_as_root(&preparation.plan);
         let root = tempfile::tempdir().expect("control output root");
@@ -483,16 +426,17 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
             &owners,
             &[(ReturnFold, 623, 12), (ReturnedVisSettlement, 623, 658)],
         );
-        let _built = built.expect("smoke emits an artifact beneath the Process gate");
+        let _built = built.expect("smoke emits an artifact with Process authority");
     });
 }
 
-/// Promise class: transition sentinel, retired by this WP's Increment 2.
-/// MEASURED: argv_env_pipe and live_child build artifacts beneath the separate
-/// Process gate after argv's generated context-4 Result contract becomes None.
-/// Both retain exact static region-exit owners. CLAIMED: the planner cannot
-/// confuse an ordinary successor Vis under Excluded{Relay} with a completed
-/// K Ret publication. THE GAP: neither program runs natively here.
+/// Promise class: transition sentinel for the fixed B1a static plan.
+/// MEASURED: argv_env_pipe and live_child build native artifacts with declared
+/// Process authority after argv's generated context-4 Result contract becomes
+/// None. Both retain exact static region-exit owners. CLAIMED: the planner
+/// cannot confuse an ordinary successor Vis under Excluded{Relay} with a
+/// completed K Ret publication. THE GAP: native execution is established by
+/// the F parity rows, not this static-plan observation.
 #[test]
 fn px10_argv_and_live_emit_below_process_gate() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
@@ -541,7 +485,7 @@ fn px10_argv_and_live_emit_below_process_gate() {
                     "an ordinary successor Vis is not a completed K Ret: {contracts:?}"
                 );
             }
-            let _built = built.expect("px10 program emits an artifact beneath the Process gate");
+            let _built = built.expect("px10 program emits an artifact with Process authority");
             assert_eq!(
                 seat_refusals,
                 seat.into_iter().collect::<Vec<_>>(),
@@ -553,12 +497,12 @@ fn px10_argv_and_live_emit_below_process_gate() {
 }
 
 /// Promise class: transition sentinel for the three B1a G-ERASURE fixtures;
-/// re-derive the population if a fixture changes or B2 removes the Process gate.
-/// MEASURED: the below-gate native build succeeds, seven actual self-placed
+/// re-derive the population if a fixture changes after B2 promotion.
+/// MEASURED: the native build succeeds, seven actual self-placed
 /// checked-IH calls have no response owner and each has an Escaped residual;
 /// every installed relay pair has a route. CLAIMED: a self transport cannot
 /// mint a response owner or leave an unrouted relay in these three plans.
-/// THE GAP: native execution parity remains a B2 obligation, not a B1a test.
+/// THE GAP: this plan pin does not assert execution; the B2 F rows do.
 fn assert_b1a_g_erasure(name: &'static str, source: String) {
     in_census_thread(name, move || {
         let (built, diagnostics) =
@@ -668,7 +612,7 @@ fn px10_relays_are_numbered_protocol_members() {
                 ken_runtime::with_static_response_feasibility_diagnostics(|| {
                     emit_below_gate(name, source)
                 });
-            let _built = built.expect("px10 program emits an artifact beneath the Process gate");
+            let _built = built.expect("px10 program emits an artifact with Process authority");
             assert_eq!(diagnostics.len(), 1, "{name}: one completed plan");
             let plan = &diagnostics[0];
             let mut discriminants = std::collections::BTreeSet::new();
