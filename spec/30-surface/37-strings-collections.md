@@ -683,7 +683,7 @@ the pinned imported predicate. The defining shapes are:
   fallback is `‖Perm_rel‖`, the propositional truncation of a
   proof-relevant permutation relation (§57 §3.1, `16 §6`). It is
   **not** the `Perm` pin. A bare proof-relevant inductive
-  `Perm_rel : Ω` would violate `16 §1.4`/`13 §4`.
+  `Perm_rel : Ω` would violate `16 §1.3`/`13 §4`.
 
 No `Perm` is prelude in this contract: it is imported from
 `Data.Collections.Derived`, along with `is_sorted` and `eq_from_ord`.
