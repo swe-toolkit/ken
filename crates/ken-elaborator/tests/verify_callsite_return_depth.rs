@@ -4,6 +4,17 @@
 use ken_elaborator::{ElabEnv, ObligationKind};
 use ken_kernel::Term;
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
+fn with_checked_not() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    checked_not::load(&mut env);
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+        .expect("selected checked negation");
+    env
+}
+
 fn pi_prefix(mut ty: &Term, count: usize) -> (Vec<Term>, Term) {
     let mut domains = Vec::with_capacity(count);
     for _ in 0..count {
@@ -30,7 +41,7 @@ fn equal_int(env: &ElabEnv, left: Term, right: Term) -> Term {
 }
 
 fn not(env: &ElabEnv, proposition: Term) -> Term {
-    Term::app(Term::const_(env.globals["Not"], vec![]), proposition)
+    Term::app(Term::const_(env.globals["Core.Logic.Not.Not"], vec![]), proposition)
 }
 
 /// AR1 and AR5. MEASURED: the full checked type has explicit `n`, then its
@@ -39,11 +50,11 @@ fn not(env: &ElabEnv, proposition: Term) -> Term {
 /// GAP: exact domains distinguish n from the result-function argument.
 #[test]
 fn function_return_type_stays_after_requires() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let f = env
         .elaborate_decl_v1(
             "fn f (n : Int) : Int -> Int \
-             requires Not (Equal Int n 0) = \\m. m",
+             requires CheckedNot (Equal Int n 0) = \\m. m",
         )
         .expect("function-valued return with requires");
     let (_, ty) = env
@@ -67,12 +78,12 @@ fn function_return_type_stays_after_requires() {
 /// the complete domain terms, not just the Pi count, are compared.
 #[test]
 fn multiple_requires_split_before_a_function_valued_return() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let f = env
         .elaborate_decl_v1(
             "fn f (n : Int) (d : Int) : Int -> Int \
-             requires Not (Equal Int d 0) \
-             requires Not (Equal Int n 0) = \\m. m",
+             requires CheckedNot (Equal Int d 0) \
+             requires CheckedNot (Equal Int n 0) = \\m. m",
         )
         .expect("multiple requires before a function-valued return");
     let (_, ty) = env
@@ -101,10 +112,10 @@ fn multiple_requires_split_before_a_function_valued_return() {
 /// from either a silent zero-hole accept or an unrelated failure.
 #[test]
 fn function_valued_call_creates_requires_obligation() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let results = env
         .elaborate_file_v1(
-            "fn f (n : Int) : Int -> Int requires Not (Equal Int n 0) = \\m. m\n\
+            "fn f (n : Int) : Int -> Int requires CheckedNot (Equal Int n 0) = \\m. m\n\
              fn h (k : Int) : Int = f 0 k",
         )
         .expect("the caller receives a Requires obligation");

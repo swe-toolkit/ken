@@ -5,6 +5,9 @@ use ken_elaborator::{modules, parser, ElabEnv, ElabError};
 use ken_kernel::{Decl, GlobalId, KernelError, Term};
 use tempfile::tempdir;
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
 const NEEDS_PREMISE: &str = "const ac0_need : Int requires Equal Int 0 0 = 0";
 const BAD_CALLER: &str = "const ac0_bad : Bool = ac0_need";
 const SPACE_DECL_AFTER_HOLE: &str = r#"
@@ -128,8 +131,11 @@ fn failed_roots_loaded_declaration_has_exact_zero_delta() {
 #[test]
 fn failed_space_decl_after_premise_hole_has_exact_zero_delta() {
     let mut env = ElabEnv::new().expect("base environment");
+    checked_not::load(&mut env);
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+        .expect("selected checked negation");
     env.elaborate_decl_v1(
-        r#"fn ac0_space_callee (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x"#,
+        r#"fn ac0_space_callee (x : Int) (y : Int) : Int requires CheckedNot (Equal Int x y) = x"#,
     )
     .expect("the requires-bearing callee is checked");
 

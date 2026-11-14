@@ -375,8 +375,14 @@ fn accepted_seed_prefix(sources: &[&str]) -> String {
     let [ordered, controls, _, _] = sources else {
         panic!("seed needs two checked control fences and two separate refusals");
     };
+    // Keep the conformance source byte-for-byte; select the checked constructor
+    // in this client-only projection rather than relying on pre-source spelling.
+    let ordered = format!(
+        "import Core.Logic.Conjunction (and_intro as checked_and_intro)\n{}",
+        ordered.replace("and_intro", "checked_and_intro")
+    );
     let mut env = loaded_trace();
-    env.elaborate_file(ordered)
+    env.elaborate_file(&ordered)
         .expect("ordered law instance and both exact tie outputs check");
     env.elaborate_file(controls)
         .expect("both unordered inputs and four exact output controls check");

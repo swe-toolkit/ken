@@ -7,6 +7,17 @@ use ken_elaborator::{ElabEnv, ElabError, ElabResult, ObligationKind};
 use ken_interp::{eval, EvalStore, EvalVal};
 use ken_kernel::GlobalId;
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
+fn with_checked_not() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    checked_not::load(&mut env);
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+        .expect("selected checked negation");
+    env
+}
+
 fn trusted(env: &ElabEnv) -> HashSet<GlobalId> {
     env.env.trusted_base().into_iter().collect()
 }
@@ -47,11 +58,11 @@ fn assert_reported_delta(env: &ElabEnv, before: &HashSet<GlobalId>, result: &Ela
 /// trusted-base identity set must equal the result's reported hole IDs.
 #[test]
 fn instance_field_requires_hole_is_reported() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let before = trusted(&env);
     let results = env
         .elaborate_file_v1(
-            "fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x\n\
+            "fn d (x : Int) (y : Int) : Int requires CheckedNot (Equal Int x y) = x\n\
              class Endo A { apply : A -> A }\n\
              instance Endo Int { apply = \\x. d x x }",
         )
@@ -88,11 +99,11 @@ fn instance_field_requires_hole_is_reported() {
 /// compare identities, not counts.
 #[test]
 fn space_cell_requires_hole_is_reported() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let before = trusted(&env);
     let results = env
         .elaborate_file_v1(
-            "fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x\n\
+            "fn d (x : Int) (y : Int) : Int requires CheckedNot (Equal Int x y) = x\n\
              space S { mut cell : Int = d 0 0 }",
         )
         .expect("space cell initializer reports its premise hole");
@@ -123,11 +134,11 @@ fn space_cell_requires_hole_is_reported() {
 /// GAP: the equality is over hole identities, not obligation counts.
 #[test]
 fn space_operation_requires_hole_is_reported() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let before = trusted(&env);
     let results = env
         .elaborate_file_v1(
-            "fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x\n\
+            "fn d (x : Int) (y : Int) : Int requires CheckedNot (Equal Int x y) = x\n\
              space S { mut cell : Int = 0\n\
                proc call () : Int ensures Equal Int result 0 visits [S] = d 0 0\n\
              }",
@@ -172,8 +183,8 @@ fn space_operation_requires_hole_is_reported() {
 /// refusal variant proves this is not an unrelated elaboration failure.
 #[test]
 fn standalone_expression_refuses_unsupplied_requires_without_hole() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
-    env.elaborate_decl_v1("fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x")
+    let mut env = with_checked_not();
+    env.elaborate_decl_v1("fn d (x : Int) (y : Int) : Int requires CheckedNot (Equal Int x y) = x")
         .expect("callee declaration");
     let before = trusted(&env);
     let result = env.elaborate_expr("standalone-call", "d 0 0");

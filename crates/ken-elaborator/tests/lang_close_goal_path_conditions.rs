@@ -5,6 +5,9 @@ use ken_elaborator::{ElabEnv, ElabResult, Obligation, ObligationKind};
 use ken_kernel::{check::check as kernel_check, subst::weaken, Context, Decl, GlobalId, Term};
 use std::collections::BTreeSet;
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
 fn result<'a>(results: &'a [ElabResult], name: &str) -> &'a ElabResult {
     results
         .iter()
@@ -229,13 +232,15 @@ fn requires_call_argument<'a>(body: &'a Term, callee: ken_kernel::GlobalId) -> O
 #[test]
 fn requires_argument_is_checked_binder_or_hole_applied_to_checked_binder() {
     let mut env = ElabEnv::new().expect("prelude");
+    checked_not::load(&mut env);
     let before = env.env.trusted_base().into_iter().collect();
     let results = env
         .elaborate_file_v1(
-            "fn direct (b : Bool) : Bool requires Equal Bool b True = b\n\
+            "import Core.Logic.Not (Not as CheckedNot)\n\
+             fn direct (b : Bool) : Bool requires Equal Bool b True = b\n\
          fn direct_plain (b : Bool) : Bool = direct b\n\
          fn direct_branch (b : Bool) : Bool = if b then direct b else b\n\
-         fn indirect (b : Bool) : Bool requires Not (Equal Bool b False) = b\n\
+         fn indirect (b : Bool) : Bool requires CheckedNot (Equal Bool b False) = b\n\
          fn indirect_plain (b : Bool) : Bool = indirect b\n\
          fn indirect_branch (b : Bool) : Bool = if b then indirect b else b",
         )
@@ -313,10 +318,12 @@ fn requires_argument_is_checked_binder_or_hole_applied_to_checked_binder() {
 #[test]
 fn related_requires_hole_independently_needs_the_checked_if_equation() {
     let mut env = ElabEnv::new().expect("prelude");
+    checked_not::load(&mut env);
     let before = env.env.trusted_base().into_iter().collect();
     let results = env
         .elaborate_file_v1(
-            "fn indirect (b : Bool) : Bool requires Not (Equal Bool b False) = b\n\
+            "import Core.Logic.Not (Not as CheckedNot)\n\
+             fn indirect (b : Bool) : Bool requires CheckedNot (Equal Bool b False) = b\n\
          fn outside (b : Bool) : Bool = indirect b\n\
          fn inside (b : Bool) : Bool = if b then indirect b else b",
         )

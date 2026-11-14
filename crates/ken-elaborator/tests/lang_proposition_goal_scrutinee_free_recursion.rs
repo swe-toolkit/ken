@@ -3,6 +3,9 @@
 
 use ken_elaborator::{ElabEnv, ElabError};
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
 // The adjacent indexed-match suites state 8 MiB against a measured
 // 1,982,464-byte prelude peak; this provisions more than four times that peak.
 const ELABORATION_STACK_BYTES: usize = 8 * 1024 * 1024;
@@ -50,7 +53,7 @@ const CLOSED_EQUAL: &str = "theorem closed_equal (a : Type) (n : Nat) (xs : Dual
 const DUAL_PROP: &str = "theorem dual_prop (a : Type) (pp : Prop) (h : pp) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : pp = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ h }; DualFS m j ↦ match xs { DualCons k x rest ↦ dual_prop a pp h m rest j } }";
 const VEC_PROP: &str = "theorem vec_prop (a : Type) (b : Type) (pp : Prop) (h : pp) (n : Nat) (xs : Vec a n) (ys : Vec b n) : pp = match xs { VNil ↦ h; VCons k x r ↦ match ys { VCons _ y r2 ↦ vec_prop a b pp h k r r2 } }";
 const BOTTOM_TWIN: &str = "theorem bottom_twin (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Bottom = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Proved }; DualFS m j ↦ match xs { DualCons k x rest ↦ bottom_twin a m rest j } }";
-const NOT_BOTTOM: &str = "theorem not_bottom (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Not Bottom = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ λh. h }; DualFS m j ↦ match xs { DualCons k x rest ↦ λh. not_bottom a m rest j h } }";
+const NOT_BOTTOM: &str = "theorem not_bottom (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : CheckedNot Bottom = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ λh. h }; DualFS m j ↦ match xs { DualCons k x rest ↦ λh. not_bottom a m rest j h } }";
 const NONRECURSIVE: &str = "theorem nonrecursive (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Top = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Proved }; DualFS m j ↦ match xs { DualCons k x rest ↦ Proved } }";
 
 #[test]
@@ -139,7 +142,14 @@ fn g4_bottom_false_twin_gets_typed_refusal() {
 #[test]
 fn not_bottom_and_nonrecursive_step_controls() {
     on_elaboration_stack(|| {
-        checks(true, NOT_BOTTOM);
+        let mut env = env(true);
+        checked_not::load(&mut env);
+        env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+            .expect("checked negation must be selected explicitly");
+        let trust = env.env.trusted_base();
+        env.elaborate_decl(NOT_BOTTOM)
+            .expect("the negative proposition checks without a convoy");
+        assert_eq!(env.env.trusted_base(), trust, "no new trusted identity");
         checks(true, NONRECURSIVE);
     });
 }
