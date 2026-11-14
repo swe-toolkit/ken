@@ -2115,10 +2115,10 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
 }
 
 /// The host operations planning represents: every operation the reference
-/// executor admits, read from `ken_host`. After B2's Process promotion this
-/// equals the native-tested set, including the pipe-stream and Process ops.
-/// The emitted native F parity rows, rather than this inventory assertion,
-/// establish that those newly admitted effects execute.
+/// executor admits, read from `ken_host`. After B2's six-op promotion this
+/// is the NativeTested set plus interpreter-only ResourceStreamWrite, which
+/// awaits a checked source home before native parity can promote it. The
+/// emitted native F rows, not this inventory, establish executable effects.
 fn executor_admitted_host_operations() -> BTreeSet<ken_host::HostOpV1> {
     ken_host::HostOpV1::ALL
         .into_iter()

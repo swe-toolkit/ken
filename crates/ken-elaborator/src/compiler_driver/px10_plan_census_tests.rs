@@ -110,6 +110,11 @@ fn px10_issued_set_reader_mismatch_refuses_at_planning() {
 /// completes ProcessPlanOpen and wait with no terminal error. CLAIMED: native
 /// Process admission is executable, not an availability label alone. THE GAP:
 /// exact engine parity and ordered settlements are pinned by the CLI B2 rows.
+/// The earlier unavailable-operation census cannot issue ResourceStreamWrite:
+/// checked source has no import home for write_pipe. Native ABI availability
+/// still refuses it, but that route's observable arm is UnboundName during
+/// elaboration, not a native OperationUnavailable witness. The separate
+/// spec/catalog source-home node owns a reaching refusal/parity row.
 #[test]
 fn native_process_smoke_runs_from_emitted_artifact() {
     in_census_thread("px10-native-process-smoke", || {
