@@ -117,7 +117,6 @@ fn check_ac1_native_process_smoke_matches_fresh_interpreter() {
     assert_eq!(native.terminal_error, reference.terminal_error);
     assert_eq!(native.effect_trace, reference.effect_trace);
     assert_exported_resource_lifetime_template_holds(&native.effect_trace);
-
 }
 
 /// Promise class: durable invariant; `Signaled 15` is the specified UInt8
@@ -524,19 +523,34 @@ fn ac1b_native_failed_spawn_settles_plan_like_interpreter() {
             assert_eq!(native.terminal_exit, reference.terminal_exit);
             assert_eq!(native.effect_trace, reference.effect_trace);
             let trace = &native.effect_trace;
-            let plan = trace.iter().find_map(|event| match (&event.operation, &event.outcome) {
-                (Op::ProcessPlanOpen, Outcome::Success(Reply::ResourceAcquired {
-                    resource_kind: Kind::SpawnPlan, identity, ..
-                })) => Some(*identity),
-                _ => None,
-            }).expect("failed spawn first acquires a plan");
-            let failed = trace.iter().filter(|event|
-                event.operation == Op::ProcessSpawn && matches!(event.outcome, Outcome::Error(_)))
+            let plan = trace
+                .iter()
+                .find_map(|event| match (&event.operation, &event.outcome) {
+                    (
+                        Op::ProcessPlanOpen,
+                        Outcome::Success(Reply::ResourceAcquired {
+                            resource_kind: Kind::SpawnPlan,
+                            identity,
+                            ..
+                        }),
+                    ) => Some(*identity),
+                    _ => None,
+                })
+                .expect("failed spawn first acquires a plan");
+            let failed = trace
+                .iter()
+                .filter(|event| {
+                    event.operation == Op::ProcessSpawn
+                        && matches!(event.outcome, Outcome::Error(_))
+                })
                 .collect::<Vec<_>>();
             assert_eq!(failed.len(), 1);
-            let settled = trace.iter().filter(|event|
-                event.operation == Op::ResourceRelease
-                    && event.resource_bindings.contains(&(Role::Target, plan)))
+            let settled = trace
+                .iter()
+                .filter(|event| {
+                    event.operation == Op::ResourceRelease
+                        && event.resource_bindings.contains(&(Role::Target, plan))
+                })
                 .collect::<Vec<_>>();
             assert_eq!(settled.len(), 1);
             assert!(failed[0].sequence < settled[0].sequence);

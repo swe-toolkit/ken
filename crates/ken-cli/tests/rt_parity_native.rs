@@ -6867,18 +6867,25 @@ fn px10_native_process_operation_pairs_match_fresh_interpreter() {
             )
             .expect("native Process smoke executes");
             let pairs = |observation: &ken_runtime::EffectObservation| {
-                observation.effect_trace.iter().map(|event| (
-                    event.operation,
-                    event.request.clone(),
-                    event.outcome.clone(),
-                )).collect::<Vec<_>>()
+                observation
+                    .effect_trace
+                    .iter()
+                    .map(|event| {
+                        (
+                            event.operation,
+                            event.request.clone(),
+                            event.outcome.clone(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
             };
             assert_eq!(native.exit_status, reference.exit_status);
             assert_eq!(native.terminal_exit, reference.terminal_exit);
             assert_eq!(native.terminal_error, reference.terminal_error);
             assert_eq!(pairs(&native), pairs(&reference));
-            assert!(pairs(&reference).iter().any(|(operation, _, _)|
-                *operation == ken_runtime::HostOpV1::ProcessWait));
+            assert!(pairs(&reference)
+                .iter()
+                .any(|(operation, _, _)| *operation == ken_runtime::HostOpV1::ProcessWait));
         })
         .expect("stated Process parity worker")
         .join()

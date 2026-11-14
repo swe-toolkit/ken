@@ -220,8 +220,11 @@ impl HostOpV1 {
             Self::ResourceStreamRead => HostOpAvailabilityV1::NativeTested,
             Self::ResourceStreamWrite => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
-            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
+            Self::ProcessPlanOpen
+            | Self::ProcessPlanPush
+            | Self::ProcessSpawn
+            | Self::ProcessTakePipe
+            | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
         }
     }
 

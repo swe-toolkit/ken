@@ -89,7 +89,10 @@ fn compare_f_engines(name: &str, raw: &str) {
             env!("CARGO_BIN_EXE_px10-child-probe"),
         )
         .replace("PX10_READY_FILE", &ready.display().to_string());
-    assert!(source.contains("RootExecution Allow"), "{name}: grant header moved");
+    assert!(
+        source.contains("RootExecution Allow"),
+        "{name}: grant header moved"
+    );
     assert!(!source.contains("PX10_CHILD_PROBE_PATH"));
     assert!(!source.contains("PX10_READY_FILE"));
     let roots =
@@ -236,8 +239,9 @@ fn r_nodes_starter_argv_refuses_on_invocation_nodes() {
                 );
             assert!(source.contains("RootExecution Allow"));
             assert!(!source.contains("PX10_CHILD_PROBE_PATH"));
-            let roots = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../catalog/packages")];
+            let roots =
+                [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../catalog/packages")];
             let built = ken_cli::build_native_program_with_roots(
                 &source,
                 ken_cli::SourceFormat::Ken,
@@ -257,16 +261,24 @@ fn r_nodes_starter_argv_refuses_on_invocation_nodes() {
                 },
             )
             .expect("R-NODES native artifact runs and returns a typed observation");
-            assert_ne!(observed.exit_status, 0, "starter did not refuse: {observed:?}");
-            assert!(observed.effect_trace.iter().any(|event|
-                event.operation == ken_host::HostOpV1::ProcessSpawn));
+            assert_ne!(
+                observed.exit_status, 0,
+                "starter did not refuse: {observed:?}"
+            );
+            assert!(observed
+                .effect_trace
+                .iter()
+                .any(|event| event.operation == ken_host::HostOpV1::ProcessSpawn));
             match observed.terminal_error {
                 Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) => {
                     assert_eq!(fault.scope, ken_runtime::CapacityScopeV1::Invocation);
                     assert_eq!(fault.resource, ken_runtime::CapacityResourceV1::Nodes);
                     assert_eq!(fault.limit, 64);
                     assert!(fault.requested > fault.limit, "{fault:?}");
-                    eprintln!("B2 R-NODES requested={} limit={}", fault.requested, fault.limit);
+                    eprintln!(
+                        "B2 R-NODES requested={} limit={}",
+                        fault.requested, fault.limit
+                    );
                 }
                 other => panic!("R-NODES expected typed Invocation/Nodes fault, got {other:?}"),
             }

@@ -1166,9 +1166,13 @@ mod tests {
             },
         };
         let plan = super::super::plan_static_transition_graph_with_symbols(
-            &source, &BTreeMap::new(), &symbols,
-            super::super::AbiRootIngress::Value, false,
-        ).expect("the checked-shape fold has a planned source graph");
+            &source,
+            &BTreeMap::new(),
+            &symbols,
+            super::super::AbiRootIngress::Value,
+            false,
+        )
+        .expect("the checked-shape fold has a planned source graph");
         let root = plan.root_occurrence.expect("enclosing fold origin");
         let inner = child(&plan, root, 0).expect("inner fold in scrutinee");
         let ret_let = child(&plan, inner, 1).expect("inner Ret case body");
