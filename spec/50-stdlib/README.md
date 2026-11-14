@@ -123,8 +123,8 @@ persistent-tree, copying, and sharing strategy is private (`41 §2`).
 `trusted_base()`, not primitives** (`52-map.md`; OQ-A retires the earlier
 opaque `Map`/`Set` primitive, `30 §6`). This catalog provides `Array`'s
 combinators and hosts the proved `Map` module (`52-map.md`). The **verified
-building blocks** — a `sort` returning
-`{ ys | is_sorted ys ∧ Perm ys xs }`, the proved `Map` — are the canonical
+building blocks** — a `sort` with the explicit-comparator refinement of
+`../30-surface/37 §6`, the proved `Map` — are the canonical
 demonstrations of the thesis; the sort's predicates
 `is_sorted`/`Perm` are **definitions** the prover unfolds (`../30-surface/37 §6`,
 ES1), never postulates.

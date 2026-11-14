@@ -135,25 +135,24 @@ dictionary: `where Ord a` desugars to an implicit instance argument
 single constraint binds the reserved `d` (`37 §6`, L3b); the `d<v>`/named-binder/
 comma form is now **shared** across the definition path — `const`/`fn`/`proc`,
 and the legacy `view` — and instances alike (`33 §5.4`, landed def-path
-constraint-binder unification).) So
-the `Ord`-constrained `sort` and the explicit-comparator `sort` are the **same
-view** — one `sort`, whose comparator is either passed explicitly or supplied by
-the dictionary:
+constraint-binder unification).)
 
-```
-view sort {a} (leq : a → a → Bool) (xs : List a) : { ys | is_sorted leq ys ∧ Perm ys xs }
-                          -- explicit comparator (37 §6), and:
-view sort {a} (xs : List a) : { ys | is_sorted (d.leq) ys ∧ Perm ys xs }  where Ord a
-                          -- `d.leq` supplied by the dictionary — the SAME view
-```
+A caller with `where Ord a` passes `d.leq` to the **same**
+explicit-argument `fn sort` of `37 §6`: `sort a (d.leq) xs`.
+The verified result uses
+`is_sorted a (d.leq) ys ∧ Perm a (eq_from_ord a (d.leq)) ys xs`,
+exactly §37 §6's predicate with `leq` supplied by the dictionary.
+An explicit-comparator caller instead passes `leq` to `sort a leq xs`
+and uses the same two predicates with that comparator.
 
 There is **no second `sort`** and **no new mechanism**: `where Ord a` is
 ordinary implicit-dictionary insertion (`33 §5.4`), and a caller may still pass
 a **named, non-canonical** `Ord` value explicitly (`33 §5.5`,
 `sortBy byLength xs`) — the dependent-types escape hatch — without perturbing
-canonical resolution. The refinement predicates (`is_sorted`, `Perm`) are
-unchanged; `Ord`'s `total` law is what lets a verified `sort` *discharge* the
-sortedness obligation the explicit form could only *state*.
+canonical resolution. Substituting `d.leq` leaves the refinement predicates
+(`is_sorted`, `Perm`) unchanged; `Ord`'s `total` law is what lets a verified
+`sort` *discharge* the sortedness obligation the explicit form could only
+*state*.
 
 ## 5. Laws PROVED, not postulated — the hard soundness gate (AC3)
 
