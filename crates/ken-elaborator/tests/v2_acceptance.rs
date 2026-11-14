@@ -20,6 +20,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, Level, Term};
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
 fn mk_env() -> ElabEnv {
     ElabEnv::new().expect("base env")
 }
@@ -474,9 +477,12 @@ fn spec_declaration_variants_have_provenance() {
 /// extraction and V2-to-export projection, not prover search.
 #[test]
 fn open_call_requires_hole_exports_unknown() {
-    let callee_source = "fn guarded (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n";
+    let callee_source = "fn guarded (n : Int) (d : Int) : Int requires CheckedNot (Equal Int d 0) = n";
     let caller_source = "fn caller (value : Int) : Int = guarded 1 0";
     let mut env = mk_env();
+    checked_not::load(&mut env);
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+        .expect("direct callee selects the checked Not identity");
     let callee = env
         .elaborate_decl_v1(callee_source)
         .expect("explicit-requires callee");
@@ -500,10 +506,13 @@ fn open_call_requires_hole_exports_unknown() {
     let trusted_base = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     assert!(trusted_base.contains(&call_hole));
     let results = vec![(triple.clone(), Verdict::Unknown { hole_id: call_hole })];
-    let program_source = format!("{callee_source}\n{caller_source}");
+    let program_source = format!(
+        "import Core.Logic.Not (Not as CheckedNot)\n{callee_source}\n{caller_source}"
+    );
     let denotation = compile_checked_target_denotation(
         "v2_acceptance_callsite_requires_status",
-        CompilerSource::new("callsite_requires_status.ken", program_source),
+        CompilerSource::new("callsite_requires_status.ken", program_source)
+            .with_roots(checked_not::roots()),
         "caller",
     )
     .expect("checked target containing the explicit-requires call");
