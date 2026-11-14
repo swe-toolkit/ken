@@ -636,9 +636,11 @@ impl ElabEnv {
     /// Used by tests to pre-declare types, predicates, and propositions needed
     /// for conformance test setup.
     pub fn declare_postulate_raw(&mut self, name: &str, ty: Term) -> Result<GlobalId, ElabError> {
+        self.module_state.check_raw_root_binding(name)?;
         let id = declare_postulate(&mut self.env, name.to_string(), vec![], ty)
             .map_err(|e| ElabError::Internal(format!("declare_postulate failed: {}", e)))?;
         self.globals.insert(name.to_string(), id);
+        self.module_state.bind_raw_root(name, id);
         if is_globals_type_former(&self.env, id) {
             // Raw postulates bypass register_effect_row too. Preserve a
             // charge-all spelling if a later phantom family shadows it.
@@ -743,6 +745,13 @@ impl ElabEnv {
         src: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
         modules::elaborate_isolated_strict_v1(self, src, false, roots)
+    }
+
+    /// Select the catalog root for subsequent ordinary file/declaration
+    /// entries. Reuses the roots-entry loader and preserves this env's mode;
+    /// an env without roots retains its missing-module refusal.
+    pub fn set_catalog_roots_v1(&mut self, roots: &[PathBuf]) -> Result<(), ElabError> {
+        modules::set_catalog_roots_v1(self, roots)
     }
 
     /// Elaborate an isolated literate source after extracting its Ken fences.

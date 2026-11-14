@@ -13,6 +13,7 @@
 //! retract). The `:list` command shows all names in entry order.
 
 use std::io::{self, BufRead, Write};
+use std::path::Path;
 
 use ken_elaborator::{
     extract::v2_extract,
@@ -35,7 +36,15 @@ struct Session {
 
 impl Session {
     fn new() -> Result<Self, ElabError> {
-        let env = ElabEnv::new()?;
+        let mut env = ElabEnv::new()?;
+        // The REPL is pathless, so use the nearest catalog root of its
+        // working directory. Outside a catalog-bearing tree, imports keep
+        // their existing missing-provider refusal rather than guessing one.
+        if let Some(root) =
+            ken_elaborator::modules::isolated_catalog_root(Path::new(".ken-repl.ken"))
+        {
+            env.set_catalog_roots_v1(&[root])?;
+        }
         // Shared with `run_file` (`crate::build_eval_store`) so a store field
         // wired in tests can't be forgotten in one production entry point but
         // not the other (VAL2 #7, CLI-string-wiring-fix).
@@ -136,6 +145,11 @@ fn show_term(t: &Term) -> String {
 /// On success: print the registered name. On error: print diagnostic, no registration.
 fn do_def(session: &mut Session, src: &str) {
     match session.env.elaborate_session_decl_results_v1(src.trim()) {
+        Ok(results) if results.is_empty() && src.trim_start().starts_with("import ") => {
+            // A checked import changes the session's scope, not its list of
+            // definitions. Do not present the module path as a new binding.
+            println!("  imported: {}", src.trim());
+        }
         Ok(results) => {
             // Extract the declared name (second whitespace token after the keyword).
             let name = src
@@ -212,7 +226,7 @@ fn do_type(session: &mut Session, expr_src: &str) {
 
 fn print_help() {
     println!("  Commands:");
-    println!("    :def <decl>         elaborate+check a declaration (let/const/fn/proc/prove/law)");
+    println!("    :def <decl>         elaborate+check a declaration or import");
     println!("    :check <prop>       verify a proposition via the prover (alias: :prove)");
     println!("    :eval <expr>        evaluate an expression via ken-interp");
     println!("    :type <expr>        infer and print the type of an expression");
@@ -320,7 +334,7 @@ pub fn run() {
 
                 "def" => {
                     if args.is_empty() {
-                        println!("  usage: :def <let/const/fn/proc/prove/law declaration>");
+                        println!("  usage: :def <declaration or import>");
                     } else {
                         do_def(&mut session, args);
                     }
@@ -405,6 +419,45 @@ mod reused_env_rollback_tests {
                 .count(),
             2
         );
+    }
+
+    /// Promise class: durable invariant. MEASURED: the REPL discovers its
+    /// catalog root and :def import loads the real home; its later declaration
+    /// selects that checked pre-source id, not an invented module definition.
+    /// CLAIMED: interactive imports bind the same identity as file imports.
+    /// THE GAP: the CLI-level :def dispatch is pinned separately.
+    #[test]
+    fn repl_import_uses_home_id_without_listing_a_phantom_definition() {
+        let mut session = Session::new().expect("REPL environment");
+        let expected = session.env.globals["host_pure"];
+        do_def(&mut session, "import Capability.Process.Exit (host_pure)");
+        assert!(
+            session.env.loaded_module_count() > 0,
+            "import must load its provider"
+        );
+        assert!(session.names.is_empty(), "import is not a new definition");
+        let selected = session
+            .env
+            .elaborate_session_decl_results_v1(
+                "fn selected (a : Auth) (r : Type) (x : r) : HostIO a r = host_pure a r x",
+            )
+            .unwrap();
+        assert_eq!(selected.len(), 1);
+        let (_, mut term) = session
+            .env
+            .env
+            .transparent_body(selected[0].def_id)
+            .unwrap();
+        loop {
+            match term {
+                Term::Lam(_, body) | Term::App(body, _) => term = *body,
+                Term::Const { id, .. } => {
+                    assert_eq!(id, expected);
+                    break;
+                }
+                other => panic!("REPL client did not select the checked home: {other:?}"),
+            }
+        }
     }
 
     #[test]
