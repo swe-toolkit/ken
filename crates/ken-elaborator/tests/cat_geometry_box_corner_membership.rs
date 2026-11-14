@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 
 fn root() -> PathBuf {
@@ -78,7 +81,7 @@ fn generic_corner_laws_are_checked_without_new_trust_or_public_helpers() {
             "{law} must have a checked transparent body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent generic client checks both exact public law types");
 
     for private in ["axis_corner_low", "axis_corner_high"] {
@@ -149,16 +152,17 @@ theorem reject_outside_witness :
 "#;
 
 fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
-    match env.elaborate_file(false_claim) {
+    let checked_claim = checked_is_true::selected_source(false_claim);
+    match env.elaborate_file(&checked_claim) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) => {
-            let start = false_claim
+            let start = checked_claim
                 .find(&format!("theorem {name}"))
                 .expect("isolated false theorem follows its positive prefix");
             assert!(
-                span.start >= start && span.start < span.end && span.end <= false_claim.len(),
+                span.start >= start && span.start < span.end && span.end <= checked_claim.len(),
                 "{name}: kernel refusal must target its own theorem: {span:?}"
             );
         }
@@ -186,7 +190,7 @@ fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
 fn contained_witness_proves_both_corners_but_false_premises_refuse() {
     let mut positive = loaded_geometry();
     positive
-        .elaborate_file(CLOSED_PREFIX)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("independent memberships and both law applications check");
     for (name, negative) in [
         ("reject_inverted_lo", FALSE_INVERTED_LO),
@@ -195,7 +199,7 @@ fn contained_witness_proves_both_corners_but_false_premises_refuse() {
     ] {
         let mut isolated = loaded_geometry();
         isolated
-            .elaborate_file(CLOSED_PREFIX)
+            .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
             .expect("complete accepted client checks before each false theorem");
         refuse_at_own_theorem(&mut isolated, name, negative);
     }
