@@ -13,7 +13,8 @@
 > SPEC-GRAPHS-REACHABILITY-TRANS §11;
 > SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC §12;
 > SPEC-GRAPHS-ORDER-EDGE-ANTITONE §13;
-> SPEC-GRAPHS-SUCCESSOR-LIST-ADAPTOR §14).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-SUCCESSOR-LIST-ADAPTOR §14;
+> SPEC-GRAPHS-UNION §15).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -59,7 +60,11 @@
 > test passed 3/3 with candidate-local trusted identities 114 → 114.
 > Neither scratch nor package-test evidence establishes official
 > conformance-runner execution; none is claimed here. No CI,
-> publication, landing or measured landed trust is claimed.
+> publication, landing or measured landed trust is claimed. Section 15
+> specifies the graph-union operation and six public declarations.
+> Architect's isolated AC-0 checked them with unchanged scratch
+> trusted-base identity sets 114 → 114; that D0 is not an official
+> conformance run or a measured landed-trust result.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -1307,3 +1312,137 @@ three-vertex accepted client checking listed edges through both
 laws and a same-form refused unlisted edge; these closed cases do
 not replace the generic checked proofs. The scratch D0 is not a
 claim that the CV seed or official runner has executed.
+
+## 15. The union of two graphs
+
+> **Section 15 status: DRAFT v0 (SPEC-GRAPHS-UNION).** Architect's
+> isolated AC-0 on `c565e0cf3` checked the operation, all six public
+> declarations and the private helper with no added `Axiom`. Base and
+> scratch trusted-base identity sets each contain 114 entries with no
+> difference. Its 36 closed mutant cells and pointwise determination
+> lemmas are scratch observations, not a candidate package check,
+> official conformance run, CI or measured landed-trust delta.
+
+### 15.1 Operation and six public declarations
+
+`Algorithm.Graphs.Dependency` exports `graph_union` immediately after
+`walk_reverse_involutive` and before `contains`, followed in one block
+by the six declarations below. The operation uses the same vertex
+carrier as its operands: the edge from `s` to `t` is the Boolean
+`bool_or` of the two input edges. Its two inclusions and two
+reachability laws follow left-then-right order; argument order is
+`q`, `fq` where required, `g`, `h`, then the endpoints or target.
+No `Finite q` or `DecEq q` is required to construct the union.
+
+```ken
+pub fn graph_union (q : Type) (g : Graph q) (h : Graph q) : Graph q
+
+pub theorem graph_union_edge
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_union q g h) s t)
+        (bool_or (edge q g s t) (edge q h s t))
+
+pub theorem graph_union_edge_left
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q g s t) True
+      → Equal Bool (edge q (graph_union q g h) s t) True
+
+pub theorem graph_union_edge_right
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q h s t) True
+      → Equal Bool (edge q (graph_union q g h) s t) True
+
+pub fn graph_union_edge_cases
+      (q : Type) (g : Graph q) (h : Graph q) (s : q) (t : q)
+    : Equal Bool (edge q (graph_union q g h) s t) True
+      → Or (Equal Bool (edge q g s t) True)
+          (Equal Bool (edge q h s t) True)
+
+pub theorem graph_union_reachable_left
+      (q : Type) (fq : Finite q) (g : Graph q) (h : Graph q)
+      (s : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq g s target) True
+      → Equal Bool
+          (graph_reachable q fq (graph_union q g h) s target) True
+
+pub theorem graph_union_reachable_right
+      (q : Type) (fq : Finite q) (g : Graph q) (h : Graph q)
+      (s : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq h s target) True
+      → Equal Bool
+          (graph_reachable q fq (graph_union q g h) s target) True
+```
+
+The edge law states the exact Boolean observation, not equality of
+`Graph q` values. The inclusion laws use a checked true edge from one
+input to obtain a checked true edge of the union. The case function
+returns a surviving left-or-right witness; it is a public `fn`, not a
+`theorem`, because `Or` has sort `Type` rather than `Omega`. The
+reachability laws take `Finite q` as §7 already does, but no
+additional edge, distinctness or order premise. All six public
+results are checked, and §§1–14 retain their operation and law types.
+
+### 15.2 Proof boundary and pointwise determination
+
+The edge law closes by reduction: unfolding `graph_union`, then
+observing `edge` on `MkGraph`, yields the displayed `bool_or`. The
+inclusions use the existing `or_left` and `or_right` at those two
+edge terms. The case function calls the new **private**
+`bool_or_true_cases`: it matches the first bare `Bool`, returning an
+`Inl` when true and an `Inr` when false; its proof of a true `bool_or`
+feeds the selected branch. The existing `or_cases` cannot fill this
+role: it eliminates only into an `Omega` goal, not the Type-sorted
+`Or` witness. This helper belongs after private `walk_lift` and
+before `named`; neither it nor `walk_lift` becomes public. The two
+reachability proofs apply §7's `graph_reachable_graph_monotone` with
+the relevant inclusion as its `included` argument. There is no new
+import, axiom, trusted assumption, kernel rule or surface form.
+The public roster grows from **15 functions and 25 theorems** to
+**17 functions and 30 theorems**: `graph_union` and
+`graph_union_edge_cases` are functions, and the other five new names
+are theorems.
+
+The isolated D0 separately checked that the left and right
+inclusions together with the case split determine an arbitrary
+candidate union's edges pointwise. For each `s` and `t`, if both
+input true-edge implications and the union true-edge case split
+hold for a graph `k`, their conclusion is the Boolean equality:
+
+```text
+Equal Bool (edge q k s t)
+  (bool_or (edge q g s t) (edge q h s t))
+```
+
+The proof splits on the two input Booleans and the candidate Boolean;
+these scratch lemmas are **not** public declarations. Do not replace
+this observation with `Equal (Graph q)`: `Graph` has no η, as §10.1
+explains. Nor does reachability split across union. On the closed
+three-vertex chain, `g_only` has only V0 → V1 and `h_only` only
+V1 → V2. The union reaches V2 from V0, whereas neither input does
+so alone. The two reachability laws preserve each input's existing
+reachability but make no converse or decomposition claim.
+
+### 15.3 Closed discriminator and evidence limit
+
+The isolated D0 checked the correct operation and three operation-only
+alternatives on the same closed three-vertex fixture, with the six
+original generic proof bodies removed from the mutant copies:
+`M-LEFT` ignores `h`, `M-AND` uses `bool_and` of the two edges, and
+`M-TRUE` assigns `True` to every edge. Two same-form false twins
+separate the intended operation: T1 says that the union's edge from
+V1 to V2 is `False`; it refuses for the correct union but accepts
+under `M-LEFT` and `M-AND`. T2 says that V2 → V0 is an edge; it
+refuses for the correct union but accepts under `M-TRUE`. Each twin
+is paired with an independently accepted same-form true claim on a
+fresh prefix. The two closed sites of `graph_union_edge` suffice to
+refuse all three mutants: its V1 → V2 instance refuses `M-LEFT` and
+`M-AND`, and its V2 → V0 instance refuses `M-TRUE`.
+
+The measured 4-by-9 table covers closed instances only; it does not
+constitute a checked generic mutant proof. A changed operation that
+breaks the original generic proof body does not by itself falsify the
+law statement. The independently checked generic proofs and the
+private-import refusal belong to the isolated D0. The separate CV
+seed, catalog package test, assembled-tip review, official
+conformance runner, CI and landed-trust measurement have their own
+gates; none is established by this spec text or by scratch D0.
