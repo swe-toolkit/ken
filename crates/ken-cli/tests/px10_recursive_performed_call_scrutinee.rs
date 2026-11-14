@@ -10,6 +10,7 @@ const P8: &str = include_str!("fixtures/px10_recursive_performed_p8.ken");
 const P10: &str = include_str!("fixtures/px10_recursive_performed_p10.ken");
 const VLET2: &str = include_str!("fixtures/px10_recursive_performed_vlet2.ken");
 const VMATCH2: &str = include_str!("fixtures/px10_recursive_performed_vmatch2.ken");
+const VMATCH_MIXED: &str = include_str!("fixtures/px10_recursive_performed_vmatch_mixed.ken");
 
 fn with_native_grant(source: &str) -> String {
     let granted = source.replacen(
@@ -81,16 +82,18 @@ fn p7_self_recursive_bind_scrutinee_refuses_before_native_emission() {
     assert_self_recursive_scrutinee_refuses("p7", P7);
 }
 
-/// Promise class: durable fail-closed refusal. MEASURED: both decreasing
+/// Promise class: durable fail-closed refusal. MEASURED: all three decreasing
 /// variants execute on the checked interpreter and refuse before native
 /// emission. V-MATCH2 reaches the Match result-position arm: disabling only
-/// that arm lets it build; disabling only ComputationalMatch does not. V-LET2
-/// refuses as a direct Call after its Let is removed before erasure, so it is
-/// not a witness of the Let arm. CLAIMED: a performed call in a surviving
-/// Match case result cannot pass the native erasure guard. THE GAP: If,
-/// ComputationalMatch, and Let are classified by the exhaustive predicate
-/// but unwitnessed by these rows. Scratch V-LETIN also refused with Let false,
-/// so no Let reachability or mutation bite is claimed.
+/// that arm lets it build; disabling only ComputationalMatch does not. The
+/// mixed Match has one pure result and one recursive performed call; replacing
+/// Match's `any` with `all` lets it build, so the refusal depends on ANY case.
+/// V-LET2 refuses as a direct Call after its Let is removed before erasure;
+/// it is not a witness of the Let arm. CLAIMED: a performed call in one
+/// surviving Match case result cannot pass the native erasure guard even if
+/// the other case is pure. THE GAP: If, ComputationalMatch, and Let are
+/// classified by the exhaustive predicate but unwitnessed by these rows.
+/// Scratch V-LETIN also refused with Let false; no Let reachability is claimed.
 fn assert_result_position_variant_refuses(name: &'static str, raw: &'static str) {
     std::thread::Builder::new()
         .name(format!("px10-b2-c3-result-{name}"))
@@ -154,6 +157,11 @@ fn vlet2_result_position_performed_call_refuses_before_native_emission() {
 #[test]
 fn vmatch2_result_position_performed_call_refuses_before_native_emission() {
     assert_result_position_variant_refuses("vmatch2", VMATCH2);
+}
+
+#[test]
+fn vmatch_mixed_pure_and_performed_case_refuses_before_native_emission() {
+    assert_result_position_variant_refuses("vmatch_mixed", VMATCH_MIXED);
 }
 
 /// Promise class: durable differential. MEASURED: the print-only p2 and the
