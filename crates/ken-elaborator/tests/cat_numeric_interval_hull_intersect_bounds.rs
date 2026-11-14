@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -130,7 +133,7 @@ fn two_generic_bound_laws_are_owned_checked_private_and_zero_trust() {
             "{name} has a kernel-checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent open clients consume both §7 public types");
     for private in ["equiv_leq", "rational_distrib_r"] {
         match interval_env().elaborate_file(&format!("import {INTERVAL} ({private})")) {
@@ -223,7 +226,8 @@ fn complete_bounds_seed_checks_and_false_hull_converse_refuses() {
         theorem_shape(EXPECTED_REFUSED, "refused_hull"),
         "seed_neg must claim the false low-high hull inside low"
     );
-    let decls = parse_decls(refused).expect("isolated §7 refusal parses");
+    let refused_client = checked_is_true::selected_source(refused);
+    let decls = parse_decls(&refused_client).expect("isolated §7 refusal parses");
     let [SourceDecl::TheoremDecl {
         name,
         params,
@@ -236,7 +240,7 @@ fn complete_bounds_seed_checks_and_false_hull_converse_refuses() {
     assert_eq!(name, "seed_neg");
     assert!(params.is_empty(), "false hull claim is closed");
     let mut env = interval_env();
-    env.elaborate_file(accepted)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete accepted §7 seed checks first against shipped exports");
     for name in [
         "hull_inside_outer_by_law",
@@ -248,7 +252,7 @@ fn complete_bounds_seed_checks_and_false_hull_converse_refuses() {
         let id = env.globals[name];
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    match env.elaborate_file(refused) {
+    match env.elaborate_file(&refused_client) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

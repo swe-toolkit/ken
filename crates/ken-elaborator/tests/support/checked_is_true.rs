@@ -43,6 +43,9 @@ pub fn selected_source_with_import(source: &str) -> String {
 }
 
 fn selected_source_inner(source: &str, add_missing_import: bool) -> String {
+    if !source.contains("IsTrue") {
+        return source.to_owned();
+    }
     let mut edits = Vec::new();
     for declaration in parse_decls(source).expect("Ken client source parses") {
         let Decl::ImportDecl {

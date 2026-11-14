@@ -8,10 +8,13 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, ImportKind, KenMdFenceRole,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole,
     Type as SourceType,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 const SEED: &str = include_str!(concat!(
@@ -32,57 +35,15 @@ fn loaded_geometry() -> ElabEnv {
     env
 }
 
-// The compiler base binds IsTrue already. Omit only its redundant unaliased
-// import item in the executable client; do not change the source seed or any
-// other imported name, fixture, assertion, or refused proposition.
-fn without_redundant_is_true(source: &str) -> String {
-    let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("seed Ken parses") {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module != "Core.Classes.LawfulClasses" {
-                continue;
-            }
-            let mut keep = Vec::new();
-            let mut removed = false;
-            for item in items {
-                if item.name == "IsTrue" && item.rename.is_none() {
-                    removed = true;
-                } else {
-                    keep.push(match item.rename {
-                        Some(alias) => format!("{} as {alias}", item.name),
-                        None => item.name,
-                    });
-                }
-            }
-            if removed {
-                let replacement = if keep.is_empty() {
-                    String::new()
-                } else {
-                    format!("import {module} ({})", keep.join(", "))
-                };
-                edits.push((span.start..span.end, replacement));
-            }
-        }
-    }
-    let mut client = source.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        client.replace_range(range, &replacement);
-    }
-    client
-}
-
-fn seed_programs() -> Vec<String> {
+// Parse and compare propositions in their unchanged published source; only
+// the Ken text sent for elaboration gets a checked catalog alias.
+fn seed_programs() -> Vec<&'static str> {
     extract_ken_md(SEED)
         .expect("§5 seed fences extract")
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| without_redundant_is_true(&SEED[fence.body_range]))
+        .map(|fence| &SEED[fence.body_range])
         .collect()
 }
 
@@ -140,7 +101,7 @@ fn generic_order_laws_are_owned_checked_private_and_add_no_trust() {
         assert!(owned.contains(&id), "{law} must be NatBox-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("generic public client consumes all three exact §5 types");
     for private in [
         "axis_within",
@@ -169,7 +130,7 @@ fn shipped_order_seed_accepted_client_checks() {
     let programs = seed_programs();
     assert_eq!(programs.len(), 4, "one accepted and three refusal fences");
     loaded_geometry()
-        .elaborate_file(&programs[0])
+        .elaborate_file(&checked_is_true::selected_source(programs[0]))
         .expect("complete accepted §5 seed checks through package imports");
 }
 
@@ -246,7 +207,6 @@ fn shipped_order_seed_reverse_inclusions_refuse_on_controlled_pairs() {
             params,
             theorem,
             body: Expr::ECon(proof, _),
-            span,
             ..
         }] = negative_decls.as_slice()
         else {
@@ -262,21 +222,26 @@ fn shipped_order_seed_reverse_inclusions_refuse_on_controlled_pairs() {
         let hypothetical = format!("theorem typed_refusal (h : {proposition}) : {proposition} = h");
         let mut type_control = loaded_geometry();
         type_control
-            .elaborate_file(positive)
+            .elaborate_file(&checked_is_true::selected_source(positive))
             .expect("full positive prefix checks before well-typed control");
         type_control
-            .elaborate_file(&hypothetical)
+            .elaborate_file(&checked_is_true::selected_source(&hypothetical))
             .expect("the false proposition is well-typed when witnessed");
 
         let mut env = loaded_geometry();
-        env.elaborate_file(positive)
+        env.elaborate_file(&checked_is_true::selected_source(positive))
             .expect("full positive prefix checks before each fresh refusal");
-        match env.elaborate_file(negative) {
+        let checked_negative = checked_is_true::selected_source(negative);
+        let checked_decls = parse_decls(&checked_negative).expect("checked refusal parses");
+        let [SourceDecl::TheoremDecl { span: checked_span, .. }] = checked_decls.as_slice() else {
+            panic!("checked refusal remains one theorem");
+        };
+        match env.elaborate_file(&checked_negative) {
             Err(ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 span: failed,
-            }) if failed.start >= span.start
-                && failed.end <= span.end
+            }) if failed.start >= checked_span.start
+                && failed.end <= checked_span.end
                 && failed.start < failed.end => {}
             other => panic!("{name} must kernel-reject at its own theorem: {other:?}"),
         }

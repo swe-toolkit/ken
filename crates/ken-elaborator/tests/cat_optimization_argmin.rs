@@ -9,6 +9,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const ARGMIN: &str = "Algorithm.Optimization.Argmin";
 const ORDER: &str = "Data.Numeric.Nat.Order";
 const SEED: &str = include_str!(concat!(
@@ -38,15 +41,10 @@ fn seed_programs() -> Vec<&'static str> {
         .collect()
 }
 
-// The isolated legacy client already has the canonical IsTrue identity in
-// its compiler base. Importing it again creates AmbiguousReference even
-// though the provider GlobalId is identical; only that redundant import
-// is omitted in memory, leaving the seed's declarations and law uses intact.
+// Keep the seed's selected leq_nat and IsTrue imports; alias only IsTrue so
+// the imported checked identity cannot resolve through the compiler floor.
 fn seed_positive(source: &str) -> String {
-    source.replace(
-        "import Core.Classes.LawfulClasses (IsTrue, leq_nat)",
-        "import Core.Classes.LawfulClasses (leq_nat)",
-    )
+    checked_is_true::selected_source(source)
 }
 
 /// SOURCE: spec/50-stdlib/72-optimization.md §§1.2–1.3.
@@ -119,7 +117,7 @@ fn generic_laws_and_nat_bridges_check_without_added_trust() {
         assert!(argmin_owned.contains(&id), "{law} must be Argmin-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("all seven §1.2 laws, §1.5 invariance, and two order bridges check");
 }
 
