@@ -159,9 +159,6 @@ fn generic_area_exports_are_checked_and_private_helpers_add_no_trust() {
 
     for private in [
         "axis_span",
-        "sub_left_mono",
-        "sub_below",
-        "sub_right_antitone",
         "axis_span_mono",
         "mul_right_mono_any",
         "mul_left_mono_any",

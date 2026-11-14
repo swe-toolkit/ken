@@ -24,7 +24,8 @@ import Core.Logic.Transport (cong, subst, sym, trans)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r)
 
-import Data.Numeric.Nat.Order (leq_nat_successor_bound, leq_nat_weaken_right, sub)
+import Data.Numeric.Nat.Order
+  (leq_nat_successor_bound, leq_nat_weaken_right, sub, mul_sub_distrib_r)
 
 data Divides (d : Nat) (n : Nat) : Type where {
   MkDivides : (quotient : Nat) → Equal Nat n (mul d quotient) → Divides d n
@@ -359,7 +360,11 @@ fn divides_sub
                 (sub (mul d qx) (mul d qy))
                 (mul d (sub qx qy))
                 (cong Nat Nat y (mul d qy) (λz. sub (mul d qx) z) ey)
-                (mul_sub d qx qy)))
+                (sym
+                  Nat
+                  (mul d (sub qx qy))
+                  (sub (mul d qx) (mul d qy))
+                  (mul_sub_distrib_r d qx qy))))
       }
   }
 
@@ -418,33 +423,6 @@ fn subst_divides
     : Divides d y =
   subst Nat x y (λn. Divides d n) p dx
 
-theorem mul_sub
-      (d : Nat) (x : Nat) (y : Nat)
-    : Equal Nat (sub (mul d x) (mul d y)) (mul d (sub x y)) =
-  match y {
-    Zero ↦ Refl;
-    Suc y2 ↦
-      match x {
-        Zero ↦ (proof zero_left for sub) (mul d (Suc y2));
-        Suc x2 ↦
-          trans
-            Nat
-            (sub (add (mul d x2) d) (add (mul d y2) d))
-            (sub (mul d x2) (mul d y2))
-            (mul d (sub x2 y2))
-            (sub_add_same (mul d x2) (mul d y2) d)
-            (mul_sub d x2 y2)
-      }
-  }
-
-theorem sub_add_same
-      (x : Nat) (y : Nat) (z : Nat)
-    : Equal Nat (sub (add x z) (add y z)) (sub x y) =
-  match z {
-    Zero ↦ Refl;
-    Suc z2 ↦ sub_add_same x y z2
-  }
-
 fn bool_view (value : Bool) : BoolView value =
   match value {
     True ↦ BoolIsTrue True Proved;
@@ -482,7 +460,9 @@ that sum. `Divides` is witness-bearing data, and the required laws are checked
 proof terms. `add`, its algebraic laws, `mul`, and `mul_add_distrib_r` retain
 their Arithmetic identities; `leq_nat` comes directly from LawfulClasses;
 `sub`, its cancellation and zero-left laws, right weakening, and the successor
-bound retain their Order identities. Equality transport uses `cong`, `subst`,
+bound and multiplication over truncated subtraction retain their Order
+identities. The subtraction-distribution proof is imported rather than
+repeated privately. Equality transport uses `cong`, `subst`,
 `sym`, and `trans` from their canonical provider. This package introduces no
 axiom,
 postulate, primitive, foreign declaration, or local replacement for those
