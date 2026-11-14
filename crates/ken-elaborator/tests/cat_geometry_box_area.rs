@@ -32,8 +32,9 @@ fn loaded_geometry() -> ElabEnv {
     env
 }
 
-// The compiler base already binds canonical IsTrue. Remove only its parsed,
-// unaliased duplicate import; retain every other import and declaration.
+// Under Legacy, an unaliased IsTrue import collides with the pre-source
+// spelling. Alias the selected catalog identity inside the checked seed
+// client, so the source uses that provider rather than ambient fallback.
 fn without_redundant_is_true(source: &str) -> String {
     let mut edits = Vec::new();
     for declaration in parse_decls(source).expect("seed Ken parses") {
@@ -51,6 +52,7 @@ fn without_redundant_is_true(source: &str) -> String {
             for item in items {
                 if item.name == "IsTrue" && item.rename.is_none() {
                     removed = true;
+                    keep.push("__I1_IS_TRUE_IMPORT__".to_string());
                 } else {
                     keep.push(match item.rename {
                         Some(alias) => format!("{} as {alias}", item.name),
@@ -72,7 +74,11 @@ fn without_redundant_is_true(source: &str) -> String {
     for (range, replacement) in edits.into_iter().rev() {
         client.replace_range(range, &replacement);
     }
+    // This seed contains Ken source, not prose: all its IsTrue occurrences
+    // become an alias, while the import token remains the provider's name.
     client
+        .replace("IsTrue", "CatalogIsTrue")
+        .replace("__I1_IS_TRUE_IMPORT__", "IsTrue as CatalogIsTrue")
 }
 
 fn seed_programs() -> Vec<String> {
@@ -88,7 +94,7 @@ fn seed_programs() -> Vec<String> {
 // Restate each §4 public law at arbitrary boxes or coordinates. A weakened
 // public type cannot pass merely because the fixed seed boxes are convenient.
 const GENERIC_CLIENT: &str = r#"
-import Core.Classes.LawfulClasses (leq_nat)
+import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue, leq_nat)
 import Algorithm.Geometry.NatBox
   (Box, MkBox, MkPoint, inside, area, area_inside,
    area_inverted_x, area_inverted_y)
@@ -96,18 +102,18 @@ import Algorithm.Geometry.NatBox
 fn client_area (b : Box) : Nat = area b
 
 theorem client_area_inside (b : Box) (c : Box)
-    (h : IsTrue (inside b c)) :
-  IsTrue (leq_nat (area b) (area c)) = area_inside b c h
+    (h : CatalogIsTrue (inside b c)) :
+  CatalogIsTrue (leq_nat (area b) (area c)) = area_inside b c h
 
 theorem client_area_inverted_x
     (lx : Nat) (ly : Nat) (hx : Nat) (hy : Nat)
-    (h : IsTrue (leq_nat (Suc hx) lx)) :
+    (h : CatalogIsTrue (leq_nat (Suc hx) lx)) :
   Equal Nat (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) Zero =
   area_inverted_x lx ly hx hy h
 
 theorem client_area_inverted_y
     (lx : Nat) (ly : Nat) (hx : Nat) (hy : Nat)
-    (h : IsTrue (leq_nat (Suc hy) ly)) :
+    (h : CatalogIsTrue (leq_nat (Suc hy) ly)) :
   Equal Nat (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) Zero =
   area_inverted_y lx ly hx hy h
 "#;
@@ -232,7 +238,7 @@ fn shipped_strictly_larger_inner_area_refuses_on_the_pinned_pair() {
     )
     .expect("same-pair false-value control parses");
     let expected_refusal = parse_decls(
-        "theorem expected_refusal : IsTrue \
+        "theorem expected_refusal : CatalogIsTrue \
          (leq_nat (Suc (area outer_box)) (area inner_box)) = Proved",
     )
     .expect("same-pair false strict-area proposition parses");

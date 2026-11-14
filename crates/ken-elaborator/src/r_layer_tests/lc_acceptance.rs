@@ -36,7 +36,6 @@ fn ac1_same_key_resolves_same_canonical() {
     // For simplicity use a simpler approach: declare Bool-typed field class.
     // class Eq A { eq : Bool } — Bool is Type-sorted → structure class.
     elab(&mut env, "class Eq A { eq : Bool }").unwrap();
-    elab(&mut env, "let true_val : Bool = true_val").ok(); // not needed
 
     // Declare the instance.
     // instance Eq Int { eq = ... } — we just need a Bool term.
@@ -116,11 +115,9 @@ fn ac3_overlap_check_first_ok_second_errors() {
     elab(&mut env, "class Show A { show : Bool }").unwrap();
 
     // (a) First instance → ok.
-    let r1 = elab(&mut env, "instance Show Int { show = show }");
-    // The field 'show' references itself — it's unbound but that's ok for this
-    // structural test; the class declaration and overlap checks don't need a
-    // well-typed body. If elaboration fails for other reasons, we skip to the
-    // overlap test via a dummy env.
+    let r1 = elab(&mut env, "instance Show Int { show = True }");
+    // This discarded setup remains closed even when every attempted source
+    // elaboration uses Strict resolution; the overlap test uses another env.
     // Let's use a simpler approach: declare a zero-field structure class.
     let mut env2 = mk_env();
     // Zero-field class with Bool member — but we need a relevant field to make
@@ -130,12 +127,9 @@ fn ac3_overlap_check_first_ok_second_errors() {
     elab(&mut env2, "class Count A { n : Nat }").unwrap();
 
     // First instance → accepted (class module matches).
-    let r_first = elab(&mut env2, "instance Count Int { n = n }");
-    // Field 'n' is unbound — elab fails at the field expression level.
-    // We need a valid Nat term. We can use 'zero' if it's in scope.
-    // Actually, let's skip field-level correctness and test the overlap check
-    // at the ClassEnv level directly (the overlap check fires BEFORE field elab).
-    let _ = r_first; // may fail due to unbound 'n'
+    let r_first = elab(&mut env2, "instance Count Int { n = Zero }");
+    // Overlap is tested in env4 against a manually registered earlier instance.
+    let _ = r_first;
 
     // Manually register a first instance in the env to test the overlap check.
     let mut env3 = mk_env();
