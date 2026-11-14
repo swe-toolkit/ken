@@ -29,10 +29,10 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. The width operation and two checked laws use
-Rational's truncated subtraction, not a subtraction of intervals. The checked
-inverted-emptiness and two ordered-endpoint membership laws make the endpoint
-boundary explicit.
+source; their operations follow. The width operation and three checked laws,
+including `interval_width_inside`, use Rational's truncated subtraction,
+not a subtraction of intervals. The checked inverted-emptiness and two
+ordered-endpoint membership laws make the endpoint boundary explicit.
 Enclosure uses both membership premises and the checked Rational monotonicity
 laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
@@ -70,6 +70,7 @@ import Data.Numeric.Rational
     rational_leq,
     rational_equiv,
     rational_add_mono,
+    rational_sub_mono,
     rational_mul_mono,
     rational_min,
     rational_max,
@@ -563,6 +564,25 @@ pub theorem interval_inside_antisym_hi
         d
         ((proof right for bool_and) (rational_leq c a) (rational_leq b d) outward)
         ((proof right for bool_and) (rational_leq a c) (rational_leq d b) inward)
+
+pub theorem interval_width_inside
+      (i : Interval) (k : Interval)
+    : IsTrue (interval_inside i k)
+      → IsTrue (rational_leq (interval_width i) (interval_width k)) =
+  match i {
+    MkInterval a b ↦
+      match k {
+        MkInterval c d ↦
+          λw.
+            rational_sub_mono
+              b
+              d
+              a
+              c
+              ((proof right for bool_and) (rational_leq c a) (rational_leq b d) w)
+              ((proof left for bool_and) (rational_leq c a) (rational_leq b d) w)
+      }
+  }
 
 pub theorem interval_add_inside
       (i : Interval) (i2 : Interval) (j : Interval) (j2 : Interval)
@@ -1623,6 +1643,9 @@ that width distributes over the endpoint-wise sum. Both results compare
 rational values through `rational_equiv`, not stored fraction spellings.
 The two laws do not determine width on their own; the definition uses
 `rational_sub hi lo`, and a nonzero-width value checks that formula separately.
+`interval_width_inside` uses the two comparisons from endpoint inclusion
+as the premises of `rational_sub_mono`, including when the inner interval is
+inverted and its width truncates to zero.
 
 ## 5. Design notes
 
@@ -1662,15 +1685,16 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-four
-   checked interval laws form the public contract.
+   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-five
+   checked interval laws, including `interval_width_inside`, form the public
+   contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
    including endpoint inclusion, its witnessed converse, the four
    distributivity/factoring inclusions, hull/intersection regrouping, the
    four point-unit inclusions, two point-zero absorption inclusions,
-   and the point and ordered-addition width proofs.
+   and the point, ordered-addition and inside-monotonicity width proofs.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -1692,8 +1716,10 @@ interval subtraction are not.
    on both endpoints; `interval_point_contains` derives point completeness.
    Inverted emptiness composes the member's two checked comparisons against
    the false endpoint order; each ordered endpoint uses reflexivity and
-   conjunction introduction. Neither family adds a helper.
-4. **Trusted-base delta.** Zero: all fifty-four laws have checked proof bodies,
+   conjunction introduction. Neither family adds a helper. Width under
+   inclusion uses Rational's two-sided subtraction monotonicity with the
+   inclusion comparisons as its only premises.
+4. **Trusted-base delta.** Zero: all fifty-five laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1737,5 +1763,7 @@ interval subtraction are not.
    antisymmetry package test checks both open endpoint-value results and a
    closed equal-value pair, then rejects a one-way enclosure and a structural
    equality ascription. Its local fixtures do not execute a separately
-   authored conformance seed. These package tests do not establish official
-   conformance-runner execution, CI, publication or landing.
+   authored conformance seed. The width-inside package test checks the seven
+   open subtraction and width laws, independent closed widths, and three
+   false claims after fresh same-form controls. These package tests do not
+   establish official conformance-runner execution, CI, publication or landing.
