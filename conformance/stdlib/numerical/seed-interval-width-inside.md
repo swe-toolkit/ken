@@ -4,11 +4,11 @@ Format: `../../README.md`.
 Spec: `spec/50-stdlib/68-numerical.md` §16.1–§16.3.
 Frame: `docs/program/issues/SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO.md`.
 
-These closed clients exercise the public interval-width and Rational
-subtraction monotonicity laws. Each direct closed `Proved` conclusion is
-independent of the corresponding law application. The clients establish
-instances, not the generic laws. They do not import `IsTrue`; it is already
-available in the client prelude.
+These closed clients exercise the public interval-width, Rational subtraction
+monotonicity and Nat.Order subtraction laws. Each direct closed `Proved`
+conclusion is independent of the corresponding law application. The clients
+establish instances, not the generic laws. They do not import `IsTrue`; it is
+already available in the client prelude.
 
 `MkRational n Zero` denotes the natural rational `n`. In A1, `[1,2]` is inside
 `[0,4]`, with widths one and four. In A2, inverted `[3,1]` is inside `[0,4]`
@@ -23,6 +23,10 @@ the corresponding public law. Each refusal below is appended alone to a fresh
 copy of this block.
 
 ```ken
+import Data.Numeric.Nat.Arithmetic (mul)
+
+import Data.Numeric.Nat.Order (leq_nat, sub, mul_sub_distrib_r, mul_sub_distrib_l)
+
 import Data.Numeric.Rational
   (Rational, MkRational, rational_leq, rational_sub, rational_sub_mono)
 
@@ -93,6 +97,82 @@ theorem a4_closed_conclusion : IsTrue (rational_leq (rational_sub r1 r1) (ration
 theorem a4_subtraction_monotonicity_application
     : IsTrue (rational_leq (rational_sub r1 r1) (rational_sub r3 r0)) =
   rational_sub_mono r1 r3 r1 r0 Proved Proved
+
+const nat_one : Nat = Suc Zero
+
+const nat_two : Nat = Suc nat_one
+
+const nat_three : Nat = Suc nat_two
+
+const nat_four : Nat = Suc nat_three
+
+const nat_six : Nat = Suc (Suc nat_four)
+
+-- N1: 4 - 1 = 3 is at most 4, without saturating to zero.
+theorem nat_sub_leq_left_closed : IsTrue (leq_nat (sub nat_four nat_one) nat_four) = Proved
+
+theorem nat_sub_leq_left_application : IsTrue (leq_nat (sub nat_four nat_one) nat_four) =
+  (proof leq_left for sub) nat_four nat_one
+
+-- N2: subtracting 1 from 2 <= 4 yields 1 <= 3.
+theorem nat_sub_left_mono_closed
+    : IsTrue (leq_nat (sub nat_two nat_one) (sub nat_four nat_one)) =
+  Proved
+
+theorem nat_sub_left_mono_application
+    : IsTrue (leq_nat (sub nat_two nat_one) (sub nat_four nat_one)) =
+  (proof left_mono for sub) nat_two nat_four nat_one Proved
+
+-- N3: subtracting 3 rather than 1 from 4 yields 1 <= 3.
+theorem nat_sub_right_antitone_closed
+    : IsTrue (leq_nat (sub nat_four nat_three) (sub nat_four nat_one)) =
+  Proved
+
+theorem nat_sub_right_antitone_application
+    : IsTrue (leq_nat (sub nat_four nat_three) (sub nat_four nat_one)) =
+  (proof right_antitone for sub) nat_four nat_one nat_three Proved
+
+-- N4: 2 * (4 - 1) = (2 * 4) - (2 * 1) = 6.
+theorem nat_mul_sub_distrib_r_closed
+    : Equal Nat
+        (mul nat_two (sub nat_four nat_one))
+        (sub (mul nat_two nat_four) (mul nat_two nat_one)) =
+  Proved
+
+theorem nat_mul_sub_distrib_r_application
+    : Equal Nat
+        (mul nat_two (sub nat_four nat_one))
+        (sub (mul nat_two nat_four) (mul nat_two nat_one)) =
+  mul_sub_distrib_r nat_two nat_four nat_one
+
+theorem nat_mul_sub_distrib_r_left_value
+    : Equal Nat (mul nat_two (sub nat_four nat_one)) nat_six =
+  Proved
+
+theorem nat_mul_sub_distrib_r_right_value
+    : Equal Nat (sub (mul nat_two nat_four) (mul nat_two nat_one)) nat_six =
+  Proved
+
+-- N5: (4 - 2) * 3 = (4 * 3) - (2 * 3) = 6.
+theorem nat_mul_sub_distrib_l_closed
+    : Equal Nat
+        (mul (sub nat_four nat_two) nat_three)
+        (sub (mul nat_four nat_three) (mul nat_two nat_three)) =
+  Proved
+
+theorem nat_mul_sub_distrib_l_application
+    : Equal Nat
+        (mul (sub nat_four nat_two) nat_three)
+        (sub (mul nat_four nat_three) (mul nat_two nat_three)) =
+  mul_sub_distrib_l nat_four nat_two nat_three
+
+theorem nat_mul_sub_distrib_l_left_value
+    : Equal Nat (mul (sub nat_four nat_two) nat_three) nat_six =
+  Proved
+
+theorem nat_mul_sub_distrib_l_right_value
+    : Equal Nat (sub (mul nat_four nat_three) (mul nat_two nat_three)) nat_six =
+  Proved
 ```
 
 ### stdlib/numerical/interval-width-inside-closed-inclusion
@@ -145,6 +225,75 @@ theorem a4_subtraction_monotonicity_application
 - gap: this instance does not prove the generic law or isolate each direction.
 - why: both supplied order premises are true, and the conclusion is checked
   independently of the law application.
+
+## Nat.Order direct law cases
+
+The attached proofs are selected through the public `sub` subject; the two
+multiplication/subtraction theorems are imported by name. Each N1–N5 pair
+checks a closed `Proved` conclusion separately from its checked law application.
+The distribution cases also check both sides against six, avoiding an equality
+that would pass if both sides collapsed to zero. These finite examples do not
+replace the open checked law types in §16.1.
+
+### stdlib/numerical/nat-sub-leq-left
+
+- spec: `spec/50-stdlib/68-numerical.md` §16.1.
+- promise class: durable invariant.
+- given: `4 ∸ 1 = 3`, where the truncated result is nonzero.
+- expect: `3 ≤ 4` is proved by the public `sub::leq_left` proof.
+- measured: a direct closed `Proved` comparison and a separate attached-proof
+  application to the same closed arguments.
+- claimed: truncated subtraction stays below its minuend on this input.
+- gap: one instance does not establish the generic bound.
+- why: a positive minuend and non-saturating subtrahend test a real bound.
+
+### stdlib/numerical/nat-sub-left-monotonicity
+
+- spec: `spec/50-stdlib/68-numerical.md` §16.1.
+- promise class: durable invariant.
+- given: `2 ≤ 4`, with one subtracted from both sides.
+- expect: `2 ∸ 1 = 1 ≤ 3 = 4 ∸ 1` is proved by `sub::left_mono`.
+- measured: the direct closed `Proved` conclusion and a separate application
+  of the attached proof with the accepted `2 ≤ 4` premise.
+- claimed: subtraction preserves the first argument's order on this input.
+- gap: the pair does not prove monotonicity for all naturals.
+- why: the positive results differ, so reversing the conclusion is false.
+
+### stdlib/numerical/nat-sub-right-antitonicity
+
+- spec: `spec/50-stdlib/68-numerical.md` §16.1.
+- promise class: durable invariant.
+- given: `1 ≤ 3`, both subtracted from four.
+- expect: `4 ∸ 3 = 1 ≤ 3 = 4 ∸ 1` is proved by `sub::right_antitone`.
+- measured: the direct closed `Proved` conclusion and a separate application
+  of the attached proof with the accepted `1 ≤ 3` premise.
+- claimed: subtraction reverses the second argument's order on this input.
+- gap: the pair does not prove antitonicity for all naturals.
+- why: the positive results differ, so reversing the conclusion is false.
+
+### stdlib/numerical/nat-mul-sub-distrib-right
+
+- spec: `spec/50-stdlib/68-numerical.md` §16.1.
+- promise class: durable invariant.
+- given: factor two applied to `4 ∸ 1`.
+- expect: `2 · (4 ∸ 1) = (2 · 4) ∸ (2 · 1) = 6`.
+- measured: a direct closed `Proved` equality and a separate application of
+  `mul_sub_distrib_r`; both sides independently check equal to six.
+- claimed: the factor on the left distributes over truncated subtraction here.
+- gap: this instance does not establish the generic theorem.
+- why: both minuends are positive and each nonzero difference is six.
+
+### stdlib/numerical/nat-mul-sub-distrib-left
+
+- spec: `spec/50-stdlib/68-numerical.md` §16.1.
+- promise class: durable invariant.
+- given: factor three applied on the right of `4 ∸ 2`.
+- expect: `(4 ∸ 2) · 3 = (4 · 3) ∸ (2 · 3) = 6`.
+- measured: a direct closed `Proved` equality and a separate application of
+  `mul_sub_distrib_l`; both sides independently check equal to six.
+- claimed: the factor on the right distributes over truncated subtraction here.
+- gap: this instance does not establish the generic theorem.
+- why: both minuends are positive and each nonzero difference is six.
 
 ## Isolated refusals
 
@@ -236,13 +385,18 @@ theorem reject_rational_subtraction_second_argument_direction
 
 This seed instantiates `spec/50-stdlib/68-numerical.md` §§16.1–16.3.
 Architect AC-0 ruling `evt_aha7hvm88ckz`, item 5, and AC-2 release
-`evt_604adzbznbep5` supply the scratch evidence only. A scratch overlay of
-the D0 catalog cut at base `750f1622b0aed49ac8deedd415ba06388f068fcc`
-passed the extracted accepted block, all three isolated controls and twins,
-and an own-theorem-span `KernelRejected(TypeMismatch)` check. The one targeted
-scratch test passed 1/1; all four extracted Ken fences passed `ken fmt --check`.
-Log:
-`/workspaces/ken/tmp/cv-width-inside-mono-seed-check.log`. This is not official
-conformance-runner execution, product package-test evidence, CI, publication,
-landing, or a landed trust measurement. No external or `local/refs` material
-was consulted.
+`evt_604adzbznbep5` supply the earlier scratch evidence only. A scratch
+overlay of the D0 catalog cut at base
+`750f1622b0aed49ac8deedd415ba06388f068fcc` passed the original A1–A4
+accepted block and three isolated controls and twins, with own-theorem-span
+`KernelRejected(TypeMismatch)` checks. Its targeted scratch test passed 1/1;
+log: `/workspaces/ken/tmp/cv-width-inside-mono-seed-check.log`.
+
+The expanded A1–A4 and N1–N5 client checked from this candidate's catalog root
+with a probe-only `IsTrue` import for standalone CLI checking. All three
+unchanged refusal fences were rechecked after the expanded accepted prefix:
+each same-form control accepted, and each twin refused at its own theorem span.
+All four extracted Ken fences passed `ken fmt --check`. These are targeted local
+checks, not official conformance-runner execution, product package-test
+coverage, CI, publication, landing, or a landed trust measurement. No external
+or `local/refs` material was consulted.
