@@ -3300,7 +3300,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–16 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–17 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3312,6 +3312,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [expression-power seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power.md),
+[expression-power multiplication seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power-multiplication.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
@@ -3322,7 +3323,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and thirty-three checked theorems; Horner, substitution and differentiation
+and thirty-five checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
