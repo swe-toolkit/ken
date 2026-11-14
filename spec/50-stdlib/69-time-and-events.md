@@ -14,7 +14,8 @@
 > SPEC-TIME-WINDOW-LENGTH-BOUND §12;
 > SPEC-TIME-MERGE-SEPARATED-APPEND §13;
 > SPEC-TIME-WINDOW-NONE-EMPTY §14;
-> SPEC-TIME-TRACE-MERGE-ALL §15).** The §1–2 EventTrace
+> SPEC-TIME-TRACE-MERGE-ALL §15;
+> SPEC-TIME-TRACE-MERGE-ALL-COUNT §16).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -69,6 +70,11 @@
 > evidence, not an exact committed-tip gate or official conformance-
 > runner execution; it does not establish CI, publication, landing or
 > measured landed trust.
+> Section 16 specifies a premise-free count-preservation law for
+> finite k-way merge and its list-append prerequisite. Architect's
+> isolated AC-0 checked both generic proofs with scratch trusted
+> identities 114 → 114. Neither the scratch check nor this Spec child
+> is an assembled-tip gate, official conformance or landed-trust result.
 
 ## 1. Finite event traces over natural times
 
@@ -1336,3 +1342,101 @@ Closed cases do not replace these generic checked proofs. A
 fabricating operation that is still ordered and complete remains a
 soundness discriminator to review; no soundness-isolating mutation
 was measured by the AC-0 report.
+
+## 16. Every classified event keeps its multiplicity
+
+> **Section 16 status: DRAFT v0
+> (SPEC-TIME-TRACE-MERGE-ALL-COUNT).** Architect's AC-0 on the
+> checked scratch development measured `ken check` rc 0 for Derived,
+> EventTrace and a client; it found no new `Axiom` and equal
+> trusted-base identity sets for independent roots (114 → 114).
+> The closed acceptance, false count-one refusal and mutation
+> observations below are scratch measurements, not a check on this
+> Spec-only child, the assembled candidate, the separate CV seed,
+> official conformance, CI or landed trust.
+
+### 16.1 Public types and placement
+
+`Data.Collections.Derived` adds one **public checked proof attached to
+`list_append`**, immediately after `count_left_first` and before
+`count_right_first`:
+
+```ken
+pub proof count for list_append
+      (a : Type) (eqf : a → a → Bool) (q : a) (xs : List a)
+    : (ys : List a)
+      → Equal Nat
+        (count a eqf q (list_append a xs ys))
+        (add (count a eqf q xs) (count a eqf q ys))
+```
+
+The proof is imported as `list_append::count`. Its classifier `eqf`
+is an explicit Boolean function, not an inferred `DecEq` instance.
+It counts every occurrence of `q` on either side of an append;
+no distinctness or ordering premise is required.
+
+`Data.Time.EventTrace` adds one **public Transparent checked theorem**
+after `trace_merge_all_member_sound`:
+
+```ken
+pub theorem trace_merge_all_count
+      (p : Type) (eqf : Event p → Event p → Bool)
+      (q : Event p) (traces : List (List (Event p)))
+    : Equal Nat
+        (count (Event p) eqf q (trace_merge_all p traces))
+        (count (Event p) eqf q (list_concat (Event p) traces))
+```
+
+This equation holds for **every** classifier, query event and finite
+outer list, including unordered input traces. Neither an ordered-
+input premise nor a separate event equality is inserted. The law
+compares `Nat` counts, not structural equality between the merged
+trace and the flattened input; the two lists can have different
+orders. No §1–§15 operation or law type changes.
+
+### 16.2 Why the induction closes
+
+Both `trace_merge_all` (§15) and `list_concat` are right folds. At
+`Nil` their counts are both zero and the checked base proof is
+`Proved`. At `Cons t rest`, the existing two-way
+`trace_merge_count` law counts the merge as the count in `t` plus
+the count in the recursive merge. The induction hypothesis replaces
+the latter with the count in `list_concat rest`; the new
+`list_append::count` proof identifies that sum with the count in
+`list_append t (list_concat rest)`. This is the flattened input
+for the same `Cons` case. All three laws quantify over the **same**
+`eqf` and `q`, so the argument does not switch classifiers or
+silently discard duplicate events. No helper is added to the
+public EventTrace API, and no new axiom, primitive, kernel or
+surface rule is involved. The isolated AC-0 trust result is
+§1a **0, delta 0**; it does not measure an assembled or landed tip.
+
+### 16.3 Closed count discriminator and its limits
+
+A three-trace input in which the queried event occurs once in each
+of two different traces has flattened count **2**. The intended
+merge preserves both occurrences, so its count for the same
+classifier and event is also **2**. An accepted closed result row
+checks that value independently of applying `trace_merge_all_count`
+(R-CLOSED); a generic application checks the public law's type
+(R-LAW). The false same-form row claiming merged count **1**
+(R-ONCE) is refused on a fresh accepted prefix with
+`KernelRejected(TypeMismatch)` at its own `merged_once` claim.
+Its accepted control claims **2** on the same input and in the
+same equality form. A merge that silently keeps one copy satisfies
+§15's ordered, complete and sound membership laws but fails this
+count comparison and the closed value row. Conversely, these
+counts alone do not specify output order or left-biased ties;
+§15's exact-output checks remain separate.
+
+The scratch Suc mutation of the new theorem failed inside its
+mutated proof and was restored byte-identically. That rejection
+shows a proof gate for that mutation; it is not evidence of a
+checked generic proof for any other mutated implementation.
+AC-0's publication probe initially failed on a missing `add`
+import in the test's generated attached-proof signature; the
+Architect identified the separate `signature_imports` consumer and
+ruled a Foundation-owned correction. The failure was not a proof
+refusal for either public law. Foundation's targeted candidate
+tests, CV's separate seed, assembled-tip review, official runner,
+CI and landed trusted-base comparison remain independent gates.
