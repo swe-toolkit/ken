@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::{parser::parse_decls, Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const LAWS: [&str; 2] = ["interval_inside_antisym_lo", "interval_inside_antisym_hi"];
 
@@ -77,7 +80,7 @@ fn checked_public_laws_have_generic_clients_without_added_trust() {
         env.elaborate_file(&format!("import {INTERVAL} ({law} as client_{law})"))
             .unwrap_or_else(|e| panic!("{law} selectively imports: {e:?}"));
     }
-    env.elaborate_file(GENERIC)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC))
         .expect("open client consumes both precise endpoint-value propositions");
 }
 
@@ -113,7 +116,7 @@ theorem hi_equiv : rational_equiv two four_halves =
 #[test]
 fn equal_value_endpoint_clients_accept_with_two_direction_controls() {
     interval_env()
-        .elaborate_file(ACCEPT_CLIENT)
+        .elaborate_file(&checked_is_true::selected_source_with_import(ACCEPT_CLIENT))
         .expect("both directions and both value-equivalence clients check");
 }
 
@@ -147,7 +150,7 @@ fn reject_own_theorem(env: &mut ElabEnv, source: &str) -> KernelError {
     let [SourceDecl::TheoremDecl { span: claim, .. }] = parsed.as_slice() else {
         panic!("negative client must be one attempted theorem");
     };
-    match env.elaborate_file(source) {
+    match env.elaborate_file(&checked_is_true::selected_source(source)) {
         Err(ElabError::KernelRejected {
             error: error @ KernelError::TypeMismatch { .. },
             span,
@@ -165,10 +168,10 @@ fn reject_own_theorem(env: &mut ElabEnv, source: &str) -> KernelError {
 #[test]
 fn dropped_reverse_inclusion_refuses_at_the_law_application() {
     interval_env()
-        .elaborate_file(ACCEPT_CLIENT)
+        .elaborate_file(&checked_is_true::selected_source_with_import(ACCEPT_CLIENT))
         .expect("same-form two-way lo application accepts");
     let mut env = interval_env();
-    env.elaborate_file(REFUSE_ONE_WAY_CONTROL)
+    env.elaborate_file(&checked_is_true::selected_source(REFUSE_ONE_WAY_CONTROL))
         .expect("one-way True and reverse False check independently");
     let error = reject_own_theorem(&mut env, REFUSE_ONE_WAY);
     assert!(matches!(error, KernelError::TypeMismatch { .. }));
@@ -182,7 +185,7 @@ fn dropped_reverse_inclusion_refuses_at_the_law_application() {
 #[test]
 fn value_equivalence_does_not_ascribe_to_structural_equality() {
     let mut env = interval_env();
-    env.elaborate_file(ACCEPT_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(ACCEPT_CLIENT))
         .expect("same-input value-equivalence client checks first");
     let error = reject_own_theorem(&mut env, REFUSE_EQUAL_FORM);
     assert!(matches!(error, KernelError::TypeMismatch { .. }));

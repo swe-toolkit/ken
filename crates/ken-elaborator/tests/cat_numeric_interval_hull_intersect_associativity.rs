@@ -10,6 +10,9 @@ use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const NEW_LAWS: [&str; 4] = [
     "interval_hull_assoc_inside",
@@ -96,7 +99,7 @@ fn four_generic_regroupings_are_public_checked_and_zero_trust() {
             "{name} has a kernel-checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("all four open, premise-free public types check");
     for private in ["equiv_leq", "rational_distrib_r"] {
         match interval_env().elaborate_file(&format!("import {INTERVAL} ({private})")) {
@@ -241,9 +244,10 @@ theorem seed_neg :
 #[test]
 fn closed_hull_intersect_regroupings_refuse_dropped_operand() {
     let mut env = interval_env();
-    env.elaborate_file(CLOSED_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_CLIENT))
         .expect("four complete laws, values, three inverted positions and False control check");
-    let parsed = parse_decls(FALSE_DROPPED_OPERAND).expect("isolated §9 refusal parses");
+    let checked_refused = checked_is_true::selected_source(FALSE_DROPPED_OPERAND);
+    let parsed = parse_decls(&checked_refused).expect("isolated §9 refusal parses");
     let [SourceDecl::TheoremDecl {
         name,
         span: claim_span,
@@ -255,9 +259,9 @@ fn closed_hull_intersect_regroupings_refuse_dropped_operand() {
     assert_eq!(name, "seed_neg");
     let mut rejecting = interval_env();
     rejecting
-        .elaborate_file(CLOSED_CLIENT)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_CLIENT))
         .expect("fresh full accepted fixture checks before refusal");
-    match rejecting.elaborate_file(FALSE_DROPPED_OPERAND) {
+    match rejecting.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

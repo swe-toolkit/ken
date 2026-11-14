@@ -12,6 +12,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -139,7 +142,7 @@ fn four_generic_interval_assoc_laws_are_owned_private_and_zero_trust() {
             "{name} has a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent generic client checks both operation regroupings");
     match env.elaborate_file(&format!("import {INTERVAL} (equiv_leq)")) {
         Err(ElabError::UnboundName { name, .. }) => {
@@ -224,7 +227,8 @@ fn accepted_regrouping_seed_refuses_only_false_prefix_inclusion() {
         theorem_shape(EXPECTED_REFUSED, "expected_neg"),
         "refusal must assert that the three-operand sum lies in the prefix"
     );
-    let decls = parse_decls(refused).expect("isolated refusal parses");
+    let checked_refused = checked_is_true::selected_source(refused);
+    let decls = parse_decls(&checked_refused).expect("isolated refusal parses");
     let [SourceDecl::TheoremDecl {
         name,
         span: claim_span,
@@ -235,9 +239,9 @@ fn accepted_regrouping_seed_refuses_only_false_prefix_inclusion() {
     };
     assert_eq!(name, "seed_neg");
     let mut env = interval_env();
-    env.elaborate_file(accepted)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete §6 accepted client checks against checked exports");
-    match env.elaborate_file(refused) {
+    match env.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

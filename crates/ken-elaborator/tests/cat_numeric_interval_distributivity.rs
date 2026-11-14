@@ -12,6 +12,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -165,7 +168,7 @@ fn generic_four_inclusions_are_owned_transparent_private_and_zero_trust() {
             "{name} has a kernel-checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("client independently consumes all four exact §4 types");
     for private in ["equiv_leq", "rational_distrib_r"] {
         match env.elaborate_file(&format!("import {INTERVAL} ({private})")) {
@@ -191,7 +194,7 @@ fn shipped_positive_distributivity_seed_checks() {
         panic!("§4 seed needs one positive client and one isolated refusal");
     };
     loaded_interval()
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("four shipped law instances and same-input controls check");
 }
 
@@ -370,14 +373,14 @@ fn dropped_product_refusal_is_about_the_same_checked_operands() {
         panic!("§4 seed needs one positive client and one isolated refusal");
     };
     let mut env = loaded_interval();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("positive same-input control and four laws check first");
     assert_dropped_product_refusal_is_paired(positive, negative);
     let declarations = parse_decls(negative).expect("refusal parses");
     let [SourceDecl::TheoremDecl { span: theorem, .. }] = declarations.as_slice() else {
         panic!("one attempted theorem is required");
     };
-    match env.elaborate_file(negative) {
+    match env.elaborate_file(&checked_is_true::selected_source(negative)) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

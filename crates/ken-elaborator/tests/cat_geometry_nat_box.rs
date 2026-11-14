@@ -9,10 +9,13 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, ImportKind, KenMdFenceRole,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole,
     Type as SourceType,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 const CONTAINMENT_SEED: &str = include_str!(concat!(
@@ -20,47 +23,15 @@ const CONTAINMENT_SEED: &str = include_str!(concat!(
     "/../../conformance/stdlib/geometry/seed-box-containment.md"
 ));
 
-// The compiler base already binds canonical IsTrue. Remove only a parsed
-// duplicate import; keep all other imported names and ignore source spacing.
-fn without_redundant_is_true_import(source: &str) -> String {
-    let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("seed Ken parses") {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module != "Core.Classes.LawfulClasses" {
-                continue;
-            }
-            let mut keep = Vec::new();
-            let mut removed = false;
-            for item in items {
-                if item.name == "IsTrue" && item.rename.is_none() {
-                    removed = true;
-                } else {
-                    keep.push(match item.rename {
-                        Some(alias) => format!("{} as {alias}", item.name),
-                        None => item.name,
-                    });
-                }
-            }
-            if removed {
-                let replacement = if keep.is_empty() {
-                    String::new()
-                } else {
-                    format!("import {module} ({})", keep.join(", "))
-                };
-                edits.push((span.start..span.end, replacement));
-            }
-        }
-    }
-    let mut client = source.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        client.replace_range(range, &replacement);
-    }
-    client
+// Select the checked proposition identity only in executable clients; the
+// published conformance seed remains unchanged.
+fn checked_client(source: &str, fresh: bool) -> String {
+    let client = if fresh {
+        checked_is_true::selected_source_with_import(source)
+    } else {
+        checked_is_true::selected_source(source)
+    };
+    checked_is_true::selected_and_source_with_import(&client)
 }
 
 fn containment_sources() -> Vec<String> {
@@ -69,7 +40,7 @@ fn containment_sources() -> Vec<String> {
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| without_redundant_is_true_import(&CONTAINMENT_SEED[fence.body_range]))
+        .map(|fence| CONTAINMENT_SEED[fence.body_range].to_owned())
         .collect()
 }
 
@@ -151,7 +122,7 @@ fn generic_public_geometry_laws_and_order_bounds_add_no_trust() {
             "{law} must have a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_client(GENERIC_CLIENT, true))
         .expect("all six independently restated §1.3 law types elaborate");
 }
 
@@ -183,10 +154,9 @@ theorem generic_manhattan_self (p : Point) :
   Equal Nat (manhattan p p) Zero = manhattan_self p
 "##;
 
-// The 22 seed theorems and their fixtures are verbatim. The seed's redundant
-// IsTrue import is omitted in this in-memory client: the compiler base already
-// binds the same canonical IsTrue identity, and reimporting it ambiguates that
-// name. Constructed expectations never call intersect, hull or manhattan.
+// The 22 seed theorems and their fixtures are verbatim. Their in-memory
+// client selects checked IsTrue and proposition-sorted And by explicit alias.
+// Constructed expectations never call intersect, hull or manhattan.
 const SEED_POSITIVE: &str = r##"
 import Algorithm.Geometry.NatBox
   (Point, MkPoint, Box, MkBox, axis_contains, contains, intersect,
@@ -281,7 +251,7 @@ theorem seed_law_manhattan_self :
 #[test]
 fn twenty_two_seed_assertions_check_from_client_import() {
     let mut env = geometry_env();
-    env.elaborate_file(SEED_POSITIVE)
+    env.elaborate_file(&checked_client(SEED_POSITIVE, true))
         .expect("22 positive seed assertions must check from client import");
     for name in [
         "axis_lower_in",
@@ -377,11 +347,12 @@ fn five_false_seed_propositions_are_refused_after_positive_control() {
         (REJECT_WRONG_DISTANCE, "incorrect Manhattan distance", false),
     ] {
         let mut env = geometry_env();
-        env.elaborate_file(SEED_POSITIVE)
+        env.elaborate_file(&checked_client(SEED_POSITIVE, true))
             .expect("same positive client must check before each refusal");
-        match env.elaborate_file(bad) {
+        let checked_bad = checked_client(bad, false);
+        match env.elaborate_file(&checked_bad) {
             Err(ElabError::TypeMismatch { span, .. }) if refl => assert_eq!(
-                bad.get(span.start..span.end),
+                checked_bad.get(span.start..span.end),
                 Some("Refl"),
                 "{label}: refusal must target the false proof"
             ),
@@ -389,10 +360,10 @@ fn five_false_seed_propositions_are_refused_after_positive_control() {
                 error: KernelError::TypeMismatch { .. },
                 span,
             }) if !refl => {
-                let declaration_start = bad.find("theorem reject_").expect("negative theorem");
+                let declaration_start = checked_bad.find("theorem reject_").expect("negative theorem");
                 assert!(
                     span.start >= declaration_start
-                        && span.end <= bad.len()
+                        && span.end <= checked_bad.len()
                         && span.start < span.end,
                     "{label}: kernel rejection must target this false theorem, got {span:?}"
                 );
@@ -450,7 +421,7 @@ fn section_three_generic_containment_laws_add_no_trust() {
             "{public} must have a checked body"
         );
     }
-    env.elaborate_file(CONTAINMENT_GENERIC_CLIENT)
+    env.elaborate_file(&checked_client(CONTAINMENT_GENERIC_CLIENT, true))
         .expect("seven generic §3 law clients consume their exact public propositions");
     match env.elaborate_file(&format!("import {GEOMETRY} (axis_within)")) {
         Err(ElabError::UnboundName { name, .. }) => {
@@ -508,7 +479,7 @@ fn shipped_box_containment_seed_positive_cases_check() {
     assert!(!sources.is_empty(), "seed needs positive source fences");
     let mut env = geometry_env();
     for positive in sources {
-        env.elaborate_file(&positive)
+        env.elaborate_file(&checked_client(&positive, true))
             .expect("every shipped positive containment declaration checks");
     }
 }
@@ -662,17 +633,18 @@ fn shipped_strictly_smaller_box_refuses_on_its_controlled_pair() {
     let (shared, refused) = negative.split_at(span.start);
     let mut env = geometry_env();
     for positive in &sources {
-        env.elaborate_file(positive)
+        env.elaborate_file(&checked_client(positive, true))
             .expect("all shipped positives check first");
     }
-    env.elaborate_file(shared)
+    env.elaborate_file(&checked_client(shared, false))
         .expect("four same-pair controls check first");
     assert_strictly_smaller_refusal_goal(first_positive, shared, refused);
-    match env.elaborate_file(refused) {
+    let checked_refused = checked_client(refused, false);
+    match env.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
-        }) if span.start < span.end && span.end <= refused.len() => {}
+        }) if span.start < span.end && span.end <= checked_refused.len() => {}
         other => panic!("false inward containment must fail at its own theorem: {other:?}"),
     }
 }

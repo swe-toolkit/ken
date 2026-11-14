@@ -13,6 +13,9 @@ use std::{collections::BTreeSet, path::PathBuf};
 
 use ken_elaborator::{ElabEnv, ElabError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -104,7 +107,7 @@ theorem checked_one_cons (a : Type) (cost : a → Nat) (x : a) (rest : List a)
 #[test]
 fn public_generic_laws_check_without_a_trusted_identity_delta() {
     let mut env = load_provider();
-    env.elaborate_file(PUBLIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(PUBLIC_CLIENT))
         .expect("all eight public declarations retain their exact generic types");
 }
 

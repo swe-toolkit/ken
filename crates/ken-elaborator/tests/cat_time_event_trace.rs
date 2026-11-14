@@ -163,6 +163,7 @@ import Data.Time.EventTrace
    trace_merge_ordered, trace_merge_count)
 import Data.Collections.Derived (count)
 import Data.Numeric.Nat.Arithmetic (add)
+import Core.Logic.Conjunction (and_intro as checked_and_intro)
 
 const t1 : Nat = Suc Zero
 const t2 : Nat = Suc t1
@@ -253,12 +254,12 @@ theorem merge_unordered_inputs_keep_head_order :
 -- These are explicit witnesses for the ordering premises, not law-derived
 -- input facts. Equal timestamps satisfy the non-decreasing relation.
 theorem seed_left_ordered : time_ordered Bool left =
-  and_intro
+  checked_and_intro
     (Equal Bool (event_before Bool e1 e3) True)
     (time_ordered Bool (Cons (Event Bool) e3 (Nil (Event Bool))))
     Proved Proved
 theorem seed_right_ordered : time_ordered Bool right =
-  and_intro
+  checked_and_intro
     (Equal Bool (event_before Bool e2 e3b) True)
     (time_ordered Bool (Cons (Event Bool) e3b (Nil (Event Bool))))
     Proved Proved
@@ -266,17 +267,17 @@ theorem seed_ordered_tail :
   time_ordered Bool
     (Cons (Event Bool) e2
       (Cons (Event Bool) e3 (Cons (Event Bool) e3b (Nil (Event Bool))))) =
-  and_intro
+  checked_and_intro
     (Equal Bool (event_before Bool e2 e3) True)
     (time_ordered Bool
       (Cons (Event Bool) e3 (Cons (Event Bool) e3b (Nil (Event Bool)))))
     Proved
-    (and_intro
+    (checked_and_intro
       (Equal Bool (event_before Bool e3 e3b) True)
       (time_ordered Bool (Cons (Event Bool) e3b (Nil (Event Bool))))
       Proved Proved)
 theorem seed_ordered_input : time_ordered Bool ordered_input =
-  and_intro
+  checked_and_intro
     (Equal Bool (event_before Bool e1 e2) True)
     (time_ordered Bool
       (Cons (Event Bool) e2

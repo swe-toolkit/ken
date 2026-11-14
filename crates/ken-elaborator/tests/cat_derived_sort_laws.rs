@@ -112,7 +112,9 @@ fn a_non_total_comparator_sorts_the_fixture_but_not_its_proof() {
         ))
         .unwrap_or_else(|error| panic!("{name} concrete sort must agree: {error:?}"));
     }
-    let closed_sorted_proof = "and_intro Top Top Proved Proved";
+    env.elaborate_file("import Core.Logic.Conjunction (and_intro as checked_and_intro)")
+        .expect("the closed sortedness proof selects the checked conjunction constructor");
+    let closed_sorted_proof = "checked_and_intro Top Top Proved Proved";
     env.elaborate_decl(&format!(
         "theorem good_sorted : catalog_is_sorted Nat leq_nat cat_sort_result = {closed_sorted_proof}"
     ))

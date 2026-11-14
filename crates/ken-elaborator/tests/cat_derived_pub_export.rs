@@ -21,6 +21,8 @@ use std::path::PathBuf;
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
@@ -343,16 +345,14 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 fn derived_loader_publishes_exactly_its_authorized_export_surface() {
     let mut env = load_derived();
     // Attached-proof probes restate the provider theorem outside Derived's
-    // module namespace. `IsTrue` is already available in the base environment;
-    // re-importing that package name would be ambiguous, so import only the
-    // other foreign name from its canonical provider.
+    // namespace. Select checked IsTrue with an alias once for every query.
     env.elaborate_file(
-        "import Core.Classes.LawfulClasses (leq_nat)\nimport Core.Function.Combinators (comp, idf)",
+        "import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue, leq_nat, bool_leq)\nimport Core.Function.Combinators (comp, idf)",
     )
     .expect("Derived proof dependencies must elaborate for publication queries");
     let published = top_level_publication_queries()
         .into_iter()
-        .filter(|query| match env.elaborate_file(&query.source) {
+        .filter(|query| match env.elaborate_file(&checked_is_true::selected_source(&query.source)) {
             Ok(_) => true,
             Err(ElabError::UnboundName { name: rejected, .. }) => {
                 assert!(

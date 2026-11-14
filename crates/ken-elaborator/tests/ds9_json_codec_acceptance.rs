@@ -193,6 +193,8 @@ fn list_count(env: &ElabEnv, value: &EvalVal) -> u64 {
 
 fn assert_positivity_violation(source: &str, shape: &str) {
     let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Logic.EmptyDec")
+        .expect("checked Empty provider must load before the negative shape");
     match env.elaborate_file(source) {
         Err(ElabError::KernelRejected {
             error: KernelError::PositivityViolation(message),
@@ -277,8 +279,9 @@ fn intrinsic_all_lift_direct_pi_domain_remains_rejected() {
     // THE GAP: the former-nested sibling is exercised independently below.
     assert_positivity_violation(
         r#"
+        import Core.Logic.EmptyDec (Empty as CheckedEmpty)
         data DirectNegative : Type where {
-          MkDirectNegative : (DirectNegative → Empty) → DirectNegative
+          MkDirectNegative : (DirectNegative → CheckedEmpty) → DirectNegative
         }
         "#,
         "direct Pi-domain recursive occurrence",
@@ -294,9 +297,10 @@ fn intrinsic_all_lift_former_nested_pi_domain_remains_rejected() {
     // nested-inductives corpus rather than being restated here.
     assert_positivity_violation(
         r#"
+        import Core.Logic.EmptyDec (Empty as CheckedEmpty)
         data FormerNestedNegative : Type where {
           MkFormerNestedNegative
-            : List (Pair (FormerNestedNegative → Empty) Unit)
+            : List (Pair (FormerNestedNegative → CheckedEmpty) Unit)
             → FormerNestedNegative
         }
         "#,

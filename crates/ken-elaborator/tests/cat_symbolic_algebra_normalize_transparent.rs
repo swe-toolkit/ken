@@ -16,6 +16,9 @@ use ken_elaborator::{
 };
 use ken_kernel::Decl;
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -95,7 +98,7 @@ fn three_generic_normalization_laws_are_checked_public_and_zero_trust() {
             "{name} has a checked, non-axiom body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("open client consumes every §9 public theorem type");
 }
 
@@ -199,7 +202,7 @@ fn full_seed_accepts_and_moved_derivative_index_refuses() {
     let refusal = seed_case("refuse_moved_derivative_index_after_normalization");
     let mut positive = package_env();
     positive
-        .elaborate_file(accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete §9 accepted client and independent oracles check");
     for name in [
         "explicit_normal_form",
@@ -250,10 +253,10 @@ fn full_seed_accepts_and_moved_derivative_index_refuses() {
     ));
     let mut refusing = package_env();
     refusing
-        .elaborate_file(accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("fresh complete accepted client succeeds before false claim");
     refusing
-        .elaborate_file(claim)
+        .elaborate_file(&checked_is_true::selected_source(claim))
         .expect_err("the isolated false moved-index proof must be refused");
 
     // These shape controls cannot mask a true-neighbor behavioral mutation:

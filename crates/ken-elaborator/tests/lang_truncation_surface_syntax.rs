@@ -682,13 +682,19 @@ fn d1_truncation_headed_constrained_instance_resolves_by_a_consistent_head() {
 #[test]
 fn d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation() {
     let mut env = mk_env();
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots_strict(&[root], "Core.Classes.LawfulClasses")
+        .expect("checked predicate provider roots-loads in existing Strict mode");
     let err = env
         .elaborate_file(
-            "fn <+> (a : Nat) (b : Nat) : Nat = a\n\
+            "import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)\n\
+             fn <+> (a : Nat) (b : Nat) : Nat = a\n\
              infixl 6 <+>\n\
              fn <*> (a : Nat) (b : Nat) : Nat = a\n\
              infixr 6 <*>\n\
-             theorem tie (x : Nat) : ‖ { y : Nat | IsTrue (x <+> x <*> x) } ‖ = \
+             theorem tie (x : Nat) : ‖ { y : Nat | CatalogIsTrue (x <+> x <*> x) } ‖ = \
                trunc_intro x",
         )
         .expect_err(

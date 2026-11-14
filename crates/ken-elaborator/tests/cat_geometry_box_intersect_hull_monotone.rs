@@ -7,6 +7,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 
 fn root() -> PathBuf {
@@ -86,7 +89,7 @@ fn generic_monotone_laws_are_owned_transparent_and_trust_free() {
             "{law} must have a checked transparent body"
         );
     }
-    env.elaborate_file(CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(CLIENT))
         .expect("open and closed clients consume both exact public laws");
 }
 
@@ -133,23 +136,24 @@ theorem join_wrong_first_premise : IsTrue (inside (hull small point) (hull short
 #[test]
 fn monotone_laws_require_each_live_premise_on_fresh_accepted_prefixes() {
     loaded_geometry()
-        .elaborate_file(ACCEPTED_PREFIX)
+        .elaborate_file(&checked_is_true::selected_source_with_import(ACCEPTED_PREFIX))
         .expect("both controls and independently false conclusions check");
     for (name, claim) in [
         ("meet_wrong_second_premise", REFUSE_MEET),
         ("join_wrong_first_premise", REFUSE_JOIN),
     ] {
         let mut env = loaded_geometry();
-        env.elaborate_file(ACCEPTED_PREFIX)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(ACCEPTED_PREFIX))
             .expect("fresh accepted prefix checks before each refusal");
-        match env.elaborate_file(claim) {
+        let checked_claim = checked_is_true::selected_source(claim);
+        match env.elaborate_file(&checked_claim) {
             Err(ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 span,
             }) => {
-                let own = claim.find(&format!("theorem {name}")).expect("own theorem");
+                let own = checked_claim.find(&format!("theorem {name}")).expect("own theorem");
                 assert!(
-                    span.start >= own && span.start < span.end && span.end <= claim.len(),
+                    span.start >= own && span.start < span.end && span.end <= checked_claim.len(),
                     "{name} must refuse at its own law application: {span:?}"
                 );
             }

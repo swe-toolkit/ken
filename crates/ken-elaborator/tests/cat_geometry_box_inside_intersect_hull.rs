@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 
 fn root() -> PathBuf {
@@ -77,7 +80,7 @@ fn generic_inside_equations_are_owned_transparent_and_trust_free() {
             "{law} must have a checked transparent body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("open client checks both exact curried public laws");
 }
 
@@ -110,21 +113,22 @@ theorem meet_short_refl : Equal Box (intersect small short) small = Refl
 "#;
 
 fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, claim: &str) {
-    match env.elaborate_file(claim) {
+    let checked_claim = checked_is_true::selected_source(claim);
+    match env.elaborate_file(&checked_claim) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) if name == "small_in_short" => {
-            let start = claim
+            let start = checked_claim
                 .find(&format!("theorem {name}"))
                 .expect("the false premise has its own theorem");
             assert!(
-                span.start >= start && span.start < span.end && span.end <= claim.len(),
+                span.start >= start && span.start < span.end && span.end <= checked_claim.len(),
                 "{name} must be refused at its own claim: {span:?}"
             );
         }
         Err(ElabError::TypeMismatch { span, reason }) if name == "meet_short_refl" => {
-            let proof = claim.find("Refl").expect("false equation uses Refl");
+            let proof = checked_claim.find("Refl").expect("false equation uses Refl");
             assert_eq!(span.start..span.end, proof..proof + "Refl".len());
             assert!(
                 reason.contains("Refl expects an `Eq`-shaped goal"),
@@ -150,14 +154,14 @@ fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, claim: &str) {
 #[test]
 fn nested_boxes_accept_and_one_axis_false_premise_and_equation_refuse() {
     loaded_geometry()
-        .elaborate_file(CLOSED_PREFIX)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("closed cases and the same-form tall control check");
     for (name, claim) in [
         ("small_in_short", REFUSE_PREMISE),
         ("meet_short_refl", REFUSE_EQUATION),
     ] {
         let mut env = loaded_geometry();
-        env.elaborate_file(CLOSED_PREFIX)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
             .expect("accepted prefix checks before an isolated false theorem");
         refuse_at_own_theorem(&mut env, name, claim);
     }

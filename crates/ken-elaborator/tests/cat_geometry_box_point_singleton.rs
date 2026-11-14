@@ -10,6 +10,9 @@ use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::Decl;
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.Geometry.NatBox";
 
 fn root() -> PathBuf {
@@ -116,7 +119,7 @@ fn singleton_law_and_both_derived_clients_are_checked_without_new_trust() {
         env.env.lookup(helper),
         Some(Decl::Transparent { .. })
     ));
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("the public law and both derived uses check with open points");
     match env.elaborate_file(&format!("import {PACKAGE} (axis_point_equal)")) {
         Err(ElabError::UnboundName { name, .. }) => {
@@ -163,7 +166,7 @@ theorem false_member_equality : IsTrue (contains (MkBox other off) other) → Eq
 #[test]
 fn inhabited_two_point_box_refuses_false_singleton_claim_after_control() {
     let mut env = loaded_package();
-    env.elaborate_file(CLOSED_PREFIX)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("both coordinate and membership witnesses and Refl control check");
     for name in [
         "off_coordinates",
@@ -175,7 +178,8 @@ fn inhabited_two_point_box_refuses_false_singleton_claim_after_control() {
         let id = env.globals[name];
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    let parsed = parse_decls(REFUSED).expect("the false theorem parses");
+    let checked_refused = checked_is_true::selected_source(REFUSED);
+    let parsed = parse_decls(&checked_refused).expect("the false theorem parses");
     let [SourceDecl::TheoremDecl {
         name: claim,
         span: claim_span,
@@ -185,7 +189,7 @@ fn inhabited_two_point_box_refuses_false_singleton_claim_after_control() {
         panic!("the isolated claim must be one theorem");
     };
     assert_eq!(claim, "false_member_equality");
-    match env.elaborate_file(REFUSED) {
+    match env.elaborate_file(&checked_refused) {
         Err(ElabError::TypeMismatch { span, reason })
             if span.start >= claim_span.start
                 && span.start < span.end

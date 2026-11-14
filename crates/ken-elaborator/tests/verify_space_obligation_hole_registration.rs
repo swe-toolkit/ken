@@ -5,8 +5,12 @@ use std::collections::BTreeSet;
 use ken_elaborator::{ElabEnv, ObligationKind};
 use ken_kernel::{check, declare_def, postulates_reachable, Context, Decl, GlobalId, Term};
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
 const SOURCE: &str = r#"
-fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x
+import Core.Logic.Not (Not as CheckedNot)
+fn d (x : Int) (y : Int) : Int requires CheckedNot (Equal Int x y) = x
 const k : Int = d 0 0
 space S {
   mut cell : Int = 0
@@ -31,6 +35,7 @@ fn reached(env: &ElabEnv, root: GlobalId) -> BTreeSet<GlobalId> {
 #[test]
 fn space_call_site_demotes_operation_and_transitive_theorem() {
     let mut env = ElabEnv::new().expect("prelude");
+    checked_not::load(&mut env);
     let results = env
         .elaborate_file_v1(SOURCE)
         .expect("space and proof fixture");
@@ -107,6 +112,7 @@ fn space_call_site_demotes_operation_and_transitive_theorem() {
 #[test]
 fn space_cell_initializer_demotes_a_checked_state_reader() {
     let mut env = ElabEnv::new().expect("prelude");
+    checked_not::load(&mut env);
     let results = env
         .elaborate_file_v1(SOURCE)
         .expect("space and proof fixture");

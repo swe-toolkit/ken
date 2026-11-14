@@ -11,6 +11,9 @@ use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const NEW_LAWS: [&str; 4] = [
     "interval_add_zero_l_inside",
@@ -121,7 +124,7 @@ fn generic_point_unit_laws_compose_right_forms_without_new_trust() {
             "{name} has a checked proof body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent open client checks four left laws and public-only right forms");
     for private in ["equiv_leq", "rational_distrib_r"] {
         match interval_env().elaborate_file(&format!("import {INTERVAL} ({private})")) {
@@ -180,10 +183,11 @@ theorem false_zero_unit : IsTrue (interval_inside (interval_mul (interval_point 
 fn one_point_proved_accepts_and_zero_point_proved_refuses_on_same_interval() {
     let mut accepted = interval_env();
     accepted
-        .elaborate_file(CLOSED_ACCEPTED)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_ACCEPTED))
         .expect("§10 accepted one-unit, false-value and inverted controls check");
 
-    let parsed = parse_decls(FALSE_ZERO_UNIT).expect("isolated false claim parses");
+    let checked_refused = checked_is_true::selected_source(FALSE_ZERO_UNIT);
+    let parsed = parse_decls(&checked_refused).expect("isolated false claim parses");
     let [SourceDecl::TheoremDecl {
         name,
         params,
@@ -198,9 +202,9 @@ fn one_point_proved_accepts_and_zero_point_proved_refuses_on_same_interval() {
 
     let mut rejecting = interval_env();
     rejecting
-        .elaborate_file(CLOSED_ACCEPTED)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_ACCEPTED))
         .expect("same accepted fixture and one-point control precede refusal");
-    match rejecting.elaborate_file(FALSE_ZERO_UNIT) {
+    match rejecting.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

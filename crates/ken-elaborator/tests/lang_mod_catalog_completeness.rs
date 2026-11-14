@@ -335,7 +335,7 @@ fn derived_generic_sort_exports_are_roots_owned_and_selectively_importable() {
         .expect("Derived provider closure must roots-load");
     env.elaborate_file(
         r#"import Data.Collections.Derived (Perm, insert, sort, count, is_sorted as catalog_is_sorted)
-import Core.Classes.LawfulClasses (bool_or)
+import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue, bool_or)
 fn cat_generic_perm (a : Type) (eqf : a → a → Bool) (xs : List a) (ys : List a) : Prop =
   Perm a eqf xs ys
 fn cat_generic_insert (a : Type) (le : a → a → Bool) (x : a) (xs : List a) : List a =
@@ -344,7 +344,7 @@ fn cat_generic_sort (a : Type) (le : a → a → Bool) (xs : List a) : List a =
   sort a le xs
 theorem cat_generic_insert_sorted
     (a : Type) (le : a → a → Bool)
-    (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+    (total : (x : a) → (y : a) → CatalogIsTrue (bool_or (le x y) (le y x)))
     (x : a) (xs : List a) :
     catalog_is_sorted a le xs → catalog_is_sorted a le (insert a le x xs) =
   insert::sorted a le total x xs
@@ -355,7 +355,7 @@ theorem cat_generic_insert_count
   insert::count a le x xs eqf q
 theorem cat_generic_sort_sorted
     (a : Type) (le : a → a → Bool)
-    (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+    (total : (x : a) → (y : a) → CatalogIsTrue (bool_or (le x y) (le y x)))
     (xs : List a) : catalog_is_sorted a le (sort a le xs) =
   sort::sorted a le total xs
 theorem cat_generic_sort_perm

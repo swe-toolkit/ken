@@ -7,6 +7,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 
 fn root() -> PathBuf {
@@ -71,7 +74,7 @@ fn generic_antisym_is_checked_trust_free_and_keeps_helpers_private() {
         matches!(env.env.lookup(law), Some(Decl::Transparent { .. })),
         "inside_antisym must have a checked transparent body"
     );
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("generic client checks the exact curried public law");
 
     for private in [
@@ -132,21 +135,22 @@ theorem reject_inverted_equality : Equal Box inv_a inv_b = Refl
 "#;
 
 fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
-    match env.elaborate_file(false_claim) {
+    let checked_claim = checked_is_true::selected_source(false_claim);
+    match env.elaborate_file(&checked_claim) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) => {
-            let start = false_claim
+            let start = checked_claim
                 .find(&format!("theorem {name}"))
                 .expect("isolated false theorem follows its accepted prefix");
             assert!(
-                span.start >= start && span.start < span.end && span.end <= false_claim.len(),
+                span.start >= start && span.start < span.end && span.end <= checked_claim.len(),
                 "{name}: kernel refusal must target its own theorem: {span:?}"
             );
         }
         Err(ElabError::TypeMismatch { span, reason }) if name == "reject_inverted_equality" => {
-            let proof = false_claim.find("Refl").expect("false equality uses Refl");
+            let proof = checked_claim.find("Refl").expect("false equality uses Refl");
             assert_eq!(span.start..span.end, proof..proof + "Refl".len());
             assert!(
                 reason.contains("Refl expects an `Eq`-shaped goal"),
@@ -172,7 +176,7 @@ fn refuse_at_own_theorem(env: &mut ElabEnv, name: &str, false_claim: &str) {
 #[test]
 fn closed_mutual_inside_accepts_and_false_reverse_or_inverted_equalities_refuse() {
     loaded_geometry()
-        .elaborate_file(CLOSED_PREFIX)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("closed same-corner proof and independent false controls check");
     for (name, claim) in [
         ("reject_reverse", REFUSE_REVERSE),
@@ -180,7 +184,7 @@ fn closed_mutual_inside_accepts_and_false_reverse_or_inverted_equalities_refuse(
         ("reject_inverted_equality", REFUSE_INVERTED_EQUALITY),
     ] {
         let mut env = loaded_geometry();
-        env.elaborate_file(CLOSED_PREFIX)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
             .expect("positive client checks before isolated false theorem");
         refuse_at_own_theorem(&mut env, name, claim);
     }

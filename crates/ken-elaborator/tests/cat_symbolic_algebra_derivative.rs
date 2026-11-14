@@ -12,6 +12,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -102,7 +105,7 @@ fn generic_derivative_exports_check_without_trust_or_public_scaffolding() {
             "{public} has a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent client consumes both universal interfaces");
     for private in ["var_deriv", "deriv_taylor", "taylor_rem", "deriv_extract"] {
         match env.elaborate_file(&format!("import {PACKAGE} ({private})")) {
@@ -124,7 +127,7 @@ fn generic_derivative_exports_check_without_trust_or_public_scaffolding() {
 fn shipped_derivative_seed_positive_client_checks() {
     let (positive, _) = seed_cases();
     let mut env = loaded_package();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("shipped derivative positive client checks completely");
     for name in [
         "originals_agree_at_every_environment",
@@ -246,7 +249,7 @@ fn shipped_square_derivative_as_one_x_refuses_at_its_own_closed_equality() {
     );
     let mut checked_type = loaded_package();
     checked_type
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("positive controls check before the claim-type control");
     checked_type
         .elaborate_file(&well_typed_claim)
@@ -272,14 +275,14 @@ theorem one_summand_square_equals_x :
     );
     let mut one_summand = loaded_package();
     one_summand
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("positive controls check before the one-summand client");
     one_summand
         .elaborate_file(&one_summand_client)
         .expect("the same closed claim accepts with one product summand dropped");
 
     let mut env = loaded_package();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("all positive controls check before refusal");
     match env.elaborate_file(refusal) {
         Err(ElabError::KernelRejected {

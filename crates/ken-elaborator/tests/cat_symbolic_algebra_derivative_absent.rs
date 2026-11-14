@@ -12,6 +12,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -103,7 +106,7 @@ fn generic_absent_derivative_and_occurs_are_checked_public_and_zero_trust() {
             other => panic!("Boolean eliminator {name} must remain private: {other:?}"),
         }
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("open §14 law and one-step poly_eq consequence check");
 }
 
@@ -203,7 +206,7 @@ fn actual_seed_discriminates_absence_from_occurrence_and_independence() {
 
     let mut positive = package_env();
     positive
-        .elaborate_file(accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete actual §14 seed checks before refusals");
     let id = positive.globals["absent_variable_zero"];
     assert!(matches!(
@@ -211,7 +214,7 @@ fn actual_seed_discriminates_absence_from_occurrence_and_independence() {
         Some(Decl::Transparent { .. })
     ));
     positive
-        .elaborate_file(CLOSED_OBSERVATIONS)
+        .elaborate_file(&checked_is_true::selected_source(CLOSED_OBSERVATIONS))
         .expect("closed occurrence and derivative facts compute independently");
 
     for (name, expected_index) in [("refuse_occurring_zero", 0), ("refuse_occurring_unused", 1)] {
@@ -232,9 +235,9 @@ fn actual_seed_discriminates_absence_from_occurrence_and_independence() {
 
         let mut negative = package_env();
         negative
-            .elaborate_file(accepted)
+            .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
             .expect("fresh complete seed prefix checks before the refusal");
-        match negative.elaborate_file(refused) {
+        match negative.elaborate_file(&checked_is_true::selected_source(refused)) {
             Err(ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 span,

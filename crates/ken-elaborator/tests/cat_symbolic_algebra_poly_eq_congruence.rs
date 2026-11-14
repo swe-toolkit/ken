@@ -9,6 +9,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 
 fn root() -> PathBuf {
@@ -81,7 +84,7 @@ fn generic_constructor_laws_are_owned_checked_and_trust_free() {
             "{public} must have a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("generic client consumes exactly both two-premise signatures");
     for private in ["add_cong", "mul_cong", "expr_add_cong", "expr_mul_cong"] {
         match env.elaborate_file(&format!("import {PACKAGE} ({private})")) {
@@ -153,16 +156,17 @@ theorem reject_false_second_premise :
 "#;
 
 fn refuses_at_own_theorem(env: &mut ElabEnv, name: &str, negative: &str) {
-    match env.elaborate_file(negative) {
+    let checked_negative = checked_is_true::selected_source(negative);
+    match env.elaborate_file(&checked_negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) => {
-            let theorem_start = negative
+            let theorem_start = checked_negative
                 .find(&format!("theorem {name}"))
                 .expect("isolated negative names its theorem");
             assert!(
-                span.start >= theorem_start && span.start < span.end && span.end <= negative.len(),
+                span.start >= theorem_start && span.start < span.end && span.end <= checked_negative.len(),
                 "{name} must refuse at its own proof: {span:?}"
             );
         }
@@ -185,7 +189,7 @@ fn refuses_at_own_theorem(env: &mut ElabEnv, name: &str, negative: &str) {
 #[test]
 fn closed_constructor_cases_accept_and_controls_refuse() {
     let mut env = loaded_package();
-    env.elaborate_file(CLOSED_PREFIX)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("both premises, constructor laws, decisions and values accept");
     for (name, negative) in [
         ("reject_outer_constructor", FALSE_OUTER),
@@ -194,7 +198,7 @@ fn closed_constructor_cases_accept_and_controls_refuse() {
     ] {
         let mut isolated = loaded_package();
         isolated
-            .elaborate_file(CLOSED_PREFIX)
+            .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
             .expect("same accepted controls load before isolated refusal");
         refuses_at_own_theorem(&mut isolated, name, negative);
     }

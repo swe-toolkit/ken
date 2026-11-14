@@ -3,6 +3,9 @@ use std::collections::HashSet;
 use ken_elaborator::{v2_extract, ElabEnv, ElabError, ObligationKind, ProvKind};
 use ken_kernel::{check, convert_type, Context, GlobalId, KernelError, Level, Term};
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
 fn arbitrary_predicate(env: &mut ElabEnv) {
     let int = Term::const_(env.globals["Int"], vec![]);
     env.declare_postulate_raw("P", Term::pi(int, Term::omega(Level::Zero)))
@@ -548,7 +551,19 @@ fn trusted(env: &ElabEnv) -> HashSet<GlobalId> {
 /// must reach its own generating arm, pinned by its Reported twin; fixed-width
 /// numeric literals may separately register non-obligation globals.
 fn assert_unsinkable_obligation(expression: &str, declaration: &str, kind: ObligationKind) {
+    assert_unsinkable_obligation_with_provider(expression, declaration, kind, false);
+}
+
+fn assert_unsinkable_obligation_with_provider(
+    expression: &str,
+    declaration: &str,
+    kind: ObligationKind,
+    use_checked_not: bool,
+) {
     let mut standalone = ElabEnv::new().expect("prelude");
+    if use_checked_not {
+        checked_not::load(&mut standalone);
+    }
     let before = trusted(&standalone);
     let error = standalone
         .elaborate_expr("no_sink", expression)
@@ -560,6 +575,12 @@ fn assert_unsinkable_obligation(expression: &str, declaration: &str, kind: Oblig
     assert_eq!(trusted(&standalone), before, "{expression}: leaked trust");
 
     let mut reported = ElabEnv::new().expect("prelude");
+    if use_checked_not {
+        checked_not::load(&mut reported);
+        reported
+            .elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+            .expect("reported row selects the checked negation identity");
+    }
     let before = trusted(&reported);
     let result = reported
         .elaborate_decl_v1(declaration)
@@ -583,10 +604,11 @@ fn assert_unsinkable_obligation(expression: &str, declaration: &str, kind: Oblig
 
 #[test]
 fn r1_open_refinement_refuses_without_a_hole() {
-    assert_unsinkable_obligation(
-        "(0 : { z : Int | Not (Equal Int z 0) })",
-        "const open_refinement : Int = (0 : { z : Int | Not (Equal Int z 0) })",
+    assert_unsinkable_obligation_with_provider(
+        "(0 : { z : Int | Core.Logic.Not.Not (Equal Int z 0) })",
+        "const open_refinement : Int = (0 : { z : Int | CheckedNot (Equal Int z 0) })",
         ObligationKind::RefinementIntroduction,
+        true,
     );
 }
 

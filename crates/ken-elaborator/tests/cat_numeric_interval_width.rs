@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const RATIONAL: &str = "Data.Numeric.Rational";
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 
@@ -122,7 +125,7 @@ fn generic_subtraction_and_width_laws_are_public_checked_and_zero_delta() {
             "{name} has a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("five independently stated generic §15 signatures check");
 }
 

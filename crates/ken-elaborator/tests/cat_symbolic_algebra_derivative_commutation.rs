@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::Decl;
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -108,7 +111,7 @@ fn generic_commutation_is_owned_checked_and_adds_no_trust() {
         matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
         "law has a checked body"
     );
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("arbitrary-argument law and existing poly_eq corollary check");
     match env.elaborate_file(&format!("import {PACKAGE} (deriv_var_deriv_eval)")) {
         Err(ElabError::UnboundName { name, .. }) => {
@@ -128,7 +131,7 @@ fn generic_commutation_is_owned_checked_and_adds_no_trust() {
 fn shipped_commutation_client_checks() {
     let positive = seed_case("xy_commute");
     loaded_package()
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("all accepted §6 seed theorems and same-tree control check");
 }
 
@@ -244,7 +247,7 @@ fn cross_order_structural_equality_refuses_at_its_own_refl() {
 
     let mut accepted = loaded_package();
     accepted
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("full accepted prefix checks before refusal");
     let claim_span = refused.span();
     let claim = &negative[claim_span.start..claim_span.end];
@@ -254,9 +257,9 @@ fn cross_order_structural_equality_refuses_at_its_own_refl() {
         ))
         .expect("the false proposition is itself a well-typed equality");
     let mut env = loaded_package();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("fresh refusal path checks every accepted control first");
-    match env.elaborate_file(negative) {
+    match env.elaborate_file(&checked_is_true::selected_source(negative)) {
         Err(ElabError::TypeMismatch { reason, span })
             if reason == "Refl expects an `Eq`-shaped goal"
                 && span.start >= refusal_span.start

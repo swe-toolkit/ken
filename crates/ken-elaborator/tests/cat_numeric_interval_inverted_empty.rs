@@ -10,6 +10,9 @@ use ken_elaborator::{
 };
 use ken_kernel::Decl;
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -84,7 +87,7 @@ fn three_generic_public_laws_are_owned_checked_and_zero_trust() {
         env.elaborate_file(&format!("import {INTERVAL} ({law} as probe_{law})"))
             .unwrap_or_else(|error| panic!("{law} selectively imports: {error:?}"));
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("all three independently stated generic §13 signatures check");
 }
 
@@ -166,7 +169,7 @@ fn accepted_seed_uses_all_three_laws_and_ordered_control() {
         SourceDecl::TheoremDecl { name, .. }
             if name == "ordered_zero_membership_control")));
     let mut env = interval_env();
-    env.elaborate_file(accepted)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete accepted law client and same-form ordered control check");
     env.elaborate_file(
         "theorem inverted_decision_is_false : Equal Bool \
@@ -184,9 +187,9 @@ fn accepted_seed_uses_all_three_laws_and_ordered_control() {
 fn isolated_inverted_membership_refuses_after_accepted_client() {
     let cases = seed_cases();
     let mut env = interval_env();
-    env.elaborate_file(cases.accepted)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(cases.accepted))
         .expect("accepted complete client checks before isolated refusal");
-    match env.elaborate_file(cases.refused) {
+    match env.elaborate_file(&checked_is_true::selected_source(cases.refused)) {
         Err(ElabError::KernelRejected { .. }) => {}
         other => panic!("direct inverted membership must refuse by kernel: {other:?}"),
     }

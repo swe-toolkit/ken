@@ -7,9 +7,12 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, ImportKind, KenMdFenceRole,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const RATIONAL: &str = "Data.Numeric.Rational";
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
@@ -24,57 +27,24 @@ fn root() -> PathBuf {
         .join("catalog/packages")
 }
 
-// IsTrue already belongs to the isolated compiler base. Remove only a
-// redundant, unaliased IsTrue selective import from parsed Ken declarations;
-// no seed line spelling or incidental whitespace is an oracle.
-fn omit_redundant_is_true(source: &str) -> String {
-    let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("seed Ken parses") {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module != "Core.Classes.LawfulClasses" {
-                continue;
-            }
-            let mut keep = Vec::new();
-            let mut removed = false;
-            for item in items {
-                if item.name == "IsTrue" && item.rename.is_none() {
-                    removed = true;
-                } else {
-                    keep.push(match item.rename {
-                        Some(alias) => format!("{} as {alias}", item.name),
-                        None => item.name,
-                    });
-                }
-            }
-            if removed {
-                let replacement = if keep.is_empty() {
-                    String::new()
-                } else {
-                    format!("import {module} ({})", keep.join(", "))
-                };
-                edits.push((span.start..span.end, replacement));
-            }
-        }
-    }
-    let mut client = source.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        client.replace_range(range, &replacement);
-    }
-    client
+// The generic and seed clients need the proposition-sorted checked And,
+// never the distinct Type-sorted And or the pre-source flat fallback.
+fn checked_client(source: &str, fresh: bool) -> String {
+    let client = if fresh {
+        checked_is_true::selected_source_with_import(source)
+    } else {
+        checked_is_true::selected_source(source)
+    };
+    checked_is_true::selected_and_source_with_import(&client)
 }
 
-fn seed_programs() -> Vec<String> {
+fn seed_programs() -> Vec<&'static str> {
     extract_ken_md(SEED)
         .expect("conformance Ken fences are well-formed")
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| omit_redundant_is_true(&SEED[fence.body_range]))
+        .map(|fence| &SEED[fence.body_range])
         .collect()
 }
 
@@ -199,7 +169,7 @@ fn public_generic_min_max_and_containment_laws_add_no_trust() {
             "{name} must have a checked transparent body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_client(GENERIC_CLIENT, true))
         .expect("ten independently restated arbitrary-argument types check");
     for private in [
         "rational_pick",
@@ -232,20 +202,21 @@ fn closed_seed_checks_hull_and_intersection_cases() {
     let programs = seed_programs();
     let positive = programs.first().expect("seed has a positive Ken client");
     loaded_interval()
-        .elaborate_file(positive)
+        .elaborate_file(&checked_client(positive, true))
         .expect("§2 source-shaped positive client checks");
     loaded_interval()
-        .elaborate_file(CLOSED_CONTROLS)
+        .elaborate_file(&checked_is_true::selected_source(CLOSED_CONTROLS))
         .expect("independent closed endpoints and tied-spelling selection check");
 }
 
 fn expect_false_theorem_rejected(env: &mut ElabEnv, negative: &str, label: &str) {
-    match env.elaborate_file(negative) {
+    let checked_negative = checked_client(negative, false);
+    match env.elaborate_file(&checked_negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) => {
-            let in_theorem = parse_decls(negative)
+            let in_theorem = parse_decls(&checked_negative)
                 .expect("negative is valid Ken")
                 .into_iter()
                 .any(|decl| {
@@ -338,7 +309,7 @@ fn false_hull_and_intersection_claims_reject_at_their_own_theorems() {
     let (positive, negatives) = programs.split_first().expect("seed has a positive client");
     for negative in negatives {
         let mut env = loaded_interval();
-        env.elaborate_file(positive)
+        env.elaborate_file(&checked_client(positive, true))
             .expect("positive seed client checks before its negative");
         expect_false_theorem_rejected(&mut env, negative, "seed refusal");
     }
@@ -348,7 +319,9 @@ fn false_hull_and_intersection_claims_reject_at_their_own_theorems() {
         (FALSE_OVERLAP_MEMBER, "left-only overlap member"),
     ] {
         let mut env = loaded_interval();
-        env.elaborate_file(CLOSED_CONTROLS)
+        env.elaborate_file("import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)")
+            .expect("independent closed client selects the checked membership proposition");
+        env.elaborate_file(&checked_is_true::selected_source(CLOSED_CONTROLS))
             .expect("independent closed controls check before refusal");
         expect_false_theorem_rejected(&mut env, negative, label);
     }

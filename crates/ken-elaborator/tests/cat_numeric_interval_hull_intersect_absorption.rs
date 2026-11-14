@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -93,7 +96,7 @@ fn generic_absorption_directions_are_owned_checked_and_zero_trust() {
             "{name} has a kernel-checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent open client consumes all four §8 public directions");
     for private in ["equiv_leq", "rational_distrib_r"] {
         match interval_env().elaborate_file(&format!("import {INTERVAL} ({private})")) {
@@ -290,7 +293,8 @@ fn complete_absorption_seed_checks_and_moved_argument_refuses() {
         theorem_shape(EXPECTED_REFUSAL, "expected_neg"),
         "refusal claims the false moved-shared-argument proposition with Proved"
     );
-    let parsed = parse_decls(refused).expect("isolated §8 refusal parses");
+    let checked_refused = checked_is_true::selected_source(refused);
+    let parsed = parse_decls(&checked_refused).expect("isolated §8 refusal parses");
     let [SourceDecl::TheoremDecl {
         name,
         params,
@@ -303,9 +307,9 @@ fn complete_absorption_seed_checks_and_moved_argument_refuses() {
     assert_eq!(name, "seed_neg");
     assert!(params.is_empty(), "false §8 claim is closed");
     let mut env = interval_env();
-    env.elaborate_file(accepted)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete §8 seed checks first against shipped package exports");
-    env.elaborate_file(FIXTURE_CONTROLS)
+    env.elaborate_file(&checked_is_true::selected_source(FIXTURE_CONTROLS))
         .expect("actual seed intervals overlap and have exactly the stated endpoints");
     for name in [
         "left_inside_intersect_hull_by_law",
@@ -320,12 +324,12 @@ fn complete_absorption_seed_checks_and_moved_argument_refuses() {
     }
     let mut rejecting = interval_env();
     rejecting
-        .elaborate_file(accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("fresh complete accepted client checks before refusal");
     rejecting
-        .elaborate_file(FIXTURE_CONTROLS)
+        .elaborate_file(&checked_is_true::selected_source(FIXTURE_CONTROLS))
         .expect("fresh fixture preserves overlapping, non-nested intervals");
-    match rejecting.elaborate_file(refused) {
+    match rejecting.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

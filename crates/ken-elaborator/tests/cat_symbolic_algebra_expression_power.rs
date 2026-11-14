@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::ElabEnv;
 use ken_kernel::Decl;
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 
 fn root() -> PathBuf {
@@ -80,7 +83,7 @@ fn generic_expression_power_laws_are_owned_checked_and_add_no_trust() {
             "{name} has a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("open client uses both public power laws through selective imports");
 }
 
@@ -103,6 +106,6 @@ theorem two_times_x : IsTrue (poly_eq
 #[test]
 fn two_times_x_closed_decision_checks_independently_of_law_application() {
     loaded_package()
-        .elaborate_file(TWO_TIMES_CONTROL)
+        .elaborate_file(&checked_is_true::selected_source_with_import(TWO_TIMES_CONTROL))
         .expect("closed two-times Proved power-rule instance checks");
 }

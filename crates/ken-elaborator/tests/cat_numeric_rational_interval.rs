@@ -10,6 +10,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 
 fn root() -> PathBuf {
@@ -136,7 +139,7 @@ fn generic_interval_laws_and_rational_monotonicity_add_no_trust() {
             "{law} must have a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("seven public-law generic types and derived point completeness check");
 }
 
@@ -182,10 +185,8 @@ theorem generic_mul_point (x : Rational) (y : Rational) :
     (interval_point (rational_mul x y)) = interval_mul_point x y
 "##;
 
-// All 24 seed assertions and their fixtures are verbatim; the redundant
-// IsTrue import is omitted for an in-memory client because the compiler
-// base already binds the same canonical IsTrue GlobalId and reimporting
-// it under the same short name gives AmbiguousReference.
+// All 24 seed assertions and their fixtures are verbatim. The in-memory
+// client explicitly selects checked IsTrue through a test-side alias.
 const SEED_POSITIVE: &str = r##"
 import Data.Numeric.Rational
   (Rational, MkRational, rational_add, rational_mul, rational_equiv)
@@ -299,7 +300,7 @@ theorem law_mul_point :
 #[test]
 fn twenty_four_seed_assertions_check_as_a_client() {
     let mut env = loaded_interval();
-    env.elaborate_file(SEED_POSITIVE)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(SEED_POSITIVE))
         .expect("24 positive source-shaped interval assertions check");
     for name in [
         "lower_in",
@@ -422,7 +423,7 @@ fn membership_respects_rational_value_equality_with_isolated_refusals() {
         ("K1_control", format!("{RESPECT_HEADER}\n{RESPECT_K1}")),
     ] {
         let mut row_env = loaded_interval();
-        let result = row_env.elaborate_file(&prefix);
+        let result = row_env.elaborate_file(&checked_is_true::selected_source_with_import(&prefix));
         match result {
             Ok(_) => eprintln!("NIR row={label} result=ok"),
             Err(error) => panic!("NIR row={label} must check: {error:?}"),
@@ -430,7 +431,7 @@ fn membership_respects_rational_value_equality_with_isolated_refusals() {
     }
     let mut premise_env = loaded_interval();
     premise_env
-        .elaborate_file(&accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(&accepted))
         .expect("accepted prefix must precede the independent false-premise probe");
     let false_equiv_type = match premise_env.elaborate_file(RESPECT_FALSE_EQUIV) {
         Err(ElabError::KernelRejected {
@@ -442,9 +443,10 @@ fn membership_respects_rational_value_equality_with_isolated_refusals() {
     for (label, claim) in [("R1_value", RESPECT_R1), ("R2_law_premise", RESPECT_R2)] {
         let mut row_env = loaded_interval();
         row_env
-            .elaborate_file(&accepted)
+            .elaborate_file(&checked_is_true::selected_source_with_import(&accepted))
             .expect("the full §12 accepted client must check before each refusal");
-        let result = row_env.elaborate_file(claim);
+        let checked_claim = checked_is_true::selected_source(claim);
+        let result = row_env.elaborate_file(&checked_claim);
         eprintln!("NIR row={label} result={result:?}");
         match result {
             Err(ElabError::KernelRejected {
@@ -452,8 +454,8 @@ fn membership_respects_rational_value_equality_with_isolated_refusals() {
                 span,
             }) => {
                 assert!(
-                    span.start >= claim.find("theorem ").expect("claim theorem")
-                        && span.end <= claim.len()
+                    span.start >= checked_claim.find("theorem ").expect("claim theorem")
+                        && span.end <= checked_claim.len()
                         && span.start < span.end,
                     "{label} must reject at its own false theorem: {span:?}"
                 );
@@ -523,11 +525,12 @@ fn five_false_seed_propositions_are_semantically_refused() {
         (REJECT_WRONG_SUM_ENDPOINTS, "wrong sum upper endpoint", true),
     ] {
         let mut env = loaded_interval();
-        env.elaborate_file(SEED_POSITIVE)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(SEED_POSITIVE))
             .expect("positive seed client must check before each negative");
-        match env.elaborate_file(bad) {
+        let checked_bad = checked_is_true::selected_source(bad);
+        match env.elaborate_file(&checked_bad) {
             Err(ElabError::TypeMismatch { span, .. }) if refl => assert_eq!(
-                bad.get(span.start..span.end),
+                checked_bad.get(span.start..span.end),
                 Some("Refl"),
                 "{label}: refusal must target the false proof"
             ),
@@ -535,9 +538,9 @@ fn five_false_seed_propositions_are_semantically_refused() {
                 error: KernelError::TypeMismatch { .. },
                 span,
             }) if !refl => {
-                let start = bad.find("theorem reject_").expect("negative theorem");
+                let start = checked_bad.find("theorem reject_").expect("negative theorem");
                 assert!(
-                    span.start >= start && span.end <= bad.len() && span.start < span.end,
+                    span.start >= start && span.end <= checked_bad.len() && span.start < span.end,
                     "{label}: kernel rejection must target its false theorem, got {span:?}"
                 );
             }
@@ -548,7 +551,7 @@ fn five_false_seed_propositions_are_semantically_refused() {
     let alternative = REJECT_EQUAL_POINT_SPELLINGS.replace("= Refl", "= Proved");
     assert_ne!(alternative, REJECT_EQUAL_POINT_SPELLINGS);
     let mut env = loaded_interval();
-    env.elaborate_file(SEED_POSITIVE)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(SEED_POSITIVE))
         .expect("same positive client must check before the alternate B4 terminal");
     match env.elaborate_file(&alternative) {
         Err(ElabError::KernelRejected {

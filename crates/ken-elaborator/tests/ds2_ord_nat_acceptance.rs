@@ -108,6 +108,8 @@ fn trusted_base_delta_is_empty_across_the_entry() {
 #[test]
 fn refl_trans_antisym_need_no_conversion() {
     let mut env = base_env();
+    env.elaborate_file("import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)")
+        .expect("the probe selects the checked IsTrue provider");
     env.elaborate_decl(
         "fn leqNat (m : Nat) (n : Nat) : Bool = match m { Zero ↦ True ; Suc m2 ↦ match n { Zero ↦ False ; Suc n2 ↦ leqNat m2 n2 } }",
     )
@@ -119,6 +121,6 @@ fn refl_trans_antisym_need_no_conversion() {
 
     // The SAME term, reflLeqNat, satisfies the IsTrue-phrased signature
     // directly — zero adaptation.
-    env.elaborate_decl("theorem probeRefl (x : Nat) : IsTrue (leqNat x x) = reflLeqNat x")
+    env.elaborate_decl("theorem probeRefl (x : Nat) : CatalogIsTrue (leqNat x x) = reflLeqNat x")
         .expect("reflLeqNat must satisfy IsTrue (leqNat x x) with zero conversion code");
 }

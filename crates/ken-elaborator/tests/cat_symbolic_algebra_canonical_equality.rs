@@ -14,6 +14,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -109,7 +112,7 @@ fn section_two_generic_laws_and_public_operations_add_no_trust() {
         );
     }
     assert!(owned.contains(&env.globals[&format!("{PACKAGE}.Poly")]));
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independently restated §2.2 laws elaborate at arbitrary expressions");
 
     for private in ["add_cancel_right", "canon", "is_canonical", "poly_complete"] {
@@ -155,9 +158,9 @@ theorem client_poly_eq_false_refutes (e1 : Expr) (e2 : Expr)
 "#;
 
 fn run_positive_seed(env: &mut ElabEnv, programs: &[&str]) {
-    env.elaborate_file(programs[0])
+    env.elaborate_file(&checked_is_true::selected_source_with_import(programs[0]))
         .expect("§2 closed operation oracles check through client imports");
-    env.elaborate_file(programs[1])
+    env.elaborate_file(&checked_is_true::selected_source(programs[1]))
         .expect("§2 closed instances of the five checked laws elaborate");
 }
 
@@ -219,8 +222,8 @@ fn unequal_variable_false_theorem_is_kernel_refused_on_same_positive_pair() {
     assert_eq!(programs.len(), 3, "two positive and one false seed input");
     let mut env = loaded_package();
     run_positive_seed(&mut env, &programs);
-    let negative = programs[2];
-    match env.elaborate_file(negative) {
+    let negative = checked_is_true::selected_source(programs[2]);
+    match env.elaborate_file(&negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
@@ -283,7 +286,7 @@ fn section_three_generic_substitution_laws_are_checked_without_new_trust() {
             "{public} must have a checked body"
         );
     }
-    env.elaborate_file(SUBSTITUTION_GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(SUBSTITUTION_GENERIC_CLIENT))
         .expect("§3 independent generic law clients consume their stated propositions");
     match env.elaborate_file(&format!("import {PACKAGE} (mul_cong)")) {
         Err(ElabError::UnboundName { name, .. }) => {
@@ -330,7 +333,7 @@ fn shipped_substitution_seed_positive_cases_check() {
     assert!(!sources.is_empty(), "seed needs positive source fences");
     let mut env = loaded_package();
     for positive in sources {
-        env.elaborate_file(positive)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
             .expect("each shipped substitution positive program checks");
     }
 }
@@ -474,9 +477,9 @@ fn shipped_uncomposed_env_refuses_on_the_same_positive_operands() {
     let (shared, refused) = negative.split_at(span.start);
     assert_uncomposed_proposition(shared, refused);
     let mut env = loaded_package();
-    env.elaborate_file(shared)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(shared))
         .expect("all negative-fixture value and composed controls check first");
-    match env.elaborate_file(refused) {
+    match env.elaborate_file(&checked_is_true::selected_source(refused)) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

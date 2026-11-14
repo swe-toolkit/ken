@@ -6,6 +6,17 @@ use std::collections::HashSet;
 use ken_elaborator::{ElabEnv, ObligationKind};
 use ken_kernel::Term;
 
+#[path = "support/checked_not.rs"]
+mod checked_not;
+
+fn with_checked_not() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    checked_not::load(&mut env);
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+        .expect("selected checked negation");
+    env
+}
+
 fn pi_domains(mut ty: &Term, count: usize) -> (Vec<&Term>, &Term) {
     let mut domains = Vec::with_capacity(count);
     for _ in 0..count {
@@ -27,7 +38,7 @@ fn not_eq_int(env: &ElabEnv, variable: usize, value: i64) -> Term {
         ),
         Term::IntLit(value.into()),
     );
-    Term::app(Term::const_(env.globals["Not"], vec![]), eq)
+    Term::app(Term::const_(env.globals["Core.Logic.Not.Not"], vec![]), eq)
 }
 
 /// Spec 21 §1/§6.3; promise class: durable invariant.
@@ -42,13 +53,13 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
     let cases = [
         (
             "M1",
-            "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) \
-             requires Not (Equal Int n 0) = n / d",
+            "fn f (n : Int) (d : Int) : Int requires CheckedNot (Equal Int d 0) \
+             requires CheckedNot (Equal Int n 0) = n / d",
         ),
         (
             "M2",
-            "fn f (n : Int) (d : Int) : Int requires Not (Equal Int n 0) \
-             requires Not (Equal Int d 0) = n / d",
+            "fn f (n : Int) (d : Int) : Int requires CheckedNot (Equal Int n 0) \
+             requires CheckedNot (Equal Int d 0) = n / d",
         ),
         (
             "M3",
@@ -57,13 +68,13 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
         ),
         (
             "M4",
-            "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) \
-             requires Not (Equal Int d 0) = n / d",
+            "fn f (n : Int) (d : Int) : Int requires CheckedNot (Equal Int d 0) \
+             requires CheckedNot (Equal Int d 0) = n / d",
         ),
     ];
 
     for (name, source) in cases {
-        let mut env = ElabEnv::new().expect("numeric prelude");
+        let mut env = with_checked_not();
         let result = env.elaborate_decl_v1(source).unwrap_or_else(|error| {
             panic!("{name} must elaborate and kernel-check with both requires: {error:?}")
         });
@@ -104,12 +115,12 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
     // A third clause reaches another binder depth. The exact domain check is
     // needed because n and d share a type, so kernel admission alone cannot
     // distinguish the correct variable from its neighbour.
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let result = env
         .elaborate_decl_v1(
             "fn many (n : Int) (d : Int) : Int \
              requires Equal Int n 1 requires Equal Int d 2 \
-             requires Not (Equal Int n 0) = n",
+             requires CheckedNot (Equal Int n 0) = n",
         )
         .expect("three requires clauses");
     let (_, ty) = env.env.const_type(result.def_id).expect("many type");
@@ -118,10 +129,10 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
 
     // The twin does not establish d's nonzero premise. Its single remaining
     // divisor obligation is closed under both explicit proof arguments.
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let result = env
         .elaborate_decl_v1(
-            "fn twin (n : Int) (d : Int) : Int requires Not (Equal Int n 0) \
+            "fn twin (n : Int) (d : Int) : Int requires CheckedNot (Equal Int n 0) \
              requires Equal Int d d = n / d",
         )
         .expect("twin with unrelated and reflexive requirements");
@@ -160,12 +171,12 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
 /// not just matching counts; compare the actual T1-T0 ID set with reported IDs.
 #[test]
 fn ensures_goal_and_obligation_holes_are_closed_under_requires() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let before = env.env.trusted_base().into_iter().collect::<HashSet<_>>();
     let results = env
         .elaborate_file_v1(
             "fn divide (n : Int) (d : Int) : Int \
-             requires Not (Equal Int d 0) \
+             requires CheckedNot (Equal Int d 0) \
              ensures Equal Int (result * d + n % d) n = n / d",
         )
         .expect("the spec 21 contract example elaborates");
@@ -230,13 +241,13 @@ fn ensures_goal_and_obligation_holes_are_closed_under_requires() {
 /// closed goal's complete two-premise telescope.
 #[test]
 fn ensures_expression_uses_later_requires_premise() {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = with_checked_not();
     let result = env
         .elaborate_decl_v1(
             "fn f (n : Int) (d : Int) : Int \
-             requires Not (Equal Int n 0) \
-             requires Not (Equal Int d 0) \
-             ensures Equal Int (result + n / d) n = n / d",
+             requires CheckedNot (Equal Int n 0) \
+             requires CheckedNot (Equal Int d 0) \
+             ensures Equal Int (result + n / d) n = n / d"
         )
         .expect("later requires premise discharges ensures division");
     let [obligation] = result.obligations.as_slice() else {

@@ -8,10 +8,13 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, ImportKind, KenMdFenceRole,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole,
     Type as SourceType,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 const SEED: &str = include_str!(concat!(
@@ -32,62 +35,14 @@ fn loaded_geometry() -> ElabEnv {
     env
 }
 
-// Under Legacy, an unaliased IsTrue import collides with the pre-source
-// spelling. Alias the selected catalog identity inside the checked seed
-// client, so the source uses that provider rather than ambient fallback.
-fn without_redundant_is_true(source: &str) -> String {
-    let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("seed Ken parses") {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module != "Core.Classes.LawfulClasses" {
-                continue;
-            }
-            let mut keep = Vec::new();
-            let mut removed = false;
-            for item in items {
-                if item.name == "IsTrue" && item.rename.is_none() {
-                    removed = true;
-                    keep.push("__I1_IS_TRUE_IMPORT__".to_string());
-                } else {
-                    keep.push(match item.rename {
-                        Some(alias) => format!("{} as {alias}", item.name),
-                        None => item.name,
-                    });
-                }
-            }
-            if removed {
-                let replacement = if keep.is_empty() {
-                    String::new()
-                } else {
-                    format!("import {module} ({})", keep.join(", "))
-                };
-                edits.push((span.start..span.end, replacement));
-            }
-        }
-    }
-    let mut client = source.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        client.replace_range(range, &replacement);
-    }
-    // This seed contains Ken source, not prose: all its IsTrue occurrences
-    // become an alias, while the import token remains the provider's name.
-    client
-        .replace("IsTrue", "CatalogIsTrue")
-        .replace("__I1_IS_TRUE_IMPORT__", "IsTrue as CatalogIsTrue")
-}
-
+// The checked source client uses a selected alias, never ambient fallback.
 fn seed_programs() -> Vec<String> {
     extract_ken_md(SEED)
         .expect("§4 seed fences extract")
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| without_redundant_is_true(&SEED[fence.body_range]))
+        .map(|fence| checked_is_true::selected_source(&SEED[fence.body_range]))
         .collect()
 }
 

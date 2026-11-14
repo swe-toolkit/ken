@@ -7,9 +7,12 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, ImportKind, KenMdFenceRole,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 const SEED: &str = include_str!(concat!(
@@ -23,57 +26,14 @@ fn root() -> PathBuf {
         .join("catalog/packages")
 }
 
-// The isolated compiler base already binds IsTrue. Inspect the parsed Ken
-// import, not its whitespace or source line: remove only that redundant name
-// and retain every other selective import, including future additions.
-fn seed_client_without_redundant_import(source: &str) -> String {
-    let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("seed Ken parses") {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module != "Core.Classes.LawfulClasses" {
-                continue;
-            }
-            let mut keep = Vec::new();
-            let mut removed = false;
-            for item in items {
-                if item.name == "IsTrue" && item.rename.is_none() {
-                    removed = true;
-                } else {
-                    keep.push(match item.rename {
-                        Some(alias) => format!("{} as {alias}", item.name),
-                        None => item.name,
-                    });
-                }
-            }
-            if removed {
-                let replacement = if keep.is_empty() {
-                    String::new()
-                } else {
-                    format!("import {module} ({})", keep.join(", "))
-                };
-                edits.push((span.start..span.end, replacement));
-            }
-        }
-    }
-    let mut client = source.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        client.replace_range(range, &replacement);
-    }
-    client
-}
-
-fn seed_programs() -> Vec<String> {
+// Compare the raw seed independently; alias only the executable Ken client.
+fn seed_programs() -> Vec<&'static str> {
     let extraction = extract_ken_md(SEED).expect("conformance Ken fences are well-formed");
     extraction
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| seed_client_without_redundant_import(&SEED[fence.body_range]))
+        .map(|fence| &SEED[fence.body_range])
         .collect()
 }
 
@@ -143,7 +103,7 @@ fn metric_laws_are_generic_checked_and_trust_set_is_unchanged() {
             "{law} must contain a checked proof body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("public clients can consume both §2 laws at arbitrary points");
 
     for private in [
@@ -177,10 +137,10 @@ fn metric_seed_clients_check_strict_and_tight_detours() {
     let programs = seed_programs();
     let positive = programs.first().expect("conformance has a positive client");
     geometry_env()
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source(positive))
         .expect("positive conformance client imports and checks §2 metrics");
     geometry_env()
-        .elaborate_file(CLOSED_METRIC_CLIENT)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_METRIC_CLIENT))
         .expect("independent closed metric controls check through public imports");
 }
 
@@ -260,7 +220,7 @@ fn false_metric_claims_are_kernel_refused_at_their_own_theorems() {
     let (positive, seed_negatives) = programs.split_first().expect("conformance has a client");
     for negative in seed_negatives {
         let mut env = geometry_env();
-        env.elaborate_file(positive)
+        env.elaborate_file(&checked_is_true::selected_source(positive))
             .expect("seed's positive client checks before its refusal");
         assert_own_theorem_kernel_refusal(&mut env, negative, "seed refusal");
     }
@@ -270,21 +230,22 @@ fn false_metric_claims_are_kernel_refused_at_their_own_theorems() {
         (REJECT_IDENTITY_ON_DISTINCT, "identity on distinct points"),
     ] {
         let mut env = geometry_env();
-        env.elaborate_file(CLOSED_METRIC_CLIENT)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_METRIC_CLIENT))
             .expect("independent positive controls check before each refusal");
         assert_own_theorem_kernel_refusal(&mut env, negative, label);
     }
 }
 
 fn assert_own_theorem_kernel_refusal(env: &mut ElabEnv, negative: &str, label: &str) {
-    match env.elaborate_file(negative) {
+    let checked_negative = checked_is_true::selected_source(negative);
+    match env.elaborate_file(&checked_negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) => {
             // The parser locates the false declaration's own span; its
             // spelling and whitespace are irrelevant to this diagnosis.
-            let in_theorem = parse_decls(negative)
+            let in_theorem = parse_decls(&checked_negative)
                 .expect("negative client is valid Ken")
                 .into_iter()
                 .any(|decl| {
