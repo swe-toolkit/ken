@@ -704,6 +704,8 @@ pub fn compile_ken_source(
 /// lowering; no Cranelift or linker artifact participates. The selected target
 /// is resolved from the live admitted environment, and operation subterms are
 /// decoded with the same identity-checked HostIO vocabulary used by production.
+/// Explicit source roots use Strict resolution as on the native route;
+/// rootless sources retain transitional resolution until LANG-DELETE I4.
 pub fn compile_checked_target_denotation(
     package_name: &str,
     source: CompilerSource,
@@ -715,6 +717,13 @@ pub fn compile_checked_target_denotation(
 
     let manifest = CompilerManifest::new(package_name, Vec::new());
     let mut env = ElabEnv::new()?;
+    if !source.roots.is_empty() {
+        env.prepare_isolated_source_strict_v1(
+            &source.roots,
+            &source.text,
+            source.name.ends_with(".ken.md"),
+        )?;
+    }
     let (declarations, examples, example_ids) = if source.name.ends_with(".ken.md") {
         env.elaborate_ken_md_file_parts(&source.text)?
     } else {
@@ -1328,6 +1337,8 @@ fn elaborate_package_source(
     Ok(parts)
 }
 
+/// Explicit source roots use Strict resolution as on the native route;
+/// rootless sources retain transitional resolution until LANG-DELETE I4.
 pub fn compile_ken_package_sources(
     manifest: &CompilerManifest,
     sources: Vec<CompilerSource>,
@@ -1353,7 +1364,15 @@ fn compile_ken_package_sources_with_env(
     let mut example_ids = BTreeSet::new();
     let mut results = Vec::new();
     let mut headed_source = None;
+    let rooted = sources.iter().any(|source| !source.roots.is_empty());
     for source in &sources {
+        if rooted {
+            env.prepare_isolated_source_strict_v1(
+                &source.roots,
+                &source.text,
+                source.name.ends_with(".ken.md"),
+            )?;
+        }
         let (declarations, examples, source_example_ids) =
             elaborate_package_source(&mut env, source, &mut headed_source)?;
         for result in &declarations {
