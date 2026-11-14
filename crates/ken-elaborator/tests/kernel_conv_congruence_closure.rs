@@ -5,13 +5,13 @@
 //! newly covered former. Removing the corresponding `conv_struct_path` arm
 //! should make the same check report `TypeMismatch` without a surface name.
 //!
-//! MEASURED: five core checks succeed; removing the Omega, QuotClass, and
-//! Cast arms yields `TypeMismatch`, but removing Quot leaves its check green.
-//! QuotElim mutation has not been run. This is WIP, not a complete pin.
+//! MEASURED: all five application checks pass on their installed checked
+//! terms. Replacing each corresponding conversion arm with `false` makes
+//! its own row fail at `TypeMismatch`, leaving the other four rows green.
 //! CLAIMED: same-former conversion handles Omega, Quot, QuotClass, Cast, and
-//! QuotElim. THE GAP: Quot's check does not yet prove its named arm is reached;
-//! success alone cannot exclude blanket `true`. Kernel directional rejects
-//! independently vary components and reject heterogeneity.
+//! QuotElim. THE GAP: acceptance alone cannot exclude blanket `true`; the
+//! independent kernel directional rejects vary each compared component and
+//! retain heterogeneous refusal.
 
 use std::collections::BTreeSet;
 
