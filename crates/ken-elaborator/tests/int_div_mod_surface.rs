@@ -3,6 +3,7 @@
 //! (35 §3.1, 18a §5.2); lexer spellings/fixity are compatibility vectors.
 
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 use ken_elaborator::extract::{v2_extract, ProvKind};
 use ken_elaborator::lexer::{Lexer, Token};
@@ -10,6 +11,20 @@ use ken_elaborator::parser::{parse_decls, parse_expr};
 use ken_elaborator::{BinOp, ElabEnv, ElabError, Expr, ObligationKind};
 use ken_kernel::env::Context;
 use ken_kernel::{check, convert_type, whnf, Decl, GlobalId, Term};
+
+fn env_with_checked_not() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.set_catalog_roots_v1(&[root]).expect("catalog roots");
+    // The pre-source spelling is still present through I1. Select the
+    // checked provider under a separate binding so Legacy does not report
+    // two candidates for the same bare spelling.
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+        .expect("checked propositional negation imports");
+    env
+}
 
 fn peel_function_body(body: &Term) -> &Term {
     let Term::Lam(_, inner) = body else {
@@ -109,7 +124,7 @@ fn int_dispatch_emits_one_nonzero_divisor_obligation_per_site() {
 }
 
 fn assert_operation_obligations(spelling: &str, case: &str, source: &str, expected: usize) {
-    let mut env = ElabEnv::new().expect("numeric prelude");
+    let mut env = env_with_checked_not();
     let before = env.env.trusted_base();
     let result = env
         .elaborate_decl_v1(source)
@@ -202,10 +217,10 @@ fn assert_refined_divisor_certificate(
 #[test]
 fn refined_divisor_discharges_recorded_operation_hole_with_checked_projection() {
     for spelling in ["/", "%"] {
-        let mut env = ElabEnv::new().unwrap();
+        let mut env = env_with_checked_not();
         let before = env.env.trusted_base();
         let source = format!(
-            "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
+            "fn f (n : Int) (d : {{z : Int | CheckedNot (Equal Int z 0)}}) : Int = n {spelling} d"
         );
         let result = env
             .elaborate_decl_v1(&source)
@@ -268,11 +283,11 @@ fn refined_divisor_discharges_recorded_operation_hole_with_checked_projection() 
 #[test]
 fn standalone_refined_divisor_certificate_needs_no_obligation_channel() {
     for spelling in ["/", "%"] {
-        let mut env = ElabEnv::new().expect("numeric prelude");
+        let mut env = env_with_checked_not();
         let before = env.env.trusted_base();
         let source = format!(
             "(\\n . \\d . n {spelling} d) : \
-             (n : Int) -> (d : {{z : Int | Not (Equal Int z 0)}}) -> Int"
+             (n : Int) -> (d : {{z : Int | Core.Logic.Not.Not (Equal Int z 0)}}) -> Int"
         );
         let (body, ty) = env
             .elaborate_expr(format!("checked_{spelling}"), &source)
@@ -289,7 +304,7 @@ fn standalone_refined_divisor_certificate_needs_no_obligation_channel() {
             ("plain Int", "Int"),
             (
                 "reversed nonzero predicate",
-                "{z : Int | Not (Equal Int 0 z)}",
+                "{z : Int | Core.Logic.Not.Not (Equal Int 0 z)}",
             ),
         ] {
             let source =
@@ -313,11 +328,11 @@ fn standalone_refined_divisor_certificate_needs_no_obligation_channel() {
 #[test]
 fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
     for spelling in ["/", "%"] {
-        let mut env = ElabEnv::new().unwrap();
+        let mut env = env_with_checked_not();
         let before = env.env.trusted_base();
         let result = env
             .elaborate_decl_v1(&format!(
-                "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int \
+                "fn f (n : Int) (d : {{z : Int | CheckedNot (Equal Int z 0)}}) : Int \
                  requires Equal Int n 5 = n {spelling} d"
             ))
             .expect("refined argument with a non-direct requires");
@@ -387,11 +402,11 @@ fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
 #[test]
 fn refined_divisor_caller_owes_introduction_after_callee_discharge() {
     for spelling in ["/", "%"] {
-        let mut env = ElabEnv::new().unwrap();
+        let mut env = env_with_checked_not();
         let before = env.env.trusted_base();
         let f = env
             .elaborate_decl_v1(&format!(
-                "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
+                "fn f (n : Int) (d : {{z : Int | CheckedNot (Equal Int z 0)}}) : Int = n {spelling} d"
             ))
             .expect("callee with erased refined domain");
         let [hole] = f.obligations.as_slice() else {
@@ -428,8 +443,11 @@ fn refined_divisor_caller_owes_introduction_after_callee_discharge() {
         );
         assert_eq!(
             caller_goal.as_ref(),
-            &Term::app(Term::const_(env.globals["Not"], vec![]), eq_zero),
-            "{spelling}: the caller owes Not (Equal Int 0 0)"
+            &Term::app(
+                Term::const_(env.globals["Core.Logic.Not.Not"], vec![]),
+                eq_zero,
+            ),
+            "{spelling}: the caller owes CheckedNot (Equal Int 0 0)"
         );
         assert_eq!(
             env.env
@@ -460,13 +478,13 @@ fn unrelated_refinements_cannot_discharge_divisor_side_condition() {
             (
                 "different exclusion",
                 format!(
-                    "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 1)}}) : Int = n {spelling} d"
+                    "fn f (n : Int) (d : {{z : Int | CheckedNot (Equal Int z 1)}}) : Int = n {spelling} d"
                 ),
             ),
             (
                 "refined numerator only",
                 format!(
-                    "fn f (n : {{z : Int | Not (Equal Int z 0)}}) (d : Int) : Int = n {spelling} d"
+                    "fn f (n : {{z : Int | CheckedNot (Equal Int z 0)}}) (d : Int) : Int = n {spelling} d"
                 ),
             ),
         ] {
@@ -485,25 +503,25 @@ fn refined_divisor_certificate_survives_checked_branch_and_let() {
             (
                 "branch",
                 format!(
-                    "fn f (b : Bool) (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = \
+                    "fn f (b : Bool) (n : Int) (d : {{z : Int | CheckedNot (Equal Int z 0)}}) : Int = \
                      if b then n {spelling} d else 0"
                 ),
             ),
             (
                 "let alias",
                 format!(
-                    "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = \
+                    "fn f (n : Int) (d : {{z : Int | CheckedNot (Equal Int z 0)}}) : Int = \
                      let e = d in n {spelling} e"
                 ),
             ),
             (
                 "refined second operand named n",
                 format!(
-                    "fn f (n : {{z : Int | Not (Equal Int z 0)}}) (d : Int) : Int = d {spelling} n"
+                    "fn f (n : {{z : Int | CheckedNot (Equal Int z 0)}}) (d : Int) : Int = d {spelling} n"
                 ),
             ),
         ] {
-            let mut env = ElabEnv::new().expect("numeric prelude");
+            let mut env = env_with_checked_not();
             let before = env.env.trusted_base();
             let result = env
                 .elaborate_decl_v1(&source)
@@ -532,11 +550,11 @@ fn refined_divisor_certificate_survives_checked_branch_and_let() {
 #[test]
 fn requires_call_site_emits_one_hole_without_reopening_body_division() {
     for spelling in ["/", "%"] {
-        let mut env = ElabEnv::new().unwrap();
+        let mut env = env_with_checked_not();
         let before = env.env.trusted_base().into_iter().collect::<HashSet<_>>();
         let f = env
             .elaborate_decl_v1(&format!(
-                "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n {spelling} d"
+                "fn f (n : Int) (d : Int) : Int requires CheckedNot (Equal Int d 0) = n {spelling} d"
             ))
             .expect("the callee body uses its requires binder");
         assert!(f.obligations.is_empty());
@@ -570,7 +588,7 @@ fn directly_required_nonzero_divisor_needs_no_new_operation_obligation_or_hole()
             spelling,
             "direct requires",
             &format!(
-                "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n {spelling} d"
+                "fn f (n : Int) (d : Int) : Int requires CheckedNot (Equal Int d 0) = n {spelling} d"
             ),
             0,
         );
@@ -594,7 +612,7 @@ fn possibly_zero_non_direct_and_unrelated_cases_each_emit_one_obligation() {
             (
                 "unrelated requires",
                 format!(
-                    "fn f (n : Int) (d : Int) (e : Int) : Int requires Not (Equal Int e 0) = n {spelling} d"
+                    "fn f (n : Int) (d : Int) (e : Int) : Int requires CheckedNot (Equal Int e 0) = n {spelling} d"
                 ),
             ),
         ] {
