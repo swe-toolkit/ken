@@ -2,14 +2,16 @@
 //!
 //! Promise class: durable invariant. The expected types and values are checked
 //! kernel declarations; each fresh core check requires conversion under one
-//! newly covered former. Removing that `conv_struct_path` arm must return
-//! `TypeMismatch` from this same check without relying on a surface name.
+//! newly covered former. Removing the corresponding `conv_struct_path` arm
+//! should make the same check report `TypeMismatch` without a surface name.
 //!
-//! MEASURED: all five core checks succeed on the installed terms and fail
-//! with `TypeMismatch` when their respective conversion arms are removed.
+//! MEASURED: five core checks succeed; removing the Omega, QuotClass, and
+//! Cast arms yields `TypeMismatch`, but removing Quot leaves its check green.
+//! QuotElim mutation has not been run. This is WIP, not a complete pin.
 //! CLAIMED: same-former conversion handles Omega, Quot, QuotClass, Cast, and
-//! QuotElim. THE GAP: success alone cannot exclude a blanket `true`; kernel
-//! directional rejects vary compared components and reject heterogeneity.
+//! QuotElim. THE GAP: Quot's check does not yet prove its named arm is reached;
+//! success alone cannot exclude blanket `true`. Kernel directional rejects
+//! independently vary components and reject heterogeneity.
 
 use std::collections::BTreeSet;
 
