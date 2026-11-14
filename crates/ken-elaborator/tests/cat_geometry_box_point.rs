@@ -8,10 +8,13 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr as SourceExpr, ImportKind,
-    KenMdFenceRole, Type as SourceType,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr as SourceExpr, KenMdFenceRole,
+    Type as SourceType,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
 const SEED: &str = include_str!(concat!(
@@ -33,11 +36,12 @@ fn loaded_geometry() -> ElabEnv {
 }
 
 const GENERIC_CLIENT: &str = r#"
+import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)
 import Algorithm.Geometry.NatBox
   (Point, MkBox, contains, area, contains_point_box, area_point_box)
 
 theorem generic_contains_point (p : Point)
-    : IsTrue (contains (MkBox p p) p) = contains_point_box p
+    : CatalogIsTrue (contains (MkBox p p) p) = contains_point_box p
 
 theorem generic_area_point (p : Point)
     : Equal Nat (area (MkBox p p)) (Suc Zero) = area_point_box p
@@ -94,47 +98,8 @@ fn generic_point_box_laws_are_public_checked_and_zero_new_trust() {
     }
 }
 
-// IsTrue is already bound by the compiler floor. Strip only the exact parsed,
-// unaliased redundant import; all other seed declarations and imports remain.
-fn without_redundant_is_true(source: &str) -> String {
-    let mut client = source.to_owned();
-    for declaration in parse_decls(source)
-        .expect("Ken seed parses")
-        .into_iter()
-        .rev()
-    {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module == "Core.Classes.LawfulClasses" {
-                let mut kept = Vec::new();
-                let mut removed = false;
-                for item in items {
-                    if item.name == "IsTrue" && item.rename.is_none() {
-                        removed = true;
-                    } else {
-                        kept.push(match item.rename {
-                            Some(alias) => format!("{} as {alias}", item.name),
-                            None => item.name,
-                        });
-                    }
-                }
-                if removed {
-                    let replacement = if kept.is_empty() {
-                        String::new()
-                    } else {
-                        format!("import {module} ({})", kept.join(", "))
-                    };
-                    client.replace_range(span.start..span.end, &replacement);
-                }
-            }
-        }
-    }
-    client
-}
+// Rewrite only the extracted Ken source; the published seed stays unchanged.
+// Its unaliased IsTrue import now selects the checked LawfulClasses identity.
 
 // Select a unique checked declaration, never fence ordinal or prose spelling.
 fn seed_case(name: &str) -> String {
@@ -157,7 +122,9 @@ fn seed_case(name: &str) -> String {
             );
         }
     }
-    without_redundant_is_true(selected.unwrap_or_else(|| panic!("missing §14 seed theorem {name}")))
+    checked_is_true::selected_source(
+        selected.unwrap_or_else(|| panic!("missing §14 seed theorem {name}")),
+    )
 }
 
 fn shape(ty: &SourceType) -> String {
@@ -243,7 +210,7 @@ fn seed_controls_check_and_both_false_point_box_claims_refuse() {
     );
     assert_eq!(
         shape(contains_control),
-        "(name:IsTrue ((name:contains ((name:MkBox name:off) name:off)) name:off))"
+        "(name:CatalogIsTrue ((name:contains ((name:MkBox name:off) name:off)) name:off))"
     );
     let mut positive = loaded_geometry();
     positive
@@ -280,7 +247,7 @@ fn seed_controls_check_and_both_false_point_box_claims_refuse() {
         (
             "seed_contains_neg",
             contains_control,
-            "(name:IsTrue ((name:contains ((name:MkBox name:off) name:off)) name:other))",
+            "(name:CatalogIsTrue ((name:contains ((name:MkBox name:off) name:off)) name:other))",
         ),
     ] {
         let refused = seed_case(name);
