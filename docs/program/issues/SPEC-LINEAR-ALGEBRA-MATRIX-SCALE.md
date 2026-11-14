@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-MATRIX-SCALE
 title: "Spec 65 scales vectors by a natural factor but has no matrix scaling, so a client cannot state k·A, nor that it distributes over matrix sums, composes, commutes with transpose and passes through a matrix product. Rule from a checked D0 at zero trust a public matrix_scale with those laws, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
