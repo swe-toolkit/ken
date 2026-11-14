@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-TRACE-MERGE-ALL-COUNT
 title: "Spec 69 §15 gives the k-way trace merge ordered, complete and sound membership laws but no count law, so an operation that drops or duplicates repeated events still satisfies all three. Rule from a checked D0 at zero trust that trace_merge_all preserves every classifier's count of the flattened input, with the count-over-append list law it needs, and state them with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
