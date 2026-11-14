@@ -42,9 +42,10 @@ base, stop and report the mismatch; do not build around it.
 
 ## Scope
 
-37 §6's Perm sentences and the obligation form (Spec enclave); C5's two
-sources and the named prose rows (CV). No catalog, crate, kernel or
-prelude change; the pre-source Perm's retirement follows I4.
+Every spec 37 sentence that states the old Perm or obligation form (Spec
+enclave); C5's sources, the closed pair and the named prose rows (CV);
+the two C5 rows of one crate test (Steward evt_r8q1h0trvt51). No catalog,
+kernel or prelude change; the pre-source Perm's retirement follows I4.
 
 ## Acceptance
 
@@ -53,16 +54,30 @@ prelude change; the pre-source Perm's retirement follows I4.
   is the named fallback. The obligation reads `is_sorted leq ys ∧ Perm
   (eq_from_ord leq) ys xs`. The Spec Leader and CV review it, with a
   Decision.
-- **AC-2.** C5's two sources import Perm, is_sorted and eq_from_ord
-  from `Data.Collections.Derived`. sound-verified-sort accepts and
-  unsound-const-nil refuses, both on the checked path. If
-  unsound-const-nil accepts, that is a soundness stop to the Architect.
+- **AC-2 (restated, Architect evt_583dm8zxz2fzc).** C5 is re-rooted by
+  import from `Data.Collections.Derived`; `ken check` is the observation.
+  - sound-verified-sort: rc 0. Every open obligation names both
+    conjuncts, `is_sorted` and `Perm` over `eq_from_ord` of the sort's
+    comparator, as the Derived identities; none is reported proved.
+  - unsound-const-nil: rc 0 with exactly one open obligation, which
+    contains the Perm conjunct over the Nil result and `xs`. Zero
+    obligations, a Perm-free obligation or a proved one is a soundness
+    stop to the Architect.
+  - A new closed pair carries the accept/refuse split, both in
+    `conformance/challenge/C5-verified-sort/`, with the README's Expected
+    section listing them. `sound-closed-count.ken` is accepted, rc 0 with
+    no open obligation. `unsound-closed-const-nil.ken` is refused, rc 1
+    with KernelRejected TypeMismatch inside its theorem. A scratch
+    mutation of the second list to `Nil Bool` is accepted.
+  - The `lang_strict_isolated_routes_inc3a_diverge` C5 rows are deleted
+    (15 to 13 cases); Language QA votes that path.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
 
 - The amendment needs a change to 57 §3.1 or to a catalog law.
-- unsound-const-nil accepts under the count form.
+- `unsound-closed-const-nil` is accepted, or unsound-const-nil reports
+  no Perm obligation.
 
 Checks: 7 fired: the const-Nil counterexample was re-run against the count
 form by the Architect. With leq quantified, the constant-True comparator
