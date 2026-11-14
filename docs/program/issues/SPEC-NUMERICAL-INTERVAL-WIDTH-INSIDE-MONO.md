@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO
 title: "Spec 68 §15 gives interval width a point law and a sum law but no relation to inclusion, so a client that narrows an enclosure cannot conclude its error bound shrank. Rule from a checked D0 at zero trust that an interval inside another has no greater width, with the truncated Rational subtraction monotonicity it needs, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
