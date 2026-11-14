@@ -31,14 +31,7 @@ fn checked_client(source: &str, fresh: bool) -> String {
     } else {
         checked_is_true::selected_source(source)
     };
-    if source.contains("And (") {
-        format!(
-            "import Core.Logic.Conjunction (And as CatalogAnd)\n{}",
-            client.replace("And (", "CatalogAnd (")
-        )
-    } else {
-        client
-    }
+    checked_is_true::selected_and_source_with_import(&client)
 }
 
 fn containment_sources() -> Vec<String> {
