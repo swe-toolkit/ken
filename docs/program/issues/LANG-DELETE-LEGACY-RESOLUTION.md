@@ -114,6 +114,16 @@ resolves to the catalog id. Before I4 is built, the residue census adds
 its instrument at `resolve_expr_standalone`, so the 67 `.elaborate_expr(`
 callers are counted, not inferred.
 
+I4 also completes the rooted driver entries (Architect
+evt_385y36vdagp66; I1b converts `compile_checked_target_denotation` and
+`compile_ken_package_sources_with_env` to honor `CompilerSource.roots`).
+Their empty-roots path becomes Strict, and an import on a rootless
+source refuses at the import with a diagnostic that names the missing
+roots, not a downstream unbound name (I4 decides whether the current
+UnboundName on the module path suffices). `allow_rootless_strict` must
+not let a rootless library row pass for the wrong reason: I4's pin shows
+a library import refusing on a rootless entry.
+
 Carried, framed at I4's landing: retire the pre-source `Perm` and
 `Perm_rel` registration (`prelude.rs` :1534-1762) with the rows whose
 subject is that definition (Architect evt_3agt8q8hbz7sb (3), five rows by
@@ -138,7 +148,7 @@ loaded already.
 ## §1b symptom inventory
 
 Chain: the increment cut and non-home reachability (Architect
-evt_13j52ac43jrw8; §1a 2 at evt_5qrdh3g8nzmx2).
+evt_13j52ac43jrw8; §1a 3 at evt_3yez2y6dx17fz, research called).
 
 1. A generated prelude family (checked/saturating fixed-width arithmetic,
    `conversions.rs`) is source-reachable only through Legacy ambient
@@ -151,6 +161,14 @@ evt_13j52ac43jrw8; §1a 2 at evt_5qrdh3g8nzmx2).
    preserves the user's identity or meaning. Keyed on a spelling-equal,
    definition-distinct catalog provider. Disposition waits on the
    Architect's ruling from the full-spelling Perm population.
+3. A test row's subject (the B1 checked-target export of a call-site
+   Requires hole) is reached only through
+   `compile_checked_target_denotation`, which elaborates its
+   `CompilerSource` on a fresh env without its roots, so the bare name's
+   home exists but cannot be selected from that route. Keyed on an entry
+   that discards `CompilerSource.roots`. The causes of entries 1 to 3
+   are independent (a catalog gap, a spec gap, a driver gap in this WP's
+   scope); no recut.
 
 ## Stop conditions
 
