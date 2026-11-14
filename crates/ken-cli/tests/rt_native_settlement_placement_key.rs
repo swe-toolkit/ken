@@ -21,16 +21,15 @@ const LIVE: &str = include_str!("fixtures/px10_live_child.ken");
 const NULL_STDOUT: &str = include_str!("fixtures/rnspk_v_argv_stdout_null.ken");
 
 fn b2_native_profile() -> ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3 {
-    // Explicit deployment policy: argv requires 269 Invocation Words, versus
-    // 256 in starter_smoke_profile. Never silently redefine the starter.
+    // Explicit deployment policy, not a change to the starter. Scratch
+    // observation at the emitted allocator's successful capacity-checked
+    // stores measured peak Invocation Nodes: argv 73, live 68, null 57;
+    // peak Words: argv 249, live 240, null 225 (all below starter 256).
+    // Starter Nodes are 64. Round the maximum peak up to the next multiple
+    // of 16: 80 leaves 7 nodes of headroom above argv's observed 73.
+    // Every other limit, including Invocation Words, stays at starter.
     let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
-    profile.invocation.nodes = 2048;
-    profile.invocation.words = 8192;
-    profile.invocation.data_bytes = 65536;
-    profile.persistent.nodes = 2048;
-    profile.persistent.words = 8192;
-    profile.persistent.data_bytes = 65536;
-    profile.call_events.live_pending_slots = 1024;
+    profile.invocation.nodes = 80;
     profile
 }
 
@@ -206,4 +205,71 @@ fn f_v_argv_stdout_null_matches_fresh_interpreter() {
 #[test]
 fn f_live_child_matches_fresh_interpreter() {
     assert_f_native_interpreter_parity("live", LIVE);
+}
+
+/// Promise class: durable capacity discriminator. MEASURED: the same checked
+/// argv program that passes the F parity row builds and executes under the
+/// exact starter profile, then reports typed Invocation Nodes exhaustion at
+/// the starter's 64-node ceiling. CLAIMED: B2's single Nodes raise is needed
+/// for native parity, not an incidental widening. THE GAP: this one row does
+/// not measure other limits; the three F rows run with them all at starter.
+#[test]
+fn r_nodes_starter_argv_refuses_on_invocation_nodes() {
+    // The identical argv F source needed a stated 16 MiB worker (measured
+    // 8 MiB on the earlier fixture), not the ambient harness stack.
+    std::thread::Builder::new()
+        .name("rnspk-r-nodes".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let root = tempfile::tempdir().expect("isolated native capacity root");
+            let source = ARGV
+                .replacen(
+                    "program capabilities FS AFull, Process\n",
+                    "program capabilities FS AFull, Process, RootExecution Allow\n",
+                    1,
+                )
+                .replace(
+                    "PX10_CHILD_PROBE_PATH",
+                    env!("CARGO_BIN_EXE_px10-child-probe"),
+                );
+            assert!(source.contains("RootExecution Allow"));
+            assert!(!source.contains("PX10_CHILD_PROBE_PATH"));
+            let roots = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../catalog/packages")];
+            let built = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots,
+                "rnspk_r_nodes_argv",
+                root.path().join("native"),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+            .expect("R-NODES native artifact builds under starter policy");
+            let observed = ken_runtime::run_bound_process_effect_observation(
+                &built.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: Vec::new(),
+                    environment: Vec::new(),
+                    cwd: root.path().to_owned(),
+                    plan_hash: built.plan_transport_hash,
+                },
+            )
+            .expect("R-NODES native artifact runs and returns a typed observation");
+            assert_ne!(observed.exit_status, 0, "starter did not refuse: {observed:?}");
+            assert!(observed.effect_trace.iter().any(|event|
+                event.operation == ken_host::HostOpV1::ProcessSpawn));
+            match observed.terminal_error {
+                Some(ken_runtime::TerminalErrorV1::CapacityExhausted(fault)) => {
+                    assert_eq!(fault.scope, ken_runtime::CapacityScopeV1::Invocation);
+                    assert_eq!(fault.resource, ken_runtime::CapacityResourceV1::Nodes);
+                    assert_eq!(fault.limit, 64);
+                    assert!(fault.requested > fault.limit, "{fault:?}");
+                    eprintln!("B2 R-NODES requested={} limit={}", fault.requested, fault.limit);
+                }
+                other => panic!("R-NODES expected typed Invocation/Nodes fault, got {other:?}"),
+            }
+        })
+        .expect("R-NODES stated worker")
+        .join()
+        .expect("R-NODES worker completed");
 }
