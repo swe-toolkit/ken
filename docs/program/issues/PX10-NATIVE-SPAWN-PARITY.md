@@ -117,8 +117,12 @@ Steward rulings evt_3yrmbfdkws1wx and evt_6kmhp6k18ypq5:
   promotes RNSPK's AC-1c row from today's production refusal to native
   parity. F's native outcome matches the interpreter on main below the
   gate (Architect evt_r2abprmhd4zf), so no trap landed. The promoted
-  test states its capacity profile: argv needs 269 Invocation Words
-  against the starter smoke profile's 256. If B1a reopens the trap
+  test states its capacity profile. On `fe2e8ce01`, argv passes at the
+  starter's 256 Invocation Words and needs Invocation Nodes above the
+  starter's 64 (first fault requested 65); the B2 profile raises nodes
+  only, from measured peaks (Architect evt_3ssj48kepbxc4; the earlier
+  269-words figure was measured before the return-clause landing and is
+  retired). If B1a reopens the trap
   (below), B2 promotes to the trap's refusal and its M-T and M-P rows
   instead.
 - **Increment B-closure** is dynamic relay forwarding (Architect
