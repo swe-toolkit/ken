@@ -12,6 +12,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -154,7 +157,7 @@ fn five_generic_laws_are_owned_transparent_and_zero_trust() {
             "{name} has a checked transparent body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("five exact public §5 types work on arbitrary arguments");
 }
 
@@ -172,7 +175,7 @@ fn shipped_positive_inside_order_seed_checks() {
         panic!("§5 seed needs one positive client and two isolated refusals");
     };
     loaded_interval()
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("all shipped §5 law instances and same-input controls check");
 }
 
@@ -267,7 +270,8 @@ fn assert_paired_refusal(positive: &str, negative: &str, reversed: bool) {
         );
         assert_eq!(expression_shape(true_body), expected_body);
     }
-    let negatives = parse_decls(negative).expect("isolated refusal Ken parses");
+    let checked_negative = checked_is_true::selected_source(negative);
+    let negatives = parse_decls(&checked_negative).expect("isolated refusal Ken parses");
     let [SourceDecl::TheoremDecl {
         theorem: actual_goal,
         body: actual_body,
@@ -277,14 +281,16 @@ fn assert_paired_refusal(positive: &str, negative: &str, reversed: bool) {
     else {
         panic!("isolated refusal has exactly one attempted proof theorem");
     };
-    let (expected_goal, expected_body) = expected_theorem(expected_refusal);
+    let (expected_goal, expected_body) = expected_theorem(
+        &checked_is_true::selected_source(expected_refusal),
+    );
     assert_eq!(type_shape(actual_goal), expected_goal);
     assert_eq!(expression_shape(actual_body), expected_body);
     assert!(theorem_span.start < theorem_span.end);
     let mut env = loaded_interval();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("complete same-input positive prefix checks before refusal");
-    match env.elaborate_file(negative) {
+    match env.elaborate_file(&checked_negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,

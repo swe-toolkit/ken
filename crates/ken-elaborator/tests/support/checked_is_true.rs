@@ -22,6 +22,11 @@ fn rename_identifier(source: &str) -> String {
             let before = start
                 .checked_sub(1)
                 .and_then(|index| source.as_bytes().get(index));
+            assert_ne!(
+                before,
+                Some(&b'.'),
+                "qualified IsTrue is not re-keyed by this helper"
+            );
             let after = source.as_bytes().get(end);
             (!before.is_some_and(|byte| identifier_byte(*byte))
                 && !after.is_some_and(|byte| identifier_byte(*byte)))
@@ -32,6 +37,31 @@ fn rename_identifier(source: &str) -> String {
         result.replace_range(start..start + "IsTrue".len(), ALIAS);
     }
     result
+}
+
+fn declares_is_true(decl: &Decl) -> bool {
+    match decl {
+        Decl::DataDecl { name, .. }
+        | Decl::ExplicitDataDecl { name, .. }
+        | Decl::ViewDecl { name, .. }
+        | Decl::LetDecl { name, .. }
+        | Decl::ClassDecl { name, .. }
+        | Decl::TheoremDecl { name, .. }
+        | Decl::AxiomDecl { name, .. }
+        | Decl::TypeAlias { name, .. }
+        | Decl::PropDecl { name, .. }
+        | Decl::RecordDecl { name, .. }
+        | Decl::LawDecl { name, .. }
+        | Decl::ProveDecl { name, .. }
+        | Decl::SpaceDecl { name, .. }
+        | Decl::ForeignDecl { name, .. }
+        | Decl::TemporalDecl { name, .. } => name == "IsTrue",
+        Decl::AttachedProofDecl { proof_name, .. } => proof_name == "IsTrue",
+        Decl::ModuleDecl { name, decls, .. } => {
+            name == "IsTrue" || decls.iter().any(declares_is_true)
+        }
+        _ => false,
+    }
 }
 
 pub fn selected_source(source: &str) -> String {
@@ -47,7 +77,12 @@ fn selected_source_inner(source: &str, add_missing_import: bool) -> String {
         return source.to_owned();
     }
     let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("Ken client source parses") {
+    let declarations = parse_decls(source).expect("Ken client source parses");
+    assert!(
+        !declarations.iter().any(declares_is_true),
+        "client declares its own IsTrue"
+    );
+    for declaration in declarations {
         let Decl::ImportDecl {
             module,
             kind: ImportKind::Selective(items),

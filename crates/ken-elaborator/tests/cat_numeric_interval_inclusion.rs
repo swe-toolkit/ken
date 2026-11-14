@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -192,7 +195,7 @@ fn generic_inclusion_exports_are_package_owned_checked_and_zero_trust() {
             "{name} must contain a kernel-checked transparent body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("all nine §3 types are available at arbitrary client arguments");
 }
 
@@ -209,7 +212,7 @@ fn shipped_positive_inclusion_seed_checks_from_public_package() {
     let sources = seed_programs();
     let positive = sources.first().expect("seed has a positive Ken client");
     loaded_interval()
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("all shipped positive interval inclusion cases check");
 }
 
@@ -410,14 +413,15 @@ fn lower_and_upper_refusals_match_their_controlled_false_inclusions() {
     };
     for (refused, is_lower) in [(lower, true), (upper, false)] {
         let mut env = loaded_interval();
-        env.elaborate_file(positive)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
             .expect("all positive seed controls check before a refusal");
         assert_refusal_matches_its_bound(positive, refused, is_lower);
-        let negative_decls = parse_decls(refused).expect("negative theorem parses");
+        let checked_refused = checked_is_true::selected_source(refused);
+        let negative_decls = parse_decls(&checked_refused).expect("negative theorem parses");
         let [SourceDecl::TheoremDecl { span: theorem, .. }] = negative_decls.as_slice() else {
             panic!("negative fence must contain one theorem");
         };
-        match env.elaborate_file(refused) {
+        match env.elaborate_file(&checked_refused) {
             Err(ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 span,
