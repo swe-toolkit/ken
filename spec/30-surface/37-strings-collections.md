@@ -618,24 +618,26 @@ explicit comparator and produces a **refinement-typed** result (`34 §5`):
 
 ```
 view sort {a} (leq : a → a → Bool) (xs : List a)
-    : { ys : List a | is_sorted leq ys ∧ Perm (eq_from_ord leq) ys xs } = …
+    : { ys : List a |
+        is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs } = …
 ```
 
 The comparator and list result retain the earlier L3 demonstration's
 shape (`l3a_acceptance.rs`); its old pre-source `Perm` does not establish
 this imported, count-based refinement. The conjuncts are:
 
-- `is_sorted leq ys` — `ys` is in non-decreasing `leq`-order (a decidable
+- `is_sorted a leq ys` — `ys` is in non-decreasing `leq`-order (a decidable
   refinement predicate, `34 §5`).
-- `Perm (eq_from_ord leq) ys xs` — `ys` preserves every input count using
-  equality derived from the **same** comparator that sorts it (§57 §3.1).
+- `Perm a (eq_from_ord a leq) ys xs` — `ys` preserves every input count
+  using equality from the **same** comparator that sorts it (§57 §3.1).
 
 `is_sorted`-**alone is degenerate**: `sort _ = Nil` satisfies
-`{ ys | is_sorted leq ys }` (the empty list is vacuously sorted), so a
+`{ ys | is_sorted a leq ys }` (the empty list is vacuously sorted), so a
 sortedness-only spec is met by a **constant-`Nil`** implementation that throws
 the input away — it guards nothing. The `Perm` conjunct rules out that
 loss on nonempty inputs. Elaboration **emits the conjoined obligation**
-`is_sorted leq (sort leq xs) ∧ Perm (eq_from_ord leq) (sort leq xs) xs`
+`is_sorted a leq (sort leq xs) ∧
+ Perm a (eq_from_ord a leq) (sort leq xs) xs`
 on result introduction (`34 §5`, `22 §2.1`); a verified `sort`
 discharges it with a bundled proof. AC6 observes the **emitted VC**,
 not an assumed guarantee.
@@ -650,9 +652,10 @@ pre-source `Perm` registration survives until I4, but does not define
 the pinned imported predicate. The defining shapes are:
 
 - **`is_sorted : Π(a : Type). (a → a → Bool) → List a → Ω`** — an `Ω`-valued
-  structural recursion over the **explicit comparator**: `is_sorted leq Nil = ⊤`,
-  `is_sorted leq (x :: Nil) = ⊤`, and
-  `is_sorted leq (x :: y :: r) = IsTrue (leq x y) ∧ is_sorted leq (y :: r)` (the
+  structural recursion over the **explicit comparator**: `is_sorted a leq Nil = ⊤`,
+  `is_sorted a leq (x :: Nil) = ⊤`, and
+  `is_sorted a leq (x :: y :: r) = IsTrue (leq x y) ∧
+  is_sorted a leq (y :: r)` (the
   connective is the derived Ω-conjunction `And`, `16 §1.3`; the recursion
   descends structurally on the list, so it terminates). The comparator is
   `Bool`-valued (matching the landed `sort`), so the order relation enters `Ω`
@@ -666,11 +669,11 @@ the pinned imported predicate. The defining shapes are:
   `leq : a → a → Bool` from the dictionary — the `IsTrue` bridge is
   **unchanged**; the class changes only *where* `leq` comes from, `33 §5.4`.)
 - **`Perm : Π(a : Type). (a → a → Bool) → List a → List a → Ω`** —
-  given `eqf`, `Perm eqf xs ys` compares `count eqf x xs` with
-  `count eqf x ys` by `Equal Nat` for **every** `x : a` (§57 §3.1).
+  given `eqf`, `Perm a eqf xs ys` compares `count a eqf x xs` with
+  `count a eqf x ys` by `Equal Nat` for **every** `x : a` (§57 §3.1).
   This count equality is a `Π` of equations into `Ω`, so it needs no
-  truncation. The verified sort supplies `eq_from_ord leq` as `eqf`:
-  `eq_from_ord leq x y` is `bool_and (leq x y) (leq y x)`.
+  truncation. The verified sort supplies `eq_from_ord a leq` as `eqf`:
+  `eq_from_ord a leq x y` is `bool_and (leq x y) (leq y x)`.
   The equality comparator comes from the sort's own lawful order;
   no unrelated `DecEq` or second comparator is silently selected.
   For a carrier without decidable element equality, the named
@@ -730,8 +733,8 @@ with its level, and none adds a universe computation:
   rule** (`34 §7`).
 - **`Array a` / `Set a`** — abstract types at `level a`; `Map k v` at `max(level
   k, level v)`. Abstract carriers over `41`'s heap, no universe bump.
-- **Refinement `{ ys : List a | is_sorted leq ys ∧
-  Perm (eq_from_ord leq) ys xs }`** — a
+- **Refinement `{ ys : List a | is_sorted a leq ys ∧
+  Perm a (eq_from_ord a leq) ys xs }`** — a
   subset-Σ over `List a : Type ℓ_a`, with its checked predicate in
   `Ω_ℓ_P` (`12 §5`/`16 §1`). The pair lands in
   `Type (max ℓ_a ℓ_P)` (`13 §4`, `34 §5`/§7); its Ω proof is
@@ -803,7 +806,7 @@ test/property framework).
   keyed by lawful `Ord`; its accept/reject coverage lives in `50-stdlib/52`.
 - **AC6 (the verified example, structural).** `sort` (threading the explicit
   `leq : a → a → Bool`) produces
-  `{ ys | is_sorted leq ys ∧ Perm (eq_from_ord leq) ys xs }` — the
+  `{ ys | is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs }` — the
   **conjoined** refinement obligation is **emitted** and dischargeable;
   assert the **`Perm` conjunct is present** (a sortedness-only obligation
   is degenerate — `const Nil` satisfies it). `is_sorted`, `Perm` and
