@@ -2540,6 +2540,39 @@ pub theorem trace_merge_all_member_sound
           (trace_merge_member_sound p e t (trace_merge_all p rest) member)
   }
 
+pub theorem trace_merge_all_count
+      (p : Type) (eqf : Event p → Event p → Bool) (q : Event p) (traces : List (List (Event p)))
+    : Equal Nat
+        (count (Event p) eqf q (trace_merge_all p traces))
+        (count (Event p) eqf q (list_concat (Event p) traces)) =
+  match traces {
+    Nil ↦ Proved;
+    Cons t rest ↦
+      trans
+        Nat
+        (count (Event p) eqf q (trace_merge p t (trace_merge_all p rest)))
+        (add (count (Event p) eqf q t) (count (Event p) eqf q (trace_merge_all p rest)))
+        (count (Event p) eqf q (list_append (Event p) t (list_concat (Event p) rest)))
+        (trace_merge_count p eqf q t (trace_merge_all p rest))
+        (trans
+          Nat
+          (add (count (Event p) eqf q t) (count (Event p) eqf q (trace_merge_all p rest)))
+          (add (count (Event p) eqf q t) (count (Event p) eqf q (list_concat (Event p) rest)))
+          (count (Event p) eqf q (list_append (Event p) t (list_concat (Event p) rest)))
+          (cong
+            Nat
+            Nat
+            (count (Event p) eqf q (trace_merge_all p rest))
+            (count (Event p) eqf q (list_concat (Event p) rest))
+            (λj. add (count (Event p) eqf q t) j)
+            (trace_merge_all_count p eqf q rest))
+          (sym
+            Nat
+            (count (Event p) eqf q (list_append (Event p) t (list_concat (Event p) rest)))
+            (add (count (Event p) eqf q t) (count (Event p) eqf q (list_concat (Event p) rest)))
+            (list_append::count (Event p) eqf q t (list_concat (Event p) rest))))
+  }
+
 theorem event_before_skip
       (p : Type)
       (x : Event p)
@@ -3352,9 +3385,13 @@ the Ω-valued event-membership goal. Its sound law eliminates the two-way
 truncated membership choice into Ω and lifts either branch through public
 list-append membership. The conclusion identifies a result member with the
 flattened input traces via `list_concat`, without a new helper, ordering
-premise, or public existential. Soundness excludes added events, but ordered
-and sound alone do not characterize this merge: a constant empty result
-satisfies both while violating completeness.
+premise, or public existential. The count law inducts over the trace list:
+two-way `trace_merge_count` accounts for each head, the induction hypothesis
+accounts for the rest, and Derived's public `list_append::count` relates the
+result to `list_concat`. It preserves duplicate occurrences without ordering
+or a new helper. Soundness excludes added events, but ordered and sound alone
+do not characterize this merge: a constant empty result satisfies both while
+violating completeness.
 
 When every left event is at or before every right event, merge equals
 append, even if the individual traces are unordered. The checked
@@ -3431,7 +3468,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, and the twenty-four laws form the
+   `trace_merge`, `trace_merge_all`, and the twenty-five laws form the
    package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
@@ -3446,7 +3483,9 @@ merging, not window multiplicity.
    Merge membership reuses `list_elem_later` and ordinary truncated `Or`;
    merge-all reuses the two-way order and membership laws, Derived
    `list_elem_head`/`list_elem_later`, `list_concat`, append membership,
-   and Ω-valued `J` transport. Its three proofs add no helper. The one-way
+   and Ω-valued `J` transport. The count proof composes checked
+   `trace_merge_count` with public `list_append::count`; these four merge-all
+   proofs add no helper. The one-way
    window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
    `max`/`min` bounds and structurally fuses generic list filters. Window
@@ -3469,7 +3508,7 @@ merging, not window multiplicity.
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
    The no-member law reuses those same lemmas and `window_keep` to delete
    each missed head, without an additional helper or import.
-4. **Trusted-base delta.** Zero: all twenty-four exported laws have checked proof
+4. **Trusted-base delta.** Zero: all twenty-five exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The

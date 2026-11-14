@@ -2993,10 +2993,11 @@ retains the head-order fact through filtering a sorted tail; the public
 comparator is transitive. EventTrace
 uses it when distributing a window across a merge. The public sorted-cons,
 tail and head bridges reuse the existing private sorted-head proof family.
-`count_cons`,
-`count_left_first` and `count_right_first` account for a predicate-recognized
-occurrence without requiring a comparator or sorted input; the intermediate
-case-split and arithmetic helpers remain private.
+`count_cons`, `count_left_first` and `count_right_first` account for a
+predicate-recognized occurrence without requiring a comparator or sorted input.
+The public `list_append::count` proof inducts on the left list and uses
+`count_left_first` to preserve every occurrence across concatenation, including
+duplicates; the intermediate case-split and arithmetic helpers remain private.
 
 ```ken
 pub fn starts_after (a : Type) (le : a → a → Bool) (h : a) (xs : List a) : Prop =
@@ -3411,6 +3412,33 @@ pub theorem count_left_first
             (count a eqf q (Cons a x xt))
             (add (count a eqf q xt) (count a eqf q (Cons a x (Nil a))))
             (count_cons a eqf q x xt)))))
+
+pub proof count for list_append
+      (a : Type) (eqf : a → a → Bool) (q : a) (xs : List a)
+    : (ys : List a)
+      → Equal Nat
+        (count a eqf q (list_append a xs ys))
+        (add (count a eqf q xs) (count a eqf q ys)) =
+  match xs {
+    Nil ↦
+      λys.
+        sym
+          Nat
+          (add Zero (count a eqf q ys))
+          (count a eqf q ys)
+          ((proof zero_l for add) (count a eqf q ys));
+    Cons x xt ↦
+      λys.
+        count_left_first
+          a
+          eqf
+          q
+          x
+          xt
+          (list_append a xt ys)
+          ys
+          (list_append::count a eqf q xt ys)
+  }
 
 pub theorem count_right_first
       (a : Type)
@@ -4295,7 +4323,8 @@ reference implementation.
    `eq_from_ord`, `filter`, `length`, `list_append`, `list_concat`, `list_all`,
    `map`, `nth`, `reverse`, `take`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
-   `list_append::right_unit`, `list_append::length`, `map::append`,
+   `list_append::right_unit`, `list_append::length`, `list_append::count`,
+   `map::append`,
    `map::fusion`, `map::id`, `filter::append`, `filter::length`,
    `filter::empty_if_none`, `take::length`, `take::member`, `take::sorted`,
    `take::filter_prefix`, `nth::at_or_beyond_is_none`,
@@ -4340,8 +4369,10 @@ reference implementation.
    also use structural induction + `cong`/`trans` under the head constructor.
    Private `mem_filter` and `mem_filter_sound` split named predicate/comparator
    outcomes and use `cong` over this module's `filter` branch, with
-   compatibility needed only for the first law. `list_append::length` combines
-   the list induction with the canonical `add` successor law; `length_drop`
+   compatibility needed only for the first law. `list_append::count` combines
+   list induction with `count_left_first` and the canonical `add` zero law;
+   `list_append::length` combines list induction with the canonical `add`
+   successor law; `length_drop`
    splits the bound and the list. The two conditional string count laws lift
    their view equalities with `cong` and compose the corresponding generic
    append/take/drop length laws; the view lemmas pass their explicit list
