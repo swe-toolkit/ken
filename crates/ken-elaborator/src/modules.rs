@@ -4911,6 +4911,24 @@ fn named_type_head(ty: &Type) -> Option<&str> {
     }
 }
 
+/// Use the resolver's instance-head binder rule, not a second spelling rule:
+/// only a `TVar` that the instance resolver binds may bypass module lookup.
+fn instance_head_is_type_binder(decl: &Decl) -> bool {
+    let Decl::InstanceDecl { head_type, .. } = decl else {
+        return false;
+    };
+    let mut head = head_type;
+    loop {
+        match head {
+            Type::TApp(function, _, _) | Type::TRefine(_, function, _, _) => {
+                head = function;
+            }
+            Type::TVar(name, _) => return crate::resolve::is_instance_head_param(name),
+            _ => return false,
+        }
+    }
+}
+
 fn canonical_leaf(name: &str) -> &str {
     name.rsplit('.').next().unwrap_or(name)
 }
@@ -4960,10 +4978,18 @@ fn synthesized_dictionary_name(
     exports: &HashMap<String, HashMap<String, String>>,
     class_name: &str,
     head_name: &str,
+    head_is_binder: bool,
     span: &Span,
 ) -> Result<SynthesizedDictionaryName, ElabError> {
     let resolved_class = resolve_class_ref(scope, exports, class_name, span)?;
-    let resolved_head = resolve_ref(scope, exports, head_name, span)?;
+    // A generic instance head's type variable is bound by the declaration,
+    // not by the module scope. Resolving it as a global spelling would discard
+    // the planned identity during prebind and again at ordered admission.
+    let resolved_head = if head_is_binder {
+        head_name.to_string()
+    } else {
+        resolve_ref(scope, exports, head_name, span)?
+    };
     Ok(SynthesizedDictionaryName {
         // The unit-local alias follows its selected source spelling; the
         // global key below follows the canonical checked class identity.
@@ -5350,6 +5376,7 @@ fn prebind_synthesized_dictionaries(
                     exports,
                     class_name,
                     head_name,
+                    instance_head_is_type_binder(inner),
                     span,
                 ) {
                     Ok(name) => name,
@@ -6416,7 +6443,12 @@ fn expand_scope(
                         DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
                             class_name, head_name, span,
                         } => synthesized_dictionary_name(
-                            scope, &elab.module_state.exports, class_name, head_name, span,
+                            scope,
+                            &elab.module_state.exports,
+                            class_name,
+                            head_name,
+                            instance_head_is_type_binder(inner),
+                            span,
                         )
                         .ok(),
                         _ => None,
@@ -6788,6 +6820,45 @@ mod namespace_effect_tests {
     use crate::parser::parse_decls;
     use crate::ElabEnv;
     use ken_kernel::GlobalId;
+
+    /// Promise class: durable invariant (33 §5.3, 39 §6).
+    /// MEASURED: a generic instance's type-variable head mints its planned
+    /// checked dictionary ID at the root and through same-file child replay.
+    /// CLAIMED: S3 prebind and S5 ordered admission agree on that checked
+    /// identity, without global-resolving a binder.
+    /// THE GAP: a missing-class UnboundName at the class span cannot be green
+    /// under Legacy (it gives UnresolvedCon); that negative is held to I4.
+    #[test]
+    fn generic_instance_head_binder_has_checked_identity_after_child_replay() {
+        let mut root = ElabEnv::new().expect("prelude");
+        root.elaborate_decl_v1("class Flag A { tag : Bool }").unwrap();
+        let instance = root
+            .elaborate_decl_v1("instance Flag a { tag = True }")
+            .expect("generic head binder has a checked dictionary");
+        assert_eq!(root.globals["Flag_instance_a"], instance.def_id);
+        assert_eq!(
+            root.module_state.root_scope.checked_local_ids["Flag_instance_a"],
+            instance.def_id
+        );
+
+        let mut child = ElabEnv::new().expect("prelude");
+        let child_results = child
+            .elaborate_file_v1(
+                "module Child { class Flag A { tag : Bool } instance Flag a { tag = True } }",
+            )
+            .expect("same-file child replay carries its checked dictionary");
+        let child_id = child_results
+            .iter()
+            .find(|result| result.name == "Child.Flag_instance_a")
+            .expect("same-file child returned the checked dictionary")
+            .def_id;
+        assert_eq!(child.globals["Child.Flag_instance_a"], child_id);
+        assert!(child
+            .class_env
+            .instances_by_id
+            .values()
+            .any(|info| info.instance_id == child_id));
+    }
 
     /// Promise class: durable owner-scope isolation invariant (33 §3.3/§4).
     /// MEASURED: an entry whose `ken example` fails returns Err and restores
