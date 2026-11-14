@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-UNION
 title: "Spec 62 has no way to combine two graphs on one vertex carrier, so a client merging two dependency relations must write the Boolean disjunction by hand and re-prove what its edges mean. Rule from a checked D0 at zero trust a public graph_union with left and right edge inclusion, an edge case split, and reachability carried into the union, and state them with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -32,8 +32,10 @@ public types.
 - **The Bool laws already public.** `bool_or`
   (`catalog/packages/Core/Classes/LawfulClasses.ken.md:107`), `or_left`
   (`:782`), `or_right` (`:788`) and `or_cases` (`:794`, eliminating
-  into an `Omega` goal). `Or`, `Inl` and `Inr` are in `Core.Logic.Or`,
-  already imported by Dependency (`:51`).
+  into an `Omega` goal only). `Or`, `Inl` and `Inr` are in
+  `Core.Logic.Or`, already imported by Dependency (`:51`). `Or` is
+  Type-sorted, so the case split cannot be `or_cases`; AC-0 ruled a
+  private Bool match (`evt_7gy680pa9gfz8`).
 - **The reachability route.** `graph_reachable_graph_monotone`
   (`Dependency.ken.md:230`) carries reachability along any edge
   inclusion. So the reachability laws reduce to the two inclusion laws.
@@ -89,7 +91,8 @@ Checks: 4 fired: `Graph`, `edge`, `bool_or`, `or_left`, `or_right`,
 `or_cases`, the `Or` import and `graph_reachable_graph_monotone` were
 read at `a24a82d4c` on the cited lines; each inclusion law's obligation
 is `or_left` or `or_right` after `edge` of `MkGraph` reduces, and the
-case split is `or_cases` into `Or`. 3 fired: the `graph_union` grep
+case split was framed as `or_cases` into `Or`, which is ill-typed;
+AC-0 corrected it. 3 fired: the `graph_union` grep
 covered `catalog/`, `spec/`, `conformance/` and `crates/`, with 0 hits.
 8 fired: a union that ignores `h` satisfies left inclusion, the case
 split and left reachability; a union built with `bool_and` satisfies
