@@ -7,9 +7,12 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, ImportKind, KenMdFenceRole,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole,
 };
 use ken_kernel::{Decl, KernelError};
+
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
 
 const DERIVED: &str = "Data.Collections.Derived";
 const TRACE: &str = "Data.Time.EventTrace";
@@ -24,50 +27,8 @@ fn root() -> PathBuf {
         .join("catalog/packages")
 }
 
-// IsTrue already belongs to the isolated compiler base. Remove only a
-// redundant, unaliased IsTrue selective import from parsed Ken declarations;
-// no seed line spelling or incidental whitespace is an oracle.
-fn omit_redundant_is_true(source: &str) -> String {
-    let mut edits = Vec::new();
-    for declaration in parse_decls(source).expect("seed Ken parses") {
-        if let SourceDecl::ImportDecl {
-            module,
-            kind: ImportKind::Selective(items),
-            span,
-        } = declaration
-        {
-            if module != "Core.Classes.LawfulClasses" {
-                continue;
-            }
-            let mut keep = Vec::new();
-            let mut removed = false;
-            for item in items {
-                if item.name == "IsTrue" && item.rename.is_none() {
-                    removed = true;
-                } else {
-                    keep.push(match item.rename {
-                        Some(alias) => format!("{} as {alias}", item.name),
-                        None => item.name,
-                    });
-                }
-            }
-            if removed {
-                let replacement = if keep.is_empty() {
-                    String::new()
-                } else {
-                    format!("import {module} ({})", keep.join(", "))
-                };
-                edits.push((span.start..span.end, replacement));
-            }
-        }
-    }
-    let mut client = source.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        client.replace_range(range, &replacement);
-    }
-    client
-}
-
+// The published seed stays unchanged; only its executable client gains the
+// explicit checked IsTrue alias when it is elaborated.
 // The seed's cases, by the theorem each one states (its case entries name
 // them). A case is selected by its parsed theorem, never by how many source
 // fences the seed has or in what order they appear.
@@ -93,7 +54,7 @@ fn seed_case(theorem: &str) -> String {
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| omit_redundant_is_true(&SEED[fence.body_range]))
+        .map(|fence| SEED[fence.body_range].to_owned())
         .filter(|program| states(program, theorem));
     let program = stating
         .next()
@@ -107,12 +68,12 @@ fn seed_case(theorem: &str) -> String {
 fn checked_seed_client() -> ElabEnv {
     let mut env = loaded_trace();
     let anchor = seed_case(SEED_ANCHOR);
-    env.elaborate_file(&anchor)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(&anchor))
         .expect("§12 source-shaped law instance checks");
     for theorem in SEED_ACCEPTED {
         let program = seed_case(theorem);
         if program != anchor {
-            env.elaborate_file(&program)
+            env.elaborate_file(&checked_is_true::selected_source(&program))
                 .unwrap_or_else(|error| panic!("{theorem} checks: {error:?}"));
         }
     }
@@ -207,7 +168,7 @@ fn generic_window_length_bound_checks_without_new_trust() {
             "{name} must carry a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("the §12 type and both filter::length spellings check independently");
     let mut derived_only = ElabEnv::new().expect("compiler base");
     derived_only
@@ -235,17 +196,18 @@ fn generic_window_length_bound_checks_without_new_trust() {
 fn closed_seed_checks_window_length_cases() {
     checked_seed_client();
     loaded_trace()
-        .elaborate_file(CLOSED_CONTROLS)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_CONTROLS))
         .expect("independent closed window lengths check");
 }
 
 fn expect_false_theorem_rejected(env: &mut ElabEnv, negative: &str, theorem: &str) {
-    match env.elaborate_file(negative) {
+    let checked_negative = checked_is_true::selected_source(negative);
+    match env.elaborate_file(&checked_negative) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         }) => {
-            let in_theorem = parse_decls(negative)
+            let in_theorem = parse_decls(&checked_negative)
                 .expect("negative is valid Ken")
                 .into_iter()
                 .any(|decl| {
@@ -326,7 +288,7 @@ fn false_window_length_claims_reject_at_their_own_theorems() {
         (FALSE_REVERSE, "refuse_reverse_proved"),
     ] {
         let mut env = loaded_trace();
-        env.elaborate_file(CLOSED_CONTROLS)
+        env.elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_CONTROLS))
             .expect("independent closed controls check before refusal");
         expect_false_theorem_rejected(&mut env, negative, theorem);
     }

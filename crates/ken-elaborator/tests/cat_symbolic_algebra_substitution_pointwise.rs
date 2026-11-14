@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 
 fn root() -> PathBuf {
@@ -73,7 +76,7 @@ fn generic_pointwise_law_is_owned_checked_and_trust_free() {
         matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
         "pointwise law has a checked body"
     );
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("generic selective-import client accepts the public contract");
 }
 
@@ -151,7 +154,9 @@ theorem results_differ :
 "#;
 
 fn refuses_at_own_theorem(name: &str, negative: &str) {
-    let combined = format!("{CLOSED_CLIENTS}\n{negative}");
+    let combined = checked_is_true::selected_source_with_import(
+        &format!("{CLOSED_CLIENTS}\n{negative}"),
+    );
     let mut env = loaded_package();
     match env.elaborate_file(&combined) {
         Err(ElabError::KernelRejected {
@@ -182,11 +187,13 @@ fn refuses_at_own_theorem(name: &str, negative: &str) {
 fn closed_pointwise_clients_accept_and_false_images_refuse() {
     let mut accepted = loaded_package();
     accepted
-        .elaborate_file(CLOSED_CLIENTS)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_CLIENTS))
         .expect("the law application and same-form direct control accept");
     let mut false_control = loaded_package();
     false_control
-        .elaborate_file(&format!("{CLOSED_CLIENTS}\n{FALSE_CONTROL}"))
+        .elaborate_file(&checked_is_true::selected_source_with_import(
+            &format!("{CLOSED_CLIENTS}\n{FALSE_CONTROL}"),
+        ))
         .expect("changed image and result are both decidably False");
     refuses_at_own_theorem("refuse_direct", REFUSE_DIRECT);
     refuses_at_own_theorem("refuse_images", REFUSE_IMAGES);
