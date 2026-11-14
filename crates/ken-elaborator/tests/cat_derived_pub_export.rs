@@ -4,8 +4,8 @@
 //! retain their checked identities: length comes from `Data.Collections.List`
 //! through Derived's re-export; the remaining operations are Derived-owned.
 //! The two `nth` bound
-//! proofs, four `list_append` attached proofs (the three monoid laws and
-//! `list_append::length`), the `map::{id, fusion, append}`
+//! proofs, five `list_append` attached proofs (the three monoid laws,
+//! `list_append::length`, and `list_append::count`), the `map::{id, fusion, append}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
 //! their subjects.
 //! Generic `Perm`, `insert`, `sort`, public `take` and their attached proofs
@@ -281,6 +281,10 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
                 "import Data.Collections.Derived (length)\n\
                  import Data.Numeric.Nat.Arithmetic (add)\n"
             }
+            "list_append::count" => {
+                "import Data.Collections.Derived (count)\n\
+                 import Data.Numeric.Nat.Arithmetic (add)\n"
+            }
             "filter::append" => "import Data.Collections.Derived (list_append)\n",
             "filter::length" => "import Data.Collections.Derived (length)\n",
             "insert::count" => "import Data.Collections.Derived (count)\n",
@@ -327,7 +331,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// compared with an independent literal contract set. CLAIMED: Derived's
 /// complete loader-visible export surface is exactly the authorized
 /// collection operations (including list_concat and list_all), two `nth`
-/// bound proofs, four `list_append` attached
+/// bound proofs, five `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
 /// operations (`Perm`, `insert`, `sort`), their four attached sort proofs,
 /// structural `is_sorted`, public `take` and its four attached laws, the
@@ -387,6 +391,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_concat".to_owned(),
             "list_all".to_owned(),
             "list_append::assoc".to_owned(),
+            "list_append::count".to_owned(),
             "list_append::left_unit".to_owned(),
             "list_append::length".to_owned(),
             "list_append::right_unit".to_owned(),

@@ -27,13 +27,14 @@ fn trace_env() -> ElabEnv {
     env
 }
 
-// Independent open restatements exercise the exact four public types; a
-// weakened premise or conclusion cannot be hidden by a closed example.
+// Independent open restatements exercise the five public types; a weakened
+// premise or conclusion cannot be hidden by a closed example.
 const GENERIC_CLIENT: &str = r#"
-import Data.Collections.Derived (list_elem, list_concat)
+import Data.Collections.Derived (count, list_elem, list_concat)
 import Data.Time.EventTrace
   (Event, trace_merge_all, time_ordered, trace_merge_all_ordered,
-   trace_merge_all_member_complete, trace_merge_all_member_sound)
+   trace_merge_all_member_complete, trace_merge_all_member_sound,
+   trace_merge_all_count)
 
 theorem ordered
     (p : Type) (traces : List (List (Event p)))
@@ -53,13 +54,52 @@ theorem sound
     : list_elem (Event p) e (trace_merge_all p traces)
       → list_elem (Event p) e (list_concat (Event p) traces) =
   trace_merge_all_member_sound p e traces
+
+theorem all_count
+    (p : Type) (eqf : Event p → Event p → Bool) (q : Event p)
+    (traces : List (List (Event p)))
+    : Equal Nat
+        (count (Event p) eqf q (trace_merge_all p traces))
+        (count (Event p) eqf q (list_concat (Event p) traces)) =
+  trace_merge_all_count p eqf q traces
 "#;
 
+// Durable invariant: a duplicate in separate traces remains two occurrences.
+// The wrong-one row below uses this identical accepted prefix in a fresh env.
+const COUNT_ACCEPTED: &str = r#"
+import Data.Time.EventTrace (Event, MkEvent, trace_merge_all, trace_merge_all_count, event_before)
+import Data.Collections.Derived (count, list_concat, eq_from_ord)
+import Core.Logic.Transport (trans)
+
+const one : Nat = Suc Zero
+const two : Nat = Suc one
+const three : Nat = Suc two
+
+const t1 : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool one True)
+    (Cons (Event Bool) (MkEvent Bool three True) (Nil (Event Bool)))
+const t2 : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool two False) (Nil (Event Bool))
+const t3 : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool three True) (Nil (Event Bool))
+const ts : List (List (Event Bool)) =
+  Cons (List (Event Bool)) t1
+    (Cons (List (Event Bool)) t2 (Cons (List (Event Bool)) t3 (Nil (List (Event Bool)))))
+const same : Event Bool → Event Bool → Bool = eq_from_ord (Event Bool) (event_before Bool)
+const q3 : Event Bool = MkEvent Bool three True
+
+theorem merged_twice : Equal Nat (count (Event Bool) same q3 (trace_merge_all Bool ts)) two = Proved
+
+theorem merged_twice_by_law : Equal Nat (count (Event Bool) same q3 (trace_merge_all Bool ts)) two = trans Nat (count (Event Bool) same q3 (trace_merge_all Bool ts)) (count (Event Bool) same q3 (list_concat (Event Bool) ts)) two (trace_merge_all_count Bool same q3 ts) Proved
+"#;
+
+const COUNT_ONCE_REFUSED: &str = "theorem merged_once : Equal Nat (count (Event Bool) same q3 (trace_merge_all Bool ts)) one = Proved\n";
+
 /// MEASURED: after loading checked providers, the exact trusted GlobalId
-/// identity set is unchanged when EventTrace loads; all four new declarations
-/// are owner-local Transparent bodies, and independent selective imports
-/// consume their full open signatures. CLAIMED: the §15 right fold and three
-/// public laws add no trust and cannot be weakened by a closed fixture alone.
+/// identity set is unchanged when EventTrace loads; the operation and four
+/// public laws are owner-local Transparent bodies, and independent selective
+/// imports consume their full open signatures. CLAIMED: the §15 right fold
+/// and public laws add no trust and cannot be weakened by a closed fixture alone.
 /// THE GAP: inherited provider trust persists; V1 and V3 below distinguish
 /// the right-fold value and tie order that the generic laws alone do not.
 #[test]
@@ -80,7 +120,7 @@ fn open_laws_and_operation_are_public_checked_and_zero_delta() {
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     let owned = env
         .elaborate_module_from_roots(&[root()], TRACE)
-        .expect("§15 right fold and all three checked proof bodies load");
+        .expect("§15 right fold and all four checked proof bodies load");
     let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     eprintln!(
         "EventTrace trusted GlobalIds: {} → {}",
@@ -93,13 +133,57 @@ fn open_laws_and_operation_are_public_checked_and_zero_delta() {
         "trace_merge_all_ordered",
         "trace_merge_all_member_complete",
         "trace_merge_all_member_sound",
+        "trace_merge_all_count",
     ] {
         let id = env.globals[&format!("{TRACE}.{name}")];
         assert!(owned.contains(&id), "EventTrace must own {name}");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
     env.elaborate_file(GENERIC_CLIENT)
-        .expect("open ordered, complete and sound signatures check independently");
+        .expect("open ordered, complete, sound and count signatures check independently");
+}
+
+/// MEASURED: two closed occurrences are accepted directly and via the new
+/// public law. CLAIMED: merge-all retains multiplicity, not only membership.
+/// THE GAP: this finite client does not prove the generic law; the open proof
+/// type and checked EventTrace declaration are independently exercised above.
+#[test]
+fn repeated_event_count_and_public_count_law_check() {
+    trace_env()
+        .elaborate_file(COUNT_ACCEPTED)
+        .expect("R-CLOSED and R-LAW both preserve two occurrences");
+}
+
+/// MEASURED: the same accepted prefix in a fresh environment refuses a false
+/// one-occurrence conclusion at the `merged_once` theorem's own span.
+/// CLAIMED: the merge-all result must retain both occurrences.
+/// THE GAP: rejection witnesses this one duplicate input, while the checked
+/// open law above supplies the general proof.
+#[test]
+fn repeated_event_count_wrong_once_refuses_at_own_claim() {
+    let source = format!("{COUNT_ACCEPTED}\n{COUNT_ONCE_REFUSED}");
+    let decls = parse_decls(&source).expect("negative Ken client parses");
+    let claims = decls
+        .iter()
+        .filter_map(|decl| match decl {
+            SourceDecl::TheoremDecl {
+                name, params, span, ..
+            } if name == "merged_once" && params.is_empty() => Some(span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let [claim_span] = claims.as_slice() else {
+        panic!("one merged_once negative claim must be parsed");
+    };
+    match trace_env().elaborate_file(&source) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            span,
+        }) if claim_span.start <= span.start
+            && span.start < span.end
+            && span.end <= claim_span.end => {}
+        other => panic!("R-ONCE must refuse at its own false count: {other:?}"),
+    }
 }
 
 /// MEASURED: the selective-import Ken client checks Nil by Proved, the
