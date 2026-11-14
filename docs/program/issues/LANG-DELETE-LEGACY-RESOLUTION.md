@@ -124,6 +124,12 @@ UnboundName on the module path suffices). `allow_rootless_strict` must
 not let a rootless library row pass for the wrong reason: I4's pin shows
 a library import refusing on a rootless entry.
 
+`LANG-INLINE-MODULE-ENCLOSING-SCOPE` has landed: spec 33 rules inline
+children lexical (Spec evt_318gqrbkefpmt), and the held
+`lang_standard_infix_call_completion` and
+`lang_membership_operator_surface` rows migrate in I4 with no fixture or
+assertion edit (Architect evt_4em1d5vqwab2p, evt_13ms2ywx4pta0).
+
 Carried, framed at I4's landing: retire the pre-source `Perm` and
 `Perm_rel` registration (`prelude.rs` :1534-1762) with the rows whose
 subject is that definition (Architect evt_3agt8q8hbz7sb (3), five rows by
@@ -148,7 +154,7 @@ loaded already.
 ## §1b symptom inventory
 
 Chain: the increment cut and non-home reachability (Architect
-evt_13j52ac43jrw8; §1a 3 at evt_3yez2y6dx17fz, research called).
+evt_13j52ac43jrw8; §1a 4 at evt_4em1d5vqwab2p).
 
 1. A generated prelude family (checked/saturating fixed-width arithmetic,
    `conversions.rs`) is source-reachable only through Legacy ambient
@@ -169,6 +175,13 @@ evt_13j52ac43jrw8; §1a 3 at evt_3yez2y6dx17fz, research called).
    that discards `CompilerSource.roots`. The causes of entries 1 to 3
    are independent (a catalog gap, a spec gap, a driver gap in this WP's
    scope); no recut.
+4. A fixture-local class declared at a unit's root is used inside an
+   inline child module of the same unit. Strict builds the child's scope
+   fresh (`modules.rs` :5764), so the enclosing locals are not visible,
+   and Legacy's passthrough masked this. Keyed on the inline-module scope
+   boundary. Entries 3 and 4 share a shape the predicate question at
+   entry 6 tests: a resolution context that does not carry what its
+   enclosing context selected.
 
 ## Stop conditions
 
