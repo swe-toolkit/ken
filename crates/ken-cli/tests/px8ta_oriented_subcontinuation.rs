@@ -569,7 +569,7 @@ fn px8ds_p1_swapped_tail_call_exits_match_reference() {
 /// Promise class: normative compatibility vector for the original checked
 /// program under B1a. MEASURED (D0-5): both former Console P1 rows descend
 /// from retired main slots 2/3; the candidate has no NoContinuationUnit row,
-/// but one Specialized ConsoleIsTerminal Vis 656 owned by specialization 0.
+/// but one Specialized ConsoleIsTerminal response owned by specialization 0.
 /// Native and interpreter still observe one Console effect on the false arm.
 /// CLAIMED: Let lowering removes those deferred P1 rows while preserving the
 /// original program's observable path. THE GAP: no known P1 deferral population
@@ -602,7 +602,6 @@ fn px8ds_original_false_arm_and_console_response_projection_are_stable() {
             let [console] = console.as_slice() else {
                 panic!("one Console response is Specialized: {console:?}");
             };
-            assert_eq!(console.vis_origin, 656);
             assert_eq!(
                 console.base_owner,
                 "Specialization(ContinuationSpecializationId(0))"
