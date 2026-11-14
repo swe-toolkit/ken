@@ -102,10 +102,16 @@ fn ordered_search_publishes_exactly_its_authorized_surface() {
             MODULE,
             "cat_bsearch_ordered_search",
         ),
-        ["ListMembership", "MkListMembership", "elem", "search", "sorted_for_search"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect::<BTreeSet<_>>(),
+        [
+            "ListMembership",
+            "MkListMembership",
+            "elem",
+            "search",
+            "sorted_for_search"
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>(),
     );
 }
 
@@ -189,16 +195,23 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
         .expect("Ord must remain a checked class")
         .projection
         .type_id;
-    assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
+    assert!(
+        lawful_owned.contains(&ord_class),
+        "LawfulClasses must own Ord"
+    );
     let bool_instance = env
         .class_env
         .instance_search("Core.Classes.LawfulClasses.Ord", "Bool")
         .expect("Ord Bool must remain registered");
-    assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be owner-checked");
+    assert!(
+        lawful_owned.contains(&bool_instance),
+        "Ord Bool must be owner-checked"
+    );
     env.elaborate_file(
         "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
          import Algorithm.Searching.OrderedSearch (elem, sorted_for_search, search)\n\
          import Core.Logic.EmptyDec (Dec as empty_dec_Dec, decide as empty_dec_decide)\n\
+         import Core.Logic.Conjunction (and_intro)\n\
          fn cat_bsearch_decision \
              (a : Type) (d : Ord a) (x : a) (xs : List a) \
              (sorted : sorted_for_search a d xs) \
@@ -280,7 +293,9 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
             .unwrap_or_else(|error| panic!("{name} decision must elaborate: {error}"));
         let case_id = env.globals[&format!("cat_bsearch_{name}")];
         let references = catalog_or::declaration_references(
-            env.env.lookup(case_id).expect("the checked decision must exist"),
+            env.env
+                .lookup(case_id)
+                .expect("the checked decision must exist"),
         );
         assert!(
             references.contains(&bool_instance),
