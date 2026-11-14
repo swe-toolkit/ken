@@ -100,6 +100,28 @@ The spec text moves in a Spec enclave co-turn on the product candidate.
 it (listed by identity in I1's handoff) migrate by import in I4
 (Architect evt_13j52ac43jrw8, evt_3pxvhj0yngpxm).
 
+`SPEC-COLLECTIONS-PERM-PIN-ALIGN` has landed: spec 37 §6 states the
+57 §3.1 Perm, and C5 is re-rooted by import (Architect
+evt_3agt8q8hbz7sb (5)).
+
+I4 also closes the standalone route (Architect evt_3agt8q8hbz7sb (4)).
+`elaborate_expr` (`lib.rs` :1181) resolves against flat globals outside
+the Legacy census, so bare pre-source names would survive the deletion
+through it. It resolves through the Strict root scope of a module body,
+or accepts qualified checked keys only. Pin: bare `Not` through
+`elaborate_expr` refuses with UnboundName, and `Core.Logic.Not.Not`
+resolves to the catalog id. Before I4 is built, the residue census adds
+its instrument at `resolve_expr_standalone`, so the 67 `.elaborate_expr(`
+callers are counted, not inferred.
+
+Carried, framed at I4's landing: retire the pre-source `Perm` and
+`Perm_rel` registration (`prelude.rs` :1534-1762) with the rows whose
+subject is that definition (Architect evt_3agt8q8hbz7sb (3), five rows by
+identity). The es4 bridge keeps its Derived half. Count the pre-source
+`is_sorted`'s remaining users and include it if none remain. This is the
+same shape as the zip retirement carried by
+`LANG-PRELUDE-NONHOME-FAMILIES-HOME`.
+
 ## I4 spec 33 co-turn carry
 
 The fence import scope (Architect evt_4f4yshmbkj59e, on landed I0
@@ -116,13 +138,19 @@ loaded already.
 ## §1b symptom inventory
 
 Chain: the increment cut and non-home reachability (Architect
-evt_13j52ac43jrw8; §1a 1).
+evt_13j52ac43jrw8; §1a 2 at evt_5qrdh3g8nzmx2).
 
 1. A generated prelude family (checked/saturating fixed-width arithmetic,
    `conversions.rs`) is source-reachable only through Legacy ambient
    lookup and has no taxonomy row or package home. Keyed on pre-source
    registration with no explicit-import home. I4 now depends on a
    homing node framed from the counted non-home population.
+2. A pre-source definition (`Perm`, comparator-free truncation) whose
+   only catalog namesake has a different signature and meaning
+   (`Derived.Perm`, comparator-indexed count equality), so no import
+   preserves the user's identity or meaning. Keyed on a spelling-equal,
+   definition-distinct catalog provider. Disposition waits on the
+   Architect's ruling from the full-spelling Perm population.
 
 ## Stop conditions
 
