@@ -365,23 +365,11 @@ fn assert_retained_unit_call_target_mutation_child() {
 
     let mode = std::env::var(RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD)
         .expect("retained-unit call-target mutation child mode");
-    let (mutation, expected) = match mode.as_str() {
-        "unrelated-owner-root" => (
-            Mutation::SubstituteUnrelatedOwnerRoot,
-            "has no graph-derived call target in this unit",
-        ),
-        "suppress-graph-claims" => (
-            Mutation::SuppressGraphClaims,
-            "has no graph-derived call target in this unit",
-        ),
-        "wrong-target" => (
-            Mutation::SubstituteWrongTarget,
-            "a retained-body graph claim for",
-        ),
-        "ambiguous-target" => (
-            Mutation::DuplicateTargetClaim,
-            "has more than one graph-derived call target",
-        ),
+    let mutation = match mode.as_str() {
+        "unrelated-owner-root" => Mutation::SubstituteUnrelatedOwnerRoot,
+        "suppress-graph-claims" => Mutation::SuppressGraphClaims,
+        "wrong-target" => Mutation::SubstituteWrongTarget,
+        "ambiguous-target" => Mutation::DuplicateTargetClaim,
         other => panic!("unknown retained-unit call-target mutation: {other}"),
     };
     let dir = tempfile::Builder::new()
@@ -398,16 +386,9 @@ fn assert_retained_unit_call_target_mutation_child() {
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
-    let error = match result {
-        Ok(_) => panic!("{mode}: malformed retained-unit target derivation compiled"),
-        Err(error) => error,
-    };
-    let rendered = format!("{error:?}");
-    assert!(
-        rendered.contains(expected),
-        "{mode}: mutation missed intended refusal; error:\n{rendered}"
-    );
-    eprintln!("{mode}: {rendered}");
+    result.unwrap_or_else(|error| {
+        panic!("{mode}: the B1a fixture has no retained-unit graph claims: {error:?}")
+    });
     assert!(
         ken_runtime::retained_unit_call_target_mutation_is_exact(),
         "{mode}: scoped retained-unit target mutation did not restore"
@@ -452,7 +433,7 @@ fn assert_retained_result_closure_proof_mutation_child() {
         ),
         "widened-population" => (
             Mutation::WidenToEveryOtherCapturedClosure,
-            Some("proof population widens beyond an exact typed occurrence"),
+            Some("the retained result-closure control found no real neighboring row"),
         ),
         "missing-static-body-call-edge" => (
             Mutation::DropExactStaticBodyCallEdge,
@@ -474,27 +455,43 @@ fn assert_retained_result_closure_proof_mutation_child() {
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
-    match expected {
-        None => {
-            result.expect("the exact typed retained result-closure proof must compile");
-            assert_eq!(
-                ken_runtime::retained_result_closure_proof_mutation_applied(),
-                0,
-                "the exact positive must not perturb the proof population"
-            );
-        }
-        Some(expected) => {
-            let error = result.expect_err("a malformed retained result-closure proof compiled");
-            let rendered = format!("{error:?}");
-            assert!(
-                rendered.contains(expected),
-                "{mode}: mutation missed intended refusal; error:\n{rendered}"
-            );
-            assert!(
-                ken_runtime::retained_result_closure_proof_mutation_applied() > 0,
-                "{mode}: no exact retained-result relation or consumer was changed"
-            );
-            eprintln!("{mode}: {rendered}");
+    if mode == "widened-population" {
+        // D0-5: six proof rows survive, but all seven candidate closure
+        // neighbours descend from the retired WRITE_ALL main#7 branch.
+        // Scratch M-B1A restores 6*7 applications and makes this FIRST
+        // assertion red; the original proof-widening refusal then passes.
+        assert_eq!(
+            ken_runtime::retained_result_closure_proof_mutation_applied(),
+            0,
+            "B1a has no captured-closure neighbors for proof widening"
+        );
+        let error = result.expect_err("widening without neighbors refuses before proof mutation");
+        let rendered = format!("{error:?}");
+        assert!(rendered.contains(expected.unwrap()), "{mode}: {rendered}");
+        eprintln!("{mode}: {rendered}");
+    } else {
+        match expected {
+            None => {
+                result.expect("the exact typed retained result-closure proof must compile");
+                assert_eq!(
+                    ken_runtime::retained_result_closure_proof_mutation_applied(),
+                    0,
+                    "the exact positive must not perturb the proof population"
+                );
+            }
+            Some(expected) => {
+                let error = result.expect_err("a malformed retained result-closure proof compiled");
+                let rendered = format!("{error:?}");
+                assert!(
+                    rendered.contains(expected),
+                    "{mode}: mutation missed intended refusal; error:\n{rendered}"
+                );
+                assert!(
+                    ken_runtime::retained_result_closure_proof_mutation_applied() > 0,
+                    "{mode}: no exact retained-result relation or consumer was changed"
+                );
+                eprintln!("{mode}: {rendered}");
+            }
         }
     }
     assert!(
@@ -519,7 +516,6 @@ fn assert_handler_owned_deferred_response_mutation_child() {
         .tempdir()
         .unwrap();
     std::fs::write(dir.path().join("input.bin"), b"abcdef").unwrap();
-    let preload = build_short_pwrite_preload(dir.path());
     let (compiled, applications) =
         ken_runtime::with_handler_owned_deferred_response_mutation(mutation, || {
             ken_cli::build_native_program_with_roots(
@@ -531,60 +527,29 @@ fn assert_handler_owned_deferred_response_mutation_child() {
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
-    assert_eq!(
-        applications, 1,
-        "{mode}: mutation must reach exactly one natural production consumer"
-    );
+    if mode == "suppress-unitless-drive" {
+        assert_eq!(
+            applications, 0,
+            "{mode}: D0-5 retired the only unitless P1 response"
+        );
+    } else {
+        assert!(
+            applications >= 1,
+            "{mode}: the bracket-local K still has natural production consumers"
+        );
+    }
     match mode.as_str() {
         "suppress-unitless-drive" => {
-            let output = compiled.expect("suppressing P1 execution still emits the old artifact");
-            let run = ken_runtime::run_bound_process_effect_observation(
-                &output.artifact,
-                &ken_runtime::NativeEffectRunOptionsV1 {
-                    arguments: Vec::new(),
-                    environment: vec![("LD_PRELOAD".into(), preload.into_os_string())],
-                    cwd: dir.path().to_owned(),
-                    plan_hash: output.plan_transport_hash,
-                },
-            );
-            let observation = run.expect("the inert P1 artifact reports its source trap");
-            assert_ne!(
-                observation.exit_status, 0,
-                "suppressing P1 execution preserved the successful program"
-            );
-            let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-                observation.terminal_error
-            else {
-                panic!("suppressing P1 execution did not restore the source Result trap");
-            };
-            assert_eq!(
-                provenance.trap.code,
-                ken_runtime::RuntimeTrapCode::PatternMatchFailure
-            );
-            assert!(
-                provenance.trap.message.ends_with("::Result"),
-                "the P1 suppression reached the wrong source trap: {:?}",
-                provenance.trap
-            );
-            assert!(
-                observation
-                    .effect_trace
-                    .iter()
-                    .all(|event| event.operation != ken_runtime::HostOpV1::FsWriteAt),
-                "the inert P1 path unexpectedly dispatched a write"
-            );
-            assert_eq!(
-                std::fs::read(dir.path().join("output.bin")).unwrap_or_default(),
-                b"",
-                "suppressing P1 execution still wrote the output"
-            );
+            compiled.expect("no unitless P1 drive remains to suppress under B1a");
+            // The separate linked_checked_write_all positive row pins native
+            // versus interpreter parity and its three short-progress writes.
         }
         "suppress-bracket-in-place-continuation" => {
             let error = compiled
                 .expect_err("suppressing the handler-local continuation drive crossed its closure");
             assert!(
-                format!("{error:?}").contains("a closure cannot cross the boundary"),
-                "the local-continuation mutation reached the wrong refusal: {error:?}"
+                format!("{error:?}").contains("without matched InPlace lowerings"),
+                "the live bracket-local mutation must refuse unmatched settlement: {error:?}"
             );
         }
         _ => unreachable!("the mode was validated above"),
@@ -612,36 +577,24 @@ fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
-/// Promise class: durable invariant. A specialization-owned retained call is
-/// admitted only from its checked raw owner's exact graph subtree; an unrelated
-/// root, missing claim, wrong target, or ambiguous target reaches a production
-/// refusal.
-///
-/// MEASURED: each child moves the traversal root or mutates resolved graph
-/// claims before function-local declaration and asserts the exact downstream
-/// refusal family.
-/// CLAIMED: an unrelated owner, lookup failure, target disagreement, and
-/// candidate ambiguity cannot synthesize or select a retained-body target.
-/// THE GAP: the child reuses the real checked `writeAll` compile, so a green row
-/// depends on the production context-definition and call-emission path.
+/// Promise class: transition sentinel for the exact B1a WRITE_ALL projection.
+/// MEASURED (D0-5): all four mutations encounter zero nonempty graph-claim
+/// populations on the candidate; SubstituteUnrelatedOwnerRoot traverses nine
+/// empty roots, while the base had one nonempty seven-claim graph. The same
+/// WRITE_ALL fixture builds under each existing mutation on B1a; scratch
+/// M-B1A restores the original exact refusal in every mode.
+/// CLAIMED: with the unchanged retained-unit derivation, Ok under each scoped
+/// corruption means no graph claim remains to corrupt on this fixture.
+/// THE GAP: the call-target guard's bite has no known B1a population; the
+/// Steward must decide deletion versus a new positive witness.
 #[test]
-fn retained_unit_call_target_controls_reject_malformed_derivations() {
-    let cases = [
-        (
-            "unrelated-owner-root",
-            "has no graph-derived call target in this unit",
-        ),
-        (
-            "suppress-graph-claims",
-            "has no graph-derived call target in this unit",
-        ),
-        ("wrong-target", "a retained-body graph claim for"),
-        (
-            "ambiguous-target",
-            "has more than one graph-derived call target",
-        ),
-    ];
-    for (mode, expected) in cases {
+fn retained_unit_call_target_mutations_are_inert_without_graph_claims() {
+    for mode in [
+        "unrelated-owner-root",
+        "suppress-graph-claims",
+        "wrong-target",
+        "ambiguous-target",
+    ] {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
@@ -658,17 +611,6 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(expected),
-            "{mode}: child did not publish intended refusal; stderr:\n{stderr}"
-        );
-        if mode == "unrelated-owner-root" {
-            assert!(
-                stderr.contains("retained-unit root control replaced checked root"),
-                "{mode}: child did not traverse from a real unrelated owner; stderr:\n{stderr}"
-            );
-        }
     }
 }
 
@@ -679,19 +621,24 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
 /// sections 3.2 and 7).
 ///
 /// MEASURED: the same real px8f compile accepts the exact population, while
-/// dropping, duplicating, substituting real neighboring owner/body/field/target
-/// rows, permuting the real capture run, widening to every other captured
-/// lexical occurrence, or dropping the exact downstream call edge reaches a
-/// distinct production refusal. Each malformed child also reports the fixed
-/// fixture's six unique rows, exact descending capture runs, and both nested
-/// specialization-to-parent target/body joins.
+/// dropping, duplicating, substituting real owner/body/field/target rows,
+/// permuting the real capture run, or dropping the exact downstream call edge
+/// reaches a distinct production refusal. Under B1a, widening to every other
+/// captured lexical occurrence sees zero neighbors and refuses at the
+/// no-neighbor guard without changing the proof population (D0-5: the seven
+/// original neighbors descended from retired WRITE_ALL slot 7). Scratch
+/// M-B1A restores 42 applications and the original proof-widening refusal.
+/// Each malformed child still reports the fixture's six unique proof rows,
+/// exact descending capture runs, and both nested parent-target/body joins.
 /// CLAIMED: only the exact result/constructor/field/closure/body/capture/target
 /// tuple and its joined static call edge may acquire the existing M4 environment
 /// representation. Handler-owned Deferred continuations no longer cross this
 /// boundary; their replacement control is
 /// `handler_owned_deferred_response_controls_are_load_bearing`.
-/// THE GAP: the fixed fixture supplies four predeclared and two nested rows; the
-/// assertions identify them by typed relations, never planner allocation ids.
+/// THE GAP: the fixed fixture supplies four predeclared and two nested rows,
+/// but no captured neighbor for the widening mutation under B1a. Its guard
+/// has no known B1a population; Steward decides deletion versus a witness.
+/// Other assertions identify typed relations, never planner allocation ids.
 #[test]
 fn retained_result_closure_proof_controls_are_exact_and_positional() {
     let cases = [
@@ -723,7 +670,7 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
         ),
         (
             "widened-population",
-            Some("proof population widens beyond an exact typed occurrence"),
+            Some("the retained result-closure control found no real neighboring row"),
         ),
         (
             "missing-static-body-call-edge",
@@ -760,16 +707,19 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
 
 #[cfg(target_os = "linux")]
 /// Promise class: durable mutation proof. Both halves of the single-owner recut
-/// are load-bearing on the real WRITE_ALL compile: dropping P1 execution restores
-/// the inert no-write path, while dropping handler-local K consumption restores
-/// the existing closure-boundary refusal.
-///
-/// MEASURED: each isolated child mutates one natural production consumer, reports
-/// a nonzero application count, and observes its distinct pre-recut failure.
-/// CLAIMED: executable P1 dispatch and handler-local continuation consumption are
-/// both necessary to return the carried success value without a durable closure.
-/// THE GAP: the unchanged positive row above proves the same fixture reaches exit
-/// zero with the exact three writes; these negative children prove causality.
+/// have distinct B1a populations on WRITE_ALL. MEASURED (D0-5): the
+/// SuppressUnitlessDrive child has zero applications because its sole P1 row
+/// descended from retired main slot 7; the independent unmutated native/
+/// interpreter parity row still writes three short-progress events. The
+/// bracket-local drive applies 18 times on B1a versus 1 on M-B1A and
+/// refuses an unmatched InPlace settlement.
+/// CLAIMED: B1a's direct-style performed write no longer needs a unitless P1
+/// drive; suppressing a live bracket-local K leaves settlement unmatched.
+/// THE GAP: the unitless-drive guard has no known B1a population; the
+/// closure-boundary refusal is not reached by this bracket-local mutation
+/// under B1a. Steward decides deletion versus a witness for the dead guard.
+/// Scratch M-B1A restores one unitless application and its original no-write
+/// Result trap.
 #[test]
 fn handler_owned_deferred_response_controls_are_load_bearing() {
     for mode in ["suppress-unitless-drive", "suppress-bracket-in-place-continuation"] {
@@ -1109,15 +1059,26 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
 #[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The checked `writeAll` response plane
 /// promotes exactly its two exclusively-predeclared ordinary producer groups;
-/// unit-less P1 remains Deferred and all marked release S rows are bracket-owned.
+/// the performed FsWriteAt call has no residual response row under B1a, and
+/// all marked release S rows are bracket-owned.
 ///
-/// MEASURED: ordinary FsReadAt/BufferAllocate owners compile beside one
-/// FsWriteAt P1 row and three distinct authenticated bracket settlements.
-/// Suppression restores the ordinary read to P2 without moving any S. Inserting
-/// each marked row, one at a time, into ordinary ownership is independently
-/// refused by plan close. CLAIMED: bracket authority never borrows ordinary
-/// ownership. THE GAP: plan-close exclusion does not establish the held parent
-/// carry WP's successful `ReadSome` runtime body.
+/// MEASURED (B1a D0-5 and px10-b1a-r1-px8f-projection-probe.log): the old
+/// FsWriteAt P1 Vis 1257 descends from retired WRITE_ALL slot 7. The exact
+/// candidate projection has zero FsWriteAt owners and no Deferred rows;
+/// ordinary FsReadAt/BufferAllocate owners compile beside three distinct
+/// authenticated bracket settlements. On the candidate, suppressing
+/// execute-then-resume leaves FsReadAt Specialized alongside BufferAllocate
+/// and FsOpen, with zero UnconsumedTransportCaller P2 rows and the same three
+/// bracket S rows. On M-B1A, the original row instead sees only
+/// [BufferAllocate, FsOpen] Specialized and one FsReadAt P2; its parent
+/// assertions passed in px10-b1a-r1-mb1a-whole-px8f-original.log.
+/// CLAIMED: bracket authority never borrows ordinary ownership; on this
+/// fixture suppressing execute-then-resume reopens no ordinary P2 veto.
+/// THE GAP: no known positive-controlled B1a fixture witnesses the ordinary
+/// execute-then-resume P2 veto; Steward decides deletion versus a witness.
+/// Plan-close exclusion does not establish the held parent carry WP's
+/// successful `ReadSome` runtime body. Inserting each marked row, one at a
+/// time, into ordinary ownership is independently refused by plan close.
 #[test]
 fn write_all_classifies_mixed_specialized_and_deferred_responses() {
     std::thread::Builder::new()
@@ -1147,6 +1108,27 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             let diagnostic = diagnostics.into_iter().next().unwrap();
             assert_eq!(diagnostic.static_response_infeasible, None);
             assert_eq!(diagnostic.all_static_response_infeasible, None);
+            // First assertion arm for M-B1A: the pre-B1a FsWriteAt P1 Vis
+            // 1257 returns on the whole-product revert and this count becomes 1.
+            let write_responses = diagnostic
+                .all_static_response_rows
+                .iter()
+                .filter(|row| row.operation == "FsWriteAt")
+                .count()
+                + diagnostic
+                    .static_response_deferred
+                    .iter()
+                    .filter(|row| row.operation == "FsWriteAt")
+                    .count();
+            assert_eq!(
+                write_responses, 0,
+                "B1a performs FsWriteAt without a static response row"
+            );
+            assert!(
+                diagnostic.static_response_deferred.is_empty(),
+                "B1a's original WRITE_ALL fixture has no Deferred P1 row: {:?}",
+                diagnostic.static_response_deferred
+            );
 
             let specialized = diagnostic
                 .all_static_response_rows
@@ -1168,12 +1150,9 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                     counts
                 },
             );
-            assert_eq!(
-                deferred,
-                std::collections::BTreeMap::from([
-                    (("FsWriteAt", "NoContinuationUnit"), 1),
-                ]),
-                "P1 stays main-lowered; marked S cannot enter ordinary Deferred"
+            assert!(
+                deferred.is_empty(),
+                "the original P1 row was a retired re-emission branch, not a live Deferred response: {deferred:?}"
             );
             let bracket = &diagnostic.bracket_response_rows;
             assert_eq!(bracket.len(), 3, "three mixed-owner release rows move to bracket S");
@@ -1190,49 +1169,11 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             // Gate 0, on continuation structure rather than the RecursiveBackedge
             // marker. The maximum path use is one, every tail returns or makes one
             // static declared call, and no other exit can publish the continuation.
-            // The P1 owner must be the exact promoted BufferAllocate handler.
-            let buffer_handler = diagnostic
-                .all_static_response_rows
-                .iter()
-                .find(|row| row.operation == "BufferAllocate")
-                .expect("the promoted BufferAllocate response remains present")
-                .base_owner
-                .clone();
-            let p1 = diagnostic
-                .static_response_deferred
-                .iter()
-                .find(|row| row.operation == "FsWriteAt" && row.sub_case == "NoContinuationUnit")
-                .expect("the P1 response remains in the Deferred population");
-            assert_eq!(p1.handler_owner.as_deref(), Some(buffer_handler.as_str()));
-            for row in &diagnostic.static_response_deferred {
-                assert!(
-                    row.handler_owner.is_some() && row.k_body_origin.is_some(),
-                    "Deferred response {} has no single static handler or lexical K body",
-                    row.vis_origin
-                );
-                assert_eq!(
-                    row.response_uses,
-                    Some(1),
-                    "Deferred response {} can use one host response more than once on one path",
-                    row.vis_origin
-                );
-                assert!(
-                    row.tail_ret_exits.is_some_and(|exits| exits > 0),
-                    "Deferred response {} has no tail Ret exit",
-                    row.vis_origin
-                );
-                assert_eq!(
-                    row.tail_other_exits,
-                    Some(0),
-                    "Deferred response {} has a non-local or non-tail exit",
-                    row.vis_origin
-                );
-            }
-            assert_eq!(
-                p1.tail_static_calls,
-                Some(1),
-                "P1 short progress must recurse through one static tail call"
-            );
+            // No FsWriteAt owner remains to project: the direct-style member
+            // call's observable writes stay covered by the independent native
+            // versus interpreter WRITE_ALL parity row. The no-unit P1 handler
+            // owner has no known B1a population; M-B1A restores its original
+            // one-row owner assertion without changing this product tree.
 
             let (suppressed_result, suppressed_diagnostics) =
                 ken_runtime::with_suppressed_execute_then_resume_response(|| {
@@ -1252,8 +1193,8 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .collect::<Vec<_>>();
             assert_eq!(
                 suppressed_specialized,
-                vec!["BufferAllocate", "FsOpen"],
-                "suppression removes execute-then-resume owners but retains the independent relay performer"
+                vec!["FsReadAt", "BufferAllocate", "FsOpen"],
+                "the performed read's candidate response owner is no longer removed by the old suppression mode"
             );
             let suppressed_p2 = suppressed
                 .static_response_deferred
@@ -1263,12 +1204,9 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                     *counts.entry(row.operation.as_str()).or_insert(0usize) += 1;
                     counts
                 });
-            assert_eq!(
-                suppressed_p2,
-                std::collections::BTreeMap::from([
-                    ("FsReadAt", 1),
-                ]),
-                "the veto reopens only the ordinary read group as P2"
+            assert!(
+                suppressed_p2.is_empty(),
+                "the old suppression has no candidate P2 response population: {suppressed_p2:?}"
             );
             assert_eq!(suppressed.bracket_response_rows.len(), 3,
                 "suppressing ordinary promotion cannot move bracket settlements");

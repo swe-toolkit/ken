@@ -281,8 +281,8 @@ fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
     assert_alternative_writer_raw(
         "px10_answer_argv",
         ARGV_ENV_PIPE,
-        "Predeclared(PredeclaredFunctionId(25))",
-        1971,
+        "Predeclared(PredeclaredFunctionId(17))",
+        1769,
         &[1, 2, 3],
     );
 }
@@ -292,8 +292,8 @@ fn px10_live_alternative_writer_keeps_foreign_members_raw() {
     assert_alternative_writer_raw(
         "px10_answer_live",
         LIVE_CHILD,
-        "Predeclared(PredeclaredFunctionId(23))",
-        1474,
+        "Predeclared(PredeclaredFunctionId(15))",
+        1286,
         &[2, 3, 4],
     );
 }
@@ -449,7 +449,12 @@ fn assert_region_exit_owners(
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
 /// recording one feasibility diagnostic with no returned-Vis protocol error,
 /// and builds an artifact beneath the separate Process admission gate. Its
-/// settlement 647 resumes through fold 12 and is returned by Vis 682.
+/// settlement 623 resumes through fold 12 and is returned by Vis 658.
+/// MEASURED (B1a D0-7, D0-1-to-D0-7-attribution.txt): region-0 acquire
+/// 710→686, body-entry Construct 682→658, outcome merge 641→617, and
+/// settlement Construct 647→623 preserve producer and order. The ReturnFold
+/// producer remains computational match 12; the ReturnedVisSettlement
+/// producer is the same region-0 body-entry Construct, not the fold.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -476,7 +481,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 647, 12), (ReturnedVisSettlement, 647, 682)],
+            &[(ReturnFold, 623, 12), (ReturnedVisSettlement, 623, 658)],
         );
         let _built = built.expect("smoke emits an artifact beneath the Process gate");
     });
@@ -497,9 +502,9 @@ fn px10_argv_and_live_emit_below_process_gate() {
             ARGV_ENV_PIPE,
             &[
                 (ReturnFold, 1160, 571),
-                (ReturnFold, 1429, 1165),
-                (ReturnedVisSettlement, 1160, 1985),
-                (ReturnedVisSettlement, 1429, 1538),
+                (ReturnFold, 1405, 1165),
+                (ReturnedVisSettlement, 1160, 1783),
+                (ReturnedVisSettlement, 1405, 1500),
             ][..],
             None,
         ),
@@ -508,9 +513,9 @@ fn px10_argv_and_live_emit_below_process_gate() {
             LIVE_CHILD,
             &[
                 (ReturnFold, 601, 12),
-                (ReturnFold, 870, 606),
-                (ReturnedVisSettlement, 601, 1488),
-                (ReturnedVisSettlement, 870, 1043),
+                (ReturnFold, 846, 606),
+                (ReturnedVisSettlement, 601, 1300),
+                (ReturnedVisSettlement, 846, 1019),
             ][..],
             None,
         ),
@@ -547,30 +552,115 @@ fn px10_argv_and_live_emit_below_process_gate() {
     }
 }
 
+/// Promise class: transition sentinel for the three B1a G-ERASURE fixtures;
+/// re-derive the population if a fixture changes or B2 removes the Process gate.
+/// MEASURED: the below-gate native build succeeds, seven actual self-placed
+/// checked-IH calls have no response owner and each has an Escaped residual;
+/// every installed relay pair has a route. CLAIMED: a self transport cannot
+/// mint a response owner or leave an unrouted relay in these three plans.
+/// THE GAP: native execution parity remains a B2 obligation, not a B1a test.
+fn assert_b1a_g_erasure(name: &'static str, source: String) {
+    in_census_thread(name, move || {
+        let (built, diagnostics) =
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                emit_below_gate(name, &source)
+            });
+        // The old 9807 owner/context refusal is a build error, not a stderr
+        // observation; a successful artifact proves that refusal is absent.
+        let _built = built.expect("B1a G-ERASURE must build without 9807");
+        assert_eq!(diagnostics.len(), 1, "{name}: one completed plan");
+        let plan = &diagnostics[0];
+        let self_vis: std::collections::BTreeSet<_> =
+            plan.self_transport_vis_origins.iter().copied().collect();
+        assert_eq!(
+            self_vis.len(),
+            7,
+            "{name}: exact G self-transport population"
+        );
+        assert_eq!(
+            plan.self_transport_vis_origins.len(),
+            self_vis.len(),
+            "{name}: one placement per self-transport Vis"
+        );
+        assert!(
+            plan.owned_self_transport_vis_origins.is_empty(),
+            "{name}: a self transport acquired a response owner: {:?}",
+            plan.owned_self_transport_vis_origins
+        );
+        let escaped: std::collections::BTreeSet<_> = plan
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.sub_case == "EscapedCheckedIhCaller")
+            .map(|row| row.vis_origin)
+            .collect();
+        assert_eq!(
+            escaped, self_vis,
+            "{name}: each self transport must retain its ordinary Construct route"
+        );
+        let pairs: std::collections::BTreeSet<_> =
+            plan.relay_pair_sources.iter().cloned().collect();
+        let routed: std::collections::BTreeSet<_> =
+            plan.routed_relay_pair_sources.iter().cloned().collect();
+        assert!(
+            !pairs.is_empty(),
+            "{name}: the fixture must exercise relay edges"
+        );
+        assert_eq!(
+            pairs, routed,
+            "{name}: every relay pair has a performing route"
+        );
+    });
+}
+
+#[test]
+fn px10_g_erasure_argv_has_unowned_self_transports_and_routed_relays() {
+    assert_b1a_g_erasure("px10_g_erasure_argv", ARGV_ENV_PIPE.to_owned());
+}
+
+#[test]
+fn px10_g_erasure_live_has_unowned_self_transports_and_routed_relays() {
+    assert_b1a_g_erasure("px10_g_erasure_live", LIVE_CHILD.to_owned());
+}
+
+#[test]
+fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
+    let body = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
+    assert_ne!(body, ARGV_ENV_PIPE, "the stdout disposition moved");
+    let null = body.replacen(
+        "import Capability.Process.Child (ChildPipe,",
+        "import Capability.Process.Child (ChildNull,",
+        1,
+    );
+    assert_b1a_g_erasure("px10_g_erasure_null", null);
+}
+
 /// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
-/// relays 1247 and 992 and live's relays 688 and 433 are relay members of
+/// relays 1223 and 992 and live's relays 664 and 433 are relay members of
 /// their owners' returned-Vis protocols, numbered once per emitting copy
 /// with distinct nonzero discriminants rather than by a response row, and
-/// kept in the settled member set. Copies of 1247 and 688 resume at the rows
-/// whose Vis are 1484 and 932; copies of 992 and 433 resume by their planned
+/// kept in the settled member set. Copies of 1223 and 664 resume at the rows
+/// whose Vis are 1448 and 908; copies of 992 and 433 resume by their planned
 /// named trap. CLAIMED: each named relay has a numbered copy with the
 /// expected resume, and copies retain separate discriminants. THE GAP: this
 /// census does not prove that every emitting owner minted a copy or that
 /// other copies' resumes agree with their issuers; the artifact is not run,
 /// the expected seat is read from the plane that chose it, and a trap's
-/// reason text is not projected.
+/// reason text is not projected. These origin pins are re-derived by producer
+/// and order on the B1a tree against `B-attribution-r2-structural-comparison.txt`
+/// (SHA256 2b45cce5e87da7f616767ea12772d28abdbb74143000f014853e907546babc06),
+/// which found equal owner/relay/resume/successor structure under that mapping.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
         (
             "px10_census_relay_argv_env_pipe",
             ARGV_ENV_PIPE,
-            [(1247, 1725, Some(1484)), (992, 1985, None)],
+            [(1223, 1687, Some(1448)), (992, 1783, None)],
         ),
         (
             "px10_census_relay_live_child",
             LIVE_CHILD,
-            [(688, 1228, Some(932)), (433, 1488, None)],
+            [(664, 1204, Some(908)), (433, 1300, None)],
         ),
     ] {
         in_census_thread(name, move || {
@@ -639,23 +729,25 @@ fn px10_relays_are_numbered_protocol_members() {
     }
 }
 
-/// Promise class: durable invariant (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1).
-/// MEASURED: on the live child and the null-stdout argv program, dropping
-/// region 0's return clause from the stack a carried match lowers under is
-/// refused at lowering as BracketReturnClause, and the unmutated build emits.
-/// CLAIMED: a claim inside a bracket body whose return clause is absent from
-/// the eliminator stack cannot pass as an ordinary native build.
-/// THE GAP: one mutation seat, the carried-remaining choice, and the planner's
-/// region-to-clause map is read on both sides. Other ways of losing the
-/// clause reach the same check but are not exercised here.
+/// Promise class: transition sentinel for B1a's exact original-fixture
+/// projection (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1). MEASURED (B1a D0-4):
+/// the live carried-stack seats Vis 1307/1429 and null seats Vis 1806/1928
+/// descend from retired main matches. Their DropBracketReturnClause mutation
+/// applies zero times on each B1a fixture; the unmutated Let-body build emits.
+/// CLAIMED: a performed bind lowers its Ret body under the original region
+/// eliminators, without a carried re-emission stack. THE GAP: the Let route's
+/// BracketReturnClause check reads the clause with its frame present, but this
+/// projection does not inject a missing Let-route clause. F native/interpreter
+/// parity and Buffer1 release order were measured, not committed, in B1a.
+/// Scratch M-B1A restores the old carried seats and their exact refusal.
 #[test]
-fn live_child_dropped_return_clause_refuses_at_lowering() {
+fn live_child_has_no_carried_return_clause_drop_under_b1a() {
     assert_dropped_return_clause_refuses("px10_return_clause_live_child", LIVE_CHILD.to_owned());
 }
 
-/// Promise class: durable invariant; the null-stdout row of the pin above.
+/// Promise class: transition sentinel; the null-stdout row of the pin above.
 #[test]
-fn null_stdout_dropped_return_clause_refuses_at_lowering() {
+fn null_stdout_has_no_carried_return_clause_drop_under_b1a() {
     let null_body = ARGV_ENV_PIPE.replacen("        ChildPipe)", "        ChildNull)", 1);
     assert_ne!(
         null_body, ARGV_ENV_PIPE,
@@ -677,36 +769,12 @@ fn assert_dropped_return_clause_refuses(name: &'static str, source: String) {
             ken_runtime::HandlerOwnedDeferredResponseMutation::DropBracketReturnClause,
             || emit_below_gate(name, &source),
         );
-        assert!(
-            applications >= 1,
-            "{name}: the mutation must reach the carried stack"
+        assert_eq!(
+            applications, 0,
+            "{name}: the retired carried stack must not provide a drop seat"
         );
         let dropped = ken_runtime::dropped_bracket_return_clauses();
-        assert!(
-            !dropped.is_empty(),
-            "{name}: the mutation must record the clause frames it drops"
-        );
-        let error = built.expect_err("a dropped return clause cannot emit an artifact");
-        let NativeProgramBuildError::Packaging(error) = error else {
-            panic!("expected a packaging refusal, got {error:?}");
-        };
-        assert_eq!(
-            error.stage,
-            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
-        );
-        assert_eq!(
-            error.source_cause,
-            Some(ken_runtime::LoweringCause::PlannerInvariant)
-        );
-        assert!(error.reason.contains("BracketReturnClause"), "{error:?}");
-        assert!(
-            dropped
-                .iter()
-                .any(|(region, clause)| error.reason.contains(&format!(
-                    "a claim inside region {region}'s body runs without its return clause {clause} ("
-                ))),
-            "{name}: the refusal must name a region and clause the mutation dropped, \
-             {dropped:?}: {error:?}"
-        );
+        assert!(dropped.is_empty(), "{name}: no carried return clause was dropped: {dropped:?}");
+        built.expect("the no-op carried-stack mutation leaves the Let-body build available");
     });
 }

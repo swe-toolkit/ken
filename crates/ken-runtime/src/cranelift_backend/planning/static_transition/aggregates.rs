@@ -6304,7 +6304,10 @@ fn checked_ih_escape_subtree_contains(
 /// A checked-IH source whose only apparent crossing is into the owner that
 /// already emits the call. Such a crossing cannot mint a relocation, but its
 /// result still escapes into that owner's worker and cannot acquire a response
-/// owner merely because the transport source was correctly omitted.
+/// owner merely because the transport source was correctly omitted. This is
+/// the seed of the escaped-caller closure. A self transport outside that
+/// closure is deferred separately, under the same sub-case, by
+/// `static_response_phase_b_split_over`.
 pub(super) fn checked_ih_self_emitter_source(
     plan: &StaticTransitionPlan<'_>,
     identity: &ContinuationCallIdentity,
