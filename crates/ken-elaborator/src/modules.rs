@@ -6637,22 +6637,31 @@ pub fn expand_and_elaborate(
     };
     precheck_module_paths(&elab.module_state, decls, "", &owner)?;
     // Ordinary roots use the same file-unit dependency loader as the catalog
-    // entry and isolated-source routes. A declared inline sibling stays on the
-    // ordered pass (including its premature-import refusal); with no roots the
-    // existing absent-provider refusal is unchanged.
+    // entry and isolated-source routes, under the mode the roots were selected
+    // with. A declared inline sibling stays on the ordered pass (including its
+    // premature-import refusal). A path already owned by an earlier in-memory
+    // unit of this env resolves through the ordered pass, as with no roots;
+    // it is never reloaded from a file. With no roots the existing
+    // absent-provider refusal is unchanged.
     if !elab.module_state.catalog_roots.is_empty() && elab.module_state.active_imports.is_empty() {
-        let mode = elab.module_state.root_scope.mode;
-        if elab.module_state.roots_resolution_mode != Some(mode) {
+        let Some(mode) = elab.module_state.roots_resolution_mode else {
             return Err(ElabError::Internal(
-                "roots resolution mode cannot change during one elaboration run".to_string(),
+                "catalog roots are selected without a resolution mode".to_string(),
             ));
-        }
+        };
         let mut imports = Vec::new();
         imported_module_paths(decls, "", &mut imports);
         for (dependency, import_owner, span) in imports {
-            if declared_inline_import(&import_owner, None, &dependency, &local_modules).is_none() {
-                load_unit(elab, &dependency, &span, mode)?;
+            if declared_inline_import(&import_owner, None, &dependency, &local_modules).is_some() {
+                continue;
             }
+            if matches!(
+                elab.module_state.module_path_owners.get(&dependency),
+                Some(ModuleUnitOwner::InMemory(_))
+            ) {
+                continue;
+            }
+            load_unit(elab, &dependency, &span, mode)?;
         }
     }
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();

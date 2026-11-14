@@ -215,3 +215,51 @@ fn ordinary_roots_setting_is_single_and_root_locked() {
     env.set_catalog_roots_v1(&roots)
         .expect("a later equal-root request keeps the checked closure");
 }
+
+/// Promise class: durable invariant (spec 33 §§3.1–3.3).
+/// MEASURED: after an in-memory module M owns its checked path, its later
+/// importer selects the captured in-memory ID even when roots contain M.ken;
+/// without the in-memory owner, the same root supplies the file provider ID.
+/// CLAIMED: the preload never lets an available file replace an earlier
+/// checked in-memory owner, while still loading genuine external imports.
+/// THE GAP: removing only the in-memory-owner skip must reach the exact
+/// ModuleOwnerClash on M, not a missing-file refusal or a flat-name fallback.
+#[test]
+fn ordinary_roots_preserve_checked_memory_owner_over_available_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("catalog/packages");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("M.ken"), "pub const from_file : Nat = Zero\n").unwrap();
+    let roots = [root];
+
+    let mut memory = ElabEnv::new().unwrap();
+    memory.set_catalog_roots_v1(&roots).unwrap();
+    let admitted = memory
+        .elaborate_file_v1("module M { pub const from_memory : Nat = Suc Zero }")
+        .unwrap();
+    let memory_id = admitted
+        .iter()
+        .find(|result| result.name == "M.from_memory")
+        .expect("earlier in-memory module returned its checked declaration")
+        .def_id;
+    memory
+        .elaborate_file_v1("import M (from_memory)\nconst memory_client : Nat = from_memory")
+        .unwrap();
+    assert_eq!(
+        checked_head(&memory, memory.globals["memory_client"]),
+        memory_id
+    );
+
+    let mut file = ElabEnv::new().unwrap();
+    file.set_catalog_roots_v1(&roots).unwrap();
+    file.elaborate_file_v1("import M (from_file)\nconst file_client : Nat = from_file")
+        .unwrap();
+    let file_id = file
+        .elaborate_module_from_roots_v1(&roots, "M")
+        .unwrap()
+        .into_iter()
+        .find(|result| result.name == "M.from_file")
+        .expect("file provider returned its checked declaration")
+        .def_id;
+    assert_eq!(checked_head(&file, file.globals["file_client"]), file_id);
+}
