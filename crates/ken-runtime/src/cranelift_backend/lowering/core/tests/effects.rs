@@ -1147,35 +1147,14 @@ fn carried_site_operand_projection_preserves_the_exact_source_witness() {
         .expect("the exact carried projection compiles after the mutation clears");
 }
 
-#[test]
-fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
-    const RECOVERY_ASSERTION: &str =
-        "reintroduced launch ingress recovered the capability-using process answer";
+const LAUNCH_INGRESS_CHILD_ENV: &str = "KEN_B2F_LAUNCH_INGRESS_CHILD";
+const LAUNCH_INGRESS_EMITTED: &str = "b2f launch-ingress child: mutated program emitted";
 
-    struct Reset;
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            set_process_slot_mutation(ProcessSlotMutation::Exact);
-            B2F_PROCESS_PAIR_OBSERVATION.with(|cell| cell.set((0, 0)));
-        }
-    }
-    let _reset = Reset;
-
-    for mutation in [
-        ProcessSlotMutation::DeleteProcessInput,
-        ProcessSlotMutation::DeleteCapability,
-    ] {
-        set_process_slot_mutation(mutation);
-        let error = match compile_b2f_process_pair_fixture() {
-            Ok(_) => panic!("deleting either declared root slot must refuse emission"),
-            Err(error) => error,
-        };
-        assert!(
-            error.to_string().contains("declared input"),
-            "{mutation:?} failed for the wrong reason: {error}"
-        );
-    }
-
+/// The process-pair root ingress. The retained direct context is deliberately
+/// opaque. It has enough addressable storage to make an accidental fixed-offset
+/// load harmless, but it is not launch-ingress-shaped and contains no
+/// source-pair value.
+fn with_process_pair_ingress<R>(body: impl FnOnce(&RootIngressFixture) -> R) -> R {
     let fields = [
         BorrowedFixtureValue {
             kind: 2,
@@ -1202,9 +1181,6 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
         data: fields.as_ptr().cast(),
         len: fields.len(),
     };
-    // The retained direct context is deliberately opaque. It has enough
-    // addressable storage to make an accidental fixed-offset load harmless,
-    // but it is not launch-ingress-shaped and contains no source-pair value.
     let mut direct_context = DirectHostContextFixture {
         opaque: [std::ptr::null_mut(); 3],
     };
@@ -1213,17 +1189,91 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
         host_context: (&mut direct_context as *mut DirectHostContextFixture).cast(),
         capability: 1_u64 << 32,
     };
+    body(&ingress)
+}
+
+/// Child half of the ReintroduceLaunchIngress control, run only by
+/// `the_process_pair_reaches_a_retained_body_only_through_declared_slots`.
+/// The mutation hands the callee a context word that points at an object of
+/// another type, so what its native code then does is no part of any
+/// contract. It runs here, in its own process, where a native fault cannot
+/// abort the parent's other arms.
+#[test]
+fn launch_ingress_recovery_child() {
+    if std::env::var_os(LAUNCH_INGRESS_CHILD_ENV).is_none() {
+        return;
+    }
+    set_process_slot_mutation(ProcessSlotMutation::ReintroduceLaunchIngress);
+    let compiled = compile_b2f_process_pair_fixture()
+        .expect("the explicit launch-ingress recovery mutation still emits");
+    println!("{LAUNCH_INGRESS_EMITTED}");
+    std::io::Write::flush(&mut std::io::stdout()).expect("the child marker reaches the parent");
+    let recovered = with_process_pair_ingress(|ingress| {
+        compiled
+            .run_with_profile(
+                Some((ingress as *const RootIngressFixture).cast()),
+                crate::boundary_resource_profile::starter_smoke_profile(),
+            )
+            .expect("the explicit launch-ingress recovery mutation runs")
+            .1
+            .expect("the explicit launch-ingress recovery mutation returns a status")
+    });
+    assert_ne!(
+        recovered, 0,
+        "reintroduced launch ingress recovered the capability-using process answer"
+    );
+    assert_eq!(
+        B2F_PROCESS_PAIR_OBSERVATION.with(std::cell::Cell::get),
+        (0, 0),
+        "the invalid raw launch-ingress pair reached the host"
+    );
+}
+
+#[test]
+fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            set_process_slot_mutation(ProcessSlotMutation::Exact);
+            B2F_PROCESS_PAIR_OBSERVATION.with(|cell| cell.set((0, 0)));
+        }
+    }
+    let _reset = Reset;
+
+    for mutation in [
+        ProcessSlotMutation::DeleteProcessInput,
+        ProcessSlotMutation::DeleteCapability,
+    ] {
+        set_process_slot_mutation(mutation);
+        let error = match compile_b2f_process_pair_fixture() {
+            Ok(_) => panic!("deleting either declared root slot must refuse emission"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("declared input"),
+            "{mutation:?} failed for the wrong reason: {error}"
+        );
+    }
 
     set_process_slot_mutation(ProcessSlotMutation::Exact);
-    let exact = compile_b2f_process_pair_fixture()
-        .expect("the exact declared pair compiles")
-        .run_with_profile(Some((&ingress as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
-        .expect("the exact declared pair runs")
-        .1
-        .expect("the exact declared pair returns a status");
-    assert_eq!(exact, 0, "the descendant process answer must reach the root");
+    let (exact, capability) = with_process_pair_ingress(|ingress| {
+        let status = compile_b2f_process_pair_fixture()
+            .expect("the exact declared pair compiles")
+            .run_with_profile(
+                Some((ingress as *const RootIngressFixture).cast()),
+                crate::boundary_resource_profile::starter_smoke_profile(),
+            )
+            .expect("the exact declared pair runs")
+            .1
+            .expect("the exact declared pair returns a status");
+        (status, ingress.capability)
+    });
+    assert_eq!(
+        exact, 0,
+        "the descendant process answer must reach the root"
+    );
     let exact_observation = B2F_PROCESS_PAIR_OBSERVATION.with(std::cell::Cell::get);
-    assert_eq!(exact_observation, (1, ingress.capability));
+    assert_eq!(exact_observation, (1, capability));
 
     set_process_slot_mutation(ProcessSlotMutation::AttemptFixedContextOffsets);
     let fixed_context_error = match compile_b2f_process_pair_fixture() {
@@ -1236,9 +1286,6 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
          host-dispatch context is not semantic process-pair storage"
     );
 
-    B2F_PROCESS_PAIR_OBSERVATION.with(|cell| cell.set((0, 0)));
-    set_process_slot_mutation(ProcessSlotMutation::ReintroduceLaunchIngress);
-
     // MEASURED: the positive control changes both ends of the route: the root
     // caller explicitly injects its launch-ingress pointer, and the callee
     // reloads the pair from that reintroduced pointer.
@@ -1246,34 +1293,39 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
     // slots.
     // THE GAP: the retained host context is independently exercised above as
     // opaque storage; merely substituting offsets against it is not this
-    // mutation and has no source-pair value to recover.
-    let recovery_red = std::panic::catch_unwind(|| {
-        let recovered = compile_b2f_process_pair_fixture()
-            .expect("the explicit launch-ingress recovery mutation still emits")
-            .run_with_profile(Some((&ingress as *const RootIngressFixture).cast()), crate::boundary_resource_profile::starter_smoke_profile())
-            .expect("the explicit launch-ingress recovery mutation runs")
-            .1
-            .expect("the explicit launch-ingress recovery mutation returns a status");
-        assert_eq!(
-            recovered,
-            0,
-            "{RECOVERY_ASSERTION}"
-        );
-    })
-    .expect_err("the reintroduced launch-ingress mutation must red");
-    let recovery_message = recovery_red
-        .downcast_ref::<String>()
-        .map(String::as_str)
-        .or_else(|| recovery_red.downcast_ref::<&str>().copied())
-        .unwrap_or("");
+    // mutation and has no source-pair value to recover. The mutated program
+    // runs in launch_ingress_recovery_child's process. A non-zero status with
+    // the host unreached and a native memory fault after emission are both its
+    // red. Which one occurs depends on the wrong object it reads and differs
+    // between builds: PX10 B2's CI build faults, the local build refuses. It
+    // is not an emitter property.
+    let child = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "cranelift_backend::lowering::core::tests::effects::launch_ingress_recovery_child",
+            "--nocapture",
+        ])
+        .env(LAUNCH_INGRESS_CHILD_ENV, "1")
+        .output()
+        .expect("isolated launch-ingress recovery child");
+    let stdout = String::from_utf8_lossy(&child.stdout);
     assert!(
-        recovery_message.contains(RECOVERY_ASSERTION),
-        "the mutation failed at the wrong assertion: {recovery_message}"
+        stdout.lines().any(|line| line == LAUNCH_INGRESS_EMITTED),
+        "the launch-ingress mutation never reached native execution: {child:?}"
     );
-    assert_eq!(
-        B2F_PROCESS_PAIR_OBSERVATION.with(std::cell::Cell::get),
-        (0, 0),
-        "the invalid raw launch-ingress pair reached the host"
+    let refused = child.status.success() && stdout.contains("1 passed; 0 failed");
+    // SIGBUS (7) and SIGSEGV (11) on Linux: a native memory fault after
+    // emission. SIGABRT is Rust's own abort and is not accepted.
+    #[cfg(unix)]
+    let faulted = matches!(
+        std::os::unix::process::ExitStatusExt::signal(&child.status),
+        Some(7 | 11)
+    );
+    #[cfg(not(unix))]
+    let faulted = false;
+    assert!(
+        refused || faulted,
+        "the reintroduced launch-ingress mutation must red by refusal or native fault: {child:?}"
     );
 }
 
