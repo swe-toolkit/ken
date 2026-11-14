@@ -618,6 +618,45 @@ fn performed_bind_call(
     Ok(Some((call, ret_branch)))
 }
 
+/// Only checked metadata wrappers may enclose one executable call without
+/// changing its scrutinee result. Lowering produces these six forms around
+/// executable bodies (recursive_application_spine produces the recursive
+/// invocation wrapper); Project, Let, Closure and the other expression forms
+/// are not transparent call wrappers. Keep the residual match exhaustive so
+/// a new RuntimeExpr form must be classified before it can hide a call here.
+fn is_performed_call_scrutinee(expression: &RuntimeExpr, performing: &BTreeSet<String>) -> bool {
+    match expression {
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => {
+            is_performed_call_scrutinee(body, performing)
+        }
+        RuntimeExpr::Call { callee, .. } => matches!(
+            callee.as_ref(),
+            RuntimeExpr::DeclarationRef { symbol } if performing.contains(symbol)
+        ),
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::Var(_)
+        | RuntimeExpr::Let { .. }
+        | RuntimeExpr::If { .. }
+        | RuntimeExpr::PrimitiveCall { .. }
+        | RuntimeExpr::Construct { .. }
+        | RuntimeExpr::Match { .. }
+        | RuntimeExpr::ComputationalMatch { .. }
+        | RuntimeExpr::Record { .. }
+        | RuntimeExpr::Project { .. }
+        | RuntimeExpr::Closure { .. }
+        | RuntimeExpr::LexicalClosure { .. }
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Effect { .. }
+        | RuntimeExpr::Trap(_) => false,
+    }
+}
+
 /// A performed call left in a computational-match scrutinee indicates that
 /// direct-style lowering missed it; never patch a plan after it was collected.
 fn refuse_performed_call_scrutinees(
@@ -630,14 +669,7 @@ fn refuse_performed_call_scrutinees(
         scrutinee, cases, ..
     } = expression
     {
-        let performed = matches!(
-            scrutinee.as_ref(),
-            RuntimeExpr::Call { callee, .. }
-                if matches!(
-                    callee.as_ref(),
-                    RuntimeExpr::DeclarationRef { symbol } if performing.contains(symbol)
-                )
-        );
+        let performed = is_performed_call_scrutinee(scrutinee, performing);
         if performed {
             return Err(expression_lowering_error(
                 owner,
