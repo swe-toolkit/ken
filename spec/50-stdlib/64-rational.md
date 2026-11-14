@@ -380,6 +380,11 @@ proposed `mul::cancel_r`, but did **not** check either new order
 lemma. `Algorithm.Numeric.Gcd` retains no public surface in this WP:
 no ruled rational declaration consumes it.
 
+The later width-under-inclusion contract (§68 §16) adds a separate
+Nat.Order prerequisite: `mul_sub_distrib_l` and the three attached
+`sub` proofs `leq_left`, `left_mono` and `right_antitone`.
+This forward pointer does not change the §4 Rational CAT obligations.
+
 ## 5. Deliberate exclusions and next consumers
 
 This contract specifies **non-negative exact rational values** only.
