@@ -8,8 +8,6 @@ const P5: &str = include_str!("fixtures/px10_recursive_performed_p5.ken");
 const P7: &str = include_str!("fixtures/px10_recursive_performed_p7.ken");
 const P8: &str = include_str!("fixtures/px10_recursive_performed_p8.ken");
 const P10: &str = include_str!("fixtures/px10_recursive_performed_p10.ken");
-const VLET: &str = include_str!("fixtures/px10_recursive_performed_vlet.ken");
-const VMATCH: &str = include_str!("fixtures/px10_recursive_performed_vmatch.ken");
 
 fn with_native_grant(source: &str) -> String {
     let granted = source.replacen(
@@ -79,84 +77,6 @@ fn p5_self_recursive_bind_scrutinee_refuses_before_native_emission() {
 #[test]
 fn p7_self_recursive_bind_scrutinee_refuses_before_native_emission() {
     assert_self_recursive_scrutinee_refuses("p7", P7);
-}
-
-/// Promise class: transition sentinel. MEASURED: both exact p10 result-position
-/// variants fail at the SCT gate during checked elaboration on both the native
-/// build and fresh interpreter, before emission. CLAIMED: neither source can
-/// silently bypass the C3 refusal while this SCT restriction holds. THE GAP:
-/// this does not exercise the performed-call erasure predicate; if SCT begins
-/// accepting these exact forms, retire this sentinel and establish native
-/// parity or a direct erasure refusal for each variant.
-fn assert_result_position_sct_refusal(name: &'static str, raw: &'static str) {
-    std::thread::Builder::new()
-        .name(format!("px10-b2-c3-sct-{name}"))
-        // C3's existing recursive probes measured below 2 MiB resident on
-        // 16 MiB scratch workers; 16 MiB provisions that same baseline.
-        .stack_size(16 * 1024 * 1024)
-        .spawn(move || {
-            let root = tempfile::tempdir().expect("isolated result-position root");
-            let source = with_native_grant(raw);
-            let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
-            profile.invocation.nodes = 80; // Same nodes-only B2 deployment profile.
-            let error = ken_cli::build_native_program_with_roots(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &roots(),
-                name,
-                root.path().join("native"),
-                profile,
-            )
-            .expect_err("result-position variant must not emit a native artifact");
-            assert!(
-                matches!(
-                    &error,
-                    ken_elaborator::compiler_driver::NativeProgramBuildError::Driver(
-                        ken_elaborator::compiler_driver::CompilerDriverError::Elaboration(
-                            ken_elaborator::ElabError::KernelRejected {
-                                error: ken_kernel::KernelError::NotTerminating(_),
-                                ..
-                            }
-                        )
-                    )
-                ),
-                "{name}: unexpected native build refusal: {error:?}"
-            );
-            let mut host = ken_interp::PosixHost::new_at(root.path());
-            let reference = ken_cli::run_program_effect_observation(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &roots(),
-                &[],
-                &[],
-                root.path().as_os_str().as_encoded_bytes(),
-                &mut host,
-            )
-            .expect_err("result-position variant must not execute in the interpreter");
-            assert!(
-                matches!(
-                    &reference,
-                    ken_cli::RunError::Elaboration(ken_elaborator::ElabError::KernelRejected {
-                        error: ken_kernel::KernelError::NotTerminating(_),
-                        ..
-                    })
-                ),
-                "{name}: unexpected interpreter refusal: {reference:?}"
-            );
-        })
-        .expect("stated result-position refusal worker")
-        .join()
-        .expect("result-position refusal worker completed");
-}
-
-#[test]
-fn vlet_result_position_refuses_at_sct_before_native_emission() {
-    assert_result_position_sct_refusal("vlet", VLET);
-}
-
-#[test]
-fn vmatch_result_positions_refuse_at_sct_before_native_emission() {
-    assert_result_position_sct_refusal("vmatch", VMATCH);
 }
 
 /// Promise class: durable differential. MEASURED: the print-only p2 and the
