@@ -115,11 +115,12 @@ theorem client_area_inverted_y
 /// SOURCE: spec/50-stdlib/67-geometry.md §§4.1–4.3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: all four §4 globals are transparent and belong to a roots-loaded
-/// NatBox; their exact types check in a generic client, all thirteen new
-/// helpers refuse selective import, and the trusted GlobalId identity set
+/// NatBox; their exact types check in a generic client, ten remaining
+/// helpers refuse selective import, while three former helpers were replaced
+/// by public Nat.Order `sub` proofs. The trusted GlobalId identity set
 /// stays equal above the explicitly loaded provider closure.
 /// CLAIMED: the four §4 exports have the specified checked generic types
-/// at zero new trust, while the thirteen named new helpers stay private.
+/// at zero new trust; the ten named remaining helpers stay private.
 /// THE GAP: inherited provider assumptions remain; exact public-inventory
 /// closure is source-reviewed, and fixed values are checked in the seed.
 #[test]
