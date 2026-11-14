@@ -618,12 +618,12 @@ fn performed_bind_call(
     Ok(Some((call, ret_branch)))
 }
 
-/// Only checked metadata wrappers may enclose one executable call without
-/// changing its scrutinee result. Lowering produces these six forms around
-/// executable bodies (recursive_application_spine produces the recursive
-/// invocation wrapper); Project, Let, Closure and the other expression forms
-/// are not transparent call wrappers. Keep the residual match exhaustive so
-/// a new RuntimeExpr form must be classified before it can hide a call here.
+/// Follow a scrutinee's result positions through checked metadata wrappers,
+/// Let bodies, If arms and Match case bodies. The six checked wrappers preserve
+/// the executable body (recursive_application_spine supplies the recursive
+/// invocation wrapper); Let values, scrutinees, Project, Closure and the other
+/// forms do not themselves supply the scrutinee's result. Keep the residual
+/// match exhaustive so a new RuntimeExpr form must be classified here.
 fn is_performed_call_scrutinee(expression: &RuntimeExpr, performing: &BTreeSet<String>) -> bool {
     match expression {
         RuntimeExpr::CheckedBracketFinalizer { body, .. }
@@ -638,14 +638,25 @@ fn is_performed_call_scrutinee(expression: &RuntimeExpr, performing: &BTreeSet<S
             callee.as_ref(),
             RuntimeExpr::DeclarationRef { symbol } if performing.contains(symbol)
         ),
+        RuntimeExpr::Let { body, .. } => is_performed_call_scrutinee(body, performing),
+        RuntimeExpr::If {
+            then_expr,
+            else_expr,
+            ..
+        } => {
+            is_performed_call_scrutinee(then_expr, performing)
+                || is_performed_call_scrutinee(else_expr, performing)
+        }
+        RuntimeExpr::Match { cases, .. } => cases
+            .iter()
+            .any(|case| is_performed_call_scrutinee(&case.body, performing)),
+        RuntimeExpr::ComputationalMatch { cases, .. } => cases
+            .iter()
+            .any(|case| is_performed_call_scrutinee(&case.body, performing)),
         RuntimeExpr::Value(_)
         | RuntimeExpr::Var(_)
-        | RuntimeExpr::Let { .. }
-        | RuntimeExpr::If { .. }
         | RuntimeExpr::PrimitiveCall { .. }
         | RuntimeExpr::Construct { .. }
-        | RuntimeExpr::Match { .. }
-        | RuntimeExpr::ComputationalMatch { .. }
         | RuntimeExpr::Record { .. }
         | RuntimeExpr::Project { .. }
         | RuntimeExpr::Closure { .. }

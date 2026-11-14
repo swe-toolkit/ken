@@ -8,6 +8,8 @@ const P5: &str = include_str!("fixtures/px10_recursive_performed_p5.ken");
 const P7: &str = include_str!("fixtures/px10_recursive_performed_p7.ken");
 const P8: &str = include_str!("fixtures/px10_recursive_performed_p8.ken");
 const P10: &str = include_str!("fixtures/px10_recursive_performed_p10.ken");
+const VLET2: &str = include_str!("fixtures/px10_recursive_performed_vlet2.ken");
+const VMATCH2: &str = include_str!("fixtures/px10_recursive_performed_vmatch2.ken");
 
 fn with_native_grant(source: &str) -> String {
     let granted = source.replacen(
@@ -77,6 +79,78 @@ fn p5_self_recursive_bind_scrutinee_refuses_before_native_emission() {
 #[test]
 fn p7_self_recursive_bind_scrutinee_refuses_before_native_emission() {
     assert_self_recursive_scrutinee_refuses("p7", P7);
+}
+
+/// Promise class: durable fail-closed refusal. MEASURED: checked interpreter
+/// executes both exact decreasing recursive variants; native build refuses at
+/// the performed-call erasure lane before emission under B2's nodes-only
+/// profile. CLAIMED: result-position Let and Match scrutinees cannot bypass
+/// the performed-call guard. THE GAP: these two inputs do not cover arbitrary
+/// If arms or every nested match, which remain production-classified by the
+/// exhaustive predicate rather than witnessed here.
+fn assert_result_position_variant_refuses(name: &'static str, raw: &'static str) {
+    std::thread::Builder::new()
+        .name(format!("px10-b2-c3-result-{name}"))
+        // Scratch 16 MiB workers on the preceding p10 controls used under
+        // 2 MiB resident; 16 MiB provisions the same recursive baseline.
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let root = tempfile::tempdir().expect("isolated result-position root");
+            let source = with_native_grant(raw);
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            let reference = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots(),
+                &[],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .unwrap_or_else(|error| panic!("{name}: interpreter must elaborate: {error:?}"));
+            assert_eq!(reference.exit_status, 0, "{name}: {reference:?}");
+            assert!(
+                reference.stdout.ends_with(b"end\n"),
+                "{name}: {reference:?}"
+            );
+            assert!(!reference.effect_trace.is_empty(), "{name}: effect ran");
+            let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+            profile.invocation.nodes = 80; // B2's measured-only native policy.
+            let error = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots(),
+                name,
+                root.path().join("native"),
+                profile,
+            )
+            .expect_err("result-position performed call must refuse before emission");
+            assert!(
+                matches!(
+                    &error,
+                    ken_elaborator::compiler_driver::NativeProgramBuildError::Erasure(
+                        ken_elaborator::erasure::ErasureError::ExpressionLowering {
+                            lane: "performed_call_scrutinee_not_direct",
+                            ..
+                        }
+                    )
+                ),
+                "{name}: wrong native build refusal: {error:?}"
+            );
+        })
+        .expect("stated result-position worker")
+        .join()
+        .expect("result-position worker completed");
+}
+
+#[test]
+fn vlet2_result_position_performed_call_refuses_before_native_emission() {
+    assert_result_position_variant_refuses("vlet2", VLET2);
+}
+
+#[test]
+fn vmatch2_result_position_performed_call_refuses_before_native_emission() {
+    assert_result_position_variant_refuses("vmatch2", VMATCH2);
 }
 
 /// Promise class: durable differential. MEASURED: the print-only p2 and the
