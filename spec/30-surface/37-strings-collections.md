@@ -617,48 +617,48 @@ built-in comparators (the L-classes boundary below).
 explicit comparator and produces a **refinement-typed** result (`34 §5`):
 
 ```
-view sort {a} (leq : a → a → Bool) (xs : List a)
-    : { ys : List a | is_sorted leq ys ∧ Perm ys xs } = …
+fn sort (a : Type) (leq : a → a → Bool) (xs : List a)
+    : { ys : List a |
+        is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs } = …
 ```
 
-This matches the landed AC6 `sort` surface exactly (`l3a_acceptance.rs`, the
-`leq : a → a → Bool` comparator after the ES2 `OrdResult → Bool` migration) — no
-`where`-constraint threading, no new surface. The refinement carries **two**
-conjuncts, and the second is **load-bearing**:
+The explicit type and comparator arguments match §57 §3.4 and the
+L3 `fn sort` example (`l3a_acceptance.rs`). This refinement
+illustrates the verified client contract; it does not change
+`Data.Collections.Derived.sort`'s `List a` result type. The old
+pre-source `Perm` does not establish the imported count-based claim.
+The conjuncts are:
 
-- `is_sorted leq ys` — `ys` is in non-decreasing `leq`-order (a decidable
+- `is_sorted a leq ys` — `ys` is in non-decreasing `leq`-order (a decidable
   refinement predicate, `34 §5`).
-- `Perm ys xs` — `ys` is a **permutation** of the input (comparator-free).
+- `Perm a (eq_from_ord a leq) ys xs` — `ys` preserves every input count
+  using equality from the **same** comparator that sorts it (§57 §3.1).
 
-`is_sorted`-**alone is degenerate**: `sort _ = Nil` satisfies
-`{ ys | is_sorted leq ys }` (the empty list is vacuously sorted), so a
+`is_sorted`-**alone is degenerate**: `sort a leq xs = Nil a` satisfies
+`{ ys | is_sorted a leq ys }` (the empty list is vacuously sorted), so a
 sortedness-only spec is met by a **constant-`Nil`** implementation that throws
-the input away — it guards nothing
-(the discriminating-example / refinement-must-not-be-vacuous discipline). The
-`Perm ys xs` conjunct is what forces `sort` to actually *be* a sort. The
-elaboration **emits the conjoined obligation**
-`is_sorted leq (sort leq xs) ∧ Perm (sort leq xs) xs` on the result introduction
-(`34 §5`, `22 §2.1`); a verified
-`sort` discharges it with a bundled proof (AC6 observes the **emitted VC**
-structurally — per the untrusted-layer lesson, the obligation must be *emitted*,
-not assumed).
+the input away — it guards nothing. The `Perm` conjunct rules out that
+loss on nonempty inputs. Elaboration **emits the conjoined obligation**
+`is_sorted a leq (sort a leq xs) ∧
+ Perm a (eq_from_ord a leq) (sort a leq xs) xs`
+on result introduction (`34 §5`, `22 §2.1`); a verified `sort`
+discharges it with a bundled proof. AC6 observes the **emitted VC**,
+not an assumed guarantee.
 
-**The refinement predicates are definitions, not postulates (ES1).** The
-obligation `is_sorted leq (sort leq xs) ∧ Perm (sort leq xs) xs` is dischargeable
-only if the prover can **unfold** `is_sorted` and `Perm` — so both are
-**definitions** (`Ω`-valued, re-checked, **out** of `trusted_base()`), never
-opaque postulates. As `declare_postulate`s (their current `prelude.rs` form) the
-predicates are **undefined**: `is_sorted leq (sort leq xs)` cannot reduce, so the
-obligation is either **undischargeable** or discharged **circularly** (the proof
-assuming the
-conclusion), and the flagship verified `sort` would prove **nothing**
-(`30 §6`, the surface-minimality invariant; ES2 lands the demotion). The
-defining shapes:
+**The refinement predicates are definitions, not postulates (ES1).**
+The prover must be able to unfold `is_sorted` and the count-based
+`Perm` imported from `Data.Collections.Derived`. Both are checked
+`Ω`-valued definitions, out of `trusted_base()`. Replacing either
+with an opaque postulate would make a claimed verified `sort` circular
+rather than prove its conjoined obligation (`30 §6`). A legacy
+pre-source `Perm` registration survives until I4, but does not define
+the pinned imported predicate. The defining shapes are:
 
 - **`is_sorted : Π(a : Type). (a → a → Bool) → List a → Ω`** — an `Ω`-valued
-  structural recursion over the **explicit comparator**: `is_sorted leq Nil = ⊤`,
-  `is_sorted leq (x :: Nil) = ⊤`, and
-  `is_sorted leq (x :: y :: r) = IsTrue (leq x y) ∧ is_sorted leq (y :: r)` (the
+  structural recursion over the **explicit comparator**: `is_sorted a leq Nil = ⊤`,
+  `is_sorted a leq (x :: Nil) = ⊤`, and
+  `is_sorted a leq (x :: y :: r) = IsTrue (leq x y) ∧
+  is_sorted a leq (y :: r)` (the
   connective is the derived Ω-conjunction `And`, `16 §1.3`; the recursion
   descends structurally on the list, so it terminates). The comparator is
   `Bool`-valued (matching the landed `sort`), so the order relation enters `Ω`
@@ -671,32 +671,24 @@ defining shapes:
   `../50-stdlib/51-lawful-classes.md`, `where Ord a` supplies this **same**
   `leq : a → a → Bool` from the dictionary — the `IsTrue` bridge is
   **unchanged**; the class changes only *where* `leq` comes from, `33 §5.4`.)
-- **`Perm : Π(a : Type). List a → List a → Ω`** — a permutation **must** be
-  `Ω`-valued, and a bare inductive relation is **not**:
-  `data Perm_rel := perm_refl | perm_swap | perm_trans | perm_cons` is
-  proof-**relevant** (a proof records *which* permutation) so it lands in
-  `Type`, and `16 §1.3` **forbids** a proof-relevant `Type → Ω` directly (it
-  would admit `Bool`, collapsing `true ≡ false` by Ω-PI). **Pinned form
-  (ES2-remainder ruling `evt_3cn9v6em54yej`, closing ES1's "spec picks one"
-  fork) — the truncation:**
+- **`Perm : Π(a : Type). (a → a → Bool) → List a → List a → Ω`** —
+  given `eqf`, `Perm a eqf xs ys` compares `count a eqf x xs` with
+  `count a eqf x ys` by `Equal Nat` for **every** `x : a` (§57 §3.1).
+  This count equality is a `Π` of equations into `Ω`, so it needs no
+  truncation. The verified sort supplies `eq_from_ord a leq` as `eqf`:
+  `eq_from_ord a leq x y` is `bool_and (leq x y) (leq y x)`.
+  The equality comparator comes from the sort's own lawful order;
+  no unrelated `DecEq` or second comparator is silently selected.
+  For a carrier without decidable element equality, the named
+  fallback is `‖Perm_rel‖`, the propositional truncation of a
+  proof-relevant permutation relation (§57 §3.1, `16 §6`). It is
+  **not** the `Perm` pin. A bare proof-relevant inductive
+  `Perm_rel : Ω` would violate `16 §1.4`/`13 §4`.
 
-  `Perm xs ys := ∥ Perm_rel xs ys ∥ : Ω`
-
-  — propositional truncation of the `Type`-level inductive (the `∨ := ∥+∥` /
-  `∃ := ∥Σ∥` pattern, `16 §6`; proof-irrelevant). It is **comparator-free** and
-  carries **no `DecEq a` / `Ord a` dependency** — the decisive reason to prefer
-  it. The rejected alternative, **count-equality**
-  `Perm xs ys := Π (x : a). Eq Nat (count x xs) (count x ys)`, is natively `Ω`
-  (a `Π` of `Eq`s) but requires `DecEq a` to `count` occurrences (counting
-  compares elements) — dragging in exactly the class dependency this ruling
-  defers. `Perm` therefore uses the truncation, **not** count-equality.
-
-  Declaring the bare inductive `: Ω` is the relevance leak `16 §1.3`/`13 §4`
-  forbid (CV's table surfaced this fork; CV-Spec blocked on it).
-
-Neither is prelude: no primitive signature names either one, and neither has
-an independent internal-provision witness (`30 §4`). They are the
-verified-`sort` showcase's own definitions.
+No `Perm` is prelude in this contract: it is imported from
+`Data.Collections.Derived`, along with `is_sorted` and `eq_from_ord`.
+The legacy pre-source registration is an I4 retirement obligation,
+not a second permitted definition of the verified-sort predicate.
 
 **L-classes staging boundary (flag, do not resolve).** The collection **types**
 and **structural equality** ship in L3 with **built-in** `DecEq`/`Ord` instances
@@ -744,7 +736,8 @@ with its level, and none adds a universe computation:
   rule** (`34 §7`).
 - **`Array a` / `Set a`** — abstract types at `level a`; `Map k v` at `max(level
   k, level v)`. Abstract carriers over `41`'s heap, no universe bump.
-- **Refinement `{ ys : List a | is_sorted leq ys ∧ Perm ys xs }`** — a
+- **Refinement `{ ys : List a | is_sorted a leq ys ∧
+  Perm a (eq_from_ord a leq) ys xs }`** — a
   subset-Σ over `List a : Type ℓ_a`, with its checked predicate in
   `Ω_ℓ_P` (`12 §5`/`16 §1`). The pair lands in
   `Type (max ℓ_a ℓ_P)` (`13 §4`, `34 §5`/§7); its Ω proof is
@@ -815,12 +808,13 @@ test/property framework).
   independently of runtime representation. The proved `Map`/`Set` carrier is
   keyed by lawful `Ord`; its accept/reject coverage lives in `50-stdlib/52`.
 - **AC6 (the verified example, structural).** `sort` (threading the explicit
-  `leq : a → a → Bool`) produces `{ ys | is_sorted leq ys ∧ Perm ys xs }` — the
-  **conjoined** refinement obligation is **emitted** and dischargeable; assert
-  the **`Perm` conjunct is present** (a sortedness-only obligation is degenerate
-  — `const Nil` satisfies it). `is_sorted`/`Perm` are the pinned **definitions**
-  (`§6`: explicit-comparator `is_sorted`, `Perm := ∥Perm_rel∥`), unfoldable — not
-  postulates (the demotion is the ES2-remainder follow-on).
+  `leq : a → a → Bool`) produces
+  `{ ys | is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs }` — the
+  **conjoined** refinement obligation is **emitted** and dischargeable;
+  assert the **`Perm` conjunct is present** (a sortedness-only obligation
+  is degenerate — `const Nil` satisfies it). `is_sorted`, `Perm` and
+  `eq_from_ord` come from `Data.Collections.Derived`, not a prelude
+  `Perm`; the predicates are unfoldable definitions, not postulates.
 
 **Derived string surface — slice-2 acceptance (`§2.5` / `§2.5.1` / `§4.1`,
 impl-ready).** The floor + 5 string ops, mapping the WP frame's AC1–AC7:

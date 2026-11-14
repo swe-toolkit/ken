@@ -35,10 +35,8 @@ fn missing_observation(
 /// claimed by this file-source subset.
 #[test]
 fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
-    const CASES: [(&str, &str); 15] = [
+    const CASES: [(&str, &str); 13] = [
         ("conformance/challenge/C1-deceq-noncanonical/sound-deceq-char.ken", "DecEq"),
-        ("conformance/challenge/C5-verified-sort/sound-verified-sort.ken", "isSorted"),
-        ("conformance/challenge/C5-verified-sort/unsound-const-nil.ken", "isSorted"),
         ("conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken", "Ord"),
         ("conformance/challenge/C6-lawful-ord-vs-stub/stub-ord-axiom.ken", "Ord"),
         ("crates/ken-elaborator/tests/fixtures/kernel_conv_cast_consumer.ken", "ConvCastExpectedOf"),
@@ -61,10 +59,7 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
     for (path, expected) in CASES {
         let original = std::fs::read_to_string(root.join(path))
             .unwrap_or_else(|error| panic!("{path}: cannot read fixture: {error}"));
-        let c5 = path.starts_with("conformance/challenge/C5-verified-sort/");
-        let strict_source = if c5 {
-            format!("import Core.Logic.Conjunction (And)\n{original}")
-        } else if path == "conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken" {
+        let strict_source = if path == "conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken" {
             format!("import Core.Classes.LawfulClasses (IsTrue)\n{original}")
         } else {
             original.clone()

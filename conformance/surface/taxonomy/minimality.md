@@ -330,7 +330,7 @@ Verdicts + Ω-sort witnesses:
 | **`Equal : Π(A). A→A→Ω`** | `declare_def` (`prelude.rs:805`) | **DEMOTED (landed) — a re-checked def aliasing computing `Eq`; a §4 floor member** | the ES2 demotion landed: `Equal`'s body **is** the kernel's native `Eq A a b : Ω` (computes, with `refl`/`J` — `16 §2`, `term.rs`), so it is a `Decl::Transparent` def **out** of `trusted_base()`, not the earlier shadowing postulate. As the surface-nameable alias for kernel equality it is kernel-keyed (a source `data Equal` forfeits `Eq`'s `J`/`refl` — fails to interoperate), so it is a prelude floor member (`30-taxonomy §4`), no longer a bloat instance. |
 | **`And : Ω→Ω→Ω`** | `declare_postulate` | **DERIVABLE** | `data And (A B:Ω):Ω := conj (a:A)(b:B)` → **Ω** via both-keyed `sort_sigma` (Σ of two Ω → Ω); or `16 §1.3` derived connectives. |
 | **`isSorted : Π(A). List A→Ω`** | `declare_postulate` | **DERIVABLE (★ soundness)** | Ω-recursion `isSorted (x::y::r)= And (x≤y)(isSorted (y::r))`. **Needs a Prop-valued `≤ : A→A→Ω`** — if `Ord` exposes only `Bool` `leq`, add `Le`/`IsTrue (leq a b):Ω` (else it's `Type`, a relevance leak). |
-| **`Perm : Π(A). List A→List A→Ω`** | `declare_postulate` | **DERIVABLE (★ soundness)** | **Ω-sort fork:** the inductive relation (`refl\|swap\|trans\|cons`) is proof-**relevant** (`Type`) ⇒ needs **truncation** `∥·∥` to be an Ω predicate; count-equality (`Π x. Eq Nat (count x xs)(count x ys)`) is **natively Ω** but DecEq-dependent. Either is derivable; spec picks the form. |
+| **`Perm (a : Type) (eqf : a→a→Bool) (xs ys : List a) : Ω`** | `declare_postulate` | **DERIVABLE (★ soundness)** | The pinned definition is count equality: `(x : a) → Equal Nat (count a eqf x xs) (count a eqf x ys)` (`57 §3.1`). It is natively Ω and takes explicit element equality; verified sort supplies `eqf = eq_from_ord a leq`. `‖Perm_rel‖` is the named fallback for carriers without decidable element equality, not the pin. A proof-relevant multi-constructor relation cannot be declared directly at Ω. |
 | **opaque `Bool`** | `declare_primitive` (Opaque) | **DERIVABLE (F1)** | `data Bool = True\|False` (Type) — removes the opaque primitive **and** the `OrdResult` branch-workaround (§B). |
 | **the former `Map`/`Set` placeholder** | historical `declare_postulate`, then `declare_primitive`, now retired | **DERIVABLE — proved package (landed `52-map`)** | The shipped carrier is ordinary inductive `Tree k v` over lawful `Ord k`; its operations and shipped laws are re-checked definitions, `Set` derives from the same carrier, and the one deferred permutation law is not postulated (`52 §1`/`§4.4`/`§7c`). It is out of `trusted_base()`. Extensional behavior and durable round-trip do not require a particular in-process representation: copying, sharing, or interning the value is private, and internal bytes are not observable (`41 §3a`/`§4`). |
 | **`reg_novf` — the no-overflow PREDICATE** (`Fits`/`inBounds : Int → Ω`) | `declare_postulate` (`numbers.rs:190`) | **★ NEW (seed missed) — DERIVABLE (ruled §6)** | the reusable decidable fixed-width **bound predicate** (`(a+b)` within `[MIN_w, MAX_w]` over arbitrary-precision `Int`) → a **definition, out of `trusted_base()`** (`OQ-1a`). Same Prop-`≤`/`IsTrue` bridge as `isSorted`. My signature-grep surfaced it; §6 ruled it a definition. |
@@ -341,7 +341,8 @@ Verdicts + Ω-sort witnesses:
 every refinement predicate must land in **Ω** (proof-irrelevant), not
 `Type` — a `Type`-valued "prop" cannot be the subset-Σ proof component and
 would instead add relevant data to the pair.
-`And` ✓ (both- keyed Σ→Ω); `isSorted`/`Perm` per the forks above; `Bool` is
+`And` ✓ (both-keyed Σ→Ω); `isSorted` follows its Ω recursion; `Perm` is the
+count-equality definition above; `Bool` is
 correctly `Type` (matchable data, not a prop).
 
 ## E. Trust-class accounting (AC4) — the `trusted_base()` delta
@@ -402,7 +403,8 @@ ordinary data representation.
   bloat finding proves the opposite direction (ruled remove; `Ordering`→package,
   §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/
-  `isSorted`/`Perm` with defining equations + Ω-sort witnesses; the
+  `isSorted`/`Perm` with defining equations + Ω-sort witnesses; `Perm` uses
+  count equality under the sort comparator's `eq_from_ord`; the
   verified-`sort` refinement (`37 §6`) unfolds them (green-vs-green against a
   postulate otherwise).
 - **AC4** (trust-class rulings exact): §E — the item-2/item-3 line per entry,

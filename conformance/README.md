@@ -197,8 +197,9 @@ claim with no conformance case is a claim no one can rely on
   combinator laws as **emitted propositions**; **infinitude without
   coinduction** (the fuel-bounded inductive `unfoldUpTo` + the
   no-coinductive-**construct** absence net); the `DecEq`-key **verdict flip**;
-  and the verified `sort` whose `isSorted ∧ Perm` obligation is asserted **with
-  the `Perm` conjunct present**.
+  and the verified `sort` whose imported `is_sorted` plus count-equality
+  `Perm a (eq_from_ord a leq) ys xs` obligation is asserted with the `Perm`
+  conjunct present.
 - `surface/bytes-io/seed-bytes-io.md` — L6 `Bytes` + binary I/O (`38 §1`):
   `Bytes` as a `14 §5` primitive (`0x05`, immutable, `b"…"`/`0x[…]` literals),
   interpreter-side primitive-operation behavior + no-silent-OOB partiality,

@@ -1,0 +1,8 @@
+-- C5 closed negative control: the counts differ, so Proved must be refused.
+import Data.Collections.Derived (Perm, eq_from_ord)
+
+fn always (x : Bool) (y : Bool) : Bool = True
+
+theorem const_nil_is_perm
+    : Perm Bool (eq_from_ord Bool always) (Nil Bool) (Cons Bool True (Nil Bool)) =
+  λx. Proved

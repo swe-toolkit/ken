@@ -122,7 +122,7 @@ not the frame):**
   highest-risk kind.
 - **Refinement must not be vacuous** (the discriminating-example discipline,
   `34 §5`): AC6 asserts the emitted obligation carries the **`Perm` conjunct**,
-  because `isSorted`-alone is satisfied by `const Nil` (the empty list is
+  because `is_sorted`-alone is satisfied by `const Nil` (the empty list is
   vacuously sorted) — a sortedness-only obligation guards nothing.
 - **One home per property** (`subsume-don't-proliferate`): the `String ↔ Bytes`
   partial decode and the round-trip law are **L6's** (`../bytes-io/`),
@@ -142,8 +142,8 @@ trace. `(oracle)` — confirmed by the Spec enclave / at build time, safe as it 
 `Map a Unit`, and the **NFC-equality case** (pending real NFC, per the staging
 fact above). The durable kind tags, byte/char length distinction,
 convertible-view totalities, persistent value behavior, no-coinduction
-absence, `isSorted ∧ Perm` refinement, and every live verdict are
-**normative**. Runtime sharing is not.
+absence, the `is_sorted` plus comparator-derived count-equality `Perm`
+refinement, and every live verdict are **normative**. Runtime sharing is not.
 
 ---
 
@@ -430,27 +430,33 @@ is rejected, and a non-canonical `Ord` key (e.g. `Decimal`) is unlawful
 
 `sort` threads an **explicit comparator** `leq : a → a → Bool` (the pinned §6
 surface — the lawful-`Ord` class is **deferred**, `37 §6`) and produces the
-refinement `{ ys : List a | isSorted leq ys ∧ Perm ys xs }` (`34 §5`); the
-elaboration **emits the conjoined obligation**.
+refinement `{ ys : List a | is_sorted a leq ys ∧
+Perm a (eq_from_ord a leq) ys xs }` (`34 §5`, `57 §3.1`); the elaboration
+**emits the conjoined obligation**.
+The C5 sources import `Perm`, `is_sorted`, and `eq_from_ord` from
+`Data.Collections.Derived`.
 
 ### surface/collections/sort-emits-issorted-and-perm (soundness)
 - spec: `37 §6`, `34 §5` (refinement obligation), `22 §2.1`
 - given: `fn sort {a} (leq : a → a → Bool) (xs : List a) : R = …`, where the
-  refinement `R = { ys : List a | isSorted leq ys ∧ Perm ys xs }` (`34 §5`) —
-  the **explicit-comparator** surface (ES2-remainder pin; no `where Ord a`).
+  refinement `R = { ys : List a | is_sorted a leq ys ∧
+  Perm a (eq_from_ord a leq) ys xs }` (`34 §5`, `57 §3.1`) — the
+  **explicit-comparator** surface
+  (ES2-remainder pin; no `where Ord a`).
 - expect: the result-introduction **emits the conjoined refinement obligation**
-  `isSorted leq (sort leq xs) ∧ Perm (sort leq xs) xs` (`34 §5`, `22 §2.1`),
-  dischargeable by a verified `sort` with a bundled proof. Assert the emitted
-  obligation carries **both** conjuncts — **specifically that the
-  `Perm (sort leq xs) xs` conjunct is present**, not `isSorted`-alone.
+  `is_sorted a leq (sort a leq xs) ∧
+  Perm a (eq_from_ord a leq) (sort a leq xs) xs` (`34 §5`, `22 §2.1`),
+  dischargeable by a verified `sort` with a bundled
+  proof. Assert both conjuncts, specifically the count-equality `Perm`
+  conjunct; `eq_from_ord a leq` uses the sort comparator.
 - why: AC6 — the canonical verification example, **structural on the emitted
   obligation**, and the **refinement-must-not-be-vacuous** discriminator.
-  `isSorted`-alone is **degenerate**: `sort _ = Nil` satisfies
-  `{ ys | isSorted leq ys }` (the empty list is vacuously sorted), so a
+  `is_sorted`-alone is **degenerate**: `sort _ = Nil` satisfies
+  `{ ys | is_sorted a leq ys }` (the empty list is vacuously sorted), so a
   sortedness-only obligation is met by a **`const Nil`** implementation that
   discards the input — it guards nothing. The `Perm` conjunct forces `sort` to
   **be** a sort. **`(soundness)`** via the untrusted-layer **omission** lesson:
-  the bug is the elaborator **emitting only `isSorted`** (silently dropping
+  the bug is the elaborator **emitting only `is_sorted`** (silently dropping
   `Perm`) — a never-generated conjunct supplies no proof obligation and reads
   `proved`-by-default, a verification-soundness gap the kernel does **not**
   catch. The case asserts the **completeness** of the emitted obligation (both
@@ -528,7 +534,8 @@ re-points to a user `instance Ord K`.**)**
   `Ord K` is a **user** `instance Ord K` resolved via
   `instance_search("Ord", "K")` and desugared to threading its `leq`
 - expect (on that WP): the result-introduction **emits the conjoined
-  obligation** `isSorted leq (sort xs) ∧ Perm (sort xs) xs` — **both conjuncts,
+  obligation** `is_sorted a leq (sort a leq xs) ∧
+  Perm a (eq_from_ord a leq) (sort a leq xs) xs` — **both conjuncts,
   `Perm` present** — identically to the explicit-comparator base; the emission
   does **not** regress through the desugaring
 - why: (L3b-AC3 ★, deferred) (soundness) the VC-emission must **not regress

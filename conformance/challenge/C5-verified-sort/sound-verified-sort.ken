@@ -2,27 +2,28 @@
 -- should-PASS on emission (both conjuncts). The subset-Σ Pair core shape is
 -- deferred until W5; current transitional lowering remains carrier-only.
 --
--- Run against the prelude (List, Bool, And, isSorted, Perm — the C2 Ω-clean
--- Perm: ‖Perm_rel‖ / count-equality, NOT a proof-relevant Ω inductive).
+-- Import the checked collection predicates; the count-equality Perm is Ω-native.
+import Core.Logic.Conjunction (And)
+
+import Data.Collections.Derived (Perm, is_sorted, eq_from_ord)
 
 fn insert (a : Type) (leq : a → a → Bool) (x : a) (xs : List a) : List a =
   match xs {
-    Nil      ↦ Cons a x (Nil a) ;
-    Cons h t ↦ match leq x h {
-                  True  ↦ Cons a x (Cons a h t) ;
-                  False ↦ Cons a h (insert a leq x t) } }
+    Nil ↦ Cons a x (Nil a);
+    Cons h t ↦
+      match leq x h {
+        True ↦ Cons a x (Cons a h t);
+        False ↦ Cons a h (insert a leq x t)
+      }
+  }
 
 -- W1 target: the surface refinement elaborates to `Sigma(ys, And(...))` and
 -- its result is a checked pair carrying both conjuncts. This pair shape is
 -- deferred until W5; the live C5 property is emission of both conjuncts.
-fn sort (a : Type) (leq : a → a → Bool) (xs : List a)
-  : { ys : List a | And (isSorted a leq ys) (Perm a ys xs) } =
+fn sort
+      (a : Type) (leq : a → a → Bool) (xs : List a)
+    : {ys : List a | And (is_sorted a leq ys) (Perm a (eq_from_ord a leq) ys xs)} =
   match xs {
-    Nil      ↦ Nil a ;
-    Cons h t ↦ insert a leq h (sort a leq t) }
-
--- Expected current C5 behavior: emits the conjoined obligation with BOTH
--- conjuncts (isSorted AND Perm) present. The checked subset-Sigma Pair output
--- is deferred until W5. Full proof discharge (prover closing Perm) remains a
--- known gap; emission with both conjuncts is the checkable property. Contrast
--- the unsound arm.
+    Nil ↦ Nil a;
+    Cons h t ↦ insert a leq h (sort a leq t)
+  }
