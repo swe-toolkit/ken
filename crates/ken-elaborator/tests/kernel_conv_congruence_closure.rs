@@ -496,32 +496,6 @@ fn install_quot_elim_fixture_prelude(env: &mut ElabEnv) {
     );
 }
 
-// Construct the same dependent consumer as the former surface fixture, but
-// directly in core: Π(parameters). ExpectedOf parameters. The installed value
-// has this type only through conversion of the neutral former underneath it.
-fn expected_consumer_type(original: &Term, expected: GlobalId, arity: usize) -> Term {
-    // The inner leaf is under all `arity` binders; apply in outer-to-inner
-    // order to preserve the same open telescope (Var(arity-1), ..., Var(0)).
-    fn build(ty: &Term, expected: GlobalId, remaining: usize, arity: usize) -> Term {
-        if remaining == 0 {
-            let mut result = Term::const_(expected, vec![]);
-            for index in (0..arity).rev() {
-                result = Term::app(result, Term::var(index));
-            }
-            result
-        } else {
-            let Term::Pi(domain, codomain) = ty else {
-                panic!("fixture value lacks a parameter: {ty:?}");
-            };
-            Term::pi(
-                (**domain).clone(),
-                build(codomain, expected, remaining - 1, arity),
-            )
-        }
-    }
-    build(original, expected, arity, arity)
-}
-
 fn assert_core_consumer(
     install: impl FnOnce(&mut ElabEnv),
     expected_name: &str,
@@ -537,12 +511,26 @@ fn assert_core_consumer(
     let Some(Decl::Transparent { ty: value_ty, .. }) = env.env.lookup(value) else {
         panic!("fixture value must be a checked definition");
     };
-    let target = expected_consumer_type(value_ty, expected, arity);
-    let (_, value_body) = env
-        .env
-        .transparent_body(value)
-        .expect("checked core value body");
-    check(&env.env, &Context::new(), &value_body, &target)
+    // Match the former surface `fn c (params) : Expected params = value params`:
+    // application inference must convert the value's declared result type
+    // against Expected, rather than checking its body against a fresh Pi.
+    let mut ctx = Context::new();
+    let mut ty = value_ty.clone();
+    for _ in 0..arity {
+        let Term::Pi(domain, codomain) = ty else {
+            panic!("fixture value lacks a parameter: {ty:?}");
+        };
+        ctx.push(*domain);
+        ty = *codomain;
+    }
+    let apply = |head: GlobalId| {
+        (0..arity)
+            .rev()
+            .fold(Term::const_(head, vec![]), |acc, index| {
+                Term::app(acc, Term::var(index))
+            })
+    };
+    check(&env.env, &ctx, &apply(value), &apply(expected))
         .unwrap_or_else(|error| panic!("{consumer} must kernel-check: {error:?}"));
     assert_eq!(
         before,
@@ -578,7 +566,8 @@ fn omega_congruence_is_reached_by_checked_core_term() {
     assert_eq!(before, trust(&env), "core check changes no trust entries");
 }
 
-/// MEASURED: a reducible relation converts under Quot's core former.
+/// MEASURED: the value applied to its parameters converts to QuotExpectedOf
+/// applied to the same parameters, with a reducible relation under Quot.
 /// CLAIMED: Quot component conversion is admitted. THE GAP: the core checker
 /// alone does not distinguish a blanket-true conversion implementation.
 #[test]
@@ -592,7 +581,8 @@ fn quotient_congruence_is_reached_by_checked_core_term() {
     );
 }
 
-/// MEASURED: core types indexed at reducibly equal quotient classes convert.
+/// MEASURED: class_value applied to its parameter converts to ClassExpectedOf
+/// applied to that parameter, at reducibly equal quotient classes.
 /// CLAIMED: QuotClass component equality is admitted. THE GAP: heterogeneous
 /// classes are rejected in the independent kernel-unit tests.
 #[test]
@@ -606,7 +596,8 @@ fn quotient_class_congruence_is_reached_by_checked_core_term() {
     );
 }
 
-/// MEASURED: open Cast indices with a reducible value convert in core.
+/// MEASURED: conv_cast_value applied to its parameters converts to
+/// ConvCastExpectedOf applied to those parameters under a neutral Cast.
 /// CLAIMED: neutral Cast's component conversion is admitted. THE GAP:
 /// independent kernel rejects vary each component.
 #[test]
@@ -620,8 +611,9 @@ fn cast_congruence_is_reached_by_checked_core_term() {
     );
 }
 
-/// MEASURED: neutral QuotElim methods differing only by transparent identity
-/// convert in core. CLAIMED: QuotElim components convert. THE GAP: independent
+/// MEASURED: conv_quot_elim_value applied to its parameter converts to
+/// ConvQuotElimExpectedOf applied to that parameter; methods differ only by
+/// transparent identity. CLAIMED: QuotElim components convert. THE GAP: independent
 /// kernel rejects cover mismatched motive, method, respect and scrutinee.
 #[test]
 fn quotient_elim_congruence_is_reached_by_checked_core_term() {
