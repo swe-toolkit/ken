@@ -273,10 +273,11 @@ fn add_render_probes(env: &mut ElabEnv) {
 fn add_law_probes(env: &mut ElabEnv) {
     env.elaborate_file(
         r#"
+        import Core.Logic.Conjunction (And as CAnd, and_intro)
         theorem cc5_group_valid : DocContentInvariant cc5_group_doc =
           and_intro
             Top
-            (And Top Top)
+            (CAnd Top Top)
             Proved
             (and_intro Top Top Proved Proved)
 

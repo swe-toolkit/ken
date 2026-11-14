@@ -1,32 +1,25 @@
-//! Source-reaching acceptance for `KERNEL-CONV-CONGRUENCE-CLOSURE`.
+//! Core-term acceptance for `KERNEL-CONV-CONGRUENCE-CLOSURE`.
 //!
-//! Promise class: durable invariant. Each checked `.ken` fixture consumes a
-//! test-prelude declaration whose expected and inferred types differ only by a
-//! genuine definitional equality under one newly-covered former. Removing the
-//! corresponding `conv_struct_path` arm makes the unchanged fixture fail at the
-//! kernel mode switch; changing unrelated repository text does not affect it.
+//! Promise class: durable invariant. The expected types and values are checked
+//! kernel declarations; each fresh core check requires conversion under one
+//! newly covered former. Removing the corresponding `conv_struct_path` arm
+//! should make the same check report `TypeMismatch` without a surface name.
 //!
-//! MEASURED: each source declaration reaches the kernel mode switch and changes
-//! from `TypeMismatch` on the arm-less base to acceptance with its arm present.
-//! CLAIMED: same-former conversion recognizes exactly the component equalities
-//! specified for Omega, Quot, QuotClass, Cast, and QuotElim. THE GAP: source
-//! acceptance alone
-//! cannot exclude a blanket `true`; the kernel-unit directional rejects vary
-//! every compared component independently and retain heterogeneous rejection.
+//! MEASURED: all five application checks pass on their installed checked
+//! terms. Replacing each corresponding conversion arm with `false` makes
+//! its own row fail at `TypeMismatch`, leaving the other four rows green.
+//! CLAIMED: same-former conversion handles Omega, Quot, QuotClass, Cast, and
+//! QuotElim. THE GAP: acceptance alone cannot exclude blanket `true`; the
+//! independent kernel directional rejects vary each compared component and
+//! retain heterogeneous refusal.
 
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
 use ken_kernel::{
-    declare_def, declare_inductive, declare_postulate, CtorSpec, GlobalId, InductiveSpec, Level,
-    LevelVar, Term,
+    check, declare_def, declare_inductive, declare_postulate, env::Context, CtorSpec, Decl,
+    GlobalId, InductiveSpec, Level, LevelVar, Term,
 };
-
-const OMEGA_CONSUMER: &str = include_str!("fixtures/kernel_conv_omega_consumer.ken");
-const QUOT_CONSUMER: &str = include_str!("fixtures/kernel_conv_quot_consumer.ken");
-const QUOT_CLASS_CONSUMER: &str = include_str!("fixtures/kernel_conv_quot_class_consumer.ken");
-const CAST_CONSUMER: &str = include_str!("fixtures/kernel_conv_cast_consumer.ken");
-const QUOT_ELIM_CONSUMER: &str = include_str!("fixtures/kernel_conv_quot_elim_consumer.ken");
 
 fn trust(env: &ElabEnv) -> BTreeSet<GlobalId> {
     env.env.trusted_base().into_iter().collect()
@@ -503,14 +496,42 @@ fn install_quot_elim_fixture_prelude(env: &mut ElabEnv) {
     );
 }
 
-fn assert_source_consumer(source: &str, install: impl FnOnce(&mut ElabEnv), consumer: &str) {
+fn assert_core_consumer(
+    install: impl FnOnce(&mut ElabEnv),
+    expected_name: &str,
+    value_name: &str,
+    arity: usize,
+    consumer: &str,
+) {
     let mut env = ElabEnv::new().expect("prelude construction");
     install(&mut env);
     let before = trust(&env);
-
-    env.elaborate_file(source)
-        .unwrap_or_else(|error| panic!("{consumer} must kernel-check: {error}"));
-
+    let expected = env.globals[expected_name];
+    let value = env.globals[value_name];
+    let Some(Decl::Transparent { ty: value_ty, .. }) = env.env.lookup(value) else {
+        panic!("fixture value must be a checked definition");
+    };
+    // Match the former surface `fn c (params) : Expected params = value params`:
+    // application inference must convert the value's declared result type
+    // against Expected, rather than checking its body against a fresh Pi.
+    let mut ctx = Context::new();
+    let mut ty = value_ty.clone();
+    for _ in 0..arity {
+        let Term::Pi(domain, codomain) = ty else {
+            panic!("fixture value lacks a parameter: {ty:?}");
+        };
+        ctx.push(*domain);
+        ty = *codomain;
+    }
+    let apply = |head: GlobalId| {
+        (0..arity)
+            .rev()
+            .fold(Term::const_(head, vec![]), |acc, index| {
+                Term::app(acc, Term::var(index))
+            })
+    };
+    check(&env.env, &ctx, &apply(value), &apply(expected))
+        .unwrap_or_else(|error| panic!("{consumer} must kernel-check: {error:?}"));
     assert_eq!(
         before,
         trust(&env),
@@ -518,61 +539,89 @@ fn assert_source_consumer(source: &str, install: impl FnOnce(&mut ElabEnv), cons
     );
 }
 
-/// On arm-less base `661d988d7`, this fixture reaches the catch-all and reports
-/// `TypeMismatch`: expected `OmegaExpectedOf a`, found `Omega0`.
+/// MEASURED: core value type converts from Omega(0) to Omega(max 0 0).
+/// CLAIMED: Omega level conversion reaches the Omega arm. THE GAP: the
+/// independent kernel directional rejects forbid a blanket-true conversion.
 #[test]
-fn omega_congruence_is_reached_by_checked_ken_source() {
-    assert_source_consumer(
-        OMEGA_CONSUMER,
-        install_omega_fixture_prelude,
-        "Omega(max 0 0) versus Omega(0)",
+fn omega_congruence_is_reached_by_checked_core_term() {
+    let mut env = ElabEnv::new().expect("prelude construction");
+    install_omega_fixture_prelude(&mut env);
+    let before = trust(&env);
+    let mut ctx = Context::new();
+    ctx.push(Term::Type(Level::zero()));
+    ctx.push(Term::var(0));
+    let value = Term::app(
+        Term::app(
+            Term::const_(env.globals["omega_value"], vec![]),
+            Term::var(1),
+        ),
+        Term::var(0),
     );
+    let expected = Term::app(
+        Term::const_(env.globals["OmegaExpectedOf"], vec![]),
+        Term::var(1),
+    );
+    check(&env.env, &ctx, &value, &expected)
+        .expect("open omega application must check against its expected level");
+    assert_eq!(before, trust(&env), "core check changes no trust entries");
 }
 
-/// On arm-less base `661d988d7`, this fixture reaches the catch-all and reports
-/// `TypeMismatch`: expected `QuotExpectedOf r`, found `Bool / identity r`.
+/// MEASURED: the value applied to its parameters converts to QuotExpectedOf
+/// applied to the same parameters, with a reducible relation under Quot.
+/// CLAIMED: Quot component conversion is admitted. THE GAP: the core checker
+/// alone does not distinguish a blanket-true conversion implementation.
 #[test]
-fn quotient_congruence_is_reached_by_checked_ken_source() {
-    assert_source_consumer(
-        QUOT_CONSUMER,
+fn quotient_congruence_is_reached_by_checked_core_term() {
+    assert_core_consumer(
         install_quot_fixture_prelude,
+        "QuotExpectedOf",
+        "quotient_value",
+        2,
         "Quot with a reducible relation",
     );
 }
 
-/// On arm-less base `661d988d7`, this fixture reaches the catch-all and reports
-/// `TypeMismatch` between the same indexed family at reducibly equal classes.
+/// MEASURED: class_value applied to its parameter converts to ClassExpectedOf
+/// applied to that parameter, at reducibly equal quotient classes.
+/// CLAIMED: QuotClass component equality is admitted. THE GAP: heterogeneous
+/// classes are rejected in the independent kernel-unit tests.
 #[test]
-fn quotient_class_congruence_is_reached_by_checked_ken_source() {
-    assert_source_consumer(
-        QUOT_CLASS_CONSUMER,
+fn quotient_class_congruence_is_reached_by_checked_core_term() {
+    assert_core_consumer(
         install_quot_class_fixture_prelude,
+        "ClassExpectedOf",
+        "class_value",
+        1,
         "QuotClass with a reducible representative",
     );
 }
 
-/// On arm-less base `f1e7e516c`, the open `A` versus `Bool` endpoints leave a
-/// genuine neutral Cast. The fixture then reports `TypeMismatch` between the
-/// same indexed family at casts whose values differ only by transparent
-/// identity reduction.
+/// MEASURED: conv_cast_value applied to its parameters converts to
+/// ConvCastExpectedOf applied to those parameters under a neutral Cast.
+/// CLAIMED: neutral Cast's component conversion is admitted. THE GAP:
+/// independent kernel rejects vary each component.
 #[test]
-fn cast_congruence_is_reached_by_checked_ken_source() {
-    assert_source_consumer(
-        CAST_CONSUMER,
+fn cast_congruence_is_reached_by_checked_core_term() {
+    assert_core_consumer(
         install_cast_fixture_prelude,
+        "ConvCastExpectedOf",
+        "conv_cast_value",
+        3,
         "neutral Cast with a reducible value",
     );
 }
 
-/// On arm-less base `f1e7e516c`, the quotient-variable scrutinee leaves a
-/// genuine neutral QuotElim. The fixture then reports `TypeMismatch` between
-/// the same indexed family at eliminators whose methods differ only by
-/// transparent identity reduction.
+/// MEASURED: conv_quot_elim_value applied to its parameter converts to
+/// ConvQuotElimExpectedOf applied to that parameter; methods differ only by
+/// transparent identity. CLAIMED: QuotElim components convert. THE GAP: independent
+/// kernel rejects cover mismatched motive, method, respect and scrutinee.
 #[test]
-fn quotient_elim_congruence_is_reached_by_checked_ken_source() {
-    assert_source_consumer(
-        QUOT_ELIM_CONSUMER,
+fn quotient_elim_congruence_is_reached_by_checked_core_term() {
+    assert_core_consumer(
         install_quot_elim_fixture_prelude,
+        "ConvQuotElimExpectedOf",
+        "conv_quot_elim_value",
+        1,
         "neutral QuotElim with a reducible method",
     );
 }

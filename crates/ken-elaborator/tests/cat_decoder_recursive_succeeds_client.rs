@@ -38,6 +38,7 @@ import Capability.Parsing.Decoder
   (Decoder, DecoderResult, Decoded, decoder_recursive, decoder_recursive_succeeds)
 import Data.Collections.Derived (length)
 import Core.Logic.Transport (sym, trans)
+import Core.Logic.Conjunction (and_intro)
 
 fn sample_remaining (cur : List UInt8) : Nat = length UInt8 cur
 fn sample_peek (cur : List UInt8) : Option UInt8 = None UInt8

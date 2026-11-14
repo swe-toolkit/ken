@@ -14,6 +14,8 @@
 //! combinator and `sort` emits an undischarged obligation that must not
 //! reach the prelude.
 
+use std::path::PathBuf;
+
 use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
 use ken_interp::eval::{eval, prim_reduce, EvalStore, EvalVal};
 use ken_kernel::{whnf, Context, GlobalId, Term};
@@ -409,14 +411,25 @@ fn structurally_equal_lists_share_slot() {
 fn sort_emits_issorted_and_perm() {
     let mut env = mk_env();
     setup_combinators(&mut env); // declares `insert` (the sort helper)
-                                 // `sort : (a → a → Bool) → List a → { ys | is_sorted leq ys ∧ Perm ys xs }`.
-                                 // `leq` is the buildable-now spelling of `Ord a` (the `where Ord a`
-                                 // constraint + constraint resolution is L3b-gated, `37 §6`); ES2-remainder
-                                 // threads it through `is_sorted` too (`is_sorted a leq ys`, real def, `§6`).
+    // The checked stdlib predicate counts elements under the equality
+    // induced by this sort's own comparator (57 §3.1).
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.set_catalog_roots_v1(&[root]).expect("catalog roots");
+    env.elaborate_file(
+        "import Core.Logic.Conjunction (And as CheckedAnd)\n\
+         import Data.Collections.Derived \
+         (is_sorted as CheckedSorted, Perm as CheckedPerm, eq_from_ord)",
+    )
+    .expect("checked sort predicates import");
+    // `leq` is explicit here; L3b's `where Ord a` path is a separate test.
+    // Both checked predicates consume the comparator through their imports.
     let res = env
         .elaborate_decl_v1(
             "fn sort (a : Type) (leq : a → a → Bool) (xs : List a) : \
-             { ys : List a | And (is_sorted a leq ys) (Perm a ys xs) } = \
+             { ys : List a | CheckedAnd (CheckedSorted a leq ys) \
+             (CheckedPerm a (eq_from_ord a leq) ys xs) } = \
              match xs { Nil |-> Nil a ; Cons h t |-> insert a leq h (sort a leq t) }",
         )
         .expect("sort elaborates (recursive + refinement)");
@@ -450,9 +463,9 @@ fn sort_emits_issorted_and_perm() {
     // the load-bearing `Perm` (sortedness-alone is `const Nil`-vacuous; a
     // dropped `Perm` reads `proved`-by-default, the untrusted-layer omission).
     let (issorted_id, perm_id, and_id) = (
-        env.globals["is_sorted"],
-        env.globals["Perm"],
-        env.globals["And"],
+        env.globals["Data.Collections.Derived.is_sorted"],
+        env.globals["Data.Collections.Derived.Perm"],
+        env.globals["Core.Logic.Conjunction.and"],
     );
     assert!(
         term_mentions_const(&obl.goal_closed, and_id),

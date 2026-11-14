@@ -61,6 +61,7 @@ import Capability.Parsing.Decoder
   (Decoder, DecoderResult, decoder_recursive, decoder_alt, decoder_seq,
     decoder_satisfy, decoder_pure)
 import Data.Collections.Derived (length)
+import Core.Logic.Conjunction (And, and_intro)
 
 fn honest_remaining (cur : List Bool) : Nat = length Bool cur
 fn list_peek (cur : List Bool) : Option Bool =

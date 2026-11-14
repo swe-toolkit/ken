@@ -1,6 +1,8 @@
 //! Demand-only recursive constructor equations, without reading a method IH
 //! (LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW; spec 22 §3, 34 §3.3).
 
+use std::path::PathBuf;
+
 use ken_elaborator::{ElabEnv, ObligationKind};
 use ken_kernel::{check, subst::shift, Context, Decl, GlobalId, Term};
 
@@ -51,10 +53,21 @@ fn recursive_sort_nil_goal_carries_checked_list_eq_without_consuming_ih() {
          True |-> Cons a x (Cons a h t) ; False |-> Cons a h (insert a leq x t) } }",
     )
     .expect("checked insertion helper");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.set_catalog_roots_v1(&[root]).expect("catalog roots");
+    env.elaborate_file(
+        "import Core.Logic.Conjunction (And as CheckedAnd)\n\
+         import Data.Collections.Derived \
+         (is_sorted as CheckedSorted, Perm as CheckedPerm, eq_from_ord)",
+    )
+    .expect("checked sort predicates import");
     let result = env
         .elaborate_decl_v1(
             "fn sort (a : Type) (leq : a → a → Bool) (xs : List a) : \
-             { ys : List a | And (is_sorted a leq ys) (Perm a ys xs) } = \
+             { ys : List a | CheckedAnd (CheckedSorted a leq ys) \
+             (CheckedPerm a (eq_from_ord a leq) ys xs) } = \
              match xs { Nil |-> Nil a ; Cons h t |-> insert a leq h (sort a leq t) }",
         )
         .expect("recursive sort with two open result refinements");

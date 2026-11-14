@@ -16,6 +16,8 @@
 //!   `where DecEq K`-only const accepts; adding `where Ord K` (no `Ord K`
 //!   instance) rejects, showing the identity gate is DecEq.
 
+use std::path::PathBuf;
+
 use ken_elaborator::{error::ElabError, ElabEnv, ObligationKind};
 use ken_kernel::{GlobalId, Term};
 
@@ -155,6 +157,16 @@ fn user_ord_sort_emits_both_conjuncts() {
     elab(&mut env, "class Ord A { }").unwrap();
     elab(&mut env, "data K = MkK").unwrap();
     elab(&mut env, "instance Ord K { }").unwrap();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.set_catalog_roots_v1(&[root]).expect("catalog roots");
+    env.elaborate_file(
+        "import Core.Logic.Conjunction (And as CheckedAnd)\n\
+         import Data.Collections.Derived \
+         (is_sorted as CheckedSorted, Perm as CheckedPerm, eq_from_ord)",
+    )
+    .expect("checked sort predicates import");
 
     // Declare a sort-shaped const with the full conjoined refinement and
     // `where Ord K`.  Body `Nil K` (the empty list) type-checks against
@@ -168,7 +180,8 @@ fn user_ord_sort_emits_both_conjuncts() {
     let res = env
         .elaborate_decl_v1(
             "fn sortK (xs : List K) : \
-             { ys : List K | And (is_sorted K (\\_ _. True) ys) (Perm K ys xs) } \
+             { ys : List K | CheckedAnd (CheckedSorted K (\\_ _. True) ys) \
+             (CheckedPerm K (eq_from_ord K (\\_ _. True)) ys xs) } \
              where Ord K = Nil K",
         )
         .expect(
@@ -191,9 +204,9 @@ fn user_ord_sort_emits_both_conjuncts() {
         .find(|o| matches!(o.kind, ObligationKind::RefinementIntroduction))
         .expect("AC3: refinement-introduction obligation (22 §2.1), per result leaf");
 
-    let and_id = env.globals["And"];
-    let issorted_id = env.globals["is_sorted"];
-    let perm_id = env.globals["Perm"];
+    let and_id = env.globals["Core.Logic.Conjunction.and"];
+    let issorted_id = env.globals["Data.Collections.Derived.is_sorted"];
+    let perm_id = env.globals["Data.Collections.Derived.Perm"];
 
     assert!(
         term_mentions_const(&obl.goal_closed, and_id),

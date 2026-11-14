@@ -686,7 +686,7 @@ impl Scope {
     }
 }
 
-fn is_instance_head_param(name: &str) -> bool {
+pub(crate) fn is_instance_head_param(name: &str) -> bool {
     name.chars()
         .next()
         .map(|c| c == '_' || c.is_ascii_lowercase())

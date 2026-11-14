@@ -1094,6 +1094,7 @@ fn cat5_d1_valid_half_open_bounds_and_zero_width_offsets_check() {
     let mut env = mk_env();
     env.elaborate_cat5_client(
         r#"
+        import Core.Logic.Conjunction (and_intro)
         fn zero_width_span_at_start (s : Source) : Span = MkSpan Zero Zero
 
         theorem valid_zero_width_span_at_start (s : Source) : ValidSpan s (zero_width_span_at_start s) =
@@ -1138,6 +1139,7 @@ fn cat5_d1_concrete_nonempty_source_constructs_and_projects() {
     env.elaborate_cat5_client(
         r#"
         import Data.Collections.Derived (bytes_nat_length)
+        import Core.Logic.Conjunction (and_intro)
         data ConcreteByteSource = MkConcreteByteSource
 
         const sample_abc_bytes : Bytes = bytes_encode "abc"
@@ -1252,6 +1254,7 @@ fn cat5_d1_end_past_source_length_rejected() {
     let err = env
         .elaborate_cat5_client(
             r#"
+            import Core.Logic.Conjunction (and_intro)
             const invalid_span : Span = MkSpan Zero (Suc (Suc (Suc Zero)))
             theorem invalid_span_valid (s : Source) : ValidSpan s invalid_span =
               and_intro
@@ -1277,6 +1280,7 @@ fn cat5_d1_start_after_end_rejected() {
     let err = env
         .elaborate_cat5_client(
             r#"
+            import Core.Logic.Conjunction (and_intro)
             const invalid_span : Span = MkSpan (Suc (Suc Zero)) (Suc Zero)
             theorem invalid_span_valid (s : Source) : ValidSpan s invalid_span =
               and_intro
@@ -1541,6 +1545,7 @@ fn cat5_d2_success_parser_carries_valid_consumed_span_from_start() {
     let mut env = mk_env();
     env.elaborate_cat5_client(
         r#"
+        import Core.Logic.Conjunction (And as CAnd, and_intro)
         const success_parser : Parser Bool =
           parser_pure Bool True
 
@@ -1548,7 +1553,7 @@ fn cat5_d2_success_parser_carries_valid_consumed_span_from_start() {
           \s. \start. \h.
             and_intro
               (ValidSpan s (MkSpan start start))
-              (And
+              (CAnd
                 (Equal Nat (span_start (MkSpan start start)) start)
                 (Equal Nat (span_end (MkSpan start start)) start))
               (valid_zero_width_span s start h)
@@ -1561,7 +1566,7 @@ fn cat5_d2_success_parser_carries_valid_consumed_span_from_start() {
         theorem success_parser_laws : ParserLaws Bool success_parser =
           and_intro
             (ParserValid Bool success_parser)
-            (And (ParserTotal Bool success_parser) (ParserSourceLocal Bool success_parser))
+            (CAnd (ParserTotal Bool success_parser) (ParserSourceLocal Bool success_parser))
             success_parser_valid
             (and_intro
               (ParserTotal Bool success_parser)
@@ -1578,6 +1583,7 @@ fn cat5_d2_failed_parser_carries_same_source_valid_span() {
     let mut env = mk_env();
     env.elaborate_cat5_client(
         r#"
+        import Core.Logic.Conjunction (and_intro)
         const failed_parser : Parser Bool =
           parser_fail Bool
 
@@ -1602,6 +1608,7 @@ fn cat5_d2_failure_with_wrong_source_rejected_by_law() {
     let err = env
         .elaborate_cat5_client(
             r#"
+            import Core.Logic.Conjunction (and_intro)
             const wrong_source_failed_parser : Parser Bool =
               \s. \start. \h.
                 Failed Bool (MkParseError (source_id_from_nat (Suc Zero)) (MkSpan start start))
@@ -1633,6 +1640,7 @@ fn cat5_d2_failure_with_invalid_span_rejected_by_law() {
     let err = env
         .elaborate_cat5_client(
             r#"
+            import Core.Logic.Conjunction (and_intro)
             const invalid_span_failed_parser : Parser Bool =
               \s. \start. \h.
                 Failed Bool (MkParseError (source_id s) (MkSpan (Suc (Suc Zero)) (Suc Zero)))
