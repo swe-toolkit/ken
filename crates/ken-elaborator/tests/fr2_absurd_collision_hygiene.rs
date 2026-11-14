@@ -75,11 +75,18 @@ fn declaring_lower_arity_j_or_eq_elaborates_fine_not_a_collision() {
 #[test]
 fn landed_class_eq_shape_elaborates_cleanly_with_the_guard_active() {
     let mut env = ElabEnv::new().expect("base env");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[root], "Core.Classes.LawfulClasses")
+        .expect("checked IsTrue provider roots-loads");
+    env.elaborate_file("import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)")
+        .expect("local class fields select checked IsTrue");
     env.elaborate_decl(
         "class Eq a { eq : a -> a -> Bool ; \
-                      refl : (x : a) -> IsTrue (eq x x) ; \
-                      sym : (x : a) -> (y : a) -> IsTrue (eq x y) -> IsTrue (eq y x) ; \
-                      trans : (x : a) -> (y : a) -> (z : a) -> IsTrue (eq x y) -> IsTrue (eq y z) -> IsTrue (eq x z) }",
+                      refl : (x : a) -> CatalogIsTrue (eq x x) ; \
+                      sym : (x : a) -> (y : a) -> CatalogIsTrue (eq x y) -> CatalogIsTrue (eq y x) ; \
+                      trans : (x : a) -> (y : a) -> (z : a) -> CatalogIsTrue (eq x y) -> CatalogIsTrue (eq y z) -> CatalogIsTrue (eq x z) }",
     )
     .expect("the landed class Eq a shape must elaborate cleanly with the collision guard active");
 }

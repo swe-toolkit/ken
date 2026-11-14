@@ -31,11 +31,17 @@ fn elaborate_err(src: &str) -> ElabError {
 #[test]
 fn def_refinement_parses_and_elaborates_without_trusted_base_growth() {
     let mut env = mk_env();
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[root], "Core.Classes.LawfulClasses")
+        .expect("checked refinement proposition roots-loads");
     let before = env.env.trusted_base();
 
     env.elaborate_file(
         r#"
-        fn posP (n : Int) : Prop = IsTrue (leq_int 1 n)
+        import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)
+        fn posP (n : Int) : Prop = CatalogIsTrue (leq_int 1 n)
         def Pos = { n : Int | posP n }
         "#,
     )

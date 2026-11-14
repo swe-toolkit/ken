@@ -181,6 +181,13 @@ fn one_solved_introduction(env: &mut ElabEnv, source: &str) {
 #[test]
 fn refined_parameter_recursion_keeps_base_obligations_for_all_shapes() {
     let mut env = ElabEnv::new().expect("prelude");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[root], "Core.Classes.LawfulClasses")
+        .expect("checked refinement predicate roots-loads");
+    env.elaborate_file("import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)")
+        .expect("refinement selects checked IsTrue");
     env.elaborate_decl("def AnyNat = { x : Nat | Top }")
         .expect("alias");
     env.elaborate_decl("fn leq_n (x : Nat) (y : Nat) : Bool = True")
@@ -192,7 +199,7 @@ fn refined_parameter_recursion_keeps_base_obligations_for_all_shapes() {
     );
     one_solved_introduction(
         &mut env,
-        "fn inline (n : { x : Nat | IsTrue (leq_n x ten) }) : Nat = \
+        "fn inline (n : { x : Nat | CatalogIsTrue (leq_n x ten) }) : Nat = \
          match n { Zero |-> Zero ; Suc m |-> inline m }",
     );
     one_solved_introduction(

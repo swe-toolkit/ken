@@ -96,6 +96,13 @@ fn guard_uses_pattern_binders_and_false_falls_through() {
 #[test]
 fn guard_must_be_bool_and_does_not_refine_its_truth() {
     let mut env = ElabEnv::new().expect("base environment");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[root], "Core.Classes.LawfulClasses")
+        .expect("checked guard proposition roots-loads");
+    env.elaborate_file("import Core.Classes.LawfulClasses (IsTrue as CatalogIsTrue)")
+        .expect("guard proof test selects checked IsTrue");
     elaborate(&mut env, "data GuardValue = MkGuardValue Bool");
     match env.elaborate_decl(
         "const non_bool_guard : Nat = match MkGuardValue True { \
@@ -108,7 +115,7 @@ fn guard_must_be_bool_and_does_not_refine_its_truth() {
     match env.elaborate_decl(
         "const guard_is_not_a_proof : Nat = match MkGuardValue True { \
          MkGuardValue flag if flag |-> \
-           let impossible : IsTrue flag = Proved in Zero ; \
+           let impossible : CatalogIsTrue flag = Proved in Zero ; \
          MkGuardValue _ |-> Zero }",
     ) {
         Err(ElabError::KernelRejected { .. }) => {}
