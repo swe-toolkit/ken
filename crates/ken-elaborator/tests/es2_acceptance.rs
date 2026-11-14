@@ -143,6 +143,12 @@ fn demoted_predicates_absent_from_trusted_base() {
 #[test]
 fn sort_refinement_unfolds_issorted_and_perm() {
     let mut env = mk_env();
+    env.elaborate_file(
+        "import Core.Logic.Conjunction (And as CheckedAnd)\n\
+         import Data.Collections.Derived \
+         (is_sorted as CheckedSorted, Perm as CheckedPerm, eq_from_ord)",
+    )
+    .expect("checked sort predicates import");
     env.elaborate_decl(
         "fn insert (a : Type) (leq : a -> a -> Bool) (x : a) (xs : List a) : List a = \
          match xs { Nil |-> Cons a x (Nil a) ; \
@@ -152,7 +158,8 @@ fn sort_refinement_unfolds_issorted_and_perm() {
     .expect("insert elaborates");
     env.elaborate_decl_v1(
         "fn sort (a : Type) (leq : a -> a -> Bool) (xs : List a) : \
-         { ys : List a | And (is_sorted a leq ys) (Perm a ys xs) } = \
+         { ys : List a | CheckedAnd (CheckedSorted a leq ys) \
+             (CheckedPerm a (eq_from_ord a leq) ys xs) } = \
          match xs { Nil |-> Nil a ; Cons h t |-> insert a leq h (sort a leq t) }",
     )
     .expect("smoke check: sort refinement must at least type-check");
