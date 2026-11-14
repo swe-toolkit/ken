@@ -256,12 +256,6 @@ impl StaticTransitionPlan<'_> {
         Ok(sets)
     }
 
-    /// The issued labelled-transport count, read once by the compiled
-    /// module's containment (PX10-NATIVE-SPAWN-PARITY Increment B deletes it).
-    pub(in crate::cranelift_backend) fn producer_alternative_set_count(&self) -> usize {
-        self.producer_alternative_sets.len()
-    }
-
     pub(in crate::cranelift_backend) fn producer_alternative_set_of(
         &self,
         member: &ContinuationCallIdentity,

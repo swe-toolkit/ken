@@ -3432,9 +3432,6 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     };
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
     let carrier_identity_catalog = compiler.static_transition_plan.carrier_identity_catalog()?;
-    let alternative_transport_sets = compiler
-        .static_transition_plan
-        .producer_alternative_set_count();
     let compiled = CompiledModule::from_parts(
         module,
         func_id,
@@ -3446,7 +3443,6 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         true,
         compiler.assumptions,
         compiler.unsupported,
-        alternative_transport_sets,
     );
     #[cfg(test)]
     scale_b_finish_emission_attempt();

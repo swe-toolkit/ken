@@ -618,6 +618,56 @@ fn performed_bind_call(
     Ok(Some((call, ret_branch)))
 }
 
+/// Follow a scrutinee's result positions through checked metadata wrappers,
+/// Let bodies, If arms and Match case bodies. The six checked wrappers preserve
+/// the executable body (recursive_application_spine supplies the recursive
+/// invocation wrapper); Let values, scrutinees, Project, Closure and the other
+/// forms do not themselves supply the scrutinee's result. Keep the residual
+/// match exhaustive so a new RuntimeExpr form must be classified here.
+fn is_performed_call_scrutinee(expression: &RuntimeExpr, performing: &BTreeSet<String>) -> bool {
+    match expression {
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => {
+            is_performed_call_scrutinee(body, performing)
+        }
+        RuntimeExpr::Call { callee, .. } => matches!(
+            callee.as_ref(),
+            RuntimeExpr::DeclarationRef { symbol } if performing.contains(symbol)
+        ),
+        RuntimeExpr::Let { body, .. } => is_performed_call_scrutinee(body, performing),
+        RuntimeExpr::If {
+            then_expr,
+            else_expr,
+            ..
+        } => {
+            is_performed_call_scrutinee(then_expr, performing)
+                || is_performed_call_scrutinee(else_expr, performing)
+        }
+        RuntimeExpr::Match { cases, .. } => cases
+            .iter()
+            .any(|case| is_performed_call_scrutinee(&case.body, performing)),
+        RuntimeExpr::ComputationalMatch { cases, .. } => cases
+            .iter()
+            .any(|case| is_performed_call_scrutinee(&case.body, performing)),
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::Var(_)
+        | RuntimeExpr::PrimitiveCall { .. }
+        | RuntimeExpr::Construct { .. }
+        | RuntimeExpr::Record { .. }
+        | RuntimeExpr::Project { .. }
+        | RuntimeExpr::Closure { .. }
+        | RuntimeExpr::LexicalClosure { .. }
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Effect { .. }
+        | RuntimeExpr::Trap(_) => false,
+    }
+}
+
 /// A performed call left in a computational-match scrutinee indicates that
 /// direct-style lowering missed it; never patch a plan after it was collected.
 fn refuse_performed_call_scrutinees(
@@ -630,14 +680,7 @@ fn refuse_performed_call_scrutinees(
         scrutinee, cases, ..
     } = expression
     {
-        let performed = matches!(
-            scrutinee.as_ref(),
-            RuntimeExpr::Call { callee, .. }
-                if matches!(
-                    callee.as_ref(),
-                    RuntimeExpr::DeclarationRef { symbol } if performing.contains(symbol)
-                )
-        );
+        let performed = is_performed_call_scrutinee(scrutinee, performing);
         if performed {
             return Err(expression_lowering_error(
                 owner,

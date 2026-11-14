@@ -53,37 +53,70 @@ fn declared_process_smoke_executes_and_reaps_in_interpreter() {
     ));
 }
 
-/// Promise: durable invariant. MEASURED: a native build of the same checked
-/// Process source refuses with an identified unavailable operation before an
-/// artifact exists. CLAIMED: native Process never silently falls through to
-/// the unfinished bracket planner. THE GAP: a scratch build with the successor
-/// return-fold repair must yield this same refusal, not a changed planner text.
-/// THE GAP: the gate keys on the declared grant, so a program declaring
-/// Process without using it is also conservatively refused.
+/// Promise: durable invariant. MEASURED: the exact checked Process smoke
+/// produces the same native and fresh-interpreter terminal and complete
+/// ordered canonical effects, including acquired child and plan settlements.
+/// CLAIMED: B2's Process promotion opens executable native parity rather than
+/// merely admitting a build. THE GAP: argv, stdout and live child need their
+/// separately committed F rows; the smoke uses the 256-word starter profile.
 #[test]
-fn native_process_op_is_unavailable_before_object_emission() {
-    use ken_elaborator::compiler_driver::NativeProgramBuildError;
+fn ac1_native_process_smoke_matches_fresh_interpreter() {
+    // The completed 16 MiB smoke sampled 2308 KiB resident worker stack;
+    // provisioned headroom is at least 14076 KiB against that observation.
+    // The ambient 2 MiB test worker overflowed before completing the native
+    // build, so this is explicit fixture provisioning, not a product repair.
+    std::thread::Builder::new()
+        .name("px10-b2-native-smoke".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(check_ac1_native_process_smoke_matches_fresh_interpreter)
+        .expect("stated native smoke worker")
+        .join()
+        .expect("native smoke worker completed");
+}
 
-    let root = tempfile::tempdir().expect("isolated native output root");
-    let error = ken_cli::build_native_program_with_roots(
-        SMOKE,
+fn check_ac1_native_process_smoke_matches_fresh_interpreter() {
+    let root = tempfile::tempdir().expect("isolated Process root");
+    let source = SMOKE.replacen(
+        "program capabilities FS AFull, Process\n",
+        "program capabilities FS AFull, Process, RootExecution Allow\n",
+        1,
+    );
+    assert_ne!(source, SMOKE, "the smoke capability header moved");
+    let mut host = ken_interp::PosixHost::new_at(root.path());
+    let reference = ken_cli::run_program_effect_observation(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
+        &[],
+        &[],
+        root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("fresh checked interpreter smoke");
+    let built = ken_cli::build_native_program_with_roots(
+        &source,
         ken_cli::SourceFormat::Ken,
         &checked_catalog_roots(),
         "px10_spawn_plan_wait_smoke",
-        root.path(),
+        root.path().join("native"),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
-    .expect_err("Process must not produce a partial native artifact");
-    let NativeProgramBuildError::Unavailable(lane) = error else {
-        panic!("expected typed host-op availability refusal, found: {error:?}");
-    };
-    assert_eq!(lane.lane, "host_effect_lowering_unavailable");
-    assert!(lane.reason.contains("ProcessPlanOpen"), "{lane:?}");
-    assert!(lane.reason.contains("RepresentedUnavailable"), "{lane:?}");
-    assert_eq!(
-        std::fs::read_dir(root.path()).expect("output root").count(),
-        0
-    );
+    .expect("native Process smoke builds without availability gate");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &built.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: root.path().to_owned(),
+            plan_hash: built.plan_transport_hash,
+        },
+    )
+    .expect("native Process smoke executes");
+    assert_eq!(native.exit_status, reference.exit_status);
+    assert_eq!(native.terminal_exit, reference.terminal_exit);
+    assert_eq!(native.terminal_error, reference.terminal_error);
+    assert_eq!(native.effect_trace, reference.effect_trace);
+    assert_exported_resource_lifetime_template_holds(&native.effect_trace);
 }
 
 /// Promise class: durable invariant; `Signaled 15` is the specified UInt8
@@ -429,6 +462,102 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
                 && observation.outcome == Settlement::Released
     ));
     assert!(errors[0].sequence < failed_settlements[0].sequence);
+}
+
+/// Promise class: durable settlement invariant. MEASURED: a failed native
+/// spawn and the fresh interpreter emit the same canonical error and exactly
+/// one plan settlement after it. CLAIMED: a native failure cannot orphan the
+/// acquired plan. THE GAP: only a missing executable path is exercised here;
+/// the successful pipe/child path is covered by AC-1b and the F parity row.
+#[test]
+fn ac1b_native_failed_spawn_settles_plan_like_interpreter() {
+    use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
+    use ken_host::{HostOpV1 as Op, ResourceBindingRole as Role, ResourceKindV1 as Kind};
+    std::thread::Builder::new()
+        .name("px10-ac1b-failed-spawn".to_owned())
+        // The B2 native smoke completed at this stated 16 MiB provisioning;
+        // the default 2 MiB worker overflowed on its compiler path.
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let root = tempfile::tempdir().expect("isolated failed-spawn root");
+            let missing = root.path().join("no-such-child");
+            let source = SMOKE
+                .replacen(
+                    "program capabilities FS AFull, Process\n",
+                    "program capabilities FS AFull, Process, RootExecution Allow\n",
+                    1,
+                )
+                .replace("/bin/true", missing.to_str().expect("UTF-8 missing path"));
+            assert!(source.contains("RootExecution Allow"));
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            let reference = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
+                &[],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .expect("interpreter observes the failed spawn");
+            let built = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &checked_catalog_roots(),
+                "px10_ac1b_failed_spawn_native",
+                root.path().join("native"),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+            .expect("native failed-spawn fixture builds");
+            let native = ken_runtime::run_bound_process_effect_observation(
+                &built.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: Vec::new(),
+                    environment: Vec::new(),
+                    cwd: root.path().to_owned(),
+                    plan_hash: built.plan_transport_hash,
+                },
+            )
+            .expect("native observes the failed spawn");
+            assert_eq!(native.terminal_error, reference.terminal_error);
+            assert_eq!(native.terminal_exit, reference.terminal_exit);
+            assert_eq!(native.effect_trace, reference.effect_trace);
+            let trace = &native.effect_trace;
+            let plan = trace
+                .iter()
+                .find_map(|event| match (&event.operation, &event.outcome) {
+                    (
+                        Op::ProcessPlanOpen,
+                        Outcome::Success(Reply::ResourceAcquired {
+                            resource_kind: Kind::SpawnPlan,
+                            identity,
+                            ..
+                        }),
+                    ) => Some(*identity),
+                    _ => None,
+                })
+                .expect("failed spawn first acquires a plan");
+            let failed = trace
+                .iter()
+                .filter(|event| {
+                    event.operation == Op::ProcessSpawn
+                        && matches!(event.outcome, Outcome::Error(_))
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(failed.len(), 1);
+            let settled = trace
+                .iter()
+                .filter(|event| {
+                    event.operation == Op::ResourceRelease
+                        && event.resource_bindings.contains(&(Role::Target, plan))
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(settled.len(), 1);
+            assert!(failed[0].sequence < settled[0].sequence);
+        })
+        .expect("stated failed-spawn worker")
+        .join()
+        .expect("failed-spawn worker completed");
 }
 
 struct NonCloexecFd9 {
