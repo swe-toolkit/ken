@@ -38,10 +38,10 @@ through — the load-bearing negative).
 | # | Actual | vs predicted |
 |---|---|---|
 | **C1** `deceq-noncanonical` | sound `DecEq Char` **PASS**; unsound `DecEq Decimal` **instance ADMITTED** (false `sound = Axiom` accepted) | as predicted — the machinery **guards deception, not falsehood** (`§51 §5`); canonical-carrier soundness is a *user* obligation, not machine-checked. Not a kernel hole (honest `Axiom`). The Bottom-*exploit* tail is blocked by a surface-expressibility wall (explicit `Refl A x` / injectivity projection). Run with `lawful_classes.ken` prepended. |
-| **C2** `proof-relevant-omega` | sound `‖Perm‖`/count **PASS**; unsound `data Perm : Ω` **REJECT — parser gap** (Ω-data ctor doesn't parse), not the Ω-PI sort gate | sound ✓; unsound rejects *coincidentally* (residual #3) |
+| **C2** `proof-relevant-omega` | count-equality **PASS**; unsound `data Perm : Ω` **REJECT — parser gap** (Ω-data ctor doesn't parse), not the Ω-PI sort gate | sound ✓; unsound rejects *coincidentally* (residual #3) |
 | **C3** `codata-totality` | sound fuel-unfold **PASS** *(after fixing an arm typo — missing `Some`'s type arg; capability was always present)*; unsound `codata` **REJECT** (`codata` not a keyword) | both ✓ (right reasons) |
 | **C4** `indexed-vec-head` | **KNOWN-GAP at the *declaration* step** — `data Vec a : Nat → Type` doesn't parse (residual #1) | ✓✓ confirms the flagged refinement (decl-step, earlier than head-absurdity) |
-| **C5** `verified-sort` | sound **PASS**; unsound `const Nil` **ELABORATES** (not rejected at elab) | **SPECIFIED, not a gap** — obligations are emit-at-elaboration (V1) / discharge-later (V3); elaboration never rejects on an undischarged obligation (`21 §5`, `22-obligations.md`). The bogus sort is caught at the *verify* stage, not elab. |
+| **C5** `verified-sort` | at initial direct elaboration: sound **PASS**; unsound `const Nil` **ELABORATES** | **SPECIFIED, not a gap** — obligations are emitted at elaboration and checked later. The C5 README now records the original emission/never-proved observations and the separate closed pair; this initial table entry is historical. |
 | **C6** `lawful-ord-vs-stub` | law-proved `Ord` **PASS**; `Axiom`-stub `Ord` **also ELABORATES** (admitted) | as predicted — the "a provable law must not be postulated" enforcement is a **documented known-gap** (deferred lawful-classes work). Run with `lawful_classes.ken` prepended. |
 | **C7** `quotient-respect` | neither arm produces a `Quot` term: `/` is integer division, not quotient syntax (residual #2) | legacy sketches also omit checked `e` and do not test `respect` |
 | **C8** `funext-definitional` | sound (convertible-pointwise) **PASS**; unsound (differ) **REJECT** | funext **IS** surface-reachable (`eq_at_pi` reduces function-`Equal`) — corrected from the first pass. Reachable for *convertible*-pointwise fns; the *non-convertible* case (needs a case-split) is residual #4. |
@@ -108,13 +108,14 @@ Format per entry — **`slug` · axis · flavor** — sound arm → / unsound ar
 - **C1 · `deceq-noncanonical` · lawful classes / canonical carrier · A** —
   `DecEq Char` PASS / `DecEq Decimal` + Bottom-exploit **REJECT**.
 - **C2 · `proof-relevant-omega` · Ω / strict-prop boundary · A** —
-  `‖Perm‖` / count-eq PASS / `data Perm : Ω` (4-ctor) **REJECT**.
+  count-equality PASS / `data Perm : Ω` (4-ctor) **REJECT**.
 - **C3 · `codata-totality` · coinduction under totality · A** — fuel-bounded
   `unfoldUpTo` PASS / `codata`/`cofix` stream **REJECT**.
 - **C4 · `indexed-vec-head` · dependent / indexed families · B** — `head` on
   `Vec (Suc n)` (as far as landed) / impossible-`VNil` head **known-gap**.
-- **C5 · `verified-sort` · proof-carrying programs · B** — refinement emits both
-  conjuncts PASS / `const Nil` (isSorted-only) **REJECT**.
+- **C5 · `verified-sort` · proof-carrying programs · B** — the original
+  sources emit both conjuncts and leave `const Nil`'s `Perm` never proved; the
+  closed count-equality pair accepts the positive and refuses the negative.
 - **C6 · `lawful-ord-vs-stub` · law-carrying instances · B** — law-**proved**
   `Ord` (zero-delta) / `Axiom`-stub `Ord` (grows trust base).
 - **C7 · `quotient-respect` · observational / quotient · B** — intended
@@ -128,8 +129,9 @@ Format per entry — **`slug` · axis · flavor** — sound arm → / unsound ar
 C1 and C7 tell **one story**: the naive `DecEq` over a non-canonical carrier
 (C1) is unsound; a lawful quotient with a `respect` obligation is the sound
 design target for C7. The current C7 fixtures still lack valid quotient
-formation. C2 and C5 are coupled: C5's `Perm` must sit at the universe C2
-establishes (`‖Perm‖`/count-equality, never a proof-relevant Ω inductive). C7
+formation. C2 and C5 are coupled: C5 uses the count-equality `Perm` pinned by
+`57 §3.1`, never a proof-relevant Ω inductive. `‖Perm_rel‖` is only the named
+fallback for carriers without decidable element equality. C7
 and C8 are the **two OTT faces** — C7 the *quotient* fragment (equality you
 *impose*, gated by checked formation and `respect`), C8 the *funext* fragment
 (equality that *computes* pointwise) — Ken's signature observational equality
@@ -143,7 +145,7 @@ reconciled against `16 §5` and the current parser grammar. Surface examples
 follow the landed catalog package
 `catalog/packages/Core/Classes/LawfulClasses.ken.md`
 (classes/instances/`Axiom`/`IsTrue`/`Equal`) and the `es2_acceptance.rs`
-refinement form (`{ ys : List a | And (isSorted a leq ys) (Perm a ys xs) }`).
+refinement form with `And`, `is_sorted`, and `Perm a (eq_from_ord a leq) ys xs`.
 K5 `absurd` is the documented Bottom eliminator. The quotient kernel forms
 `A / R / e`, `[t]`, and `elim_/` are specified in `11-syntax.md`. Where an
 encoding pushes past the landed surface, that is

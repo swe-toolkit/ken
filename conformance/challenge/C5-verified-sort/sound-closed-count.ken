@@ -1,0 +1,11 @@
+-- C5 closed positive control: the count-equality proof reduces to Top.
+import Data.Collections.Derived (Perm, eq_from_ord, sort)
+
+fn always (x : Bool) (y : Bool) : Bool = True
+
+theorem sorted_one_is_perm
+    : Perm Bool
+        (eq_from_ord Bool always)
+        (sort Bool always (Cons Bool True (Nil Bool)))
+        (Cons Bool True (Nil Bool)) =
+  λx. Proved

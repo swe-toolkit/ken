@@ -1,59 +1,60 @@
 # C2 — a proof-relevant inductive declared at `Ω`
 
-**Axis:** the Ω / strict-prop boundary. **Flavor:** A (soundness-boundary — the
-unsound arm must REJECT; acceptance = a consistency hole). **Couples with C5**
-(C5's `Perm` must live at the universe this exercise establishes).
+**Axis:** the Ω / strict-prop boundary. **Flavor:** A
+(soundness-boundary — the unsound arm must reject; acceptance is a consistency
+hole). **Couples with C5**, whose `Perm` uses the Ω-native count-equality form
+pinned in `57 §3.1`.
 
 ## Why this is a blind spot
 
-`Ω` (SProp / `Prop`) is **definitionally proof-irrelevant**: any two inhabitants
-of an Ω-proposition are equal by fiat. So only **sub-singletons** may enter Ω.
-A **proof-relevant** multi-constructor inductive — where distinct derivations
-are distinct data (a permutation relation, `∨`, `∃`) — **cannot** be declared
-`data P … : Ω` directly: an unrestricted `Type → Ω` admits `Bool`, and Ω-
-proof-irrelevance then forces `True ≡ False`, collapsing consistency
-(`16 §1.3`). It reaches Ω only via **truncation** `‖P_rel‖` or a natively-Ω
-form (a count-equality). VAL2 never touched Ω at all.
+`Ω` (`Prop`) is definitionally proof-irrelevant: any two inhabitants of an
+Ω-proposition are equal by fiat. A proof-relevant multi-constructor inductive
+cannot be declared directly at Ω: unrestricted `Type → Ω` admits `Bool`, and
+Ω proof irrelevance would then force `True ≡ False`, collapsing consistency
+(`16 §1.4`).
+
+The pinned `Perm` is not a truncation of a permutation relation. It is
+count-equality:
+
+```text
+Perm a eqf xs ys = (x : a) → Equal Nat (count a eqf x xs) (count a eqf x ys)
+```
+
+For verified sort, `eqf` is `eq_from_ord a leq`, derived from the sort's own
+comparator. `‖Perm_rel‖` remains the named fallback for carriers without
+decidable element equality; it is not the `Perm` pin (`57 §3.1`).
 
 ## The pair
 
-- **Sound arm — `sound-perm-truncated.ken` — should-PASS.** The permutation
-  relation as a proof-*relevant* inductive at **`Type`** (`data Perm_rel … :
-  Type`, distinct derivations allowed), then truncated to Ω —
-  `Perm := ‖Perm_rel‖ : Ω` (the sub-singleton that is the `∃ := ‖Σ‖` analog,
-  `16 §6`). A
-  count-equality alternative (`Perm xs ys := Equal Nat (count xs) (count ys)`,
-  natively Ω-valued) is included as `sound-perm-count.ken`.
-- **Unsound arm — `unsound-perm-omega.ken` — should-REJECT.** The same
-  permutation relation as a **4-constructor proof-relevant inductive declared
-  directly at Ω**: `data Perm … : Omega = perm_nil | perm_skip … | perm_swap … |
-  perm_trans …`. This is the exact construction `16 §1.3` forbids.
+- **Sound arm — `sound-perm-count.ken` — should pass.** It exhibits the
+  count-equality shape as an Ω proposition. The fixture names a witness
+  element (`PermAt`) to keep the example concrete; it is not the full public
+  `Perm`, which quantifies over every element.
+- **Unsound arm — `unsound-perm-omega.ken` — should reject.** It declares a
+  proof-relevant permutation relation directly at Ω using four constructors.
+  This is forbidden by the Ω proof-irrelevance gate.
 
-## Expected behavior (exact)
+## Expected behavior
 
-- Sound arms: **PASS** — `Perm_rel : Type` elaborates; `‖Perm_rel‖ : Ω` is a
-  legal truncation (sub-singleton); the count-equality form is a legal Ω-valued
-  proposition (a `Nat` equation). (Grounded: `16 §6` truncation; `37 §6` pins
-  `Perm := ‖Perm_rel‖`.)
-- Unsound arm: **should-REJECT** — the kernel's Ω sort-check must refuse a
-  proof-relevant multi-constructor inductive at Ω (`16 §1.3`: `Type → Ω`
-  unrestricted admits `Bool ⇒ True ≡ False`). The reject fires at the `data …
-  : Omega` admission (a sort/positivity-into-Ω error), **not** downstream. **If
-  it is ACCEPTED, that is a consistency hole** — you can then derive `True ≡
-  False` and inhabit `Bottom`.
+The count-equality proposition is natively Ω-valued because it is a function
+into equality of `Nat` values (`16 §1.1`). The C5 sort law specializes that
+form with `eq_from_ord` and imports `Perm` from `Data.Collections.Derived`.
 
-## Discriminates
+The direct Ω inductive must not be accepted. The recorded C2 probe currently
+rejects at the parser because Ω-data constructors do not parse; that is a
+coincidental rejection, not evidence that the Ω sort-check was reached. If a
+surface path admits the declaration and the kernel accepts it, that is a
+consistency stop.
 
-Does the kernel enforce the Ω admission gate (sub-singletons only)? `‖Perm_rel‖`
-/ count-equality (legal Ω) vs `data Perm : Ω` (4 proof-relevant constructors,
-illegal) is the flip. A single "the truncation works" case would be green-vs-
-green — the illegal direct-Ω declaration is the guard.
+## Discriminator
+
+The property is the representation boundary: count-equality is the current
+Ω-native `Perm`; a proof-relevant multi-constructor relation is not an Ω
+inductive. A successful count-equality example alone would not test the
+forbidden declaration.
 
 ## Surface-expressibility note
 
-`data … : Type`, truncation `‖·‖`, and Ω/`Prop` sort annotations follow the
-kernel surface (`11-syntax.md`, `16`). If the surface cannot yet *write* an
-explicit Ω sort annotation on a `data`, the probe degrades to "can a proof-
-relevant inductive be forced into Ω by any surface path?" — document whichever
-path is reachable and its result. This was a live CV-Spec BLOCKING finding on
-ES1 (a `Perm` specified as a 4-ctor inductive at Ω), so the boundary is real.
+If the surface cannot write an explicit Ω sort annotation on `data`, record the
+parser boundary rather than crediting the kernel gate. The C2 arm is a prepared
+challenge, not an official conformance-runner result.
