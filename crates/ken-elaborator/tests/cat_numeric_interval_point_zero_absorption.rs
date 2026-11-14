@@ -10,6 +10,9 @@ use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const INTERVAL: &str = "Algorithm.Numeric.RationalInterval";
 const NEW_LAWS: [&str; 2] = [
     "interval_mul_zero_l_inside",
@@ -122,7 +125,7 @@ fn generic_point_zero_absorption_and_right_composition_add_no_trust() {
             "{name} has a checked proof body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("independent client checks both exact left laws and both right compositions");
     for private in ["equiv_leq", "rational_distrib_r"] {
         match interval_env().elaborate_file(&format!("import {INTERVAL} ({private})")) {
@@ -147,10 +150,11 @@ fn cv_seed_prefix_checks_before_point_one_refuses_at_its_own_claim() {
     let refused_source = seed_source_containing("reject_zero_product_inside_point_one");
     let mut accepted = interval_env();
     accepted
-        .elaborate_file(accepted_source)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted_source))
         .expect("CV seed's complete accepted source block checks");
 
-    let parsed = parse_decls(refused_source).expect("isolated CV seed refusal parses");
+    let checked_refused = checked_is_true::selected_source(refused_source);
+    let parsed = parse_decls(&checked_refused).expect("isolated CV seed refusal parses");
     let [SourceDecl::TheoremDecl {
         name,
         params,
@@ -165,9 +169,9 @@ fn cv_seed_prefix_checks_before_point_one_refuses_at_its_own_claim() {
 
     let mut rejecting = interval_env();
     rejecting
-        .elaborate_file(accepted_source)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted_source))
         .expect("accepted CV seed prefix checks before isolated refusal");
-    match rejecting.elaborate_file(refused_source) {
+    match rejecting.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
@@ -219,10 +223,11 @@ theorem false_one_target : IsTrue (interval_inside (interval_mul (interval_point
 fn zero_target_proved_accepts_and_one_target_refuses_on_same_product() {
     let mut accepted = interval_env();
     accepted
-        .elaborate_file(CLOSED_ACCEPTED)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_ACCEPTED))
         .expect("§11 both laws, inverted controls and true Proved check");
 
-    let parsed = parse_decls(FALSE_ONE_TARGET).expect("isolated false claim parses");
+    let checked_refused = checked_is_true::selected_source(FALSE_ONE_TARGET);
+    let parsed = parse_decls(&checked_refused).expect("isolated false claim parses");
     let [SourceDecl::TheoremDecl {
         name,
         params,
@@ -237,9 +242,9 @@ fn zero_target_proved_accepts_and_one_target_refuses_on_same_product() {
 
     let mut rejecting = interval_env();
     rejecting
-        .elaborate_file(CLOSED_ACCEPTED)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_ACCEPTED))
         .expect("accepted same-product point-zero control precedes refusal");
-    match rejecting.elaborate_file(FALSE_ONE_TARGET) {
+    match rejecting.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
