@@ -5429,7 +5429,9 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// contract into those whose `Avail` admits a carried word and those it does
 /// not.
 /// **CLAIMED:** the original `D5` pair, ABI-A2's carried append/rename seats,
-/// and ABI-S6's witnessed Mapping write payload are activated, and no others.
+/// ABI-S6's Mapping write payload, PX10 B2's Open Arg0 (F argv/null/live and
+/// R-NODES) and Push Arg2/3 (native smoke, operation-pair and F rows) are
+/// activated, and no others.
 /// **THE GAP this closes:** a forbidden list only reddens on a seat someone
 /// thought to name. This scans the authoritative population and asserts the
 /// whole partition, so a new byte-span seat, or a later flip of one nobody
@@ -5443,12 +5445,15 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// The `SPECIALIZED_ONLY` side is not a gap in the observer. `D5` measured the
 /// original four and ABI-A2's real artifacts measure append, metadata, and
 /// rename paths. FsRename destination is the additional directly observed
-/// carried span. Each synthesized `FileError` separately declares
+/// carried span. PX10 B2's F argv/null/live rows witness carried Open Arg0;
+/// native smoke, operation-pair and F rows independently witness carried Push
+/// Arg2 and Arg3 by per-seat narrowing. Each synthesized `FileError` declares
 /// `SiteOperand(0)`; that carried source-path use is projected through the
 /// emitted helper without widening its direct-consumer availability.
 ///
 /// Seats of a planned operation the native ABI still refuses form a third,
-/// gated partition. Their table disposition is not an evidence claim.
+/// gated partition. ResourceStreamWrite has no byte-span seat, so this
+/// partition is now empty; its table disposition is not an evidence claim.
 #[test]
 fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     let mut either_phase = Vec::new();
@@ -5486,6 +5491,9 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     assert_eq!(
         either_phase,
         vec![
+            (ken_host::HostOpV1::ProcessPlanOpen, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::ProcessPlanPush, EffectSeatSlot::Argument(2)),
+            (ken_host::HostOpV1::ProcessPlanPush, EffectSeatSlot::Argument(3)),
             (ken_host::HostOpV1::ConsoleWrite, EffectSeatSlot::Argument(1)),
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(2)),
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(1)),
@@ -5516,17 +5524,13 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     );
     assert_eq!(
         gated,
-        vec![
-            (ken_host::HostOpV1::ProcessPlanOpen, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::ProcessPlanPush, EffectSeatSlot::Argument(2)),
-            (ken_host::HostOpV1::ProcessPlanPush, EffectSeatSlot::Argument(3)),
-        ],
+        vec![],
         "a byte-span seat of a natively refused operation is not the planned set"
     );
     assert_eq!(
         either_phase.len() + specialized_only.len(),
-        16,
-        "the native byte-span seat population is sixteen; a change needs its own disposition"
+        19,
+        "the native byte-span seat population is nineteen; a change needs its own disposition"
     );
 }
 

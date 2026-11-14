@@ -38,8 +38,9 @@ fn invoke(route: &str, source: &Path, dir: &Path) -> Output {
 /// its one compiler-internal relay exemption changes. The AC-0 census found
 /// 98 isolated sources and 64 Legacy-clean at the cut; Time adds two
 /// non-Legacy fixtures and RNSPK adds one Legacy-clean fixture, making the
-/// post-RNSPK cohort 101/65. The relay keeps its separate Legacy elaboration
-/// as a core-term fixture (30 §4, I row). MEASURED:
+/// post-RNSPK cohort 101/65. PX10 B2 adds eight Legacy-clean native-parity
+/// fixtures, making the cohort 109/73. The relay keeps its separate Legacy
+/// elaboration as a core-term fixture (30 §4, I row). MEASURED:
 /// the independent Legacy entry rechecks each body without its new import
 /// directives, then every Legacy-clean root except the relay checks through
 /// the real CLI binary. CLAIMED: every post-RNSPK Legacy-clean file checks on
@@ -47,7 +48,7 @@ fn invoke(route: &str, source: &Path, dir: &Path) -> Output {
 /// provisioned and tested by their owning binaries, not by this file cohort.
 #[test]
 fn post_rnspk_legacy_clean_file_cohort_checks_through_switched_cli_route() {
-    const POST_RNSPK_LEGACY_CLEAN: usize = 65;
+    const POST_RNSPK_LEGACY_CLEAN: usize = 73;
     const INTERNAL_CORE_ONLY: usize = 1;
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
