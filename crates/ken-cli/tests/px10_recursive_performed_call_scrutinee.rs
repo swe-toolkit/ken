@@ -81,13 +81,16 @@ fn p7_self_recursive_bind_scrutinee_refuses_before_native_emission() {
     assert_self_recursive_scrutinee_refuses("p7", P7);
 }
 
-/// Promise class: durable fail-closed refusal. MEASURED: checked interpreter
-/// executes both exact decreasing recursive variants; native build refuses at
-/// the performed-call erasure lane before emission under B2's nodes-only
-/// profile. CLAIMED: result-position Let and Match scrutinees cannot bypass
-/// the performed-call guard. THE GAP: these two inputs do not cover arbitrary
-/// If arms or every nested match, which remain production-classified by the
-/// exhaustive predicate rather than witnessed here.
+/// Promise class: durable fail-closed refusal. MEASURED: both decreasing
+/// variants execute on the checked interpreter and refuse before native
+/// emission. V-MATCH2 reaches the Match result-position arm: disabling only
+/// that arm lets it build; disabling only ComputationalMatch does not. V-LET2
+/// refuses as a direct Call after its Let is removed before erasure, so it is
+/// not a witness of the Let arm. CLAIMED: a performed call in a surviving
+/// Match case result cannot pass the native erasure guard. THE GAP: If,
+/// ComputationalMatch, and Let are classified by the exhaustive predicate
+/// but unwitnessed by these rows. Scratch V-LETIN also refused with Let false,
+/// so no Let reachability or mutation bite is claimed.
 fn assert_result_position_variant_refuses(name: &'static str, raw: &'static str) {
     std::thread::Builder::new()
         .name(format!("px10-b2-c3-result-{name}"))
