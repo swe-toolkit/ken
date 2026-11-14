@@ -94,6 +94,36 @@ The spec text moves in a Spec enclave co-turn on the product candidate.
   rows to acceptance.
 - **AC-4.** Full-workspace CI is green on the exact candidate.
 
+## I4 preconditions
+
+`LANG-PRELUDE-NONHOME-FAMILIES-HOME` has landed, and the I1 rows held for
+it (listed by identity in I1's handoff) migrate by import in I4
+(Architect evt_13j52ac43jrw8, evt_3pxvhj0yngpxm).
+
+## I4 spec 33 co-turn carry
+
+The fence import scope (Architect evt_4f4yshmbkj59e, on landed I0
+`68d4a6ab4`; I1 carries the pin) enters spec 33 in I4, in the
+spec-author's wording, with this content: a checked `ken example` or
+`ken reject` fence in a literate module is elaborated in that module's
+completed scope. Its imports resolve as the module's own imports do,
+through the selected catalog roots in their resolution mode, so a fence
+may import a module outside the module's tangled closure, which is then
+loaded and checked with it. A `ken reject` fence demonstrates a refusal
+of the language, not one that depends on which modules happen to be
+loaded already.
+
+## §1b symptom inventory
+
+Chain: the increment cut and non-home reachability (Architect
+evt_13j52ac43jrw8; §1a 1).
+
+1. A generated prelude family (checked/saturating fixed-width arithmetic,
+   `conversions.rs`) is source-reachable only through Legacy ambient
+   lookup and has no taxonomy row or package home. Keyed on pre-source
+   registration with no explicit-import home. I4 now depends on a
+   homing node framed from the counted non-home population.
+
 ## Stop conditions
 
 - The reach includes a catalog package whose public law or export name
