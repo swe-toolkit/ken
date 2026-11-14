@@ -38,8 +38,9 @@ fn invoke(route: &str, source: &Path, dir: &Path) -> Output {
 /// its one compiler-internal relay exemption changes. The AC-0 census found
 /// 98 isolated sources and 64 Legacy-clean at the cut; Time adds two
 /// non-Legacy fixtures and RNSPK adds one Legacy-clean fixture, making the
-/// post-RNSPK cohort 101/65. PX10 B2 adds eight Legacy-clean native-parity
-/// fixtures, making the cohort 109/73. The relay keeps its separate Legacy
+/// post-RNSPK cohort 101/65. Two non-Legacy conformance challenge sources
+/// bring the base to 103/65; PX10 B2 adds eight Legacy-clean native-parity
+/// fixtures, making the cohort 111/73. The relay keeps its separate Legacy
 /// elaboration as a core-term fixture (30 §4, I row). MEASURED:
 /// the independent Legacy entry rechecks each body without its new import
 /// directives, then every Legacy-clean root except the relay checks through
