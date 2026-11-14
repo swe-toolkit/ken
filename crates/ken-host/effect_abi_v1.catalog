@@ -100,10 +100,10 @@ operation|MappingAllocate|0404|native|MappingAllocateRequestV1|2|HostReplyV1|1
 operation|MappingReadView|0405|native|MappingReadViewRequestV1|4|HostReplyV1|1
 operation|MappingWriteView|0406|native|MappingWriteViewRequestV1|4|HostReplyV1|1
 operation|MappingAcquireFile|0407|native|MappingAcquireFileRequestV1|3|HostReplyV1|1
-operation|ResourceStreamRead|0408|unavailable|ResourceStreamReadRequestV1|4|HostReplyV1|1
-operation|ResourceStreamWrite|0409|unavailable|ResourceStreamWriteRequestV1|5|HostReplyV1|1
-operation|ProcessPlanOpen|0601|unavailable|ProcessPlanOpenRequestV1|2|HostReplyV1|1
-operation|ProcessPlanPush|0602|unavailable|ProcessPlanPushRequestV1|5|HostReplyV1|1
-operation|ProcessSpawn|0603|unavailable|ProcessSpawnRequestV1|1|HostReplyV1|1
-operation|ProcessTakePipe|0604|unavailable|ProcessTakePipeRequestV1|2|HostReplyV1|1
-operation|ProcessWait|0605|unavailable|ProcessWaitRequestV1|1|HostReplyV1|1
+operation|ResourceStreamRead|0408|native|ResourceStreamReadRequestV1|4|HostReplyV1|1
+operation|ResourceStreamWrite|0409|native|ResourceStreamWriteRequestV1|5|HostReplyV1|1
+operation|ProcessPlanOpen|0601|native|ProcessPlanOpenRequestV1|2|HostReplyV1|1
+operation|ProcessPlanPush|0602|native|ProcessPlanPushRequestV1|5|HostReplyV1|1
+operation|ProcessSpawn|0603|native|ProcessSpawnRequestV1|1|HostReplyV1|1
+operation|ProcessTakePipe|0604|native|ProcessTakePipeRequestV1|2|HostReplyV1|1
+operation|ProcessWait|0605|native|ProcessWaitRequestV1|1|HostReplyV1|1

@@ -6811,3 +6811,76 @@ fn substitute_unrelated_owner_root_reds_on_a_specialized_owner_program() {
          occur under this family; stderr:\n{stderr}"
     );
 }
+
+/// Promise class: durable Process execution differential. MEASURED: the
+/// checked native and fresh interpreter smoke agree on the ordered canonical
+/// (operation, request, outcome) pairs and on terminal status. CLAIMED:
+/// B2's promoted Process host operations preserve the reference evaluator's
+/// effects rather than merely emitting an object. THE GAP: argv, null and
+/// live-child programs have separate F parity rows with full bindings.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[test]
+fn px10_native_process_operation_pairs_match_fresh_interpreter() {
+    const SOURCE: &str = include_str!("fixtures/px10_child_wait_smoke.ken");
+    // The same smoke's native path completed on the stated 16 MiB worker in
+    // px10_spawn_plan_wait; this independent binary provisions it explicitly.
+    std::thread::Builder::new()
+        .name("rt-parity-px10-smoke".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let root = tempfile::tempdir().expect("isolated Process root");
+            let source = SOURCE.replacen(
+                "program capabilities FS AFull, Process\n",
+                "program capabilities FS AFull, Process, RootExecution Allow\n",
+                1,
+            );
+            assert_ne!(source, SOURCE, "the smoke capability header moved");
+            let roots = checked_catalog_roots();
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            let reference = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots,
+                &[],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .expect("fresh checked interpreter Process smoke");
+            let built = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots,
+                "rt_parity_px10_smoke",
+                root.path().join("native"),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+            .expect("native Process smoke builds");
+            let native = ken_runtime::run_bound_process_effect_observation(
+                &built.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: Vec::new(),
+                    environment: Vec::new(),
+                    cwd: root.path().to_owned(),
+                    plan_hash: built.plan_transport_hash,
+                },
+            )
+            .expect("native Process smoke executes");
+            let pairs = |observation: &ken_runtime::EffectObservation| {
+                observation.effect_trace.iter().map(|event| (
+                    event.operation,
+                    event.request.clone(),
+                    event.outcome.clone(),
+                )).collect::<Vec<_>>()
+            };
+            assert_eq!(native.exit_status, reference.exit_status);
+            assert_eq!(native.terminal_exit, reference.terminal_exit);
+            assert_eq!(native.terminal_error, reference.terminal_error);
+            assert_eq!(pairs(&native), pairs(&reference));
+            assert!(pairs(&reference).iter().any(|(operation, _, _)|
+                *operation == ken_runtime::HostOpV1::ProcessWait));
+        })
+        .expect("stated Process parity worker")
+        .join()
+        .expect("Process parity worker completed");
+}

@@ -1111,6 +1111,85 @@ mod tests {
         assert_eq!(actual, reason);
     }
 
+    /// Promise class: durable positional refusal. MEASURED: the inner fold's
+    /// Ret case/Let body returns the enclosing scrutinee fold, while entering
+    /// through its Vis case or Let value refuses at the same up-walk.
+    /// CLAIMED: acquiring through a non-tail position cannot inherit the
+    /// fold's return clause. THE GAP: full bracket finalizer/settlement
+    /// execution is covered by the public native parity rows, not this walk.
+    #[test]
+    fn return_fold_refuses_vis_case_and_let_value_positions() {
+        let symbols = NativeProcessSymbols::legacy_prelude();
+        let inner = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Value(crate::RuntimeValue::Bool(true))),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: symbols.itree_ret.clone(),
+                    argument_binders: 1,
+                    recursive_positions: Vec::new(),
+                    body: RuntimeExpr::Let {
+                        value: Box::new(RuntimeExpr::Value(crate::RuntimeValue::Bool(false))),
+                        body: Box::new(RuntimeExpr::Value(crate::RuntimeValue::Bool(true))),
+                    },
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: symbols.itree_vis.clone(),
+                    argument_binders: 2,
+                    recursive_positions: vec![1],
+                    body: RuntimeExpr::Value(crate::RuntimeValue::Bool(false)),
+                },
+            ],
+            default: crate::RuntimeTrap {
+                code: crate::RuntimeTrapCode::ExplicitTrap,
+                message: "unmatched return-fold constructor".into(),
+            },
+        };
+        let source = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(inner),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: symbols.itree_ret.clone(),
+                    argument_binders: 1,
+                    recursive_positions: Vec::new(),
+                    body: RuntimeExpr::Value(crate::RuntimeValue::Bool(true)),
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: symbols.itree_vis.clone(),
+                    argument_binders: 2,
+                    recursive_positions: vec![1],
+                    body: RuntimeExpr::Value(crate::RuntimeValue::Bool(false)),
+                },
+            ],
+            default: crate::RuntimeTrap {
+                code: crate::RuntimeTrapCode::ExplicitTrap,
+                message: "unmatched enclosing fold constructor".into(),
+            },
+        };
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            &source, &BTreeMap::new(), &symbols,
+            super::super::AbiRootIngress::Value, false,
+        ).expect("the checked-shape fold has a planned source graph");
+        let root = plan.root_occurrence.expect("enclosing fold origin");
+        let inner = child(&plan, root, 0).expect("inner fold in scrutinee");
+        let ret_let = child(&plan, inner, 1).expect("inner Ret case body");
+        let ret_body = child(&plan, ret_let, 1).expect("Let body");
+        let let_value = child(&plan, ret_let, 0).expect("Let value");
+        let vis_body = child(&plan, inner, 2).expect("inner Vis case body");
+        let parent_map = parents(&plan).expect("one exact parent per source child");
+        let roles = BracketRoles::from(&symbols);
+        assert_eq!(
+            return_fold(&plan, &parent_map, &roles, ret_body)
+                .expect("Ret case's Let body is a valid positional tail"),
+            root,
+        );
+        for dispatch in [let_value, vis_body] {
+            assert_refusal(
+                return_fold(&plan, &parent_map, &roles, dispatch),
+                "acquire dispatch has no positional return fold",
+            );
+        }
+    }
+
     fn walk_test_body<'a>(
         body: &'a RuntimeExpr,
         declarations: &BTreeMap<&str, &'a RuntimeDeclaration>,

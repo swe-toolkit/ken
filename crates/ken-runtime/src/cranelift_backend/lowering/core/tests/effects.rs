@@ -389,7 +389,6 @@ fn run_checked_bounded_nat_fixture(
         true,
         compiler.assumptions,
         compiler.unsupported,
-        0,
     );
     compiled
         .run_with_profile(None, crate::boundary_resource_profile::starter_smoke_profile())
@@ -2116,11 +2115,10 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
 }
 
 /// The host operations planning represents: every operation the reference
-/// executor admits, read from `ken_host`. That is the native-tested set plus the
-/// PX10 Process and pipe-stream operations, which are `RepresentedUnavailable`.
-/// Planning them does not make them native: the compiler driver's Process gate
-/// refuses their programs before object emission, and the native ABI refuses
-/// them at dispatch, until native parity moves them to `NativeTested`.
+/// executor admits, read from `ken_host`. After B2's Process promotion this
+/// equals the native-tested set, including the pipe-stream and Process ops.
+/// The emitted native F parity rows, rather than this inventory assertion,
+/// establish that those newly admitted effects execute.
 fn executor_admitted_host_operations() -> BTreeSet<ken_host::HostOpV1> {
     ken_host::HostOpV1::ALL
         .into_iter()

@@ -172,8 +172,9 @@ impl HostOpV1 {
     ///
     /// `RepresentedUnavailable` means native parity evidence has not been
     /// produced. The native ABI requires `NativeTested`; reference-interpreter
-    /// execution instead uses [`Self::executor_admits`]. PX10's seven operations
-    /// are executor-admitted without being promoted to native availability.
+    /// execution instead uses [`Self::executor_admits`]. PX10's seven Process
+    /// and stream operations are promoted together with native differential
+    /// parity; no interpreter-only admission exception remains.
     ///
     /// Relabelling an operation therefore does not merely relabel it: it opens
     /// the native ABI path on the strength of a label whose job is to record
@@ -215,30 +216,18 @@ impl HostOpV1 {
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
-            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::NativeTested,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
-            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::RepresentedUnavailable,
+            | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
         }
     }
 
     /// May a Ken program execute the operation through the reference host?
-    /// Unlike native availability, the PX10 Process and pipe operations are
-    /// admitted here while native emission and the native ABI refuse them.
+    /// All executor-admitted operations now have native parity evidence;
+    /// operations still represented but unavailable refuse at either entry.
     pub const fn executor_admits(self) -> bool {
-        match self.availability() {
-            HostOpAvailabilityV1::NativeTested => true,
-            HostOpAvailabilityV1::RepresentedUnavailable => matches!(
-                self,
-                Self::ResourceStreamRead
-                    | Self::ResourceStreamWrite
-                    | Self::ProcessPlanOpen
-                    | Self::ProcessPlanPush
-                    | Self::ProcessSpawn
-                    | Self::ProcessTakePipe
-                    | Self::ProcessWait
-            ),
-        }
+        matches!(self.availability(), HostOpAvailabilityV1::NativeTested)
     }
 
     /// **`ABI-R3` `D2` -- exhaustive, no wildcard.**
@@ -306,7 +295,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -333,6 +322,13 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
     HostOpV1::MappingReadView,
     HostOpV1::MappingWriteView,
     HostOpV1::MappingAcquireFile,
+    HostOpV1::ResourceStreamRead,
+    HostOpV1::ResourceStreamWrite,
+    HostOpV1::ProcessPlanOpen,
+    HostOpV1::ProcessPlanPush,
+    HostOpV1::ProcessSpawn,
+    HostOpV1::ProcessTakePipe,
+    HostOpV1::ProcessWait,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -5850,12 +5846,12 @@ mod tests {
         );
     }
 
-    /// Promise: durable invariant. MEASURED: the full HostOp inventory's
-    /// interpreter-only admitted set is exactly PX10's seven operations.
-    /// CLAIMED: native-unavailable operations do not silently gain executor
-    /// admission. THE GAP: the shared dispatcher must use executor_admits.
+    /// Promise: durable invariant. MEASURED: the full HostOp inventory has no
+    /// interpreter-only admitted operations after PX10's native promotion.
+    /// CLAIMED: native-unavailable operations cannot gain executor admission.
+    /// THE GAP: the shared dispatcher must still use executor_admits.
     #[test]
-    fn executor_admits_exactly_native_tested_plus_px10_interpreter_set() {
+    fn executor_admits_exactly_native_tested_operations() {
         use std::collections::BTreeSet;
         let widened = HostOpV1::ALL
             .into_iter()
@@ -5864,18 +5860,7 @@ mod tests {
                     && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
             })
             .collect::<BTreeSet<_>>();
-        assert_eq!(
-            widened,
-            BTreeSet::from([
-                HostOpV1::ResourceStreamRead,
-                HostOpV1::ResourceStreamWrite,
-                HostOpV1::ProcessPlanOpen,
-                HostOpV1::ProcessPlanPush,
-                HostOpV1::ProcessSpawn,
-                HostOpV1::ProcessTakePipe,
-                HostOpV1::ProcessWait,
-            ])
-        );
+        assert!(widened.is_empty(), "no interpreter-only operation remains: {widened:?}");
         assert!(HostOpV1::ALL.into_iter().all(|op| {
             op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
         }));
