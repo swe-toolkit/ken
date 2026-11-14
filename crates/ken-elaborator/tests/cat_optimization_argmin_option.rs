@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const ARGMIN: &str = "Algorithm.Optimization.Argmin";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -165,7 +168,7 @@ fn generic_option_exports_check_without_new_trust_or_public_helpers() {
         assert!(owned.contains(&id), "{name} must be Argmin-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("§1.4 generic client consumes all four laws");
     for private in [
         "option_member",
@@ -200,7 +203,7 @@ fn shipped_option_seed_positive_client_checks() {
         panic!("the §1.4 seed has a positive client and one isolated refusal");
     };
     let mut env = loaded_argmin();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("all shipped §1.4 positive controls check");
     for name in [
         "empty_returns_none",
@@ -275,9 +278,9 @@ fn shipped_some_on_nil_claim_refuses_at_the_pinned_theorem() {
         "the refusal must assert the shipped Some-on-Nil proposition"
     );
     let mut env = loaded_argmin();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("same-input None control and all positives check first");
-    match env.elaborate_file(refused) {
+    match env.elaborate_file(&checked_is_true::selected_source(refused)) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span: failure,

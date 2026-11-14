@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const ARGMIN: &str = "Algorithm.Optimization.Argmin";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -162,7 +165,7 @@ fn generic_argmax_option_exports_check_without_new_trust_or_public_helpers() {
         assert!(owned.contains(&id), "{name} must be Argmin-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("generic client applies all four §3.4 laws");
     for private in [
         "option_greatest",
@@ -195,7 +198,7 @@ fn shipped_argmax_option_seed_positive_client_checks() {
         "one positive and five refusal Ken fences"
     );
     let mut env = loaded_argmin();
-    env.elaborate_file(&programs[0])
+    env.elaborate_file(&checked_is_true::selected_source_with_import(&programs[0]))
         .expect("entire shipped §3.4 positive client kernel-checks");
     for name in [
         "empty_returns_none",
@@ -290,16 +293,16 @@ fn shipped_argmax_option_false_claims_refuse_after_full_positive_prefix() {
             format!("theorem refusal_claim_typechecks (h : {claim}) : {claim} = h");
         let mut checked_type = loaded_argmin();
         checked_type
-            .elaborate_file(&programs[0])
+            .elaborate_file(&checked_is_true::selected_source_with_import(&programs[0]))
             .expect("full positive client checks before the type control");
         checked_type
-            .elaborate_file(&well_typed_claim)
+            .elaborate_file(&checked_is_true::selected_source(&well_typed_claim))
             .expect("refused proposition is well-typed under a witness");
 
         let mut env = loaded_argmin();
-        env.elaborate_file(&programs[0])
+        env.elaborate_file(&checked_is_true::selected_source_with_import(&programs[0]))
             .expect("entire positive client checks before each fresh refusal");
-        match env.elaborate_file(refused) {
+        match env.elaborate_file(&checked_is_true::selected_source(refused)) {
             Err(ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 span: failure,

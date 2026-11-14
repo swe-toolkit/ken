@@ -12,6 +12,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const ARGMIN: &str = "Algorithm.Optimization.Argmin";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -140,7 +143,7 @@ fn generic_argmax_exports_check_without_new_trust_or_public_helpers() {
         assert!(owned.contains(&id), "{name} must be Argmin-owned");
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("generic client consumes exactly seven §3 laws");
     for private in [
         "argmax_from",
@@ -173,7 +176,7 @@ fn shipped_argmax_seed_positive_client_checks() {
         panic!("§3 seed has one positive client and one isolated refusal");
     };
     let mut env = loaded_argmin();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("all shipped §3 positive controls check");
     let id = env.globals["argmax_earliest_tie"];
     assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
@@ -243,16 +246,16 @@ fn shipped_argmax_later_tie_claim_refuses_at_its_own_equality() {
     );
     let mut checked_type = loaded_argmin();
     checked_type
-        .elaborate_file(positive)
+        .elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("full positive client checks before the type control");
     checked_type
-        .elaborate_file(&well_typed_claim)
+        .elaborate_file(&checked_is_true::selected_source(&well_typed_claim))
         .expect("false proposition itself is well-typed under a witness");
 
     let mut env = loaded_argmin();
-    env.elaborate_file(positive)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(positive))
         .expect("full earliest-tie positive client checks before refusal");
-    match env.elaborate_file(refused) {
+    match env.elaborate_file(&checked_is_true::selected_source(refused)) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span: failure,

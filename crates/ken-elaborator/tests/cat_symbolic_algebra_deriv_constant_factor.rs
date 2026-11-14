@@ -13,6 +13,9 @@ use ken_elaborator::{
 };
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -80,7 +83,7 @@ fn generic_constant_factor_is_public_checked_and_zero_trust() {
         matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
         "public law has a checked body, not an assumption"
     );
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("external client consumes the complete premise-free §12 law");
 }
 
@@ -172,7 +175,6 @@ fn actual_seed_accepts_before_dropped_derivative_refuses_at_own_claim() {
         params,
         theorem,
         body,
-        span: claim_span,
         ..
     }] = negatives.as_slice()
     else {
@@ -187,7 +189,7 @@ fn actual_seed_accepts_before_dropped_derivative_refuses_at_own_claim() {
 
     let mut positive = package_env();
     positive
-        .elaborate_file(accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("complete actual §12 seed and same-form Proved control check");
     for name in [
         "factor_law_at_variable_zero",
@@ -203,15 +205,20 @@ fn actual_seed_accepts_before_dropped_derivative_refuses_at_own_claim() {
 
     let mut negative = package_env();
     negative
-        .elaborate_file(accepted)
+        .elaborate_file(&checked_is_true::selected_source_with_import(accepted))
         .expect("fresh full seed accepted prefix checks before refusal");
-    match negative.elaborate_file(refused) {
+    let checked_refused = checked_is_true::selected_source(refused);
+    let checked_decls = parse_decls(&checked_refused).expect("selected refusal parses");
+    let [SourceDecl::TheoremDecl { span: checked_span, .. }] = checked_decls.as_slice() else {
+        panic!("selected refusal remains one theorem");
+    };
+    match negative.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
-        }) if span.start >= claim_span.start
+        }) if span.start >= checked_span.start
             && span.start < span.end
-            && span.end <= claim_span.end => {}
+            && span.end <= checked_span.end => {}
         other => panic!("dropped derivative must reject at its own claim: {other:?}"),
     }
 

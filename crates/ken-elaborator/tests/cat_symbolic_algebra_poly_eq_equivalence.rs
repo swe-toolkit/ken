@@ -9,6 +9,9 @@ use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 
 fn root() -> PathBuf {
@@ -78,7 +81,7 @@ fn generic_equivalence_laws_are_checked_public_and_zero_trust() {
             "{public} has a checked body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
+    env.elaborate_file(&checked_is_true::selected_source_with_import(GENERIC_CLIENT))
         .expect("open clients consume the precise §11 contracts");
     match env.elaborate_file(&format!("import {PACKAGE} (poly_same_refl)")) {
         Err(ElabError::UnboundName { name, .. }) => {
@@ -130,17 +133,18 @@ theorem equal_form_refusal : IsTrue (poly_eq x0_sum x1) = Proved
 fn closed_equal_form_control_accepts_and_false_claim_refuses() {
     let mut accepting = loaded_package();
     accepting
-        .elaborate_file(CLOSED_PREFIX)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("common prefix and three law applications accept");
     accepting
-        .elaborate_file(ACCEPTED_CONTROL)
+        .elaborate_file(&checked_is_true::selected_source(ACCEPTED_CONTROL))
         .expect("true poly_eq decision accepts Proved");
 
     let mut rejecting = loaded_package();
     rejecting
-        .elaborate_file(CLOSED_PREFIX)
+        .elaborate_file(&checked_is_true::selected_source_with_import(CLOSED_PREFIX))
         .expect("fresh accepted prefix precedes refusal");
-    let parsed = parse_decls(REFUSED_CLAIM).expect("refusal parses");
+    let checked_refused = checked_is_true::selected_source(REFUSED_CLAIM);
+    let parsed = parse_decls(&checked_refused).expect("refusal parses");
     let [SourceDecl::TheoremDecl {
         name,
         params,
@@ -155,7 +159,7 @@ fn closed_equal_form_control_accepts_and_false_claim_refuses() {
         params.is_empty(),
         "refusal is closed over the common prefix"
     );
-    match rejecting.elaborate_file(REFUSED_CLAIM) {
+    match rejecting.elaborate_file(&checked_refused) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
