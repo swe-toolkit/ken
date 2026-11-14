@@ -48,15 +48,6 @@ fn main() {
                 .read_to_end(&mut Vec::new())
                 .expect("await stdin EOF");
         }
-        Some(b"stdin-sink") => {
-            std::io::stdout().write_all(b"ready\n").expect("write ready record");
-            std::io::stdout().flush().expect("flush ready record");
-            let mut payload = Vec::new();
-            std::io::stdin().read_to_end(&mut payload).expect("read parent pipe to EOF");
-            if payload.first() != Some(&b'r') {
-                std::process::exit(94);
-            }
-        }
         _ => std::process::exit(95),
     }
 }

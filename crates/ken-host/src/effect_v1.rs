@@ -172,9 +172,10 @@ impl HostOpV1 {
     ///
     /// `RepresentedUnavailable` means native parity evidence has not been
     /// produced. The native ABI requires `NativeTested`; reference-interpreter
-    /// execution instead uses [`Self::executor_admits`]. PX10's seven Process
-    /// and stream operations are promoted together with native differential
-    /// parity; no interpreter-only admission exception remains.
+    /// execution instead uses [`Self::executor_admits`]. PX10 B2 promotes
+    /// ResourceStreamRead and five Process operations with native differential
+    /// parity. ResourceStreamWrite awaits a checked source home and a native
+    /// parity witness in the follow-on; its interpreter admission remains.
     ///
     /// Relabelling an operation therefore does not merely relabel it: it opens
     /// the native ABI path on the strength of a label whose job is to record
@@ -216,7 +217,8 @@ impl HostOpV1 {
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
-            Self::ResourceStreamRead | Self::ResourceStreamWrite => HostOpAvailabilityV1::NativeTested,
+            Self::ResourceStreamRead => HostOpAvailabilityV1::NativeTested,
+            Self::ResourceStreamWrite => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
             | Self::ProcessTakePipe | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
@@ -224,10 +226,15 @@ impl HostOpV1 {
     }
 
     /// May a Ken program execute the operation through the reference host?
-    /// All executor-admitted operations now have native parity evidence;
-    /// operations still represented but unavailable refuse at either entry.
+    /// ResourceStreamWrite alone remains interpreter-admitted without native
+    /// parity until its checked source home and native follow-on land.
     pub const fn executor_admits(self) -> bool {
-        matches!(self.availability(), HostOpAvailabilityV1::NativeTested)
+        match self.availability() {
+            HostOpAvailabilityV1::NativeTested => true,
+            HostOpAvailabilityV1::RepresentedUnavailable => {
+                matches!(self, Self::ResourceStreamWrite)
+            }
+        }
     }
 
     /// **`ABI-R3` `D2` -- exhaustive, no wildcard.**
@@ -295,7 +302,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 32] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -323,7 +330,6 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
     HostOpV1::MappingWriteView,
     HostOpV1::MappingAcquireFile,
     HostOpV1::ResourceStreamRead,
-    HostOpV1::ResourceStreamWrite,
     HostOpV1::ProcessPlanOpen,
     HostOpV1::ProcessPlanPush,
     HostOpV1::ProcessSpawn,
@@ -5846,12 +5852,12 @@ mod tests {
         );
     }
 
-    /// Promise: durable invariant. MEASURED: the full HostOp inventory has no
-    /// interpreter-only admitted operations after PX10's native promotion.
-    /// CLAIMED: native-unavailable operations cannot gain executor admission.
-    /// THE GAP: the shared dispatcher must still use executor_admits.
+    /// Promise: durable invariant. MEASURED: the full HostOp inventory has
+    /// exactly ResourceStreamWrite admitted in the interpreter without native
+    /// parity. CLAIMED: no other native-unavailable operation gains executor
+    /// admission. THE GAP: the shared dispatcher must use executor_admits.
     #[test]
-    fn executor_admits_exactly_native_tested_operations() {
+    fn executor_admits_exactly_native_tested_plus_pipe_write() {
         use std::collections::BTreeSet;
         let widened = HostOpV1::ALL
             .into_iter()
@@ -5860,7 +5866,11 @@ mod tests {
                     && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
             })
             .collect::<BTreeSet<_>>();
-        assert!(widened.is_empty(), "no interpreter-only operation remains: {widened:?}");
+        assert_eq!(
+            widened,
+            BTreeSet::from([HostOpV1::ResourceStreamWrite]),
+            "the checked source home for pipe write is follow-on"
+        );
         assert!(HostOpV1::ALL.into_iter().all(|op| {
             op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
         }));
