@@ -1,8 +1,7 @@
 # Interval width under inclusion
 
 Format: `../../README.md`.
-Contract: Architect AC-0 ruling `evt_aha7hvm88ckz`, item 5; AC-2
-release `evt_604adzbznbep5`. The new §16 is authored separately.
+Spec: `spec/50-stdlib/68-numerical.md` §16.1–§16.3.
 Frame: `docs/program/issues/SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO.md`.
 
 These closed clients exercise the public interval-width and Rational
@@ -98,7 +97,7 @@ theorem a4_subtraction_monotonicity_application
 
 ### stdlib/numerical/interval-width-inside-closed-inclusion
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §§16.2–16.3.
 - promise class: durable invariant.
 - given: `[1,2]` inside `[0,4]`.
 - expect: the inner interval's width is no greater than the outer width.
@@ -110,7 +109,7 @@ theorem a4_subtraction_monotonicity_application
 
 ### stdlib/numerical/interval-width-inside-inverted
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §§16.2–16.3.
 - promise class: durable invariant.
 - given: inverted `[3,1]` inside `[0,4]`.
 - expect: the inverted interval's truncated width is no greater than four.
@@ -122,7 +121,7 @@ theorem a4_subtraction_monotonicity_application
 
 ### stdlib/numerical/interval-width-inside-intersection
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §§16.2–16.3.
 - promise class: durable invariant.
 - given: `[0,3] ∩ [1,4]` inside `[0,3]`.
 - expect: the intersection's width is no greater than the left operand's.
@@ -135,7 +134,7 @@ theorem a4_subtraction_monotonicity_application
 
 ### stdlib/numerical/rational-subtraction-monotonicity-both-arguments
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §§16.1–16.3.
 - promise class: durable invariant.
 - given: `1 ≤ 3` and `0 ≤ 1`.
 - expect: `1 − 1 ≤ 3 − 0` under truncated rational subtraction.
@@ -156,7 +155,7 @@ refusal's own theorem declaration. Do not pin a reason string or raw id.
 
 ### stdlib/numerical/reject-interval-width-inside-reversed
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §16.3.
 - promise class: durable invariant.
 - given: `[0,4]` and `[1,2]`; the positive client proves the forward width
   inclusion for these intervals.
@@ -185,12 +184,12 @@ theorem reject_interval_width_inside_reversed
 
 ### stdlib/numerical/reject-rational-subtraction-first-argument-direction
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §16.3.
 - promise class: durable invariant.
 - given: `3 − 1` and `2 − 1`.
 - expect: claiming `3 − 1 ≤ 2 − 1` is refused.
-- measured: the accepted control applies `rational_sub_mono` to the reversed
-  true comparison, `2 − 1 ≤ 3 − 1`; the twin reverses its conclusion.
+- measured: the accepted control directly proves the reversed true closed
+  comparison, `2 − 1 ≤ 3 − 1`; the twin reverses its conclusion.
 - claimed: the first argument's monotonicity direction is enforced.
 - gap: this twin does not test the second argument's direction.
 - controls: the same closed values accept with the conclusion reversed.
@@ -210,12 +209,12 @@ theorem reject_rational_subtraction_first_argument_direction
 
 ### stdlib/numerical/reject-rational-subtraction-second-argument-direction
 
-- spec: Architect AC-0 ruling item 5; AC-2 release `evt_604adzbznbep5`.
+- spec: `spec/50-stdlib/68-numerical.md` §16.3.
 - promise class: durable invariant.
 - given: `3 − 0` and `3 − 1`.
 - expect: claiming `3 − 0 ≤ 3 − 1` is refused.
-- measured: the accepted control applies `rational_sub_mono` to the reversed
-  true comparison, `3 − 1 ≤ 3 − 0`; the twin reverses its conclusion.
+- measured: the accepted control directly proves the reversed true closed
+  comparison, `3 − 1 ≤ 3 − 0`; the twin reverses its conclusion.
 - claimed: the second argument's antitone direction is enforced.
 - gap: this twin does not test the first argument's direction.
 - controls: the same closed values accept with the conclusion reversed.
@@ -235,13 +234,14 @@ theorem reject_rational_subtraction_second_argument_direction
 
 ## Evidence boundary
 
-This seed follows Architect AC-0 ruling `evt_aha7hvm88ckz`, item 5, and the
-AC-2 release `evt_604adzbznbep5`. The new §16 is authored separately and
-requires reconciliation at assembly. A scratch overlay of the D0 catalog cut
-at base `750f1622b0aed49ac8deedd415ba06388f068fcc` passed the extracted
-accepted block, all three isolated controls and twins, and an own-theorem-span
-`KernelRejected(TypeMismatch)` check. The one targeted scratch test passed 1/1;
-all four extracted Ken fences passed `ken fmt --check`. Log:
+This seed instantiates `spec/50-stdlib/68-numerical.md` §§16.1–16.3.
+Architect AC-0 ruling `evt_aha7hvm88ckz`, item 5, and AC-2 release
+`evt_604adzbznbep5` supply the scratch evidence only. A scratch overlay of
+the D0 catalog cut at base `750f1622b0aed49ac8deedd415ba06388f068fcc`
+passed the extracted accepted block, all three isolated controls and twins,
+and an own-theorem-span `KernelRejected(TypeMismatch)` check. The one targeted
+scratch test passed 1/1; all four extracted Ken fences passed `ken fmt --check`.
+Log:
 `/workspaces/ken/tmp/cv-width-inside-mono-seed-check.log`. This is not official
 conformance-runner execution, product package-test evidence, CI, publication,
 landing, or a landed trust measurement. No external or `local/refs` material
