@@ -42,7 +42,8 @@ import Core.Classes.LawfulClasses (IsTrue, bool_or, leq_nat)
 import Data.Numeric.Nat.Arithmetic
   (add, mul, mul_add_distrib_l, mul_add_distrib_r, add_cancel_r)
 
-import Data.Numeric.Nat.Order (sub, lt_nat, leq_nat_mul_right_mono, leq_nat_mul_right_cancel)
+import Data.Numeric.Nat.Order
+  (sub, lt_nat, leq_nat_mul_right_mono, leq_nat_mul_right_cancel, mul_sub_distrib_l)
 
 pub data Rational : Type where {
   MkRational : (num : Nat) → (den_tail : Nat) → Rational
@@ -661,6 +662,27 @@ pub proof add_distrib for rational_sub
       in
         rational_add_cancel_r total_width separate_widths low same_after_add
 
+pub theorem rational_sub_mono
+      (x : Rational) (y : Rational) (z : Rational) (w : Rational)
+    : Equal Bool (rational_leq x y) True
+      → Equal Bool (rational_leq w z) True
+      → Equal Bool (rational_leq (rational_sub x z) (rational_sub y w)) True =
+  match x {
+    MkRational a ax ↦
+      match y {
+        MkRational b bx ↦
+          match z {
+            MkRational c cx ↦
+              match w {
+                MkRational d dx ↦
+                  λxy.
+                    λwz.
+                      rational_sub_cross_mono a (Suc ax) b (Suc bx) c (Suc cx) d (Suc dx) xy wz
+              }
+          }
+      }
+  }
+
 pub theorem rational_mul_mono
       (x : Rational) (y : Rational) (z : Rational) (w : Rational)
     : Equal Bool (rational_leq x y) True
@@ -839,6 +861,10 @@ factors. The two-input distribution proof adds the smaller values back to each
 truncated difference, rearranges the rational sums, and cancels their common
 right addend with private cross-product lemmas. Both order premises are needed;
 no subtraction identity is asserted for arbitrary reversed operands.
+`rational_sub_mono` cross-multiplies both differences, distributes
+multiplication over truncated subtraction with `mul_sub_distrib_l`, and
+applies `sub::left_mono` and `sub::right_antitone` to the rearranged
+cross products without assuming either difference is nonnegative.
 
 ```ken
 theorem positive_product_factor
@@ -1801,6 +1827,82 @@ theorem rational_mul_cross_mono
       (leq_nat_mul_right_mono_any (mul a bb) (mul b aa) (mul c dd) xy)
       (leq_nat_mul_left_mono_any (mul b aa) (mul c dd) (mul d cc) zw))
 
+theorem rational_sub_cross_mono
+      (a : Nat)
+      (aa : Nat)
+      (b : Nat)
+      (bb : Nat)
+      (c : Nat)
+      (cc : Nat)
+      (d : Nat)
+      (dd : Nat)
+      (xy : Equal Bool (leq_nat (mul a bb) (mul b aa)) True)
+      (wz : Equal Bool (leq_nat (mul d cc) (mul c dd)) True)
+    : Equal Bool
+        (leq_nat
+          (mul (sub (mul a cc) (mul c aa)) (mul bb dd))
+          (mul (sub (mul b dd) (mul d bb)) (mul aa cc)))
+        True =
+  leq_rewrite
+    (mul (sub (mul a cc) (mul c aa)) (mul bb dd))
+    (sub (mul (mul a cc) (mul bb dd)) (mul (mul c aa) (mul bb dd)))
+    (mul (sub (mul b dd) (mul d bb)) (mul aa cc))
+    (sub (mul (mul b dd) (mul aa cc)) (mul (mul d bb) (mul aa cc)))
+    (mul_sub_distrib_l (mul a cc) (mul c aa) (mul bb dd))
+    (mul_sub_distrib_l (mul b dd) (mul d bb) (mul aa cc))
+    ((proof trans for leq_nat)
+      (sub (mul (mul a cc) (mul bb dd)) (mul (mul c aa) (mul bb dd)))
+      (sub (mul (mul b dd) (mul aa cc)) (mul (mul c aa) (mul bb dd)))
+      (sub (mul (mul b dd) (mul aa cc)) (mul (mul d bb) (mul aa cc)))
+      ((proof left_mono for sub)
+        (mul (mul a cc) (mul bb dd))
+        (mul (mul b dd) (mul aa cc))
+        (mul (mul c aa) (mul bb dd))
+        (leq_rewrite
+          (mul (mul a cc) (mul bb dd))
+          (mul (mul a bb) (mul cc dd))
+          (mul (mul b dd) (mul aa cc))
+          (mul (mul b aa) (mul cc dd))
+          (mul_shuffle a cc bb dd)
+          (trans
+            Nat
+            (mul (mul b dd) (mul aa cc))
+            (mul (mul b aa) (mul dd cc))
+            (mul (mul b aa) (mul cc dd))
+            (mul_shuffle b dd aa cc)
+            (mul_inner_comm (mul b aa) dd cc))
+          (leq_nat_mul_right_mono_any (mul a bb) (mul b aa) (mul cc dd) xy)))
+      ((proof right_antitone for sub)
+        (mul (mul b dd) (mul aa cc))
+        (mul (mul d bb) (mul aa cc))
+        (mul (mul c aa) (mul bb dd))
+        (leq_rewrite
+          (mul (mul d bb) (mul aa cc))
+          (mul (mul d cc) (mul aa bb))
+          (mul (mul c aa) (mul bb dd))
+          (mul (mul c dd) (mul aa bb))
+          (trans
+            Nat
+            (mul (mul d bb) (mul aa cc))
+            (mul (mul d bb) (mul cc aa))
+            (mul (mul d cc) (mul aa bb))
+            (mul_inner_comm (mul d bb) aa cc)
+            (trans
+              Nat
+              (mul (mul d bb) (mul cc aa))
+              (mul (mul d cc) (mul bb aa))
+              (mul (mul d cc) (mul aa bb))
+              (mul_shuffle d bb cc aa)
+              (mul_inner_comm (mul d cc) bb aa)))
+          (trans
+            Nat
+            (mul (mul c aa) (mul bb dd))
+            (mul (mul c aa) (mul dd bb))
+            (mul (mul c dd) (mul aa bb))
+            (mul_inner_comm (mul c aa) bb dd)
+            (mul_shuffle c aa dd bb))
+          (leq_nat_mul_right_mono_any (mul d cc) (mul c dd) (mul aa bb) wz))))
+
 theorem leq_nat_add_mono
       (a : Nat)
       (b : Nat)
@@ -1900,7 +2002,7 @@ min/max when argument order changes; no structural commutativity is claimed.
    monotonicity. `rational_min` and `rational_max` add six attached order
    proofs required by interval hull and intersection. `rational_sub` adds
    self-zero, ordered add-cancellation and ordered two-input distribution
-   under spec 68 §15.
+   under spec 68 §15; `rational_sub_mono` supplies the two-sided order law.
 2. **Source map.** [Definition](#2-definition) lists the exported values and
    laws; [Laws & proofs](#4-laws--proofs) explains and carries the private
    derivation, including the cross-product monotonicity helpers;
@@ -1912,8 +2014,10 @@ min/max when argument order changes; no structural commutativity is claimed.
    Paired-input monotonicity uses only checked Nat add and multiply laws.
    Comparison selection uses rational order reflexivity and totality, with
    private pick helpers connecting each Boolean branch to its bounds.
-   Subtraction uses Nat's checked truncated `sub` and right-add cancellation;
-   the Rational sum cancellation and factor rearrangements remain private.
+   Subtraction uses Nat's checked truncated `sub`, right-add cancellation,
+   multiplication distribution and both directions of subtraction order.
+   The Rational sum cancellation, factor rearrangements and cross-product
+   monotonicity stage remain private.
 4. **Trusted-base delta.** Zero: all exported theorems carry checked proof
    terms. Nat and equality imports retain their existing trusted base; this
    package adds no `Axiom`, postulate, primitive or floating point.

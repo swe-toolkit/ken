@@ -390,6 +390,119 @@ pub proof add_cancel for sub
         }
   }
 
+pub proof leq_left for sub (a : Nat) : (k : Nat) → IsTrue (leq_nat (sub a k) a) =
+  match a {
+    Zero ↦
+      λk.
+        match k {
+          Zero ↦ Proved;
+          Suc k2 ↦ Proved
+        };
+    Suc a2 ↦
+      λk.
+        match k {
+          Zero ↦ (proof refl for leq_nat) (Suc a2);
+          Suc k2 ↦ leq_nat_weaken_right (sub a2 k2) a2 ((proof leq_left for sub) a2 k2)
+        }
+  }
+
+pub proof left_mono for sub
+      (a : Nat)
+    : (b : Nat) → (k : Nat) → IsTrue (leq_nat a b) → IsTrue (leq_nat (sub a k) (sub b k)) =
+  match a {
+    Zero ↦
+      λb.
+        λk.
+          match k {
+            Zero ↦ λh. Proved;
+            Suc k2 ↦ λh. Proved
+          };
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λk. λh. absurd h;
+          Suc b2 ↦
+            λk.
+              match k {
+                Zero ↦ λh. h;
+                Suc k2 ↦ λh. (proof left_mono for sub) a2 b2 k2 h
+              }
+        }
+  }
+
+pub proof right_antitone for sub
+      (a : Nat)
+    : (k : Nat) → (l : Nat) → IsTrue (leq_nat k l) → IsTrue (leq_nat (sub a l) (sub a k)) =
+  λk.
+    match k {
+      Zero ↦ λl. λh. (proof leq_left for sub) a l;
+      Suc k2 ↦
+        λl.
+          match l {
+            Zero ↦ λh. absurd h;
+            Suc l2 ↦
+              match a {
+                Zero ↦ λh. Proved;
+                Suc a2 ↦ λh. (proof right_antitone for sub) a2 k2 l2 h
+              }
+          }
+    }
+
+pub theorem mul_sub_distrib_r
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul a (sub b c)) (sub (mul a b) (mul a c)) =
+  match c {
+    Zero ↦ Refl;
+    Suc c2 ↦
+      match b {
+        Zero ↦
+          sym Nat (sub Zero (mul a (Suc c2))) Zero ((proof zero_left for sub) (mul a (Suc c2)));
+        Suc b2 ↦
+          trans
+            Nat
+            (mul a (sub b2 c2))
+            (sub (mul a b2) (mul a c2))
+            (sub (add (mul a b2) a) (add (mul a c2) a))
+            (mul_sub_distrib_r a b2 c2)
+            (sym
+              Nat
+              (sub (add (mul a b2) a) (add (mul a c2) a))
+              (sub (mul a b2) (mul a c2))
+              (sub_add_same (mul a b2) (mul a c2) a))
+      }
+  }
+
+pub theorem mul_sub_distrib_l
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (sub a b) c) (sub (mul a c) (mul b c)) =
+  trans
+    Nat
+    (mul (sub a b) c)
+    (mul c (sub a b))
+    (sub (mul a c) (mul b c))
+    ((proof comm for mul) (sub a b) c)
+    (trans
+      Nat
+      (mul c (sub a b))
+      (sub (mul c a) (mul c b))
+      (sub (mul a c) (mul b c))
+      (mul_sub_distrib_r c a b)
+      (trans
+        Nat
+        (sub (mul c a) (mul c b))
+        (sub (mul a c) (mul c b))
+        (sub (mul a c) (mul b c))
+        (cong Nat Nat (mul c a) (mul a c) (λv. sub v (mul c b)) ((proof comm for mul) c a))
+        (cong Nat Nat (mul c b) (mul b c) (λv. sub (mul a c) v) ((proof comm for mul) c b))))
+
+theorem sub_add_same
+      (x : Nat) (y : Nat) (z : Nat)
+    : Equal Nat (sub (add x z) (add y z)) (sub x y) =
+  match z {
+    Zero ↦ Refl;
+    Suc z2 ↦ sub_add_same x y z2
+  }
+
 pub fn compare (a : Nat) (b : Nat) : OrdResult =
   match leq_nat a b {
     True ↦
@@ -1015,6 +1128,14 @@ and the reverse order for `Gt`. The equality proof recurses through the two
 `Nat` arguments, transports reflexivity along the tail equality to recover
 both order directions, and applies `leq_nat::antisym` at each step.
 
+The three attached `sub` proofs follow the truncated subtraction recursion:
+`sub::leq_left` bounds a difference by its minuend, `sub::left_mono`
+preserves order in the minuend, and `sub::right_antitone` reverses order
+in the subtrahend. `mul_sub_distrib_r` recurses on that subtrahend,
+using the private `sub_add_same` to cancel a common summand in the
+successor case. `mul_sub_distrib_l` follows from the right law and the
+checked commutativity of multiplication.
+
 `self_is_zero` needs its induction: `sub`'s structural recursion does not reduce
 for an abstract `n` matched against itself, so `Refl` alone cannot close the
 goal. That is asserted here, not merely asserted about:
@@ -1069,8 +1190,9 @@ argument and its bridge exposes the canonical successor relation.
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
    positive-right-multiplication order transports; the six `min`/`max` bounds
    and their eight selectors (`comm`, `assoc`, `absorb`, and `distrib` for each);
-   the three `compare` agreements;
-   and the five inductive `sub` proofs, including `sub::add_cancel`.
+   the three `compare` agreements; the eight inductive `sub` proofs,
+   including `sub::add_cancel`, `sub::leq_left`, `sub::left_mono`, and
+   `sub::right_antitone`; and `mul_sub_distrib_l` and `mul_sub_distrib_r`.
    `OrdResult` remains package-local.
 2. **Source map.**
 
@@ -1097,16 +1219,21 @@ argument and its bridge exposes the canonical successor relation.
    package's checked laws use structural recursion for the strict-order and
    successor/weakening/addition bounds, `min`/`max` bounds and their
    commutativity, associativity, absorption and distribution selectors, and
-   subtraction theory, including cancellation; and case analysis on the canonical relation
-   for the `compare` agreements. The equality arm closes through
+   subtraction theory, including cancellation and both directions of
+   monotonicity. The two multiplication/subtraction distribution laws
+   use induction and commutativity. The `compare` agreements use case
+   analysis on the canonical relation. The equality arm closes through
    `leq_nat::antisym`. The order-scaling family proves equality of Boolean
    comparisons by induction and transports it in both directions through
    checked `Equal Bool` proofs; its private helpers are not exported.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
    comparison operations and strict-order proofs, including subtraction's
-   checked cancellation law. Consumers of exact rational values can import
-   both positive-scaling order directions without constructing a new `Ord Nat`.
+   checked cancellation and monotonicity laws. Geometry and gcd clients
+   reuse these laws and the multiplication/subtraction distribution theorems
+   instead of carrying private copies. Consumers of exact rational values
+   can import both positive-scaling order directions without constructing a
+   new `Ord Nat`.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
    controls check the carried dictionary, canonical relation and bridge
    identities, zero local registration, zero trust delta, examples, and

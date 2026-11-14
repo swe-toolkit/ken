@@ -523,6 +523,13 @@ factor, so the private proof also handles zero. No Nat library theorem
 is promoted as part of this geometry contract. The exported operation
 and three theorems require no new primitive, axiom or surface feature.
 
+**Correction (2026-11-14).** The preceding private-helper and
+Nat.Order inventories and no-promotion sentence describe the original
+§4 geometry increment, not the later provider surface. The three generic `sub` bounds and
+monotonicity proofs are now `Data.Numeric.Nat.Order` exports under
+§68 §16; NatBox consumes them rather than retaining private copies.
+The three §4.2 public area-law types remain unchanged.
+
 On landed base `0fd75f5515dded57eea1aeb47021573cfbc4a5e0`, the
 checked scratch D0 `2645b9830d31e75e2d0974185ae3901402958ead`
 returned `ken check` rc 0 with no local `Axiom` or postulate. Its

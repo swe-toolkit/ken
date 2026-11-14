@@ -1245,7 +1245,7 @@ theorem sub_triangle
         Zero ↦ Proved;
         Suc a2 ↦
           match b {
-            Zero ↦ leq_nat_weaken_right (sub a2 c2) a2 (sub_leq a2 c2);
+            Zero ↦ leq_nat_weaken_right (sub a2 c2) a2 ((proof leq_left for sub) a2 c2);
             Suc b2 ↦ sub_triangle a2 b2 c2
           }
       }
@@ -1258,16 +1258,6 @@ theorem sub_add_bound (a : Nat) (b : Nat) : IsTrue (leq_nat a (add (sub a b) b))
       match a {
         Zero ↦ Proved;
         Suc a2 ↦ sub_add_bound a2 b2
-      }
-  }
-
-theorem sub_leq (a : Nat) (c : Nat) : IsTrue (leq_nat (sub a c) a) =
-  match c {
-    Zero ↦ (proof refl for leq_nat) a;
-    Suc c2 ↦
-      match a {
-        Zero ↦ Proved;
-        Suc a2 ↦ leq_nat_weaken_right (sub a2 c2) a2 (sub_leq a2 c2)
       }
   }
 
@@ -1453,12 +1443,12 @@ theorem axis_sub_within
         (sub a b)
         (sub hi b)
         (axis_distance lo hi)
-        (sub_left_mono a hi b high)
+        ((proof left_mono for sub) a hi b high)
         ((proof trans for leq_nat)
           (sub hi b)
           (sub hi lo)
           (axis_distance lo hi)
-          (sub_right_antitone hi lo b low)
+          ((proof right_antitone for sub) hi lo b low)
           (leq_nat_eq_right
             (sub hi lo)
             (add (sub hi lo) (sub lo hi))
@@ -2485,66 +2475,8 @@ theorem axis_span_mono
         (axis_span li hi)
         (sub (Suc ho) li)
         (axis_span lo ho)
-        (sub_left_mono (Suc hi) (Suc ho) li hh)
-        (sub_right_antitone (Suc ho) lo li hl)
-
-theorem sub_right_antitone
-      (a : Nat)
-    : (k : Nat) → (l : Nat) → IsTrue (leq_nat k l) → IsTrue (leq_nat (sub a l) (sub a k)) =
-  λk.
-    match k {
-      Zero ↦ λl. λh. sub_below a l;
-      Suc k2 ↦
-        λl.
-          match l {
-            Zero ↦ λh. absurd h;
-            Suc l2 ↦
-              match a {
-                Zero ↦ λh. Proved;
-                Suc a2 ↦ λh. sub_right_antitone a2 k2 l2 h
-              }
-          }
-    }
-
-theorem sub_below (a : Nat) : (k : Nat) → IsTrue (leq_nat (sub a k) a) =
-  match a {
-    Zero ↦
-      λk.
-        match k {
-          Zero ↦ Proved;
-          Suc k2 ↦ Proved
-        };
-    Suc a2 ↦
-      λk.
-        match k {
-          Zero ↦ (proof refl for leq_nat) (Suc a2);
-          Suc k2 ↦ leq_nat_weaken_right (sub a2 k2) a2 (sub_below a2 k2)
-        }
-  }
-
-theorem sub_left_mono
-      (a : Nat)
-    : (b : Nat) → (k : Nat) → IsTrue (leq_nat a b) → IsTrue (leq_nat (sub a k) (sub b k)) =
-  match a {
-    Zero ↦
-      λb.
-        λk.
-          match k {
-            Zero ↦ λh. Proved;
-            Suc k2 ↦ λh. Proved
-          };
-    Suc a2 ↦
-      λb.
-        match b {
-          Zero ↦ λk. λh. absurd h;
-          Suc b2 ↦
-            λk.
-              match k {
-                Zero ↦ λh. h;
-                Suc k2 ↦ λh. sub_left_mono a2 b2 k2 h
-              }
-        }
-  }
+        ((proof left_mono for sub) (Suc hi) (Suc ho) li hh)
+        ((proof right_antitone for sub) (Suc ho) lo li hl)
 
 theorem axis_span_inverted
       (lo : Nat) (hi : Nat)
@@ -2706,8 +2638,10 @@ Neither needs a match, a Nat lemma or a validity premise.
 
 `area_inside` bounds each inner inclusive span by its outer span using
 monotonicity and antitonicity of saturating subtraction, then combines the
-bounds with multiplication monotonicity, including zero factors. An
-inverted outer box needs no added premise: `inside` forces the inner box
+bounds with multiplication monotonicity, including zero factors. The
+subtraction monotonicity and antitonicity proofs now come from
+`Data.Numeric.Nat.Order` rather than local copies. An inverted outer box
+needs no added premise: `inside` forces the inner box
 to be inverted on that axis too. `area_inverted_x` and `area_inverted_y`
 use the checked saturation law separately for either axis. `area_point_box`
 rewrites each factor with the private `axis_span_point`; the closed product
@@ -2783,8 +2717,9 @@ this interface.
    `hull_monotone`, `area`, `area_inside`,
    `area_inverted_x`, `area_inverted_y`, and `area_point_box`.
    `axis_point_equal`, `axis_within`, `axis_span`, `box_with_lo`,
-   `box_with_hi`, `box_equal`, generic subtraction and multiplication bounds,
-   per-axis lemmas and proof transport helpers remain private.
+   `box_with_hi`, `box_equal`, generic multiplication bounds, per-axis
+   lemmas and proof transport helpers remain private. Generic subtraction
+   bounds are checked exports of `Data.Numeric.Nat.Order`.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
    closed examples and generic metric, containment, inclusion order and area

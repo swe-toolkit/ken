@@ -14,7 +14,8 @@
 > SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT §12;
 > SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY §13;
 > SPEC-NUMERICAL-INTERVAL-INSIDE-ANTISYMMETRY §14;
-> SPEC-NUMERICAL-INTERVAL-WIDTH §15).** The §1–2
+> SPEC-NUMERICAL-INTERVAL-WIDTH §15;
+> SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO §16).** The §1–2
 > operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
@@ -74,6 +75,11 @@
 > GlobalId identities 114 → 114. That working-tree report is not an
 > exact committed-tip gate and does not establish official conformance-
 > runner execution, CI, publication, landing or measured landed trust.
+> Section 16 specifies width under inclusion and its Nat and Rational
+> prerequisites. Architect's isolated AC-0 on `750f1622b` checked all
+> seven public laws with equal scratch trusted-base identity sets
+> 114 → 114. This does not establish an assembled-tip check, official
+> conformance, CI or measured landed trust for §16.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -1487,3 +1493,150 @@ ordered-sum laws and gives same-form accepting controls for its
 inverted-operand and wrong-width refusals; Foundation's package
 test owns the nonzero value discriminator. Scratch results do not
 establish execution of either committed artifact.
+
+## 16. Interval width under inclusion
+
+> **Section 16 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO).** Architect's AC-0 on
+> exact base `750f1622b` checked the seven generic public law types
+> below in five isolated catalog modules, without a new `Axiom` and
+> with equal trusted-base source-name/Decl-kind sets (114 → 114).
+> The accepted applications, their independent closed conclusions,
+> three same-form refused twins and private-import refusals were
+> scratch measurements. They are not this Spec child's tests, an
+> assembled-tip result, official conformance, CI, publication,
+> landing or a measured landed-trust delta.
+
+### 16.1 Seven public laws and their placement
+
+`Data.Numeric.Nat.Order` exports three additional checked proofs
+attached to `sub`, immediately after `sub::add_cancel`. They give
+truncated subtraction a bound, left monotonicity and right
+antitonicity. Two public theorems follow them: multiplication
+preserves truncated subtraction with the factor on either side.
+Their exact public types are:
+
+```ken
+pub proof leq_left for sub (a : Nat)
+    : (k : Nat) → IsTrue (leq_nat (sub a k) a)
+
+pub proof left_mono for sub (a : Nat)
+    : (b : Nat) → (k : Nat) → IsTrue (leq_nat a b)
+      → IsTrue (leq_nat (sub a k) (sub b k))
+
+pub proof right_antitone for sub (a : Nat)
+    : (k : Nat) → (l : Nat) → IsTrue (leq_nat k l)
+      → IsTrue (leq_nat (sub a l) (sub a k))
+
+pub theorem mul_sub_distrib_r (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul a (sub b c))
+        (sub (mul a b) (mul a c))
+
+pub theorem mul_sub_distrib_l (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (sub a b) c)
+        (sub (mul a c) (mul b c))
+```
+
+The auxiliary `sub_add_same` follows the two distribution laws in
+Order, but is **private**. The attached proofs belong to `sub`, not
+to three competing top-level theorems. `Data.Numeric.Rational`
+exports one theorem after `rational_sub::add_distrib` and before
+`rational_mul_mono`:
+
+```ken
+pub theorem rational_sub_mono
+      (x : Rational) (y : Rational) (z : Rational) (w : Rational)
+    : Equal Bool (rational_leq x y) True
+      → Equal Bool (rational_leq w z) True
+      → Equal Bool (rational_leq (rational_sub x z) (rational_sub y w)) True
+```
+
+Its cross-multiplied proof stage `rational_sub_cross_mono` follows
+`rational_mul_cross_mono` in Rational and remains **private**.
+`Algorithm.Numeric.RationalInterval` exports the final theorem
+immediately after `interval_inside_antisym_hi`, within the fence
+that defines `interval_inside`:
+
+```ken
+pub theorem interval_width_inside (i : Interval) (k : Interval)
+    : IsTrue (interval_inside i k)
+      → IsTrue (rational_leq (interval_width i) (interval_width k))
+```
+
+No §1–§15 operation or law type changes. These are five new public
+Nat.Order laws, one Rational law and one RationalInterval law;
+NatBox and Gcd gain no new public declaration.
+
+### 16.2 Subtraction, cross multiplication and the proof boundary
+
+`rational_sub_mono` is monotone in its **first** argument and
+antitone in its **second**: `x ≤ y` and `w ≤ z` imply
+`x ∸ z ≤ y ∸ w`. In the existing non-negative `Rational` carrier,
+`∸` truncates at zero (§15); the result is a value inequality,
+not an assertion of structural `Equal Rational`.
+
+For `x = a/aa`, `y = b/bb`, `z = c/cc`, `w = d/dd` with positive
+natural denominators, the hypotheses cross-multiply to
+`a·bb ≤ b·aa` and `d·cc ≤ c·dd`. The conclusion compares the
+truncated numerators after multiplication by the other result's
+denominator:
+
+```text
+(sub (mul a cc) (mul c aa)) · (bb · dd)
+  ≤ (sub (mul b dd) (mul d bb)) · (aa · cc)
+```
+
+`mul_sub_distrib_l` distributes those factors over truncated Nat
+`sub`; the two existing order-scaling stages transport the original
+hypotheses. `sub::left_mono` carries the first numerator bound, and
+`sub::right_antitone` carries the reversed second bound. The latter
+uses `sub::leq_left`, which bounds any truncated subtraction by its
+minuend. `mul_sub_distrib_r` supplies the general Nat provider law;
+its left-facing counterpart uses multiplication commutativity.
+`sub_add_same` and `rational_sub_cross_mono` are internal stages,
+not new imports available to clients.
+
+For `i = [a,b]` inside `k = [c,d]`, the existing `interval_inside`
+means `c ≤ a` and `b ≤ d`. Applying `rational_sub_mono` with
+`x=b`, `y=d`, `z=a`, `w=c` yields `b ∸ a ≤ d ∸ c`, exactly the
+width bound. **Inclusion is the only premise** of
+`interval_width_inside`: no separate ordered-endpoint or validity
+hypothesis is necessary. In particular, an inverted inner interval
+has width zero by truncation; if it is inside an outer interval, the
+same bound still holds.
+
+The three attached sub proofs move from NatBox's private scaffolding
+to the generic Nat.Order provider; NatBox consumes those exports
+rather than retaining private copies. Gcd consumes Order's
+`mul_sub_distrib_r` and removes its local multiplication/subtraction
+proof and local `sub_add_same`. No new import beyond the named Nat
+and Rational laws is needed for the owning catalog modules. There
+is no new axiom, primitive, trusted assumption, kernel or surface
+rule; the measured **114 → 114** equality applies only to the
+isolated AC-0 roots, not an unmeasured assembled candidate.
+
+### 16.3 Closed discriminators and evidence limit
+
+The correct width of `[0,4]` is four and that of `[1,2]` is one,
+so T1's reversed claim that the former has width at most the latter
+is false. Its accepted control reverses the two intervals. By
+calculation, a mistaken width defined as the lower endpoint would
+accept T1 (`0 ≤ 1`), as would constant zero (`0 ≤ 0`): the
+inclusion law alone does **not** characterize the width operation.
+Using the upper endpoint instead also refuses T1 (`4 ≤ 2` is false),
+but §15's point law excludes that alternative. These mutant
+outcomes are **derived**, not measured mutant runs.
+
+Two more false claims fix the direction of each Rational argument.
+T2 claims `3 ∸ 1 ≤ 2 ∸ 1`, false because `2 ≤ 1` fails; its
+same-form control reverses the bound. T3 claims
+`3 ∸ 0 ≤ 3 ∸ 1`, false because `3 ≤ 2` fails; its same-form
+control likewise reverses the bound. T2 detects reversal of the
+first-argument direction; T3 detects reversal of the second-argument
+antitonicity. The D0 measured acceptance of all three controls,
+then each twin's own-span `KernelRejected(TypeMismatch)` on a fresh
+prefix. Its accepted closed interval clients also include an
+inverted inner interval and an intersection bound, each with an
+independent closed conclusion. These are **scratch** checks, not
+execution of the separate CV seed, official conformance, an
+assembled-tip gate, CI or measured landed trust.
