@@ -8,10 +8,9 @@ The client has three input traces. The queried event occurs once in each
 of two traces; a third event at a different timestamp keeps the classifier
 from counting every event. The Boolean classifier recognizes equal event
 timestamps. In this closed input, only the two copies of the queried event
-have its timestamp. The accepted client both applies the public generic law
-and independently computes the merged count as two. The refused client is
-a fresh copy of the accepted prefix with only the closed count claim changed
-to one.
+have its timestamp. The accepted client applies the public generic law and
+independently checks the merged count as two. The refused client is a fresh
+copy of the accepted prefix with only the closed count claim changed to one.
 
 ## Accepted three-trace client
 
@@ -29,7 +28,7 @@ const three : Nat = Suc two
 const early : Event Bool = MkEvent Bool zero False
 const repeated : Event Bool = MkEvent Bool three True
 
-const same_time (x : Event Bool) (y : Event Bool) : Bool =
+fn same_time (x : Event Bool) (y : Event Bool) : Bool =
   bool_and
     (leq_nat (event_time Bool x) (event_time Bool y))
     (leq_nat (event_time Bool y) (event_time Bool x))
@@ -57,7 +56,7 @@ theorem merged_count_is_two
     : Equal Nat
         (count (Event Bool) same_time repeated
           (trace_merge_all Bool three_traces))
-        two = Refl
+        two = Proved
 ```
 
 ### stdlib/time-and-events/trace-merge-all-count-three
@@ -79,8 +78,8 @@ theorem merged_count_is_two
 On a fresh complete copy of the accepted client above, append only the
 following theorem. The accepted prefix, including its two-count control and
 generic law application, must check before this false closed claim is
-considered. The expected refusal is at `Refl` for `merged_count_is_one`, not
-at an import or unrelated declaration.
+considered. The expected refusal is at the `Proved` claim in
+`merged_count_is_one`, not at an import or unrelated declaration.
 
 ```ken
 
@@ -88,7 +87,7 @@ theorem merged_count_is_one
     : Equal Nat
         (count (Event Bool) same_time repeated
           (trace_merge_all Bool three_traces))
-        one = Refl
+        one = Proved
 ```
 
 ### stdlib/time-and-events/reject-trace-merge-all-count-one
@@ -96,7 +95,8 @@ theorem merged_count_is_one
 - spec: §16.3, which pins the merged count at two for this input.
 - given: the accepted client and its complete prefix, with only the false
   count-one claim appended.
-- expect: the prefix accepts; `merged_count_is_one` is refused at `Refl`.
+- expect: the prefix accepts; `merged_count_is_one` is refused at its
+  `Proved` claim.
 - measured: the accepting count-two claim uses the same input, classifier,
   merged expression, and equality form.
 - claimed: one occurrence is not an acceptable result for these two copies.
