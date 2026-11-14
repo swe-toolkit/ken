@@ -1408,8 +1408,7 @@ for the same `Cons` case. All three laws quantify over the **same**
 `eqf` and `q`, so the argument does not switch classifiers or
 silently discard duplicate events. No helper is added to the
 public EventTrace API, and no new axiom, primitive, kernel or
-surface rule is involved. The isolated AC-0 trust result is
-§1a **0, delta 0**; it does not measure an assembled or landed tip.
+surface rule is involved.
 
 ### 16.3 Closed count discriminator and its limits
 
@@ -1433,10 +1432,6 @@ The scratch Suc mutation of the new theorem failed inside its
 mutated proof and was restored byte-identically. That rejection
 shows a proof gate for that mutation; it is not evidence of a
 checked generic proof for any other mutated implementation.
-AC-0's publication probe initially failed on a missing `add`
-import in the test's generated attached-proof signature; the
-Architect identified the separate `signature_imports` consumer and
-ruled a Foundation-owned correction. The failure was not a proof
-refusal for either public law. Foundation's targeted candidate
+Foundation's targeted candidate
 tests, CV's separate seed, assembled-tip review, official runner,
 CI and landed trusted-base comparison remain independent gates.
