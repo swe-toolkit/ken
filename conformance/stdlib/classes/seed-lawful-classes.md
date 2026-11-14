@@ -36,7 +36,8 @@ on main (ES4-lawproofs, `72e38a5`); `Ord Bool`'s `antisym` + `DecEq Bool`'s
   kernel-computed (both-components-keyed `sort_sigma`, `13 §4`); an instance is
   a record value of ops **+ law proofs**. **No new kernel former.**
 - `37 §6` — the verified `sort`'s explicit `leq : a→a→Bool` (ES2-remainder
-  `2358b4d`) that `Ord` subsumes; the `isSorted leq ys ∧ Perm ys xs` obligation.
+  `2358b4d`) that `Ord` subsumes; the `is_sorted a leq ys ∧
+  Perm a (eq_from_ord a leq) ys xs` obligation.
 - `25 §3` — `trusted_base_delta`; `16 §1` — `Ω`/proof-irrelevance;
   `../surface/taxonomy/minimality.md` (ES1) — the zero-delta / surface-TB-Sound
   invariant AC3 is the **law-side reading** of.
@@ -368,13 +369,13 @@ postulate. Current operation/value controls remain live in
 - spec: `51 §4` (`Ord` subsumes the comparator), `33 §5.4` (`where C a` →
   implicit dict + projection), `37 §6`/`34 §5` (the `sort` obligation)
 - given: the verified `sort` invoked two ways on the same `List a`: (a) the
-  **explicit** form `sort leq xs` (ES2-remainder surface, `37 §6`); (b) the
-  **constrained** form `sort xs where Ord a`, where `where Ord a` desugars to an
-  implicit `{d : Ord a}` and the body's comparator is `d.leq` (`33 §5.4`)
+  **explicit** form `sort a leq xs` (ES2-remainder surface, `37 §6`); (b) the
+  `where Ord a` form supplies `d.leq` to `sort a (d.leq) xs`, where the
+  constraint desugars to an implicit `{d : Ord a}` (`33 §5.4`)
 - expect: **both emit the structurally identical refinement obligation**
-  `isSorted (leq) ys ∧ Perm ys xs` (`34 §5`, with (b)'s `leq` ≡ `d.leq`) — the
-  **same view**, one `sort`, the comparator either passed or
-  dictionary-supplied. There is **no second `sort`** and **no
+  `is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs` (`34 §5`, with (b)'s
+  `leq` ≡ `d.leq`; `51 §4`) — the **same view**, one `sort`, and the comparator
+  either passed or dictionary-supplied. There is **no second `sort`** and **no
   distinct/duplicated obligation**
 - why: (AC2) reflect-don't-extend — `where Ord a` is ordinary
   implicit-dictionary insertion supplying the comparator, **not** new mechanism.
@@ -477,8 +478,9 @@ postulate. Current operation/value controls remain live in
   (`../surface/taxonomy/minimality.md`, `../../security/trust-model/`). AC3
   **reads it from the law side** (a postulated law → non-empty delta); it does
   **not** re-pin the delta computation.
-- **The verified-`sort` refinement obligation** (`isSorted leq ys ∧ Perm ys xs`,
-  the `Perm`-conjunct-present net) is **`../surface/collections/`'s**
+- **The verified-`sort` refinement obligation**
+  (`is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs`, the
+  `Perm`-conjunct-present net) is **`../surface/collections/`'s**
   (`sort-emits-issorted-and-perm`). AC2 references it (the `Ord`-supplied form
   emits the same obligation); it does **not** re-pin the emission completeness.
 - **The two `user-ord-*-sort` user-instance cases** are
