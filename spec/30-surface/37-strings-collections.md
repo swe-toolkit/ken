@@ -617,27 +617,30 @@ built-in comparators (the L-classes boundary below).
 explicit comparator and produces a **refinement-typed** result (`34 §5`):
 
 ```
-view sort {a} (leq : a → a → Bool) (xs : List a)
+fn sort (a : Type) (leq : a → a → Bool) (xs : List a)
     : { ys : List a |
         is_sorted a leq ys ∧ Perm a (eq_from_ord a leq) ys xs } = …
 ```
 
-The comparator and list result retain the earlier L3 demonstration's
-shape (`l3a_acceptance.rs`); its old pre-source `Perm` does not establish
-this imported, count-based refinement. The conjuncts are:
+The explicit type and comparator arguments match §57 §3.4 and the
+L3 `fn sort` example (`l3a_acceptance.rs`). This refinement
+illustrates the verified client contract; it does not change
+`Data.Collections.Derived.sort`'s `List a` result type. The old
+pre-source `Perm` does not establish the imported count-based claim.
+The conjuncts are:
 
 - `is_sorted a leq ys` — `ys` is in non-decreasing `leq`-order (a decidable
   refinement predicate, `34 §5`).
 - `Perm a (eq_from_ord a leq) ys xs` — `ys` preserves every input count
   using equality from the **same** comparator that sorts it (§57 §3.1).
 
-`is_sorted`-**alone is degenerate**: `sort _ = Nil` satisfies
+`is_sorted`-**alone is degenerate**: `sort a leq xs = Nil a` satisfies
 `{ ys | is_sorted a leq ys }` (the empty list is vacuously sorted), so a
 sortedness-only spec is met by a **constant-`Nil`** implementation that throws
 the input away — it guards nothing. The `Perm` conjunct rules out that
 loss on nonempty inputs. Elaboration **emits the conjoined obligation**
-`is_sorted a leq (sort leq xs) ∧
- Perm a (eq_from_ord a leq) (sort leq xs) xs`
+`is_sorted a leq (sort a leq xs) ∧
+ Perm a (eq_from_ord a leq) (sort a leq xs) xs`
 on result introduction (`34 §5`, `22 §2.1`); a verified `sort`
 discharges it with a bundled proof. AC6 observes the **emitted VC**,
 not an assumed guarantee.
