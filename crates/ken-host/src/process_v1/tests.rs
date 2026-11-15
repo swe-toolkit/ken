@@ -285,16 +285,44 @@ fn pidfd_mint_esrch_keeps_body_and_does_not_signal() {
 }
 
 /// Promise class: durable invariant. A mint failure under ordinary SIGCHLD
-/// kills and reaps its child before the original errno is returned.
+/// kills and reaps its child before the original errno is returned. MEASURED:
+/// the injected spawn returns EMFILE within ten seconds and the child is then
+/// not waitable. CLAIMED: cleanup kills, rather than waiting for natural exit.
+/// THE GAP: the child must remain alive longer than the completion bound;
+/// `sleep 30` separates SIGKILL from a signal-zero/no-kill cleanup.
 #[test]
 fn pidfd_mint_emfile_cleans_up_child_before_error() {
+    const RETURN_BOUND: std::time::Duration = std::time::Duration::from_secs(10);
     assert_eq!(sigchld_auto_reaps().unwrap(), false);
-    LAST_MINT_PID.with(|last| last.set(None));
-    let error = with_pidfd_fault(PidfdStep::Mint, libc::EMFILE, || {
-        shell_plan("exec sleep 30").spawn().unwrap_err()
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let started = std::time::Instant::now();
+    let worker = std::thread::spawn(move || {
+        LAST_MINT_PID.with(|last| last.set(None));
+        let error = with_pidfd_fault(PidfdStep::Mint, libc::EMFILE, || {
+            shell_plan("exec sleep 30").spawn().unwrap_err()
+        });
+        let pid = LAST_MINT_PID.with(|last| last.get().unwrap());
+        sender.send((error, pid)).unwrap();
     });
+    let (error, pid) = match receiver.recv_timeout(RETURN_BOUND) {
+        Ok(completed) => completed,
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            panic!("EMFILE cleanup exceeded the ten-second kill-and-reap bound")
+        }
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+            worker
+                .join()
+                .expect("EMFILE worker terminated before reporting");
+            panic!("EMFILE worker disconnected before reporting")
+        }
+    };
+    worker.join().expect("EMFILE worker completed");
+    eprintln!(
+        "EMFILE cleanup completed in {} ms (bound {} ms)",
+        started.elapsed().as_millis(),
+        RETURN_BOUND.as_millis()
+    );
     assert_eq!(error.raw_os_error(), Some(libc::EMFILE));
-    let pid = LAST_MINT_PID.with(|last| last.get().unwrap());
     assert_eq!(
         unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) },
         -1
