@@ -1374,3 +1374,58 @@ Architect's D0 refusals after dropping the successor factor,
 replacing the unit base by zero, or falsifying the reflected
 identity were scratch observations only; they are not tests of
 this `/spec` child or of a future assembled candidate.
+
+## 17. Multiplicative expression-power laws
+
+> **Section 17 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-MUL).** Architect AC-0
+> `evt_7kqnzf87649ep` ruled both bodies feasible on landed base
+> `b4049048f`: the scratch package and accepted client checked, the
+> fourteen named symbolic-algebra test binaries passed 37/37, no new
+> `Axiom` appeared, and disjoint-root trusted-base identity sets were
+> equal (114 = 114). These are D0 observations, not a committed catalog
+> child, official conformance run, assembled-tip result, CI, landing,
+> or measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export two public
+checked laws with these exact names, arguments, and conclusions:
+
+```ken
+pub theorem expr_pow_mul
+      (e : Expr) (m : Nat) (n : Nat)
+    : IsTrue (poly_eq (expr_pow e (mul m n)) (expr_pow (expr_pow e m) n))
+
+pub theorem expr_pow_emul
+      (a : Expr) (b : Expr) (n : Nat)
+    : IsTrue (poly_eq (expr_pow (EMul a b) n) (EMul (expr_pow a n) (expr_pow b n)))
+```
+
+The first law says that raising an expression to the product of two
+natural exponents agrees canonically with raising its `m`th power to
+`n`. The second distributes a natural power over expression
+multiplication, retaining both powered factors. The conclusions use
+§2's Boolean `poly_eq` through `IsTrue`, not structural `Equal Expr`
+or definitional equality of expression trees. Both laws apply to all
+listed arguments, without nonzero, positivity, syntactic-shape or
+environment premises; neither changes §16's `expr_pow` equations or
+its two existing public laws.
+
+The checked proof route inducts on `n` in both laws. The
+power-of-a-power successor step uses `expr_pow_add` and `poly_eq_mul`:
+`mul m (Suc n)` reduces to `add (mul m n) m`, so the induction
+hypothesis compares the prior powers before the final factor is
+appended. The power-of-a-product proof uses `poly_eq_mul` and one
+`poly_eq_complete` application over the existing private
+`mul_interchange`. These are routes through checked expressions and
+existing laws, not extra public contracts. No new Nat law, private
+helper, `Axiom`, kernel rule, or surface form is required.
+
+A closed client can apply `expr_pow_mul` to a variable at `m = 2` and
+`n = 3`, and `expr_pow_emul` to two distinct variables at `n = 2`.
+With the same accepted prefix and claim form, replacing `mul m n` by
+`add m n` gives powers five versus six; leaving the second factor
+unpowered in the product law gives degree one rather than two for
+that variable. Those finite discriminators belong to the separate
+seed; their D0 refusals and the statement-mutant checks do not
+replace the generic checked bodies or establish an assembled-tip
+result.

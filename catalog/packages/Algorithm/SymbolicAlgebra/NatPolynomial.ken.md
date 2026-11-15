@@ -7,8 +7,8 @@ preserves evaluation and a positive equality decision under every total
 environment. Substitutions also compose in a fixed order and have the variable
 constructor as their identity map. Formal differentiation preserves equality
 of polynomial functions. Expression powers are repeated products, with checked
-differentiation and exponent-addition laws. These operations have kernel-checked
-generic laws.
+differentiation, exponent-addition, exponent-multiplication and
+power-of-a-product laws. These operations have kernel-checked generic laws.
 
 ## Contents
 
@@ -69,8 +69,11 @@ slope zero at the given environment. Three further public laws state that the
 ordered normalization is transparent to `poly_eq` itself, to differentiation,
 and to substitution. The latter two follow from the first and the existing
 `poly_eq`-preservation laws. `expr_pow` gives the unit constant at Zero and
-accumulates products on the left. Its two checked laws state the power rule
-for differentiation and exponent addition through canonical `poly_eq`.
+accumulates products on the left. Its four checked canonical `poly_eq` laws
+are `deriv_expr_pow` for differentiation, `expr_pow_add` for exponent addition,
+`expr_pow_mul` for exponent multiplication through `expr_pow_add` and
+`poly_eq_mul`, and `expr_pow_emul` for powers of products through `poly_eq_mul`,
+`poly_eq_complete` and the private `mul_interchange`.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -1346,6 +1349,54 @@ pub theorem expr_pow_add
     (expr_pow e (add m n))
     (EMul (expr_pow e m) (expr_pow e n))
     (λenv. eval_expr_pow_add e m env n)
+
+pub theorem expr_pow_mul
+      (e : Expr) (m : Nat) (n : Nat)
+    : IsTrue (poly_eq (expr_pow e (mul m n)) (expr_pow (expr_pow e m) n)) =
+  match n {
+    Zero ↦ poly_eq_refl (EConst (Suc Zero));
+    Suc k ↦
+      poly_eq_trans
+        (expr_pow e (add (mul m k) m))
+        (EMul (expr_pow e (mul m k)) (expr_pow e m))
+        (EMul (expr_pow (expr_pow e m) k) (expr_pow e m))
+        (expr_pow_add e (mul m k) m)
+        (poly_eq_mul
+          (expr_pow e (mul m k))
+          (expr_pow (expr_pow e m) k)
+          (expr_pow e m)
+          (expr_pow e m)
+          (expr_pow_mul e m k)
+          (poly_eq_refl (expr_pow e m)))
+  }
+
+pub theorem expr_pow_emul
+      (a : Expr) (b : Expr) (n : Nat)
+    : IsTrue (poly_eq (expr_pow (EMul a b) n) (EMul (expr_pow a n) (expr_pow b n))) =
+  match n {
+    Zero ↦ Proved;
+    Suc k ↦
+      poly_eq_trans
+        (EMul (expr_pow (EMul a b) k) (EMul a b))
+        (EMul (EMul (expr_pow a k) (expr_pow b k)) (EMul a b))
+        (EMul (EMul (expr_pow a k) a) (EMul (expr_pow b k) b))
+        (poly_eq_mul
+          (expr_pow (EMul a b) k)
+          (EMul (expr_pow a k) (expr_pow b k))
+          (EMul a b)
+          (EMul a b)
+          (expr_pow_emul a b k)
+          (poly_eq_refl (EMul a b)))
+        (poly_eq_complete
+          (EMul (EMul (expr_pow a k) (expr_pow b k)) (EMul a b))
+          (EMul (EMul (expr_pow a k) a) (EMul (expr_pow b k) b))
+          (λenv.
+            mul_interchange
+              (eval env (expr_pow a k))
+              (eval env (expr_pow b k))
+              (eval env a)
+              (eval env b)))
+  }
 
 theorem expr_add_cong
       (a1 : Expr)
@@ -3249,7 +3300,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–16 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–17 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3261,6 +3312,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [expression-power seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power.md),
+[expression-power multiplication seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power-multiplication.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
@@ -3271,7 +3323,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and thirty-three checked theorems; Horner, substitution and differentiation
+and thirty-five checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
