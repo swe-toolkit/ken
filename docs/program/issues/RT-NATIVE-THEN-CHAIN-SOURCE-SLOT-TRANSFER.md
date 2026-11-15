@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-THEN-CHAIN-SOURCE-SLOT-TRANSFER
 title: "A user-level then-chain over FS actions, fs_then chained three deep with a Console write on the error arm, fails native build: a Vis constructor with a source-slot store obligation reaches generic carrier transfer, which has no selected-case environment, and refuses with \"a source slot constructor reached generic transfer without its creation-site suffix\" (aggregates.rs:1955). The refusal is fail-closed and independent of producer alternative sets. Route such a constructor through the creation-site builder, or rule the shape out of scope with a typed cause"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1

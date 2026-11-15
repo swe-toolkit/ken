@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-MUL
 title: "Spec 66 §16 gives expr_pow the power rule and exponent addition but no multiplicative exponent law, so a client cannot state that a power of a power multiplies exponents or that a power of a product is the product of powers. Rule from a checked D0 at zero trust both laws by canonical poly_eq, (e^m)^n = e^(m·n) and (a·b)^n = a^n·b^n, and state them with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
