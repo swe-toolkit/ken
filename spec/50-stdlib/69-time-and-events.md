@@ -1435,3 +1435,67 @@ checked generic proof for any other mutated implementation.
 Foundation's targeted candidate
 tests, CV's separate seed, assembled-tip review, official runner,
 CI and landed trusted-base comparison remain independent gates.
+
+## 17. Windowing a merged list of traces
+
+> **Section 17 status: DRAFT v0
+> (SPEC-TIME-WINDOW-MERGE-ALL).** Architect ruled the detached AC-0 on
+> base `fd523a842465c0bc185140167143ad457d51bc37`: Foundation
+> Implementer checked the generic proof, closed controls and isolated
+> false claims in scratch. With the same provider-first load on base
+> and scratch, the trusted GlobalId sets were equal (114 → 114),
+> EventTrace-owned declarations rose 87 → 88, and public roots-loader
+> heads rose 35 → 36, adding only `trace_window_merge_all`. These
+> observations are not a check of this Spec/seed child, an assembled
+> candidate, official conformance, CI, publication, landing or a
+> measured landed-trust delta.
+
+`Data.Time.EventTrace` exports one public Transparent checked theorem
+immediately after `trace_merge_all_count`:
+
+```ken
+pub theorem trace_window_merge_all
+      (p : Type) (lo : Nat) (hi : Nat) (traces : List (List (Event p)))
+    : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge_all p traces))
+        (trace_merge_all
+          p
+          (map (List (Event p)) (List (Event p)) (trace_window p lo hi) traces))
+```
+
+The premise requires **every trace appearing in the outer list** to be
+ordered, not just its head or its last member. The conclusion is
+structural list equality: windowing the right-fold merge equals merging
+the separately windowed traces in their original list order. It holds
+for any `lo` and `hi` when the premise is supplied; no bound-order
+premise is added. `map` is the one additional named import from
+`Data.Collections.Derived`. No new helper, public or private, and no
+new axiom, primitive, kernel or surface rule is required.
+
+Both directions of one-sided premise weakening are false. With window
+`[0,4)` and traces `[5T,1T]` beside `[3F]`, make only the first trace
+unordered (X-FIRST) and then only the last trace unordered (X-LAST).
+In either outer-list order, the window of the merge yields
+`[3F,1T]`, while the merge of individually windowed traces yields
+`[1T,3F]`. Both operations are defined on the unordered trace; the
+false assertion is their structural equality, not admissibility of
+that input. Independently accepted closed-value controls for both
+sides precede each false claim on its own fresh client. A single
+trace needs no ordering premise for this equality because
+`trace_merge t Nil` reduces to `t`; the exported theorem intentionally
+retains the uniform all-members premise rather than adding a
+single-trace special case.
+
+For the generic proof, induct on `traces`. The empty case reduces to
+`Nil` on both sides. In a `Cons t rest` step, the premise gives
+`time_ordered p t` and an all-members premise for `rest`. Apply
+`trace_merge_all_ordered` to that tail premise, then the two-way
+`trace_window_merge` to `t` and the merged tail. Congruence lifts the
+induction hypothesis through `trace_merge p (trace_window p lo hi t)`;
+transitivity joins the two steps. This route needs no additional
+helper or new assumption. The separate conformance seed checks a
+generic public application, an ordered three-trace result at `[2,6)`,
+and each one-sided closed counterexample. Closed examples alone do
+not prove the generic theorem or establish publication.
