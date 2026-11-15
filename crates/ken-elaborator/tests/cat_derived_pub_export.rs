@@ -335,7 +335,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// collection operations (including list_concat and list_all), two `nth`
 /// bound proofs, five `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
-/// operations (`Perm`, `insert`, `sort`), their four attached sort proofs,
+/// operations (`Perm`, `insert`, `sort`), their six attached sort proofs,
 /// structural `is_sorted`, public `take` and its four attached laws, the
 /// generic insert/sort laws, and Ω-list membership with checked lemmas.
 /// THE GAP: none
@@ -419,6 +419,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "insert::member".to_owned(),
             "insert::length".to_owned(),
             "insert::stable_class".to_owned(),
+            "insert::comparator_cong".to_owned(),
             "is_sorted".to_owned(),
             "sort".to_owned(),
             "sort::perm".to_owned(),
@@ -426,6 +427,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "sort::length".to_owned(),
             "sort::member".to_owned(),
             "sort::stable_class".to_owned(),
+            "sort::comparator_cong".to_owned(),
             "take".to_owned(),
             "take::length".to_owned(),
             "take::member".to_owned(),
