@@ -74,6 +74,7 @@ impl SpawnPlanV1 {
         if self.arguments.is_empty() {
             return Err(invalid_input());
         }
+        probe_pidfd_availability()?;
         let program = checked_cstring(&self.program)?;
         let arguments = self
             .arguments
@@ -168,8 +169,26 @@ impl SpawnPlanV1 {
         if rc != 0 {
             return Err(io::Error::from_raw_os_error(rc));
         }
+        // Nothing may intervene between successful posix_spawn and this mint.
+        let identity = match mint_pidfd(pid) {
+            Ok(fd) => ChildIdentityV1::Held(fd),
+            Err(error) if error.raw_os_error() == Some(libc::ESRCH) => {
+                ChildIdentityV1::ReapedAtSpawn
+            }
+            Err(error) => {
+                // A non-auto-reaped child retains its PID until wait, so this
+                // one cleanup path can safely address that PID by number.
+                if matches!(sigchld_auto_reaps(), Ok(false)) {
+                    // SAFETY: an unwaited, non-auto-reaped child cannot lose its PID.
+                    unsafe { libc::kill(pid, libc::SIGKILL) };
+                    reap_unheld_child(pid);
+                }
+                return Err(error);
+            }
+        };
         Ok(ChildProcessV1 {
             pid,
+            identity,
             exit: None,
             pending: parent_ends,
         })
@@ -183,8 +202,15 @@ pub enum ChildExitV1 {
 }
 
 #[derive(Debug)]
+enum ChildIdentityV1 {
+    Held(OwnedFd),
+    ReapedAtSpawn,
+}
+
+#[derive(Debug)]
 pub struct ChildProcessV1 {
     pid: libc::pid_t,
+    identity: ChildIdentityV1,
     exit: Option<ChildExitV1>,
     pending: [Option<OwnedFd>; 3],
 }
@@ -205,43 +231,68 @@ impl ChildProcessV1 {
         if let Some(exit) = self.exit {
             return Ok(exit);
         }
-        let mut status: libc::c_int = 0;
+        let fd = match &self.identity {
+            ChildIdentityV1::Held(fd) => fd,
+            ChildIdentityV1::ReapedAtSpawn => {
+                return Err(io::Error::from_raw_os_error(libc::ECHILD));
+            }
+        };
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
         loop {
-            // SAFETY: valid pid from successful posix_spawn, writable status pointer.
-            let result = unsafe { libc::waitpid(self.pid, &mut status, 0) };
-            if result == -1 {
-                let error = io::Error::last_os_error();
-                if error.kind() == io::ErrorKind::Interrupted {
-                    continue;
-                }
+            // SAFETY: fd denotes the held child and info is writable. WEXITED
+            // blocks until the kernel reports that child's terminal status.
+            let rc = unsafe {
+                libc::waitid(
+                    libc::P_PIDFD,
+                    fd.as_raw_fd() as libc::id_t,
+                    &mut info,
+                    libc::WEXITED,
+                )
+            };
+            if rc == 0 {
+                break;
+            }
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::Interrupted {
                 return Err(error);
             }
-            break;
         }
-        let exit = if libc::WIFEXITED(status) {
-            ChildExitV1::Exited(libc::WEXITSTATUS(status) as u8)
-        } else if libc::WIFSIGNALED(status) {
-            ChildExitV1::Signaled(libc::WTERMSIG(status) as u8)
-        } else {
-            return Err(io::Error::from_raw_os_error(libc::ECHILD));
+        let exit = match info.si_code {
+            libc::CLD_EXITED => ChildExitV1::Exited(unsafe { info.si_status() } as u8),
+            libc::CLD_KILLED | libc::CLD_DUMPED => {
+                ChildExitV1::Signaled(unsafe { info.si_status() } as u8)
+            }
+            _ => return Err(io::Error::from_raw_os_error(libc::ECHILD)),
         };
         self.exit = Some(exit);
         Ok(exit)
     }
 
-    pub fn settle(mut self, terminal_error: bool) -> io::Result<()> {
+    pub(crate) fn send_signal(&self, signo: libc::c_int) -> io::Result<()> {
+        if self.exit.is_some() {
+            return Err(io::Error::from_raw_os_error(libc::ESRCH));
+        }
+        match &self.identity {
+            ChildIdentityV1::Held(fd) => pidfd_send_signal(fd.as_raw_fd(), signo),
+            ChildIdentityV1::ReapedAtSpawn => Err(io::Error::from_raw_os_error(libc::ESRCH)),
+        }
+    }
+
+    fn settle_exit(mut self, terminal_error: bool) -> io::Result<ChildExitV1> {
         // All untaken pipe ends close before the child is reaped.
         self.pending = std::array::from_fn(|_| None);
         if self.exit.is_none() && terminal_error {
-            // SAFETY: the positive pid is owned by this child resource.
-            if unsafe { libc::kill(self.pid, libc::SIGKILL) } == -1 {
-                let error = io::Error::last_os_error();
+            if let Err(error) = self.send_signal(libc::SIGKILL) {
                 if error.raw_os_error() != Some(libc::ESRCH) {
                     return Err(error);
                 }
             }
         }
-        self.wait().map(|_| ())
+        self.wait()
+    }
+
+    pub fn settle(self, terminal_error: bool) -> io::Result<()> {
+        self.settle_exit(terminal_error).map(|_| ())
     }
 }
 
@@ -263,6 +314,123 @@ pub fn stream_write_v1(fd: &OwnedFd, bytes: &[u8]) -> io::Result<usize> {
     } else {
         Ok(result as usize)
     }
+}
+
+fn pidfd_open(pid: libc::pid_t) -> io::Result<OwnedFd> {
+    // SAFETY: the kernel returns a fresh descriptor or -1; no glibc pidfd
+    // wrapper is linked, keeping the existing native glibc load floor.
+    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0u32) };
+    if fd == -1 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(unsafe { OwnedFd::from_raw_fd(fd as RawFd) })
+    }
+}
+
+fn pidfd_send_signal(fd: RawFd, signo: libc::c_int) -> io::Result<()> {
+    // SAFETY: fd is an owned pidfd; NULL means no signal metadata, flags=0.
+    if unsafe {
+        libc::syscall(
+            libc::SYS_pidfd_send_signal,
+            fd,
+            signo,
+            std::ptr::null::<libc::siginfo_t>(),
+            0u32,
+        )
+    } == -1
+    {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+fn probe_pidfd_availability() -> io::Result<()> {
+    let result = (|| {
+        #[cfg(test)]
+        if let Some(error) = injected_pidfd_error(PidfdStep::Probe) {
+            return Err(io::Error::from_raw_os_error(error));
+        }
+        let probe = pidfd_open(unsafe { libc::getpid() })?;
+        pidfd_send_signal(probe.as_raw_fd(), 0)?;
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        // SAFETY: probe is this process, not a child of itself; info is writable.
+        if unsafe {
+            libc::waitid(
+                libc::P_PIDFD,
+                probe.as_raw_fd() as libc::id_t,
+                &mut info,
+                libc::WEXITED | libc::WNOHANG,
+            )
+        } == -1
+        {
+            let error = io::Error::last_os_error();
+            if error.raw_os_error() == Some(libc::ECHILD) {
+                return Ok(());
+            }
+            return Err(error);
+        }
+        Err(io::Error::from_raw_os_error(libc::EINVAL))
+    })();
+    result.map_err(|error| match error.raw_os_error() {
+        Some(libc::ENOSYS | libc::EINVAL | libc::EPERM | libc::EACCES) => {
+            io::Error::from(io::ErrorKind::Unsupported)
+        }
+        _ => error,
+    })
+}
+
+fn mint_pidfd(pid: libc::pid_t) -> io::Result<OwnedFd> {
+    #[cfg(test)]
+    {
+        LAST_MINT_PID.with(|last| last.set(Some(pid)));
+        if let Some(error) = injected_pidfd_error(PidfdStep::Mint) {
+            return Err(io::Error::from_raw_os_error(error));
+        }
+    }
+    pidfd_open(pid)
+}
+
+fn sigchld_auto_reaps() -> io::Result<bool> {
+    let mut old: libc::sigaction = unsafe { std::mem::zeroed() };
+    // SAFETY: SIGCHLD is valid and old is writable; NULL requests a read only.
+    if unsafe { libc::sigaction(libc::SIGCHLD, std::ptr::null(), &mut old) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(old.sa_sigaction == libc::SIG_IGN || old.sa_flags & libc::SA_NOCLDWAIT != 0)
+}
+
+fn reap_unheld_child(pid: libc::pid_t) {
+    let mut status = 0;
+    loop {
+        // SAFETY: only called on an unwaited child under non-auto-reap.
+        let rc = unsafe { libc::waitpid(pid, &mut status, 0) };
+        if rc != -1 || io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+            break;
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PidfdStep {
+    Probe,
+    Mint,
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static PIDFD_FAULT: std::cell::Cell<Option<(PidfdStep, i32)>> = const { std::cell::Cell::new(None) };
+    static LAST_MINT_PID: std::cell::Cell<Option<libc::pid_t>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+fn injected_pidfd_error(step: PidfdStep) -> Option<i32> {
+    PIDFD_FAULT.with(|fault| {
+        fault
+            .get()
+            .and_then(|(at, code)| (at == step).then_some(code))
+    })
 }
 
 fn invalid_input() -> io::Error {
