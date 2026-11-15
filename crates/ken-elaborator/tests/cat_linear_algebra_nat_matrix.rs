@@ -153,16 +153,17 @@ fn matrix_env() -> ElabEnv {
     env
 }
 
-/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14–16. The generic
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14–17. The generic
 /// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2;
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: transition sentinel for the exact published API: the next
 /// approved public declaration requires a reviewed inventory update. The
 /// trust, ownership and generic-law checks are durable invariants.
-/// MEASURED: the exact set of sixty-one public identities is selectively
+/// MEASURED: the exact set of sixty-two public identities is selectively
 /// importable, all have transparent bodies, and generic clients instantiate
 /// seventeen earlier propositions; the eight §16 laws have their own clients;
-/// the §14 law has a separate exact generic client in its named test.
+/// the §14 law has a separate exact generic client in its named test;
+/// the §17 law has an exact open-dimension client in its named test.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -229,6 +230,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "transpose_scale",
         "matrix_product_scale",
         "matrix_product_scale_right",
+        "matrix_vector_scale",
         "matrix_add_comm",
         "matrix_add_assoc",
         "vector_scale_distrib",
@@ -284,7 +286,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     }
     assert_eq!(
         visible, expected,
-        "the exact public set has sixty-one checked names and no private helper"
+        "the exact public set has sixty-two checked names and no private helper"
     );
     env.elaborate_file(
         r#"

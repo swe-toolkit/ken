@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and fifty algebraic laws have checked proofs.
+all arithmetic is exact, and fifty-one algebraic laws have checked proofs.
 
 ## Contents
 
@@ -1802,6 +1802,42 @@ pub theorem matrix_product_scale_right
             (matrix_product_scale_right k n p x rest b))
   }
 
+pub theorem matrix_vector_scale
+      (m : Nat) (n : Nat) (factor : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m n (matrix_scale m n factor a) x)
+        (vector_scale m factor (matrix_vector m n a x)) =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        old_head = dot n (vector_scale n factor row) x;
+        new_head = mul factor (dot n row x);
+        old_tail = matrix_vector k n (matrix_scale k n factor rest) x;
+        new_tail = vector_scale k factor (matrix_vector k n rest x)
+      in
+        trans
+          (Vec Nat (Suc k))
+          (VCons Nat k old_head old_tail)
+          (VCons Nat k new_head old_tail)
+          (VCons Nat k new_head new_tail)
+          (cong
+            Nat
+            (Vec Nat (Suc k))
+            old_head
+            new_head
+            (λv. VCons Nat k v old_tail)
+            (dot_scale n factor row x))
+          (cong
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            old_tail
+            new_tail
+            (VCons Nat k new_head)
+            (matrix_vector_scale k n factor rest x))
+  }
+
 theorem matrix_add_assoc_cons
       (k : Nat)
       (n : Nat)
@@ -3538,6 +3574,10 @@ the columns of its right factor, then applies private
 `columns_scale_right`, whose head uses public `dot_scale_right`. Both
 product laws include zero dimensions and preserve the factor's position.
 
+`matrix_vector_scale` uses `dot_scale` for each scaled row's head and
+lifts the tail induction through `VCons`. It compares empty vectors on
+zero rows; no additional proof helper or premise is needed.
+
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
@@ -3575,8 +3615,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–16 owns
-sixty-one public names across eleven operations and fifty laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–17 owns
+sixty-two public names across eleven operations and fifty-one laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -3608,7 +3648,9 @@ private, as does the reused `vector_cons_eq`. The two zero-sum steps
 are imported from Nat Arithmetic as `add::eq_zero_l` and `add::eq_zero_r`.
 `matrix_scale` follows `matrix_zero`. Its eight public laws follow
 `transpose_identity`, and its two new proof helpers stay private.
-All fifty laws have checked bodies.
+`matrix_vector_scale` follows `matrix_product_scale_right` as the final
+public law, uses `dot_scale` for its row step and adds no private helper.
+All fifty-one laws have checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -3621,7 +3663,10 @@ computed dot values, and refuses the swapped-input claim. The vector-scaling
 seed checks both sides of all four laws against independent values and isolates
 a dropped factor. The zero-vector package test checks open law types and
 length-two values, then refuses a false scale-zero equality after accepting
-a same-form scale-one control. The [zero-annihilation
+a same-form scale-one control. The [matrix-vector scale package
+test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_matrix_vector_scale.rs)
+checks the open-dimension law, both closed values at `[9, 21]` and an
+isolated same-form false `[3, 7]` claim. The [zero-annihilation
 seed](../../../../conformance/stdlib/linear-algebra/seed-zero-annihilation.md)
 is authored, not officially conformance-run; its package-owned test checks
 all three open laws, fixed nonzero matrix values and the isolated false
