@@ -525,6 +525,31 @@ pub theorem graph_union_reachable_right
     target
     (graph_union_edge_right q g h)
 
+pub theorem graph_union_reachable_comm
+      (q : Type) (fq : Finite q) (g : Graph q) (h : Graph q) (s : q) (target : q → Bool)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q g h) s target)
+        (graph_reachable q fq (graph_union q h g) s target) =
+  bool_eq_from_iff
+    (graph_reachable q fq (graph_union q g h) s target)
+    (graph_reachable q fq (graph_union q h g) s target)
+    (graph_reachable_graph_monotone
+      q
+      fq
+      (graph_union q g h)
+      (graph_union q h g)
+      s
+      target
+      (graph_union_edge_swap q g h))
+    (graph_reachable_graph_monotone
+      q
+      fq
+      (graph_union q h g)
+      (graph_union q g h)
+      s
+      target
+      (graph_union_edge_swap q h g))
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -902,7 +927,10 @@ Left and right inclusion reuse `or_left` and `or_right` at those edge terms.
 The private Boolean case split constructs an untruncated `Or` for
 `graph_union_edge_cases`: `Or` is Type-sorted, while `or_cases` eliminates
 only into Omega. Both reachability laws reuse graph monotonicity with the
-corresponding inclusion law as its edge-inclusion premise.
+corresponding inclusion law as its edge-inclusion premise. Commutation applies
+graph monotonicity in both directions, using the private
+`graph_union_edge_swap` as each edge-inclusion premise; the private
+`bool_eq_from_iff` closes the resulting Boolean equality.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -1275,6 +1303,37 @@ fn bool_or_true_cases
   match b {
     True ↦ λh. Inl (Equal Bool True True) (Equal Bool c True) Proved;
     False ↦ λh. Inr (Equal Bool False True) (Equal Bool c True) h
+  }
+
+theorem graph_union_edge_swap
+      (q : Type) (g : Graph q) (h : Graph q) (u : q) (v : q)
+    : Equal Bool (edge q (graph_union q g h) u v) True
+      → Equal Bool (edge q (graph_union q h g) u v) True =
+  λpresent.
+    match graph_union_edge_cases q g h u v present {
+      Inl from_g ↦ graph_union_edge_right q h g u v from_g;
+      Inr from_h ↦ graph_union_edge_left q h g u v from_h
+    }
+
+theorem bool_eq_from_iff
+      (b : Bool)
+    : (c : Bool)
+      → (Equal Bool b True → Equal Bool c True)
+      → (Equal Bool c True → Equal Bool b True)
+      → Equal Bool b c =
+  match b {
+    True ↦
+      λc.
+        match c {
+          True ↦ λforward. λbackward. Proved;
+          False ↦ λforward. λbackward. absurd (forward Proved)
+        };
+    False ↦
+      λc.
+        match c {
+          True ↦ λforward. λbackward. absurd (backward Proved);
+          False ↦ λforward. λbackward. Proved
+        }
   }
 
 fn named (q : Type) (d : DecEq q) (x : q) (v : q) : Bool = d.eq v x
@@ -2805,7 +2864,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–14](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–16](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2842,7 +2901,7 @@ constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `dependency_order_or_cycle`, and
-`graph_from_successors`. Thirty kernel-checked theorems expose their laws,
+`graph_from_successors`. Thirty-one kernel-checked theorems expose their laws,
 including successor-list soundness and completeness. Every other helper is
 private to this package.
 
@@ -2882,5 +2941,8 @@ package test checks the generic successor-list exports and listed and unlisted
 edges on a closed three-vertex client, including a false-edge refusal. The
 union package test exercises the seven new generic exports, independent
 closed reachability values, and both false-edge claims on a shared carrier.
+The union-commutation package test checks the open law and both closed
+operand orders, refuses the same-form claim that the union reaches only
+where `g_only` does, and confirms both proof helpers remain private.
 These package tests do not stand in for official conformance-runner execution
 or CI, and do not establish execution of the §2 seed.
