@@ -7,10 +7,22 @@ mod catalog_or;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{Decl, GlobalId, KernelError, Term};
+use ken_elaborator::ElabEnv;
+use ken_kernel::{Context, Decl, GlobalId, KernelError, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
+
+fn equal_claim(env: &ElabEnv, carrier: Term, lhs: Term, rhs: Term) -> ken_kernel::KernelResult<()> {
+    let claim = Term::app(
+        Term::app(
+            Term::app(Term::const_(env.globals["Equal"], vec![]), carrier),
+            lhs,
+        ),
+        rhs,
+    );
+    let proved = Term::const_(env.env.tt_id(), vec![]);
+    ken_kernel::check(&env.env, &Context::new(), &proved, &claim)
+}
 
 fn reference_count(term: &Term, target: GlobalId) -> usize {
     usize::from(matches!(term, Term::Const { id, .. } if *id == target))
@@ -140,7 +152,7 @@ fn private_law_statements_resolve_the_derived_filter() {
 /// Promise class: durable semantic discriminator. The same checked x and xs
 /// yield True/False without comparator compatibility and False/False with
 /// structural Nat equality; the attempted proof of the unequal endpoints
-/// must reach KernelRejected(TypeMismatch), not fail at source resolution.
+/// makes a claim of Proved at Equal over the checked example ids kernel-refused.
 #[test]
 fn compatibility_premise_distinguishes_true_and_false_instances() {
     let (mut env, owned) = load_derived_owned();
@@ -220,21 +232,23 @@ fn compatibility_premise_distinguishes_true_and_false_instances() {
         );
     }
 
-    let rejected = env
-        .elaborate_decl(
-            "theorem incompatible_unconstrained_instance \
-             : Equal Bool derived_example_unconstrained_left \
-                 derived_example_unconstrained_right = Proved",
-        )
-        .expect_err("the checked unequal endpoints must make the proof false");
-    assert!(
-        matches!(
-            rejected,
-            ElabError::KernelRejected {
-                error: KernelError::TypeMismatch { .. },
-                ..
-            }
-        ),
-        "the failure must reach the false proof obligation, got {rejected:?}"
+    let bool_ty = Term::indformer(env.globals["Bool"], vec![]);
+    let ex = |name: &str| Term::const_(env.globals[name], vec![]);
+    let refusal = equal_claim(
+        &env,
+        bool_ty.clone(),
+        ex("derived_example_unconstrained_left"),
+        ex("derived_example_unconstrained_right"),
     );
+    assert!(
+        matches!(refusal, Err(KernelError::TypeMismatch { .. })),
+        "the failure must reach the false proof obligation, got {refusal:?}"
+    );
+    equal_claim(
+        &env,
+        bool_ty,
+        ex("derived_example_nat_equality_left"),
+        ex("derived_example_nat_equality_right"),
+    )
+    .expect("compatible Nat-equality example pair must accept in the same claim builder");
 }

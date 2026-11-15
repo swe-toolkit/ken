@@ -1,5 +1,8 @@
 //! PX8-X sole static resource-lifetime export projection.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::compiler_driver::{compile_checked_target_denotation, CompilerSource};
@@ -10,6 +13,10 @@ use ken_elaborator::{
 use ken_host::{HostOpV1, ResourceBindingRole, ResourceKindV1};
 
 const BUFFER_ONLY_PRODUCER: &str = r#"
+import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, withBuffer)
+import Capability.Process.Exit (host_pure)
 fn px8v_buffer_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)
@@ -26,7 +33,8 @@ fn real_buffer_export() -> BehavioralExport {
     // The route rename must not perturb the canonical export hash.
     let denotation = compile_checked_target_denotation(
         "px8v_static_v2_export_projection",
-        CompilerSource::new("buffer.ken", BUFFER_ONLY_PRODUCER),
+        CompilerSource::new("buffer.ken", BUFFER_ONLY_PRODUCER)
+            .with_roots(catalog_roots::roots()),
         "px8v_buffer_only",
     )
     .expect("real checked Buffer bracket denotation");

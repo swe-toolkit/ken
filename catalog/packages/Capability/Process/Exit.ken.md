@@ -13,13 +13,13 @@ application-specific result is handled in ordinary Ken code.
 ```ken
 export host_program, host_program_then, host_console, host_fs, host_pure, host_bind, host_clock
 
-const exit_success : ExitCode = ExitCode.Success
+pub const exit_success : ExitCode = ExitCode.Success
 
-fn exit_failure (code : UInt8) : ExitCode = ExitCode.Failure code
+pub fn exit_failure (code : UInt8) : ExitCode = ExitCode.Failure code
 
-fn exit_with (a : Type) (policy : a → ExitCode) (outcome : a) : ExitCode = policy outcome
+pub fn exit_with (a : Type) (policy : a → ExitCode) (outcome : a) : ExitCode = policy outcome
 
-fn exit_from_result
+pub fn exit_from_result
       (error : Type) (value : Type) (on_error : error → UInt8) (outcome : Result error value)
     : ExitCode =
   match outcome {

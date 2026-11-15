@@ -1,3 +1,6 @@
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::temporal::{Pred, Temporal};
@@ -9,6 +12,10 @@ use ken_elaborator::{
 use ken_host::{HostOpV1, ResourceBindingRole, ResourceKindV1};
 
 const RESOURCE_PRODUCER: &str = r#"
+import Capability.Process.Exit (host_pure, host_bind)
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult,
+   resourceMetadata, withResource)
 fn px7f_after_metadata (outcome : Result ResourceError FileMetadata)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   match outcome {
@@ -29,6 +36,8 @@ proc px7f_export_resource (cap : Cap AFull) (path : Bytes)
 "#;
 
 const ORDINARY_PRODUCER: &str = r#"
+import Capability.Process.Exit (host_console)
+import Capability.Console.Text (flush)
 proc px7f_export_ordinary (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
   host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
@@ -37,7 +46,7 @@ proc px7f_export_ordinary (_value : Unit)
 fn checked_export(source: &str, target: &str, temporal: Vec<TEntry>) -> BehavioralExport {
     let denotation = compile_checked_target_denotation(
         "px7f_resource_lifetime_export",
-        CompilerSource::new("fixture.ken", source),
+        CompilerSource::new("fixture.ken", source).with_roots(catalog_roots::roots()),
         target,
     )
     .expect("checked producer denotation");

@@ -14,6 +14,9 @@
 //! `int_to_{snake}_raw (sub_int 0 <lit>)`, the same workaround
 //! `decimal_char.rs` established.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, eval_vals_eq, EvalStore, EvalVal};
 use ken_kernel::Decl;
@@ -37,8 +40,25 @@ fn assert_eval_eq(actual: &EvalVal, expected: i128, msg: &str) {
     );
 }
 
+fn import_width_conversions(env: &mut ElabEnv, src: &str) {
+    let selected = WIDTHS
+        .iter()
+        .map(|width| format!("intTo{}", width.name))
+        .filter(|name| src.contains(name))
+        .collect::<Vec<_>>();
+    if !selected.is_empty() {
+        catalog_roots::load(env, "Data.Numeric.FixedWidth");
+        env.elaborate_file(&format!(
+            "import Data.Numeric.FixedWidth ({})",
+            selected.join(", ")
+        ))
+        .expect("select the homed fixed-width conversions");
+    }
+}
+
 fn eval_view(src: &str) -> EvalVal {
     let mut env = ElabEnv::new().expect("prelude init");
+    import_width_conversions(&mut env, src);
     let r = env.elaborate_decl_v1(src).expect("elaborates");
     let mut store = EvalStore::new();
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
@@ -64,6 +84,7 @@ fn eval_view(src: &str) -> EvalVal {
 /// Whether a single decl elaborates OK against a fresh prelude.
 fn elaborates_ok(src: &str) -> bool {
     let mut env = ElabEnv::new().expect("prelude init");
+    import_width_conversions(&mut env, src);
     env.elaborate_decl(src).is_ok()
 }
 

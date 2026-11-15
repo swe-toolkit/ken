@@ -471,7 +471,11 @@ fn scoped_resource_kind_bare_member_neither_resolves_nor_binds() {
         .elaborate_decl("const bare : ResourceKind = Buffer")
         .expect_err("bare scoped constructor is unavailable");
     assert!(
-        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "Buffer"),
+        matches!(
+            error,
+            ElabError::UnresolvedCon { ref name, .. } | ElabError::UnboundName { ref name, .. }
+                if name == "Buffer"
+        ),
         "wrong bare expression refusal: {error:?}"
     );
     let error = env
@@ -481,7 +485,11 @@ fn scoped_resource_kind_bare_member_neither_resolves_nor_binds() {
         )
         .expect_err("bare capitalized pattern must not become binder");
     assert!(
-        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "Buffer"),
+        matches!(
+            error,
+            ElabError::UnresolvedCon { ref name, .. } | ElabError::UnboundName { ref name, .. }
+                if name == "Buffer"
+        ),
         "wrong bare pattern refusal: {error:?}"
     );
 }

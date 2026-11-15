@@ -1,33 +1,40 @@
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::error::ElabError;
 use ken_elaborator::ElabEnv;
 
-const AUTHORITY_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Filesystem/Authority.ken.md");
-
 fn mk_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_ken_md_file(AUTHORITY_KEN_MD)
-        .expect("Capability/Filesystem/Authority.ken.md must elaborate");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Filesystem.Authority",
+    )
+    .expect("Capability.Filesystem.Authority must roots-load");
+    env.execute_loaded_entry_checked_fences("Capability.Filesystem.Authority")
+        .expect("Capability.Filesystem.Authority checked fences keep their contract");
     env
 }
 
 fn capability_program(header: &str) -> String {
     format!(
         "{header}\n\
+         import Capability.Filesystem.Authority (FS, readFile)\n\
          proc main (caps : ProgramCaps APartial) (path : Bytes)\n\
            : FS APartial (Result FileError Bytes) visits [FS] =\n\
            match caps {{\n\
-             ProgramCaps.MkProgramCaps cap ↦ capability_read APartial cap path\n\
+             ProgramCaps.MkProgramCaps cap ↦ readFile APartial cap path\n\
            }}\n"
     )
 }
 
 fn authority_caller(authority: &str) -> String {
     format!(
-        "proc authority_caller (cap : Cap {authority}) (path : Bytes)\n\
+        "import Capability.Filesystem.Authority (FS, writeFile)\n\
+         proc authority_caller (cap : Cap {authority}) (path : Bytes)\n\
            (policy : CreatePolicy) (contents : Bytes)\n\
            : FS AFull (Result FileError Unit) visits [FS] =\n\
-           full_authority_write cap path policy contents\n"
+           writeFile cap path policy contents\n"
     )
 }
 

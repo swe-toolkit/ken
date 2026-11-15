@@ -208,11 +208,23 @@ pub fn published_module_surfaces(source: &str, module: &str, label: &str) -> BTr
         .into_iter()
         .enumerate()
         .filter_map(|(query_index, mut query)| {
-            let subject = query
+            let (subject, proof_name) = query
                 .surface
                 .split_once("::")
-                .expect("attached surface has a subject")
-                .0;
+                .expect("attached surface has a subject");
+            let reference_alias = format!("cat_tier_d_{label}_reference_subject_{query_index}");
+            let reference = PublicationQuery {
+                surface: query.surface.clone(),
+                source: format!(
+                    "import {module} ({subject} as {reference_alias})\n\
+                     let cat_tier_d_{label}_proof_reference_{query_index} = \
+                     {reference_alias}::{proof_name}"
+                ),
+                unpublished_names: query.unpublished_names.clone(),
+            };
+            if !probe(&reference) {
+                return None;
+            }
             let (subject_import, declaration) = query
                 .source
                 .split_once('\n')
@@ -234,7 +246,12 @@ pub fn published_module_surfaces(source: &str, module: &str, label: &str) -> BTr
             imports.push(subject_import.to_owned());
             imports.push(declaration);
             query.source = imports.join("\n");
-            probe(&query).then_some(query.surface)
+            assert!(
+                probe(&query),
+                "attached proof {} is reachable but its statement does not check from public names",
+                query.surface
+            );
+            Some(query.surface)
         })
         .collect::<BTreeSet<_>>();
 

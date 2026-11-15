@@ -1,5 +1,8 @@
 //! Source-level regressions for `KM-sigma-eq-pair-refl`.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::ElabEnv;
 
 fn mk_env() -> ElabEnv {
@@ -55,6 +58,9 @@ fn componentwise_proof_is_not_unrelated_full_pair_equality() {
     let mut env = mk_env();
     env.elaborate_file(PAIR_LENS_SOURCE)
         .expect("base pair lens source elaborates");
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And)")
+        .expect("select the checked propositional conjunction");
 
     let bad = env.elaborate_decl(
         "theorem badComponentAsFull \

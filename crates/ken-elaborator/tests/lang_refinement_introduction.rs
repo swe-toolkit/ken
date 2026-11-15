@@ -271,6 +271,9 @@ fn named_return_over_a_match_is_realized_per_leaf() {
 #[test]
 fn constructor_fields_and_direct_refined_arguments_emit_once() {
     let mut env = ElabEnv::new().expect("prelude");
+    checked_not::load(&mut env);
+    env.elaborate_file("import Core.Logic.Not (Not)")
+        .expect("select the checked Not proposition for the refined parameter");
     arbitrary_predicate(&mut env);
     env.elaborate_decl("def Pos = { x : Int | P x }")
         .expect("named refinement");
@@ -406,10 +409,11 @@ fn dependent_literal_constructor_field_uses_its_checked_prefix_arguments() {
 #[test]
 fn distinct_refinement_aliases_do_not_share_an_int_carrier_key() {
     let mut env = ElabEnv::new().expect("prelude");
+    checked_not::load(&mut env);
     arbitrary_predicate(&mut env);
     env.elaborate_decl("def Pos = { x : Int | P x }")
         .expect("positive refinement");
-    env.elaborate_decl("def Neg = { x : Int | Not (P x) }")
+    env.elaborate_file("import Core.Logic.Not (Not)\ndef Neg = { x : Int | Not (P x) }")
         .expect("negative refinement");
     let negative = env
         .elaborate_decl_v1("const negative : Neg = 5")
@@ -421,7 +425,7 @@ fn distinct_refinement_aliases_do_not_share_an_int_carrier_key() {
     assert_eq!(conversion.obligations.len(), 1);
     let p = Term::const_(env.globals["P"], vec![]);
     let expected_neg = Term::app(
-        Term::const_(env.globals["Not"], vec![]),
+        Term::const_(env.globals["Core.Logic.Not.Not"], vec![]),
         Term::app(p.clone(), Term::IntLit(5.into())),
     );
     assert_eq!(

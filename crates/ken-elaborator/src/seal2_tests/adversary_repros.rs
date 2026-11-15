@@ -85,11 +85,14 @@ fn direct_buffer_span_forgery_routes_all_reject() {
         ),
         (
             "transparency of the exact-prefix proposition",
-            "fn forged (s : BufferSpan) (c : TransferCount) : BufferSpan = \
+            "import Capability.System.IO (write_all_exact_prefix_prop)\n\
+             fn forged (s : BufferSpan) (c : TransferCount) : BufferSpan = \
              write_all_exact_prefix_prop s c",
         ),
     ] {
         let mut env = ElabEnv::empty().expect("prelude");
+        env.set_catalog_roots_v1(&[seal2_support::catalog_packages_dir()])
+            .expect("seal2 forgery routes select the catalog root");
         let outcome = env.elaborate_file(source);
         assert!(
             outcome.is_err(),

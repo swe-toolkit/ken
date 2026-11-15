@@ -14,8 +14,21 @@
 //! base. The same plane gap makes the effect-escape gate accept those calls;
 //! both are closed by `LANG-EFFECT-ROW-LOCAL-LATENT`, not by this WP.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, Term};
+
+fn selected_env(imports: &[(&str, &str)]) -> ElabEnv {
+    let mut env = ElabEnv::new().expect("checked prelude");
+    for &(module, names) in imports {
+        catalog_roots::load(&mut env, module);
+        env.elaborate_file(&format!("import {module} ({names})"))
+            .unwrap_or_else(|error| panic!("select {module} ({names}): {error:?}"));
+    }
+    env
+}
 
 fn checked_def<'a>(env: &'a ElabEnv, id: ken_kernel::GlobalId) -> (&'a Term, &'a Term) {
     let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(id) else {
@@ -71,7 +84,7 @@ fn assert_bind<'a>(env: &ElabEnv, term: &'a Term) -> Vec<&'a Term> {
 
 #[test]
 fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_body() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[("Capability.Console.Text", "IO, write")]);
     let checked = env
         .elaborate_decl(
             "proc checked : IO (Result IOError Unit) visits [Console] = \
@@ -119,7 +132,7 @@ fn checked_and_inferred_performed_lets_emit_bind_with_ret_only_for_pure_infer_bo
 /// admitted parameter type, even when its declaration context carries rows.
 #[test]
 fn refinement_predicate_let_retains_value_binding_under_checked_rows() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[("Capability.Console.Text", "write")]);
     let id = env
         .elaborate_decl(
             "fn f (x : { n : Int | let t = write ConsoleStream.Stdout (bytes_encode \"a\") \
@@ -140,7 +153,7 @@ fn refinement_predicate_let_retains_value_binding_under_checked_rows() {
 /// the same row-installed declaration boundary as a refinement predicate.
 #[test]
 fn requires_proposition_let_retains_value_binding_under_checked_rows() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[("Capability.Console.Text", "write")]);
     let id = env
         .elaborate_decl(
             "fn g (n : Int) : Int requires \
@@ -216,7 +229,10 @@ fn ambient_non_tree_results_use_clock_entropy_and_multilabel_signatures() {
 /// Console pin separately observes action order through a live host.
 #[test]
 fn clock_entropy_and_multilabel_inclusions_use_checked_helpers() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[
+        ("Capability.Time.WallClock", "wall_now"),
+        ("Capability.Process.Exit", "host_pure"),
+    ]);
     for (name, source, inject) in [
         (
             "clock_to_host",
@@ -256,7 +272,10 @@ fn clock_entropy_and_multilabel_inclusions_use_checked_helpers() {
 /// injected into a HostIO caller is sequenced exactly once by bind.
 #[test]
 fn valid_console_inclusion_injects_into_host_before_binding() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[
+        ("Capability.Console.Text", "write, print_line"),
+        ("Capability.Process.Exit", "host_program"),
+    ]);
     let id = env
         .elaborate_decl(
             "proc cross : HostIO APartial ExitCode visits [Console] = \
@@ -278,7 +297,10 @@ fn valid_console_inclusion_injects_into_host_before_binding() {
 /// attempting to sequence its body into IO.
 #[test]
 fn fs_row_cannot_inject_into_declared_io_result() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[
+        ("Capability.Console.Text", "IO"),
+        ("Capability.Filesystem.Authority", "readFile"),
+    ]);
     let error = env
         .elaborate_decl(
             "proc cross (cap : Cap APartial) : IO (Result FileError Bytes) \
@@ -298,7 +320,10 @@ fn fs_row_cannot_inject_into_declared_io_result() {
 /// of its returned value is ill-typed regardless of future `incl` support.
 #[test]
 fn annotated_action_type_is_result_type_mismatch() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[
+        ("Capability.Console.Text", "write, print_line"),
+        ("Capability.Process.Exit", "host_console, host_program"),
+    ]);
     let error = env
         .elaborate_decl(
             "proc wrong_result : HostIO APartial ExitCode visits [Console] = \
@@ -429,7 +454,10 @@ fn annotated_non_tree_proc_result_binds_the_returned_value() {
 
 #[test]
 fn annotated_tree_result_is_bound_by_one_outer_bind() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[
+        ("Capability.Console.Text", "write"),
+        ("Capability.Process.Exit", "host_bind, host_console, host_pure"),
+    ]);
     let producer = env
         .elaborate_decl(
             "proc make_outer : HostIO APartial (HostIO APartial Unit) visits [Console] = \
@@ -466,7 +494,10 @@ fn annotated_tree_result_is_bound_by_one_outer_bind() {
 
 #[test]
 fn both_module_body_routes_and_pure_let_controls_preserve_their_core_shapes() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[
+        ("Capability.Console.Text", "IO, write"),
+        ("Capability.Process.Exit", "host_pure"),
+    ]);
     let plain = env
         .elaborate_decl(
             "proc plain : IO (Result IOError Unit) visits [Console] = \

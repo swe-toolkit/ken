@@ -7,10 +7,15 @@
 //! applications exercise this identity; literal occurrences have opaque checked
 //! global identities, so both twins reference the same declared messages.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{render_open_obligations, ElabEnv, Span};
 use ken_kernel::{Decl, Term};
 
 const PRE: &str = r#"program capabilities FS APartial
+import Capability.Console.Text (print_line, write)
+import Capability.Process.Exit (host_console)
 const first : String = "1"
 const second : String = "2"
 const held : String = "held"
@@ -19,8 +24,15 @@ proc emit (msg : String) : Unit visits [Console] =
 fn two (x : Unit) (y : Unit) : Unit = MkUnit
 "#;
 
-fn compare_bodies(label: &str, definitions: &str) {
+fn rooted_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("checked prelude");
+    catalog_roots::load(&mut env, "Capability.Console.Text");
+    catalog_roots::load(&mut env, "Capability.Process.Exit");
+    env
+}
+
+fn compare_bodies(label: &str, definitions: &str) {
+    let mut env = rooted_env();
     env.elaborate_file(&format!("{PRE}{definitions}"))
         .unwrap_or_else(|error| panic!("{label}: elaboration failed: {error:?}"));
     let body = |name: &str| match env.env.lookup(env.globals[name]) {
@@ -83,7 +95,7 @@ proc explicit (u : Unit) : Unit visits [Console] =
 #[test]
 fn prefix_probe_discards_earlier_argument_obligation() {
     fn elaborate(body: &str) -> (Term, Vec<String>) {
-        let mut env = ElabEnv::new().expect("checked prelude");
+        let mut env = rooted_env();
         let results = env
             .elaborate_file_v1(&format!(
                 "{PRE}const zero : Int = 0\n\
@@ -122,6 +134,8 @@ fn prefix_probe_discards_earlier_argument_obligation() {
 }
 
 const COST_PRE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_bind, host_console, host_pure)
+import Capability.Console.Text (write)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -143,7 +157,7 @@ fn sink (t : HostIO APartial Unit) : Unit = MkUnit
 #[test]
 fn held_tree_arguments_elaborate_in_linear_time() {
     fn elapsed(decls: &str) -> std::time::Duration {
-        let mut env = ElabEnv::new().expect("checked prelude");
+        let mut env = rooted_env();
         let source = format!("{COST_PRE}{decls}");
         let start = std::time::Instant::now();
         env.elaborate_file(&source).expect("held-tree spine checks");
@@ -226,7 +240,7 @@ proc explicit (u : Unit) : Unit visits [Console] =
 /// instead of guessing that it performs into a plain value slot.
 #[test]
 fn dependent_domain_tree_argument_remains_held_under_fallback() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = rooted_env();
     env.elaborate_file(&format!(
         "{COST_PRE}fn hd (T : Type) (x : T) : Unit = MkUnit\n\
          proc direct (u : Unit) : Unit visits [Console] =\n\

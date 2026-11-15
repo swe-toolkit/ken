@@ -1711,6 +1711,7 @@ mod resource_lifetime_hash_tests {
 mod exact_inventory_tests {
     use super::*;
     use crate::compiler_driver::{compile_checked_target_denotation, CompilerSource};
+    use std::path::PathBuf;
 
     fn denotation(target: &str) -> CheckedTargetDenotationV1 {
         compile_checked_target_denotation(
@@ -1718,6 +1719,8 @@ mod exact_inventory_tests {
             CompilerSource::new(
                 "binding.ken",
                 r#"
+import Capability.Process.Exit (host_console)
+import Capability.Console.Text (flush)
 proc first (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
   host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
@@ -1726,7 +1729,10 @@ proc second (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
   host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#,
-            ),
+            )
+            .with_roots(vec![
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+            ]),
             target,
         )
         .expect("checked binding fixture")

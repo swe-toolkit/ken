@@ -6,6 +6,9 @@
 //! FizzBuzz: verifies mod3/mod5/classify elaborate (batch-1 QA blocker).
 //! Batch-2: verifies fibonacci/gcd/ackermann views elaborate (batch-2 fixes).
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId};
@@ -109,6 +112,14 @@ fn string_literal_infer_path_elaborates() {
     );
 }
 
+fn print_line_client_env() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("base env");
+    catalog_roots::load(&mut env, "Capability.Console.Text");
+    env.elaborate_file("import Capability.Console.Text (IO, print_line)")
+        .expect("select the checked Console tree and operation");
+    env
+}
+
 // ── AC4: print_line type-check: String → IO Unit ─────────────────────────────
 
 /// `surface/io/print-line-type-checks` (VAL1-surface, `36 §2.1`)
@@ -117,7 +128,7 @@ fn string_literal_infer_path_elaborates() {
 /// Prim reduction (`wp/VAL1-console-exec`) is held; this tests the type only.
 #[test]
 fn print_line_type_checks_as_io_unit() {
-    let mut env = ElabEnv::new().expect("base env");
+    let mut env = print_line_client_env();
     let id = env
         .elaborate_decl("proc main : IO Unit visits [Console] = print_line \"Hello, World!\"")
         .expect("print_line app elaborates");
@@ -138,7 +149,7 @@ fn print_line_type_checks_as_io_unit() {
 /// exactly one newline; no interpreter primitive is involved.
 #[test]
 fn print_line_prim_reduction_builds_itree() {
-    let mut env = ElabEnv::new().expect("base env");
+    let mut env = print_line_client_env();
     let id = env
         .elaborate_decl("proc main : IO Unit visits [Console] = print_line \"Hello, World!\"")
         .expect("print_line app elaborates");

@@ -48,6 +48,8 @@ fn four_late_contracts_and_fresh_ascii_client_check() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("checked Derived provider");
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("checked Char projection provider");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_root()], MODULE)
         .expect("byte contracts import their real Derived dependency");
@@ -76,6 +78,7 @@ fn four_late_contracts_and_fresh_ascii_client_check() {
         "exactly four new trusted contracts"
     );
     let client = r#"
+import Core.Classes.LawfulClasses (charToInt)
 import Core.Logic.Transport (sym)
 import Data.Collections.Derived (list_append, map)
 import Data.Binary.BytesPrimitiveContracts

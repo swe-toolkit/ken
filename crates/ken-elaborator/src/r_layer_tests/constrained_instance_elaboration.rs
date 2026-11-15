@@ -161,7 +161,11 @@ fn compound_named_and_bare_d_boundaries_are_discriminating() {
         "instance Multi (Pair a b) where Wrap a, Wrap b { select = d.select }",
     );
     assert!(
-        matches!(bare_d_multi, Err(ElabError::UnresolvedCon { ref name, .. }) if name == "d"),
+        matches!(
+            bare_d_multi,
+            Err(ElabError::UnresolvedCon { ref name, .. }
+                | ElabError::UnboundName { ref name, .. }) if name == "d"
+        ),
         "bare d must be unbound with multiple constraints: {bare_d_multi:?}"
     );
 }

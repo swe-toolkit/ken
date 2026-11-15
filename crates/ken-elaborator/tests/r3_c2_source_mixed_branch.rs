@@ -84,6 +84,7 @@ use std::process::Command;
 /// selectors and the `Fork` branch's direct `k True` application are the two
 /// structural facts the ruling fixes; they must not be edited.
 const C2_MIXED_SOURCE: &str = "program capabilities FS APartial\n\
+    import Capability.Process.Exit (host_pure)\n\
     data Bag (a : Type) : Type where { \
       Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a ; \
       Fork : (Bool -> Bag a) -> Bag a \
@@ -300,7 +301,9 @@ fn c2_source_mixed_branch_walk_gates_one_to_three() {
     // boundary if it does not; it does.
     let out = compile_ken_package_sources(
         &CompilerManifest::new(package_name, Vec::new()),
-        vec![CompilerSource::new("src/main.ken", C2_MIXED_SOURCE)],
+        vec![CompilerSource::new("src/main.ken", C2_MIXED_SOURCE).with_roots(vec![
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+        ])],
         TargetSelector::StableSymbol {
             package_identity: StableSymbol::new(
                 SymbolNamespace::Module,

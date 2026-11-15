@@ -12,6 +12,18 @@ use ken_kernel::{Context, Decl, GlobalId, KernelError, Term};
 
 const MODULE: &str = "Data.Vector.Vector";
 
+fn equal_claim(env: &ElabEnv, carrier: Term, lhs: Term, rhs: Term) -> ken_kernel::KernelResult<()> {
+    let claim = Term::app(
+        Term::app(
+            Term::app(Term::const_(env.globals["Equal"], vec![]), carrier),
+            lhs,
+        ),
+        rhs,
+    );
+    let proved = Term::const_(env.env.tt_id(), vec![]);
+    ken_kernel::check(&env.env, &Context::new(), &proved, &claim)
+}
+
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -322,12 +334,12 @@ fn vector_bridge_preserves_concrete_content_and_component_order() {
 /// the unequal left/right outputs is a well-typed but false inverse claim.
 /// MEASURED: the owner-local generic inverse checks, and the independently
 /// checked Boolean heads of the unequal projections are True and False; a
-/// client claiming equality is kernel-refused. CLAIMED: the two components of
+/// claim of Proved at Equal over the checked example ids is kernel-refused. CLAIMED: the two components of
 /// `unzip` are not interchangeable. THE GAP: this concrete witness does not
 /// prove the all-type inverse; the checked generic proof above carries that.
 #[test]
 fn swapped_unzip_components_are_rejected_for_unequal_bool_values() {
-    let (mut env, owned) = checked_vector_examples(&[
+    let (env, owned) = checked_vector_examples(&[
         "vec_example_bridge_left",
         "vec_example_bridge_right",
         "vec_example_bridge_unswapped",
@@ -339,22 +351,21 @@ fn swapped_unzip_components_are_rejected_for_unequal_bool_values() {
     assert_example_references(&env, &owned, "vec_example_bridge_unswapped", "unzip_zip");
     assert_example_references(&env, &owned, "vec_example_unzip_left_head", "unzip");
     assert_example_references(&env, &owned, "vec_example_unzip_right_head", "unzip");
-    let error = env
-        .elaborate_decl(
-            "theorem bridge_swapped : Equal Bool \
-             vec_example_unzip_left_head vec_example_unzip_right_head = Proved",
-        )
-        .expect_err("swapped unequal component values must not be equal");
+    let bool_ty = Term::indformer(env.globals["Bool"], vec![]);
+    let left = Term::const_(env.globals["vec_example_unzip_left_head"], vec![]);
+    let right = Term::const_(env.globals["vec_example_unzip_right_head"], vec![]);
+    let refusal = equal_claim(&env, bool_ty.clone(), left.clone(), right);
     assert!(
-        matches!(
-            error,
-            ElabError::KernelRejected {
-                error: KernelError::TypeMismatch { .. },
-                ..
-            }
-        ),
-        "swapped result must fail by kernel type mismatch: {error:?}"
+        matches!(refusal, Err(KernelError::TypeMismatch { .. })),
+        "swapped result must fail by kernel type mismatch: {refusal:?}"
     );
+    equal_claim(
+        &env,
+        bool_ty,
+        left,
+        Term::constructor(env.globals["True"], vec![]),
+    )
+    .expect("the same claim builder must accept the checked left-head value");
 }
 
 #[test]

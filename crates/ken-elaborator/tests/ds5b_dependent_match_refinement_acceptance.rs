@@ -236,6 +236,10 @@ fn trusted_base_delta_is_empty_across_all_three_capabilities() {
 #[test]
 fn non_indexed_match_stays_unaffected() {
     let mut env = mk_env();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Logic.Conjunction")
+        .expect("checked conjunction must roots-load");
+    env.elaborate_file("import Core.Logic.Conjunction (And)")
+        .expect("select the checked propositional conjunction");
     elab_ok(
         &mut env,
         "fn allTrue (xs : List Bool) : Prop = \

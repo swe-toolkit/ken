@@ -1,3 +1,6 @@
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::compiler_driver::{
@@ -41,6 +44,44 @@ fn export(source: &str) -> Result<ken_elaborator::BehavioralExport, ExportError>
     export_target("b1_exact", source, "target")
 }
 
+fn imported_source(source: &str) -> String {
+    let providers: &[(&str, &[&str])] = &[
+        (
+            "Capability.Process.Exit",
+            &["host_pure", "host_bind", "host_clock", "host_console"],
+        ),
+        ("Capability.Console.Text", &["flush", "is_terminal"]),
+        ("Capability.Time.WallClock", &["wall_now"]),
+        (
+            "Capability.System.Resource",
+            &[
+                "ResourceBodyResult",
+                "ResourceBodyOk",
+                "ResourceBodyErr",
+                "ResourceBracketResult",
+                "resourceMetadata",
+                "withResource",
+            ],
+        ),
+    ];
+    let imports = providers
+        .iter()
+        .filter_map(|(module, names)| {
+            let selected = names
+                .iter()
+                .copied()
+                .filter(|name| source.contains(name))
+                .collect::<Vec<_>>();
+            (!selected.is_empty()).then(|| format!("import {module} ({})", selected.join(", ")))
+        })
+        .collect::<Vec<_>>();
+    if imports.is_empty() {
+        source.to_owned()
+    } else {
+        format!("{}\n{source}", imports.join("\n"))
+    }
+}
+
 fn export_target(
     package: &str,
     source: &str,
@@ -48,7 +89,8 @@ fn export_target(
 ) -> Result<ken_elaborator::BehavioralExport, ExportError> {
     let denotation = compile_checked_target_denotation(
         package,
-        CompilerSource::new("fixture.ken", source),
+        CompilerSource::new("fixture.ken", imported_source(source))
+            .with_roots(catalog_roots::roots()),
         target,
     )
     .expect("checked target denotation");

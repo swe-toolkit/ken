@@ -65,8 +65,6 @@ use ken_elaborator::ElabEnv;
 use ken_kernel::env::Decl as KernelDecl;
 use ken_kernel::{GlobalId, Term};
 
-const LAWFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulClasses.ken.md");
 
 fn mk_env_with_lawful_owned() -> (ElabEnv, Vec<ken_kernel::GlobalId>) {
     let mut env = ElabEnv::new().expect("base env construction failed");
@@ -684,35 +682,44 @@ fn char_ord_laws_carried_not_stubbed_transport_accepts() {
 
 #[test]
 fn char_ord_laws_reject_missing_law_field() {
-    // Isolate the package's prefix — everything BEFORE the `instance Ord
-    // Char` block this WP adds (classes + Int/Bool instances) — then attempt
-    // a deceptive/incomplete instance that OMITS `total` entirely. The
-    // discriminating flip: the honest transport instance (above) elaborates
-    // with every field present; an instance silently missing a law field
-    // must be REJECTED (uninhabited record), never accepted as lawful.
-    let tangled = ken_elaborator::literate::extract_ken_md(LAWFUL_CLASSES_KEN_MD)
-        .expect("catalog/packages/Core/Classes/LawfulClasses.ken.md must extract")
-        .source;
-    let prefix_end = tangled
-        .find("instance Ord Char")
-        .expect("`instance Ord Char` marker must be present in the real package source");
-    let prefix = tangled[..prefix_end].replace(
-        "import Data.Text.StringBijection (string_to_list_char_injective)\n\n",
-        "",
-    );
-    let mut env = ElabEnv::new().expect("base env construction failed");
-    catalog_or::load_core_logic_compare(&mut env);
-    env.elaborate_file(&prefix)
-        .expect("package prefix (classes + Int/Bool instances) must elaborate");
+    // A client cannot declare a second `Ord Char` (coherence; orphan rule),
+    // so the missing-law-field refusal is reachable from a client only on a
+    // client-owned type. The two sources differ only in the `total` field:
+    // the complete twin must elaborate, the incomplete one must be refused.
+    const TICK: &str = "import Core.Classes.LawfulClasses (Ord)\n\
+        data Tick : Type where {\n\
+          MkTick : Tick\n\
+        }\n\
+        fn tick_leq (a : Tick) (b : Tick) : Bool = True\n";
+    const FIELDS: &str = "  leq = tick_leq;\n\
+          refl = λx.Proved;\n\
+          antisym = λx.match x {\n\
+            MkTick ↦ λy.match y {\n\
+              MkTick ↦ λp.λq.Proved\n\
+            }\n\
+          };\n\
+          trans = λx.λy.λz.λp.λq.Proved";
+    let lawful_env = || {
+        let mut env = ElabEnv::new().expect("base env construction failed");
+        env.elaborate_module_from_roots(
+            &[catalog_or::catalog_root()],
+            "Core.Classes.LawfulClasses",
+        )
+        .expect("Core.Classes.LawfulClasses must roots-load");
+        env.execute_loaded_entry_checked_fences("Core.Classes.LawfulClasses")
+            .expect("Core.Classes.LawfulClasses checked fences keep their contract");
+        env
+    };
 
-    let r = env.elaborate_decl(
-        "instance Ord Char { leq = lawful_char_leq ; \
-         refl = λx.(Ord_instance_Int).refl (charToInt x) ; \
-         antisym = λx.λy.λp.λq.lawful_char_to_int_injective x y \
-         ((Ord_instance_Int).antisym (charToInt x) (charToInt y) p q) ; \
-         trans = λx.λy.λz.λp.λq.(Ord_instance_Int).trans \
-         (charToInt x) (charToInt y) (charToInt z) p q }",
-    );
+    let mut complete_env = lawful_env();
+    complete_env
+        .elaborate_file(&format!(
+            "{TICK}instance Ord Tick {{\n{FIELDS};\n  total = λx.λy.Proved\n}}\n"
+        ))
+        .expect("the complete lawful Ord Tick twin must elaborate");
+
+    let mut incomplete_env = lawful_env();
+    let r = incomplete_env.elaborate_file(&format!("{TICK}instance Ord Tick {{\n{FIELDS}\n}}\n"));
     assert!(
         r.is_err(),
         "an Ord Char instance omitting the `total` law field must be rejected as \

@@ -29,6 +29,10 @@ fn trace_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("compiler base");
     env.elaborate_module_from_roots(&[root()], TRACE)
         .expect("EventTrace §2 roots-loads from Derived's public filter laws");
+    env.elaborate_module_from_roots(&[root()], "Core.Logic.Conjunction")
+        .expect("Conjunction must roots-load for seed clients");
+    env.elaborate_file("import Core.Logic.Conjunction (And, and_snd)")
+        .expect("select the checked conjunction and projection for seed clients");
     env
 }
 
@@ -36,6 +40,7 @@ fn trace_env() -> ElabEnv {
 // payload type and list; neither type has a payload comparison or ordering
 // premise. The And is the prelude's Ω-valued conjunction, not Core.Logic.And.
 const GENERIC_CLIENT: &str = r#"
+import Core.Logic.Conjunction (And)
 import Core.Classes.LawfulClasses (leq_nat)
 import Data.Numeric.Nat.Order (lt_nat)
 import Data.Collections.Derived (list_elem)
@@ -73,6 +78,7 @@ theorem generic_window_complete
 fn generic_window_membership_laws_check_without_new_trust() {
     let mut env = ElabEnv::new().expect("compiler base");
     for provider in [
+        "Core.Logic.Conjunction",
         "Core.Function.Combinators",
         "Core.Logic.Transport",
         "Core.Logic.Compare",

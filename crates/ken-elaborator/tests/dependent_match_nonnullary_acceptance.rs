@@ -22,11 +22,18 @@
 //! `to_list`-ordered itself belongs to the separate, later `map-verified-laws`
 //! WP this one unblocks.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::Term;
 
 fn mk_env() -> ElabEnv {
-    ElabEnv::new().expect("base env")
+    let mut env = ElabEnv::new().expect("base env");
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And)")
+        .expect("select the checked propositional conjunction");
+    env
 }
 
 /// Peel exactly `n` `Term::Lam` layers, returning the remaining term.

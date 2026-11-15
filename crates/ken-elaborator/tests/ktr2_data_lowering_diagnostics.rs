@@ -12,7 +12,11 @@ fn undefined_uppercase_constructor_argument_is_unresolved() {
         .elaborate_decl("data D = C Missing")
         .expect_err("an undefined uppercase type must reject");
     assert!(
-        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "Missing"),
+        matches!(
+            error,
+            ElabError::UnresolvedCon { ref name, .. } | ElabError::UnboundName { ref name, .. }
+                if name == "Missing"
+        ),
         "expected the unresolved uppercase type, got {error:?}"
     );
     assert!(!env.globals.contains_key("D"));
@@ -25,7 +29,11 @@ fn unbound_lowercase_constructor_argument_is_unresolved() {
         .elaborate_decl("data D = C missing")
         .expect_err("an unbound lowercase type must reject after resolver fallback");
     assert!(
-        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "missing"),
+        matches!(
+            error,
+            ElabError::UnresolvedCon { ref name, .. } | ElabError::UnboundName { ref name, .. }
+                if name == "missing"
+        ),
         "expected the unresolved lowercase type, got {error:?}"
     );
 }

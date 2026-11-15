@@ -1,6 +1,9 @@
 //! Repeated non-recursive transparent heads must not hide a stated equality.
 //! Promise class: durable invariant. Spec 16 §2.1, 17 §1, 34 §3.5.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabError};
 
 // As in the adjacent Refl predicate suite: a measured 1,982,464-byte
@@ -18,6 +21,9 @@ fn on_elaboration_stack(f: impl FnOnce() + Send + 'static) {
 
 fn fixture_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And)")
+        .expect("select the checked propositional conjunction");
     for declaration in [
         "const MyEq : Pair Nat Nat -> Pair Nat Nat -> Prop = λp. λq. Eq (Pair Nat Nat) p q",
         "const Id : Prop -> Prop = λt. t",

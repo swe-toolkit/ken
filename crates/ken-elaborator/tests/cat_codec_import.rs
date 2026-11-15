@@ -323,7 +323,9 @@ fn codec_transport_import_withdrawal_restores_unresolved_cong() {
     without_import.replace_range(import_edges[0].0.clone(), "");
     let mut env = ElabEnv::new().expect("base environment");
     match env.elaborate_file(&without_import) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, import_edges[0].1),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, import_edges[0].1)
+        }
         Err(other) => panic!("Codec import withdrawal failed for the wrong reason: {other:?}"),
         Ok(_) => panic!("Codec unexpectedly elaborated without its Transport import"),
     }

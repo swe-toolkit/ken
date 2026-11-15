@@ -530,7 +530,9 @@ fn nonempty_owner_keeps_raw_constructor_while_clients_cannot_name_it() {
         "fn cc1_forbidden_match (xs : NonEmpty Nat) : Nat = \
          match xs { NonEmptyCons x rest ↦ x }",
     ) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "NonEmptyCons"),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "NonEmptyCons")
+        }
         other => panic!("raw constructor matching must reject at its exact name: {other:?}"),
     }
     match env.elaborate_file(

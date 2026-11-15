@@ -2,6 +2,9 @@
 //! the location of `Refl`. Promise class: durable invariant; spec 17 §1,
 //! spec 16 §2.1 and spec 34 §3.5. Every accepted proof is kernel-checked.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabError};
 
 // Existing Pair-goal and indexed-motive suites measured a 1,982,464-byte
@@ -20,6 +23,9 @@ fn on_elaboration_stack(f: impl FnOnce() + Send + 'static) {
 
 fn fixture_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And)")
+        .expect("select the checked propositional conjunction");
     for decl in [
         "const MyEq : Pair Nat Nat -> Pair Nat Nat -> Prop = λp. λq. Eq (Pair Nat Nat) p q",
         "const MyEq2 : Pair Nat Nat -> Pair Nat Nat -> Prop = MyEq",

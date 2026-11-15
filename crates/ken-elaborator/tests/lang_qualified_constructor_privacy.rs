@@ -1,5 +1,8 @@
 //! Private prelude identities must not be resurrected by qualified selection.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::mem::discriminant;
 
 use ken_elaborator::{ElabEnv, ElabError};
@@ -13,6 +16,20 @@ enum Entry {
 
 fn elaborate(entry: Entry, source: &str) -> Result<(), ElabError> {
     let mut env = ElabEnv::new().expect("checked prelude and hidden roster");
+    // Select a public handle former before attempting its private leaf. The
+    // auxiliary K4 types in the other probes have no client import route.
+    let selected = if source.contains("BufferHandle") {
+        Some(("Capability.System.Buffer", "BufferHandle"))
+    } else if source.contains("MappingHandle") {
+        Some(("Capability.System.Mapping", "MappingHandle"))
+    } else {
+        None
+    };
+    if let Some((home, name)) = selected {
+        catalog_roots::load(&mut env, home);
+        env.elaborate_file(&format!("import {home} ({name})"))
+            .unwrap_or_else(|error| panic!("checked public handle {home}.{name}: {error:?}"));
+    }
     match entry {
         Entry::Decl => env.elaborate_decl(source).map(|_| ()),
         Entry::File => env.elaborate_file(source).map(|_| ()),
@@ -29,8 +46,8 @@ fn assert_missing(entry: Entry, source: &str, missing: &str) -> ElabError {
 }
 
 /// Promise class: regression witness. Every arm reached an actual hidden
-/// constructor through T.C on the landed base, except the two zero-parameter
-/// arms whose base forms were malformed; these use valid const declarations.
+/// constructor through T.C on the landed base. The no-public-home auxiliary
+/// types are not named in the untyped reference probes.
 /// MEASURED: both ambient entry points refuse each expression and pattern
 /// specifically at its checked constructor name. CLAIMED: neither resource
 /// handles nor their span/count/trace representations can be forged or opened
@@ -71,7 +88,7 @@ private_probe!(
 private_probe!(
     forge_mapping_file,
     forge_mapping_decl,
-    "fn forge_mapping (r : Resource ResourceKind.Mapping) (x : MappingExtent) : MappingHandle = MappingHandle.PrivateMappingHandle r x",
+    "let forge_mapping = MappingHandle.PrivateMappingHandle",
     "MappingHandle.PrivateMappingHandle"
 );
 private_probe!(
@@ -95,7 +112,7 @@ private_probe!(
 private_probe!(
     forge_trace_file,
     forge_trace_decl,
-    "const forge_trace : ResourceTraceIdentity = ResourceTraceIdentity.PrivateResourceTraceIdentity (1 : Int) (2 : Int)",
+    "let forge_trace = ResourceTraceIdentity.PrivateResourceTraceIdentity (1 : Int) (2 : Int)",
     "ResourceTraceIdentity.PrivateResourceTraceIdentity"
 );
 
@@ -146,16 +163,31 @@ fn hidden_and_nonexistent_leaves_have_the_same_failure_class() {
 #[test]
 fn bracket_finalizer_constructor_not_source_resolvable() {
     for entry in [Entry::Decl, Entry::File] {
-        let source = "fn forged (r : Resource ResourceKind.FsHandle) : FSOp AFull = \
-                      PrivateBracketRelease AFull ResourceKind.FsHandle r";
+        let source = "let forged = PrivateBracketRelease";
         assert_missing(entry, source, "PrivateBracketRelease");
-        let qualified = "fn forged (r : Resource ResourceKind.FsHandle) : FSOp AFull = \
-                         FSOp.PrivateBracketRelease AFull ResourceKind.FsHandle r";
+        let qualified = "let forged = FSOp.PrivateBracketRelease";
         let err = elaborate(entry, qualified).expect_err("qualified private name refuses");
         assert!(
             matches!(&err, ElabError::UnboundName { name, .. } if name == "FSOp.PrivateBracketRelease"),
             "unexpected qualified refusal: {err:?}"
         );
+    }
+}
+
+/// Promise class: durable invariant (spec 33 §3.3).
+/// The same untyped-reference form as the six private-constructor probes
+/// accepts a reachable constructor through both source entries. If this form
+/// itself refused, a private-name refusal would be a vacuous privacy pin.
+#[test]
+fn reachable_untyped_constructor_reference_works_in_both_entries() {
+    for entry in [Entry::Decl, Entry::File] {
+        for source in [
+            "let cat_reachable_probe = Bool.True",
+            "let cat_reachable_probe = True",
+        ] {
+            elaborate(entry, source)
+                .unwrap_or_else(|error| panic!("{entry:?} {source}: {error:?}"));
+        }
     }
 }
 

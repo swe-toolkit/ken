@@ -337,8 +337,13 @@ fn decoder_preservation_laws_elaborate_for_parsing_source_and_span_client() {
         .expect("Parsing source/span client must roots-load");
     loaded
         .env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Logic.Conjunction")
+        .expect("checked propositional conjunction must roots-load");
+    loaded
+        .env
         .elaborate_file(
             r#"
+            import Core.Logic.Conjunction (And, and_snd)
             import Capability.Parsing.Parsing (Source, Span, ByteCursor, ValidSpan, byte_cursor_ops)
             import Capability.Parsing.Cursor (cursor_advance, cursor_locate, cursor_peek)
             import Capability.Parsing.Decoder

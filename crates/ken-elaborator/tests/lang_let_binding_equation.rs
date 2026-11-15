@@ -1,6 +1,9 @@
 //! Durable invariants for spec/20-verification/22 §3 and §5: a let binds its
 //! equation with checked evidence in core, not only in obligation contexts.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabError, ElabResult, Obligation, ObligationKind};
 use ken_kernel::{check::check, Context, Decl, KernelError, Level, Term};
 
@@ -41,6 +44,9 @@ fn let_conversion_deferral_rejects_wrong_body_at_final_kernel_check() {
 #[test]
 fn logical_conjunction_under_let_is_not_a_subset_coercion() {
     let mut env = fixture();
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And, and_intro)")
+        .expect("select the checked propositional conjunction and introduction");
     env.elaborate_decl(
         "theorem and_let (n : Int) (h : Q n) : And (Q n) (Q n) = \
          let r = n in and_intro (Q r) (Q r) h h",

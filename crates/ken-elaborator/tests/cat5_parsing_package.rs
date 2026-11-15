@@ -1312,13 +1312,15 @@ fn cat5_d1_old_unconstrained_source_constructor_rejected() {
             "#,
         )
         .expect_err("old three-argument MkSource constructor must not be available");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("unresolved type 'MkSource'")
-            || msg.contains("unresolved")
-            || msg.contains("UnresolvedCon"),
-        "old MkSource path should reject at producer/name resolution, got {msg}"
-    );
+    match err {
+        ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. } => {
+            assert_eq!(
+                name, "MkSource",
+                "old constructor must reject at its own name"
+            )
+        }
+        other => panic!("old MkSource path must reject at name resolution, got {other:?}"),
+    }
 }
 
 #[test]
@@ -1682,13 +1684,15 @@ fn cat5_d2_legacy_unguarded_repeat_is_not_exported() {
             "#,
         )
         .expect_err("the legacy unguarded repetition entry point must stay absent");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("unresolved type 'repeat'")
-            || msg.contains("unresolved")
-            || msg.contains("Unresolved"),
-        "unguarded repeat should reject at producer/name resolution, got {msg}"
-    );
+    match err {
+        ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. } => {
+            assert_eq!(
+                name, "repeat",
+                "unguarded helper must reject at its own name"
+            )
+        }
+        other => panic!("unguarded repeat must reject at name resolution, got {other:?}"),
+    }
 }
 
 #[test]
@@ -1706,13 +1710,15 @@ fn cat5_d2_legacy_caller_budget_repetition_is_not_exported() {
             "#,
         )
         .expect_err("CAT-5 must not retain the old caller-budget repetition helper");
-    let msg = format!("{err}");
-    assert!(
-        msg.contains("unresolved type 'repeatWithFuel'")
-            || msg.contains("unresolved")
-            || msg.contains("Unresolved"),
-        "old consuming repeatWithFuel producer path should reject at name resolution, got {msg}"
-    );
+    match err {
+        ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. } => {
+            assert_eq!(
+                name, "repeatWithFuel",
+                "old helper must reject at its own name"
+            )
+        }
+        other => panic!("old repeatWithFuel must reject at name resolution, got {other:?}"),
+    }
 }
 
 #[test]

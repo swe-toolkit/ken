@@ -1,3 +1,6 @@
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::checked_core::{
@@ -1093,6 +1096,9 @@ fn nested_dependent_motive_consumes_correlated_child_proofs() {
         }";
 
     let mut env = ElabEnv::new().expect("prelude env");
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And, and_intro)")
+        .expect("select the checked propositional conjunction and introduction");
     env.elaborate_file(source)
         .expect("dependent nested lift proof elaborates");
 }

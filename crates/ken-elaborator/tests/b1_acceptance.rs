@@ -17,6 +17,9 @@
 //! buckets by `ensures` presence) passes one but fails the other. Both tests
 //! must pass simultaneously.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{
@@ -436,6 +439,9 @@ fn call_requires_holes_are_unknown_while_ffi_runtime_checks_are_tested() {
 #[test]
 fn alphabet_equals_perform_node_signatures() {
     let source = r#"
+import Capability.Process.Exit (host_clock, host_bind, host_console)
+import Capability.Console.Text (flush)
+import Capability.Time.WallClock (wall_now)
 proc after_flush (_outcome : Result IOError Unit)
   : HostIO AFull Instant visits [Clock] =
   host_clock AFull Instant wall_now
@@ -447,7 +453,7 @@ proc h (_value : Unit) : HostIO AFull Instant visits [Console, Clock] =
 "#;
     let denotation = compile_checked_target_denotation(
         "b1_acceptance_alphabet",
-        CompilerSource::new("alphabet.ken", source),
+        CompilerSource::new("alphabet.ken", source).with_roots(catalog_roots::roots()),
         "h",
     )
     .expect("checked two-effect target");

@@ -5,10 +5,15 @@
 //! THE GAP: two concrete Rose/Box branch shapes, not every recursive carrier;
 //! each pair uses a separate fresh environment with the same checked names.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::{convert, Context, Decl, Term};
 
 const PRE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_bind, host_console, host_pure)
+import Capability.Console.Text (write)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -29,6 +34,8 @@ fn pick_body(one: &str, join: &str) -> (ElabEnv, Term, Term) {
     Join xs ys ↦ {join} }} }}\n"
     );
     let mut env = ElabEnv::new().expect("checked prelude");
+    catalog_roots::load(&mut env, "Capability.Process.Exit");
+    catalog_roots::load(&mut env, "Capability.Console.Text");
     env.elaborate_file(&source)
         .unwrap_or_else(|error| panic!("recursive result fixture failed: {error:?}"));
     let (ty, body) = match env.env.lookup(env.globals["pick"]) {

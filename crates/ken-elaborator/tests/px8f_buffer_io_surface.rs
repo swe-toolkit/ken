@@ -1,5 +1,8 @@
 //! PX8-F checked positioned-buffer surface and real structural proof terms.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -370,8 +373,9 @@ theorem first_error_is_no_progress
 #[test]
 fn abi_s6_mapping_surface_is_direct_and_the_handle_stays_opaque() {
     let mut env = ElabEnv::empty().expect("ABI-S6 prelude");
+    catalog_roots::load(&mut env, "Capability.System.Mapping");
     env.elaborate_file(
-        r#"
+        r#"import Capability.System.Mapping (MappingHandle, MappingWindow, mapWrite, mapBytes)
 proc mapping_surface_write
   (a : Auth) (mapping : MappingHandle) (offset : Int) (bytes : Bytes)
   : HostIO a (Result ResourceError Unit) visits [FS] =
@@ -430,8 +434,7 @@ fn checked_source_cannot_forge_or_project_mapping_handles() {
     for (private, source) in [
         (
             "PrivateMappingHandle",
-            "fn escaped (resource : Resource ResourceKind.Mapping) (extent : MappingExtent) \
-             : MappingHandle = PrivateMappingHandle resource extent",
+            "let escaped = PrivateMappingHandle",
         ),
         (
             "mapping_handle_resource",
@@ -540,12 +543,14 @@ fn checked_source_rejects_private_buffer_span_producers() {
     ] {
         let mut env = ElabEnv::empty().expect("SPAN-SEAL prelude");
         match (private, env.elaborate_file(source)) {
-            ("PrivateBufferSpan", Err(ElabError::UnresolvedCon { name, .. })) => {
-                assert_eq!(name, private)
-            }
-            ("write_all_advance_span", Err(ElabError::UnresolvedCon { name, .. })) => {
-                assert_eq!(name, private)
-            }
+            (
+                "PrivateBufferSpan",
+                Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }),
+            ) => assert_eq!(name, private),
+            (
+                "write_all_advance_span",
+                Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }),
+            ) => assert_eq!(name, private),
             other => panic!("`{private}` must reject as an unresolved private name, got {other:?}"),
         }
     }
@@ -574,6 +579,9 @@ fn checked_source_cannot_forge_or_project_buffer_handles() {
         ),
     ] {
         let mut env = ElabEnv::empty().expect("PX8-F-CAP-41 prelude");
+        catalog_roots::load(&mut env, "Capability.System.Buffer");
+        env.elaborate_file("import Capability.System.Buffer (BufferHandle)")
+            .expect("select the checked public handle former");
         match env.elaborate_file(source) {
             Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, private),
             other => panic!("`{private}` must reject as an unresolved private name, got {other:?}"),

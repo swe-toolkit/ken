@@ -18,7 +18,6 @@ const STRING_KEYS_KEN_MD: &str =
 const CODEC_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.md");
 const NUMERIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
-const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 const DIAGNOSTIC_RENDER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
 const SCHEMA_SOURCE: &str =
@@ -89,13 +88,15 @@ fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
         "Capability.Process.Arguments",
     )
     .expect("Capability.Process.Arguments must roots-load in dependency order");
-    for (source, label) in [
-        (NUMERIC_KEN_MD, "Capability.Parsing.Numeric"),
-        (EXIT_KEN_MD, "Capability.Process.Exit"),
-    ] {
-        env.elaborate_ken_md_file(source)
-            .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
-    }
+    env.elaborate_ken_md_file(NUMERIC_KEN_MD).unwrap_or_else(|err| {
+        panic!("Capability.Parsing.Numeric must elaborate in dependency order: {err:?}")
+    });
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Process.Exit")
+        .unwrap_or_else(|err| {
+            panic!("Capability.Process.Exit must roots-load in dependency order: {err:?}")
+        });
+    env.execute_loaded_entry_checked_fences("Capability.Process.Exit")
+        .expect("Capability.Process.Exit checked fences keep their contract");
     let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load in dependency order");
     (env, doc_owned)
