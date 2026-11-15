@@ -5,8 +5,8 @@ natural-number costs, respectively, retaining the earliest candidate on a
 tie. `argmin_option` and `argmax_option` select from possibly empty lists,
 returning `None` for `Nil`. `least_k` takes up to `k` candidates in ascending
 cost order, retaining input order among equal-cost candidates. Both nonempty
-choices are unchanged by a cost transform that preserves and reflects every
-strict natural-cost comparison.
+choices and `least_k` are unchanged by a cost transform that preserves and
+reflects every strict natural-cost comparison.
 
 ## Contents
 
@@ -483,6 +483,27 @@ pub theorem least_k_one_cons
         (sort a (cost_le a cost) (Cons a y ys))
         (least_k_one_cons a cost y ys)
   }
+
+pub theorem least_k_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (k : Nat)
+      (xs : List a)
+    : Equal (List a) (least_k a (comp a Nat Nat f cost) k xs) (least_k a cost k xs) =
+  cong
+    (List a)
+    (List a)
+    (sort a (cost_le a (comp a Nat Nat f cost)) xs)
+    (sort a (cost_le a cost) xs)
+    (take a k)
+    ((proof comparator_cong for sort)
+      a
+      (cost_le a (comp a Nat Nat f cost))
+      (cost_le a cost)
+      (least_k_cost_le_order a cost f same_order)
+      xs)
 
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
@@ -1730,6 +1751,64 @@ theorem least_k_sort_cons_step
             (argmin_from a cost y ys)
             (least_k_list_singleton_head a h t (argmin_from a cost y ys) tail_first))
   }
+
+theorem least_k_leq_order
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (i : Nat)
+      (j : Nat)
+      (b : Bool)
+    : Equal Bool (leq_nat i j) b → Equal Bool (leq_nat (f i) (f j)) b =
+  match b {
+    True ↦
+      λordered.
+        (proof false_reverse_leq for lt_nat)
+          (f j)
+          (f i)
+          (trans
+            Bool
+            (lt_nat (f j) (f i))
+            (lt_nat j i)
+            False
+            (same_order j i)
+            ((proof leq_not_lt for lt_nat) i j ordered));
+    False ↦
+      λunordered.
+        bool_false_of_not_true
+          (leq_nat (f i) (f j))
+          (λmapped.
+            absurd
+              (trans
+                Bool
+                True
+                (leq_nat i j)
+                False
+                (sym
+                  Bool
+                  (leq_nat i j)
+                  True
+                  ((proof false_reverse_leq for lt_nat)
+                    j
+                    i
+                    (trans
+                      Bool
+                      (lt_nat j i)
+                      (lt_nat (f j) (f i))
+                      False
+                      (sym Bool (lt_nat (f j) (f i)) (lt_nat j i) (same_order j i))
+                      ((proof leq_not_lt for lt_nat) (f i) (f j) mapped))))
+                unordered))
+  }
+
+theorem least_k_cost_le_order
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (x : a)
+      (y : a)
+    : Equal Bool (cost_le a (comp a Nat Nat f cost) x y) (cost_le a cost x y) =
+  least_k_leq_order f same_order (cost x) (cost y) (leq_nat (cost x) (cost y)) Refl
 ```
 
 ## Using it
@@ -1887,10 +1966,11 @@ which members survive without promising a complexity bound.
 
 ## Trust & derivation
 
-**Public API:** `cost_le`, `least_k` and its eight declarations for seven
+**Public API:** `cost_le`, `least_k` and its nine declarations for eight
 law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_ties_earliest`, `least_k_cheaper_class_selected`,
-`least_k_separation`, `least_k_one_nil`, `least_k_one_cons`);
+`least_k_separation`, `least_k_one_nil`, `least_k_one_cons`,
+`least_k_cost_order_invariant`);
 `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
 `argmin_append_takes_right`; `argmin_option` and its seven laws:

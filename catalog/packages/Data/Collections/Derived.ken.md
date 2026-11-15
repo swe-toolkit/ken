@@ -2051,6 +2051,65 @@ pub proof stable_class for sort
           ((proof stable_class for sort) a le total transitive w t))
   }
 
+pub proof comparator_cong for insert
+      (a : Type)
+      (le1 : a → a → Bool)
+      (le2 : a → a → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 x y))
+      (x : a)
+      (xs : List a)
+    : Equal (List a) (insert a le1 x xs) (insert a le2 x xs) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      J
+        (λr _.
+          Equal
+            (List a)
+            (insert a le1 x (Cons a h t))
+            (match le2 x h {
+              True ↦ Cons a x (Cons a h t);
+              False ↦ Cons a h r
+            }))
+        (J
+          (λd _.
+            Equal
+              (List a)
+              (insert a le1 x (Cons a h t))
+              (match d {
+                True ↦ Cons a x (Cons a h t);
+                False ↦ Cons a h (insert a le1 x t)
+              }))
+          Refl
+          (same_le x h))
+        (insert::comparator_cong a le1 le2 same_le x t)
+  }
+
+pub proof comparator_cong for sort
+      (a : Type)
+      (le1 : a → a → Bool)
+      (le2 : a → a → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 x y))
+      (xs : List a)
+    : Equal (List a) (sort a le1 xs) (sort a le2 xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      trans
+        (List a)
+        (insert a le1 h (sort a le1 t))
+        (insert a le2 h (sort a le1 t))
+        (insert a le2 h (sort a le2 t))
+        ((proof comparator_cong for insert) a le1 le2 same_le h (sort a le1 t))
+        (cong
+          (List a)
+          (List a)
+          (sort a le1 t)
+          (sort a le2 t)
+          (insert a le2 h)
+          (sort::comparator_cong a le1 le2 same_le t))
+  }
+
 theorem derived_class_order
       (a : Type)
       (le : a → a → Bool)
@@ -4331,8 +4390,9 @@ reference implementation.
    `nth::some_below_length`, `reverse::involutive`. Generic sorting adds
    the operations `Perm`, `insert`, and `sort`, with attached proofs
    `insert::sorted`, `insert::count`, `insert::member`, `insert::length`,
-   `insert::stable_class`, `sort::sorted`, `sort::perm`, `sort::length`,
-   `sort::member`, and `sort::stable_class`. The public
+   `insert::stable_class`, `insert::comparator_cong`, `sort::sorted`,
+   `sort::perm`, `sort::length`, `sort::member`, `sort::stable_class`,
+   and `sort::comparator_cong`. The public
    `list_sorted_head_bounded` carries its transitivity premise. All other
    definitions in this package are package-local;
    `cat_derived_pub_export.rs` is the authoritative inventory, and

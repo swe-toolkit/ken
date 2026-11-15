@@ -1550,7 +1550,30 @@ unchanged, with attached public `length`, `member`, `sorted` and
 `length_take_min`, which remains private. The `filter` proof
 `empty_if_none`, the public `list_sorted_head_bounded` helper, and
 public insert/sort laws live in `Data.Collections.Derived` where
-their operations live. The stable cost-class proof uses the totality
+their operations live. In particular, that package must export the
+following public attached comparator-congruence proofs. They have
+no cost, Nat or Argmin-specific parameter:
+
+```ken
+pub proof comparator_cong for insert
+      (a : Type)
+      (le1 : a → a → Bool)
+      (le2 : a → a → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 x y))
+      (x : a)
+      (xs : List a)
+    : Equal (List a) (insert a le1 x xs) (insert a le2 x xs)
+
+pub proof comparator_cong for sort
+      (a : Type)
+      (le1 : a → a → Bool)
+      (le2 : a → a → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 x y))
+      (xs : List a)
+    : Equal (List a) (sort a le1 xs) (sort a le2 xs)
+```
+
+The stable cost-class proof uses the totality
 and transitivity already proved for natural `leq_nat`, not new
 premises on callers. The shared `bool_false_of_not_true` lemma
 belongs to `Core.Classes.LawfulClasses`; neither package duplicates
@@ -1568,3 +1591,59 @@ or `find_below` operation or law type change in §§1–3. Greatest-cost
 top-k, arbitrary candidate-order or non-`Nat` cost variants, infinite
 or implicit search, heuristic or approximate results, and runtime
 complexity or memory bounds remain outside §4.
+
+### 4.4 Invariance under a strict-order-preserving cost transform
+
+`Algorithm.Optimization.Argmin` must export one further public checked
+Transparent theorem after `least_k_one_cons` and before `argmax`. Its
+exact name, binder order and type are:
+
+```ken
+pub theorem least_k_cost_order_invariant
+      (a : Type)
+      (cost : a → Nat)
+      (f : Nat → Nat)
+      (same_order : (i : Nat) → (j : Nat) → Equal Bool (lt_nat (f i) (f j)) (lt_nat i j))
+      (k : Nat)
+      (xs : List a)
+    : Equal (List a) (least_k a (comp a Nat Nat f cost) k xs) (least_k a cost k xs)
+```
+
+The transformed cost is on the left. The same `same_order` premise as
+§§1.5, 1.7, 3.5 and 3.7 requires `f` to preserve **and reflect**
+every strict comparison of natural costs; it is neither a premise
+about the candidate type nor a claim that `f` preserves the numeric
+costs themselves. The conclusion is structural equality of the
+selected **lists**, including the input-relative order of tied
+values, for every `a`, `cost`, `k` and finite `xs`. It needs no
+`DecEq a` or additional condition on `f`. The existing `comp`
+composes `f` with `cost`; no new selection operation is introduced.
+
+The two public Derived proofs in §4.3 keep comparator congruence at
+the owners of `insert` and `sort`, not as Argmin-specific copies. The
+checked route derives pointwise equality of `cost_le` from
+`same_order` using the existing Nat order bridge; it then applies
+`sort::comparator_cong` and carries the resulting equality through
+`take`. Bridge proofs local to `least_k` remain private. These are
+proof dependencies, not additional premises or public optimization
+law types; the eight §4.2 law signatures stay unchanged.
+
+The premise cannot be dropped. For a constant transform
+`f c = Zero`, transformed `lt_nat (f i) (f j)` reduces to `False`,
+while `lt_nat i j` remains open on `i` and `j`. Architect's
+X-FLAT-LAW D0 refusal was at this `same_order` premise, not a
+rejection of the conclusion of the stated law. At `i = Zero`,
+`j = Suc Zero`, the original comparison is `True`, so that constant
+transform does not satisfy the premise. On §4.3's four-label input,
+flattening the cost preserves input order and yields `[A, B]` at
+`k = 2`, whereas the original cost yields `[B, A]`. The separate
+CV-owned seed supplies same-form accepting controls and the false
+claim's refusal; this section does not treat D0 as official
+conformance or an assembled-tip test.
+
+Architect's checked scratch patch on `7fa8d4e58` established the
+ruled generic public law and both public attached types without a
+new `Axiom`, with disjoint-root trusted identity sets 114 = 114.
+That is D0 evidence only, not a committed catalog child, a landed
+trust measurement, CI, publication or landing. No existing §§1–4.3
+operation or law type, kernel or surface rule changes here.
