@@ -1,7 +1,7 @@
 ---
 id: CI-Z3-SCOPE-AND-FORMATTER-CORPUS-GATE
 title: "The z3 CI job runs the whole ken-elaborator lib suite with the z3-process feature on, so its 60-minute limit is spent on census, formatter and catalog tests that never reach the Z3 route and already run in the shards. Every elaborator-touching candidate is cancelled on a slow runner. Narrow that step to the tests that can reach the Z3 route, and run the formatter whole-corpus tests only when a formatter input changes"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -68,10 +68,11 @@ test assertion changes.
 
 One candidate on the Verify ring.
 
-1. **Z3 scope.** The z3 job's lib step selects, by a stated rule, every
-   lib test that can reach `attempt_d_with_z3_process`. A nextest filter
-   or a module filter are both acceptable. The adapter integration test
-   stays.
+1. **Z3 scope (amended, Steward `evt_2mgvse01zkt6h`).** The z3 job's lib
+   step runs the whole lib with `z3-process` on, except an explicit list
+   of exact test identities measured not to reach
+   `attempt_d_with_z3_process`. A test added later is selected by
+   default. The adapter integration test stays.
 2. **Formatter corpus gate.** A fail-safe path gate, in the
    `ci-z3-relevant.py` manner, decides whether the two kenfmt
    whole-corpus tests run. It is true for any change to a formatter,
@@ -82,12 +83,14 @@ One candidate on the Verify ring.
 
 ## Acceptance
 
-- **AC-1 (the population is measured).** On base, run the lib suite
-  with the feature on and with a temporary counter at the Z3 route
-  entry. Record the set of tests that reach it. The candidate's
-  selection contains every test in that set. Report the set, the rule,
-  and how a test added later that reaches the route is either caught by
-  the rule or is a stated residual.
+- **AC-1 (each exclusion is measured; amended, Steward
+  `evt_2mgvse01zkt6h`).** The original whole-lib measurement was a
+  population run, which COORDINATION §12 forbids. Instead, with a
+  temporary counter at the Z3 route entry, run one named invocation of
+  every excluded test plus a positive control that reaches the route.
+  Each excluded test shows 0 arrivals, the control more than 0, and the
+  passed count equals the names given. A test showing arrivals stays in
+  the z3 step.
 - **AC-2 (the gate fails safe).** Script tests show:
   - a formatter-input path gives true;
   - a catalog-only change gives false;

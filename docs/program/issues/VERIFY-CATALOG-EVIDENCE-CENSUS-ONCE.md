@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CATALOG-EVIDENCE-CENSUS-ONCE
 title: "The ken-elaborator lib's whole-catalog evidence census is built twice, and each build elaborates every catalog unit three times in series. It is the last work in the z3 job's whole-lib step, which has a 60-minute limit. On a slow runner the step is cancelled with one test outstanding, and that cancel holds every elaborator-touching candidate. Build the census once and drop the duplicate elaboration, with the census and every assertion unchanged"
-status: active
+status: closed
 owner: kernel
 size: S
 tier: T2
@@ -13,6 +13,10 @@ origin: "Measured CI cancels on PX10-PIDFD-CHILD-SIGNAL I1 (run 43736787210) and
 ---
 
 # Build the catalog evidence census once
+
+**Closed without a candidate (Steward).** CI-Z3-SCOPE-AND-FORMATTER-CORPUS-GATE
+(`759a4cb8c`) removes both census tests from the z3 job's lib step, which was
+the limit this WP protected. They still run once in the shards.
 
 ## Objective
 
