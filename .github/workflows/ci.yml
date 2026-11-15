@@ -574,8 +574,9 @@ jobs:
   # test is `!= 'false'`, so a missing or garbled output still runs it. The
   # The `--lib` step enables z3 on every lib test except the four exact
   # no-route corpus/census rows measured in CI-Z3-SCOPE-AND-FORMATTER-CORPUS-GATE.
-  # New tests are selected by default. If an excluded test changes to reach
-  # Route-D, remeasure it before retaining the exclusion.
+  # Nextest's exact identity filter and a full-vs-selected inventory comparison
+  # enforce the boundary: newly added tests are selected by default. If an
+  # excluded test changes to reach Route-D, remeasure before retaining it.
   z3-process-adapter:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full' && needs.classify-paths.outputs.z3_relevant != 'false'
@@ -598,14 +599,22 @@ jobs:
         run: >-
           cargo test --locked -p ken-elaborator --features z3-process
           --test v3_z3_process_adapter
-      - name: Test binary-independent SMT-LIB emission
-        run: >-
-          cargo test --locked -p ken-elaborator --features z3-process --lib --
-          --exact
-          --skip r_layer_tests::lang_mod_catalog_evidence_frontier::catalog_evidence_frontier_is_closed_and_honest
-          --skip r_layer_tests::lang_mod_catalog_evidence_frontier::population_pin_rejects_omission_replacement_and_duplicate
-          --skip r_layer_tests::kenfmt_b3_layout::ac7_whole_catalog_is_parse_preserved_idempotent_and_width_bounded
-          --skip r_layer_tests::kenfmt_b4_splicing::ac6_whole_literate_corpus_preserves_prose_ast_and_idempotence_read_only
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
+        with:
+          tool: nextest
+      - name: Check exact Z3 lib selection and run feature-on tests
+        run: |
+          python3 scripts/test-ci-z3-lib-scope.py
+          python3 scripts/test-ci-z3-lib-filter.py
+          filter=$(python3 scripts/ci-z3-lib-scope.py filter)
+          cargo nextest list --locked -p ken-elaborator --features z3-process --lib \
+            --message-format json > z3-lib-full.json
+          cargo nextest list --locked -p ken-elaborator --features z3-process --lib \
+            --message-format json -E "$filter" > z3-lib-selected.json
+          python3 scripts/ci-z3-lib-scope.py check z3-lib-full.json z3-lib-selected.json
+          cargo nextest run --locked -p ken-elaborator --features z3-process --lib \
+            -E "$filter"
       - name: Report peak disk and memory
         if: always() && steps.resource_monitor_start.outcome == 'success'
         run: python3 scripts/ci-resource-monitor.py finish
