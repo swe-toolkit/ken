@@ -43,6 +43,7 @@ jobs:
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
       z3_relevant: ${{ steps.classify.outputs.z3_relevant }}
+      formatter_corpus_relevant: ${{ steps.classify.outputs.formatter_corpus_relevant }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,6 +56,7 @@ jobs:
           if ! git diff --name-only --no-renames "$base" HEAD | python3 -c 'import json,sys; print(json.dumps([x.rstrip("\\n") for x in sys.stdin if x.rstrip("\\n")]))' > paths.json; then
             echo 'mode=full' >> "$GITHUB_OUTPUT"
             echo 'z3_relevant=true' >> "$GITHUB_OUTPUT"
+            echo 'formatter_corpus_relevant=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           z3_relevant=true
@@ -64,11 +66,20 @@ jobs:
             z3_relevant=false
           fi
           echo "z3_relevant=$z3_relevant" >> "$GITHUB_OUTPUT"
+          formatter_corpus_relevant=true
+          if [ -s cargo-metadata.json ] \
+            && formatter_verdict=$(python3 scripts/ci-formatter-corpus-relevant.py paths.json cargo-metadata.json) \
+            && [ "$formatter_verdict" = false ]; then
+            formatter_corpus_relevant=false
+          fi
+          echo "formatter_corpus_relevant=$formatter_corpus_relevant" >> "$GITHUB_OUTPUT"
           mode=full
           if classified=$(python3 scripts/ci-doc-only.py paths.json) && [ "$classified" = doc-only ]; then
             mode=doc-only
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      - name: Check formatter corpus path gate
+        run: python3 scripts/test-ci-formatter-corpus-relevant.py
       # Required, not best effort: the publisher will not merge on a run that
       # has no record of its tested base, so a recording failure fails the run.
       - name: Record tested merge tree
@@ -255,7 +266,14 @@ jobs:
           cargo nextest list --workspace --locked --message-format json > unfiltered-inventory.json
           phase_timestamp nextest-list end
           phase_timestamp project-filtered start
-          python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
+          # A missing/invalid gate value runs both tests; only an explicit
+          # false omits the two exact identities in ci_formatter_corpus.py.
+          formatter_gate='${{ needs.classify-paths.outputs.formatter_corpus_relevant }}'
+          if [ "$formatter_gate" = false ]; then
+            python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json --skip-formatter-corpus
+          else
+            python3 scripts/ci-duration-shard.py project-filtered unfiltered-inventory.json inventory.json
+          fi
           phase_timestamp project-filtered end
           phase_timestamp planner start
           # These 35 files are the five per-test timing sources. The newest
@@ -554,8 +572,10 @@ jobs:
   # Runs in `full` mode unless classify-paths reported `z3_relevant=false`:
   # no changed path is an input of this job (scripts/ci-z3-relevant.py). The
   # test is `!= 'false'`, so a missing or garbled output still runs it. The
-  # `--lib` step is the only feature-on run of the whole elaborator lib suite
-  # (prover.rs routes Route-D fallthrough to z3); keep it whole.
+  # The `--lib` step enables z3 on every lib test except the four exact
+  # no-route corpus/census rows measured in CI-Z3-SCOPE-AND-FORMATTER-CORPUS-GATE.
+  # New tests are selected by default. If an excluded test changes to reach
+  # Route-D, remeasure it before retaining the exclusion.
   z3-process-adapter:
     needs: classify-paths
     if: needs.classify-paths.outputs.mode == 'full' && needs.classify-paths.outputs.z3_relevant != 'false'
@@ -563,7 +583,8 @@ jobs:
     runs-on: ubuntu-latest
     # A hung z3 process otherwise holds the run open until GitHub's six-hour
     # default (measured: 74 minutes with this job the only pending check, run
-    # 40615495110, then cancelled). A whole green run takes 30 to 48 minutes.
+    # 40615495110, then cancelled). Before the named exclusions, a whole
+    # green run took 30 to 48 minutes; the narrowed wall awaits CI measurement.
     timeout-minutes: 60
     container: ghcr.io/swe-toolkit/ken/ci-z3@sha256:4043afa445489c19fa9b6628258134225953354e2bf1766d996558cdf73e38da
     steps:
@@ -579,7 +600,12 @@ jobs:
           --test v3_z3_process_adapter
       - name: Test binary-independent SMT-LIB emission
         run: >-
-          cargo test --locked -p ken-elaborator --features z3-process --lib
+          cargo test --locked -p ken-elaborator --features z3-process --lib --
+          --exact
+          --skip r_layer_tests::lang_mod_catalog_evidence_frontier::catalog_evidence_frontier_is_closed_and_honest
+          --skip r_layer_tests::lang_mod_catalog_evidence_frontier::population_pin_rejects_omission_replacement_and_duplicate
+          --skip r_layer_tests::kenfmt_b3_layout::ac7_whole_catalog_is_parse_preserved_idempotent_and_width_bounded
+          --skip r_layer_tests::kenfmt_b4_splicing::ac6_whole_literate_corpus_preserves_prose_ast_and_idempotence_read_only
       - name: Report peak disk and memory
         if: always() && steps.resource_monitor_start.outcome == 'success'
         run: python3 scripts/ci-resource-monitor.py finish
@@ -836,8 +862,12 @@ jobs:
         id: resource_monitor_start
         run: python3 scripts/ci-resource-monitor.py start
       - name: Verify realized partition
+        env:
+          CI_FORMATTER_CORPUS_RELEVANT: ${{ needs.classify-paths.outputs.formatter_corpus_relevant }}
         run: |
           test -d realized-rt-parity
+          python3 scripts/test-ci-duration-shard.py
+          python3 scripts/test-check-ci-shard-union.py
           python3 scripts/check-ci-shard-union.py
       - name: Report peak disk and memory
         if: always() && steps.resource_monitor_start.outcome == 'success'

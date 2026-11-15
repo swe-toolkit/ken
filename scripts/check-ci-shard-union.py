@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 
 import ci_workspace_timings
+from ci_formatter_corpus import FORMATTER_CORPUS_TESTS
 
 
 SHARD_COUNT = 7
@@ -238,7 +239,15 @@ def main() -> int:
             for rows in unfiltered[1:]
         ):
             raise ShardCheckError("unfiltered inventories differ")
-        population = authority_live - authority_excluded
+        formatter_relevant = os.environ.get("CI_FORMATTER_CORPUS_RELEVANT", "true")
+        if formatter_relevant not in {"true", "false"}:
+            raise ShardCheckError("formatter corpus gate must be true or false")
+        skips = set()
+        if formatter_relevant == "false":
+            if not FORMATTER_CORPUS_TESTS <= authority_live:
+                raise ShardCheckError("formatter corpus exclusion absent from authority inventory")
+            skips = FORMATTER_CORPUS_TESTS
+        population = authority_live - authority_excluded - skips
         for discovered, selected, _, _ in inventories:
             if discovered != authority_discovered:
                 raise ShardCheckError("filtered and unfiltered discovered inventories differ")

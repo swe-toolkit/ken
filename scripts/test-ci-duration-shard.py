@@ -35,6 +35,34 @@ def timing_artifact(records, shard=1, run_id=1):
 
 
 class DurationShardControls(unittest.TestCase):
+    def test_formatter_projection_excludes_only_two_exact_rows_when_gated(self):
+        corpus = _planner.FORMATTER_CORPUS_TESTS
+        sibling = ("ken-elaborator", next(iter(corpus))[1] + "_future")
+        rows = list(corpus) + [sibling, ("fixture::other", "ordinary")]
+        suites = {
+            str(index): {
+                "binary-id": binary,
+                "binary-name": "ken_elaborator" if binary == "ken-elaborator" else "other",
+                "testcases": {name: {"filter-match": {"status": "matches"}}},
+            }
+            for index, (binary, name) in enumerate(rows)
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            authority = root / "authority.json"
+            filtered = root / "filtered.json"
+            authority.write_text(json.dumps({"test-count": len(rows), "rust-suites": suites}))
+            for skip in (False, True):
+                _planner.filtered_projection(authority, filtered, skip)
+                self.assertEqual(set(_planner.tests(json.loads(filtered.read_text()))),
+                                 set(rows) - (corpus if skip else set()))
+            # If either named row disappears, fail instead of silently accepting
+            # an empty or stale skip population.
+            suites.pop("0")
+            authority.write_text(json.dumps({"test-count": len(rows) - 1, "rust-suites": suites}))
+            with self.assertRaisesRegex(SystemExit, "formatter corpus exclusion missing"):
+                _planner.filtered_projection(authority, filtered, True)
+
     def test_live_native_binary_cannot_enter_a_shard(self):
         rows = [("fixture::ordinary", "ordinary", "ordinary_test", "matches")]
         rows.extend(
