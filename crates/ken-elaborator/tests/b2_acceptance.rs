@@ -25,6 +25,9 @@
 //!
 //! Built from `/spec` (`72`) + `/conformance` (`seed-temporal.md`) only.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::{
@@ -50,6 +53,9 @@ fn emit_export(
     assert!(legacy_alphabet.effects().next().is_none());
     let source = format!(
         r#"
+import Capability.Process.Exit (host_clock, host_bind, host_console)
+import Capability.Console.Text (flush)
+import Capability.Time.WallClock (wall_now)
 proc after_flush (_outcome : Result IOError Unit)
   : HostIO AFull Instant visits [Clock] =
   host_clock AFull Instant wall_now
@@ -63,7 +69,7 @@ proc {target_name} (_value : Unit)
     );
     let denotation = compile_checked_target_denotation(
         &format!("b2_acceptance_{target_name}"),
-        CompilerSource::new("fixture.ken", source),
+        CompilerSource::new("fixture.ken", source).with_roots(catalog_roots::roots()),
         target_name,
     )
     .expect("checked B2 signature producer");
@@ -847,11 +853,14 @@ fn temporal_symbols_consume_the_one_checked_b1_alphabet() {
         CompilerSource::new(
             "consumer.ken",
             r#"
+import Capability.Process.Exit (host_console)
+import Capability.Console.Text (flush)
 proc target (_value : Unit)
   : HostIO AFull (Result IOError Unit) visits [Console] =
   host_console AFull (Result IOError Unit) (flush ConsoleStream.Stdout)
 "#,
-        ),
+        )
+        .with_roots(catalog_roots::roots()),
         "target",
     )
     .expect("checked B1 producer");

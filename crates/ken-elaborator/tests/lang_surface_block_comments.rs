@@ -275,8 +275,10 @@ fn acd0_bool_literals_and_trueish_preserved() {
     // because it was intercepted as a keyword).
     let mut env = ElabEnv::new().expect("prelude");
     match env.elaborate_decl("const t : Bool = trueish") {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "trueish"),
-        other => panic!("expected UnresolvedCon(\"trueish\"), got {other:?}"),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "trueish")
+        }
+        other => panic!("expected name-resolution refusal for trueish, got {other:?}"),
     }
 }
 

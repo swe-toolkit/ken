@@ -1,5 +1,8 @@
 //! `SURF-SPACE-CELLS-P1` — behavioral pins for `36 §4` cell surface.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{
     effects::RowType, parser::parse_decls, Decl as SurfaceDecl, ElabEnv, ElabError, NumericLitVal,
 };
@@ -551,11 +554,22 @@ const LABEL_ALIAS_MAIN: &str = "proc main (_input : ProcessInput) (_caps : Progr
 ";
 
 fn label_program(body: &str) -> String {
-    format!("program capabilities FS APartial\n{body}{LABEL_ALIAS_MAIN}")
+    format!(
+        "program capabilities FS APartial\n\
+         import Capability.Process.Exit (host_program)\n\
+         import Capability.Console.Text (print_line)\n{body}{LABEL_ALIAS_MAIN}"
+    )
+}
+
+fn label_env() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("prelude");
+    catalog_roots::load(&mut env, "Capability.Process.Exit");
+    catalog_roots::load(&mut env, "Capability.Console.Text");
+    env
 }
 
 fn assert_space_label_refused(source: &str, label: &str) {
-    let mut env = ElabEnv::new().expect("prelude");
+    let mut env = label_env();
     match env.elaborate_file(source) {
         Err(ElabError::SpaceNameIsEffectLabel { name, span }) => {
             assert_eq!(name, label);
@@ -634,8 +648,7 @@ fn other_space_controls_and_ambient_console_keep_their_results() {
 proc user_console (n : Int) : Int visits [Console] = let m : Int = Other.call in m
 ",
     );
-    let error = ElabEnv::new()
-        .expect("prelude")
+    let error = label_env()
         .elaborate_file(&control)
         .expect_err("an Other charge escapes a Console row");
     assert!(
@@ -651,8 +664,7 @@ proc user_console (n : Int) : Int visits [Console] = let m : Int = Other.call in
 }
 ",
     );
-    let error = ElabEnv::new()
-        .expect("prelude")
+    let error = label_env()
         .elaborate_file(&performs_ambient)
         .expect_err("ambient Console escapes an Other row");
     assert!(
@@ -661,8 +673,7 @@ proc user_console (n : Int) : Int visits [Console] = let m : Int = Other.call in
             .contains("EffectEscapes in 'Other.call': Console"),
         "{error}"
     );
-    ElabEnv::new()
-        .expect("prelude")
+    label_env()
         .elaborate_file(&label_program(
             "proc greet (n : Int) : Unit visits [Console] = print_line \"x\"\n",
         ))

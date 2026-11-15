@@ -51,7 +51,11 @@ fn seed_programs() -> Vec<&'static str> {
 #[test]
 fn generic_laws_check_without_added_trust() {
     let mut env = ElabEnv::new().expect("compiler base");
-    for provider in ["Core.Logic.Transport", "Data.Numeric.Nat.Order"] {
+    for provider in [
+        "Core.Logic.Conjunction",
+        "Core.Logic.Transport",
+        "Data.Numeric.Nat.Order",
+    ] {
         env.elaborate_module_from_roots(&[root()], provider)
             .unwrap_or_else(|error| panic!("{provider} roots-loads: {error:?}"));
     }
@@ -106,6 +110,7 @@ fn generic_laws_check_without_added_trust() {
 }
 
 const GENERIC_CLIENT: &str = r#"
+import Core.Logic.Conjunction (And)
 import Algorithm.Optimization.BoundedSearch
   (find_below, find_below_sound, find_below_least, find_below_complete,
    find_below_stable, find_below_refuted, find_below_least_hit)

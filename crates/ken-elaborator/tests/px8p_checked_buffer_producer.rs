@@ -1,11 +1,18 @@
 //! PX8-P checked `withBuffer` producer and exact perform inventory.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use std::collections::BTreeSet;
 
 use ken_elaborator::compiler_driver::{compile_checked_target_denotation, CompilerSource};
 use ken_elaborator::{emit_checked_target_export, ElabEnv};
 
 const BUFFER_ONLY_PRODUCER: &str = r#"
+import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, withBuffer)
+import Capability.Process.Exit (host_pure)
 fn px8p_buffer_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)
@@ -20,8 +27,13 @@ proc px8p_buffer_only (capacity : Int)
 #[test]
 fn with_buffer_has_the_ruled_surface_and_keeps_raw_allocation_private() {
     let mut env = ElabEnv::empty().expect("PX8-P prelude bootstrap");
+    for provider in ["Capability.System.Buffer", "Capability.System.Resource"] {
+        catalog_roots::load(&mut env, provider);
+    }
     env.elaborate_file(
         r#"
+import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource (ResourceBodyResult, ResourceBracketResult, withBuffer)
 proc exact_with_buffer_surface
   (a : Auth) (e r : Type) (capacity : Int)
   (body : BufferHandle -> HostIO a (ResourceBodyResult e r))
@@ -70,7 +82,8 @@ proc exact_with_buffer_surface
 fn real_checked_buffer_bracket_emits_exact_allocate_and_release_sigma() {
     let denotation = compile_checked_target_denotation(
         "px8p_checked_buffer_producer",
-        CompilerSource::new("producer.ken", BUFFER_ONLY_PRODUCER),
+        CompilerSource::new("producer.ken", BUFFER_ONLY_PRODUCER)
+            .with_roots(catalog_roots::roots()),
         "px8p_buffer_only",
     )
     .expect("real checked withBuffer denotation");

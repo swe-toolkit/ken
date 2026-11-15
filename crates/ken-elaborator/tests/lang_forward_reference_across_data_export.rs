@@ -245,6 +245,10 @@ fn existing_cycle_and_missing_name_fences_remain() {
     let unbound = env
         .elaborate_file("module M { fn a (x : Int) : Int = b x data D = MkD }")
         .expect_err("an absent sibling must not resolve");
-    assert!(matches!(unbound, ElabError::UnresolvedCon { name, .. } if name == "b"));
+    assert!(matches!(
+        unbound,
+        ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }
+            if name == "b"
+    ));
     checked("module M { fn a (x : Int) : Int = b x fn b (x : Int) : Int = x }");
 }

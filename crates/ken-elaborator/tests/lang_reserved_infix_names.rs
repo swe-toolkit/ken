@@ -364,7 +364,8 @@ fn unbound_reserved_names_reach_resolution_without_implicit_meaning() {
             ))
             .expect_err("A0 supplies no default binding");
         match error {
-            ElabError::UnresolvedCon { name, .. } if name == canonical => {}
+            ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }
+                if name == canonical => {}
             other => panic!("unbound {canonical:?} must reach resolution, got {other:?}"),
         }
     }

@@ -16,6 +16,9 @@
 //! never a hand-fed expected value
 //! ([[conformance-hand-feeds-the-deliverable]]).
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal, ObligationKind};
 use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::{convert, convert_type, infer, whnf, Context, Decl, Term};
@@ -24,7 +27,16 @@ use ken_kernel::{convert, convert_type, infer, whnf, Context, Decl, Term};
 /// literal side-table from the elaborator's own `num_values` (never a
 /// hand-built literal value).
 fn eval_view(src: &str) -> EvalVal {
+    eval_view_with_import(src, None)
+}
+
+fn eval_view_with_import(src: &str, imported: Option<&str>) -> EvalVal {
     let mut env = ElabEnv::new().expect("prelude init");
+    if let Some(name) = imported {
+        catalog_roots::load(&mut env, "Core.Classes.LawfulClasses");
+        env.elaborate_file(&format!("import Core.Classes.LawfulClasses ({name})"))
+            .expect("select the checked Char operation");
+    }
     let r = env.elaborate_decl_v1(src).expect("elaborates");
     let mut store = EvalStore::new();
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
@@ -235,6 +247,9 @@ fn expected_char_integer_literals_report_scalar_boundary() {
 #[test]
 fn int_expression_at_char_result_reports_scalar_obligation() {
     let mut env = ElabEnv::new().expect("prelude init");
+    catalog_roots::load(&mut env, "Core.Classes.LawfulClasses");
+    env.elaborate_file("import Core.Classes.LawfulClasses (intToChar)")
+        .expect("select the checked scalar conversion");
     let raw = env
         .elaborate_decl_v1("fn toC (n : Int) : Char = n")
         .expect("free Int introduction is checked with a visible obligation");
@@ -300,9 +315,9 @@ fn char_eq_and_ord_on_projection() {
     assert_eq!(eval_view("const t = eqChar 65 66"), EvalVal::Bool(false));
     // The order PAIR (accept a<=b while reject b<=a) — a single accept is
     // green-vs-green under an orientation flip.
-    assert_eq!(eval_view("const t = leqChar 65 66"), EvalVal::Bool(true));
-    assert_eq!(eval_view("const t = leqChar 66 65"), EvalVal::Bool(false));
-    assert_eq!(eval_view("const t = charToInt 65"), EvalVal::Int(65));
+    assert_eq!(eval_view_with_import("const t = leqChar 65 66", Some("leqChar")), EvalVal::Bool(true));
+    assert_eq!(eval_view_with_import("const t = leqChar 66 65", Some("leqChar")), EvalVal::Bool(false));
+    assert_eq!(eval_view_with_import("const t = charToInt 65", Some("charToInt")), EvalVal::Int(65));
 }
 
 // AC-C3 — surrogate/OOR reject, flips vs inRangeBool := True (soundness)
@@ -329,7 +344,7 @@ fn int_to_char_unicode_scalar_boundaries() {
         (0x41_u32, true),
     ];
     for (codepoint, accepted) in cases {
-        let result = eval_view(&format!("const t = intToChar {codepoint}"));
+        let result = eval_view_with_import(&format!("const t = intToChar {codepoint}"), Some("intToChar"));
         let is_some = match result {
             EvalVal::Ctor { args, .. } if args.len() == 2 => true,
             EvalVal::Ctor { args, .. } if args.len() == 1 => false,

@@ -53,6 +53,7 @@ fn load_arguments_module(env: &mut ElabEnv) -> Vec<GlobalId> {
 struct ProcessFixture {
     inner: ElabEnv,
     arguments_owned: Vec<GlobalId>,
+    exit_owned: Vec<GlobalId>,
     arg_location_constructor: GlobalId,
 }
 
@@ -80,13 +81,26 @@ impl ProcessFixture {
         )
         .unwrap_or_else(|error| panic!("Arguments owner {name}: {error}"))
     }
+
+    fn checked_exit_id(&self, name: &str) -> GlobalId {
+        catalog_or::provider_owned_id(
+            &self.inner,
+            &self.exit_owned,
+            "Capability.Process.Exit",
+            name,
+        )
+        .unwrap_or_else(|error| panic!("Exit owner {name}: {error}"))
+    }
 }
 
 fn full_env() -> ProcessFixture {
     let mut env = dependency_env();
     let arguments_owned = load_arguments_module(&mut env);
-    env.elaborate_ken_md_file(EXIT_KEN_MD)
-        .expect("Capability.Process.Exit must elaborate after Capability.Process.Arguments");
+    let exit_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Capability.Process.Exit")
+        .expect("Capability.Process.Exit must roots-load after Capability.Process.Arguments");
+    env.execute_loaded_entry_checked_fences("Capability.Process.Exit")
+        .expect("Capability.Process.Exit checked fences keep their contract");
     let cursor_owned = env
         .elaborate_module_from_roots(&[catalog_root()], "Capability.Parsing.Cursor")
         .expect("Cursor must retain its real checked owner");
@@ -109,6 +123,7 @@ fn full_env() -> ProcessFixture {
     ProcessFixture {
         inner: env,
         arguments_owned,
+        exit_owned,
         arg_location_constructor,
     }
 }
@@ -116,7 +131,7 @@ fn full_env() -> ProcessFixture {
 fn assert_transparent_globals(env: &ProcessFixture, names: &[&str]) {
     for name in names {
         let id = if name.starts_with("exit_") {
-            env.globals[*name] // Exit is compiled as this fixture's own checked unit.
+            env.checked_exit_id(name) // Exit is roots-loaded as its own file unit.
         } else {
             env.checked_arguments_id(name)
         };
@@ -440,6 +455,7 @@ fn exit_policy_is_total_explicit_and_keeps_uint8_payloads() {
     let mut env = full_env();
     env.elaborate_file(
         r#"
+        import Capability.Process.Exit (exit_success, exit_failure, exit_with, exit_from_result)
         data CC6Outcome = CC6Okay | CC6Usage | CC6Failed
 
         fn cc6_policy (outcome : CC6Outcome) : ExitCode =
@@ -530,8 +546,10 @@ fn cc6a_has_zero_trust_delta_and_no_new_carrier_or_string_hop() {
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     load_arguments_module(&mut env);
-    env.elaborate_ken_md_file(EXIT_KEN_MD)
-        .expect("Capability.Process.Exit must elaborate in the shared environment");
+    env.elaborate_module_from_roots(&[catalog_root()], "Capability.Process.Exit")
+        .expect("Capability.Process.Exit must roots-load in the shared environment");
+    env.execute_loaded_entry_checked_fences("Capability.Process.Exit")
+        .expect("Capability.Process.Exit checked fences keep their contract");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC6a must add zero trusted-base entries");
 }

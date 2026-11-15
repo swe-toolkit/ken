@@ -250,8 +250,13 @@ fn ac3_raw_narrowing_is_private_and_ac5_refl_stays_rejected() {
             "fn px3_bad_raw (n : Int) : {name} = int_to_{snake}_raw n"
         ));
         assert!(
-            matches!(raw, Err(ElabError::UnresolvedCon { .. })),
-            "unchecked {name} narrowing must be unavailable, got {raw:?}"
+            matches!(
+                raw,
+                Err(ElabError::UnresolvedCon { ref name, .. }
+                    | ElabError::UnboundName { ref name, .. })
+                    if name == &format!("int_to_{snake}_raw")
+            ),
+            "unchecked {name} narrowing must be unavailable at its exact name, got {raw:?}"
         );
 
         let retract_id = env.globals[&format!("{snake}_int_retract")];

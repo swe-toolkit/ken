@@ -6739,7 +6739,11 @@ proc main
         let package_name = "caller_reporting_open_package";
         let output = compile_ken_source(
             package_name,
-            CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE),
+            native_fixture_source(
+                "src/main.ken",
+                CALLER_OPEN_SOURCE,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            ),
             selector(package_name, main_symbol(package_name)),
         )
         .expect("package driver compiles an open obligation");
@@ -6755,7 +6759,11 @@ proc main
         let package_name = "caller_reporting_open_denotation";
         let denotation = compile_checked_target_denotation(
             package_name,
-            CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE),
+            native_fixture_source(
+                "src/main.ken",
+                CALLER_OPEN_SOURCE,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            ),
             "main",
         )
         .expect("denotation driver keeps flagged success");
@@ -6773,7 +6781,11 @@ proc main
         let package_name = "caller_reporting_refinement_introduction";
         let output = compile_ken_source(
             package_name,
-            CompilerSource::new("src/main.ken", CALLER_REFINEMENT_SOURCE),
+            native_fixture_source(
+                "src/main.ken",
+                CALLER_REFINEMENT_SOURCE,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            ),
             selector(package_name, main_symbol(package_name)),
         )
         .expect("package driver compiles an open refinement introduction");
@@ -6821,7 +6833,11 @@ proc main
     fn package_control_core_semantic_hash(package_name: &str, source: &str) -> u64 {
         let output = compile_ken_source(
             package_name,
-            CompilerSource::new("src/main.ken", source),
+            native_fixture_source(
+                "src/main.ken",
+                source,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            ),
             selector(package_name, main_symbol(package_name)),
         )
         .expect("control package compiles");
@@ -6849,7 +6865,11 @@ proc main
     fn denotation_control_core_semantic_hash(package_name: &str, source: &str) -> u64 {
         let denotation = compile_checked_target_denotation(
             package_name,
-            CompilerSource::new("src/main.ken", source),
+            native_fixture_source(
+                "src/main.ken",
+                source,
+                "import Capability.Console.Text (print_line)\nimport Capability.Process.Exit (host_program)\n",
+            ),
             "main",
         )
         .expect("control denotation compiles");

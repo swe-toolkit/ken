@@ -14,9 +14,21 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::{Decl, GlobalId};
+use ken_kernel::{Context, Decl, GlobalId, KernelError, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
+
+fn equal_claim(env: &ElabEnv, carrier: Term, lhs: Term, rhs: Term) -> ken_kernel::KernelResult<()> {
+    let claim = Term::app(
+        Term::app(
+            Term::app(Term::const_(env.globals["Equal"], vec![]), carrier),
+            lhs,
+        ),
+        rhs,
+    );
+    let proved = Term::const_(env.env.tt_id(), vec![]);
+    ken_kernel::check(&env.env, &Context::new(), &proved, &claim)
+}
 const COLLECTIONS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/Derived.ken.md");
 
@@ -236,33 +248,29 @@ fn ac8_off_by_one_range_length_rejected() {
 }
 
 // AC8 discriminator 3: the owner-local zip has length two on 3-vs-2
-// inputs. The wrong left-only length (three) must fail at the kernel,
-// not at private-name resolution. A non-truncating zip would make the
+// inputs. A claim of Proved at Equal over the checked example ids must fail
+// at the kernel for the wrong left-only length (three). A non-truncating zip would make the
 // negative theorem true and turn this test red.
 #[test]
 fn ac8_zip_length_is_min_not_left_length() {
-    let (mut env, checked) =
+    let (env, checked) =
         ds4_owner_examples(&[("derived_example_zip3v2_length_value", &["length", "zip"])]);
     assert_eq!(
         checked_nat(&env, checked["derived_example_zip3v2_length_value"]),
         2
     );
-    let rejected = env
-        .elaborate_decl(
-            "theorem bad_zip_length_is_left_length : Equal Nat \
-             derived_example_zip3v2_length_value (Suc (Suc (Suc Zero))) = Proved",
-        )
-        .expect_err("zip must truncate at the shorter list");
+    let nat_ty = Term::indformer(env.globals["Nat"], vec![]);
+    let example = Term::const_(checked["derived_example_zip3v2_length_value"], vec![]);
+    let suc = |n| Term::app(Term::constructor(env.globals["Suc"], vec![]), n);
+    let zero = Term::constructor(env.globals["Zero"], vec![]);
+    let two = suc(suc(zero));
+    let refusal = equal_claim(&env, nat_ty.clone(), example.clone(), suc(two.clone()));
     assert!(
-        matches!(
-            rejected,
-            ken_elaborator::ElabError::KernelRejected {
-                error: ken_kernel::KernelError::TypeMismatch { .. },
-                ..
-            }
-        ),
-        "wrong zip length must reach kernel equality refusal, got {rejected:?}"
+        matches!(refusal, Err(KernelError::TypeMismatch { .. })),
+        "wrong zip length must reach kernel equality refusal, got {refusal:?}"
     );
+    equal_claim(&env, nat_ty, example, two)
+        .expect("the same claim builder must accept the checked zip length of two");
 }
 
 // Functional sanity: `zip` genuinely truncates at the shorter list (a

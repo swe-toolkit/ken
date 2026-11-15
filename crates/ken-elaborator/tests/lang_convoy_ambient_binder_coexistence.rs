@@ -1,6 +1,9 @@
 //! Ambient hypotheses and index/embedded convoys share one motive telescope.
 //! Promise class: durable invariant. Spec 34 §3.2.1, §3.5 and 39 §2.1.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabError};
 
 // A measured 1,982,464-byte prelude peak has more than fourfold headroom.
@@ -35,8 +38,18 @@ fn env(dual: bool) -> ElabEnv {
     env
 }
 
-fn check_true(dual: bool, source: &str) {
+fn env_for_source(dual: bool, source: &str) -> ElabEnv {
     let mut env = env(dual);
+    if source == A1 || source == A1F {
+        catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+        env.elaborate_file("import Core.Logic.Conjunction (And, and_intro)")
+            .expect("select the checked propositional conjunction and introduction");
+    }
+    env
+}
+
+fn check_true(dual: bool, source: &str) {
+    let mut env = env_for_source(dual, source);
     let trust = env.env.trusted_base();
     env.elaborate_decl(source)
         .unwrap_or_else(|error| panic!("true proof must check: {source}: {error:?}"));
@@ -44,7 +57,7 @@ fn check_true(dual: bool, source: &str) {
 }
 
 fn check_typed_refusal(source: &str) {
-    let mut env = env(true);
+    let mut env = env_for_source(true, source);
     let trust = env.env.trusted_base();
     let error = env
         .elaborate_decl(source)

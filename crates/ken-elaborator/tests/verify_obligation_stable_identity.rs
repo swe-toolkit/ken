@@ -1,6 +1,9 @@
 //! Stable obligation and hole identity at the checked-core package boundary.
 //! Source-order controls vary only the allocation history, never the two files.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
     CompilerManifest, CompilerSource, CompilerTargetKind, TargetSelector,
@@ -10,6 +13,8 @@ use ken_elaborator::{ElabEnv, v2_extract};
 
 const PKG: &str = "verify_stable_identity_ac0";
 const TARGET: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_program)
+import Capability.Console.Text (print_line)
 const ac0_need : String requires Equal Int 0 0 = "ac0-run"
 const ac0_use : String = ac0_need
 proc main
@@ -23,11 +28,11 @@ const HOLE: &str = "ac0_use#0";
 const OBLIGATION: &str = "ac0_use.requires.0";
 
 fn target() -> CompilerSource {
-    CompilerSource::new("src/main.ken", TARGET)
+    CompilerSource::new("src/main.ken", TARGET).with_roots(catalog_roots::roots())
 }
 
 fn extra() -> CompilerSource {
-    CompilerSource::new("src/extra.ken", UNRELATED)
+    CompilerSource::new("src/extra.ken", UNRELATED).with_roots(catalog_roots::roots())
 }
 
 fn decl(name: &str) -> StableSymbol {

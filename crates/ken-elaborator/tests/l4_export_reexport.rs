@@ -624,7 +624,9 @@ fn abstract_reexport_preserves_hidden_constructor_boundary() {
          import P (Token) \
          fn open (x : Token) : Nat = match x { MkToken ↦ Zero }",
     ) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "MkToken"),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "MkToken")
+        }
         other => panic!("re-export must not widen hidden constructors, got {other:?}"),
     }
 }

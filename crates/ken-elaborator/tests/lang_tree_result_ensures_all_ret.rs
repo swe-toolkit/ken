@@ -11,12 +11,18 @@
 //! CLAIMED: no payload is refined. THE GAP: discharge by the prover routes is
 //! not measured here; `ken check` reports these as open obligations.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
 use ken_kernel::subst::weaken;
 use ken_kernel::{check, normalize, whnf, Context, GlobalId, Term};
 
 fn elaborate(source: &str) -> (ElabEnv, Vec<ElabResult>) {
     let mut env = ElabEnv::new().expect("prelude");
+    if source.starts_with("import Capability.Console.Text (IO, print_line)") {
+        catalog_roots::load(&mut env, "Capability.Console.Text");
+    }
     let results = env
         .elaborate_file_v1(source)
         .expect("tree-result ensures fixture");
@@ -83,7 +89,8 @@ fn changed(post: i64) -> String {
 
 fn declared(post: &str) -> String {
     format!(
-        "proc tick : IO Bool ensures Equal Bool result {post} visits [Console] =\n  \
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc tick : IO Bool ensures Equal Bool result {post} visits [Console] =\n  \
          let w = print_line \"tick\" in ITree.Ret ConsoleOp console_resp Bool False\n"
     )
 }

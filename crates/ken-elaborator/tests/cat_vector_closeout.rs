@@ -12,10 +12,22 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{Decl, GlobalId, Level, Term};
+use ken_kernel::{Context, Decl, GlobalId, KernelError, Level, Term};
 
 const VECTOR: &str = "Data.Vector.Vector";
 const TRANSPORT: &str = "Core.Logic.Transport";
+
+fn equal_claim(env: &ElabEnv, carrier: Term, lhs: Term, rhs: Term) -> ken_kernel::KernelResult<()> {
+    let claim = Term::app(
+        Term::app(
+            Term::app(Term::const_(env.globals["Equal"], vec![]), carrier),
+            lhs,
+        ),
+        rhs,
+    );
+    let proved = Term::const_(env.env.tt_id(), vec![]);
+    ken_kernel::check(&env.env, &Context::new(), &proved, &claim)
+}
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -476,14 +488,15 @@ fn zip_with_map_has_exact_checked_pointwise_proposition() {
 /// negative use of the pointwise law.
 /// MEASURED: both mapped inputs are Bool, with `g True = True` and
 /// `h True = False`; the unswapped law is inhabited, while the swapped
-/// concrete claim is kernel-rejected. CLAIMED: `g` and `h` are not
+/// claim of Proved at Equal over the checked example ids is kernel-refused.
+/// CLAIMED: `g` and `h` are not
 /// interchangeable in the pointwise law. THE GAP: this one-vector witness
 /// discriminates the two orders, not every possible function pair. The
 /// contract is now spelled in the provider's example fence and elaborated
 /// separately from the law; checked bodies cite the exact owned operations.
 #[test]
 fn swapped_maps_reject_on_distinct_boolean_functions() {
-    let (mut env, owned) = checked_vector_examples(&[
+    let (env, owned) = checked_vector_examples(&[
         "vec_example_pointwise_g",
         "vec_example_pointwise_h",
         "vec_example_pointwise_f",
@@ -515,22 +528,21 @@ fn swapped_maps_reject_on_distinct_boolean_functions() {
             );
         }
     }
-    let error = env
-        .elaborate_file(
-            "theorem vector_swapped_concrete : Equal Bool \
-             vec_example_swapped_head vec_example_pointwise_head = Proved",
-        )
-        .expect_err("swapped maps must not prove the same proposition");
+    let bool_ty = Term::indformer(env.globals["Bool"], vec![]);
+    let left = Term::const_(env.globals["vec_example_swapped_head"], vec![]);
+    let right = Term::const_(env.globals["vec_example_pointwise_head"], vec![]);
+    let refusal = equal_claim(&env, bool_ty.clone(), left.clone(), right);
     assert!(
-        matches!(
-            error,
-            ElabError::KernelRejected {
-                error: ken_kernel::KernelError::TypeMismatch { .. },
-                ..
-            }
-        ),
-        "swapped map statement must fail by kernel type mismatch: {error:?}"
+        matches!(refusal, Err(KernelError::TypeMismatch { .. })),
+        "swapped map statement must fail by kernel type mismatch: {refusal:?}"
     );
+    equal_claim(
+        &env,
+        bool_ty,
+        left,
+        Term::constructor(env.globals["True"], vec![]),
+    )
+    .expect("the same claim builder must accept the checked swapped-head value");
 }
 
 /// Promise class: durable invariant for the exact private proof obligation.

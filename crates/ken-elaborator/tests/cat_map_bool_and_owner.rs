@@ -253,11 +253,13 @@ fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
 fn assert_import_mutation_fails(source: &str, label: &str) {
     let mut env = map_dependency_env();
     match env.elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(source)) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
-            name, "bool_and",
-            "{label} must fail at Map's unqualified bool_and use"
-        ),
-        other => panic!("{label} must fail with UnresolvedCon bool_and, got {other:?}"),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(
+                name, "bool_and",
+                "{label} must fail at Map's unqualified bool_and use"
+            )
+        }
+        other => panic!("{label} must fail at unresolved bool_and, got {other:?}"),
     }
 }
 

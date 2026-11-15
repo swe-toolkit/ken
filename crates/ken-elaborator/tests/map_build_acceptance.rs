@@ -299,7 +299,10 @@ fn mk_env_with_provider_owned() -> (ElabEnv, MapDependenciesOwned) {
 }
 
 fn mk_env() -> ElabEnv {
-    mk_env_with_provider_owned().0
+    let mut env = mk_env_with_provider_owned().0;
+    env.elaborate_file("import Core.Classes.LawfulClasses (leqChar)")
+        .expect("Map clients select the homed Char comparator");
+    env
 }
 
 /// Promise class: durable invariant.
@@ -475,11 +478,13 @@ fn replace_exactly_once(source: &str, from: &str, to: &str) -> String {
 fn assert_map_import_mutation_fails_at_is_some(source: &str, label: &str) {
     let mut env = mk_map_dependency_env();
     match env.elaborate_ken_md_file(&catalog_or::map_source_for_loose_environment(source)) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
-            name, "is_some",
-            "{label} must fail at Map's unqualified is_some use"
-        ),
-        other => panic!("{label} must fail with UnresolvedCon is_some, got {other:?}"),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(
+                name, "is_some",
+                "{label} must fail at Map's unqualified is_some use"
+            )
+        }
+        other => panic!("{label} must fail at unresolved is_some, got {other:?}"),
     }
 }
 

@@ -12,8 +12,12 @@ fn checked_ascii_client(env: &mut ElabEnv) -> Result<(), (String, ken_elaborator
     let catalog_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join("catalog/packages");
-    env.elaborate_module_from_roots(&[catalog_root], "Data.Collections.Derived")
+    env.elaborate_module_from_roots(&[catalog_root.clone()], "Data.Collections.Derived")
         .map_err(|error| ("load Data.Collections.Derived.map".to_owned(), error))?;
+    env.elaborate_module_from_roots(&[catalog_root], "Core.Classes.LawfulClasses")
+        .map_err(|error| ("load Core.Classes.LawfulClasses.charToInt".to_owned(), error))?;
+    env.elaborate_file("import Core.Classes.LawfulClasses (charToInt)")
+        .map_err(|error| ("import Core.Classes.LawfulClasses (charToInt)".to_owned(), error))?;
     let derived_map = env.globals["Data.Collections.Derived.map"];
     assert!(env.env.transparent_body(derived_map).is_some());
     env.elaborate_file("import Data.Collections.Derived (map)")

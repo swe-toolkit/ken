@@ -1,16 +1,18 @@
 //! PX7-F checked surface and `ResourceHostIO` collision discriminator.
 
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
+
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{env::PrimReduction, Decl};
-
-const RESOURCE_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/System/Resource.ken.md");
 
 #[test]
 fn system_resource_is_opaque_and_only_the_bracket_mints_it() {
     let mut env = ElabEnv::empty().expect("PX7-F prelude bootstrap");
-    env.elaborate_ken_md_file(RESOURCE_KEN_MD)
-        .expect("System.Resource checked fences elaborate");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.System.Resource")
+        .expect("System.Resource owner must roots-load");
+    env.execute_loaded_entry_checked_fences("Capability.System.Resource")
+        .expect("System.Resource checked fences keep their contract");
 
     let resource = env.globals["Resource"];
     assert!(matches!(

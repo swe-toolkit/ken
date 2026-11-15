@@ -1,6 +1,9 @@
 //! D0/D1 compatibility vectors for the structural-result association and
 //! contextual selector (`34 §3.1.1`, `39 §2.3`/`§4`).
 
+#[path = "../../tests/support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::{
     error::ElabError,
     parser::parse_expr,
@@ -473,6 +476,9 @@ fn binary_omega_residual_method_recheck_is_a_transition_sentinel() {
     // different error is not retirement. Retirement must sweep 14, 18, 34, 39,
     // both nested seeds, SPEC-PROGRESS, and the kernel-test staging header.
     let mut env = ElabEnv::new().unwrap();
+    catalog_roots::load(&mut env, "Core.Logic.Conjunction");
+    env.elaborate_file("import Core.Logic.Conjunction (And, and_intro)")
+        .expect("select the checked proposition and introduction for the sentinel");
     match env.elaborate_file(BINARY_OMEGA_RESIDUAL_SOURCE) {
         Err(ElabError::Internal(message)) => assert!(
             message.starts_with("generated All method failed kernel re-check: type mismatch"),
@@ -498,7 +504,8 @@ fn d2_generated_support_name_stays_unresolvable_beside_visible_source_name() {
     // spelling. It is deliberately absent from the source resolver's globals.
     assert!(matches!(
         env.elaborate_decl(&format!("const hidden_support : Type = {generated_name}")),
-        Err(ElabError::UnresolvedCon { name, .. }) if name == generated_name
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. })
+            if name == generated_name
     ));
     // Same type-expression position, but a real source family, remains usable.
     env.elaborate_decl("const visible_source : Type = Bag Nat")

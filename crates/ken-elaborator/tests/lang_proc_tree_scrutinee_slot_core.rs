@@ -7,12 +7,17 @@
 //! the pairs hoist their shared message to one checked const; this does not
 //! assert that separate literal occurrences are definitionally identical.
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 use ken_elaborator::ElabEnv;
 use ken_kernel::{convert, Context, Decl};
 
 // Inline Ken input: adding an isolated .ken file would widen the strict
 // isolated-source census without changing the property this test measures.
 const PRE: &str = r#"program capabilities FS APartial
+import Capability.Process.Exit (host_bind, host_console, host_pure, host_program)
+import Capability.Console.Text (write, print_line)
 proc action (x : Unit) : HostIO APartial Unit visits [Console] =
   host_bind APartial (Result IOError Unit) Unit
     (host_console APartial (Result IOError Unit)
@@ -36,6 +41,8 @@ proc pick (r : Rose) : Box visits [Console] = match r {
 
 fn verdict(pair: &str, decls: &str, slot: &str, twin: &str) -> &'static str {
     let mut env = ElabEnv::new().expect("checked prelude");
+    catalog_roots::load(&mut env, "Capability.Process.Exit");
+    catalog_roots::load(&mut env, "Capability.Console.Text");
     let source = format!("{PRE}{decls}");
     if let Err(error) = env.elaborate_file(&source) {
         println!("D02CORE {pair} ELAB-ERROR {error:?}");

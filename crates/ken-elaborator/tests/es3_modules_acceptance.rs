@@ -246,7 +246,9 @@ fn client_match_hidden_ctor_rejected_at_surface() {
         .expect("client explicitly imports the abstract type");
 
     match env.elaborate_decl("fn bad (t : M.T) : Int = match t { MkT |-> 0 }") {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "MkT"),
+        Err(ElabError::UnresolvedCon { name, .. } | ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "MkT")
+        }
         other => panic!("AC2: hidden constructor match must be a surface rejection: {other:?}"),
     }
 }
