@@ -9,6 +9,9 @@ use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl as SourceDecl, ElabEnv, ElabError};
 use ken_kernel::{Decl, GlobalId, KernelError, Term};
 
+#[path = "support/checked_is_true.rs"]
+mod checked_is_true;
+
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 
 fn root() -> PathBuf {
@@ -142,8 +145,10 @@ fn open_laws_are_owned_transparent_selectively_imported_and_trust_free() {
             "{law} carries a checked proof body"
         );
     }
-    env.elaborate_file(GENERIC_CLIENT)
-        .expect("W-GEN selective import checks both open law types");
+    env.elaborate_file(&checked_is_true::selected_source_with_import(
+        GENERIC_CLIENT,
+    ))
+    .expect("W-GEN selective import checks both open law types");
     for (client, law) in [
         ("congruence_generic", "poly_eq_expr_pow"),
         ("substitution_generic", "substitute_expr_pow"),
@@ -170,19 +175,19 @@ fn open_laws_are_owned_transparent_selectively_imported_and_trust_free() {
 #[test]
 fn closed_commuted_squares_and_substituted_square_accept_together() {
     loaded_package()
-        .elaborate_file(ACCEPTED)
+        .elaborate_file(&checked_is_true::selected_source_with_import(ACCEPTED))
         .expect("every accepted W-CLOSED and W-LAW theorem checks together");
 }
 
 fn isolated_refusal(name: &str, negative: &str, terminal: &str) -> ElabError {
-    // Run the whole accepted prefix in its own fresh environment, then put
-    // only this negative after an identical prefix in another fresh env.
-    loaded_package()
-        .elaborate_file(ACCEPTED)
+    // In a fresh environment, the accepted prefix imports the checked
+    // IsTrue identity under a distinct alias. Only this negative follows.
+    let mut env = loaded_package();
+    env.elaborate_file(&checked_is_true::selected_source_with_import(ACCEPTED))
         .unwrap_or_else(|error| panic!("{name} accepted prefix: {error:?}"));
-    let source = format!("{ACCEPTED}\n{negative}");
-    let claims = parse_decls(&source)
-        .expect("negative fixture parses")
+    let checked_negative = checked_is_true::selected_source(negative);
+    let claims = parse_decls(&checked_negative)
+        .expect("selected negative fixture parses")
         .into_iter()
         .filter_map(|declaration| match declaration {
             SourceDecl::TheoremDecl {
@@ -196,8 +201,8 @@ fn isolated_refusal(name: &str, negative: &str, terminal: &str) -> ElabError {
     let [claim] = claims.as_slice() else {
         panic!("{name} must occur as one negative theorem");
     };
-    let error = loaded_package()
-        .elaborate_file(&source)
+    let error = env
+        .elaborate_file(&checked_negative)
         .expect_err("isolated false claim must refuse");
     let span = match &error {
         ElabError::KernelRejected { span, .. } | ElabError::TypeMismatch { span, .. } => span,
@@ -207,7 +212,9 @@ fn isolated_refusal(name: &str, negative: &str, terminal: &str) -> ElabError {
         claim.start <= span.start && span.start < span.end && span.end <= claim.end,
         "{name} must refuse inside its own theorem: {span:?} vs {claim:?}"
     );
-    let terminal_start = source.rfind(terminal).expect("terminal in negative");
+    let terminal_start = checked_negative
+        .rfind(terminal)
+        .expect("terminal in selected negative");
     assert!(
         terminal_start >= claim.start
             && terminal_start + terminal.len() <= claim.end
@@ -216,7 +223,7 @@ fn isolated_refusal(name: &str, negative: &str, terminal: &str) -> ElabError {
         "{name} refusal must include its own {terminal} proof"
     );
     if terminal == "Refl" {
-        assert_eq!(&source[span.start..span.end], "Refl");
+        assert_eq!(&checked_negative[span.start..span.end], "Refl");
     }
     error
 }
