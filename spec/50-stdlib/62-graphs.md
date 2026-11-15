@@ -1446,3 +1446,86 @@ private-import refusal belong to the isolated D0. The separate CV
 seed, catalog package test, assembled-tip review, official
 conformance runner, CI and landed-trust measurement have their own
 gates; none is established by this spec text or by scratch D0.
+
+## 16. Reachability is invariant under union operand order
+
+> **Section 16 status: DRAFT v0
+> (SPEC-GRAPHS-UNION-REACHABLE-COMM).** The Architect ruled AC-0
+> clean on a D0 run by Foundation implementer in detached scratch on
+> landed base `a931dcb40`: the generic law and importing client
+> checked, without a new `Axiom` or change to the trusted-base
+> identity set. The six accepted client rows checked; the isolated
+> false claim refused at its own proof term. These are scratch
+> observations, not a check of this Spec child, the separate catalog
+> or CV seed children, an assembled candidate, official conformance,
+> CI, publication, landing or a landed-trust measurement.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent
+checked theorem immediately after `graph_union_reachable_right` and
+before `contains`, at the end of the §15 union block. Its exact
+public name, argument order and type are:
+
+```ken
+pub theorem graph_union_reachable_comm
+      (q : Type) (fq : Finite q) (g : Graph q) (h : Graph q) (s : q) (target : q → Bool)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q g h) s target)
+        (graph_reachable q fq (graph_union q h g) s target)
+```
+
+For any finite vertex carrier, graphs `g` and `h`, start `s` and
+Boolean target, reachability over `union g h` equals reachability over
+`union h g` as a Boolean observation. The type has no distinctness,
+ordering or edge-equality premise beyond its `Finite q` argument.
+The orientation places `union g h` on the left and `union h g` on the
+right. It does not claim that reachability splits into either input's
+reachability: the §15 three-vertex chain needs an edge from each
+operand to reach V2 from V0.
+
+The checked route uses two new **private** Dependency helpers, in
+order after the private `bool_or_true_cases` and before `named`.
+`graph_union_edge_swap q g h u v` turns a checked true edge of
+`union g h` into a checked true edge of `union h g`. It eliminates
+§15's public `graph_union_edge_cases`: the left witness enters the
+swapped union through `graph_union_edge_right q h g`, and the right
+witness through `graph_union_edge_left q h g`. Applying §7's
+`graph_reachable_graph_monotone` with that inclusion gives the
+true-reachability implication in one direction; applying it with
+`graph_union_edge_swap q h g` gives the converse. The private
+`bool_eq_from_iff` splits the two result Booleans and uses these
+two implications to construct `Equal Bool` for the displayed law.
+Neither helper is an additional public export or assumption.
+
+**Edge-level commutation is not public here.** The edge equation
+reduces under §15's `graph_union_edge` to commutation of `bool_or` on
+Booleans, a Core fact not yet public as a named law. Moreover,
+`Equal (Graph q)` cannot be inferred from pointwise edge equations:
+`Graph` has no η (§10.1 and §15.2). The reachability proof needs
+only the private true-edge inclusion, not public edge equality. A
+client seeking edge-level commutation must currently split the
+Booleans using §15's `graph_union_edge_left`, `_right` and `_cases`.
+A **separate Core node for Steward intake**, not part of this WP,
+would publish `bool_eq_from_iff` and a `bool_or` commutation law in
+`Core.Classes.LawfulClasses`, then migrate and retire both private
+copies of the generic helper in Dependency and Rational. This
+section does not authorize that Core or Rational change.
+
+The §15.2 roster of **17 functions and 30 theorems** is historical:
+it counts public names through §15 and remains unchanged. §16 adds
+one public theorem and no function, giving **17 functions and 31
+theorems** through §16. No §§1–15 operation or law type changes.
+
+The separately owned CV seed uses §15's `Vertex3` chain:
+`g_only` has only V0 → V1, and `h_only` only V1 → V2.
+Its accepted clients check both operand orders reach V2 from V0,
+apply the new law to both orders and accept their equal result. On
+a fresh accepted prefix, the same-form false claim that
+`union g_only h_only` reaches V2 exactly when `g_only` alone does
+must refuse at its own `Proved`; `g_only` alone cannot reach V2.
+Foundation's detached D0 checked this refusal and paired it with
+an accepted same-form row. Three mutation checks that changed
+only the new declaration sites also refused, but breaking the
+original proof under a change does not by itself falsify an
+alternative law. Those scratch checks do not replace the generic
+checked proof, the separate seed, exact-tip gates or official
+conformance.
