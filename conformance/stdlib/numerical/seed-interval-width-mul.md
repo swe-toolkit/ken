@@ -4,30 +4,39 @@ Format: `../../README.md`.
 Spec: `spec/50-stdlib/68-numerical.md` §17.
 Frame: `docs/program/issues/SPEC-NUMERICAL-INTERVAL-WIDTH-MUL.md` AC-2.
 
-These closed clients instantiate the public ordered-product width law.
-They do not establish its generic proof. `MkRational n Zero` denotes the
-natural rational `n`. The ordered product `[1,2]·[1,2]` has width three:
-its endpoint product is `[1,4]`, while the selected right-hand side is
-`2·1 + 1·1 = 3`. The product of the two operand widths is only one.
-`IsTrue` is already available in the client prelude; this client does
-not import it a second time.
+The closed interval clients instantiate the public ordered-product
+width law; they do not establish its generic proof. A separate generic
+client applies Rational's public right-cancellation theorem.
+`MkRational n Zero` denotes the natural rational `n`. The ordered
+product `[1,2]·[1,2]` has width three: its endpoint product is `[1,4]`,
+while the selected right-hand side is `2·1 + 1·1 = 3`. The product
+of the two operand widths is only one.
 
 ## Accepted client
 
-Check this entire client before appending one isolated refusal. W-APPLY
-uses the public theorem, W-THREE independently checks the closed value,
-and W-FORM independently checks the selected expression with the same
-proposition form and proof terminal as X-DROP-FIRST.
+Check this entire client before appending one isolated refusal. The
+cancellation client applies the public Rational theorem at generic
+arguments. W-APPLY uses the interval theorem, W-THREE independently
+checks the closed value, and W-FORM independently checks the selected
+expression with the same proposition form and proof terminal as both
+single-inverted refusals.
 
 ```ken
 import Data.Numeric.Rational
-  (Rational, MkRational, rational_add, rational_mul, rational_equiv, rational_leq)
+  (Rational, MkRational, rational_add, rational_mul, rational_equiv, rational_leq,
+    rational_add_cancel_r)
 import Algorithm.Numeric.RationalInterval
   (Interval, MkInterval, interval_mul, interval_width, interval_width_mul)
 
 const r1 : Rational = MkRational (Suc Zero) Zero
 const r2 : Rational = MkRational (Suc (Suc Zero)) Zero
 const r3 : Rational = MkRational (Suc (Suc (Suc Zero))) Zero
+
+theorem rational_add_cancel_public_client
+      (x : Rational) (y : Rational) (z : Rational)
+      (same_sum : rational_equiv (rational_add x z) (rational_add y z))
+    : rational_equiv x y =
+  rational_add_cancel_r x y z same_sum
 
 -- W-APPLY: both intervals are ordered.
 theorem width_product_application
@@ -66,6 +75,22 @@ theorem width_product_selected_form
 - why: W-THREE and W-FORM separately fix nonzero product and sum values;
   the theorem application alone could not distinguish a bad width operation.
 
+### stdlib/numerical/rational-add-cancel-public-client
+
+- spec: §68 §17 and §64 §4, `rational_add_cancel_r`.
+- promise class: durable invariant.
+- given: an external client with equivalent sums and arbitrary Rational
+  values `x`, `y` and shared right summand `z`.
+- expect: the imported public theorem yields `rational_equiv x y`.
+- measured: the client imports and applies `rational_add_cancel_r` at its
+  declared generic type.
+- claimed: Rational right cancellation is available to external clients
+  with the specified type.
+- gap: the client checks public lookup and type application, not the
+  theorem's generic proof body.
+- why: interval-width multiplication uses the theorem internally, but
+  that alone would not establish its public availability.
+
 ### stdlib/numerical/interval-width-product-value-and-form
 
 - spec: §17, `interval_width` and the selected product form.
@@ -83,7 +108,7 @@ theorem width_product_selected_form
 
 Append exactly one negative declaration to a fresh complete copy of
 the accepted client for each row. The accepted controls remain in the
-prefix. Both false claims must refuse at their own `Proved` after
+prefix. Each false claim must refuse at its own `Proved` after
 that prefix; a failure to import, parse or check an earlier theorem
 is not the intended refusal.
 
@@ -121,9 +146,9 @@ theorem reject_width_product_of_widths
 - measured: W-FORM accepts the same kind of `rational_equiv`/`Proved`
   claim for ordered inputs; X-DROP-FIRST changes the first interval.
 - claimed: the selected product-width formula needs its first premise.
-- gap: a closed value refusal is not a generic premise-consumption proof;
-  it also does not test necessity of the second premise. Architect's
-  separate D0 X-DROP-SECOND checked `[1,2]·[3,1]` at its own `Proved`.
+- gap: this closed value refusal shows the first premise is necessary
+  on these values; it does not establish the generic proof or test every
+  alternative law.
 - controls: W-FORM uses the same operation, expression form and terminal
   with the first operand ordered.
 - why: truncated product width is zero, while the selected sum is one.
@@ -139,13 +164,42 @@ theorem reject_width_product_inverted_first
   Proved
 ```
 
+### stdlib/numerical/reject-width-product-inverted-second
+
+- spec: §17, necessity of the second ordered-endpoint premise.
+- promise class: durable invariant.
+- given: `[1,2]·[3,1]`; only the second interval is inverted.
+- expect: X-DROP-SECOND refuses the premise-free selected expression.
+- measured: W-FORM accepts the same kind of `rational_equiv`/`Proved`
+  claim for ordered inputs; X-DROP-SECOND changes only the second interval.
+- claimed: the selected product-width formula needs its second premise.
+- gap: this closed value refusal shows the second premise is necessary
+  on these values; it does not establish the generic proof or test every
+  alternative law.
+- controls: W-FORM uses the same operation, expression form and terminal
+  with the second operand ordered.
+- why: truncated product width is zero, while the selected sum is three.
+
+```ken
+-- X-DROP-SECOND: refuse after W-FORM on a fresh accepted prefix.
+theorem reject_width_product_inverted_second
+  : rational_equiv
+      (interval_width (interval_mul (MkInterval r1 r2) (MkInterval r3 r1)))
+      (rational_add
+        (rational_mul r2 (interval_width (MkInterval r3 r1)))
+        (rational_mul r3 (interval_width (MkInterval r1 r2)))) =
+  Proved
+```
+
 ## Evidence boundary
 
 Architect's AC-0 ruling `evt_19ygq87cxn5hh` records the detached D0
 on `287abf7ed`, run by Foundation Implementer. In that scratch D0,
-W-APPLY, W-THREE and W-FORM accepted, and X-PRODUCT and X-DROP-FIRST
-refused with `KernelRejected(TypeMismatch)` at their own `Proved` on
-fresh prefixes following W-THREE and W-FORM respectively. That is
-not execution of these newly authored fences, a generic mutant-law
-check, official conformance, CI, publication, landing or a measured
-landed-trust delta. No external or `local/refs` material was used.
+W-APPLY, W-THREE and W-FORM accepted, and X-PRODUCT, X-DROP-FIRST
+and X-DROP-SECOND refused with `KernelRejected(TypeMismatch)` at
+their own `Proved` on fresh prefixes. The D0 and its refusal for
+X-DROP-SECOND are scratch evidence; they did not execute this revised
+seed or its public Rational cancellation client. No local Ken check,
+official conformance run, CI, publication, landing or measured
+landed-trust delta is claimed. No external or `local/refs` material
+was used.
