@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-SCALE
 title: "Spec 65 states that matrix_vector commutes with scaling the vector (matrix_vector_homogeneous) but not with scaling the matrix, so a client cannot move a matrix_scale factor out of a matrix-vector application. Rule from a checked D0 at zero trust that matrix_vector of matrix_scale factor a equals vector_scale factor of matrix_vector a, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
