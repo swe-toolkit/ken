@@ -10742,6 +10742,7 @@ mod cat_numeric_interval_public_export_tests {
             "interval_mul_point",
             "interval_width_point",
             "interval_width_add",
+            "interval_width_mul",
             "interval_hull_contains_left",
             "interval_hull_contains_right",
             "interval_intersect_sound",
