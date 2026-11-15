@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-WIDTH-MUL
 title: "Spec 68 §15 says how width propagates through interval addition but not through multiplication, so a client that multiplies two enclosures cannot bound the error of the product. Rule from a checked D0 at zero trust that, for ordered operands, the width of the product is equivalent to hi(i)·width(j) + lo(j)·width(i), with any Rational subtraction-distribution law it needs, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
