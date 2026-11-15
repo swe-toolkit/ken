@@ -212,6 +212,30 @@ fn terminal_settle_kills_and_reaps_held_child_not_spoofed_decoy() {
     decoy.assert_running();
 }
 
+/// Promise class: durable invariant. A signal to an exited but unwaited
+/// child is discarded, without replacing its actual recorded exit.
+#[test]
+fn signal_to_exited_unwaited_child_preserves_its_exit() {
+    let mut child = shell_plan("exit 7").spawn().unwrap();
+    let fd = match &child.identity {
+        ChildIdentityV1::Held(fd) => fd.as_raw_fd(),
+        ChildIdentityV1::ReapedAtSpawn => panic!("child must not auto-reap"),
+    };
+    let mut pollfd = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    assert_eq!(unsafe { libc::poll(&mut pollfd, 1, 5000) }, 1);
+    child.send_signal(libc::SIGKILL).unwrap();
+    assert_eq!(child.wait().unwrap(), ChildExitV1::Exited(7));
+    assert_eq!(
+        child.send_signal(libc::SIGKILL).unwrap_err().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+    child.settle(true).unwrap();
+}
+
 /// Promise class: durable invariant. An unavailable pidfd fails before
 /// posix_spawn; the same missing executable reaches ENOENT with a real probe.
 #[test]
@@ -309,7 +333,7 @@ fn ignored_sigchld_auto_reaps_held_child_without_a_pid_kill() {
         unsafe { libc::signal(libc::SIGCHLD, libc::SIG_IGN) },
         libc::SIG_ERR
     );
-    let mut child = shell_plan("exec sleep 1").spawn().unwrap();
+    let mut child = shell_plan("exec sleep 3").spawn().unwrap();
     let held = match &child.identity {
         ChildIdentityV1::Held(fd) => fd.as_raw_fd(),
         ChildIdentityV1::ReapedAtSpawn => panic!("child must be held before it exits"),
