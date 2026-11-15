@@ -332,7 +332,7 @@ pub theorem add_cancel_r
 ```
 
 It cancels the same right summand from two equal natural sums. The
-private proof of rational addition cancellation needed for §68 §15
+Rational addition cancellation theorem, public since §68 §17,
 imports this theorem rather than introducing a third Nat copy.
 This promotion adds one Nat.Arithmetic public name; it does not
 turn the private `mul::suc_l` helper into an export.

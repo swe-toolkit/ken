@@ -579,6 +579,20 @@ pub theorem rational_add_mono
       }
   }
 
+pub theorem rational_add_cancel_r
+      (x : Rational) (y : Rational) (z : Rational)
+    : rational_equiv (rational_add x z) (rational_add y z) → rational_equiv x y =
+  match x {
+    MkRational a bx ↦
+      match y {
+        MkRational b by ↦
+          match z {
+            MkRational c bz ↦
+              λsame_sum. rational_add_cancel_cross a b c (Suc bx) (Suc by) bz same_sum
+          }
+      }
+  }
+
 pub proof self_is_zero for rational_sub
       (x : Rational)
     : rational_equiv (rational_sub x x) rational_zero =
@@ -1037,20 +1051,6 @@ theorem rational_add_cancel_cross
         (mul b aa)
         (positive_product_tail tail tail)
         scaled_equality
-
-theorem rational_add_cancel_r
-      (x : Rational) (y : Rational) (z : Rational)
-    : rational_equiv (rational_add x z) (rational_add y z) → rational_equiv x y =
-  match x {
-    MkRational a bx ↦
-      match y {
-        MkRational b by ↦
-          match z {
-            MkRational c bz ↦
-              λsame_sum. rational_add_cancel_cross a b c (Suc bx) (Suc by) bz same_sum
-          }
-      }
-  }
 
 theorem rational_add_interchange
       (a : Rational) (b : Rational) (c : Rational) (d : Rational)
@@ -2003,6 +2003,8 @@ min/max when argument order changes; no structural commutativity is claimed.
    proofs required by interval hull and intersection. `rational_sub` adds
    self-zero, ordered add-cancellation and ordered two-input distribution
    under spec 68 §15; `rational_sub_mono` supplies the two-sided order law.
+   Public `rational_add_cancel_r` cancels a common right summand of a
+   rational-value equivalence.
 2. **Source map.** [Definition](#2-definition) lists the exported values and
    laws; [Laws & proofs](#4-laws--proofs) explains and carries the private
    derivation, including the cross-product monotonicity helpers;
@@ -2016,8 +2018,9 @@ min/max when argument order changes; no structural commutativity is claimed.
    private pick helpers connecting each Boolean branch to its bounds.
    Subtraction uses Nat's checked truncated `sub`, right-add cancellation,
    multiplication distribution and both directions of subtraction order.
-   The Rational sum cancellation, factor rearrangements and cross-product
-   monotonicity stage remain private.
+   Public `rational_add_cancel_r` cancels an equal right addend using a
+   private cross-product proof; factor rearrangements and cross-product
+   monotonicity stages remain private.
 4. **Trusted-base delta.** Zero: all exported theorems carry checked proof
    terms. Nat and equality imports retain their existing trusted base; this
    package adds no `Axiom`, postulate, primitive or floating point.

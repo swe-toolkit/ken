@@ -1446,8 +1446,9 @@ fraction. `self_is_zero` relates the result of subtracting a value
 from itself to `rational_zero` by `rational_equiv`, not structural
 `Equal Rational`. `add_cancel` states the right-inverse property
 only when `y ≤ x`; `add_distrib` needs each corresponding pair
-ordered. The private cancellation and reshuffle stages of the
-checked proofs introduce no further public law. The existing
+ordered. The checked proofs' reshuffle stages remain private;
+§17 promotes the existing rational addition cancellation theorem to
+public visibility without changing its type or body. The existing
 Nat.Arithmetic `add_cancel_r` becomes public under §64 §4 with its
 original checked type and body, as a visibility-only prerequisite.
 
@@ -1640,3 +1641,61 @@ inverted inner interval and an intersection bound, each with an
 independent closed conclusion. These are **scratch** checks, not
 execution of the separate CV seed, official conformance, an
 assembled-tip gate, CI or measured landed trust.
+
+## 17. Interval width under multiplication
+
+> **Section 17 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-WIDTH-MUL).** Architect's AC-0 on base
+> `287abf7ed` checked the generic law and public Rational promotion in
+> detached scratch. The independent trusted-base identity sets were
+> equal, 114 → 114, with one additional public Rational declaration
+> and one additional public RationalInterval declaration. These are
+> scratch observations, not a check of this Spec child or its seed,
+> an assembled-tip result, official conformance, CI, publication,
+> landing or a measured landed-trust delta.
+
+`Data.Numeric.Rational` promotes its existing checked theorem directly
+following `rational_add_mono` to public visibility, leaving its type
+and proof body unchanged:
+
+```ken
+pub theorem rational_add_cancel_r
+      (x : Rational) (y : Rational) (z : Rational)
+    : rational_equiv (rational_add x z) (rational_add y z) → rational_equiv x y
+```
+
+This cancels the same right summand from equivalent Rational sums. It
+is a visibility change, not a new proof or a second cancellation law.
+`Algorithm.Numeric.RationalInterval` exports one public Transparent
+checked theorem immediately after `interval_width_add`:
+
+```ken
+pub theorem interval_width_mul
+      (lo1 : Rational) (hi1 : Rational) (lo2 : Rational) (hi2 : Rational)
+    : IsTrue (rational_leq lo1 hi1)
+      → IsTrue (rational_leq lo2 hi2)
+      → rational_equiv
+        (interval_width (interval_mul (MkInterval lo1 hi1) (MkInterval lo2 hi2)))
+        (rational_add
+          (rational_mul hi1 (interval_width (MkInterval lo2 hi2)))
+          (rational_mul lo2 (interval_width (MkInterval lo1 hi1))))
+```
+
+The two ordered-endpoint premises are necessary. On `[3,1]·[1,2]`,
+the product has width zero by truncation but the displayed right side
+has value one; on `[1,2]·[3,1]`, the product again has width zero but
+the right side has value three. Each counterexample inverts exactly
+one operand. For ordered operands, the selected form is
+`hi1·width(j) + lo2·width(i)`. The equal-by-value alternative
+`hi2·width(i) + lo1·width(j)` is not a second exported law.
+
+The checked proof cancels the common `lo1·lo2` term from the product
+width and the displayed sum, using Rational's public
+`rational_add_cancel_r`. Orderedness supplies the required
+subtraction cancellation and product ordering. This boundary needs
+no law distributing `rational_mul` over `rational_sub`, public or
+private; adding one would be a separate decision. The closed `[1,2]`
+product has width three and its selected-form sum is `2·1 + 1·1 = 3`,
+not the product of the two widths, which is one. The separate seed
+checks closed applications and same-form refused claims; these do
+not prove the open theorem or replace the generic checked body.

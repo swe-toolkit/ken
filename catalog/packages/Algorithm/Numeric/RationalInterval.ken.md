@@ -29,10 +29,11 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. The width operation and three checked laws,
-including `interval_width_inside`, use Rational's truncated subtraction,
-not a subtraction of intervals. The checked inverted-emptiness and two
-ordered-endpoint membership laws make the endpoint boundary explicit.
+source; their operations follow. The width operation and four checked laws,
+including `interval_width_mul` and `interval_width_inside`, use Rational's
+truncated subtraction, not a subtraction of intervals. The checked
+inverted-emptiness and two ordered-endpoint membership laws make the endpoint
+boundary explicit.
 Enclosure uses both membership premises and the checked Rational monotonicity
 laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
@@ -71,6 +72,7 @@ import Data.Numeric.Rational
     rational_equiv,
     rational_add_mono,
     rational_sub_mono,
+    rational_add_cancel_r,
     rational_mul_mono,
     rational_min,
     rational_max,
@@ -279,6 +281,110 @@ pub theorem interval_width_add
           (interval_width (MkInterval lo1 hi1))
           (interval_width (MkInterval lo2 hi2))) =
   (proof add_distrib for rational_sub) hi1 lo1 hi2 lo2
+
+pub theorem interval_width_mul
+      (lo1 : Rational) (hi1 : Rational) (lo2 : Rational) (hi2 : Rational)
+    : IsTrue (rational_leq lo1 hi1)
+      → IsTrue (rational_leq lo2 hi2)
+      → rational_equiv
+        (interval_width (interval_mul (MkInterval lo1 hi1) (MkInterval lo2 hi2)))
+        (rational_add
+          (rational_mul hi1 (interval_width (MkInterval lo2 hi2)))
+          (rational_mul lo2 (interval_width (MkInterval lo1 hi1)))) =
+  λfirst_ordered.
+    λsecond_ordered.
+      let
+        low = rational_mul lo1 lo2;
+        high = rational_mul hi1 hi2;
+        first_width = rational_sub hi1 lo1;
+        second_width = rational_sub hi2 lo2;
+        product_width = rational_sub high low;
+        high_share = rational_mul hi1 second_width;
+        low_share = rational_mul lo2 first_width;
+        shares = rational_add high_share low_share;
+        width_cancel : rational_equiv (rational_add product_width low) high =
+          (proof add_cancel for rational_sub)
+            high
+            low
+            (rational_mul_mono lo1 hi1 lo2 hi2 first_ordered second_ordered);
+        low_share_cancel : rational_equiv (rational_add low_share low) (rational_mul lo2 hi1) =
+          (proof trans for rational_equiv)
+            (rational_add low_share low)
+            (rational_add low_share (rational_mul lo2 lo1))
+            (rational_mul lo2 hi1)
+            ((proof respect for rational_add)
+              low_share
+              low_share
+              low
+              (rational_mul lo2 lo1)
+              ((proof refl for rational_equiv) low_share)
+              ((proof comm for rational_mul) lo1 lo2))
+            ((proof trans for rational_equiv)
+              (rational_add low_share (rational_mul lo2 lo1))
+              (rational_mul lo2 (rational_add first_width lo1))
+              (rational_mul lo2 hi1)
+              ((proof sym for rational_equiv)
+                (rational_mul lo2 (rational_add first_width lo1))
+                (rational_add low_share (rational_mul lo2 lo1))
+                ((proof distrib_l for rational_mul) lo2 first_width lo1))
+              ((proof respect for rational_mul)
+                lo2
+                lo2
+                (rational_add first_width lo1)
+                hi1
+                ((proof refl for rational_equiv) lo2)
+                ((proof add_cancel for rational_sub) hi1 lo1 first_ordered)));
+        shares_cancel : rational_equiv (rational_add shares low) high =
+          (proof trans for rational_equiv)
+            (rational_add shares low)
+            (rational_add high_share (rational_add low_share low))
+            high
+            ((proof sym for rational_equiv)
+              (rational_add high_share (rational_add low_share low))
+              (rational_add (rational_add high_share low_share) low)
+              ((proof assoc for rational_add) high_share low_share low))
+            ((proof trans for rational_equiv)
+              (rational_add high_share (rational_add low_share low))
+              (rational_add high_share (rational_mul hi1 lo2))
+              high
+              ((proof respect for rational_add)
+                high_share
+                high_share
+                (rational_add low_share low)
+                (rational_mul hi1 lo2)
+                ((proof refl for rational_equiv) high_share)
+                ((proof trans for rational_equiv)
+                  (rational_add low_share low)
+                  (rational_mul lo2 hi1)
+                  (rational_mul hi1 lo2)
+                  low_share_cancel
+                  ((proof comm for rational_mul) lo2 hi1)))
+              ((proof trans for rational_equiv)
+                (rational_add high_share (rational_mul hi1 lo2))
+                (rational_mul hi1 (rational_add second_width lo2))
+                high
+                ((proof sym for rational_equiv)
+                  (rational_mul hi1 (rational_add second_width lo2))
+                  (rational_add high_share (rational_mul hi1 lo2))
+                  ((proof distrib_l for rational_mul) hi1 second_width lo2))
+                ((proof respect for rational_mul)
+                  hi1
+                  hi1
+                  (rational_add second_width lo2)
+                  hi2
+                  ((proof refl for rational_equiv) hi1)
+                  ((proof add_cancel for rational_sub) hi2 lo2 second_ordered))));
+        same_after_low : rational_equiv
+          (rational_add product_width low)
+          (rational_add shares low) =
+          (proof trans for rational_equiv)
+            (rational_add product_width low)
+            high
+            (rational_add shares low)
+            width_cancel
+            ((proof sym for rational_equiv) (rational_add shares low) high shares_cancel)
+      in
+        rational_add_cancel_r product_width shares low same_after_low
 
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
@@ -1639,8 +1745,11 @@ the arithmetic result; those final equations use structural `Equal Interval`.
 The point-width proof is Rational subtraction's checked self-zero proof after
 unfolding `interval_point` and `interval_width`. For addition, both intervals'
 endpoints must be ordered: Rational's checked two-input subtraction law proves
-that width distributes over the endpoint-wise sum. Both results compare
-rational values through `rational_equiv`, not stored fraction spellings.
+that width distributes over the endpoint-wise sum. For ordered operands, the
+product-width proof uses Rational's public right-add cancellation to remove
+the common `lo1·lo2` from the product-width and endpoint-width sums. All
+three results compare rational values through `rational_equiv`, not stored
+fraction spellings.
 The two laws do not determine width on their own; the definition uses
 `rational_sub hi lo`, and a nonzero-width value checks that formula separately.
 `interval_width_inside` uses the two comparisons from endpoint inclusion
@@ -1685,8 +1794,9 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-five
-   checked interval laws, including `interval_width_inside`, form the public
+   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-six
+   checked interval laws, including `interval_width_mul` and
+   `interval_width_inside`, form the public
    contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1718,8 +1828,10 @@ interval subtraction are not.
    the false endpoint order; each ordered endpoint uses reflexivity and
    conjunction introduction. Neither family adds a helper. Width under
    inclusion uses Rational's two-sided subtraction monotonicity with the
-   inclusion comparisons as its only premises.
-4. **Trusted-base delta.** Zero: all fifty-five laws have checked proof bodies,
+   inclusion comparisons as its only premises. Product width uses checked
+   multiplication monotonicity and distributivity over addition, then public
+   Rational right-add cancellation to remove the common `lo1·lo2`.
+4. **Trusted-base delta.** Zero: all fifty-six laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1765,5 +1877,9 @@ interval subtraction are not.
    equality ascription. Its local fixtures do not execute a separately
    authored conformance seed. The width-inside package test checks the seven
    open subtraction and width laws, independent closed widths, and three
-   false claims after fresh same-form controls. These package tests do not
-   establish official conformance-runner execution, CI, publication or landing.
+   false claims after fresh same-form controls. The width-multiplication
+   package test checks the open law, an independent product width and the
+   public Rational cancellation import; it rejects the product-of-widths
+   and both missing-order-premise claims after fresh same-form controls.
+   These package tests do not establish official conformance-runner execution,
+   CI, publication or landing.
