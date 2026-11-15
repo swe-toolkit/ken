@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-LEAST-K-COST-ORDER-INVARIANCE
 title: "Spec 72 states cost-order invariance for argmin, argmin_option, argmax and argmax_option but not for least_k, so a client cannot rescale a top-k cost by a strictly increasing transform and keep the selection. Rule from a checked D0 at zero trust that least_k under comp f cost equals least_k under cost, on the same strict-order premise as §1.5, and state it with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1

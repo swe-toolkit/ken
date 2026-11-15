@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-VIS-MAY-YIELD-SUMMARY
 title: "Each native planning plane (the relay classifier, the census walk and the transport destination) computes which Vis constructs an ITree-valued occurrence may yield by its own lexical walk inside one function owner, and refuses a Call that is not a direct lexical-closure redex. A Vis routed through a named recursive proc, a bracket body closure or a specialization clone is invisible to every walk. Compute one shared per-function may-yield summary, with top at every open terminal, pinned by plan census and switching no consumer"
-status: ready
+status: draft
 owner: runtime
 size: L
 tier: T1
@@ -13,6 +13,17 @@ origin: "Architect ruling evt_146ymmv8mz9py on PX10-NATIVE-SPAWN-PARITY Incremen
 ---
 
 # One may-yield summary for every planning plane
+
+## Withdrawn to draft (Steward, 2026-11-15)
+
+The AC-0 D0 on `0a5cf58eb` (Architect `evt_5rb967199ham1`) found the
+motivating refusal gone: no relay is refused on the landed base, so
+AC-1's drain_pipe clause has no subject. The summary switches no
+consumer and parity does not depend on it. It is withdrawn rather
+than re-posed. Re-release it when a consumer step needs the yield
+answer (static fusion, unreached relay numbering, or a one-owner walk
+that refuses a measured program); that ruling's five items and its
+re-posed AC-1/AC-2 are then the starting design.
 
 ## Objective
 

@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-UNION
 title: "Spec 62 has no way to combine two graphs on one vertex carrier, so a client merging two dependency relations must write the Boolean disjunction by hand and re-prove what its edges mean. Rule from a checked D0 at zero trust a public graph_union with left and right edge inclusion, an edge case split, and reachability carried into the union, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
