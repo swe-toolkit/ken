@@ -3712,6 +3712,7 @@ fn emit_pending_vis_owner_loop(
     result_offset: i32,
     placeholder_offset: i32,
     #[cfg(feature = "px8-ds-test-support")] raw_host_result_escape: Option<CarriedBoundaryWord>,
+    #[cfg(feature = "px8-ds-test-support")] test_returned_vis: Option<(StaticOriginId, String)>,
     force_unknown_member: bool,
     bypass_unknown_to_c2: bool,
 ) -> Result<PendingVisFinishedBody, CraneliftBackendError> {
@@ -3748,6 +3749,29 @@ fn emit_pending_vis_owner_loop(
         )
     })?;
     let first_ret = builder.ins().iconst(types::I64, first_ret);
+    // Test-only replay is armed until the first actual Ret. A creation-site
+    // builder may make the initial K result Vis, so wrapping it now would
+    // replace a real pending member rather than add one after it.
+    #[cfg(feature = "px8-ds-test-support")]
+    let injection = if let Some((vis_origin, constructor)) = test_returned_vis {
+        let row = successors.first().ok_or_else(|| {
+            backend_module(
+                LoweringCause::PlannerInvariant,
+                "the test-only Vis needs a planned successor member".to_string(),
+            )
+        })?;
+        let member = i64::from(row.row.id().ordinal()) + 1;
+        let slot = builder.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            8,
+            3,
+        ));
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().stack_store(zero, slot, 0);
+        Some((slot, vis_origin, constructor, member))
+    } else {
+        None
+    };
     builder.ins().jump(result, &[returned.word, first_ret]);
     builder.switch_to_block(result);
     let returned_word = builder.block_params(result)[0];
@@ -3767,6 +3791,34 @@ fn emit_pending_vis_owner_loop(
     builder.switch_to_block(ret);
     let ret_fields = compiler.emit_carrier_field_count(builder, returned)?;
     Lowering::require_i64(builder, ret_fields, 1);
+    // Only the hook's terminal Ret is wrapped. Its fields are valid carried
+    // Ret words in either representation, unlike an initial returned Vis.
+    #[cfg(feature = "px8-ds-test-support")]
+    if let Some((slot, vis_origin, constructor, _)) = &injection {
+        let state = builder.ins().stack_load(types::I64, *slot, 0);
+        let first_ret =
+            builder
+                .ins()
+                .icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, state, 0);
+        let inject = builder.create_block();
+        let settle = builder.create_block();
+        builder.ins().brif(first_ret, inject, &[], settle, &[]);
+        builder.switch_to_block(inject);
+        let once = builder.ins().iconst(types::I64, 1);
+        builder.ins().stack_store(once, *slot, 0);
+        let member = compiler.transfer_constructor_operands(
+            builder,
+            *vis_origin,
+            constructor,
+            &[
+                LoweringOperand::Carried(returned),
+                LoweringOperand::Carried(returned),
+            ],
+            None,
+        )?;
+        builder.ins().jump(result, &[member.word, expected_ret]);
+        builder.switch_to_block(settle);
+    }
     #[cfg(feature = "px8-ds-test-support")]
     let stored_word = raw_host_result_escape.map_or(returned_word, |word| word.word);
     #[cfg(not(feature = "px8-ds-test-support"))]
@@ -3788,6 +3840,24 @@ fn emit_pending_vis_owner_loop(
             LoweringCause::PlannerInvariant,
             "pending-Vis member is not a finished load".to_string(),
         ));
+    };
+    // The synthetic Vis has no producer-written record: select its issued
+    // successor exactly once, without changing any real member's record.
+    #[cfg(feature = "px8-ds-test-support")]
+    let member = if let Some((slot, _, _, expected)) = &injection {
+        let state = builder.ins().stack_load(types::I64, *slot, 0);
+        let synthetic =
+            builder
+                .ins()
+                .icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, state, 1);
+        let expected = builder.ins().iconst(types::I64, *expected);
+        let selected = builder.ins().select(synthetic, expected, member);
+        let two = builder.ins().iconst(types::I64, 2);
+        let next = builder.ins().select(synthetic, two, state);
+        builder.ins().stack_store(next, *slot, 0);
+        selected
+    } else {
+        member
     };
     #[cfg(feature = "px8-ds-test-support")]
     let member = if force_unknown_member {
@@ -6063,15 +6133,15 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 }
             };
             // A bypass alone is inconclusive on a source whose real owner
-            // returns Ret. This test-only mutation supplies a Vis carrier of
-            // the source constructor's exact identity and field count. A
-            // planned returned member is driven by the pending-Vis loop; only
-            // the separate non-member ingress reaches the C2 backstop.
+            // returns Ret. This test-only mutation arms a one-shot Vis after
+            // the K result reaches Ret, regardless of whether it first
+            // returned Vis. The loop drives its exact planned successor; the
+            // separate non-member ingress reaches the C2 backstop.
             #[cfg(feature = "px8-ds-test-support")]
             let bypass_ret_validation = body_mutation
                 == Some(StaticResponseOwnerBodyMutation::BypassRetValidationAndReturnVis);
             #[cfg(feature = "px8-ds-test-support")]
-            let returned = if bypass_ret_validation {
+            let test_returned_vis = if bypass_ret_validation {
                 let vis_origin = emission.row.vis_origin();
                 let vis_expr = compiler.retained_body_occurrence(vis_origin)?.expr.clone();
                 let RuntimeExpr::Construct { constructor, args } = vis_expr else {
@@ -6086,18 +6156,9 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                         "the test-only owner bypass needs a binary Vis constructor".to_string(),
                     ));
                 }
-                compiler.transfer_constructor_operands(
-                    &mut builder,
-                    vis_origin,
-                    &constructor,
-                    &[
-                        LoweringOperand::Carried(returned),
-                        LoweringOperand::Carried(returned),
-                    ],
-                    None,
-                )?
+                Some((vis_origin, constructor))
             } else {
-                returned
+                None
             };
             if compiler
                 .response_bracket_exits
@@ -6201,6 +6262,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                     placeholder_offset,
                     #[cfg(feature = "px8-ds-test-support")]
                     raw_host_result_escape,
+                    #[cfg(feature = "px8-ds-test-support")]
+                    test_returned_vis,
                     force_unknown_member,
                     bypass_unknown_to_c2,
                 )?);

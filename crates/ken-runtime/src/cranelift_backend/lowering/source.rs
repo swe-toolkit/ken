@@ -1853,15 +1853,26 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         Some(&env),
                                     )?)
                                 } else {
-                                    LoweringOperand::Specialized(self.finish_source_constructor(
+                                    let template = self.finish_source_constructor(
                                         builder,
-                                        constructor,
+                                        constructor.clone(),
                                         static_origin,
                                         specialized_operands_at(
                                             &lowered,
                                             "a source constructor argument",
                                         )?,
-                                    )?)
+                                    )?;
+                                    if self.constructor_template_obligated(&template)? {
+                                        LoweringOperand::Carried(self.transfer_constructor_operands(
+                                            builder,
+                                            static_origin,
+                                            &constructor,
+                                            &lowered,
+                                            Some(&env),
+                                        )?)
+                                    } else {
+                                        LoweringOperand::Specialized(template)
+                                    }
                                 };
                                 SourceMachineState::Value {
                                     value: RoutedAnswer::direct(constructed),
