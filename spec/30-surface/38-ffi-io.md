@@ -1217,8 +1217,27 @@ Then `wait_child` can return ECHILD as
 `Err (ResourceHostIO (IOError.Other 10))` instead of a `ChildExit`;
 Ken does not reset SIGCHLD or promise a successful wait in that
 environment. This is a measured residual, not permission to change
-the inherited-disposition rule of §1.10. Outside that residual, the
-AC-1 observations include an argv/environment echo through a stdout
+the inherited-disposition rule of §1.10.
+
+A child that can be held is identified by a process descriptor acquired
+immediately after spawn and retained through settlement; `wait_child`
+and terminal-error kill use that identity, never the raw process number.
+If pidfd support is unavailable, `withChild` returns
+`Err (ResourceHostIO IOError.Unsupported)` before creating a child,
+with no PID fallback. If descriptor acquisition reports that the OS
+has already auto-reaped the child, spawn still succeeds: the body
+runs, its pipes remain usable, `wait_child` returns
+`Err (ResourceHostIO (IOError.Other 10))`, and terminal settlement
+sends no signal. A narrow identity residual remains only under a
+launcher that auto-reaps via SIGCHLD `SIG_IGN` or `SA_NOCLDWAIT`: if
+the child exits and an unrelated process reuses its PID between
+spawn returning and descriptor acquisition, Ken could hold the
+unrelated process instead. This requires the kernel's cyclic PID
+allocator to wrap the whole PID space within that interval; Ken
+does not reset SIGCHLD to suppress it.
+
+Outside that residual, the AC-1 observations include an
+argv/environment echo through a stdout
 pipe followed by `ChildExit.Exited 0`, and a self-SIGTERM child yielding
 `ChildExit.Signaled 15`, under the checked interpreter. AC-2 observes the live
 child's three descriptors, default SIGPIPE and inherited mask while a
