@@ -288,18 +288,60 @@ fn pidfd_mint_esrch_keeps_body_and_does_not_signal() {
 /// kills and reaps its child before the original errno is returned. MEASURED:
 /// the injected spawn returns EMFILE within ten seconds and the child is then
 /// not waitable. CLAIMED: cleanup kills, rather than waiting for natural exit.
-/// THE GAP: the child must remain alive longer than the completion bound;
-/// `sleep 30` separates SIGKILL from a signal-zero/no-kill cleanup.
+/// THE GAP: the child must survive both a signal-zero/no-kill cleanup and
+/// SIGTERM until the bound; it inherits ignored SIGTERM before posix_spawn,
+/// while `sleep 30` cannot exit naturally within ten seconds.
 #[test]
 fn pidfd_mint_emfile_cleans_up_child_before_error() {
+    const CHILD: &str = "KEN_PIDFD_EMFILE_IGNORE_TERM_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = Command::new(std::env::current_exe().unwrap())
+            .arg("--exact")
+            .arg("process_v1::tests::pidfd_mint_emfile_cleans_up_child_before_error")
+            .arg("--nocapture")
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        return;
+    }
+    // SAFETY: this re-executed process runs exactly one test, so no other
+    // test-process thread can observe the changed SIGTERM disposition.
+    assert_ne!(
+        unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) },
+        libc::SIG_ERR
+    );
     const RETURN_BOUND: std::time::Duration = std::time::Duration::from_secs(10);
     assert_eq!(sigchld_auto_reaps().unwrap(), false);
+    // Positive control: a child started by the same plan inherits ignored
+    // SIGTERM before its first instruction, not only after a shell trap runs.
+    let mut probe = shell_plan("trap '' TERM; exec sleep 30").spawn().unwrap();
+    let status = std::fs::read_to_string(format!("/proc/{}/status", probe.pid())).unwrap();
+    let ignored = status
+        .lines()
+        .find(|line| line.starts_with("SigIgn:"))
+        .unwrap();
+    let bits = u64::from_str_radix(ignored.split_whitespace().nth(1).unwrap(), 16).unwrap();
+    assert_eq!(probe.settle_exit(true).unwrap(), ChildExitV1::Signaled(9));
+    assert_ne!(
+        bits & (1 << (libc::SIGTERM - 1)),
+        0,
+        "child accepts SIGTERM"
+    );
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let started = std::time::Instant::now();
     let worker = std::thread::spawn(move || {
         LAST_MINT_PID.with(|last| last.set(None));
         let error = with_pidfd_fault(PidfdStep::Mint, libc::EMFILE, || {
-            shell_plan("exec sleep 30").spawn().unwrap_err()
+            shell_plan("trap '' TERM; exec sleep 30")
+                .spawn()
+                .unwrap_err()
         });
         let pid = LAST_MINT_PID.with(|last| last.get().unwrap());
         sender.send((error, pid)).unwrap();
