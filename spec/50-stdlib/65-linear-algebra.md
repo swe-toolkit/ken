@@ -1479,3 +1479,71 @@ statement is false. The correct operation passed all eight closed
 instances, and its eight generic proofs checked in that separate D0.
 This is not an official conformance run, a catalog package test on the
 assembled candidate or a measured landed-trust result.
+
+## 17. Scaling a matrix scales its application to a vector
+
+> Section 17 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-SCALE). Architect's AC-0 on exact
+> landed base `cb25f536d` checked the generic law and an importing client
+> without a new `Axiom`; disjoint-root trusted identity sets remained
+> 109 → 109. The accepted client checked four rows, including a generic
+> application and the closed `[9, 21]` values. A false `[3, 7]` claim
+> refused at its own `Refl`. These are scratch D0 observations, not a
+> check of this Spec child, an assembled candidate, official conformance,
+> CI, publication, landing or a landed-trust measurement.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export one additional public
+Transparent checked theorem, directly after `matrix_product_scale_right`
+and before the private `matrix_add_assoc_cons`. Its exact name, binder
+order and type are:
+
+```ken
+pub theorem matrix_vector_scale
+      (m : Nat) (n : Nat) (factor : Nat) (a : Vec (Vec Nat n) m) (x : Vec Nat n)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m n (matrix_scale m n factor a) x)
+        (vector_scale m factor (matrix_vector m n a x))
+```
+
+For every row count `m`, column count `n`, natural factor and
+well-indexed matrix and vector, scaling the **matrix** before
+application gives the same length-`m` vector as scaling the result.
+The `matrix_scale` application is on the left; neither the factor nor
+the `Vec Nat m` result index moves. This is distinct from §6's
+`matrix_vector_homogeneous`, which scales the **input vector** and
+uses `dot_scale_right` on each row. The new matrix-side law uses
+§3's public `dot_scale` for the row head, and recursion on the matrix
+for the tail. The empty matrix gives two empty output vectors;
+in the successor case `dot_scale n factor row x` equates
+`dot n (vector_scale n factor row) x` with
+`mul factor (dot n row x)`, while the induction hypothesis equates
+the tails. Congruence under `VCons`, then transitivity, combines
+both equalities. No new helper, premise, axiom, import, kernel or
+surface rule is needed. The public type is an indexed structural
+`Equal`, not a scalar dot-product equality or a runtime-cost claim.
+
+The §§14–16 rosters above count exports **through those sections**:
+§16 has eleven operations and fifty laws, or sixty-one public names.
+Adding this one law and no operation gives the §17 roster **eleven
+operations and fifty-one laws, sixty-two public names**. The exact
+public-inventory pin must include `matrix_vector_scale`, and the
+separate package-owned generic client must import and apply it.
+Those consumers test the public export; they do not replace the
+checked generic proof. No §§1–16 operation or law type changes.
+
+A closed discriminator uses `m = n = 2`, `a = [[1, 2], [3, 4]]`,
+`x = [1, 1]` and factor `3`. The scaled application and the scaled
+unscaled-result both compute `[9, 21]`, while the unscaled
+application computes `[3, 7]`. The CV-owned seed's accepted block
+checks both scaled values independently and applies the public law
+at this instance. On a fresh accepted prefix, its same-form false
+claim that the scaled application equals `[3, 7]` must refuse at its
+own `Refl`. Architect's scratch client did so with `TypeMismatch`
+at that proof term. Mutating the law's right-hand side to drop the
+factor or substituting `dot_scale_right` for the row-head bridge also
+refused in D0; those proof failures alone do not establish that an
+alternative law statement is false. The distinct closed values
+witness why omitting the factor changes the intended result. These
+finite probes delimit the contract but do not establish a generic
+proof, a fresh exact-tip check, or execution of the separate seed.
