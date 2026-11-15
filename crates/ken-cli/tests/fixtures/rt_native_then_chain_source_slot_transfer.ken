@@ -1,0 +1,47 @@
+program capabilities FS AFull
+import Capability.Console.Text (write)
+import Capability.Filesystem.Authority (file_metadata)
+import Capability.Process.Exit (host_bind, host_console, host_fs, host_pure)
+
+proc metadata_unit (cap : Cap AFull) (path : Bytes)
+  : HostIO AFull (Result FileError Unit) visits [FS] =
+  host_bind AFull (Result FileError FileMetadata) (Result FileError Unit)
+    (host_fs AFull (Result FileError FileMetadata)
+      (file_metadata AFull cap path))
+    (\answer. match answer {
+      Err error |-> host_pure AFull (Result FileError Unit) (Err FileError Unit error);
+      Ok _ |-> host_pure AFull (Result FileError Unit) (Ok FileError Unit MkUnit)
+    })
+
+proc fs_then (a : Auth) (action : HostIO a (Result FileError Unit))
+  (next : Unit -> HostIO a (Result FileError Unit))
+  : HostIO a (Result FileError Unit) visits [FS, Console] =
+  host_bind a (Result FileError Unit) (Result FileError Unit) action
+    (\response. match response {
+      Err error |-> host_bind a (Result IOError Unit) (Result FileError Unit)
+        (host_console a (Result IOError Unit)
+          (write ConsoleStream.Stdout (bytes_encode "fail")))
+        (\_. host_pure a (Result FileError Unit) (Err FileError Unit error));
+      Ok _ |-> next MkUnit
+    })
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS, Console] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      host_bind AFull (Result FileError Unit) ExitCode
+        (fs_then AFull (metadata_unit cap (bytes_encode "switch.bin"))
+          (\_. fs_then AFull (metadata_unit cap (bytes_encode "held.bin"))
+            (\_. fs_then AFull (metadata_unit cap (bytes_encode "held.bin"))
+              (\_. host_pure AFull (Result FileError Unit) (Ok FileError Unit MkUnit)))))
+        (\outcome. match outcome {
+          Err _ |-> host_bind AFull (Result IOError Unit) ExitCode
+            (host_console AFull (Result IOError Unit)
+              (write ConsoleStream.Stdout (bytes_encode "result-error")))
+            (\_. host_pure AFull ExitCode (ExitCode.Failure 42));
+          Ok _ |-> host_bind AFull (Result IOError Unit) ExitCode
+            (host_console AFull (Result IOError Unit)
+              (write ConsoleStream.Stdout (bytes_encode "result-ok")))
+            (\_. host_pure AFull ExitCode ExitCode.Success)
+        })
+  }

@@ -7683,23 +7683,33 @@ impl<'a> Lowering<'a> {
                     )?,
                 )))
             } else {
-                Ok(ProducerTrampolineStep::ordinary(
-                    LoweringOperand::Specialized(Lowered::Constructor {
-                        constructor: constructor.clone(),
-                        synthesized_identity: Some(
-                            self.static_transition_plan
-                                .constructor_symbol_identity(static_origin)?,
-                        ),
-                        occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
-                            static_origin,
-                            PlannedAggregateShape::Constructor,
-                        )?),
-                        args: specialized_constructor_fields_at(
-                            &lowered_args,
-                            "a constructor argument",
-                        )?,
-                    }),
-                ))
+                let template = Lowered::Constructor {
+                    constructor: constructor.clone(),
+                    synthesized_identity: Some(
+                        self.static_transition_plan
+                            .constructor_symbol_identity(static_origin)?,
+                    ),
+                    occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
+                        static_origin,
+                        PlannedAggregateShape::Constructor,
+                    )?),
+                    args: specialized_constructor_fields_at(
+                        &lowered_args,
+                        "a constructor argument",
+                    )?,
+                };
+                let value = if self.constructor_template_obligated(&template)? {
+                    LoweringOperand::Carried(self.transfer_constructor_operands(
+                        builder,
+                        static_origin,
+                        constructor,
+                        &lowered_args,
+                        Some(producer_env),
+                    )?)
+                } else {
+                    LoweringOperand::Specialized(template)
+                };
+                Ok(ProducerTrampolineStep::ordinary(value))
             };
         }
         if let EliminatorFrame::Active(active) = eliminator {
@@ -8324,7 +8334,7 @@ impl<'a> Lowering<'a> {
                 Some(producer_env),
             )?)
         } else {
-            LoweringOperand::Specialized(Lowered::Constructor {
+            let template = Lowered::Constructor {
                 constructor: constructor.clone(),
                 // Carry the plan's already-resolved source identity with
                 // the template.  A later unit boundary may receive this
@@ -8342,7 +8352,18 @@ impl<'a> Lowering<'a> {
                     PlannedAggregateShape::Constructor,
                 )?),
                 args: specialized_constructor_fields_at(&lowered_args, "a constructor argument")?,
-            })
+            };
+            if self.constructor_template_obligated(&template)? {
+                LoweringOperand::Carried(self.transfer_constructor_operands(
+                    builder,
+                    static_origin,
+                    constructor,
+                    &lowered_args,
+                    Some(producer_env),
+                )?)
+            } else {
+                LoweringOperand::Specialized(template)
+            }
         };
         // `D6a` upstream half -- ordinary evaluation STARTS direct and
         // the exact producer RAISES it. ⛔ Not a default written at the
@@ -14785,6 +14806,41 @@ impl<'a> Lowering<'a> {
         }).collect()
     }
 
+    /// Whether the plan issued a construct-site store obligation for any field
+    /// of this source constructor template under the current emission owner.
+    /// It is the same question `emit_carrier_transfer` asks before refusing, so
+    /// a template that answers yes is built here, where its emitter
+    /// environment still exists, rather than refused later at transfer.
+    pub(super) fn constructor_template_obligated(
+        &self,
+        template: &Lowered,
+    ) -> Result<bool, CraneliftBackendError> {
+        let Lowered::Constructor {
+            synthesized_identity: Some(identity),
+            occurrence: Some(occurrence),
+            args,
+            ..
+        } = template
+        else {
+            return Ok(false);
+        };
+        for position in 0..args.len() {
+            if self
+                .static_transition_plan
+                .slot_store_obligation(
+                    self.defining_emission_owner,
+                    *occurrence,
+                    *identity,
+                    position as u32,
+                )?
+                .is_some()
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     /// Build one source constructor directly in the boundary carrier when at
     /// least one child has already crossed a generated-unit edge.
     ///
@@ -17890,7 +17946,7 @@ impl<'a> Lowering<'a> {
                     return self.close_construct_bracket(
                         bracket, LoweringOperand::Carried(constructed));
                 }
-                let constructed = LoweringOperand::Specialized(Lowered::Constructor {
+                let template = Lowered::Constructor {
                     constructor: constructor.clone(),
                     synthesized_identity: Some(
                         self.static_transition_plan
@@ -17906,7 +17962,14 @@ impl<'a> Lowering<'a> {
                         &lowered_args,
                         "a constructor argument",
                     )?,
-                });
+                };
+                let constructed = if self.constructor_template_obligated(&template)? {
+                    LoweringOperand::Carried(self.transfer_constructor_operands(
+                        builder, static_origin, constructor, &lowered_args, Some(env),
+                    )?)
+                } else {
+                    LoweringOperand::Specialized(template)
+                };
                 self.close_construct_bracket(bracket, constructed)
             }
             RuntimeExpr::Match { scrutinee, cases, default } => {
