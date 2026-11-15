@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-UNION-REACHABLE-COMM
 title: "Spec 62 §15 preserves each operand's reachability into graph_union but states no law relating the two operand orders, so a client that built union g h cannot use a reachability fact about union h g. Rule from a checked D0 at zero trust that graph_reachable over graph_union g h equals graph_reachable over graph_union h g as Equal Bool, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-WIDTH-MUL
 title: "Spec 68 §15 says how width propagates through interval addition but not through multiplication, so a client that multiplies two enclosures cannot bound the error of the product. Rule from a checked D0 at zero trust that, for ordered operands, the width of the product is equivalent to hi(i)·width(j) + lo(j)·width(i), with any Rational subtraction-distribution law it needs, and state it with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -45,6 +45,9 @@ states it by its public type.
 - **Seeds and tests.** The seed goes beside
   `conformance/stdlib/numerical/seed-interval-width.md`. The test
   pattern is `crates/ken-elaborator/tests/cat_numeric_interval_width.rs`.
+- **Catalog style.** The catalog half follows
+  `docs/program/07-catalog-style-guide.md` and
+  `agent/playbooks/tools/write-ken.md`.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
@@ -82,7 +85,11 @@ SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO.
   - **Refused block 2.** It drops the premises. For the inverted
     `[3,1]·[1,2] = [3,2]`, the width is 0, while the first form gives
     `1·1 + 1·0 = 1`.
-- **AC-3.** Full-workspace CI is green on the exact candidate.
+- **AC-3.** Readability. The catalog proof and any provider law read
+  as the style guide requires: local names state a proof stage or
+  endpoint, and the candidate passes the independent local-naming
+  and formatter-layout review.
+- **AC-4.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
 
