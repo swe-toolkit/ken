@@ -182,6 +182,18 @@ evt_13j52ac43jrw8; §1a 4 at evt_4em1d5vqwab2p).
    boundary. Entries 3 and 4 share a shape the predicate question at
    entry 6 tests: a resolution context that does not carry what its
    enclosing context selected.
+5. to 9. The predicate was answered YES at entry 9 (Architect
+   `evt_2pz07z6hbjpay`): the test's independent statement must name a
+   checked identity that no Strict source route names. It splits by
+   cause. Private on purpose (entries 5 and 8: module-private names,
+   owner-private helpers and constructors): the hidden-identity client
+   form closes these. Public in role but unhomed (entries 6 and 9: FSOp
+   and the NEG-B auxiliaries; Cap and Resource in `withResource`'s
+   signature): a product-surface defect, homed by
+   `LANG-PRELUDE-NONHOME-FAMILIES-HOME`'s amendment. Entry 7 is the same
+   shape at module granularity: a home's own source loaded in memory does
+   not own the home's pre-source ids; only the roots loader's file unit
+   does (`evt_4txr5d63gtdp8`).
 
 ## Stop conditions
 

@@ -54,6 +54,48 @@ NODE" and sites 1 to 5), which is the contract for this node. In short:
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
 
+## Amendment: formers named by public signatures (2026-11-15)
+
+Steward recut `evt_7pm6wefbx2mb` on LANG-DELETE §1a 9; form ruled by the
+Architect in `evt_5w50s3dsa2k0f` (part A) on Research `evt_6jq14qkszqzar`.
+A public catalog export whose checked type names a pre-source former
+with no home can be called from Strict source, but the types of its
+arguments cannot be written there. This node homes those formers too.
+
+- **Census.** Every type-former identity reachable in the checked type
+  of a public catalog export with no `PRELUDE_PACKAGE_HOMES` row.
+  Reachable is transitive, through argument positions (ResourceKind
+  inside Resource) and through the bodies of transparent type-level
+  definitions (HostIO). It reports each member with the exports that
+  reach it. Measured so far: `Cap` and `Resource` (`withResource`,
+  `prelude.rs` :2984-2986). `FSOp` is expected, not assumed.
+- **Form.** A name-only home row that keeps the existing id. `Cap` and
+  `Resource` are opaque primitives (`prelude.rs` :2007, :2144), so the
+  export is abstract by construction. An inductive member exports the
+  former alone: its constructors (for example `PrivateFsOpen`) and its
+  eliminator stay unreachable.
+- **Granularity pin, per homed member.** A client that imports the
+  former still gets `UnboundName` at each constructor's spelling and at
+  the eliminator's. If a home row cannot export an inductive former
+  without its constructors, stop to the Architect before adding any row.
+- **Owner.** The Architect rules each member's home module on the
+  census; the default is the module that already homes the reaching
+  exports, the lowest in the import graph if several do.
+- **Rows inherited from LANG-DELETE I1b-b**, held there by identity:
+  `cat_system_resource_laws`
+  `resource_laws_have_exact_independent_checked_clients` (carry patch
+  `/workspaces/ken/tmp/l2-i1b-b-cat_system_resource_laws-identity-theorem-carry.rs`;
+  its And clients take the identity-theorem plus CJ form, and its two
+  Not-premise clients wait for LANG-DELETE I4), the two
+  `px8f_buffer_io_surface` rows (Architect `evt_2ps81n9eenrsn`: PX-H on
+  `write_all_checked_step_preserves_the_exact_first_error`, and the
+  FSOp hold on `checked_surface_is_public_but_proof_carrying_constructors_stay_private`),
+  and `lang_let_hostio_action` (on `random_bytes`). Once homed, their
+  clients import the homed formers. ken-interp `px8p_checked_buffer.rs`
+  :20-29 is not held here: it is an I4 carry that takes the internal
+  kernel-term route for its two private identities and imports the homed
+  `FSOp`.
+
 ## Scope
 
 Spec taxonomy rows and the 35 §2.3, 35 §5 and 37 §4/§9 sentences (Spec
