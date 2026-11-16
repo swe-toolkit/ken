@@ -550,6 +550,37 @@ pub theorem graph_union_reachable_comm
       target
       (graph_union_edge_swap q h g))
 
+pub theorem graph_union_reachable_assoc
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (k : Graph q)
+      (s : q)
+      (target : q → Bool)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q (graph_union q g h) k) s target)
+        (graph_reachable q fq (graph_union q g (graph_union q h k)) s target) =
+  bool_eq_from_iff
+    (graph_reachable q fq (graph_union q (graph_union q g h) k) s target)
+    (graph_reachable q fq (graph_union q g (graph_union q h k)) s target)
+    (graph_reachable_graph_monotone
+      q
+      fq
+      (graph_union q (graph_union q g h) k)
+      (graph_union q g (graph_union q h k))
+      s
+      target
+      (graph_union_edge_regroup_right q g h k))
+    (graph_reachable_graph_monotone
+      q
+      fq
+      (graph_union q g (graph_union q h k))
+      (graph_union q (graph_union q g h) k)
+      s
+      target
+      (graph_union_edge_regroup_left q g h k))
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -931,6 +962,10 @@ corresponding inclusion law as its edge-inclusion premise. Commutation applies
 graph monotonicity in both directions, using the private
 `graph_union_edge_swap` as each edge-inclusion premise; the private
 `bool_eq_from_iff` closes the resulting Boolean equality.
+`graph_union_reachable_assoc` follows the same left/right inclusion route:
+private `graph_union_edge_regroup_right` and `graph_union_edge_regroup_left`
+each split the outer and then the inner union with `graph_union_edge_cases`,
+rebuilding the edge with the left and right inclusion laws.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -1313,6 +1348,62 @@ theorem graph_union_edge_swap
     match graph_union_edge_cases q g h u v present {
       Inl from_g ↦ graph_union_edge_right q h g u v from_g;
       Inr from_h ↦ graph_union_edge_left q h g u v from_h
+    }
+
+theorem graph_union_edge_regroup_right
+      (q : Type) (g : Graph q) (h : Graph q) (k : Graph q) (u : q) (v : q)
+    : Equal Bool (edge q (graph_union q (graph_union q g h) k) u v) True
+      → Equal Bool (edge q (graph_union q g (graph_union q h k)) u v) True =
+  λpresent.
+    match graph_union_edge_cases q (graph_union q g h) k u v present {
+      Inl from_gh ↦
+        match graph_union_edge_cases q g h u v from_gh {
+          Inl from_g ↦ graph_union_edge_left q g (graph_union q h k) u v from_g;
+          Inr from_h ↦
+            graph_union_edge_right
+              q
+              g
+              (graph_union q h k)
+              u
+              v
+              (graph_union_edge_left q h k u v from_h)
+        };
+      Inr from_k ↦
+        graph_union_edge_right
+          q
+          g
+          (graph_union q h k)
+          u
+          v
+          (graph_union_edge_right q h k u v from_k)
+    }
+
+theorem graph_union_edge_regroup_left
+      (q : Type) (g : Graph q) (h : Graph q) (k : Graph q) (u : q) (v : q)
+    : Equal Bool (edge q (graph_union q g (graph_union q h k)) u v) True
+      → Equal Bool (edge q (graph_union q (graph_union q g h) k) u v) True =
+  λpresent.
+    match graph_union_edge_cases q g (graph_union q h k) u v present {
+      Inl from_g ↦
+        graph_union_edge_left
+          q
+          (graph_union q g h)
+          k
+          u
+          v
+          (graph_union_edge_left q g h u v from_g);
+      Inr from_hk ↦
+        match graph_union_edge_cases q h k u v from_hk {
+          Inl from_h ↦
+            graph_union_edge_left
+              q
+              (graph_union q g h)
+              k
+              u
+              v
+              (graph_union_edge_right q g h u v from_h);
+          Inr from_k ↦ graph_union_edge_right q (graph_union q g h) k u v from_k
+        }
     }
 
 theorem bool_eq_from_iff
@@ -2864,7 +2955,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–16](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–17](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2901,7 +2992,7 @@ constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `dependency_order_or_cycle`, and
-`graph_from_successors`. Thirty-one kernel-checked theorems expose their laws,
+`graph_from_successors`. Thirty-two kernel-checked theorems expose their laws,
 including successor-list soundness and completeness. Every other helper is
 private to this package.
 
@@ -2944,5 +3035,8 @@ closed reachability values, and both false-edge claims on a shared carrier.
 The union-commutation package test checks the open law and both closed
 operand orders, refuses the same-form claim that the union reaches only
 where `g_only` does, and confirms both proof helpers remain private.
-These package tests do not stand in for official conformance-runner execution
-or CI, and do not establish execution of the §2 seed.
+The union-grouping package test checks the open law and both closed groupings,
+refuses the claim that the three-way union reaches only where
+`graph_union g_only h_only` does, and confirms both regroup lemmas remain
+private. These package tests do not stand in for official conformance-runner
+execution or CI, and do not establish execution of the §2 seed.

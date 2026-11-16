@@ -1529,3 +1529,99 @@ original proof under a change does not by itself falsify an
 alternative law. Those scratch checks do not replace the generic
 checked proof, the separate seed, exact-tip gates or official
 conformance.
+
+## 17. Reachability is invariant under union grouping
+
+> **Section 17 status: DRAFT v0
+> (SPEC-GRAPHS-UNION-REACHABLE-ASSOC).** The Foundation-run D0 on
+> `b99258223` was detached scratch development, not a check of a
+> landed §17 package. Its checked catalog patch added no `Axiom` or
+> postulate; trusted `GlobalId` sets were unchanged at 114 → 114.
+> Four existing graph test binaries passed 21 tests. The accepted
+> client checked; the false `drop_k_claim` refused with
+> `KernelRejected { TypeMismatch }` at its own UTF-8 byte span
+> `6176..6491`. Changing only the new law's conclusion to the
+> wrong inner operand order also refused, and the patch was restored.
+> These observations do not check this Spec child, the separate
+> catalog or CV seed children, an assembled candidate, official
+> conformance, CI, publication, landing or landed trust.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent
+checked theorem immediately after `graph_union_reachable_comm` and
+before `contains`. Its exact name, binder order and result type are:
+
+```ken
+pub theorem graph_union_reachable_assoc
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (k : Graph q)
+      (s : q)
+      (target : q → Bool)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q (graph_union q g h) k) s target)
+        (graph_reachable q fq (graph_union q g (graph_union q h k)) s target)
+```
+
+The left side groups `g` and `h` first; the right side groups `h`
+and `k` first. This is equality of Boolean reachability results,
+not structural `Equal (Graph q)` or a decomposition of reachability
+into the three inputs. There is no additional premise beyond the
+`Finite q` argument. The §15.2 roster of 17 public functions and
+30 public theorems remains historical, as does §16's roster of
+17 functions and 31 theorems. §17 adds one public theorem and no
+operation: through §17 the roster is **17 functions and 32 theorems**.
+No operation or law type from §§1–16 changes.
+
+The proof uses two **private** edge-inclusion theorems in
+Dependency, `graph_union_edge_regroup_right` and
+`graph_union_edge_regroup_left`, directly after
+`graph_union_edge_swap` and before `bool_eq_from_iff`. The right
+helper transports a checked true edge from `(g ∪ h) ∪ k` into
+`g ∪ (h ∪ k)`; the left helper transports it back. Each applies
+`graph_union_edge_cases` first to the outer union and then to the
+inner union where necessary, rebuilding the chosen true edge with
+`graph_union_edge_left` and `graph_union_edge_right`. Each premise
+is an implication on `Equal Bool (edge …) True`, the form required
+by §7's `graph_reachable_graph_monotone`; neither helper needs an
+open-edge Boolean case split. Two applications of that monotonicity
+law, one per direction, feed the existing private `bool_eq_from_iff`
+to close the displayed Boolean equality. These helpers remain
+private like §16's `graph_union_edge_swap`: the public inclusion
+and case laws already let a client derive either direction.
+Publishing an edge regrouping law here would duplicate a
+`bool_or` associativity fact whose canonical public home, if
+needed, is Core, not a second Graphs spelling. No new import,
+assumption, kernel or surface rule is required.
+
+For the separately owned closed discriminator, `Vertex4` has
+vertices V0, V1, V2 and V3. Graphs `g_only`, `h_only` and `k_only`
+each have one distinct edge, respectively V0 → V1, V1 → V2 and
+V2 → V3. With start V0 and target `is_v3`, **both** three-way
+unions reach V3, while `graph_union Vertex4 g_only h_only`
+does not. The walk V0 → V1 → V2 → V3 uses one edge from each
+graph. The accepted client applies the law at open arguments,
+checks each full grouping reaches V3, checks the two-graph union
+misses V3, and accepts the closed law and a same-form equality
+control. On a fresh accepted prefix, the following isolated claim
+must refuse within its own theorem span because it drops `k_only`:
+
+```ken
+theorem drop_k_claim
+    : Equal Bool
+        (graph_reachable
+          Vertex4
+          vertex4_finite
+          (graph_union Vertex4 (graph_union Vertex4 g_only h_only) k_only)
+          V0
+          is_v3)
+        (graph_reachable Vertex4 vertex4_finite (graph_union Vertex4 g_only h_only) V0 is_v3) =
+  Proved
+```
+
+The closed refusal is not a proof of the open law. Its accepted
+full-union and two-graph controls establish why this exact false
+claim is discriminating; the generic proof and its trust boundary
+are separately checked. The CV seed, catalog test and assembled
+candidate retain their own independent gates.
