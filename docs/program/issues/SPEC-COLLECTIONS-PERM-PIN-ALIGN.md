@@ -1,7 +1,7 @@
 ---
 id: SPEC-COLLECTIONS-PERM-PIN-ALIGN
 title: "Spec 37 §6 still pins Perm as the comparator-free truncation and calls count equality rejected, against the later stdlib pin in 57 §3.1 that the catalog follows, so LANG-DELETE I4 cannot retire the pre-source Perm. Amend 37 §6 to the 57 §3.1 form, re-root C5's two sources on Data.Collections.Derived.Perm by import, and revise the prose rows"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

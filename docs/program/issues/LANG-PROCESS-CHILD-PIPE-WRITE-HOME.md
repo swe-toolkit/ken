@@ -1,7 +1,7 @@
 ---
 id: LANG-PROCESS-CHILD-PIPE-WRITE-HOME
 title: "The prelude defines write_pipe, close_pipe_write and close_pipe_read and spec 38 §1.11.2 types them, but §1.11.1 gives Capability.Process.Child only sixteen exports and no package homes the three, so Strict source cannot write a child's stdin or close a pipe early, and ResourceStreamWrite has no reaching witness in either engine. Home the three in Capability.Process.Child at their existing IDs, with the roster at nineteen and seed rows"
-status: ready
+status: active
 owner: language
 size: S
 tier: T2
@@ -19,16 +19,20 @@ origin: "Architect evt_6ykbqn2mrxr4t and evt_2n42pc3vef8xz on the PX10 B2 stop e
 Strict isolated source imports `write_pipe`, `close_pipe_write` and
 `close_pipe_read` from `Capability.Process.Child` and uses them on the
 pipes `take_stdin`, `take_stdout` and `take_stderr` return. Spec 38
-§1.11.1 rosters nineteen names.
+§1.11.1 rosters twenty-eight names.
 
-## Settled inputs (main `fe2e8ce01`)
+## Settled inputs (routed PX10 I2 `5b9bb88d1`)
 
-- **The roster.** Spec 38 §1.11.1 (`spec/30-surface/38-ffi-io.md:1022`)
-  homes sixteen names and says the other pipe operations have no ruled
-  home. It already homes `take_stdin`, which yields a `PipeWrite` that no
+- **The base.** PX10-PIDFD-CHILD-SIGNAL Increment 2 (`5b9bb88d1`, routed
+  `evt_34751ybh2aqne`) edits the same roster, `Child.ken.md` and spec 38.
+  Build on it, and rebase onto main once it lands. If it is withdrawn,
+  stop and report.
+- **The roster.** Spec 38 §1.11.1 (`spec/30-surface/38-ffi-io.md:1034` at
+  `5b9bb88d1`) homes twenty-five names, nine of them the signal names, and
+  says the other pipe operations have no ruled home. It already homes `take_stdin`, which yields a `PipeWrite` that no
   homed operation consumes, and `read_pipe`.
-- **The operations exist.** §1.11.2 types all three (`:1107`, `:1111`,
-  `:1113`). The prelude defines them (`prelude/process.rs:243`, `:257`);
+- **The operations exist.** §1.11.2 types all three (`:1123`, `:1127`,
+  `:1129`). The prelude defines them (`prelude/process.rs:268`, `:283`);
   `write_pipe` lowers to `PrivateResourceStreamWrite`.
 - **No home.** `catalog/packages/Capability/Process/Child.ken.md` exports
   none of the three. A bare use refuses `UnboundName close_pipe_write`
@@ -37,7 +41,7 @@ pipes `take_stdin`, `take_stdout` and `take_stderr` return. Spec 38
   (`/workspaces/ken/tmp/px10-b2-native-pipe-write-first.log`,
   `/workspaces/ken/tmp/px10-b2-native-pipe-write-import-probe.log`).
 - **Seed prose exists.** `conformance/surface/ffi-io/seed-spawn-plan-wait.md`
-  :235-274 already states the write, direction and early-close
+  :238-270 already states the write, direction and early-close
   obligations.
 - **The pattern.** Increment 3a added four names to the same home at
   their existing IDs; its test is
@@ -65,7 +69,7 @@ is the L1 runtime increment that follows.
   stdin, writes bytes through `write_pipe`, closes with
   `close_pipe_write` before `wait_child`, and observes the child's exit.
   A `PipeRead` passed to `write_pipe` refuses at type checking.
-- **AC-4.** Spec 38 §1.11.1 names nineteen exports; the CV reviews the
+- **AC-4.** Spec 38 §1.11.1 names twenty-eight exports; the CV reviews the
   spec sentence and the seed rows with a Decision.
 
 ## Stop conditions
