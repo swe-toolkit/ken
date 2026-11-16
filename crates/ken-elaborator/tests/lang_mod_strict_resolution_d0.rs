@@ -602,7 +602,7 @@ fn catalog_ambient_passthrough_migration_census() {
             ["charToInt"].into_iter().map(str::to_string).collect(),
         ),
         (
-            // Argmin imports NonEmpty, Derived membership, Nat Order and Or.
+            // Argmin imports NonEmpty, Derived membership, Nat Arithmetic, Nat Order and Or.
             // The provider closure retains four compiler conveniences under
             // the strict-floor probe; neither Nat bridge adds an assumption.
             // SUBSET-SIGMA K-a Char projection: inherited from

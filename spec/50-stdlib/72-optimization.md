@@ -1428,7 +1428,7 @@ pub fn least_k (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) : List a =
 The list is the existing `List a`, and `take`, `sort`, `filter`,
 `eq_from_ord`, `is_sorted` and `list_elem` belong to the existing
 `Data.Collections.Derived` package. `take` already has the required
-recursive body on this base but is private; this contract publishes
+recursive body and is public on this base; this contract reuses
 that **same** operation rather than adding `list_take`. On `Zero`
 it returns `Nil a`; on a positive count and `Cons h t`, it retains
 `h` and takes the remaining count from `t`; on `Nil`, it returns
@@ -1647,3 +1647,80 @@ new `Axiom`, with disjoint-root trusted identity sets 114 = 114.
 That is D0 evidence only, not a committed catalog child, a landed
 trust measurement, CI, publication or landing. No existing §§1–4.3
 operation or law type, kernel or surface rule changes here.
+
+### 4.5 Prefix stability across selection bounds
+
+> **Section 4.5 status: DRAFT v0
+> (SPEC-OPTIMIZATION-LEAST-K-PREFIX).** Architect's AC-0
+> `evt_76a9z7987y4wt` ruled a detached D0 on the older base
+> `fd523a842465c0bc185140167143ad457d51bc37`. With the same
+> provider-first loading, exact trusted GlobalId sets remained equal
+> (114 → 114). Derived-owned declarations rose 187 → 188 (public
+> heads 66 → 67), and Argmin-owned declarations rose 104 → 105
+> (public heads 49 → 50). No fallback fired and no `Axiom` was
+> added. The later authoring base `a731359837ec650464b0d17f3f03d64088ec1609`
+> does not turn that D0 into a current-base check. These are scratch
+> observations, not a check of this `/spec` child, the CV-owned seed,
+> the catalog child or assembled tip, official conformance, CI,
+> publication, landing or measured landed trust.
+
+`Data.Collections.Derived` must export the following public checked
+attached proof immediately after `filter_prefix for take` and before
+the private `derived_take_sorted_tail`. It is a generic property of
+`take`, not a private Argmin helper:
+
+```ken
+pub proof prefix for take
+      (a : Type) (k : Nat) (n : Nat) (xs : List a)
+    : Equal Bool (leq_nat k n) True
+      → Equal (List a) (take a k (take a n xs)) (take a k xs)
+```
+
+The premise says `k ≤ n` in the existing public `leq_nat` decision.
+It is not a bound expressed specifically as `add`, and it permits
+reuse for any two bounds. It is necessary: at `k = 3` and `n = 2`,
+`take 3 (take 2 [A,B,C,D])` is `[A,B]`, while
+`take 3 [A,B,C,D]` is `[A,B,C]` (X-BOUND). The closed refusal
+of the attempted law application lies at the false bound proof;
+it is not an input rejection by either `take` call. The checked
+proof inducts on `k`, then `n`, then `xs`, lifting the recursive
+result with `cong` under `Cons a h`. The `Suc k`/`Zero n` case
+refutes its false bound with `absurd`; the remaining base cases
+compute. No private or public helper accompanies this proof.
+
+`Algorithm.Optimization.Argmin` must export one public Transparent
+checked theorem directly after `least_k_cost_order_invariant` and
+before `argmax`:
+
+```ken
+pub theorem least_k_prefix
+      (a : Type) (cost : a → Nat) (k : Nat) (m : Nat) (xs : List a)
+    : Equal (List a) (least_k a cost k xs)
+        (take a k (least_k a cost (add k m) xs))
+```
+
+This is structural equality of the two **lists**, not just their
+costs or value memberships. It has no caller-supplied premise:
+`leq_nat_add_left_bound k m` supplies the `k ≤ add k m` fact
+required by `take::prefix`. Expand both `least_k` calls over the
+**same** stable sort, apply the public attached proof to that one
+sorted list, then use `sym` to orient the equality as displayed.
+Argmin adds named imports of `add` from
+`Data.Numeric.Nat.Arithmetic` and `leq_nat_add_left_bound` from
+`Data.Numeric.Nat.Order`. This route adds no helper, postulate,
+primitive, `Axiom` or change to an existing §§1–4.4 law type.
+Inducting on `k` over the `add`-shaped bound instead is not the
+chosen route: `add` recurses on its second argument, so
+`add (Suc k) m` remains stuck for open `m`.
+
+On §4.3's input `[A,B,C,D]` with costs `[2,1,2,3]`, stable sort
+places tied `A` before `C`. Thus `least_k 2` gives `[B,A]`, and
+taking two from `least_k (2+1) = [B,A,C]` gives `[B,A]`:
+the tie at the cut is load-bearing. Two stronger claims are false.
+The two-least list is **not** the entire three-least list
+(X-SAME): `[B,A]` and `[B,A,C]` have different lengths. Nor is it
+the last two of the three-least (X-LAST): `[B,A]` differs from
+`[A,C]` at its head. The independent closed controls and three
+isolated false claims belong to CV's separate seed; the D0's
+acceptance and refusal observations do not prove the generic laws
+or run that authored seed.
