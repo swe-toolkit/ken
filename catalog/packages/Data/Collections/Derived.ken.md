@@ -57,8 +57,8 @@ FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 `nth`, public `take`, and private `drop`. Public `take` retains the original
 structural recursion and has attached length, membership, sorted-prefix,
 filtered-prefix, and prefix-composition proofs. The canonical `length` comes
-from the trust-free `Data.Collections.List` module and is re-exported here with the same checked
-identity. `list_eq` and `list_compare` are imported from
+from the trust-free `Data.Collections.List` module and is re-exported here
+with the same checked identity. `list_eq` and `list_compare` are imported from
 the canonical comparison provider; `sub` is imported from the canonical Nat
 order provider and described in `§4.5`, next to the string ops that need it.
 

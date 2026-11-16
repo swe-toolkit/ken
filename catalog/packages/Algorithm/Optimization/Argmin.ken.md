@@ -2035,11 +2035,14 @@ false-result refusals specified by `spec/50-stdlib/72-optimization.md` §4.
 The `cat_optimization_least_k` package test roots-loads the public laws and
 closed sorted-prefix controls, checks exact trusted-base identities, and
 distinguishes the wrong costlier and later-tie results. The
-[§4.5 prefix seed](../../../../conformance/stdlib/optimization/seed-least-k-prefix.md)
+[§4.5 prefix seed][prefix-seed]
 records the two-of-three prefix on a tied fixture, the generic take-composition
 law, and the equal-list, last-two and violated-bound refusals. The
 `cat_optimization_least_k_prefix` package test roots-loads both laws, checks
 exact trusted-base identities, and isolates each refusal in its own theorem.
+
+[prefix-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-prefix.md
+
 `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
 instances and false-result refusals. Its scoped acceptance target checks the
