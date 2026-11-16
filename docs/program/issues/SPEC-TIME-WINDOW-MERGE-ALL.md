@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-MERGE-ALL
 title: "Spec 69 §3 distributes a time window over the two-way trace merge, but §15's k-way trace_merge_all has no window law, so a client that windows a merged list of traces cannot window each trace first. Rule from a checked D0 at zero trust that, when every input trace is time-ordered, trace_window of trace_merge_all equals trace_merge_all of the windowed traces, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
