@@ -4054,8 +4054,7 @@ checks both public generic law types, transparent ownership and exact
 trusted-identity preservation. Its closed conformance client is separate;
 this package test does not execute that client. The
 [trace seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-trace.md)
-is authored, not officially conformance-run; its
-[package test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_trace.rs)
-checks the four open law types, the closed 3 × 3 values and both isolated
+is authored, not officially conformance-run; its package test checks the
+four open law types, the closed 3 × 3 values and both isolated
 refusals. These tests use root-loaded exports; they are not official
 conformance-runner runs or claims of CI, publication or landing.
