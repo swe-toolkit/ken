@@ -194,10 +194,11 @@ fn canonical_ord_result_is_strict_standalone_and_exports_one_identity() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: the real Derived roots load reaches the canonical OrdResult and
-/// Compare globals, has no competing Derived identities, and reloads providers
-/// idempotently. CLAIMED: the consumer closure reuses its providers. THE GAP:
-/// later catalog leaves may still have unrelated unresolved dependencies.
+/// MEASURED: the real Derived load reaches exactly one OrdResult inductive,
+/// the canonical Core.Logic.OrdResult; Order owns no copy; Order's compare and
+/// Derived's two comparisons return it. CLAIMED: the consumer closure reuses
+/// its providers. THE GAP: later catalog leaves may still have unrelated
+/// unresolved dependencies.
 #[test]
 fn real_derived_consumer_reuses_canonical_logic_providers() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -220,14 +221,35 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
         .globals
         .contains_key("Data.Collections.Derived.OrdResult"));
 
-    let order_local = env.globals["Data.Numeric.Nat.Order.OrdResult"];
-    assert!(matches!(
-        env.env.lookup(order_local),
-        Some(Decl::Inductive { .. })
-    ));
-    assert_ne!(
-        order_local, canonical,
-        "Order's package-local comparison codomain must remain distinct"
+    let ord_result_ids: BTreeSet<_> = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            ((name == "OrdResult" || name.ends_with(".OrdResult"))
+                && matches!(env.env.lookup(*id), Some(Decl::Inductive { .. })))
+            .then_some(*id)
+        })
+        .collect();
+    assert_eq!(
+        ord_result_ids,
+        BTreeSet::from([canonical]),
+        "the real Derived closure has exactly the canonical OrdResult identity"
+    );
+    for name in ["OrdResult", "Lt", "Eq", "Gt"] {
+        assert!(
+            !env.globals
+                .contains_key(&format!("Data.Numeric.Nat.Order.{name}")),
+            "Order must not own a second {name}"
+        );
+    }
+    let order_compare = env.globals["Data.Numeric.Nat.Order.compare"];
+    let order_compare_ty = match env.env.lookup(order_compare) {
+        Some(Decl::Transparent { ty, .. }) => ty,
+        other => panic!("Order compare must be transparent, got {other:?}"),
+    };
+    assert!(
+        mentions_global(order_compare_ty, canonical),
+        "Order compare must return canonical Core.Logic OrdResult"
     );
 
     let mut derived_compare_bodies = Vec::new();
@@ -240,14 +262,6 @@ fn real_derived_consumer_reuses_canonical_logic_providers() {
         assert!(
             mentions_global(ty, canonical),
             "Derived {name} must return canonical Core.Logic OrdResult"
-        );
-        assert!(
-            !mentions_global(ty, order_local),
-            "Derived {name} must not return Order's package-local OrdResult"
-        );
-        assert!(
-            !mentions_global(body, order_local),
-            "Derived {name} body must exclude Order's package-local OrdResult"
         );
         derived_compare_bodies.push((name, id, body));
     }
