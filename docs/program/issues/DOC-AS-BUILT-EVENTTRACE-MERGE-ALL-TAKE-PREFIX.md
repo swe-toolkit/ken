@@ -1,7 +1,7 @@
 ---
 id: DOC-AS-BUILT-EVENTTRACE-MERGE-ALL-TAKE-PREFIX
 title: "Two catalog landings add public laws that the library's catalog reference does not summarize: EventTrace's trace_window_merge_all and Derived's take::prefix. Bring the two cards and the laws.md projection up to the landed source"
-status: active
+status: merged
 owner: doc
 size: S
 tier: T2
