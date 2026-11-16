@@ -34,8 +34,9 @@ follows `trace_merge` as a direct right fold. The first five generic laws
 follow, then their private recursive merge helper and proof lemmas. The
 window/merge distribution, composition and commutation laws, the three
 merge membership laws, merge associativity and adjacent-window split lead
-their private lemmas later in the source. The three merge-all laws follow
-the associativity helper family, in ordered, complete, sound order.
+their private lemmas later in the source. The ordered, complete, and sound
+merge-all laws follow the associativity helper family. The count law follows
+them, then the window-distribution law.
 The separated-merge law follows the right empty-merge unit and leads its
 private head-comparison helper. The inverted-window law follows window
 append; its private decision lemma sits beside the split's bound lemmas.
@@ -66,6 +67,7 @@ import Data.Collections.Derived (is_sorted)
 import Data.Collections.Derived
   (filter,
     length,
+    map,
     list_append,
     count,
     list_elem,
@@ -2573,6 +2575,64 @@ pub theorem trace_merge_all_count
             (list_append::count (Event p) eqf q t (list_concat (Event p) rest))))
   }
 
+pub theorem trace_window_merge_all
+      (p : Type) (lo : Nat) (hi : Nat) (traces : List (List (Event p)))
+    : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge_all p traces))
+        (trace_merge_all
+          p
+          (map (List (Event p)) (List (Event p)) (trace_window p lo hi) traces)) =
+  match traces {
+    Nil ↦ λeach_ordered. Proved;
+    Cons t rest ↦
+      λeach_ordered.
+        let
+          rest_ordered : (u : List (Event p))
+            → list_elem
+            (List (Event p))
+            u rest → time_ordered p u =
+            λu. λmember. each_ordered u (list_elem_later (List (Event p)) u t rest member);
+          merged_rest = trace_merge_all p rest;
+          windowed_head = trace_window p lo hi t;
+          merged_windowed_rest =
+            trace_merge_all
+              p
+              (map (List (Event p)) (List (Event p)) (trace_window p lo hi) rest);
+          head_distributes : Equal
+            (List (Event p))
+            (trace_window p lo hi (trace_merge p t merged_rest))
+            (trace_merge p windowed_head (trace_window p lo hi merged_rest)) =
+            trace_window_merge
+              p
+              lo
+              hi
+              t
+              merged_rest
+              (each_ordered t (list_elem_head (List (Event p)) t rest))
+              (trace_merge_all_ordered p rest rest_ordered);
+          rest_distributes : Equal
+            (List (Event p))
+            (trace_window p lo hi merged_rest)
+            merged_windowed_rest =
+            trace_window_merge_all p lo hi rest rest_ordered
+        in
+          trans
+            (List (Event p))
+            (trace_window p lo hi (trace_merge p t merged_rest))
+            (trace_merge p windowed_head (trace_window p lo hi merged_rest))
+            (trace_merge p windowed_head merged_windowed_rest)
+            head_distributes
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_window p lo hi merged_rest)
+              merged_windowed_rest
+              (trace_merge p windowed_head)
+              rest_distributes)
+  }
+
 theorem event_before_skip
       (p : Type)
       (x : Event p)
@@ -3389,7 +3449,11 @@ premise, or public existential. The count law inducts over the trace list:
 two-way `trace_merge_count` accounts for each head, the induction hypothesis
 accounts for the rest, and Derived's public `list_append::count` relates the
 result to `list_concat`. It preserves duplicate occurrences without ordering
-or a new helper. Soundness excludes added events, but ordered and sound alone
+or a new helper. The window-distribution law inducts on the trace list. Each
+step applies the two-way `trace_window_merge` with the head's ordering from
+the premise and the merged tail's ordering from `trace_merge_all_ordered`,
+then carries the induction hypothesis through `cong` and `trans`. Soundness
+excludes added events, but ordered and sound alone
 do not characterize this merge: a constant empty result satisfies both while
 violating completeness.
 
@@ -3468,7 +3532,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, and the twenty-five laws form the
+   `trace_merge`, `trace_merge_all`, and the twenty-six laws form the
    package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
@@ -3484,8 +3548,10 @@ merging, not window multiplicity.
    merge-all reuses the two-way order and membership laws, Derived
    `list_elem_head`/`list_elem_later`, `list_concat`, append membership,
    and Ω-valued `J` transport. The count proof composes checked
-   `trace_merge_count` with public `list_append::count`; these four merge-all
-   proofs add no helper. The one-way
+   `trace_merge_count` with public `list_append::count`. The window law
+   reuses `trace_window_merge` and `trace_merge_all_ordered`, with `map`
+   as the sole new Derived import; these five merge-all proofs add no helper.
+   The one-way
    window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
    `max`/`min` bounds and structurally fuses generic list filters. Window
@@ -3508,7 +3574,7 @@ merging, not window multiplicity.
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
    The no-member law reuses those same lemmas and `window_keep` to delete
    each missed head, without an additional helper or import.
-4. **Trusted-base delta.** Zero: all twenty-five exported laws have checked proof
+4. **Trusted-base delta.** Zero: all twenty-six exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3555,5 +3621,9 @@ merging, not window multiplicity.
    all three open laws and the right fold at zero new trust; its closed client
    checks Nil, three-trace interleaving, an earlier-trace tie and both
    membership laws, while an unordered middle trace refuses at its false
-   ordering premise. These tests are not official conformance-runner execution
+   ordering premise. The `cat_time_window_merge_all` package test applies the
+   open window law at zero added trust, checks a three-trace window both by
+   value and by law, and refuses the same-form claim with an unordered head or
+   tail after each corresponding pair of closed value controls. These tests
+   are not official conformance-runner execution
    or CI.
