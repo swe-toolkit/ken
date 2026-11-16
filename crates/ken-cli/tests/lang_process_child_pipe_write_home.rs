@@ -53,11 +53,15 @@ fn write_pipe_rejects_a_read_end_at_type_checking() {
     let wrong = CLIENT.replacen(old, replacement, 1);
     let mut env = ElabEnv::new().expect("prelude");
     match env.elaborate_isolated_file_strict_v1(&[catalog_root()], &wrong) {
-        Err(ElabError::TypeMismatch { span, reason }) => {
+        Err(ElabError::KernelRejected {
+            error: ken_kernel::KernelError::TypeMismatch { expected, found },
+            span,
+        }) => {
+            let call = wrong.find(replacement).unwrap();
+            assert_ne!(expected, found, "pipe directions must have distinct types");
             assert!(
-                span.start >= wrong.find("write_pipe AFull readable").unwrap()
-                    && span.end <= wrong.len(),
-                "typed refusal must occur at the changed write call: {span:?}, {reason}"
+                span.start <= call && span.end >= call + replacement.len(),
+                "type refusal must enclose the changed write call: {span:?}"
             );
         }
         Err(error) => panic!("wrong-direction call refused for the wrong reason: {error:?}"),
