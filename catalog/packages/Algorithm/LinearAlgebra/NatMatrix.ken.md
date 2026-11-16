@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and fifty-one algebraic laws have checked proofs.
+all arithmetic is exact, and fifty-five algebraic laws have checked proofs.
 
 ## Contents
 
@@ -34,7 +34,11 @@ both sides and that its transpose is zero. A zero self-dot conversely
 identifies the vector as zero, using Nat Arithmetic's zero-sum inversion
 laws and a private squared-head step. `matrix_scale` maps vector scaling over
 rows; its eight checked laws connect matrix addition, factor arithmetic,
-transpose and multiplication. The named private stages build columns and row
+transpose and multiplication. `trace` sums the diagonal of a square matrix
+by recursion on its dimension, adding the corner entry to the trace of the
+trailing minor. Its four checked laws make it additive over `matrix_add`,
+homogeneous under `matrix_scale`, invariant under `transpose` and equal to
+the dimension on `identity`. The named private stages build columns and row
 products; no second matrix carrier or numeric primitive is needed.
 
 ```ken
@@ -526,6 +530,16 @@ pub fn matrix_scale
       (m : Nat) (n : Nat) (factor : Nat) (rows : Vec (Vec Nat n) m)
     : Vec (Vec Nat n) m =
   map (Vec Nat n) (Vec Nat n) m (vector_scale n factor) rows
+
+pub fn trace (n : Nat) : Vec (Vec Nat n) n → Nat =
+  match n {
+    Zero ↦ λrows. Zero;
+    Suc k ↦
+      λrows.
+        match rows {
+          VCons _ row rest ↦ add (trace k (drop_column k k rest)) (row_head k row)
+        }
+  }
 
 pub theorem matrix_product_distrib_left
       (m : Nat)
@@ -1836,6 +1850,208 @@ pub theorem matrix_vector_scale
             new_tail
             (VCons Nat k new_head)
             (matrix_vector_scale k n factor rest x))
+  }
+
+pub theorem trace_add
+      (n : Nat)
+    : (a : Vec (Vec Nat n) n)
+      → (b : Vec (Vec Nat n) n)
+      → Equal Nat (trace n (matrix_add n n a b)) (add (trace n a) (trace n b)) =
+  match n {
+    Zero ↦ λa. λb. Proved;
+    Suc k ↦
+      λa.
+        λb.
+          match a {
+            VCons _ arow arest ↦
+              match b {
+                VCons _ brow brest ↦
+                  match arow {
+                    VCons _ x xs ↦
+                      match brow {
+                        VCons _ y ys ↦
+                          let
+                            da = drop_column k k arest;
+                            db = drop_column k k brest;
+                            ta = trace k da;
+                            tb = trace k db;
+                            old_minor = drop_column k k (matrix_add k (Suc k) arest brest)
+                          in
+                            trans
+                              Nat
+                              (add (trace k old_minor) (add x y))
+                              (add (add ta tb) (add x y))
+                              (add (add ta x) (add tb y))
+                              (trans
+                                Nat
+                                (add (trace k old_minor) (add x y))
+                                (add (trace k (matrix_add k k da db)) (add x y))
+                                (add (add ta tb) (add x y))
+                                (cong
+                                  (Vec (Vec Nat k) k)
+                                  Nat
+                                  old_minor
+                                  (matrix_add k k da db)
+                                  (λminor. add (trace k minor) (add x y))
+                                  (drop_column_add k k arest brest))
+                                (cong
+                                  Nat
+                                  Nat
+                                  (trace k (matrix_add k k da db))
+                                  (add ta tb)
+                                  (λsum. add sum (add x y))
+                                  (trace_add k da db)))
+                              (sym
+                                Nat
+                                (add (add ta x) (add tb y))
+                                (add (add ta tb) (add x y))
+                                (add_shuffle ta x tb y))
+                      }
+                  }
+              }
+          }
+  }
+
+pub theorem trace_scale
+      (n : Nat) (x : Nat)
+    : (a : Vec (Vec Nat n) n) → Equal Nat (trace n (matrix_scale n n x a)) (mul x (trace n a)) =
+  match n {
+    Zero ↦ λa. Proved;
+    Suc k ↦
+      λa.
+        match a {
+          VCons _ row rest ↦
+            match row {
+              VCons _ h t ↦
+                let
+                  minor = drop_column k k rest;
+                  tm = trace k minor;
+                  old_minor = drop_column k k (matrix_scale k (Suc k) x rest)
+                in
+                  trans
+                    Nat
+                    (add (trace k old_minor) (mul x h))
+                    (add (mul x tm) (mul x h))
+                    (mul x (add tm h))
+                    (trans
+                      Nat
+                      (add (trace k old_minor) (mul x h))
+                      (add (trace k (matrix_scale k k x minor)) (mul x h))
+                      (add (mul x tm) (mul x h))
+                      (cong
+                        (Vec (Vec Nat k) k)
+                        Nat
+                        old_minor
+                        (matrix_scale k k x minor)
+                        (λm. add (trace k m) (mul x h))
+                        (drop_column_scale k k x rest))
+                      (cong
+                        Nat
+                        Nat
+                        (trace k (matrix_scale k k x minor))
+                        (mul x tm)
+                        (λs. add s (mul x h))
+                        (trace_scale k x minor)))
+                    (sym
+                      Nat
+                      (mul x (add tm h))
+                      (add (mul x tm) (mul x h))
+                      (mul_add_distrib_r x tm h))
+            }
+        }
+  }
+
+pub theorem trace_transpose
+      (n : Nat)
+    : (a : Vec (Vec Nat n) n) → Equal Nat (trace n (transpose n n a)) (trace n a) =
+  match n {
+    Zero ↦ λa. Proved;
+    Suc k ↦
+      λa.
+        match a {
+          VCons _ row rest ↦
+            match row {
+              VCons _ h t ↦
+                let
+                  column = first_column k k rest;
+                  minor = drop_column k k rest;
+                  minor_t = transpose k k minor;
+                  glued = zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) k (prepend k) t minor_t
+                in
+                  trans
+                    Nat
+                    (trace
+                      (Suc k)
+                      (zip_with
+                        Nat
+                        (Vec Nat k)
+                        (Vec Nat (Suc k))
+                        (Suc k)
+                        (prepend k)
+                        (VCons Nat k h t)
+                        (transpose k (Suc k) rest)))
+                    (add (trace k (drop_column k k glued)) h)
+                    (add (trace k minor) h)
+                    (cong
+                      (Vec (Vec Nat k) (Suc k))
+                      Nat
+                      (transpose k (Suc k) rest)
+                      (VCons (Vec Nat k) k column minor_t)
+                      (λcols.
+                        trace
+                          (Suc k)
+                          (zip_with
+                            Nat
+                            (Vec Nat k)
+                            (Vec Nat (Suc k))
+                            (Suc k)
+                            (prepend k)
+                            (VCons Nat k h t)
+                            cols))
+                      (transpose_column_split k k rest))
+                    (trans
+                      Nat
+                      (add (trace k (drop_column k k glued)) h)
+                      (add (trace k minor_t) h)
+                      (add (trace k minor) h)
+                      (cong
+                        (Vec (Vec Nat k) k)
+                        Nat
+                        (drop_column k k glued)
+                        minor_t
+                        (λm. add (trace k m) h)
+                        (drop_column_prepend k k t minor_t))
+                      (cong
+                        Nat
+                        Nat
+                        (trace k minor_t)
+                        (trace k minor)
+                        (λs. add s h)
+                        (trace_transpose k minor)))
+            }
+        }
+  }
+
+pub theorem trace_identity (n : Nat) : Equal Nat (trace n (identity n)) n =
+  match n {
+    Zero ↦ Proved;
+    Suc k ↦
+      let shifted =
+        map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k)
+      in
+        trans
+          Nat
+          (add (trace k (drop_column k k shifted)) (Suc Zero))
+          (add (trace k (identity k)) (Suc Zero))
+          (Suc k)
+          (cong
+            (Vec (Vec Nat k) k)
+            Nat
+            (drop_column k k shifted)
+            (identity k)
+            (λm. add (trace k m) (Suc Zero))
+            (drop_column_prepend_zero k k (identity k)))
+          (cong Nat Nat (trace k (identity k)) k (λs. add s (Suc Zero)) (trace_identity k))
   }
 
 theorem matrix_add_assoc_cons
@@ -3445,6 +3661,138 @@ theorem zip_prepend_add
           }
       }
   }
+
+theorem drop_column_add
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat (Suc n)) m) (b : Vec (Vec Nat (Suc n)) m)
+    : Equal
+        (Vec (Vec Nat n) m)
+        (drop_column m n (matrix_add m (Suc n) a b))
+        (matrix_add m n (drop_column m n a) (drop_column m n b)) =
+  match a {
+    VNil ↦ Proved;
+    VCons j r rs ↦
+      match b {
+        VCons _ s ss ↦
+          match r {
+            VCons _ x xs ↦
+              match s {
+                VCons _ y ys ↦
+                  cong
+                    (Vec (Vec Nat n) j)
+                    (Vec (Vec Nat n) (Suc j))
+                    (drop_column j n (matrix_add j (Suc n) rs ss))
+                    (matrix_add j n (drop_column j n rs) (drop_column j n ss))
+                    (VCons (Vec Nat n) j (vector_add n xs ys))
+                    (drop_column_add j n rs ss)
+              }
+          }
+      }
+  }
+
+theorem drop_column_scale
+      (m : Nat) (n : Nat) (x : Nat) (a : Vec (Vec Nat (Suc n)) m)
+    : Equal
+        (Vec (Vec Nat n) m)
+        (drop_column m n (matrix_scale m (Suc n) x a))
+        (matrix_scale m n x (drop_column m n a)) =
+  match a {
+    VNil ↦ Proved;
+    VCons j r rs ↦
+      match r {
+        VCons _ h t ↦
+          cong
+            (Vec (Vec Nat n) j)
+            (Vec (Vec Nat n) (Suc j))
+            (drop_column j n (matrix_scale j (Suc n) x rs))
+            (matrix_scale j n x (drop_column j n rs))
+            (VCons (Vec Nat n) j (vector_scale n x t))
+            (drop_column_scale j n x rs)
+      }
+  }
+
+theorem transpose_column_split
+      (m : Nat) (n : Nat) (rows : Vec (Vec Nat (Suc n)) m)
+    : Equal
+        (Vec (Vec Nat m) (Suc n))
+        (transpose m (Suc n) rows)
+        (VCons (Vec Nat m) n (first_column m n rows) (transpose m n (drop_column m n rows))) =
+  match rows {
+    VNil ↦ Refl;
+    VCons j r rs ↦
+      match r {
+        VCons _ x xs ↦
+          cong
+            (Vec (Vec Nat j) (Suc n))
+            (Vec (Vec Nat (Suc j)) (Suc n))
+            (transpose j (Suc n) rs)
+            (VCons (Vec Nat j) n (first_column j n rs) (transpose j n (drop_column j n rs)))
+            (λcols.
+              zip_with
+                Nat
+                (Vec Nat j)
+                (Vec Nat (Suc j))
+                (Suc n)
+                (prepend j)
+                (VCons Nat n x xs)
+                cols)
+            (transpose_column_split j n rs)
+      }
+  }
+
+theorem drop_column_prepend
+      (m : Nat) (n : Nat) (col : Vec Nat m) (rows : Vec (Vec Nat n) m)
+    : Equal
+        (Vec (Vec Nat n) m)
+        (drop_column m n (zip_with Nat (Vec Nat n) (Vec Nat (Suc n)) m (prepend n) col rows))
+        rows =
+  match col {
+    VNil ↦ vec_zero_vnil (Vec Nat n) rows;
+    VCons j x xs ↦
+      match rows {
+        VCons _ r rs ↦
+          cong
+            (Vec (Vec Nat n) j)
+            (Vec (Vec Nat n) (Suc j))
+            (drop_column j n (zip_with Nat (Vec Nat n) (Vec Nat (Suc n)) j (prepend n) xs rs))
+            rs
+            (VCons (Vec Nat n) j r)
+            (drop_column_prepend j n xs rs)
+      }
+  }
+
+theorem drop_column_prepend_zero
+      (m : Nat) (n : Nat) (rows : Vec (Vec Nat n) m)
+    : Equal
+        (Vec (Vec Nat n) m)
+        (drop_column m n (map (Vec Nat n) (Vec Nat (Suc n)) m (prepend_zero n) rows))
+        rows =
+  match rows {
+    VNil ↦ Proved;
+    VCons j r rs ↦
+      cong
+        (Vec (Vec Nat n) j)
+        (Vec (Vec Nat n) (Suc j))
+        (drop_column j n (map (Vec Nat n) (Vec Nat (Suc n)) j (prepend_zero n) rs))
+        rs
+        (VCons (Vec Nat n) j r)
+        (drop_column_prepend_zero j n rs)
+  }
+
+fn drop_column (m : Nat) (n : Nat) (rows : Vec (Vec Nat (Suc n)) m) : Vec (Vec Nat n) m =
+  map (Vec Nat (Suc n)) (Vec Nat n) m (row_tail n) rows
+
+fn first_column (m : Nat) (n : Nat) (rows : Vec (Vec Nat (Suc n)) m) : Vec Nat m =
+  map (Vec Nat (Suc n)) Nat m (row_head n) rows
+
+fn row_tail (n : Nat) (row : Vec Nat (Suc n)) : Vec Nat n =
+  match row {
+    VCons _ x rest ↦ rest
+  }
+
+fn row_head (n : Nat) (row : Vec Nat (Suc n)) : Nat =
+  match row {
+    VCons _ x rest ↦ x
+  }
 ```
 
 ## 3. Using it
@@ -3578,6 +3926,19 @@ product laws include zero dimensions and preserve the factor's position.
 lifts the tail induction through `VCons`. It compares empty vectors on
 zero rows; no additional proof helper or premise is needed.
 
+The four trace laws induct on the dimension with their square matrices after
+the colon, so each successor case sees rows of the successor width.
+`trace_add` and `trace_scale` move the minor through the row-wise sum or
+scaling with private `drop_column_add` or `drop_column_scale`, apply the
+induction hypothesis to the minors and regroup with private `add_shuffle` or
+the reversed `mul_add_distrib_r`. `trace_transpose` uses private
+`transpose_column_split` to expose the transposed first column. The corner is
+unchanged, private `drop_column_prepend` removes the prepended column, and the
+hypothesis at the minor closes the step. `trace_identity` drops the zero
+column with private `drop_column_prepend_zero`; adding the unit corner on the
+right reduces to the successor. All four laws hold at dimension zero and need
+no premise.
+
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
@@ -3602,8 +3963,12 @@ merely following from it. Multiplication by a zero matrix likewise returns
 a zero matrix on either side, and transposing the zero matrix preserves
 zero entries while exchanging its dimensions. The named
 `dot_with` helper passes the row's dot product to `map` without a
-lambda-headed application in a proof goal. A rational-valued or approximate
-matrix would require a different statement of equality and is not implied
+lambda-headed application in a proof goal. `trace` takes its square matrix
+after the colon: matching on the dimension then refines the matrix's type,
+which a binder before the colon would not receive. It adds the corner entry
+on the right because natural addition recurses on its second argument. A
+rational-valued or approximate matrix would require a different statement of
+equality and is not implied
 by natural-number arithmetic.
 
 ## 6. References
@@ -3615,8 +3980,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–17 owns
-sixty-two public names across eleven operations and fifty-one laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–18 owns
+sixty-seven public names across twelve operations and fifty-five laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -3648,9 +4013,11 @@ private, as does the reused `vector_cons_eq`. The two zero-sum steps
 are imported from Nat Arithmetic as `add::eq_zero_l` and `add::eq_zero_r`.
 `matrix_scale` follows `matrix_zero`. Its eight public laws follow
 `transpose_identity`, and its two new proof helpers stay private.
-`matrix_vector_scale` follows `matrix_product_scale_right` as the final
-public law, uses `dot_scale` for its row step and adds no private helper.
-All fifty-one laws have checked bodies.
+`matrix_vector_scale` follows `matrix_product_scale_right` as a public law,
+uses `dot_scale` for its row step and adds no private helper. `trace` follows
+`matrix_scale`, and its four laws follow `matrix_vector_scale` as the final
+public laws. Its nine helpers for the corner entry, the minor and their
+transport steps stay private. All fifty-five laws have checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -3685,6 +4052,10 @@ isolated false Nat premises and the three private import boundaries. The
 [right-linearity package test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_dot_right_linearity.rs)
 checks both public generic law types, transparent ownership and exact
 trusted-identity preservation. Its closed conformance client is separate;
-this package test does not execute that client. These tests use root-loaded
-exports; they are not official conformance-runner runs or claims of CI,
-publication or landing.
+this package test does not execute that client. The
+[trace seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-trace.md)
+is authored, not officially conformance-run; its
+[package test](../../../../crates/ken-elaborator/tests/cat_linear_algebra_trace.rs)
+checks the four open law types, the closed 3 × 3 values and both isolated
+refusals. These tests use root-loaded exports; they are not official
+conformance-runner runs or claims of CI, publication or landing.
