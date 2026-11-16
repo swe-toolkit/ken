@@ -4059,29 +4059,32 @@ mod tests {
         ));
         std::fs::create_dir_all(&directory).unwrap();
         let initialized = context(&directory);
-        let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
-        let provenance = context
-            .capabilities
-            .resolve(context.capability)
-            .unwrap()
-            .provenance_for_test();
-        let mut plan = crate::SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
-        for arg in [
-            b"sh".as_slice(),
-            b"-c".as_slice(),
-            b"printf x; exec sleep 30".as_slice(),
-        ] {
-            plan.push_argument(arg.to_vec()).unwrap();
-        }
-        plan.set_stdio(1, crate::ChildStdioV1::Pipe).unwrap();
-        let mut child = plan.spawn().unwrap();
-        let mut ready = [0];
-        std::fs::File::from(child.take_pipe(1).unwrap())
-            .read_exact(&mut ready)
-            .unwrap();
-        assert_eq!(ready, [b'x']);
-        let token = context.resources.insert_child_for_test(child, provenance);
-        assert!(context.revocation.revoke(provenance));
+        let token = {
+            let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+            let provenance = context
+                .capabilities
+                .resolve(context.capability)
+                .unwrap()
+                .provenance_for_test();
+            let mut plan = crate::SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
+            for arg in [
+                b"sh".as_slice(),
+                b"-c".as_slice(),
+                b"printf x; exec sleep 30".as_slice(),
+            ] {
+                plan.push_argument(arg.to_vec()).unwrap();
+            }
+            plan.set_stdio(1, crate::ChildStdioV1::Pipe).unwrap();
+            let mut child = plan.spawn().unwrap();
+            let mut ready = [0];
+            std::fs::File::from(child.take_pipe(1).unwrap())
+                .read_exact(&mut ready)
+                .unwrap();
+            assert_eq!(ready, [b'x']);
+            let token = context.resources.insert_child_for_test(child, provenance);
+            assert!(context.revocation.revoke(provenance));
+            token
+        };
 
         let request = ProcessSignalRequestV1 {
             child: token.erased_identity(),
@@ -4109,6 +4112,7 @@ mod tests {
         assert_eq!(status, 0);
         assert_eq!(reply.tag, REPLY_ERROR);
         assert_eq!(reply.detail, 11);
+        let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
         let child = context.resources.child_for_test(token);
         assert!(
             !crate::process_v1::child_pidfd_exited_for_test(child, 250).unwrap(),
