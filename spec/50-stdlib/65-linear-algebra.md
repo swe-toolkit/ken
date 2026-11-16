@@ -1547,3 +1547,114 @@ alternative law statement is false. The distinct closed values
 witness why omitting the factor changes the intended result. These
 finite probes delimit the contract but do not establish a generic
 proof, a fresh exact-tip check, or execution of the separate seed.
+
+## 18. The trace of a square matrix
+
+> Section 18 status: DRAFT v0 (SPEC-LINEAR-ALGEBRA-TRACE).
+> Architect's AC-0 `evt_54wftzbtc5k09` was measured by Foundation
+> Implementer in detached scratch on
+> `77a4e9907d78d48389424e4904804cfd0871ceff`: the generic
+> bodies checked, exact trusted GlobalId identity sets stayed equal
+> (109 → 109), the public inventory grew 62 → 67 with the five
+> named additions below, and no `Axiom` or postulate was added.
+> No fallback fired. The later authoring base
+> `820722005a96376834415414448a9d2520327443` does not convert
+> those scratch observations into a current-base check, official
+> conformance, CI, publication, landing or measured landed trust.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export a public pure `trace`
+operation directly after `matrix_scale` and before
+`matrix_product_distrib_left`. It sums the diagonal of a square
+natural matrix by recursively removing its first row and first
+column. Its definition is:
+
+```ken
+pub fn trace (n : Nat) : Vec (Vec Nat n) n → Nat =
+  match n {
+    Zero ↦ λrows. Zero;
+    Suc k ↦
+      λrows.
+        match rows {
+          VCons _ row rest ↦ add (trace k (drop_column k k rest)) (row_head k row)
+        }
+  }
+```
+
+`row_head k row` selects the upper-left entry, while
+`drop_column k k rest` removes the first column from each trailing
+row. Those operations remain private to NatMatrix: the current
+Vector package does not export its `head` or `tail`. The recursive
+sum puts the minor's trace **first** and the corner **second**;
+`add k (Suc Zero)` then computes to `Suc k` in the identity-law
+step because `add` recurses on its second argument. The matrix
+argument occurs after the result colon. Matching on `n` before
+introducing `rows` as a lambda refines its indexed square type;
+a matrix binder placed before the colon remains unrefined by that
+match and was refused in D0 with `ExhaustivenessError` for the
+apparently missing `VNil` case. This is a checked source-shape
+constraint, not a new vector operation or a change to the public
+Pi-type meaning.
+
+Directly after `matrix_vector_scale` and before the private
+`matrix_add_assoc_cons`, NatMatrix must export these four public
+Transparent checked theorems in order. Each square matrix is bound
+after the colon for the same index-refinement reason:
+
+```ken
+pub theorem trace_add
+      (n : Nat)
+    : (a : Vec (Vec Nat n) n)
+      → (b : Vec (Vec Nat n) n)
+      → Equal Nat (trace n (matrix_add n n a b)) (add (trace n a) (trace n b))
+
+pub theorem trace_scale
+      (n : Nat) (x : Nat)
+    : (a : Vec (Vec Nat n) n)
+      → Equal Nat (trace n (matrix_scale n n x a)) (mul x (trace n a))
+
+pub theorem trace_transpose
+      (n : Nat)
+    : (a : Vec (Vec Nat n) n)
+      → Equal Nat (trace n (transpose n n a)) (trace n a)
+
+pub theorem trace_identity (n : Nat) : Equal Nat (trace n (identity n)) n
+```
+
+The laws hold at every dimension including zero, with no ordering,
+nonzero or matrix-value premise. All are structural `Equal Nat`
+claims. They add **one operation and four laws**: the §17 historical
+roster remains eleven operations, fifty-one laws and sixty-two
+public names; the §18 roster is **twelve operations, fifty-five
+laws and sixty-seven public names**. No §§1–17 operation or law
+signature changes.
+
+The four proofs induct on the dimension, matching only binders.
+For `trace_add`, `drop_column_add` moves the minor through the
+row-wise sum; the induction hypothesis acts on both minor matrices,
+and the existing private `add_shuffle` regroups the corner values.
+For `trace_scale`, `drop_column_scale` moves scaling through the
+minor; the induction hypothesis and the reverse of existing
+`mul_add_distrib_r` combine the minor and corner. For
+`trace_transpose`, `transpose_column_split` exposes the transposed
+first column, `drop_column_prepend` removes the resulting prepended
+column, and the induction hypothesis applies to the remaining
+minor. The neutral inner transpose is rewritten by `cong`, never
+matched as if it were a constructor. For `trace_identity`,
+`drop_column_prepend_zero` removes the zero column, the induction
+hypothesis determines the minor's trace, and adding the unit
+corner on the right computes to the successor. The helper proofs
+`drop_column_add`, `drop_column_scale`, `transpose_column_split`,
+`drop_column_prepend` and `drop_column_prepend_zero` and the helper
+functions `drop_column`, `first_column`, `row_tail` and `row_head`
+stay private. There is no new public vector adaptor, helper export,
+axiom, primitive, kernel or surface rule.
+
+A closed 3 × 3 matrix `a = [[1,2,3],[4,5,6],[7,8,9]]` has
+diagonal `[1,5,9]` and `trace 3 a = 15`; its first row sums to
+`1+2+3 = 6` instead (X-ROW). With factor 3, the scaled trace is
+`3·15 = 45`, not `3+15 = 18` (X-SCALE). The D0 accepted independent
+closed value and first-row controls and rejected each false claim
+at its own appended `Proved` theorem after a fresh accepted prefix.
+These finite observations distinguish the diagonal sum and
+multiplicative scaling from the two alternatives, but do not prove
+the generic laws or execute CV's separate seed.
