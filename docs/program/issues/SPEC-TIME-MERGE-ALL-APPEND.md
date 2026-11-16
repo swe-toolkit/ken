@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-ALL-APPEND
 title: "Spec 69 §15-§17 give trace_merge_all ordering, membership, count and windowing laws, but none relates the merge of a concatenated list of traces to the merges of its parts, so a client that merges two batches of traces separately cannot conclude that merging the results equals merging all of them at once. Rule from a checked D0 at zero trust that trace_merge_all over list_append xs ys equals trace_merge of the two partial merges, and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
