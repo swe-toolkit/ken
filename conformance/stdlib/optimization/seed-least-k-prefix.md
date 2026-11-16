@@ -2,7 +2,6 @@
 
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/72-optimization.md` §4.5.
-Frame: `docs/program/issues/SPEC-OPTIMIZATION-LEAST-K-PREFIX.md`.
 
 The fixture uses input `[A, B, C, D]` with costs `2, 1, 2, 3`.
 Stable cost sorting gives `[B, A, C, D]`; the equal-cost pair `A, C`
