@@ -285,26 +285,39 @@ path (`38 §1.3.1`). A program observes revocation only when a later, existing
 capability-consuming operation is denied; it cannot invoke or directly inspect
 either management action or the identity they govern.
 
-### 4.1 One denial identity, two public projections
+### 4.1 One denial identity, type-local public projections
 
-Revocation has one semantic denial identity with two exact, type-local public
-projections. The existing result families remain distinct:
+Revocation has one semantic denial identity. Path/capability operations and
+ordinary resource-token operations have two general, type-local public
+projections. The Process host operations of `38 §1.11` have the explicit
+exception stated below. The existing result families remain distinct:
 
 - a path/capability operation returns
   `MkFileError <operation> <path> Revoked`, where `Revoked` is a new `IOError`
   cause beside and distinct from `CapabilityDenied`;
-- a resource-token operation returns the nullary constructor
-  `ResourceError.Revoked`, distinct from `Closed`, `MalformedResource`,
-  `RightNotHeld`, `ResourceKindMismatch`, and `ResourceHostIO _`.
+- an ordinary resource-token operation other than a Process host operation
+  returns the nullary constructor `ResourceError.Revoked`, distinct from
+  `Closed`, `MalformedResource`, `RightNotHeld`, `ResourceKindMismatch`,
+  and `ResourceHostIO _`.
 
-The runtime/host mapping preserves this correspondence. It must not collapse
-either projection into `CapabilityDenied`,
+**Process host operations are the exception to the second projection.**
+Later plan, child and pipe host operations, including `signal_child`,
+return `ResourceHostIO IOError.Revoked` on a revoked originating Process
+grant before admission (`38 §1.11.2–§1.11.4`). They preserve the same
+`IOError.Revoked` cause routed through `ProcessOp` in `38 §1.11.3`, not
+an additional denial identity or an unrelated host-I/O failure. No
+guarded Process backend operation occurs after this denial.
+
+The runtime/host mapping preserves these type-local results. It must not
+collapse a general projection into `CapabilityDenied`,
 `ResourceHostIO CapabilityDenied`, `Closed`, malformed capability/resource,
-stale-generation, `RightNotHeld`, or a host I/O error. The discriminator applies
-when revocation is the reason an otherwise well-formed, live,
-sufficiently-righted operation is refused; this supplies a non-degenerate
-control for each neighbouring denial without choosing precedence for an input
-that is invalid in several independent ways.
+stale generation, `RightNotHeld`, or an unrelated host-I/O cause; the
+Process exception likewise preserves `IOError.Revoked` inside its
+`ResourceHostIO` carrier. The discriminator applies when revocation is
+the reason an otherwise well-formed, live, sufficiently-righted
+operation is refused; this supplies a non-degenerate control for each
+neighbouring denial without choosing precedence for an input invalid
+in several independent ways.
 
 ### 4.2 Admission and settlement
 
@@ -342,8 +355,9 @@ are delivered.
 The runtime representation and isolation argument remain a `40-runtime` ADR
 choice. A controlling space cell, forwarder, validity index, or region lifetime
 is not normative here. Whatever mechanism is chosen must preserve the lineage,
-descendant closure, admission boundary, two `Revoked` projections, and
-settlement observations above.
+descendant closure, admission boundary, the type-local `Revoked`
+projections including the Process-host exception, and settlement
+observations above.
 
 ## 5. Audit at trust boundaries — statically known
 
@@ -528,7 +542,7 @@ excepted — it is over erased labels, §3.1) (ADR 0004 Decision 3, ADR 0001).
 | Use-site **sufficiency** `a ⊑ authority c` | **design-committed; not instantiated** | the pinned target refines a sink's cap parameter `{c | a ⊑ authority c}`, but current sinks take exact `Cap AFull`; v1 has no bounded authority quantification and no landed call emits this obligation (`AUTH-BOUNDED-SINK`, §3.1) |
 | **No amplification / source attenuation** | **trusted by enumerated absence** | no `strengthen`/`amplify`/`attenuate`/`revoke` or public `Cap` constructor/producer exists — there is nothing to call; conformance asserts the positive wrappers plus this complete absence (§3.2, §4), which the kernel cannot witness |
 | **Unforgeability** of `Cap E` | **abstraction-boundary** | `Cap E` is opaque; minting and raw management are confined to trusted handler/runner/runtime machinery. The kernel rejects a user-side construction (no constructor in scope); I-4 separately nets the absence of every producer/management name (§2.2) |
-| Revocation **lineage + bounded OS-operation behavior** | **runtime-trusted contract; mechanism deferred** | raw management is not Ken-callable; descendant closure, admission linearization, the two distinct `Revoked` projections, and settlement are normative for the current implicit root space (§4) |
+| Revocation **lineage + bounded OS-operation behavior** | **runtime-trusted contract; mechanism deferred** | raw management is not Ken-callable; descendant closure, admission linearization, the type-local `Revoked` projections including the Process-host exception, and settlement are normative for the current implicit root space (§4) |
 | Revocation **mechanism + general space realization** | **deferred → `40-runtime` / `OQ-Space`** | representation and isolation argument are ADR-owned; no general multi-space, cross-space, transport, or distributed claim (§4.3) |
 | Audit points **statically known** | **kernel-backed** | the boundary set = the `Vis` nodes the type declares; an un-audited declared effect is impossible (`36 §1.4`, §5) |
 | Audit-record **emission** (log, tamper-evidence) | **deferred → runtime / `Ward`** | the static surface is fixed; runtime serialization is `(oracle)`-tagged (§5) |
@@ -598,10 +612,11 @@ here does not reassign their implementation to Team Verify:
    `attenuate`, `revoke`, or amplifying operation (§3.2/§4). *AC3 — the
    headline.*
 4. **Revocation split** — Sec2 supplies the non-Ken-visible raw-management
-   boundary and lineage contract. ABI-REVOKE supplies the Runtime-owned two
-   public `Revoked` projections, admission linearization, and settlement for the
-   bounded implicit-root OS-operation face (§4). The mechanism, ADR isolation
-   argument, and general space realization remain `40-runtime` work. *AC4.*
+   boundary and lineage contract. ABI-REVOKE supplies the Runtime-owned
+   type-local `Revoked` projections, including the Process-host exception,
+   admission linearization, and settlement for the bounded implicit-root
+   OS-operation face (§4). The mechanism, ADR isolation argument,
+   and general space realization remain `40-runtime` work. *AC4.*
 5. **Audit points** — the static boundary set + the audit-record shape;
    declassification every-use-audited and in `trusted_base_delta` (§5). *AC5.*
 6. **Authority + flow composition** — a capability gates an effect **and** the

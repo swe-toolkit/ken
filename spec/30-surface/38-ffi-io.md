@@ -243,14 +243,24 @@ exact type-local projections:
 - a path/capability operation returns
   `MkFileError <operation> <path> Revoked`, where `Revoked` is a new `IOError`
   cause beside and distinct from `CapabilityDenied`;
-- a resource-token operation returns the nullary constructor
+- an ordinary resource-token operation, other than the Process host
+  operations of §1.11, returns the nullary constructor
   `ResourceError.Revoked`.
 
-The two enclosing error families remain distinct; no shared sum is introduced.
-The runtime/host mapping preserves their common semantic meaning and never maps
-either to `CapabilityDenied`, `ResourceHostIO CapabilityDenied`, `Closed`,
-malformed capability/resource, stale-generation, `RightNotHeld`,
-`ResourceKindMismatch`, `ResourceHostIO _`, or another host I/O failure.
+**Process host operations are the exception to the second projection.**
+Later plan, child and pipe operations, including `signal_child`, return
+`ResourceHostIO IOError.Revoked` when the originating Process grant is
+revoked before admission (§1.11.2–§1.11.4). This retains the same
+`IOError.Revoked` cause through the Process classification of §1.11.3;
+it does not introduce a new semantic denial identity or permit the
+signal to reach the child. The two enclosing error families remain
+distinct; no shared sum is introduced. For the two general projections,
+the runtime/host mapping never substitutes `CapabilityDenied`,
+`ResourceHostIO CapabilityDenied`, `Closed`, malformed capability or
+resource, stale generation, `RightNotHeld`, `ResourceKindMismatch`,
+`ResourceHostIO _`, or another host I/O failure. The Process-host
+exception preserves `IOError.Revoked` inside `ResourceHostIO` rather
+than collapsing it to an unrelated host-I/O cause.
 
 ### 1.4 Text is explicit `bytes_encode` / `bytes_decode` — no hidden charset
 
@@ -770,8 +780,10 @@ admission boundary. A conforming error surface exposes exactly **one** `Revoked`
 identity, classified `Permanent`. This is the unification `ABI-REVOKE` sequences
 before PX9 (`../../docs/program/10-linux-abi-completion.md §7`), and it
 **preserves** the `Revoked` identity rather than collapsing it — the opposite of
-mapping `Revoked` into `CapabilityDenied`, `Closed`, or a host I/O failure, which
-`§1.7.2` already forbids.
+mapping `Revoked` into `CapabilityDenied`, `Closed`, or an unrelated
+host-I/O cause, which `§1.7.2` already forbids. The Process-host
+`ResourceHostIO IOError.Revoked` projection (§1.11) carries this same
+identity through the existing `IOError` cause; it is not such a collapse.
 
 These are behavioral contracts on the error surface, introducing no kernel
 feature: PX9's type and laws are re-checked Ken (the foundation deliverable),
