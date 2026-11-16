@@ -57,6 +57,9 @@ fn nat_depth(v: &EvalVal, suc_id: ken_kernel::GlobalId) -> u32 {
 fn run(src: &str) -> (Duration, EvalVal, ElabEnv) {
     use ken_elaborator::NumericLitVal;
     let mut env = ElabEnv::new().expect("init");
+    env.set_catalog_roots_v1(&[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")])
+        .expect("checked catalog root");
     let ids = env.elaborate_file(src).expect("elaborate");
     let main_id = *ids.last().unwrap();
     let mut store = EvalStore::new();
@@ -109,6 +112,7 @@ fn single_self_reference_stays_linear_at_depth_40() {
 #[test]
 fn natgcd_plus_nattodecimal_stays_fast() {
     let src = r#"
+import Core.Classes.LawfulClasses (intToChar)
 data OrdResult = Lt | Eq | Gt
 
 fn list_append (a : Type) (xs : List a) (ys : List a) : List a =

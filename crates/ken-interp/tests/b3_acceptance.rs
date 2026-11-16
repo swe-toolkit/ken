@@ -179,6 +179,9 @@ fn emit_export(
     assert_eq!(legacy_alphabet, test_alphabet());
     let source = format!(
         r#"
+import Capability.Process.Exit (host_clock, host_bind, host_console)
+import Capability.Time.WallClock (wall_now)
+import Capability.Console.Text (flush)
 proc after_flush (_outcome : Result IOError Unit)
   : HostIO AFull Instant visits [Clock] =
   host_clock AFull Instant wall_now
@@ -192,7 +195,10 @@ proc {target_name} (_value : Unit)
     );
     let denotation = compile_checked_target_denotation(
         &format!("b3_acceptance_{target_name}"),
-        CompilerSource::new("fixture.ken", source),
+        CompilerSource::new("fixture.ken", source)
+            .with_roots(vec![
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+            ]),
         target_name,
     )
     .expect("checked B3 alphabet producer");

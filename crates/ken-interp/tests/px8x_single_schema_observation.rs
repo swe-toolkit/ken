@@ -5,8 +5,15 @@ use ken_kernel::Decl;
 
 fn fixture() -> ken_elaborator::ElabEnv {
     let mut env = ken_elaborator::ElabEnv::empty().expect("PX8-X prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     env.elaborate_file(
         r#"
+import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, ResourceBracketOk, ResourceBracketBodyError, ResourceBracketReleaseError, ResourceBracketBodyAndReleaseError, withBuffer)
+import Capability.Process.Exit (host_pure, host_bind)
 fn px8x_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit)

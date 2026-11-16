@@ -708,6 +708,8 @@ mod entrypoint_tests {
 
     fn elaborate_program(source: &str) -> ken_elaborator::ElabEnv {
         let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+        env.set_catalog_roots_v1(&strict_roots())
+            .expect("checked catalog root");
         env.elaborate_file(source).expect("program elaborates");
         env
     }
@@ -723,6 +725,8 @@ mod entrypoint_tests {
     fn declared_afull_mints_runner_caps_and_writes_through_capture_host() {
         let env = elaborate_program(
             r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
+import Capability.Filesystem.Authority (writeFile)
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
@@ -779,6 +783,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
     #[test]
     fn fs_effect_without_declared_family_is_named_static_rejection() {
         let source = r#"program
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
+import Capability.Filesystem.Authority (readFile)
 proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
   : HostIO APartial ExitCode visits [FS] =
   match caps {
@@ -789,6 +795,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
         (\_. host_pure APartial ExitCode ExitCode.Success)
   }"#;
         let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+        env.set_catalog_roots_v1(&strict_roots())
+            .expect("checked catalog root");
         let error = env
             .elaborate_file(source)
             .expect_err("an FS effect requires a declared FS capability");
@@ -799,20 +807,13 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
             other => panic!("expected MissingCapability {{ effect = FS }}, got {other:?}"),
         }
 
-        // The same source must reach the capability gate after the exact R
-        // wrappers are supplied by explicit package imports under Strict.
+        // The same imported source must reach the capability gate under Strict.
         let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../catalog/packages")
             .canonicalize()
             .expect("catalog root");
-        let imported = source.replacen(
-            "program\n",
-            "program\nimport Capability.Process.Exit (host_bind, host_fs, host_pure)\n\
-             import Capability.Filesystem.Authority (readFile)\n",
-            1,
-        );
         let mut strict = ken_elaborator::ElabEnv::new().expect("prelude");
-        match strict.elaborate_isolated_file_strict_v1(&[root], &imported) {
+        match strict.elaborate_isolated_file_strict_v1(&[root], source) {
             Err(ken_elaborator::ElabError::MissingCapability { effect, .. }) => {
                 assert_eq!(effect, "FS")
             }
@@ -951,9 +952,12 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
     #[test]
     fn apartial_cannot_apply_afull_writefile_wrapper() {
         let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+        env.set_catalog_roots_v1(&strict_roots())
+            .expect("checked catalog root");
         let error = env
             .elaborate_file(
-                r#"proc rejected (cap : Cap APartial)
+                r#"import Capability.Filesystem.Authority (FS, writeFile)
+proc rejected (cap : Cap APartial)
   : FS AFull (Result FileError Unit) visits [FS] =
   writeFile cap (bytes_encode "out") CreatePolicy.CreateNew (bytes_encode "no")"#,
             )
@@ -1166,8 +1170,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 
     #[test]
     fn checked_admission_projects_root_marker_without_changing_program_caps() {
-        let denied = elaborate_program(&root_program(false));
-        let allowed = elaborate_program(&root_program(true));
+        let denied = elaborate_program(&strict_root_program(false));
+        let allowed = elaborate_program(&strict_root_program(true));
         assert!(
             !ken_elaborator::program_admission::admit_checked_main(&denied)
                 .unwrap()

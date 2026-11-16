@@ -16,6 +16,10 @@ use std::process::{Command, Output};
 
 fn assert_core_type(case: &str, source: &str, name: &str, expected: &str) -> ElabEnv {
     let mut env = ElabEnv::new().expect("checked prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     let source = format!("{source}\ndef Expected = {expected}\n");
     env.elaborate_file(&source)
         .unwrap_or_else(|error| panic!("{case}: {error:?}"));
@@ -104,7 +108,8 @@ fn assert_check_error(case: &str, source: &str, code: &str, reason: &str) {
 fn written_cap_binds_fs_tree_at_final_value() {
     assert_core_type(
         "P1 written dependent authority",
-        "proc f (a : Auth) (c : Cap a) (x : Nat) : Nat visits [FS] = x",
+        "import Capability.Filesystem.Authority (FS)\n\
+         proc f (a : Auth) (c : Cap a) (x : Nat) : Nat visits [FS] = x",
         "f",
         "(a : Auth) -> Cap a -> Nat -> FS a Nat",
     );
@@ -114,7 +119,8 @@ fn written_cap_binds_fs_tree_at_final_value() {
 fn fs_action_with_written_cap_sequences_in_returned_tree() {
     // A real FS action, not merely a row label: the let must bind its
     // Result payload into the returned FS tree, not hold or erase the action.
-    let source = "proc f (c : Cap AFull) : Nat visits [FS] =\n\
+    let source = "import Capability.Filesystem.Authority (FS, read_bytes)\n\
+                  proc f (c : Cap AFull) : Nat visits [FS] =\n\
                   let r = read_bytes AFull c (bytes_encode \"missing\") in Suc Zero";
     let env = assert_core_type(
         "P1 performed FS let",
@@ -162,7 +168,8 @@ fn fs_action_with_written_cap_sequences_in_returned_tree() {
 fn fs_plus_console_cap_gives_hostio_and_runs_one_action_before_result() {
     assert_core_type(
         "P2 closed authority and ambient",
-        "proc f (c : Cap AFull) : String visits [FS, Console] =\n\
+        "import Capability.Console.Text (print_line)\n\
+         proc f (c : Cap AFull) : String visits [FS, Console] =\n\
            let r = print_line \"x\" in \"one\"",
         "f",
         "Cap AFull -> HostIO AFull String",
@@ -198,7 +205,7 @@ fn host_operation_labels_select_their_family_summand() {
     for label in ["FsOpen", "MappingAllocate", "ResourceRelease"] {
         assert_core_type(
             &format!("P3 {label}"),
-            &format!("proc p (c : Cap AFull) : Nat visits [{label}] = Suc Zero"),
+            &format!("import Capability.Filesystem.Authority (FS)\nproc p (c : Cap AFull) : Nat visits [{label}] = Suc Zero"),
             "p",
             "Cap AFull -> FS AFull Nat",
         );
@@ -215,7 +222,8 @@ fn fs_label_without_written_cap_contributes_no_host_summand() {
     );
     assert_core_type(
         "P4 FS and Console without Cap",
-        "proc p (x : Nat) : Nat visits [FS, Console] = x",
+        "import Capability.Console.Text (IO)\n\
+         proc p (x : Nat) : Nat visits [FS, Console] = x",
         "p",
         "Nat -> IO Nat",
     );
@@ -234,9 +242,14 @@ fn fs_label_without_written_cap_contributes_no_host_summand() {
 #[test]
 fn written_cap_indices_must_convert_in_the_written_context() {
     let mut env = ElabEnv::new().expect("checked prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     let err = env
         .elaborate_file(
-            "proc p (a : Auth) (first : Cap a) (second : Cap AFull)\n\
+            "import Capability.Filesystem.Authority (FS)\n\
+             proc p (a : Auth) (first : Cap a) (second : Cap AFull)\n\
                : Nat visits [FS] = Suc Zero",
         )
         .expect_err("two distinct written Auth indices cannot share an FS tree");
@@ -247,7 +260,8 @@ fn written_cap_indices_must_convert_in_the_written_context() {
     );
     assert_core_type(
         "P5 equal bound Auth indices",
-        "proc p (a : Auth) (first : Cap a) (second : Cap a)\n\
+        "import Capability.Filesystem.Authority (FS)\n\
+         proc p (a : Auth) (first : Cap a) (second : Cap a)\n\
            : Nat visits [FS] = Suc Zero",
         "p",
         "(a : Auth) -> Cap a -> Cap a -> FS a Nat",
@@ -258,14 +272,16 @@ fn written_cap_indices_must_convert_in_the_written_context() {
 fn arrow_final_result_wraps_only_inside_the_last_lambda() {
     assert_core_type(
         "P6 arrow-final",
-        "proc h : Unit -> Nat visits [Console] =\n\
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc h : Unit -> Nat visits [Console] =\n\
            \\_. let r = print_line \"x\" in Suc Zero",
         "h",
         "Unit -> IO Nat",
     );
     assert_core_type(
         "P6 two final arrows",
-        "proc h : Unit -> Unit -> Nat visits [Console] =\n\
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc h : Unit -> Unit -> Nat visits [Console] =\n\
            \\_. \\_. let r = print_line \"x\" in Suc Zero",
         "h",
         "Unit -> Unit -> IO Nat",
@@ -298,7 +314,8 @@ fn arrow_final_result_wraps_only_inside_the_last_lambda() {
 fn user_rebound_cap_name_does_not_supply_prelude_authority() {
     assert_core_type(
         "P7 shadowed Cap",
-        "data Cap (a : Auth) : Type where { MkCap : Cap a }\n\
+        "import Capability.Console.Text (IO)\n\
+         data Cap (a : Auth) : Type where { MkCap : Cap a }\n\
          proc p (c : Cap AFull) : Nat visits [FS, Console] = Suc Zero",
         "p",
         "Cap AFull -> IO Nat",

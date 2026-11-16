@@ -3,6 +3,9 @@
 use ken_cli::{run_program, ProgramOutcome, SourceFormat};
 use ken_interp::{CaptureHost, ClockTrace, HostHandler};
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 const CLOCK_PACKAGE: &str =
     include_str!("../../../catalog/packages/Capability/Time/WallClock.ken.md");
 
@@ -143,8 +146,12 @@ fn fixed_clock_repeats_one_value_and_traces_each_read() {
 #[test]
 fn undeclared_clock_row_is_a_named_effect_escape() {
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     let error = env
-        .elaborate_file(&clock_program("", "", ""))
+        .elaborate_file(&clock_program("", HOST_IMPORT, WALL_IMPORT))
         .expect_err("calling wall_now without Clock in the row must reject");
     match error {
         ken_elaborator::ElabError::TypeMismatch { reason, .. } => {
@@ -183,8 +190,7 @@ fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
 
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
     let before = env.env.trusted_base();
-    env.elaborate_ken_md_file(CLOCK_PACKAGE)
-        .expect("ordinary Capability.Time.WallClock package elaborates");
+    catalog_roots::load_owner(&mut env, "Capability.Time.WallClock");
     assert_eq!(before, env.env.trusted_base());
     for name in [
         "Instant",

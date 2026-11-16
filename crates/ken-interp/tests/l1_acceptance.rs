@@ -292,6 +292,11 @@ fn ac5_no_implicit_cross_type_coercion() {
 #[test]
 fn ac5_explicit_conversion_is_partial_option() {
     let mut env = ElabEnv::new().unwrap();
+    env.set_catalog_roots_v1(&[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages")])
+        .expect("checked catalog root");
+    env.elaborate_file("import Data.Numeric.FixedWidth (intToInt64)")
+        .expect("checked narrowing provider");
     env.elaborate_decl_v1("fn f (x : Int) : Option Int64 = intToInt64 x")
         .expect("the named conversion checks with an explicit result type");
     let some_id = env.prelude_env.some_id;

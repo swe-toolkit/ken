@@ -11,12 +11,20 @@ use ken_elaborator::{ElabEnv, ElabError};
 
 fn accepts(case: &str, source: &str) {
     let mut env = ElabEnv::new().expect("checked prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     env.elaborate_file(source)
         .unwrap_or_else(|error| panic!("{case}: expected accepted declaration: {error:?}"));
 }
 
 fn refuses_label(case: &str, source: &str, label: &str) {
     let mut env = ElabEnv::new().expect("checked prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     let error = match env.elaborate_file(source) {
         Ok(_) => panic!("{case}: label `{label}` was accepted"),
         Err(error) => error,
@@ -47,7 +55,8 @@ fn auth_index_a_two_caps_ambient_console_is_accepted() {
 fn auth_index_b_two_caps_declared_host_tree_is_accepted() {
     accepts(
         "B declared HostIO",
-        "proc copy (src : Cap AFull) (dst : Cap APartial) : HostIO AFull Unit \
+        "import Capability.Process.Exit (host_pure)\n\
+         proc copy (src : Cap AFull) (dst : Cap APartial) : HostIO AFull Unit \
          visits [FS, Console] = host_pure AFull Unit MkUnit",
     );
 }
@@ -56,7 +65,8 @@ fn auth_index_b_two_caps_declared_host_tree_is_accepted() {
 fn auth_index_c_two_caps_declared_fs_tree_is_accepted() {
     accepts(
         "C declared FS",
-        "proc copy (src : Cap AFull) (dst : Cap APartial) : FS AFull Unit \
+        "import Capability.Filesystem.Authority (FS)\n\
+         proc copy (src : Cap AFull) (dst : Cap APartial) : FS AFull Unit \
          visits [FS] = ITree.Ret (FSOp AFull) (fs_resp AFull) Unit MkUnit",
     );
 }
@@ -73,11 +83,13 @@ fn auth_index_d_two_caps_ambient_clock_is_accepted() {
 fn r1_clock_cannot_inject_into_console_tree() {
     accepts(
         "R1 Console",
-        "proc p : IO Unit visits [Console] = print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc p : IO Unit visits [Console] = print_line \"x\"",
     );
     refuses_label(
         "R1 Clock",
-        "proc q : IO Unit visits [Console, Clock] = print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc q : IO Unit visits [Console, Clock] = print_line \"x\"",
         "Clock",
     );
 }
@@ -179,11 +191,11 @@ fn r2_all_host_operation_labels_refuse_a_different_family() {
 fn r3_transparent_tree_head_is_classified_by_checked_identity() {
     accepts(
         "R3 alias Console",
-        "def ConsoleTree = IO Unit\nproc p : ConsoleTree visits [Console] = print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\ndef ConsoleTree = IO Unit\nproc p : ConsoleTree visits [Console] = print_line \"x\"",
     );
     refuses_label(
         "R3 alias Clock",
-        "def ConsoleTree = IO Unit\nproc p : ConsoleTree visits [Console, Clock] = print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\ndef ConsoleTree = IO Unit\nproc p : ConsoleTree visits [Console, Clock] = print_line \"x\"",
         "Clock",
     );
 }
@@ -192,12 +204,14 @@ fn r3_transparent_tree_head_is_classified_by_checked_identity() {
 fn r4_fs_tree_does_not_admit_an_ambient_label() {
     accepts(
         "R4 FS and FsOpen",
-        "proc r (c : Cap AFull) : FS AFull (Result FileError Bytes) \
+        "import Capability.Filesystem.Authority (FS, read_bytes)\n\
+         proc r (c : Cap AFull) : FS AFull (Result FileError Bytes) \
          visits [FS, FsOpen] = read_bytes AFull c (bytes_encode \"x\")",
     );
     refuses_label(
         "R4 Console in FS",
-        "proc r (c : Cap AFull) : FS AFull (Result FileError Bytes) \
+        "import Capability.Filesystem.Authority (FS, read_bytes)\n\
+         proc r (c : Cap AFull) : FS AFull (Result FileError Bytes) \
          visits [FS, Console] = read_bytes AFull c (bytes_encode \"x\")",
         "Console",
     );
@@ -207,11 +221,13 @@ fn r4_fs_tree_does_not_admit_an_ambient_label() {
 fn r5_tree_final_arrow_checks_the_signature_at_the_leaf() {
     accepts(
         "R5 arrow Console",
-        "proc tf : Unit -> IO Unit visits [Console] = \\_. print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc tf : Unit -> IO Unit visits [Console] = \\_. print_line \"x\"",
     );
     refuses_label(
         "R5 arrow Clock",
-        "proc tf : Unit -> IO Unit visits [Console, Clock] = \\_. print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc tf : Unit -> IO Unit visits [Console, Clock] = \\_. print_line \"x\"",
         "Clock",
     );
 }
@@ -263,7 +279,9 @@ fn r6d_alias_name_cannot_impersonate_checked_tree_family() {
 fn r6c_local_label_cannot_inject_into_host_tree() {
     refuses_label(
         "R6 user label in HostIO",
-        "proc target (_value : Unit) : HostIO AFull (Result IOError Unit) \
+        "import Capability.Console.Text (flush)\n\
+         import Capability.Process.Exit (host_console)\n\
+         proc target (_value : Unit) : HostIO AFull (Result IOError Unit) \
          visits [Console, Local] = host_console AFull (Result IOError Unit) \
          (flush ConsoleStream.Stdout)",
         "Local",

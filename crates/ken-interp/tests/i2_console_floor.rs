@@ -3,10 +3,10 @@
 use ken_interp::{CaptureHost, ConsoleIds, ConsoleStream, ConsoleTrace, EvalStore, EvalVal};
 use ken_kernel::{GlobalId, Term};
 
-const CONSOLE_PACKAGE: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../catalog/packages/Capability/Console/Text.ken.md"
-));
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
+const CONSOLE_OWNER: &str = "Capability.Console.Text";
 
 struct ConsoleEnv {
     elab: ken_elaborator::ElabEnv,
@@ -21,8 +21,7 @@ struct ConsoleEnv {
 
 fn setup() -> ConsoleEnv {
     let mut elab = ken_elaborator::ElabEnv::new().expect("prelude registers");
-    elab.elaborate_ken_md_file(CONSOLE_PACKAGE)
-        .expect("ordinary Console package elaborates");
+    catalog_roots::load_owner(&mut elab, CONSOLE_OWNER);
     let get = |name: &str| -> GlobalId {
         *elab
             .globals
@@ -54,9 +53,11 @@ fn eval_store(env: &ConsoleEnv) -> EvalStore {
             NumericLitVal::Int(value) => EvalVal::from(value.clone()),
             NumericLitVal::Float(value) => EvalVal::Float(*value),
             NumericLitVal::Float32(value) => EvalVal::Float32(*value),
-            NumericLitVal::Decimal { coeff, exp } => {
-                ken_interp::decimal_value(env.elab.prelude_env.mkdecimalpair_id, coeff.clone(), *exp)
-            }
+            NumericLitVal::Decimal { coeff, exp } => ken_interp::decimal_value(
+                env.elab.prelude_env.mkdecimalpair_id,
+                coeff.clone(),
+                *exp,
+            ),
             NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
             NumericLitVal::Bytes(value) => EvalVal::Bytes(value.clone()),
         };
@@ -123,8 +124,7 @@ fn console_surface_and_package_are_zero_trust_definitions() {
         );
     }
     let before: std::collections::BTreeSet<_> = elab.env.trusted_base().into_iter().collect();
-    elab.elaborate_ken_md_file(CONSOLE_PACKAGE)
-        .expect("ordinary Console package elaborates");
+    catalog_roots::load_owner(&mut elab, CONSOLE_OWNER);
     let after: std::collections::BTreeSet<_> = elab.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,
