@@ -4048,8 +4048,8 @@ a same-form zero-factor control before refusing a false identity-factor
 result. The dot-self-zero package test checks the public generic law, the
 zero and nonzero closed controls, two isolated false Nat premises and the
 three private import boundaries. The right-linearity package test checks
-both public generic law types, transparent ownership and exact trusted-
-identity preservation. Its closed conformance client is separate;
+both public generic law types, transparent ownership and exact
+trusted-identity preservation. Its closed conformance client is separate;
 this package test does not execute that client. The
 [trace seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-trace.md)
 is authored, not officially conformance-run; its package test checks the
