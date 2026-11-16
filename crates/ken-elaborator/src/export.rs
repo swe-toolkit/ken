@@ -635,7 +635,8 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::ProcessPlanPush
         | ken_host::HostOpV1::ProcessSpawn
         | ken_host::HostOpV1::ProcessTakePipe
-        | ken_host::HostOpV1::ProcessWait => HostOpFamilyV1::Process,
+        | ken_host::HostOpV1::ProcessWait
+        | ken_host::HostOpV1::ProcessSignal => HostOpFamilyV1::Process,
     }
 }
 
@@ -735,6 +736,7 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::ProcessSpawn => "ProcessSpawn",
         ken_host::HostOpV1::ProcessTakePipe => "ProcessTakePipe",
         ken_host::HostOpV1::ProcessWait => "ProcessWait",
+        ken_host::HostOpV1::ProcessSignal => "ProcessSignal",
     }
 }
 
@@ -1010,9 +1012,10 @@ const PROCESS_PLAN_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessSpawn, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
 ];
-const PROCESS_CHILD_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
+const PROCESS_CHILD_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessTakePipe, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessWait, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ProcessSignal, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
 ];
 const PIPE_READ_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 2] = [
@@ -1113,6 +1116,7 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
     if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessSpawn) {
         if let Some(operation) = first_reachable_operation(alphabet, &[
             ken_host::HostOpV1::ProcessTakePipe, ken_host::HostOpV1::ProcessWait,
+            ken_host::HostOpV1::ProcessSignal,
         ]) {
             return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
                 resource_kind: ken_host::ResourceKindV1::ChildProcess, operation,
@@ -1636,6 +1640,20 @@ mod resource_lifetime_hash_tests {
         let mut wrong_status = projected.clone();
         wrong_status.status = "proved";
         assert_ne!(hash(projected), hash(wrong_status));
+    }
+
+    /// Promise class: durable invariant. A child signal without ProcessSpawn
+    /// cannot establish ChildProcess identity even when it names a Target.
+    #[test]
+    fn child_signal_without_spawn_refuses_at_resource_lifetime_projection() {
+        let alphabet = BTreeSet::from(["ProcessSignal".to_string()]);
+        assert_eq!(
+            project_resource_lifetime_obligation(&alphabet),
+            Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::ChildProcess,
+                operation: ken_host::HostOpV1::ProcessSignal,
+            })
+        );
     }
 
     #[test]

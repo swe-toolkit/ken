@@ -212,6 +212,34 @@ fn terminal_settle_kills_and_reaps_held_child_not_spoofed_decoy() {
     decoy.assert_running();
 }
 
+/// Promise class: durable invariant. A signal addresses the held pidfd rather
+/// than a mutable diagnostic PID; a decoy non-child remains running. A raw-PID
+/// mutant leaves the actual child alive until the test's cleanup.
+#[test]
+fn signal_uses_held_identity_not_spoofed_decoy_pid() {
+    let decoy = Decoy::new();
+    let mut child = shell_plan("exec sleep 30").spawn().unwrap();
+    let fd = match &child.identity {
+        ChildIdentityV1::Held(fd) => fd.as_raw_fd(),
+        ChildIdentityV1::ReapedAtSpawn => panic!("child must be held"),
+    };
+    child.pid = decoy.pid;
+    child.send_signal(libc::SIGKILL).unwrap();
+    let mut exited = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    let result = unsafe { libc::poll(&mut exited, 1, 5000) };
+    if result != 1 {
+        // Clean up the actual held child even if the mutant killed the decoy.
+        pidfd_send_signal(fd, libc::SIGKILL).unwrap();
+    }
+    assert_eq!(child.wait().unwrap(), ChildExitV1::Signaled(9));
+    assert_eq!(result, 1, "raw-PID signal left the held child running");
+    decoy.assert_running();
+}
+
 /// Promise class: durable invariant. A signal to an exited but unwaited
 /// child is discarded, without replacing its actual recorded exit.
 #[test]
@@ -274,6 +302,12 @@ fn pidfd_mint_esrch_keeps_body_and_does_not_signal() {
         .unwrap();
     assert_eq!(body, b"child-ran");
     assert_eq!(child.wait().unwrap_err().raw_os_error(), Some(libc::ECHILD));
+    let calls = PIDFD_SEND_CALLS.with(|counter| counter.get());
+    assert_eq!(
+        child.send_signal(9).unwrap_err().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+    assert_eq!(PIDFD_SEND_CALLS.with(|counter| counter.get()), calls);
     child.pid = decoy.pid;
     assert_eq!(
         child.settle_exit(true).unwrap_err().raw_os_error(),
@@ -282,6 +316,20 @@ fn pidfd_mint_esrch_keeps_body_and_does_not_signal() {
     decoy.assert_running();
     // The test seam simulates ESRCH; reap the real child that actually ran.
     reap_unheld_child(real_pid);
+}
+
+/// Promise class: durable invariant. A cached waited exit returns ESRCH
+/// without entering pidfd_send_signal, not merely after an ESRCH syscall.
+#[test]
+fn cached_waited_signal_does_not_enter_pidfd_syscall() {
+    let mut child = shell_plan("exec true").spawn().unwrap();
+    assert_eq!(child.wait().unwrap(), ChildExitV1::Exited(0));
+    let calls = PIDFD_SEND_CALLS.with(|counter| counter.get());
+    assert_eq!(
+        child.send_signal(9).unwrap_err().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+    assert_eq!(PIDFD_SEND_CALLS.with(|counter| counter.get()), calls);
 }
 
 /// Promise class: durable invariant. A mint failure under ordinary SIGCHLD
@@ -419,19 +467,173 @@ fn ignored_sigchld_auto_reaps_held_child_without_a_pid_kill() {
         child.settle_exit(true).unwrap_err().raw_os_error(),
         Some(libc::ECHILD)
     );
-    // Under auto-reap, an injected mint failure must not attempt a PID kill.
-    // Hold the still-running child with a second pidfd for safe cleanup.
+    // The mint-failure cleanup sends SIGKILL even when the OS auto-reaps.
+    LAST_MINT_PID.with(|last| last.set(None));
     let mint_error = with_pidfd_fault(PidfdStep::Mint, libc::EMFILE, || {
         shell_plan("exec sleep 30").spawn().unwrap_err()
     });
     assert_eq!(mint_error.raw_os_error(), Some(libc::EMFILE));
     let pid = LAST_MINT_PID.with(|last| last.get().unwrap());
-    let held = pidfd_open(pid).expect("auto-reap mint failure left child running");
-    let mut running = libc::pollfd {
-        fd: held.as_raw_fd(),
-        events: libc::POLLIN,
-        revents: 0,
+    assert_mint_failure_child_terminated(pid);
+}
+
+fn assert_mint_failure_child_terminated(pid: libc::pid_t) {
+    match pidfd_open(pid) {
+        Err(error) if error.raw_os_error() == Some(libc::ESRCH) => {}
+        Err(error) => panic!("cannot inspect mint-failure child {pid}: {error}"),
+        Ok(held) => {
+            let mut exited = libc::pollfd {
+                fd: held.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            let result = unsafe { libc::poll(&mut exited, 1, 5000) };
+            if result != 1 {
+                // Clean up even when the mutation leaves the child alive.
+                let _ = pidfd_send_signal(held.as_raw_fd(), libc::SIGKILL);
+            }
+            assert_eq!(result, 1, "mint failure left child running after 5000 ms");
+        }
+    }
+}
+
+/// Promise class: durable invariant. The public spawn path, with no pidfd
+/// fault injection, kills a child when descriptor mint fails under SIG_IGN.
+/// MEASURED: LAST_MINT_PID proves mint was attempted; ESRCH or readable pidfd
+/// observes the child gone. THE GAP: this does not undo effects before kill.
+#[test]
+fn ignored_sigchld_real_mint_emfile_kills_child() {
+    real_mint_emfile_cleanup_row(true);
+}
+
+/// Promise class: durable invariant. The same real-mint EMFILE configuration
+/// under default SIGCHLD kills and reaps its child before returning the error.
+#[test]
+fn default_sigchld_real_mint_emfile_kills_and_reaps_child() {
+    real_mint_emfile_cleanup_row(false);
+}
+
+fn real_mint_emfile_cleanup_row(auto_reap: bool) {
+    let name = if auto_reap {
+        "ignored_sigchld_real_mint_emfile_kills_child"
+    } else {
+        "default_sigchld_real_mint_emfile_kills_and_reaps_child"
     };
-    assert_eq!(unsafe { libc::poll(&mut running, 1, 0) }, 0);
-    pidfd_send_signal(held.as_raw_fd(), libc::SIGKILL).unwrap();
+    const CHILD: &str = "KEN_PIDFD_REAL_MINT_EMFILE_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = Command::new(std::env::current_exe().unwrap())
+            .arg("--exact")
+            .arg(format!("process_v1::tests::{name}"))
+            .arg("--nocapture")
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}: {}",
+            name,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        return;
+    }
+    if auto_reap {
+        // SAFETY: only this one re-executed test observes SIGCHLD = SIG_IGN.
+        assert_ne!(
+            unsafe { libc::signal(libc::SIGCHLD, libc::SIG_IGN) },
+            libc::SIG_ERR
+        );
+    } else {
+        assert!(!sigchld_auto_reaps().unwrap());
+    }
+    // Keep the original hard limit and restore the soft limit on exit.
+    let mut original = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    assert_eq!(
+        unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut original) },
+        0
+    );
+    struct RestoreRlimit(libc::rlimit);
+    impl Drop for RestoreRlimit {
+        fn drop(&mut self) {
+            assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &self.0) }, 0);
+        }
+    }
+    let _restore = RestoreRlimit(original);
+    let limited = libc::rlimit {
+        rlim_cur: original.rlim_cur.min(128),
+        rlim_max: original.rlim_max,
+    };
+    assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limited) }, 0);
+    let mut occupied = Vec::new();
+    loop {
+        match std::fs::File::open("/dev/null") {
+            Ok(fd) => occupied.push(fd),
+            Err(error) if error.raw_os_error() == Some(libc::EMFILE) => break,
+            Err(error) => panic!("could not fill descriptor limit: {error}"),
+        }
+    }
+    let mut mint_failure = None;
+    for free_slots in 0..=24 {
+        assert!(
+            free_slots <= occupied.len(),
+            "descriptor-limit calibration exhausted files"
+        );
+        let released = (0..free_slots)
+            .map(|_| occupied.pop().unwrap())
+            .collect::<Vec<_>>();
+        drop(released);
+        LAST_MINT_PID.with(|last| last.set(None));
+        let mut plan = shell_plan("exec sleep 30");
+        // Three inherited stdio snapshots occupy the free slots after the
+        // availability probe. Source 0 avoids inheriting the test's output
+        // pipe into the 30-second child on a failing mutation.
+        for target in 0..3 {
+            plan.set_stdio(target, ChildStdioV1::Inherit(0)).unwrap();
+        }
+        let attempt = plan.spawn();
+        let mint_pid = LAST_MINT_PID.with(|last| last.get());
+        eprintln!(
+            "calibration slots={free_slots} result={:?} minted={}",
+            attempt.as_ref().map(|_| ()),
+            mint_pid.is_some()
+        );
+        match attempt {
+            Err(error) if error.raw_os_error() == Some(libc::EMFILE) && mint_pid.is_some() => {
+                mint_failure = Some(mint_pid.unwrap());
+                break;
+            }
+            Err(error) if error.raw_os_error() == Some(libc::EMFILE) && mint_pid.is_none() => {}
+            Ok(mut child) => {
+                child.settle_exit(true).unwrap();
+                panic!("pre-spawn EMFILE skipped mint at {free_slots} free descriptors");
+            }
+            Err(error) => panic!("unexpected calibration error at {free_slots}: {error}"),
+        }
+        for _ in 0..free_slots {
+            occupied.push(std::fs::File::open("/dev/null").unwrap());
+        }
+    }
+    let pid = mint_failure.expect("calibration never reached a real mint EMFILE");
+    drop(occupied);
+    // The row's own pidfd_open needs capacity, and the limit must not mask it.
+    assert_eq!(
+        unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &original) },
+        0
+    );
+    if auto_reap {
+        assert_mint_failure_child_terminated(pid);
+    } else {
+        assert_eq!(
+            unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) },
+            -1
+        );
+        assert_eq!(
+            io::Error::last_os_error().raw_os_error(),
+            Some(libc::ECHILD)
+        );
+    }
 }

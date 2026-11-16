@@ -19,6 +19,7 @@ const SYSTEM_ERROR_IMPORT: &str =
     "import Capability.System.Error (Transience, Transient, Permanent, \
     Idempotence, Idempotent, NonIdempotent, RetryGuidance, RetryAdvised, \
     RetryUnsafeNonIdempotent, DoNotRetryPermanent, Operation, FilesystemOp, \
+    ProcessOp, SignalChild, \
     ResourceRef, FilesystemResource, SafeContext, NoSafeContext, RedactedSafeContext, \
     SystemError, MkSystemError, file_error_to_system, error_transience, \
     operation_idempotence, retry_guidance)";
@@ -256,7 +257,8 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
             "ReadPipe",
             "WritePipe",
             "ClosePipe",
-            "WaitChild"
+            "WaitChild",
+            "SignalChild"
         ]
     );
     assert_eq!(
@@ -375,6 +377,7 @@ theorem px9_sync : Equal Idempotence (operation_idempotence (FilesystemOp FileOp
 theorem px9_get_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpGetInheritance)) Idempotent = Proved
 theorem px9_set_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSetInheritance)) Idempotent = Proved
 theorem px9_duplicate : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpDuplicate)) NonIdempotent = Proved
+theorem px9_signal_child : Equal Idempotence (operation_idempotence (ProcessOp SignalChild)) NonIdempotent = Proved
 
 theorem px9_transient_idempotent : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved
 theorem px9_transient_nonidempotent : Equal RetryGuidance (retry_guidance Transient NonIdempotent) RetryUnsafeNonIdempotent = Proved
@@ -382,7 +385,7 @@ theorem px9_permanent_idempotent : Equal RetryGuidance (retry_guidance Permanent
 theorem px9_permanent_nonidempotent : Equal RetryGuidance (retry_guidance Permanent NonIdempotent) DoNotRetryPermanent = Proved
 "#),
     )
-    .expect("all 13 identity, 16 operation, and four retry matrix cells must compute");
+    .expect("all 13 identity, 17 operation, and four retry matrix cells must compute");
 
     for law in [
         "retry_guidance_transient_idempotent",

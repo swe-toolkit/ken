@@ -62,6 +62,7 @@ struct ProcessPlanPushRequestV1 { uint64_t plan; uint64_t field; struct SliceV1 
 struct ProcessSpawnRequestV1 { uint64_t plan; };
 struct ProcessTakePipeRequestV1 { uint64_t child; uint64_t fd; };
 struct ProcessWaitRequestV1 { uint64_t child; };
+struct ProcessSignalRequestV1 { uint64_t child; uint64_t signal; };
 struct ResourceErrorReplyV1 {
     uint64_t schema_version;
     uint64_t resource_kind;
@@ -127,6 +128,7 @@ int main(void) {
     FACT_SIZE(ProcessSpawnRequestV1); FACT_ALIGN(ProcessSpawnRequestV1); FACT_OFFSET(ProcessSpawnRequestV1, plan);
     FACT_SIZE(ProcessTakePipeRequestV1); FACT_ALIGN(ProcessTakePipeRequestV1); FACT_OFFSET(ProcessTakePipeRequestV1, child); FACT_OFFSET(ProcessTakePipeRequestV1, fd);
     FACT_SIZE(ProcessWaitRequestV1); FACT_ALIGN(ProcessWaitRequestV1); FACT_OFFSET(ProcessWaitRequestV1, child);
+    FACT_SIZE(ProcessSignalRequestV1); FACT_ALIGN(ProcessSignalRequestV1); FACT_OFFSET(ProcessSignalRequestV1, child); FACT_OFFSET(ProcessSignalRequestV1, signal);
     FACT_SIZE(ResourceErrorReplyV1); FACT_ALIGN(ResourceErrorReplyV1); FACT_OFFSET(ResourceErrorReplyV1, schema_version); FACT_OFFSET(ResourceErrorReplyV1, resource_kind); FACT_OFFSET(ResourceErrorReplyV1, identity); FACT_OFFSET(ResourceErrorReplyV1, io); FACT_OFFSET(ResourceErrorReplyV1, required); FACT_OFFSET(ResourceErrorReplyV1, held); FACT_OFFSET(ResourceErrorReplyV1, expected_kind); FACT_OFFSET(ResourceErrorReplyV1, actual_kind);
     FACT_SIZE(HostReplyV1); FACT_ALIGN(HostReplyV1); FACT_OFFSET(HostReplyV1, tag); FACT_OFFSET(HostReplyV1, detail); FACT_OFFSET(HostReplyV1, bytes); FACT_OFFSET(HostReplyV1, resource_error); FACT_OFFSET(HostReplyV1, effective_request);
     return 0;

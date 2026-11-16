@@ -107,3 +107,4 @@ operation|ProcessPlanPush|0602|native|ProcessPlanPushRequestV1|5|HostReplyV1|1
 operation|ProcessSpawn|0603|native|ProcessSpawnRequestV1|1|HostReplyV1|1
 operation|ProcessTakePipe|0604|native|ProcessTakePipeRequestV1|2|HostReplyV1|1
 operation|ProcessWait|0605|native|ProcessWaitRequestV1|1|HostReplyV1|1
+operation|ProcessSignal|0606|native|ProcessSignalRequestV1|2|HostReplyV1|1

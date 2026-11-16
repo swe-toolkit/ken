@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 96] = [
+const PACKAGED: [(&str, &str); 105] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -115,6 +115,15 @@ const PACKAGED: [(&str, &str); 96] = [
     ("Capability.Process.Child", "with_stderr"),
     ("Capability.Process.Child", "take_stdin"),
     ("Capability.Process.Child", "take_stderr"),
+    ("Capability.Process.Child", "ChildSignal"),
+    ("Capability.Process.Child", "SignalHangup"),
+    ("Capability.Process.Child", "SignalInterrupt"),
+    ("Capability.Process.Child", "SignalQuit"),
+    ("Capability.Process.Child", "SignalKill"),
+    ("Capability.Process.Child", "SignalUser1"),
+    ("Capability.Process.Child", "SignalUser2"),
+    ("Capability.Process.Child", "SignalTerminate"),
+    ("Capability.Process.Child", "signal_child"),
 ];
 
 fn load(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
