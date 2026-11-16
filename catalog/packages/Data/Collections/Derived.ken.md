@@ -55,9 +55,9 @@ The first four of the seven floor combinators follow: `list_append`
 FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 `List a -> List a -> List a` op and must not shadow or be shadowed by it),
 `nth`, public `take`, and private `drop`. Public `take` retains the original
-structural recursion and has attached length, membership, sorted-prefix, and
-filtered-prefix proofs. The canonical `length` comes from the trust-free
-`Data.Collections.List` module and is re-exported here with the same checked
+structural recursion and has attached length, membership, sorted-prefix,
+filtered-prefix, and prefix-composition proofs. The canonical `length` comes
+from the trust-free `Data.Collections.List` module and is re-exported here with the same checked
 identity. `list_eq` and `list_compare` are imported from
 the canonical comparison provider; `sub` is imported from the canonical Nat
 order provider and described in `§4.5`, next to the string ops that need it.
@@ -516,7 +516,8 @@ or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `length_take_min` are the three original proof-returning laws. The public
 `take::length` delegates to the unchanged private `length_take_min`; public
 `take::member`, `take::sorted` and `take::filter_prefix` characterize its
-ordered prefix without testing value equality. The public
+ordered prefix without testing value equality. `take::prefix` states that the
+k-prefix of an n-prefix is the k-prefix whenever k ≤ n. The public
 `list_append::length` and private `length_drop` laws hold for any element type
 and list. The append law uses the canonical addition laws because `add`
 recurses on its second argument. The private `mem_filter` theorem characterizes
@@ -1287,6 +1288,30 @@ pub proof filter_prefix for take
             (filter a p t)
             ((proof filter_prefix for take) a p m t)
             (p h)
+      }
+  }
+
+pub proof prefix for take
+      (a : Type) (k : Nat) (n : Nat) (xs : List a)
+    : Equal Bool (leq_nat k n) True → Equal (List a) (take a k (take a n xs)) (take a k xs) =
+  match k {
+    Zero ↦ λbounded. Proved;
+    Suc j ↦
+      match n {
+        Zero ↦ λbounded. absurd bounded;
+        Suc p ↦
+          match xs {
+            Nil ↦ λbounded. Proved;
+            Cons h t ↦
+              λbounded.
+                cong
+                  (List a)
+                  (List a)
+                  (take a j (take a p t))
+                  (take a j t)
+                  (λrest. Cons a h rest)
+                  ((proof prefix for take) a j p t bounded)
+          }
       }
   }
 
@@ -4386,7 +4411,7 @@ reference implementation.
    `map::append`,
    `map::fusion`, `map::id`, `filter::append`, `filter::length`,
    `filter::empty_if_none`, `take::length`, `take::member`, `take::sorted`,
-   `take::filter_prefix`, `nth::at_or_beyond_is_none`,
+   `take::filter_prefix`, `take::prefix`, `nth::at_or_beyond_is_none`,
    `nth::some_below_length`, `reverse::involutive`. Generic sorting adds
    the operations `Perm`, `insert`, and `sort`, with attached proofs
    `insert::sorted`, `insert::count`, `insert::member`, `insert::length`,
@@ -4448,8 +4473,9 @@ reference implementation.
    insert/sort member, length and stable-class proofs supply the sorted-prefix
    selector with a reusable checked foundation. The `take` proofs induct on
    the bound and input, delegating length to `length_take_min` and commuting
-   filtering with the selected prefix. Private decision-variable helpers
-   rewrite applied comparator branches without
+   filtering with the selected prefix, and `take::prefix` inducts on both
+   bounds and the input, refuting a longer outer bound from its premise.
+   Private decision-variable helpers rewrite applied comparator branches without
    relying on a proof-side match to refine the goal. The separate `List Bool`
    proofs case-split under `bool_leq`, closing by `Proved`/`Refl`/`cong`/
    `trans`/`sym`. `§4.4`: every law field closes by

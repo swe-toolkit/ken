@@ -299,6 +299,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
                 "import Data.Collections.Derived (list_elem)\n"
             }
             "take::filter_prefix" => "import Data.Collections.Derived (filter, length)\n",
+            "take::prefix" => "import Core.Classes.LawfulClasses (leq_nat)\n",
             "insert::length" | "sort::length" => "import Data.Collections.Derived (length)\n",
             "insert::stable_class" | "sort::stable_class" => {
                 "import Data.Collections.Derived (filter, eq_from_ord)\n\
@@ -433,6 +434,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "take::member".to_owned(),
             "take::sorted".to_owned(),
             "take::filter_prefix".to_owned(),
+            "take::prefix".to_owned(),
             "list_sorted_cons".to_owned(),
             "list_sorted_head".to_owned(),
             "list_sorted_head_bounded".to_owned(),

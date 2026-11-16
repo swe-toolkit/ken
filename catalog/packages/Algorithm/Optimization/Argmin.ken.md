@@ -51,7 +51,9 @@ import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Numeric.Nat.Order (lt_nat, min)
+import Data.Numeric.Nat.Arithmetic (add)
+
+import Data.Numeric.Nat.Order (lt_nat, min, leq_nat_add_left_bound)
 
 import Data.Collections.Derived
   (list_append,
@@ -504,6 +506,20 @@ pub theorem least_k_cost_order_invariant
       (cost_le a cost)
       (least_k_cost_le_order a cost f same_order)
       xs)
+
+pub theorem least_k_prefix
+      (a : Type) (cost : a → Nat) (k : Nat) (m : Nat) (xs : List a)
+    : Equal (List a) (least_k a cost k xs) (take a k (least_k a cost (add k m) xs)) =
+  sym
+    (List a)
+    (take a k (take a (add k m) (sort a (cost_le a cost) xs)))
+    (take a k (sort a (cost_le a cost) xs))
+    ((proof prefix for take)
+      a
+      k
+      (add k m)
+      (sort a (cost_le a cost) xs)
+      (leq_nat_add_left_bound k m))
 
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
@@ -1900,8 +1916,10 @@ and `take::filter_prefix` preserve the input order of every equal-cost class.
 The cheaper-class law selects an entire class whenever a more costly result
 has been selected, and separation bounds selected costs against excluded
 ones. The zero and singleton laws agree with `argmin` on a nonempty input.
-Private helpers carry the head-order and Boolean comparisons; none decides
-candidate equality or adds an assumption.
+`least_k_prefix` is `sym` of the public `take::prefix` on the one sorted list,
+with `leq_nat_add_left_bound` supplying k ≤ k + m. Private helpers carry the
+head-order and Boolean comparisons; none decides candidate equality or adds an
+assumption.
 
 `argmax_member` transports the shared private selection-membership proof to
 the public list view. `argmax_greatest` inducts over the ordered tail and
@@ -1966,11 +1984,11 @@ which members survive without promising a complexity bound.
 
 ## Trust & derivation
 
-**Public API:** `cost_le`, `least_k` and its nine declarations for eight
+**Public API:** `cost_le`, `least_k` and its ten declarations for nine
 law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_ties_earliest`, `least_k_cheaper_class_selected`,
 `least_k_separation`, `least_k_one_nil`, `least_k_one_cons`,
-`least_k_cost_order_invariant`);
+`least_k_cost_order_invariant`, `least_k_prefix`);
 `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
 `argmin_append_takes_right`; `argmin_option` and its seven laws:
@@ -2004,7 +2022,8 @@ their checked public laws; the shared Boolean false-of-not-true lemma by
 `Data.Collections.NonEmpty`; `cong`, `sym` and `trans` by
 `Core.Logic.Transport`; `IsTrue` and `leq_nat` by
 `Core.Classes.LawfulClasses`; `comp` by `Core.Function.Combinators`; and
-`lt_nat` with its two attached bridges by `Data.Numeric.Nat.Order`. The
+`lt_nat` with its two attached bridges and `leq_nat_add_left_bound` by
+`Data.Numeric.Nat.Order`; and `add` by `Data.Numeric.Nat.Arithmetic`. The
 selectors add no axiom, primitive, postulate or opaque constant.
 `trusted_base()` must stay unchanged relative to the provider closure;
 this does not erase inherited assumptions.
@@ -2015,7 +2034,12 @@ records accepted stable prefixes, eight public law instances and the two
 false-result refusals specified by `spec/50-stdlib/72-optimization.md` §4.
 The `cat_optimization_least_k` package test roots-loads the public laws and
 closed sorted-prefix controls, checks exact trusted-base identities, and
-distinguishes the wrong costlier and later-tie results.
+distinguishes the wrong costlier and later-tie results. The
+[§4.5 prefix seed](../../../../conformance/stdlib/optimization/seed-least-k-prefix.md)
+records the two-of-three prefix on a tied fixture, the generic take-composition
+law, and the equal-list, last-two and violated-bound refusals. The
+`cat_optimization_least_k_prefix` package test roots-loads both laws, checks
+exact trusted-base identities, and isolates each refusal in its own theorem.
 `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
 instances and false-result refusals. Its scoped acceptance target checks the
