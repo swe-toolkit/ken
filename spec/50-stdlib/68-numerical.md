@@ -1699,3 +1699,69 @@ product has width three and its selected-form sum is `2·1 + 1·1 = 3`,
 not the product of the two widths, which is one. The separate seed
 checks closed applications and same-form refused claims; these do
 not prove the open theorem or replace the generic checked body.
+
+## 18. Interval width bounds subtraction of enclosed values
+
+> **Section 18 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE).** Architect's
+> scratch AC-0 on base `44dc2b141` checked the generic theorem and
+> its formatter layout with rc 0 and no new `Axiom` or postulate.
+> The open client, two closed accepting pairs and the isolated
+> missing-containment refusal were scratch checks. A mutation
+> swapping the two containment projections was refused inside the
+> new theorem; restoring the checked copy restored rc 0. The public
+> theorem count was 56 → 57. The trusted `GlobalId` identity set
+> was **not measured** in this D0; the package test must establish
+> that gate. These observations do not check this Spec child, the
+> separate catalog or CV seed children, an assembled candidate,
+> official conformance, CI, publication, landing or landed trust.
+
+`Algorithm.Numeric.RationalInterval` must export one public
+Transparent checked theorem immediately after `interval_width_mul`
+and before `interval_contains`, keeping the width family together.
+Its exact name, binder order and public type are:
+
+```ken
+pub theorem interval_width_bounds_sub
+      (i : Interval) (x : Rational) (y : Rational)
+    : IsTrue (interval_contains i x)
+      → IsTrue (interval_contains i y)
+      → IsTrue (rational_leq (rational_sub y x) (interval_width i))
+```
+
+Both containments are required, first for `x` and then for `y`.
+There is no order premise between `x` and `y` or between the interval
+endpoints. The interval argument is the whole `i`, not an
+endpoint-binder `MkInterval lo hi`: the proof inspects `i` to
+obtain its endpoints. Since `rational_sub y x` is truncated at
+zero, this bounds **directed subtraction**, not the absolute
+value `|y − x|`; if `y < x`, this subtraction is zero. Applying
+the same law with `x` and `y` exchanged also bounds the opposite
+direction, without a second public law. An inverted interval has
+no contained value satisfying either containment, so its premise
+pair cannot hold; the theorem remains valid without an
+ordered-endpoint premise.
+
+For `i = MkInterval lo hi`, unfold both containment premises into
+`bool_and (rational_leq lo x) (rational_leq x hi)` and
+`bool_and (rational_leq lo y) (rational_leq y hi)`. The public
+`(proof right for bool_and)` projection from `y`'s containment
+gives `y ≤ hi`, and `(proof left for bool_and)` from `x` gives
+`lo ≤ x`. One application of public
+`rational_sub_mono y hi x lo` then concludes
+`rational_sub y x ≤ rational_sub hi lo`, exactly
+`rational_sub y x ≤ interval_width i`. No private helper,
+additional import, axiom, kernel rule or surface change is
+required. None of the §§1–17 operation or law types changes.
+
+The CV-owned closed checks use `[1/2, 3]`, `x = 1`, `y = 5/2`:
+`rational_sub y x = 3/2` and the width is `5/2`, so the bound
+is nontrivial. The endpoint pair `x = 1/2`, `y = 3` reaches the
+width exactly; its reverse width comparison also holds, making
+tightness observable. In `[1, 2]`, `x = 1` is contained but
+`y = 5` is not: `rational_sub 5 1 = 4` exceeds width one.
+The isolated false application with `y`'s containment dropped
+must refuse at that missing premise on a fresh accepted prefix;
+an independent closed false-conclusion check is a separate
+scratch observation. These closed checks distinguish the stated
+bound but do not prove its generic checked body.
