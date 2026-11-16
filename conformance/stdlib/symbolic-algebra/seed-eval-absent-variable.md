@@ -226,13 +226,14 @@ theorem refuse_eval_absent_at_one
 ## Companion trusted-identity test-design gate
 
 Architect's AC-0 did not measure `trusted_base()` identity sets. The
-companion package-owned test must take a baseline set, load the
-providers first, then require the exact `GlobalId` sets after
-`Data.Collections.Derived` and after `NatPolynomial` to equal that
-baseline. It must also verify that `eval_absent` is owned by
-`NatPolynomial` and is `Decl::Transparent`. This is a separate package-
-test gate, not a behavior measured by these conformance cases; no
-trusted-identity result is claimed here.
+companion package-owned test must load providers first, then capture the
+exact `GlobalId` identity set immediately before loading `NatPolynomial`.
+It must require the set after that package load to equal the baseline,
+so provider-load growth is not attributed to the package. It must also
+verify that `eval_absent` is owned by `NatPolynomial` and is
+`Decl::Transparent`. This is a separate package-test gate, not a behavior
+measured by these conformance cases; no trusted-identity result is
+claimed here.
 
 ## Evidence boundary
 
