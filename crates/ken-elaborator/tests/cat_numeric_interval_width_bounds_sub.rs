@@ -1,7 +1,7 @@
 //! Spec 68 §18: contained values differ by at most interval width under
 //! truncated Rational subtraction. Promise class: durable invariant.
-//! Open use and independent closed value proofs distinguish the missing
-//! upper containment premise from a valid interior or tight endpoint case.
+//! Open use and independent closed value proofs exercise the public law,
+//! including a false y-containment proof and tight endpoint case.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -106,11 +106,18 @@ theorem a2_tight_reverse
 theorem wide_width_is_five_halves : rational_equiv (interval_width wide) five_halves = Proved
 
 theorem narrow_contains_one : IsTrue (interval_contains narrow one) = Proved
+theorem narrow_contains_two : IsTrue (interval_contains narrow two) = Proved
 theorem narrow_width_is_one : rational_equiv (interval_width narrow) one = Proved
+theorem narrow_bound_value
+    : IsTrue (rational_leq (rational_sub two one) (interval_width narrow)) =
+  Proved
+theorem narrow_bound_by_law
+    : IsTrue (rational_leq (rational_sub two one) (interval_width narrow)) =
+  interval_width_bounds_sub narrow one two Proved Proved
 theorem five_minus_one_is_four : rational_equiv (rational_sub five one) four = Proved
 "#;
 
-const DROP_Y: &str = r#"theorem drop_y_containment_claim
+const FALSE_Y_PROOF: &str = r#"theorem false_y_containment_claim
     : IsTrue (rational_leq (rational_sub five one) (interval_width narrow)) =
   interval_width_bounds_sub narrow one five Proved Proved
 "#;
@@ -166,36 +173,37 @@ fn provider_first_exact_trust_and_open_owned_law() {
     );
 }
 
-/// SOURCE: spec/50-stdlib/68-numerical.md §18, AC-2 accepted rows.
+/// SOURCE: spec/50-stdlib/68-numerical.md §18, AC-2 accepted rows and control.
 /// PROMISE CLASS: durable invariant with specified closed-value controls.
-/// MEASURED: the entire accepted block checks [1/2,3] with interior
-/// x=1,y=5/2 and tight endpoints x=1/2,y=3, both by independent closed
-/// Proved and by the public law. Reverse endpoint comparison and the
-/// rational width value independently pin tightness; narrow [1,2] contains
-/// x=1, but its width 1 differs from 5 − 1 = 4.
+/// MEASURED: the accepted block checks [1/2,3] with interior x=1,y=5/2
+/// and tight endpoints x=1/2,y=3, both by closed Proved and the law. It
+/// also accepts [1,2], x=1, y=2 with both witnesses and checks the closed
+/// bound. The false-y case keeps the interval and x fixed and changes y to 5.
 /// CLAIMED: both ordered-premise applications use a non-vacuous bound and
 /// the endpoint bound cannot be sharpened on this interval.
 /// THE GAP: these finite examples cannot establish the open law's generality.
 #[test]
-fn interior_and_tight_endpoint_bounds_accept_whole() {
+fn interior_tight_and_same_interval_control_accept_whole() {
     let mut env = loaded_interval();
     env.elaborate_file(&checked_is_true::selected_source_with_import(ACCEPTED))
         .expect("whole accepted block with explicit IsTrue alias checks");
 }
 
-/// SOURCE: spec/50-stdlib/68-numerical.md §18, AC-2 dropped-y case.
-/// PROMISE CLASS: durable invariant with a closed refusal discriminator.
-/// MEASURED: the same whole accepted prefix checks in a fresh environment;
-/// only the missing y-containment proof for y=5 on [1,2] is added and
-/// refuses as kernel TypeMismatch inside its own parsed theorem byte span.
-/// CLAIMED: an x-only containment does not justify the width bound.
-/// THE GAP: this one refusal does not replace the generic checked proof.
+/// SOURCE: spec/50-stdlib/68-numerical.md §18, false-y witness case.
+/// PROMISE CLASS: durable invariant with a false-premise refusal discriminator.
+/// MEASURED: the accepted prefix checks in a fresh environment. The appended
+/// theorem supplies `Proved` in y's containment slot for y=5 on [1,2], where
+/// the required proposition is false. Kernel TypeMismatch is inside the new
+/// theorem and its span encloses the second `Proved` argument.
+/// CLAIMED: a false y-containment proof cannot justify the width bound.
+/// THE GAP: this false-proof case differs from the seed's separate
+/// omitted-argument arity case and does not establish the open law.
 #[test]
-fn dropped_y_containment_refuses_after_fresh_accepted_prefix() {
+fn false_y_containment_proof_refuses_after_fresh_accepted_prefix() {
     let mut env = loaded_interval();
     env.elaborate_file(&checked_is_true::selected_source_with_import(ACCEPTED))
         .expect("fresh whole accepted prefix checks before negative");
-    let negative = checked_is_true::selected_source(DROP_Y);
+    let negative = checked_is_true::selected_source(FALSE_Y_PROOF);
     let declarations = parse_decls(&negative).expect("negative parses");
     let [SourceDecl::TheoremDecl {
         name, span: claim, ..
@@ -203,16 +211,16 @@ fn dropped_y_containment_refuses_after_fresh_accepted_prefix() {
     else {
         panic!("the appended row must contain only its own theorem");
     };
-    assert_eq!(name, "drop_y_containment_claim");
+    assert_eq!(name, "false_y_containment_claim");
     let span = match env
         .elaborate_file(&negative)
-        .expect_err("false claim refuses")
+        .expect_err("false y-containment proof refuses")
     {
         ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
         } => span,
-        other => panic!("dropped y must reject at own kernel TypeMismatch: {other:?}"),
+        other => panic!("false y proof must reject at its own kernel TypeMismatch: {other:?}"),
     };
     assert!(
         claim.start <= span.start && span.start < span.end && span.end <= claim.end,
@@ -222,9 +230,11 @@ fn dropped_y_containment_refuses_after_fresh_accepted_prefix() {
         negative.is_char_boundary(span.start) && negative.is_char_boundary(span.end),
         "diagnostic span must use UTF-8 byte boundaries"
     );
-    let terminal = negative.rfind("Proved").expect("second containment proof");
+    let terminal = negative
+        .rfind("Proved")
+        .expect("second y-containment proof");
     assert!(
         span.start <= terminal && terminal + "Proved".len() <= span.end,
-        "the failing span must enclose y's missing containment proof: {span:?}"
+        "the failing span must enclose the false y-containment proof: {span:?}"
     );
 }

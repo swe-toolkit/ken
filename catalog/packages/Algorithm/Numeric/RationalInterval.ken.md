@@ -1902,8 +1902,8 @@ interval subtraction are not.
    package test checks the open law, an independent product width and the
    public Rational cancellation import; it rejects the product-of-widths
    and both missing-order-premise claims after fresh same-form controls.
-   The width-bound package test checks the open law, two independently
-   established closed bounds including a tight endpoint case, and the
-   dropped-containment refusal after a fresh accepted prefix. These package
-   tests do not establish official conformance-runner execution,
+   The width-bound package test checks the open law and two closed bounds,
+   including a tight endpoint case. It accepts the same narrow interval and
+   x with y=2, then refuses the false y-containment proof for y=5. These
+   package tests do not establish official conformance-runner execution,
    CI, publication or landing.
