@@ -24,6 +24,18 @@ NAME = "ac7_whole_catalog_is_parse_preserved_idempotent_and_width_bounded"
 PREFIX = "r_layer_tests::kenfmt_b3_layout::"
 assert PREFIX + NAME in scope.EXCLUDED
 SUFFIX = PREFIX + NAME + "_suffix_sibling"
+EXCLUDED_MARKER = "excluded.executed"
+SIBLING_MARKER = "sibling.executed"
+
+
+def marker_set(root):
+    return {path.name for path in root.glob("*.executed")}
+
+
+def assert_only_sibling(root):
+    observed = marker_set(root)
+    if observed != {SIBLING_MARKER}:
+        raise AssertionError(f"expected only suffix sibling to execute; observed={sorted(observed)}")
 
 
 def check_fixture_listings(full_listing, selected_listing):
@@ -64,6 +76,23 @@ def stub_listing_check():
     print("Z3 fixture stub: exact skip retains suffix; substring skip reddens")
 
 
+def stub_execution_check():
+    """A two-test execution cannot masquerade as suffix-only execution."""
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / SIBLING_MARKER).write_text("sibling")
+        assert_only_sibling(root)
+        (root / EXCLUDED_MARKER).write_text("excluded")
+        try:
+            assert_only_sibling(root)
+        except AssertionError as error:
+            if EXCLUDED_MARKER not in str(error):
+                raise
+        else:
+            raise AssertionError("both-test execution passed the suffix-only gate")
+    print("Z3 execution stub: sibling-only passes; both-test mutation reddens")
+
+
 def run():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -75,17 +104,24 @@ def run():
 #[cfg(test)] mod r_layer_tests {{
     mod kenfmt_b3_layout {{
         #[test] fn {NAME}() {{
-            std::fs::write(std::env::var("CI_Z3_FILTER_PROBE_MARKER").unwrap(), "excluded").unwrap();
+            std::fs::write(
+                std::path::Path::new(&std::env::var("CI_Z3_FILTER_PROBE_MARKER_DIR").unwrap())
+                    .join("excluded.executed"),
+                "excluded",
+            ).unwrap();
         }}
         #[test] fn {NAME}_suffix_sibling() {{
-            std::fs::write(std::env::var("CI_Z3_FILTER_PROBE_MARKER").unwrap(), "sibling").unwrap();
+            std::fs::write(
+                std::path::Path::new(&std::env::var("CI_Z3_FILTER_PROBE_MARKER_DIR").unwrap())
+                    .join("sibling.executed"),
+                "sibling",
+            ).unwrap();
         }}
     }}
 }}
 ''')
         manifest = str(root / "Cargo.toml")
-        marker = root / "executed.txt"
-        env = {**os.environ, "CI_Z3_FILTER_PROBE_MARKER": str(marker)}
+        env = {**os.environ, "CI_Z3_FILTER_PROBE_MARKER_DIR": str(root)}
         base = ["cargo", "nextest"]
         filter_expr = scope.filter_expression()
         args = ["--manifest-path", manifest, "--lib"]
@@ -99,15 +135,29 @@ def run():
         # The four-live-exclusion floor is checked by ci-z3-lib-scope.py on
         # the real lib inventory in this job; this tiny crate holds only one.
         subprocess.run(base + ["run", *args, "-E", filter_expr], check=True, env=env)
-        if marker.read_text() != "sibling":
-            raise AssertionError("suffix sibling did not execute exclusively")
-        print("Z3 exact filter probe: measured exclusion skipped, suffix sibling executed")
+        assert_only_sibling(root)
+        # Population-side mutation: execute the same compiled fixture without
+        # the filter. Both tests must run, and the unchanged exact-set gate
+        # must reject the resulting set rather than accepting a last writer.
+        subprocess.run(base + ["run", *args], check=True, env=env)
+        observed = marker_set(root)
+        if observed != {EXCLUDED_MARKER, SIBLING_MARKER}:
+            raise AssertionError(f"unfiltered fixture did not execute both tests: {sorted(observed)}")
+        try:
+            assert_only_sibling(root)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("both-test execution passed the suffix-only gate")
+        print("Z3 exact filter probe: suffix-only passed; unfiltered both-test mutation reddened")
 
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--stub-listing"]:
         stub_listing_check()
+    elif sys.argv[1:] == ["--stub-execution"]:
+        stub_execution_check()
     elif len(sys.argv) == 1:
         run()
     else:
-        raise SystemExit("usage: test-ci-z3-lib-filter.py [--stub-listing]")
+        raise SystemExit("usage: test-ci-z3-lib-filter.py [--stub-listing|--stub-execution]")
