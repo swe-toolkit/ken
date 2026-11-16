@@ -55,6 +55,9 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   stdin. It opens no other descriptors while blocked; the harness releases it
   after inspecting the live child.
 - `px10-exit0-silent` exits 0 without writing to stdout or stderr.
+- `px10-mark-then-exit` writes `started\n` to a marker path in `argv[1]`,
+  writes `pipe-ready\n` to stdout, and exits 0. The harness observes the
+  child-side marker independently of the Ken body.
 
 ## Plan construction and initialization
 
@@ -453,6 +456,65 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 - why: this records the specified environment-dependent residual; it does
   not require SIGCHLD repair or hide the existing errno.
 
+### surface/ffi-io/process-spawn-unavailable-descriptor-refuses-before-child
+
+- promise class: durable invariant.
+- spec: §1.11.3.
+- given: use one checked `withChild` client and `px10-mark-then-exit` in a
+  supported Linux environment and an environment where the OS lacks the
+  process-descriptor support required by §1.11.3. The harness independently
+  verifies the unsupported environment. On that host, run the fixture directly,
+  check its marker and stdout, then remove the marker. The body in each Ken run
+  reads `pipe-ready\n` and returns a distinct value. The harness traces child
+  creation and marker state.
+- expect: the supported control reaches the body, reads `pipe-ready\n`, and
+  completes with `ChildExit.Exited 0`; the child marker is present. Without
+  descriptor support, `withChild` returns outer
+  `Err (ResourceHostIO IOError.Unsupported)` before the body; there is no
+  child creation or child marker. A different error does not satisfy the case.
+- measured: the host support probe, exact `withChild` result, body result,
+  process-creation trace, and marker state on both environments.
+- claimed: unavailable descriptor support refuses before child creation and
+  skips the body, rather than falling back to a process number.
+- gap: the process-creation trace must cover all children of the Ken process;
+  marker absence alone would miss a spawned child that never execs. The
+  supported twin and direct fixture run control the client and executable.
+- why: the paired result and process trace distinguish a correct refusal from
+  an unconditional `Unsupported`, a bad executable, or a post-spawn refusal.
+
+### surface/ffi-io/process-spawn-auto-reaped-child-settles-unsignalled
+
+- promise class: durable invariant.
+- spec: §1.11.3.
+- given: the launcher ignores SIGCHLD. Run a client using
+  `px10-mark-then-exit` with stdout selected. Its body reads the buffered
+  `pipe-ready\n` bytes after child exit, calls `wait_child`, reports the result
+  to the harness, and waits at a harness-controlled barrier before returning
+  a controlled terminal body error. A default-SIGCHLD twin with the same body
+  observes the bytes and `ChildExit.Exited 0`. In the ignored-SIGCHLD run, the
+  harness confirms auto-reap and `Other 10`; after the report, it reuses the
+  child's former numeric process identifier for a live decoy before allowing
+  terminal settlement. Reuse occurs only after body entry, outside the
+  pre-acquisition residual. The decoy records catchable signals and remains
+  held; a liveness monitor detects disappearance or stop. Separate controls
+  verify signal logging and termination detection. The existing live-child
+  terminal-error case controls cleanup of an unreaped child.
+- expect: spawn succeeds, the body runs, the child marker is present, and the
+  buffered pipe bytes remain readable. `wait_child` returns
+  `Err (ResourceHostIO (IOError.Other 10))`. After terminal settlement, no
+  signal is recorded and the same-numbered decoy remains running.
+- measured: auto-reap, buffered bytes, `Other 10`, PID reuse after the body
+  reports ECHILD, empty signal log, and decoy running state after settlement.
+- claimed: the auto-reaped child remains observable through its body and pipes,
+  while terminal settlement does not signal the reused process.
+- gap: PID reuse must be confirmed after ECHILD and before settlement, and
+  the matched decoy control must prove the liveness observer is active;
+  otherwise the no-signal property is unmeasured. This does not pin the
+  acknowledged pre-acquisition reuse residual.
+- why: a stale-number signal would terminate the reused decoy. This case
+  observes public results and process liveness, not the host's identity
+  mechanism or a specific signal syscall.
+
 ## Native Process availability
 
 ### surface/ffi-io/process-native-build-refuses-before-object-emission
@@ -485,6 +547,9 @@ The host-side invalid or duplicate descriptor-entry check has no public input
 because builders expose no descriptor map. The exact reverse order among
 internal release actions and the absence of a post-fork callback are not
 source-observable; this seed pins close-before-reap behavior without claiming
-to test those implementation properties. It does not cover successor
-attachments such as cwd, credentials, namespaces, cgroups, rlimits, process
-groups, pidfd signalling, or non-blocking wait.
+to test those implementation properties. The added rows also pin the
+no-descriptor pre-spawn refusal and the auto-reaped child's observable wait and
+settlement behavior without exposing the host's identity mechanism. Explicit
+pidfd signalling and the other successor attachments—cwd, credentials,
+namespaces, cgroups, rlimits, process groups, and non-blocking wait—remain
+outside this slice.
