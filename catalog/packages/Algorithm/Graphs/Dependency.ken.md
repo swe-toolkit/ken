@@ -2955,7 +2955,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–16](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–17](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
