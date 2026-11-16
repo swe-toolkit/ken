@@ -363,19 +363,33 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 ### surface/ffi-io/process-spawn-revocation-does-not-signal-child
 
 - promise class: durable invariant.
-- spec: §1.11.2–§1.11.3; `62` authority.
-- given: select `ChildPipe` for stdin, stdout, and stderr. While `px10-held`
-  is live inside its bracket, `take_stdout` and a `read_pipe` of its readiness
-  record succeed. Leave stderr's selected pipe un-taken, then revoke the
-  originating grant. Separately attempt another
-  `withChild` spawn using that grant, `wait_child` on the first child,
-  `take_stderr`, and `read_pipe` on the held stdout pipe. The harness observes
-  the first child before releasing it.
-- expect: revocation itself does not signal the first child. Each later plan,
-  child, and pipe operation returns `ResourceHostIO IOError.Revoked`. After
-  bracket settlement, use of an escaped resource copy returns `Closed`.
-- why: the successful operations are controls for each route; the live-child
-  observation distinguishes access revocation from implicit termination.
+- spec: §1.11.2–§1.11.4; `62` authority.
+- given: Run paired clients with `ChildPipe` selected for stdin, stdout, and
+  stderr, using the same `px10-held` fixture and plan. The harness verifies
+  default, unblocked `SIGTERM`. Both clients take stdout and read the readiness
+  record while the child is live. In the unrevoked control,
+  `signal_child ChildSignal.SignalTerminate` succeeds and `wait_child` returns
+  `Ok (ChildExit.Signaled 15)`. In the revoked run, leave stderr untaken,
+  revoke the originating grant through the public authority operation, then
+  call `signal_child ChildSignal.SignalTerminate` on the first child. Also
+  attempt another `withChild` spawn using that grant,
+  `wait_child`, `take_stderr`, and `read_pipe` on held stdout. The harness
+  observes the first child before releasing it.
+- expect: the control signal returns `Ok Unit` and wait returns
+  `Ok (ChildExit.Signaled 15)`. In the revoked run, `signal_child` returns
+  `Err (ResourceHostIO IOError.Revoked)`; each other later plan, child, and
+  pipe operation returns `ResourceHostIO IOError.Revoked`. The first child
+  remains live until controlled release. After bracket
+  settlement, use of an escaped resource copy returns `Closed`.
+- measured: default and unblocked `SIGTERM`, the control signal and wait
+  results, all revoked operation results, and the revoked child's liveness
+  before release.
+- claimed: revocation blocks `SignalChild` without delivering a signal; the
+  same fixture and operation deliver `SignalTerminate` before revocation.
+- gap: child liveness is the no-delivery witness for this SIGTERM-sensitive
+  fixture; no host syscall or resource-admission implementation is asserted.
+- why: the paired `signal_child` runs differ only by grant revocation. A path
+  that signals before returning `Revoked` fails the live-child observation.
 
 ### surface/ffi-io/process-errors-use-existing-identities
 

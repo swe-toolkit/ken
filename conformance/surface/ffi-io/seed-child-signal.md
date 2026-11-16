@@ -17,6 +17,10 @@ disposition of `SIG_DFL` and that `SIGTERM` is unblocked in the spawning
 thread. The fixture's pidfd is only an external exit witness; it is not a Ken
 interface or an assertion about Ken's implementation.
 
+The auto-reap and settled-child rows use host-side PID reuse only to arrange a
+held decoy that would observe an unsafe signal. This is harness setup, not a
+Ken process-identifier input or assertion about Ken's identity mechanism.
+
 The six mapping cases also require default dispositions for `SIGHUP`, `SIGINT`,
 `SIGQUIT`, `SIGUSR1`, and `SIGUSR2`, and that each is unblocked in the spawning
 thread. The target installs no handlers for them. `SIGKILL` is uncatchable and
@@ -41,9 +45,10 @@ Each client declares `Process` and `FS AFull`, imports the required names from
 then uses `withChild`. The body takes those ends and reads
 the fixture markers through `read_pipe` with a `withBuffer`-owned
 `BufferHandle` and admitted `BufferWindow`, collecting returned spans with
-`spanBytes`. Pipe clients use `visits [FS, Process]`. Every listed operation
-occurs inside the `withChild` body, before it returns or bracket settlement
-begins.
+`spanBytes`. Pipe clients use `visits [FS, Process]`. Every operation in the
+common client occurs inside the `withChild` body, before it returns or bracket
+settlement begins. The post-settlement case below separately calls
+`signal_child` after normal settlement.
 
 The harness bounds each run. A timeout is failure; cleanup after a timeout is
 not an accepted result. No case uses a sleep or elapsed time to establish the
@@ -112,6 +117,55 @@ target's exit state.
   are fixed; only whether `wait_child` precedes `signal_child` changes. The
   pair distinguishes exited-but-unwaited `Ok Unit` from cached-waited
   `Other 3`.
+
+### surface/ffi-io/process-signal-after-auto-reap
+
+- promise class: normative compatibility vector.
+- spec: §1.11.3 and §1.11.4.
+- given: Use `px10-mark-then-exit` with the ignored-SIGCHLD setup and
+  harness controls from `process-spawn-auto-reaped-child-settles-unsignalled`.
+  The body reads `pipe-ready\n`, calls `wait_child`, reports its result, and
+  waits at a harness barrier without returning from `withChild`. After the
+  harness confirms auto-reap and reuses the child's former PID for a held,
+  signal-logging decoy, resume the body and call
+  `signal_child ChildSignal.SignalTerminate`.
+- expect: `wait_child` returns
+  `Err (ResourceHostIO (IOError.Other 10))`; `signal_child` returns
+  `Err (ResourceHostIO (IOError.Other 3))`. The decoy logs no signal and
+  remains live.
+- measured: the auto-reap witness, PID reuse, both public results, and the
+  decoy's signal log and liveness while the child resource remains unsettled.
+- claimed: an auto-reaped child yields `Other 3` for `signal_child` without
+  sending a signal to a process that reused its former PID.
+- gap: ignored `SIGCHLD` is an inherited host precondition, not repaired here.
+  The reused PID is harness setup only; no syscall path is asserted.
+- why: ECHILD alone would not detect a stale-number signal. The held decoy
+  makes that incorrect delivery observable; the live signal row controls the
+  operation on a non-auto-reaped child.
+
+### surface/ffi-io/process-signal-after-bracket-settlement
+
+- promise class: durable invariant.
+- spec: §1.11.2 and §1.11.4.
+- given: Use the same fixture and plan as `process-signal-after-cached-wait`.
+  Read `watcher-ready`, close stdin, read `target-exited`, and call
+  `wait_child`. Return an escaped copy of the child resource from the body.
+  After `withChild` completes normally, the outer client reports bracket
+  completion and waits at a harness barrier. The harness reuses the child's
+  former PID for the held signal-logging decoy from the auto-reap case, then
+  allows the outer client to call `signal_child ChildSignal.SignalTerminate`
+  on the escaped resource.
+- expect: `wait_child` returns `Ok (ChildExit.Exited 0)`; `withChild` completes
+  successfully with the escaped resource; `signal_child` returns `Err Closed`,
+  not `Other 3`. The decoy logs no signal and remains live.
+- measured: the exit witness, cached wait result, bracket completion, PID
+  reuse, post-settlement signal result, and decoy signal log and liveness.
+- claimed: bracket settlement closes the child resource; a later signal
+  returns `Closed` and cannot signal a process reusing the child's PID.
+- gap: PID reuse is harness setup only; no Ken PID input, syscall path, or
+  resource representation is asserted.
+- why: the cached-wait row observes `Other 3` while the bracket is open. This
+  row changes the bracket state and uses the decoy to expose stale signaling.
 
 ### surface/ffi-io/process-signal-map-hangup
 
@@ -229,8 +283,9 @@ then exits 0. It writes no other stdout data.
   coalescing is not a confound. A suppressed or deduplicated second delivery
   cannot produce `signal-two`.
 
-The first three rows cover `SignalTerminate` at the live, exited-but-unwaited,
-and cached-waited lifecycle points. The six mapping rows cover the other
-constructors, and the counter row observes repeated `SignalUser1` delivery.
-These cases do not cover descriptor-limit or SIGCHLD mint-failure repair,
-revocation, auto-reap, or post-settlement use.
+The lifecycle rows cover `SignalTerminate` on live, exited-but-unwaited,
+cached-waited, auto-reaped, and settled children. The six mapping rows cover
+the other constructors, and the counter row observes repeated `SignalUser1`
+delivery. The companion revocation row in `seed-spawn-plan-wait.md` also
+checks `signal_child` after grant revocation. These cases do not cover
+descriptor-limit or SIGCHLD mint-failure repair.
