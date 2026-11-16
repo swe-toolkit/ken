@@ -69,11 +69,14 @@ slope zero at the given environment. Three further public laws state that the
 ordered normalization is transparent to `poly_eq` itself, to differentiation,
 and to substitution. The latter two follow from the first and the existing
 `poly_eq`-preservation laws. `expr_pow` gives the unit constant at Zero and
-accumulates products on the left. Its four checked canonical `poly_eq` laws
+accumulates products on the left. Its five checked canonical `poly_eq` laws
 are `deriv_expr_pow` for differentiation, `expr_pow_add` for exponent addition,
 `expr_pow_mul` for exponent multiplication through `expr_pow_add` and
 `poly_eq_mul`, and `expr_pow_emul` for powers of products through `poly_eq_mul`,
-`poly_eq_complete` and the private `mul_interchange`.
+`poly_eq_complete` and the private `mul_interchange`, and `poly_eq_expr_pow`
+for a `poly_eq` base, by induction on the exponent through `poly_eq_mul`.
+`substitute_expr_pow` states that substitution distributes over a power as a
+structural `Equal Expr`, by induction through `cong`.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -1396,6 +1399,29 @@ pub theorem expr_pow_emul
               (eval env (expr_pow b k))
               (eval env a)
               (eval env b)))
+  }
+
+pub theorem poly_eq_expr_pow
+      (n : Nat) (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (expr_pow e1 n) (expr_pow e2 n)) =
+  match n {
+    Zero ↦ Proved;
+    Suc k ↦ poly_eq_mul (expr_pow e1 k) (expr_pow e2 k) e1 e2 (poly_eq_expr_pow k e1 e2 h) h
+  }
+
+pub theorem substitute_expr_pow
+      (s : Nat → Expr) (e : Expr) (n : Nat)
+    : Equal Expr (substitute s (expr_pow e n)) (expr_pow (substitute s e) n) =
+  match n {
+    Zero ↦ Proved;
+    Suc k ↦
+      cong
+        Expr
+        Expr
+        (substitute s (expr_pow e k))
+        (expr_pow (substitute s e) k)
+        (λx. EMul x (substitute s e))
+        (substitute_expr_pow s e k)
   }
 
 theorem expr_add_cong
@@ -3247,6 +3273,13 @@ through `poly_eq_sound` at `ring_env`. The remaining steps use the existing
 multiplication associativity, unit, and zero class proofs; no new Nat law is
 required.
 
+`poly_eq_expr_pow` inducts on the exponent: its zero case holds by
+computation, and its successor case applies `poly_eq_mul` to the induction
+hypothesis and the base premise. `substitute_expr_pow` inducts the same way,
+and its successor case applies `cong` with `λx. EMul x (substitute s e)` to the
+induction hypothesis, so the trees are structurally equal; `poly_eq` bases
+do not have structurally equal powers.
+
 `normalize_poly_eq` composes `normalize_sound` with `poly_eq_complete` to show
 that the normalized expression and its source have the same polynomial
 function. `deriv_normalize` and `substitute_normalize` apply the existing
@@ -3300,7 +3333,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–17 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–18 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3313,6 +3346,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [expression-power seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power.md),
 [expression-power multiplication seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power-multiplication.md),
+[expression-power congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power-congruence.md),
 [equivalence seed](
  ../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-equivalence.md),
 [normalization-transparency seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-transparent.md),
@@ -3323,7 +3357,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and thirty-five checked theorems; Horner, substitution and differentiation
+and thirty-seven checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3362,6 +3396,15 @@ law under a selective import, compares exact trusted-`GlobalId` identity
 sets, accepts a commuted-sum premise and law application, and rejects a
 false distinct-variable premise at its own proof on a fresh accepted prefix.
 It does not execute the separate conformance seed.
+
+The expression-power congruence package test applies both laws at arbitrary
+arguments under a selective import, checks their owners, owner-local
+Transparent bodies and exact trusted-`GlobalId` identity sets, and accepts
+the commuted-sum square congruence and the substituted square. It refuses a
+congruence between distinct variables, a substitution claim with the
+substitution dropped, and a structural equality of the commuted-sum squares,
+each at its own proof on a fresh accepted prefix. It does not execute the
+separate conformance seed.
 
 Package tests are not official conformance-runner execution or CI. The
 extension adds no Axiom, postulate, primitive or foreign operation; inherited

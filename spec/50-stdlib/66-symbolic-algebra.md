@@ -1429,3 +1429,73 @@ that variable. Those finite discriminators belong to the separate
 seed; their D0 refusals and the statement-mutant checks do not
 replace the generic checked bodies or establish an assembled-tip
 result.
+
+## 18. Congruence and substitution of expression powers
+
+> **Section 18 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-CONGRUENCE).** Architect's
+> AC-0 `evt_73y2qrvf62r8v` ruled a detached D0 on base
+> `fd523a842465c0bc185140167143ad457d51bc37`. Foundation
+> Implementer checked both generic bodies after the pre-registered
+> F-ZERO-S repair: the substitution zero arm uses `Proved`, not
+> `Refl`. The provider-first trusted GlobalId identity sets were
+> equal (114 → 114), NatPolynomial-owned declarations rose
+> 146 → 148, the two new declarations were Transparent, and no
+> `Axiom` was added. These are scratch observations, not a check
+> of this `/spec` child, the CV-owned seed, an assembled candidate,
+> official conformance, CI, publication, landing or measured
+> landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export two public
+Transparent checked laws immediately after `expr_pow_emul` and before
+the private `expr_add_cong`, in the displayed order and with exactly
+these public types:
+
+```ken
+pub theorem poly_eq_expr_pow
+      (n : Nat) (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (expr_pow e1 n) (expr_pow e2 n))
+
+pub theorem substitute_expr_pow
+      (s : Nat → Expr) (e : Expr) (n : Nat)
+    : Equal Expr (substitute s (expr_pow e n)) (expr_pow (substitute s e) n)
+```
+
+The first law preserves §2's canonical Boolean `poly_eq` under the
+same natural power. Its premise relates the bases; it cannot be
+omitted for positive exponents. At `n = 2`, `EVar Zero` and
+`EVar (Suc Zero)` have canonically distinct squares (X-BASE), so a
+premise-free congruence claim is false. At `n = 0`, both powers reduce
+to `EConst (Suc Zero)` and the conclusion needs no premise for that
+instance; the exported theorem nevertheless keeps the single uniform
+premise for every `n`. Canonically equivalent but structurally
+distinct bases, such as `EAdd x0 x1` and `EAdd x1 x0` for distinct
+variables `x0` and `x1`, also have structurally distinct squares
+(X-STRUCT). Consequently `poly_eq_expr_pow` must not claim
+`Equal Expr` of the powers.
+
+The second law makes a stronger, **structural** `Equal Expr` claim:
+substituting through a power gives the same expression tree as
+powering the substituted base, not merely a `poly_eq`-equivalent
+expression. It has no premise and no weaker public `poly_eq`
+companion. The substitution is not optional: let `s` replace
+`x0 = EVar Zero` by `EAdd x1 (EConst 2)` while fixing every other
+variable. Write `r = EAdd x1 (EConst 2)`. At `n = 2`,
+substitution on the left yields `EMul (EMul (EConst 1) r) r`,
+whereas unsubstituted `expr_pow x0 2` retains `x0` in both
+factors (X-DROP-SUB). This counterexample
+distinguishes the law from a mistaken identity-substitution claim.
+
+Both generic proofs induct directly on `n`. At zero, congruence
+computes to the true canonical comparison of two `EConst 1`
+expressions and substitution computes to equality of the same
+`EConst 1` tree; both D0 proof terminals are `Proved`. At `Suc k`,
+`poly_eq_mul` combines the induction hypothesis on the previous
+powers with the supplied base premise. The substitution step uses
+`cong` on the induction hypothesis with
+`λx. EMul x (substitute s e)`; since `substitute` maps `EMul`
+componentwise, this is the precise structural goal. Neither proof
+uses `poly_eq_complete`, adds a helper or import, or changes a
+§§1–17 operation or law type. The three CV-owned closed refusal
+rows and their accepted controls discriminate specific false
+claims; they do not replace the generic checked proofs.
