@@ -369,9 +369,12 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   default, unblocked `SIGTERM`. Both clients take stdout and read the readiness
   record while the child is live. In the unrevoked control,
   `signal_child ChildSignal.SignalTerminate` succeeds and `wait_child` returns
-  `Ok (ChildExit.Signaled 15)`. In the revoked run, leave stderr untaken,
-  revoke the originating grant through the public authority operation, then
-  call `signal_child ChildSignal.SignalTerminate` on the first child. Also
+  `Ok (ChildExit.Signaled 15)`. In the revoked run, leave stderr
+  untaken. Before the Ken client calls `signal_child`, the harness applies
+  the existing §62 host-management revocation action to the originating
+  grant; the Ken client does not call `revoke`. Then call
+  `signal_child ChildSignal.SignalTerminate` on the first
+  child. Also
   attempt another `withChild` spawn using that grant,
   `wait_child`, `take_stderr`, and `read_pipe` on held stdout. The harness
   observes the first child before releasing it.
