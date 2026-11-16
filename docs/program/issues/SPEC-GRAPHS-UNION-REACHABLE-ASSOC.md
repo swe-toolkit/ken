@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-UNION-REACHABLE-ASSOC
 title: "Spec 62 §16 makes graph-union reachability independent of operand order but states nothing about grouping, so a client that unions three graphs one way cannot use a reachability fact about the other grouping. Rule from a checked D0 at zero trust that graph_reachable over graph_union (graph_union g h) k equals it over graph_union g (graph_union h k), and state it with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

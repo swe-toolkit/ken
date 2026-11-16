@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-MULTI-SOURCE-IMPORT-SCOPE
 title: "Strict native preparation over several sources shares one root scope, so the first source's selective imports bind for every later source and a later source can use a name it never imported. prepare_isolated_strict_scope_v1 builds a fresh Strict root_scope only when the mode is not already Strict. Give each source its own import scope, as spec 33 requires; catalog roots stay one set per run"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
