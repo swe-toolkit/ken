@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           base='${{ github.event.pull_request.base.sha }}'
-          if ! git diff --name-only --no-renames "$base" HEAD | python3 -c 'import json,sys; print(json.dumps([x.rstrip("\\n") for x in sys.stdin if x.rstrip("\\n")]))' > paths.json; then
+          if ! git diff --name-only --no-renames "$base" HEAD | python3 scripts/ci-changed-paths.py > paths.json; then
             echo 'mode=full' >> "$GITHUB_OUTPUT"
             echo 'z3_relevant=true' >> "$GITHUB_OUTPUT"
             echo 'formatter_corpus_relevant=true' >> "$GITHUB_OUTPUT"
@@ -78,8 +78,10 @@ jobs:
             mode=doc-only
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
-      - name: Check formatter corpus path gate
-        run: python3 scripts/test-ci-formatter-corpus-relevant.py
+      - name: Check changed-path and formatter corpus gates
+        run: |
+          python3 scripts/test-ci-changed-paths.py
+          python3 scripts/test-ci-formatter-corpus-relevant.py
       # Required, not best effort: the publisher will not merge on a run that
       # has no record of its tested base, so a recording failure fails the run.
       - name: Record tested merge tree

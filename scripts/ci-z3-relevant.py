@@ -64,6 +64,7 @@ RELEVANT_FILES = frozenset({
     "Dockerfile",
     ".github/workflows/ci.yml",
     "scripts/ci-z3-relevant.py",
+    "scripts/ci-changed-paths.py",
     "scripts/ci-z3-lib-scope.py",
     "scripts/test-ci-z3-lib-filter.py",
     "scripts/ci-doc-only.py",

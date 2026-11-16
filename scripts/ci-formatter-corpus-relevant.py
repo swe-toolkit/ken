@@ -28,7 +28,7 @@ INPUT_PREFIXES = (".cargo/",)
 INPUT_FILES = frozenset({
     "Cargo.toml", "Cargo.lock", "rust-toolchain", "rust-toolchain.toml",
     ".github/workflows/ci.yml", "scripts/ci-formatter-corpus-relevant.py",
-    "scripts/ci-z3-relevant.py",
+    "scripts/ci-z3-relevant.py", "scripts/ci-changed-paths.py",
     "scripts/ci-duration-shard.py", "scripts/check-ci-shard-union.py",
     "scripts/ci-workspace-timings.py", "scripts/ci_workspace_timings.py",
     "scripts/run-ci-shard.sh", "scripts/stage-ci-shard-artifact.sh",
