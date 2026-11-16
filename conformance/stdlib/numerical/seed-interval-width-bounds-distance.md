@@ -137,20 +137,24 @@ theorem x_control_width_bounds_application
 - why: the two closed comparisons expose equality rather than only a
   loose upper bound.
 
-## Isolated refusal
+## Isolated refusals
 
-Append only X to a fresh complete copy of the accepted client. The
-positive control keeps the interval and `x` fixed while using contained
-`y=2`. X changes to the counterexample `y=5` and omits only its required
-y-containment witness. It does not assert the separate closed false
-conclusion directly.
+Append each negative declaration below alone to a fresh complete copy of
+the accepted client. Keep the accepted narrow-interval control unchanged.
+X supplies `Proved` for the y-containment argument; its expected type is
+`IsTrue (interval_contains narrow five)`, which is false. This pins the
+identity of the second premise. X-ARITY separately omits that argument
+to check the theorem cannot be used as a proof before both premises are
+supplied. The arity row alone does not discriminate which containment
+the second premise requires. Neither row asserts the separate closed
+false conclusion.
 
 ```ken
--- X: [1,2] contains 1 but not 5; do not supply y's containment proof.
+-- X: y=5 is outside [1,2]; this is not a proof of y's membership.
 theorem reject_width_bound_without_y_containment
     : IsTrue (rational_leq (rational_sub five one)
                 (interval_width narrow)) =
-  interval_width_bounds_sub narrow one five x_control_x_member
+  interval_width_bounds_sub narrow one five x_control_x_member Proved
 ```
 
 ### stdlib/numerical/reject-width-bound-without-y-containment
@@ -158,22 +162,44 @@ theorem reject_width_bound_without_y_containment
 - spec: §18, `interval_width_bounds_sub`.
 - promise class: durable invariant.
 - given: `[1,2]`, contained `x=1`, and non-contained `y=5`.
-- expect: the theorem application is refused at the omitted
-  y-containment argument.
-- measured: X uses the same theorem and target shape as the accepted
-  narrow-interval control, supplies its accepted x witness, and omits
-  only the second witness. The control with `y=2` accepts.
-- claimed: the y-containment premise is required; the bound cannot be
-  concluded for the counterexample values without it.
-- gap: this argument-omission refusal does not separately assert the
-  false closed inequality `4 ≤ 1`.
+- expect: X is refused at the y-containment argument, whose expected
+  type is `IsTrue (interval_contains narrow five)`.
+- measured: X supplies `Proved` in the y slot after the accepted x
+  witness. The control with contained `y=2` and both witnesses accepts.
+- claimed: the second premise specifically requires containment of `y`.
+- gap: X does not separately assert the false closed inequality `4 ≤ 1`.
 - controls: the accepted narrow-interval control uses the same
   interval, x value, operation, and conclusion form with contained
   `y=2` and both witnesses.
-- why: on the X input, truncated subtraction is four and the interval
-  width is one. The accepted prefix contains the theorem import and a
-  successful call on the same interval; X is its first call missing the
-  second witness.
+- why: `interval_contains narrow five` is false, so `Proved` cannot
+  inhabit the expected y-membership type. A second premise that repeats
+  x's membership would accept that same `Proved`.
+
+```ken
+-- X-ARITY: omit y's membership argument.
+theorem reject_width_bound_without_y_argument
+    : IsTrue (rational_leq (rational_sub five one)
+                (interval_width narrow)) =
+  interval_width_bounds_sub narrow one five x_control_x_member
+```
+
+### stdlib/numerical/reject-width-bound-without-y-argument
+
+- spec: §18, `interval_width_bounds_sub`.
+- promise class: durable invariant.
+- given: `[1,2]`, contained `x=1`, and `y=5`.
+- expect: X-ARITY is refused because the application still awaits
+  y-containment while the declaration expects the result proof.
+- measured: X-ARITY supplies only the accepted x witness; the
+  narrow-interval control supplies both witnesses for contained `y=2`.
+- claimed: the public theorem cannot yield its result before receiving
+  the y-containment argument.
+- gap: this arity refusal alone does not distinguish the y premise
+  from a duplicated x premise; X pins that identity.
+- controls: the same operation and target shape accept with `y=2` and
+  both membership witnesses.
+- why: after one witness the application is still a function, not a
+  proof of the bound.
 
 ## Evidence boundary
 
