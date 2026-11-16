@@ -1,0 +1,18 @@
+program capabilities FS AFull, Process
+import Capability.Process.Child (SignalHangup, SignalInterrupt, SignalQuit, SignalKill, SignalUser1, SignalUser2, SignalTerminate, signal_child, spawn_plan, wait_child, withChild)
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult)
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [Process] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+        (withChild AFull Unit Unit cap (__PROCESS_PLAN__)
+          (\child. __CHILD_BODY__))
+        (\outcome. match outcome {
+          Ok (ResourceBracketOk _) |-> host_pure AFull ExitCode ExitCode.Success;
+          Ok _ |-> host_pure AFull ExitCode (ExitCode.Failure 71);
+          Err _ |-> host_pure AFull ExitCode (ExitCode.Failure 72)
+        })
+  }

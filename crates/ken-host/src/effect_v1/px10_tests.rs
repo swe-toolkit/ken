@@ -1,4 +1,5 @@
 use super::*;
+use std::io::Read;
 
 struct ProcessBackend;
 impl HostEffectBackendV1 for ProcessBackend {
@@ -125,4 +126,221 @@ fn process_dispatch_requires_declared_execute_and_releases_child_pipes_before_wa
         ResourceErrorV1::Closed)));
     assert!(resources.finalize_all_with(&mut backend).iter().all(|settled|
         settled.resource_kind == ResourceKindV1::Buffer));
+}
+
+/// Promise class: normative compatibility vector for the seven public Linux
+/// signal numbers; durable invariant for Target admission and held identity.
+/// MEASURED: each signal through ProcessSignal returns Unit and a matching
+/// waited Signaled exit; 0 and 4 terminal-refuse while the held child lives.
+/// CLAIMED: only the seven numbers can be sent to a child resource by this
+/// operation. THE GAP: a raw PID send to a different process needs the decoy
+/// mutation; that is not implied by a matching exit on this child.
+#[test]
+fn process_signal_dispatches_seven_and_refuses_invalid_numbers() {
+    let mut backend = ProcessBackend;
+    for signal in [1_u64, 2, 3, 9, 10, 12, 15] {
+        let mut revocation = crate::RevocationDomain::default();
+        let provenance = revocation.mint_root();
+        let mut plan = crate::SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
+        for arg in [
+            b"sh".as_slice(),
+            b"-c".as_slice(),
+            b"ulimit -c 0; printf x; exec sleep 30".as_slice(),
+        ] {
+            plan.push_argument(arg.to_vec()).unwrap();
+        }
+        plan.set_stdio(1, crate::ChildStdioV1::Pipe).unwrap();
+        let mut child = plan.spawn().unwrap();
+        let mut ready = [0_u8; 1];
+        std::fs::File::from(child.take_pipe(1).unwrap())
+            .read_exact(&mut ready)
+            .unwrap();
+        assert_eq!(ready, *b"x");
+        let mut resources = ResourceTableV1::default();
+        let (token, _) = resources.insert_child(child, provenance);
+        let capabilities = CapabilityTableV1::default();
+        let request = CanonicalRequestV1::ProcessSignal { signal };
+        let dispatched = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::ProcessSignal,
+            None,
+            ResourceInputsV1::Target(token),
+            &request,
+        )
+        .unwrap();
+        assert_eq!(
+            dispatched.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
+        let waited = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::ProcessWait,
+            None,
+            ResourceInputsV1::Target(token),
+            &CanonicalRequestV1::ProcessWait,
+        )
+        .unwrap();
+        assert_eq!(
+            waited.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::ChildExit(crate::ChildExitV1::Signaled(
+                signal as u8
+            )))
+        );
+        let cached = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::ProcessSignal,
+            None,
+            ResourceInputsV1::Target(token),
+            &request,
+        )
+        .unwrap();
+        assert_eq!(
+            cached.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Other(libc::ESRCH)))
+        );
+        resources.finalize_all_with(&mut backend);
+    }
+
+    for invalid in [0_u64, 4] {
+        let mut revocation = crate::RevocationDomain::default();
+        let provenance = revocation.mint_root();
+        let mut plan = crate::SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
+        for arg in [
+            b"sh".as_slice(),
+            b"-c".as_slice(),
+            b"printf x; exec sleep 30".as_slice(),
+        ] {
+            plan.push_argument(arg.to_vec()).unwrap();
+        }
+        plan.set_stdio(1, crate::ChildStdioV1::Pipe).unwrap();
+        let mut child = plan.spawn().unwrap();
+        let mut ready = [0];
+        std::fs::File::from(child.take_pipe(1).unwrap())
+            .read_exact(&mut ready)
+            .unwrap();
+        let mut resources = ResourceTableV1::default();
+        let (token, _) = resources.insert_child(child, provenance);
+        let capabilities = CapabilityTableV1::default();
+        let denied = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::ProcessSignal,
+            None,
+            ResourceInputsV1::Target(token),
+            &CanonicalRequestV1::ProcessSignal { signal: invalid },
+        );
+        assert!(matches!(
+            denied,
+            Err(TerminalErrorV1::MalformedHostAbiField)
+        ));
+        let (owner, _, _) = resources
+            .typed_owner_mut(token, ResourceKindV1::ChildProcess)
+            .unwrap();
+        let ResourceOwnerV1::Child(child) = owner else {
+            unreachable!()
+        };
+        assert_child_lives_before_cleanup(&mut child.process);
+        child.process.send_signal(libc::SIGKILL).unwrap();
+        assert_eq!(
+            child.process.wait().unwrap(),
+            crate::ChildExitV1::Signaled(9),
+            "invalid signal {invalid} reached child before refusal"
+        );
+        resources.finalize_all_with(&mut backend);
+    }
+}
+
+// Independent liveness observation before cleanup: an immediate SIGKILL can
+// mask a forbidden prior delivery in the eventual wait result. The process
+// still held by a pidfd; test observation uses that same stable identity.
+fn assert_child_lives_before_cleanup(child: &mut crate::ChildProcessV1) {
+    let exited = crate::process_v1::child_pidfd_exited_for_test(child, 250).unwrap();
+    if exited {
+        let _ = child.send_signal(libc::SIGKILL);
+        let _ = child.wait();
+    }
+    assert!(!exited, "signal reached child before refusal");
+}
+
+/// Promise class: durable invariant. A revoked Target refuses signal delivery
+/// before the host leaf, while settlement retires the child resource as Closed.
+#[test]
+fn process_signal_revoked_target_keeps_child_alive_and_settled_target_is_closed() {
+    let mut backend = ProcessBackend;
+    let mut revocation = crate::RevocationDomain::default();
+    let provenance = revocation.mint_root();
+    let mut plan = crate::SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
+    for arg in [
+        b"sh".as_slice(),
+        b"-c".as_slice(),
+        b"printf x; exec sleep 30".as_slice(),
+    ] {
+        plan.push_argument(arg.to_vec()).unwrap();
+    }
+    plan.set_stdio(1, crate::ChildStdioV1::Pipe).unwrap();
+    let mut child = plan.spawn().unwrap();
+    let mut ready = [0];
+    std::fs::File::from(child.take_pipe(1).unwrap())
+        .read_exact(&mut ready)
+        .unwrap();
+    let mut resources = ResourceTableV1::default();
+    let (token, _) = resources.insert_child(child, provenance);
+    assert!(revocation.revoke(provenance));
+    let capabilities = CapabilityTableV1::default();
+    let signal = CanonicalRequestV1::ProcessSignal { signal: 15 };
+    let denied = dispatch_host_op_v1(
+        &mut backend,
+        &capabilities,
+        &revocation,
+        &mut resources,
+        HostOpV1::ProcessSignal,
+        None,
+        ResourceInputsV1::Target(token),
+        &signal,
+    )
+    .unwrap();
+    assert_eq!(
+        denied.outcome,
+        CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
+    );
+    let (owner, _, _) = resources
+        .typed_owner_mut(token, ResourceKindV1::ChildProcess)
+        .unwrap();
+    let ResourceOwnerV1::Child(child) = owner else {
+        unreachable!()
+    };
+    assert_child_lives_before_cleanup(&mut child.process);
+    child.process.send_signal(libc::SIGKILL).unwrap();
+    assert_eq!(
+        child.process.wait().unwrap(),
+        crate::ChildExitV1::Signaled(9),
+        "revoked signal reached the live child"
+    );
+    resources.finalize_all_with(&mut backend);
+    let closed = dispatch_host_op_v1(
+        &mut backend,
+        &capabilities,
+        &revocation,
+        &mut resources,
+        HostOpV1::ProcessSignal,
+        None,
+        ResourceInputsV1::Target(token),
+        &signal,
+    )
+    .unwrap();
+    assert_eq!(
+        closed.outcome,
+        CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Closed))
+    );
 }

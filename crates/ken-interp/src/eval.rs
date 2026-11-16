@@ -5587,7 +5587,7 @@ pub struct FSIds {
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
-    pub px10_op_ids: [GlobalId; 8],
+    pub px10_op_ids: [GlobalId; 9],
     pub px10_kind_ids: [GlobalId; 4],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_resource_release_id: GlobalId,
@@ -6884,6 +6884,10 @@ fn fs_dispatch<H: HostHandler>(
          ken_host::CanonicalRequestV1::ProcessTakePipe { fd }, fs.op_metadata_id)
     } else if op_id == fs.px10_op_ids[5] {
         (ken_host::HostOpV1::ProcessWait, ken_host::CanonicalRequestV1::ProcessWait, fs.op_metadata_id)
+    } else if op_id == fs.px10_op_ids[8] {
+        let signal = narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        (ken_host::HostOpV1::ProcessSignal,
+         ken_host::CanonicalRequestV1::ProcessSignal { signal }, fs.op_metadata_id)
     } else if op_id == fs.px10_op_ids[6] || op_id == fs.px10_op_ids[7] {
         let buffer_start = narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
         let length = narrow_host_u64(args.get(4)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
@@ -6924,6 +6928,7 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe
             | ken_host::HostOpV1::ProcessWait
+            | ken_host::HostOpV1::ProcessSignal
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -6944,6 +6949,7 @@ fn fs_dispatch<H: HostHandler>(
         ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::MappingAcquireFile
             | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
+            | ken_host::HostOpV1::ProcessSignal
     ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
@@ -8303,7 +8309,7 @@ mod px5b_effect_observation_tests {
             private_mapping_read_view_id: id(),
             private_mapping_write_view_id: id(),
             private_mapping_acquire_file_id: id(),
-            px10_op_ids: [id(); 8],
+            px10_op_ids: [id(); 9],
             px10_kind_ids: [id(); 4],
             px10_exit_ids: [id(); 2],
             private_resource_release_id: id(),

@@ -4298,6 +4298,7 @@ fn checked_host_spine_v1(
         (prelude.px10_op_ids[5], ken_host::HostOpV1::ProcessWait),
         (prelude.px10_op_ids[6], ken_host::HostOpV1::ResourceStreamRead),
         (prelude.px10_op_ids[7], ken_host::HostOpV1::ResourceStreamWrite),
+        (prelude.px10_op_ids[8], ken_host::HostOpV1::ProcessSignal),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }

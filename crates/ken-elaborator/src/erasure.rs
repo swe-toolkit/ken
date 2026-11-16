@@ -5022,6 +5022,7 @@ const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1
                 | ken_host::HostOpV1::ProcessSpawn
                 | ken_host::HostOpV1::ProcessTakePipe
                 | ken_host::HostOpV1::ProcessWait
+                | ken_host::HostOpV1::ProcessSignal
                 | ken_host::HostOpV1::ResourceRelease
         )
 }
@@ -5047,6 +5048,7 @@ const fn runtime_selected_host_operation_requires_capability(
                 | ken_host::HostOpV1::ProcessSpawn
                 | ken_host::HostOpV1::ProcessTakePipe
                 | ken_host::HostOpV1::ProcessWait
+                | ken_host::HostOpV1::ProcessSignal
                 | ken_host::HostOpV1::ResourceRelease
         )
 }
@@ -10041,6 +10043,7 @@ mod px7l_tests {
                         | ken_host::HostOpV1::ProcessSpawn
                         | ken_host::HostOpV1::ProcessTakePipe
                         | ken_host::HostOpV1::ProcessWait
+                        | ken_host::HostOpV1::ProcessSignal
                         | ken_host::HostOpV1::ResourceRelease
                 );
             assert_eq!(

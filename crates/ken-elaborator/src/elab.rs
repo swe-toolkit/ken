@@ -23091,7 +23091,7 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         | BufferAllocate | BufferFreeze | MappingAllocate | MappingReadView
         | MappingWriteView | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite
         | ProcessPlanOpen | ProcessPlanPush | ProcessSpawn | ProcessTakePipe
-        | ProcessWait => RowSummand::HostAuth,
+        | ProcessWait | ProcessSignal => RowSummand::HostAuth,
     })
 }
 

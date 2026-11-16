@@ -176,11 +176,13 @@ impl SpawnPlanV1 {
                 ChildIdentityV1::ReapedAtSpawn
             }
             Err(error) => {
-                // A non-auto-reaped child retains its PID until wait, so this
-                // one cleanup path can safely address that PID by number.
+                // The child exists but cannot be held, so kill it by number in
+                // every SIGCHLD disposition. Under auto-reap this signal carries
+                // the same PID-reuse residual as the mint just attempted.
+                // SAFETY: pid is this spawn's child unless auto-reap let it be
+                // reaped and its PID reused since posix_spawn returned.
+                unsafe { libc::kill(pid, libc::SIGKILL) };
                 if matches!(sigchld_auto_reaps(), Ok(false)) {
-                    // SAFETY: an unwaited, non-auto-reaped child cannot lose its PID.
-                    unsafe { libc::kill(pid, libc::SIGKILL) };
                     reap_unheld_child(pid);
                 }
                 return Err(error);
@@ -328,6 +330,8 @@ fn pidfd_open(pid: libc::pid_t) -> io::Result<OwnedFd> {
 }
 
 fn pidfd_send_signal(fd: RawFd, signo: libc::c_int) -> io::Result<()> {
+    #[cfg(test)]
+    PIDFD_SEND_CALLS.with(|calls| calls.set(calls.get() + 1));
     // SAFETY: fd is an owned pidfd; NULL means no signal metadata, flags=0.
     if unsafe {
         libc::syscall(
@@ -422,6 +426,18 @@ enum PidfdStep {
 std::thread_local! {
     static PIDFD_FAULT: std::cell::Cell<Option<(PidfdStep, i32)>> = const { std::cell::Cell::new(None) };
     static LAST_MINT_PID: std::cell::Cell<Option<libc::pid_t>> = const { std::cell::Cell::new(None) };
+    static PIDFD_SEND_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn child_pidfd_exited_for_test(child: &ChildProcessV1, timeout_ms: i32) -> io::Result<bool> {
+    let ChildIdentityV1::Held(fd) = &child.identity else {
+        return Err(io::Error::from_raw_os_error(libc::ESRCH));
+    };
+    let mut status = libc::pollfd { fd: fd.as_raw_fd(), events: libc::POLLIN, revents: 0 };
+    // SAFETY: status is writable and the held pidfd remains live through poll.
+    let rc = unsafe { libc::poll(&mut status, 1, timeout_ms) };
+    if rc < 0 { Err(io::Error::last_os_error()) } else { Ok(rc == 1) }
 }
 
 #[cfg(test)]

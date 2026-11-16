@@ -386,6 +386,8 @@ struct ProcessSpawnRequestV1 { plan: u64 }
 struct ProcessTakePipeRequestV1 { child: u64, fd: u64 }
 #[repr(C)]
 struct ProcessWaitRequestV1 { child: u64 }
+#[repr(C)]
+struct ProcessSignalRequestV1 { child: u64, signal: u64 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -2136,6 +2138,11 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
             let wire = unsafe { &*request.cast::<ProcessWaitRequestV1>() };
             (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessWait)
         }
+        HostOpV1::ProcessSignal if request_size == std::mem::size_of::<ProcessSignalRequestV1>() => {
+            if !request.cast::<ProcessSignalRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessSignalRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessSignal { signal: wire.signal })
+        }
         HostOpV1::ResourceStreamRead if request_size == std::mem::size_of::<ResourceStreamReadRequestV1>() => {
             if !request.cast::<ResourceStreamReadRequestV1>().is_aligned() { return -1; }
             let wire = unsafe { &*request.cast::<ResourceStreamReadRequestV1>() };
@@ -2698,6 +2705,23 @@ mod tests {
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
         assert_eq!(effect_binding("error", "io.Revoked"), 11);
         assert_eq!(effect_binding("error", "io.Other"), 12);
+    }
+
+    /// Promise class: normative compatibility vector. The independently C-
+    /// probed ProcessSignalRequestV1 agrees with Rust's two-u64 target/signal
+    /// layout and the ABI's mandated field order.
+    #[test]
+    fn px10_process_signal_request_layout_matches_c_probe() {
+        for (name, measured) in [
+            ("SIZE_ProcessSignalRequestV1", std::mem::size_of::<ProcessSignalRequestV1>()),
+            ("ALIGN_ProcessSignalRequestV1", std::mem::align_of::<ProcessSignalRequestV1>()),
+            ("OFFSET_ProcessSignalRequestV1_child", std::mem::offset_of!(ProcessSignalRequestV1, child)),
+            ("OFFSET_ProcessSignalRequestV1_signal", std::mem::offset_of!(ProcessSignalRequestV1, signal)),
+        ] {
+            assert_eq!(effect_fact(name), measured as u64, "raw ABI fact {name}");
+        }
+        assert_eq!(effect_fact("OFFSET_ProcessSignalRequestV1_child"), 0);
+        assert_eq!(effect_fact("OFFSET_ProcessSignalRequestV1_signal"), 8);
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the C-probed
