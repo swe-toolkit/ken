@@ -26,6 +26,44 @@ assert PREFIX + NAME in scope.EXCLUDED
 SUFFIX = PREFIX + NAME + "_suffix_sibling"
 
 
+def check_fixture_listings(full_listing, selected_listing):
+    """Check this two-test fixture, not the real inventory's four-name floor."""
+    discovered, full_selected = ci_workspace_timings.listed_identities(full_listing)
+    selected_discovered, selected = ci_workspace_timings.listed_identities(selected_listing)
+    excluded = f"{scope.BINARY_ID} {PREFIX}{NAME}"
+    sibling = f"{scope.BINARY_ID} {SUFFIX}"
+    if (discovered != {excluded, sibling} or selected_discovered != discovered
+            or full_selected != discovered or selected != {sibling}):
+        raise AssertionError(
+            f"nextest exact filter lost suffix sibling or retained exclusion: {selected}"
+        )
+
+
+def stub_listing_check():
+    """Local control for the fixture's inventory contract without nextest."""
+    def listing(matches):
+        return {
+            "test-count": 2,
+            "rust-suites": {"lib": {
+                "binary-id": scope.BINARY_ID,
+                "testcases": {
+                    name: {"filter-match": {"status": "matches" if name in matches else "mismatch"}}
+                    for name in (PREFIX + NAME, SUFFIX)
+                },
+            }},
+        }
+
+    full = listing({PREFIX + NAME, SUFFIX})
+    check_fixture_listings(full, listing({SUFFIX}))
+    try:
+        check_fixture_listings(full, listing(set()))  # substring skip loses sibling
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("substring skip did not red the fixture inventory check")
+    print("Z3 fixture stub: exact skip retains suffix; substring skip reddens")
+
+
 def run():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -57,13 +95,9 @@ def run():
                                   check=True, text=True, capture_output=True, env=env)
         full_listing = json.loads(full.stdout)
         selected_listing = json.loads(filtered.stdout)
-        discovered, full_selected = ci_workspace_timings.listed_identities(full_listing)
-        _, selected = ci_workspace_timings.listed_identities(selected_listing)
-        excluded = f"{scope.BINARY_ID} {PREFIX}{NAME}"
-        sibling = f"{scope.BINARY_ID} {SUFFIX}"
-        if discovered != {excluded, sibling} or full_selected != {excluded, sibling} or selected != {sibling}:
-            raise AssertionError(f"nextest exact filter lost suffix sibling or retained exclusion: {selected}")
-        scope.check(full_listing, selected_listing)
+        check_fixture_listings(full_listing, selected_listing)
+        # The four-live-exclusion floor is checked by ci-z3-lib-scope.py on
+        # the real lib inventory in this job; this tiny crate holds only one.
         subprocess.run(base + ["run", *args, "-E", filter_expr], check=True, env=env)
         if marker.read_text() != "sibling":
             raise AssertionError("suffix sibling did not execute exclusively")
@@ -71,4 +105,9 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    if sys.argv[1:] == ["--stub-listing"]:
+        stub_listing_check()
+    elif len(sys.argv) == 1:
+        run()
+    else:
+        raise SystemExit("usage: test-ci-z3-lib-filter.py [--stub-listing]")
