@@ -3832,15 +3832,16 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessWait
-            | ken_host::HostOpV1::ProcessTakePipe => {
+            | ken_host::HostOpV1::ProcessTakePipe
+            | ken_host::HostOpV1::ProcessSignal => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment, "Effect", "process resource operation carried a capability"));
                 }
                 let resource_token = self.lower_resource_token_seat(builder, seats.operand(SEAT_0)?.1,
                     "process resource operation", "plan/child")?;
                 builder.ins().stack_store(resource_token, request, request_offset(0));
-                if operation == ken_host::HostOpV1::ProcessTakePipe {
-                    let (fd, valid) = self.narrow_positioned_int_seat(builder, &seats, 1, "child pipe index")?;
+                if matches!(operation, ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessSignal) {
+                    let (fd, valid) = self.narrow_positioned_int_seat(builder, &seats, 1, "child pipe index or signal")?;
                     let invalid = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0);
                     let detail = builder.ins().iconst(types::I64, IO_ERROR_INVALID_INPUT_DISCRIMINATOR);
                     record_narrow_failure(builder, invalid, error_reply_tag, detail);
@@ -4173,6 +4174,7 @@ impl<'a> Lowering<'a> {
                 | ken_host::HostOpV1::ProcessSpawn
                 | ken_host::HostOpV1::ProcessTakePipe
                 | ken_host::HostOpV1::ProcessWait
+                | ken_host::HostOpV1::ProcessSignal
                 | ken_host::HostOpV1::ResourceStreamRead
                 | ken_host::HostOpV1::ResourceStreamWrite
                 | ken_host::HostOpV1::MappingAllocate
@@ -4460,6 +4462,7 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::ProcessSpawn
                     | ken_host::HostOpV1::ProcessTakePipe
                     | ken_host::HostOpV1::ProcessWait
+                    | ken_host::HostOpV1::ProcessSignal
                     | ken_host::HostOpV1::ResourceStreamRead
                     | ken_host::HostOpV1::ResourceStreamWrite
                     | ken_host::HostOpV1::ProcessPlanOpen

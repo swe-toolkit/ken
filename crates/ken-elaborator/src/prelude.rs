@@ -317,7 +317,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_mapping_read_view_id: z,
         private_mapping_write_view_id: z,
         private_mapping_acquire_file_id: z,
-        px10_op_ids: [z; 8],
+        px10_op_ids: [z; 9],
         px10_kind_ids: [z; 4],
         px10_exit_ids: [z; 2],
         private_buffer_handle_id: z,
@@ -489,7 +489,7 @@ pub struct PreludeEnv {
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
-    pub px10_op_ids: [GlobalId; 8],
+    pub px10_op_ids: [GlobalId; 9],
     pub px10_kind_ids: [GlobalId; 4],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_buffer_handle_id: GlobalId,
@@ -876,7 +876,7 @@ struct PreludeOperationIds {
     private_mapping_read_view_id: GlobalId,
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
-    px10_op_ids: [GlobalId; 8],
+    px10_op_ids: [GlobalId; 9],
 }
 
 struct PreludeResourceIds {
@@ -892,7 +892,7 @@ struct PreludeResourceIds {
     private_mapping_read_view_id: GlobalId,
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
-    px10_op_ids: [GlobalId; 8],
+    px10_op_ids: [GlobalId; 9],
     px10_kind_ids: [GlobalId; 4],
     px10_exit_ids: [GlobalId; 2],
     private_buffer_handle_id: GlobalId,
@@ -2079,6 +2079,8 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         .map_err(|e| ElabError::Internal(format!("prelude ChildStdio failed: {e}")))?;
     elab.elaborate_decl("data ChildExit = Exited UInt8 | Signaled UInt8")
         .map_err(|e| ElabError::Internal(format!("prelude ChildExit failed: {e}")))?;
+    elab.elaborate_decl("data ChildSignal = SignalHangup | SignalInterrupt | SignalQuit | SignalKill | SignalUser1 | SignalUser2 | SignalTerminate")
+        .map_err(|e| ElabError::Internal(format!("prelude ChildSignal failed: {e}")))?;
     // `ResourceKind.SpawnPlan` and the type `SpawnPlan` legitimately share
     // their terminal spelling. Surface `data` preflight rejects that overlap
     // before constructor scoping; install the same ordinary checked inductive
@@ -2477,9 +2479,10 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![resource_plan_t]),
                 named(vec![resource_child_t.clone()]),
                 named(vec![resource_child_t.clone(), int_t.clone()]),
-                named(vec![resource_child_t]),
+                named(vec![resource_child_t.clone()]),
                 named(vec![resource_pipe_read_t, resource_buffer_t.clone(), int_t.clone(), int_t.clone()]),
-                named(vec![resource_pipe_write_t, resource_buffer_t.clone(), int_t.clone(), int_t, resource_buffer_t]),
+                named(vec![resource_pipe_write_t, resource_buffer_t.clone(), int_t.clone(), int_t.clone(), resource_buffer_t]),
+                named(vec![resource_child_t, int_t]),
             ]
         },
     })
@@ -2524,6 +2527,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateProcessWait",
         "PrivateResourceStreamRead",
         "PrivateResourceStreamWrite",
+        "PrivateProcessSignal",
     ]
     .into_iter()
     .zip(fs_ctor_ids)
@@ -2546,6 +2550,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateProcessPlanOpen", "PrivateProcessPlanPush", "PrivateProcessSpawn",
         "PrivateProcessTakePipeWrite", "PrivateProcessTakePipeRead",
         "PrivateProcessWait", "PrivateResourceStreamRead", "PrivateResourceStreamWrite",
+        "PrivateProcessSignal",
     ].map(|name| elab.globals[name]);
     Ok(PreludeOperationIds {
         private_fs_open_id,
@@ -2642,8 +2647,9 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateProcessTakePipeRead child fd |-> Result ResourceError (Resource ResourceKind.PipeRead); \
            PrivateProcessWait child |-> Result ResourceError ChildExit; \
            PrivateResourceStreamRead stream buffer start length |-> Result ResourceError ReadProgress; \
-           PrivateResourceStreamWrite stream buffer start length origin |-> Result ResourceError WriteProgress \
-         }",
+           PrivateResourceStreamWrite stream buffer start length origin |-> Result ResourceError WriteProgress; \
+           PrivateProcessSignal child signo |-> Result ResourceError Unit \
+         }"
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
 
@@ -3122,10 +3128,12 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "PrivateProcessWait",
         "PrivateResourceStreamRead",
         "PrivateResourceStreamWrite",
+        "PrivateProcessSignal",
         "SpawnPlan.PrivateSpawnPlan",
         "private_process_error",
         "private_process_read_result",
         "process_stdio_scalar",
+        "process_signal_scalar",
         "private_process_then",
         "private_process_push_arguments",
         "private_process_push_environment",

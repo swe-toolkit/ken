@@ -316,6 +316,7 @@ fn put_request(
         CanonicalRequestV1::ProcessSpawn => put_u8(out, 39),
         CanonicalRequestV1::ProcessTakePipe { fd } => { put_u8(out, 40); put_u64(out, *fd); }
         CanonicalRequestV1::ProcessWait => put_u8(out, 41),
+        CanonicalRequestV1::ProcessSignal { signal } => { put_u8(out, 42); put_u64(out, *signal); },
     }
     Ok(())
 }
@@ -965,6 +966,7 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         39 => CanonicalRequestV1::ProcessSpawn,
         40 => CanonicalRequestV1::ProcessTakePipe { fd: cursor.u64()? },
         41 => CanonicalRequestV1::ProcessWait,
+        42 => CanonicalRequestV1::ProcessSignal { signal: cursor.u64()? },
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -1590,6 +1592,23 @@ mod tests {
         let mut wall = Vec::new();
         put_request(&mut wall, &CanonicalRequestV1::ClockWallNow).expect("encodes");
         assert_ne!(wall, encodings[0]);
+    }
+
+    /// Promise class: normative compatibility vector. Canonical ProcessSignal
+    /// uses append-only tag 42 with a full u64 signal field, including unknown
+    /// numbers for terminal dispatch validation rather than wire truncation.
+    #[test]
+    fn process_signal_request_round_trips_exact_append_only_tag() {
+        for signal in [0_u64, 1, 3, 4, 9, 15, u64::MAX] {
+            let request = CanonicalRequestV1::ProcessSignal { signal };
+            let mut bytes = Vec::new();
+            put_request(&mut bytes, &request).unwrap();
+            assert_eq!(bytes[0], 42);
+            assert_eq!(&bytes[1..], signal.to_le_bytes());
+            let mut cursor = Cursor { bytes: &bytes, position: 0 };
+            assert_eq!(get_request(&mut cursor).unwrap(), request);
+            assert_eq!(cursor.position, bytes.len());
+        }
     }
 
     /// Promise class: normative compatibility vector. MEASURED: all three D3

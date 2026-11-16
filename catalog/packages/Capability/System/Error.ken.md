@@ -55,9 +55,23 @@ export RetryGuidance, RetryAdvised, RetryUnsafeNonIdempotent, DoNotRetryPermanen
 
 data RetryGuidance = RetryAdvised | RetryUnsafeNonIdempotent | DoNotRetryPermanent
 
-export ProcessOperation, SpawnChild, TakePipe, ReadPipe, WritePipe, ClosePipe, WaitChild
+export ProcessOperation,
+  SpawnChild,
+  TakePipe,
+  ReadPipe,
+  WritePipe,
+  ClosePipe,
+  WaitChild,
+  SignalChild
 
-data ProcessOperation = SpawnChild | TakePipe | ReadPipe | WritePipe | ClosePipe | WaitChild
+data ProcessOperation =
+  SpawnChild
+  | TakePipe
+  | ReadPipe
+  | WritePipe
+  | ClosePipe
+  | WaitChild
+  | SignalChild
 
 export Operation, FilesystemOp, ProcessOp
 
@@ -176,7 +190,8 @@ pub fn operation_idempotence (operation : Operation) : Idempotence =
         ReadPipe ↦ NonIdempotent;
         WritePipe ↦ NonIdempotent;
         ClosePipe ↦ NonIdempotent;
-        WaitChild ↦ Idempotent
+        WaitChild ↦ Idempotent;
+        SignalChild ↦ NonIdempotent
       }
   }
 

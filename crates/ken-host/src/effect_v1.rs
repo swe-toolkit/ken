@@ -56,6 +56,7 @@ pub enum HostOpV1 {
     ProcessSpawn = 0x0603,
     ProcessTakePipe = 0x0604,
     ProcessWait = 0x0605,
+    ProcessSignal = 0x0606,
 }
 
 impl HostOpV1 {
@@ -159,7 +160,8 @@ impl HostOpV1 {
             Self::ProcessPlanPush => Some(Self::ProcessSpawn),
             Self::ProcessSpawn => Some(Self::ProcessTakePipe),
             Self::ProcessTakePipe => Some(Self::ProcessWait),
-            Self::ProcessWait => None,
+            Self::ProcessWait => Some(Self::ProcessSignal),
+            Self::ProcessSignal => None,
         }
     }
 
@@ -224,7 +226,8 @@ impl HostOpV1 {
             | Self::ProcessPlanPush
             | Self::ProcessSpawn
             | Self::ProcessTakePipe
-            | Self::ProcessWait => HostOpAvailabilityV1::NativeTested,
+            | Self::ProcessWait
+            | Self::ProcessSignal => HostOpAvailabilityV1::NativeTested,
         }
     }
 
@@ -283,7 +286,7 @@ impl HostOpV1 {
             Self::ResourceStreamRead | Self::ResourceStreamWrite => false,
             Self::EntropyRandomBytes => true,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
-            | Self::ProcessTakePipe | Self::ProcessWait => false,
+            | Self::ProcessTakePipe | Self::ProcessWait | Self::ProcessSignal => false,
         }
     }
 }
@@ -305,7 +308,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 32] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 33] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -338,6 +341,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 32] = [
     HostOpV1::ProcessSpawn,
     HostOpV1::ProcessTakePipe,
     HostOpV1::ProcessWait,
+    HostOpV1::ProcessSignal,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -610,6 +614,7 @@ pub fn host_effect_wire_layout_v1(
         HostOpV1::ProcessSpawn => vec![checked_u32(field("plan")?)?],
         HostOpV1::ProcessTakePipe => vec![checked_u32(field("child")?)?, checked_u32(field("fd")?)?],
         HostOpV1::ProcessWait => vec![checked_u32(field("child")?)?],
+        HostOpV1::ProcessSignal => vec![checked_u32(field("child")?)?, checked_u32(field("signal")?)?],
         HostOpV1::BufferAllocate => vec![checked_u32(field("capacity")?)?],
         HostOpV1::BufferFreeze | HostOpV1::MappingReadView => vec![
             checked_u32(field("resource")?)?,
@@ -861,6 +866,11 @@ impl CapabilityGrantV1 {
 
     pub fn revoke(&self, revocation: &mut crate::RevocationDomain) -> bool {
         revocation.revoke(self.revocation_node)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn provenance_for_test(&self) -> crate::revocation_v1::RevocationNodeId {
+        self.revocation_node
     }
 }
 
@@ -1486,6 +1496,26 @@ impl ResourceTableV1 {
             ResourceOwnerV1::Child(ChildOwnerV1 { process: child, taken_pipes: Vec::new() }),
             ResourceKindV1::ChildProcess, crate::RightSet::EXECUTE, Some(provenance),
         )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn insert_child_for_test(
+        &mut self,
+        child: crate::ChildProcessV1,
+        provenance: crate::revocation_v1::RevocationNodeId,
+    ) -> ResourceTokenV1 {
+        self.insert_child(child, provenance).0
+    }
+
+    #[cfg(test)]
+    pub(crate) fn child_for_test(&mut self, token: ResourceTokenV1) -> &mut crate::ChildProcessV1 {
+        let (ResourceOwnerV1::Child(child), _, _) = self
+            .typed_owner_mut(token, ResourceKindV1::ChildProcess)
+            .expect("test child remains live")
+        else {
+            unreachable!("validated child kind")
+        };
+        &mut child.process
     }
 
     fn insert_fs_handle(
@@ -2591,6 +2621,10 @@ pub trait HostEffectBackendV1 {
         crate::process_wait_v1(child).map_err(|error| io_error_identity_v1(&error))
     }
 
+    fn process_signal(&mut self, child: &crate::ChildProcessV1, signal: libc::c_int) -> Result<(), IoErrorIdentityV1> {
+        child.send_signal(signal).map_err(|error| io_error_identity_v1(&error))
+    }
+
     fn process_settle(&mut self, child: crate::ChildProcessV1, terminal_error: bool) -> Result<(), IoErrorIdentityV1> {
         child.settle(terminal_error).map_err(|error| io_error_identity_v1(&error))
     }
@@ -2839,6 +2873,7 @@ impl HostOpV1 {
             | Self::ProcessSpawn
             | Self::ProcessTakePipe
             | Self::ProcessWait
+            | Self::ProcessSignal
             | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
         }
     }
@@ -2855,7 +2890,8 @@ impl HostOpV1 {
             | Self::MappingAcquireFile
             | Self::ProcessPlanPush
             | Self::ProcessTakePipe
-            | Self::ProcessWait => ResourceAdmissionRequirementV1::Target,
+            | Self::ProcessWait
+            | Self::ProcessSignal => ResourceAdmissionRequirementV1::Target,
             Self::FsReadAt | Self::ResourceStreamRead => ResourceAdmissionRequirementV1::FileBuffer,
             Self::FsWriteAt | Self::ResourceStreamWrite => ResourceAdmissionRequirementV1::FileBufferSpan,
             Self::FsSeek
@@ -3027,7 +3063,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
         ) | (HostOpV1::MappingAcquireFile, ResourceInputsV1::Target(_))
             | (HostOpV1::FsReadAt | HostOpV1::ResourceStreamRead, ResourceInputsV1::FileBuffer { .. })
             | (HostOpV1::FsWriteAt | HostOpV1::ResourceStreamWrite, ResourceInputsV1::FileBufferSpan { .. })
-            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait, ResourceInputsV1::Target(_))
+            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait | HostOpV1::ProcessSignal, ResourceInputsV1::Target(_))
             | (
                 HostOpV1::BufferAllocate
                     | HostOpV1::MappingAllocate
@@ -3127,6 +3163,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             | (HostOpV1::ProcessSpawn, CanonicalRequestV1::ProcessSpawn)
             | (HostOpV1::ProcessTakePipe, CanonicalRequestV1::ProcessTakePipe { .. })
             | (HostOpV1::ProcessWait, CanonicalRequestV1::ProcessWait)
+            | (HostOpV1::ProcessSignal, CanonicalRequestV1::ProcessSignal { .. })
             | (
                 HostOpV1::FsHandleMetadata,
                 CanonicalRequestV1::FsHandleMetadata
@@ -3182,6 +3219,13 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
     );
     if !request_shape_matches {
         return Err(TerminalErrorV1::MalformedHostAbiField);
+    }
+    if let (HostOpV1::ProcessSignal, CanonicalRequestV1::ProcessSignal { signal }) =
+        (operation, request)
+    {
+        if !matches!(*signal, 1 | 2 | 3 | 9 | 10 | 12 | 15) {
+            return Err(TerminalErrorV1::MalformedHostAbiField);
+        }
     }
     let admission_tokens = match (operation.resource_admission_requirement(), resource) {
         (ResourceAdmissionRequirementV1::None, _) => Vec::new(),
@@ -3841,6 +3885,20 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 backend.process_wait(&mut child.process).map(CanonicalReplyV1::ChildExit).map_err(SemanticErrorV1::Io)
             })()
         }
+        (HostOpV1::ProcessSignal, CanonicalRequestV1::ProcessSignal { signal }) => {
+            // Request-shape validation checked the closed signal inventory
+            // before Target admission acquired its resource lease.
+            let signo = *signal as libc::c_int;
+            let ResourceInputsV1::Target(child) = resource else { unreachable!("validated resource shape") };
+            (|| {
+                let (owner, identity, _) = resources.typed_owner(child, ResourceKindV1::ChildProcess)
+                    .map_err(SemanticErrorV1::Resource)?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let ResourceOwnerV1::Child(child) = owner else { unreachable!("validated child kind") };
+                backend.process_signal(&child.process, signo)
+                    .map(|()| CanonicalReplyV1::Unit).map_err(SemanticErrorV1::Io)
+            })()
+        }
         (HostOpV1::ResourceStreamRead, CanonicalRequestV1::ResourceStreamRead { buffer_start, length }) => {
             let ResourceInputsV1::FileBuffer { file: stream, buffer } = resource else { unreachable!("validated resource shape") };
             resources.with_pipe_and_buffer_mut(stream, ResourceKindV1::PipeRead, buffer, |fd, stream_id, region, buffer_id| {
@@ -4204,6 +4262,7 @@ pub enum CanonicalRequestV1 {
     ProcessSpawn,
     ProcessTakePipe { fd: u64 },
     ProcessWait,
+    ProcessSignal { signal: u64 },
     ResourceRelease,
 }
 
@@ -5137,7 +5196,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 21] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 22] = [
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
@@ -5159,6 +5218,7 @@ mod tests {
             HostOpV1::ProcessPlanPush,
             HostOpV1::ProcessTakePipe,
             HostOpV1::ProcessWait,
+            HostOpV1::ProcessSignal,
         ];
         for operation in HostOpV1::ALL {
             let capability_admitted = expected.contains(&operation);
@@ -5218,6 +5278,7 @@ mod tests {
             HostOpV1::ProcessPlanPush,
             HostOpV1::ProcessTakePipe,
             HostOpV1::ProcessWait,
+            HostOpV1::ProcessSignal,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -5576,6 +5637,7 @@ mod tests {
             HostOpV1::ProcessSpawn,
             HostOpV1::ProcessTakePipe,
             HostOpV1::ProcessWait,
+            HostOpV1::ProcessSignal,
         ];
         let pre_resource = HostOpV1::ALL
             .into_iter()

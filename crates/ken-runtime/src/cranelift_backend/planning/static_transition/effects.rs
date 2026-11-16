@@ -347,12 +347,13 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 33] = [
+    [ken_host::HostOpV1; 34] = [
     ken_host::HostOpV1::ProcessPlanOpen,
     ken_host::HostOpV1::ProcessPlanPush,
     ken_host::HostOpV1::ProcessSpawn,
     ken_host::HostOpV1::ProcessTakePipe,
     ken_host::HostOpV1::ProcessWait,
+    ken_host::HostOpV1::ProcessSignal,
     ken_host::HostOpV1::ResourceStreamRead,
     ken_host::HostOpV1::ResourceStreamWrite,
     ken_host::HostOpV1::ConsoleRead,
@@ -454,6 +455,7 @@ fn host_effect_seat_contract(
                 | Op::ProcessSpawn
                 | Op::ProcessTakePipe
                 | Op::ProcessWait
+                | Op::ProcessSignal
                 | Op::ConsoleRead
                 | Op::ClockWallNow
                 | Op::ClockMonotonicNow
@@ -561,6 +563,7 @@ fn host_effect_seat_contract(
         | (Op::ProcessSpawn, 0)
         | (Op::ProcessTakePipe, 0)
         | (Op::ProcessWait, 0)
+        | (Op::ProcessSignal, 0)
         | (Op::ResourceStreamRead, 0)
         | (Op::ResourceStreamRead, 1)
         | (Op::ResourceStreamWrite, 0)
@@ -569,6 +572,7 @@ fn host_effect_seat_contract(
         (Op::ProcessPlanPush, 1)
         | (Op::ProcessPlanPush, 4)
         | (Op::ProcessTakePipe, 1)
+        | (Op::ProcessSignal, 1)
         | (Op::ResourceStreamRead, 2)
         | (Op::ResourceStreamRead, 3)
         | (Op::ResourceStreamWrite, 2)
@@ -670,7 +674,8 @@ fn host_effect_seat_contract(
             | Op::ProcessPlanPush
             | Op::ProcessSpawn
             | Op::ProcessTakePipe
-            | Op::ProcessWait,
+            | Op::ProcessWait
+            | Op::ProcessSignal,
             _,
         ) => None,
         // ⛔ The represented-UNAVAILABLE lanes, named rather than wildcarded.

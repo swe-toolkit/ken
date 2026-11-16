@@ -19,7 +19,7 @@ const MAPPING: [&str; 8] = [
     "mapBytes",
     "mapWrite",
 ];
-const CHILD: [&str; 12] = [
+const CHILD: [&str; 21] = [
     "ChildStdio",
     "ChildPipe",
     "ChildNull",
@@ -32,6 +32,15 @@ const CHILD: [&str; 12] = [
     "wait_child",
     "take_stdout",
     "read_pipe",
+    "ChildSignal",
+    "SignalHangup",
+    "SignalInterrupt",
+    "SignalQuit",
+    "SignalKill",
+    "SignalUser1",
+    "SignalUser2",
+    "SignalTerminate",
+    "signal_child",
 ];
 
 fn catalog() -> PathBuf {

@@ -225,7 +225,7 @@ fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_argv",
         ARGV_ENV_PIPE,
         "Predeclared(PredeclaredFunctionId(17))",
-        1769,
+        1787,
         &[1, 2, 3],
     );
 }
@@ -236,7 +236,7 @@ fn px10_live_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_live",
         LIVE_CHILD,
         "Predeclared(PredeclaredFunctionId(15))",
-        1286,
+        1295,
         &[2, 3, 4],
     );
 }
@@ -392,12 +392,14 @@ fn assert_region_exit_owners(
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
 /// recording one feasibility diagnostic with no returned-Vis protocol error,
 /// and builds an artifact beneath the separate Process admission gate. Its
-/// settlement 623 resumes through fold 12 and is returned by Vis 658.
+/// settlement 632 resumes through fold 12 and is returned by Vis 667.
 /// MEASURED (B1a D0-7, D0-1-to-D0-7-attribution.txt): region-0 acquire
 /// 710→686, body-entry Construct 682→658, outcome merge 641→617, and
-/// settlement Construct 647→623 preserve producer and order. The ReturnFold
-/// producer remains computational match 12; the ReturnedVisSettlement
-/// producer is the same region-0 body-entry Construct, not the fold.
+/// settlement Construct 647→623 preserved producer and order before I2.
+/// The new ChildSignal prelude shifts those smoke identities by nine, without
+/// changing producer roles. The ReturnFold producer remains computational
+/// match 12; the ReturnedVisSettlement producer is the same region-0
+/// body-entry Construct, not the fold.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -424,7 +426,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 623, 12), (ReturnedVisSettlement, 623, 658)],
+            &[(ReturnFold, 632, 12), (ReturnedVisSettlement, 632, 667)],
         );
         let _built = built.expect("smoke emits an artifact with Process authority");
     });
@@ -445,10 +447,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
             &[
-                (ReturnFold, 1160, 571),
-                (ReturnFold, 1405, 1165),
-                (ReturnedVisSettlement, 1160, 1783),
-                (ReturnedVisSettlement, 1405, 1500),
+                (ReturnFold, 1178, 580),
+                (ReturnFold, 1423, 1183),
+                (ReturnedVisSettlement, 1178, 1801),
+                (ReturnedVisSettlement, 1423, 1518),
             ][..],
             None,
         ),
@@ -456,10 +458,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_live_child",
             LIVE_CHILD,
             &[
-                (ReturnFold, 601, 12),
-                (ReturnFold, 846, 606),
-                (ReturnedVisSettlement, 601, 1300),
-                (ReturnedVisSettlement, 846, 1019),
+                (ReturnFold, 610, 12),
+                (ReturnFold, 855, 615),
+                (ReturnedVisSettlement, 610, 1309),
+                (ReturnedVisSettlement, 855, 1028),
             ][..],
             None,
         ),
@@ -579,11 +581,11 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 }
 
 /// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
-/// relays 1223 and 992 and live's relays 664 and 433 are relay members of
+/// relays 1241 and 1010 and live's relays 673 and 442 are relay members of
 /// their owners' returned-Vis protocols, numbered once per emitting copy
 /// with distinct nonzero discriminants rather than by a response row, and
-/// kept in the settled member set. Copies of 1223 and 664 resume at the rows
-/// whose Vis are 1448 and 908; copies of 992 and 433 resume by their planned
+/// kept in the settled member set. Copies of 1241 and 673 resume at the rows
+/// whose Vis are 1466 and 917; copies of 1010 and 442 resume by their planned
 /// named trap. CLAIMED: each named relay has a numbered copy with the
 /// expected resume, and copies retain separate discriminants. THE GAP: this
 /// census does not prove that every emitting owner minted a copy or that
@@ -593,18 +595,21 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 /// and order on the B1a tree against `B-attribution-r2-structural-comparison.txt`
 /// (SHA256 2b45cce5e87da7f616767ea12772d28abdbb74143000f014853e907546babc06),
 /// which found equal owner/relay/resume/successor structure under that mapping.
+/// I2's checked ChildSignal prelude shifts argv origins by 18 and live origins
+/// by nine; the returned-Vis protocols and settled relays were re-observed on
+/// the merged tree before repinning their identities.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
         (
             "px10_census_relay_argv_env_pipe",
             ARGV_ENV_PIPE,
-            [(1223, 1687, Some(1448)), (992, 1783, None)],
+            [(1241, 1705, Some(1466)), (1010, 1801, None)],
         ),
         (
             "px10_census_relay_live_child",
             LIVE_CHILD,
-            [(664, 1204, Some(908)), (433, 1300, None)],
+            [(673, 1213, Some(917)), (442, 1309, None)],
         ),
     ] {
         in_census_thread(name, move || {
@@ -675,9 +680,10 @@ fn px10_relays_are_numbered_protocol_members() {
 
 /// Promise class: transition sentinel for B1a's exact original-fixture
 /// projection (RT-NATIVE-BRACKET-RETURN-CLAUSE AC-1). MEASURED (B1a D0-4):
-/// the live carried-stack seats Vis 1307/1429 and null seats Vis 1806/1928
-/// descend from retired main matches. Their DropBracketReturnClause mutation
-/// applies zero times on each B1a fixture; the unmutated Let-body build emits.
+/// the pre-I2 live carried-stack seats Vis 1307/1429 and null seats Vis
+/// 1806/1928 descended from retired main matches. Their
+/// DropBracketReturnClause mutation applies zero times on each B1a fixture;
+/// the unmutated Let-body build emits.
 /// CLAIMED: a performed bind lowers its Ret body under the original region
 /// eliminators, without a carried re-emission stack. THE GAP: the Let route's
 /// BracketReturnClause check reads the clause with its frame present, but this

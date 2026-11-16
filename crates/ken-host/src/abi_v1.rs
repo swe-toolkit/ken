@@ -386,6 +386,8 @@ struct ProcessSpawnRequestV1 { plan: u64 }
 struct ProcessTakePipeRequestV1 { child: u64, fd: u64 }
 #[repr(C)]
 struct ProcessWaitRequestV1 { child: u64 }
+#[repr(C)]
+struct ProcessSignalRequestV1 { child: u64, signal: u64 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -2136,6 +2138,11 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
             let wire = unsafe { &*request.cast::<ProcessWaitRequestV1>() };
             (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessWait)
         }
+        HostOpV1::ProcessSignal if request_size == std::mem::size_of::<ProcessSignalRequestV1>() => {
+            if !request.cast::<ProcessSignalRequestV1>().is_aligned() { return -1; }
+            let wire = unsafe { &*request.cast::<ProcessSignalRequestV1>() };
+            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessSignal { signal: wire.signal })
+        }
         HostOpV1::ResourceStreamRead if request_size == std::mem::size_of::<ResourceStreamReadRequestV1>() => {
             if !request.cast::<ResourceStreamReadRequestV1>().is_aligned() { return -1; }
             let wire = unsafe { &*request.cast::<ResourceStreamReadRequestV1>() };
@@ -2698,6 +2705,23 @@ mod tests {
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
         assert_eq!(effect_binding("error", "io.Revoked"), 11);
         assert_eq!(effect_binding("error", "io.Other"), 12);
+    }
+
+    /// Promise class: normative compatibility vector. The independently C-
+    /// probed ProcessSignalRequestV1 agrees with Rust's two-u64 target/signal
+    /// layout and the ABI's mandated field order.
+    #[test]
+    fn px10_process_signal_request_layout_matches_c_probe() {
+        for (name, measured) in [
+            ("SIZE_ProcessSignalRequestV1", std::mem::size_of::<ProcessSignalRequestV1>()),
+            ("ALIGN_ProcessSignalRequestV1", std::mem::align_of::<ProcessSignalRequestV1>()),
+            ("OFFSET_ProcessSignalRequestV1_child", std::mem::offset_of!(ProcessSignalRequestV1, child)),
+            ("OFFSET_ProcessSignalRequestV1_signal", std::mem::offset_of!(ProcessSignalRequestV1, signal)),
+        ] {
+            assert_eq!(effect_fact(name), measured as u64, "raw ABI fact {name}");
+        }
+        assert_eq!(effect_fact("OFFSET_ProcessSignalRequestV1_child"), 0);
+        assert_eq!(effect_fact("OFFSET_ProcessSignalRequestV1_signal"), 8);
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the C-probed
@@ -4014,6 +4038,88 @@ mod tests {
         assert_eq!(reply.bytes.len, 0);
         assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
 
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: native raw
+    /// entry projects a revoked child Target as reply.error detail 11 without
+    /// signalling the child. CLAIMED: generated signal_child code decodes that
+    /// detail using the shared resource/unit reply plan. GAP: checked source
+    /// cannot revoke a grant, so no end-to-end source Revoked row exists.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn native_dispatch_projects_revoked_child_signal_without_delivery() {
+        use std::io::Read;
+
+        let directory = std::env::temp_dir().join(format!(
+            "ken-revoked-child-native-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+        let token = {
+            let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+            let provenance = context
+                .capabilities
+                .resolve(context.capability)
+                .unwrap()
+                .provenance_for_test();
+            let mut plan = crate::SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
+            for arg in [
+                b"sh".as_slice(),
+                b"-c".as_slice(),
+                b"printf x; exec sleep 30".as_slice(),
+            ] {
+                plan.push_argument(arg.to_vec()).unwrap();
+            }
+            plan.set_stdio(1, crate::ChildStdioV1::Pipe).unwrap();
+            let mut child = plan.spawn().unwrap();
+            let mut ready = [0];
+            std::fs::File::from(child.take_pipe(1).unwrap())
+                .read_exact(&mut ready)
+                .unwrap();
+            assert_eq!(ready, [b'x']);
+            let token = context.resources.insert_child_for_test(child, provenance);
+            assert!(context.revocation.revoke(provenance));
+            token
+        };
+
+        let request = ProcessSignalRequestV1 {
+            child: token.erased_identity(),
+            signal: 15,
+        };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::ProcessSignal as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<ProcessSignalRequestV1>(),
+                std::ptr::from_mut(&mut reply).cast(),
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(reply.tag, REPLY_ERROR);
+        assert_eq!(reply.detail, 11);
+        let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+        let child = context.resources.child_for_test(token);
+        assert!(
+            !crate::process_v1::child_pidfd_exited_for_test(child, 250).unwrap(),
+            "revoked signal reached the live child"
+        );
+        child.send_signal(libc::SIGKILL).unwrap();
+        assert_eq!(child.wait().unwrap(), crate::ChildExitV1::Signaled(9));
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();
     }

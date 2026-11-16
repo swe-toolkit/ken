@@ -12,9 +12,9 @@ available through an explicit import.
 ## Motivation
 
 A child plan is a pure value until `withChild` acquires a process resource.
-The selected public builders and pipe operations share one package home.
-`ChildExit` remains an always-present scoped checked family, not an export
-from this module.
+The selected public builders, pipe operations, and child signals share one
+package home. `ChildExit` remains an always-present scoped checked family, not
+an export from this module.
 
 ## Definition
 
@@ -34,7 +34,16 @@ export ChildStdio,
   SpawnPlan,
   with_stderr,
   take_stdin,
-  take_stderr
+  take_stderr,
+  ChildSignal,
+  SignalHangup,
+  SignalInterrupt,
+  SignalQuit,
+  SignalKill,
+  SignalUser1,
+  SignalUser2,
+  SignalTerminate,
+  signal_child
 ```
 
 ## Using it
@@ -43,8 +52,8 @@ Import `spawn_plan` and `SpawnPlan` to build and name a plan. `ChildStdio`
 selects its streams, including the `with_stderr` setting. `withChild` acquires
 the child in a resource bracket; `take_stdin` obtains its writable pipe and
 `take_stdout` or `take_stderr` obtains a readable pipe. `read_pipe` transfers
-from a readable pipe. The program still needs the Process and full FS grants required by the
-[checked process contract](../../../../spec/30-surface/38-ffi-io.md).
+from a readable pipe. The program still needs the Process and full FS grants
+required by the [checked process contract](../../../../spec/30-surface/38-ffi-io.md).
 
 ## Laws & proofs
 
@@ -54,9 +63,11 @@ kernel proof introduced by this export.
 
 ## Design notes
 
-`ChildStdio` is exported with all three public cases. The private positional
-plan constructor stays unavailable. `ChildExit` is already a scoped floor
-family, so waiting does not give it a second package identity.
+`ChildStdio` is exported with all three public cases. `ChildSignal` has seven
+cases; `signal_child` uses the held child resource, not a PID or a new grant.
+The private positional plan constructor stays unavailable. `ChildExit` is
+already a scoped floor family, so waiting does not give it a second package
+identity.
 
 ## References
 

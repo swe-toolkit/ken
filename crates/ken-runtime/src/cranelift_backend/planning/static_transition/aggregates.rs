@@ -3915,7 +3915,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::ProcessPlanOpen | Op::ProcessSpawn | Op::ProcessTakePipe => {
             (RESOURCE_SURFACE, N::Absent)
         }
-        Op::ProcessPlanPush => (RESOURCE_SURFACE, UNIT),
+        Op::ProcessPlanPush | Op::ProcessSignal => (RESOURCE_SURFACE, UNIT),
         Op::ProcessWait => (RESOURCE_SURFACE, CHILD_EXIT),
         Op::ResourceStreamRead => (RESOURCE_SURFACE, STREAM_READ_PROGRESS),
         Op::ResourceStreamWrite => (RESOURCE_SURFACE, WROTE),

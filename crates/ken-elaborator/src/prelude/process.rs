@@ -80,6 +80,18 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
             }
           }
     "#)?;
+    checked(elab, "process_signal_scalar", r#"
+        fn process_signal_scalar (sig : ChildSignal) : Int =
+          match sig {
+            SignalHangup |-> 1;
+            SignalInterrupt |-> 2;
+            SignalQuit |-> 3;
+            SignalKill |-> 9;
+            SignalUser1 |-> 10;
+            SignalUser2 |-> 12;
+            SignalTerminate |-> 15
+          }
+    "#)?;
     checked(elab, "private_process_push_stdio", r#"
         proc private_process_push_stdio (a : Auth)
           (plan : Resource ResourceKind.SpawnPlan) (fd : Int) (target : ChildStdio)
@@ -208,6 +220,19 @@ pub(super) fn register_prelude_process(elab: &mut ElabEnv) -> Result<(), ElabErr
         "#);
         checked(elab, name, &declaration)?;
     }
+    checked(elab, "signal_child", r#"
+        proc signal_child (a : Auth) (child : Resource ResourceKind.ChildProcess)
+          (sig : ChildSignal)
+          : HostIO a (Result ResourceError Unit) visits [Process] =
+          Vis (Coproduct (FSOp a) AmbientOp)
+            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+            (Result ResourceError Unit)
+            (InL (FSOp a) AmbientOp
+              (PrivateProcessSignal a child (process_signal_scalar sig)))
+            (\response. Ret (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError Unit) response)
+    "#)?;
     checked(elab, "private_process_read_result", r#"
         fn private_process_read_result (a : Auth) (response : Result ResourceError ReadProgress)
           : HostIO a (Result ResourceError ReadProgress) =

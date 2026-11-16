@@ -5587,7 +5587,7 @@ pub struct FSIds {
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
-    pub px10_op_ids: [GlobalId; 8],
+    pub px10_op_ids: [GlobalId; 9],
     pub px10_kind_ids: [GlobalId; 4],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_resource_release_id: GlobalId,
@@ -6884,6 +6884,10 @@ fn fs_dispatch<H: HostHandler>(
          ken_host::CanonicalRequestV1::ProcessTakePipe { fd }, fs.op_metadata_id)
     } else if op_id == fs.px10_op_ids[5] {
         (ken_host::HostOpV1::ProcessWait, ken_host::CanonicalRequestV1::ProcessWait, fs.op_metadata_id)
+    } else if op_id == fs.px10_op_ids[8] {
+        let signal = narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        (ken_host::HostOpV1::ProcessSignal,
+         ken_host::CanonicalRequestV1::ProcessSignal { signal }, fs.op_metadata_id)
     } else if op_id == fs.px10_op_ids[6] || op_id == fs.px10_op_ids[7] {
         let buffer_start = narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
         let length = narrow_host_u64(args.get(4)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
@@ -6924,6 +6928,7 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe
             | ken_host::HostOpV1::ProcessWait
+            | ken_host::HostOpV1::ProcessSignal
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -6944,6 +6949,7 @@ fn fs_dispatch<H: HostHandler>(
         ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::MappingAcquireFile
             | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
+            | ken_host::HostOpV1::ProcessSignal
     ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
@@ -8303,9 +8309,9 @@ mod px5b_effect_observation_tests {
             private_mapping_read_view_id: id(),
             private_mapping_write_view_id: id(),
             private_mapping_acquire_file_id: id(),
-            px10_op_ids: [id(); 8],
-            px10_kind_ids: [id(); 4],
-            px10_exit_ids: [id(); 2],
+            px10_op_ids: std::array::from_fn(|_| id()),
+            px10_kind_ids: std::array::from_fn(|_| id()),
+            px10_exit_ids: std::array::from_fn(|_| id()),
             private_resource_release_id: id(),
             private_bracket_release_id: id(),
             resource_read_id: id(),
@@ -8841,6 +8847,105 @@ mod px5b_effect_observation_tests {
         assert!(cause_args.is_empty());
         assert_ne!(ids.revoked_id, ids.capabilitydenied_id);
         assert_ne!(ids.revoked_id, ids.notfound_id);
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the real
+    /// interpreter fs_dispatch refuses a revoked live ChildProcess Target and
+    /// reifies its reply as Err (ResourceHostIO IOError.Revoked); the child
+    /// receives no signal. CLAIMED: native generated code decodes the same
+    /// signal_child resource/unit reply plan. GAP: checked source cannot
+    /// initiate revocation, so neither engine has an end-to-end source Revoked
+    /// witness; the host/runner alone owns this management operation.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn revoked_child_signal_dispatch_reifies_without_delivery() {
+        use std::time::{Duration, Instant};
+
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+        let mut revocation = ken_host::RevocationDomain::default();
+        let grant = ken_host::CapabilityGrantV1::mint_root(
+            ken_host::program_caps_fs_trace_identity_v1(),
+            ken_host::Cap::mint(ken_host::AUTH_FULL, "FS").with_declared_process_grant(),
+            &mut revocation,
+        );
+        let mut capabilities = ken_host::CapabilityTableV1::default();
+        let capability = capabilities.insert(grant.clone());
+        let mut resources = ken_host::ResourceTableV1::default();
+        let mut backend = RevokedReadBackend::default();
+        let root = std::env::temp_dir().join(format!(
+            "ken-interp-revoked-child-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let marker = root.join("pid");
+        let program = b"/bin/sh".to_vec();
+        let opened = ken_host::dispatch_host_op_v1(
+            &mut backend, &capabilities, &revocation, &mut resources,
+            ken_host::HostOpV1::ProcessPlanOpen, Some(capability),
+            ken_host::ResourceInputsV1::None,
+            &ken_host::CanonicalRequestV1::ProcessPlanOpen { program },
+        ).unwrap();
+        let plan = opened.resource_token.expect("spawn plan token");
+        let script = format!("printf '%s' \"$$\" > {}; exec sleep 30", marker.display());
+        for arg in [b"sh".as_slice(), b"-c".as_slice(), script.as_bytes()] {
+            let pushed = ken_host::dispatch_host_op_v1(
+                &mut backend, &capabilities, &revocation, &mut resources,
+                ken_host::HostOpV1::ProcessPlanPush, None,
+                ken_host::ResourceInputsV1::Target(plan),
+                &ken_host::CanonicalRequestV1::ProcessPlanPush {
+                    field: 0, first: arg.to_vec(), second: Vec::new(), scalar: 0,
+                },
+            ).unwrap();
+            assert_eq!(pushed.outcome,
+                ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Unit));
+        }
+        let spawned = ken_host::dispatch_host_op_v1(
+            &mut backend, &capabilities, &revocation, &mut resources,
+            ken_host::HostOpV1::ProcessSpawn, None,
+            ken_host::ResourceInputsV1::Target(plan),
+            &ken_host::CanonicalRequestV1::ProcessSpawn,
+        ).unwrap();
+        let child = spawned.resource_token.expect("spawned child token");
+        let deadline = Instant::now() + Duration::from_secs(3);
+        let pid = loop {
+            if let Ok(text) = std::fs::read_to_string(&marker) {
+                break text.parse::<u32>().expect("child reported numeric PID");
+            }
+            assert!(Instant::now() < deadline, "child never reported readiness");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        let stat = || {
+            let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
+            let (_, tail) = stat.rsplit_once(") ").expect("proc stat comm delimiter");
+            let fields = tail.split_whitespace().collect::<Vec<_>>();
+            (fields[0].to_string(), fields[19].to_string())
+        };
+        let (_, identity_before) = stat();
+        assert!(grant.revoke(&mut revocation));
+        let mut host = CaptureHost::new(Vec::new());
+        let result = run_fs(
+            fs.px10_op_ids[8],
+            &[EvalVal::Unknown, EvalVal::ResourceToken(child), EvalVal::Int(15)],
+            &mut host, &mut resources, &mut revocation, &fs, &ids, &mut store,
+        );
+        std::thread::sleep(Duration::from_millis(250));
+        let (state_after, identity_after) = stat();
+        // Terminal-error settlement kills and reaps through the held child,
+        // independently of admission. The PID is only a test observation.
+        let settlements = resources.finalize_all_with_mode(&mut backend, true);
+        assert!(settlements.iter().any(|settlement| {
+            settlement.resource_kind == ken_host::ResourceKindV1::ChildProcess
+                && settlement.outcome == ken_host::ResourceSettlementOutcomeV1::Released
+        }));
+        std::fs::remove_dir_all(root).unwrap();
+        expect_resource_host_io(&result, ids.revoked_id, &ids, &fs);
+        assert_eq!(identity_before, identity_after, "child PID was reused");
+        assert_ne!(state_after, "Z", "signal reached the child before refusal");
+        assert_ne!(state_after, "X", "child exited before refusal");
     }
 
     fn expect_resource_host_io(value: &EvalVal, expected: GlobalId, ids: &ConsoleIds, fs: &FSIds) {
