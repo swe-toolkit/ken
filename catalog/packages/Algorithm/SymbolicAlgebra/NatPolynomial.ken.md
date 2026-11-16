@@ -1224,6 +1224,76 @@ pub theorem deriv_absent
             (deriv_absent v b env (bool_or_false_right (occurs v a) (occurs v b) absent)))
   }
 
+pub theorem eval_absent
+      (v : Nat) (e : Expr) (env : Nat → Nat)
+    : Equal Bool (occurs v e) False
+      → (env2 : Nat → Nat)
+      → ((w : Nat) → (Equal Nat v w → Bottom) → Equal Nat (env2 w) (env w))
+      → Equal Nat (eval env2 e) (eval env e) =
+  match e {
+    EConst c ↦ λabsent. λenv2. λagree. Refl;
+    EVar w ↦
+      λabsent.
+        λenv2.
+          λagree.
+            agree
+              w
+              (λsame.
+                trans
+                  Bool
+                  False
+                  (nat_same v w)
+                  True
+                  (sym Bool (nat_same v w) False absent)
+                  (nat_same_complete v w same));
+    EAdd a b ↦
+      λabsent.
+        λenv2.
+          λagree.
+            add_cong
+              (eval env2 a)
+              (eval env a)
+              (eval env2 b)
+              (eval env b)
+              (eval_absent
+                v
+                a
+                env
+                (bool_or_false_left (occurs v a) (occurs v b) absent)
+                env2
+                agree)
+              (eval_absent
+                v
+                b
+                env
+                (bool_or_false_right (occurs v a) (occurs v b) absent)
+                env2
+                agree);
+    EMul a b ↦
+      λabsent.
+        λenv2.
+          λagree.
+            mul_cong
+              (eval env2 a)
+              (eval env a)
+              (eval env2 b)
+              (eval env b)
+              (eval_absent
+                v
+                a
+                env
+                (bool_or_false_left (occurs v a) (occurs v b) absent)
+                env2
+                agree)
+              (eval_absent
+                v
+                b
+                env
+                (bool_or_false_right (occurs v a) (occurs v b) absent)
+                env2
+                agree)
+  }
+
 pub theorem deriv_substitute
       (v : Nat)
       (s : Nat → Expr)
@@ -3246,9 +3316,15 @@ its false decision through `var_deriv` without matching on a computed
 `add_cong`. Products lift the recursive zero results through `cong` and
 `trans`, using `zero_l for mul` for the left zero factor. Syntactic
 absence is sufficient, not necessary: a variable can occur in a factor
-multiplied by zero and be semantically unused. Both Boolean eliminations
-stay private; the checked conclusion concerns evaluation at each supplied
-environment, not structural equality of derivatives.
+multiplied by zero and be semantically unused. The `eval_absent` proof
+inducts on the expression. The constant case is reflexive; the variable
+case uses `nat_same_complete` to refute equality with the absent index.
+Addition and multiplication restrict the false Boolean decision to both
+operands, then combine the recursive equalities with `add_cong` and
+`mul_cong`. Applying `eval_absent v e env absent` supplies exactly the
+`h` premise of `deriv_independent`. Both Boolean eliminations stay
+private; the checked conclusions concern evaluation, not structural
+equality of derivatives.
 
 For derivative after substitution, induction on the expression uses the two
 pointwise derivative premises on a variable. The product case reuses
@@ -3357,7 +3433,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and thirty-seven checked theorems; Horner, substitution and differentiation
+and thirty-eight checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3389,7 +3465,10 @@ selectively imports `occurs` and `deriv_absent`, checks owner-local Transparent
 bodies and exact trusted identities, and applies the open law under a
 syntactic-absence premise. The actual seed's absent-index `Proved` control
 accepts; its occurring-index and occurring-but-unused-index claims refuse
-at their own premise, with the rest of the expression held fixed.
+at their own premise, with the rest of the expression held fixed. The
+`cat_symbolic_algebra_eval_absent` package test checks the open evaluation
+law, its use in `deriv_independent`, and an absent-variable fixture against
+an isolated occurring-variable refusal.
 
 The normalization-congruence package test checks the new generic public
 law under a selective import, compares exact trusted-`GlobalId` identity

@@ -1499,3 +1499,73 @@ uses `poly_eq_complete`, adds a helper or import, or changes a
 §§1–17 operation or law type. The three CV-owned closed refusal
 rows and their accepted controls discriminate specific false
 claims; they do not replace the generic checked proofs.
+
+## 19. Evaluation ignores an absent variable
+
+> **Section 19 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-EVAL-ABSENT-VARIABLE).** Architect's AC-0
+> `evt_426n9zzc3j3nw` checked the generic theorem on a scratch catalog
+> copy at base `fa440cc7128c13fb5af6502ac905f8ca8e726948` with
+> `ken check` and `ken fmt --check` rc 0, no new helper or `Axiom`,
+> and two proof-body mutations refused inside the theorem. The probe
+> binary's source matched `970f9a491`; the intervening change to
+> `fa440cc71` was a `#[cfg(test)]`-only line excluded from that binary.
+> The scratch open client applied the law and discharged §7's premise;
+> its closed fixture accepted three evaluations and refused the false
+> absence application at the premise. Architect did **not** measure
+> `trusted_base()` identity sets; the separate package test owes that
+> gate. These are scratch findings, not checks of this Spec child, a
+> catalog or seed child, assembled candidate, official conformance, CI,
+> publication, landing or measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent checked theorem immediately after `deriv_absent` and before
+`deriv_substitute`, with the following exact public type:
+
+```ken
+pub theorem eval_absent
+      (v : Nat) (e : Expr) (env : Nat → Nat)
+    : Equal Bool (occurs v e) False
+      → (env2 : Nat → Nat)
+      → ((w : Nat) → (Equal Nat v w → Bottom) → Equal Nat (env2 w) (env w))
+      → Equal Nat (eval env2 e) (eval env e)
+```
+
+The first premise decides that `v` does not occur syntactically in `e`.
+The final premise says `env2` agrees with `env` at every index other
+than `v`; it imposes no condition at `v`. The conclusion is structural
+`Equal Nat` of the two evaluations for arbitrary total environments,
+not equality of environment functions or expression trees. The binder
+order `(v, e, env)`, absence, `env2`, agreement makes
+`eval_absent v e env absent` exactly the `h` premise of §7's
+`deriv_independent v e env h`. Thus a client can obtain that premise
+from the `occurs` decision by partial application without adding a
+second export or an eta-expanded wrapper.
+
+The checked proof descends on the written `e` and takes `absent`,
+`env2` and `agree` in each constructor case. For `EConst c`, both
+values reduce to `c`, so `Refl` closes the case even at an open
+`env2`. For `EVar w`, an equality `v = w` would imply
+`nat_same v w = True` by `nat_same_complete`; composing it with the
+reversal of the `False` absence decision by `trans` and `sym` yields
+`Equal Bool False True`, hence `Bottom`. Applying `agree w` to this
+refutation equates the variable's values. This does not match on a
+computed `nat_same`. For `EAdd` and `EMul`, the existing private
+`bool_or_false_left` and `bool_or_false_right` restrict absence to
+both operands; the recursive equalities combine with the existing
+private `add_cong` and `mul_cong`, respectively. No new helper,
+import, `Axiom`, kernel rule or surface form is needed, and no
+§§1–18 operation or law type changes.
+
+For the closed expression `EAdd (EVar 0) (EMul (EConst 2) (EVar 1))`,
+let `env` map every variable to 1. Its evaluation is **3**. Changing
+only variable 2 to 7 leaves the value **3** and satisfies the absence
+premise for `v = 2`; changing variable 1 to 5 yields **11**. The
+same-form application of `eval_absent` at `v = 1`, with agreement
+away from 1, must refuse at its false absence argument; the value-only
+claim `11 = 3` is not a test of this law. As §14 explains, syntactic
+absence is **sufficient, not necessary** for semantic independence:
+§7's expression `e1` contains variable `Suc Zero` multiplied by zero,
+so its value ignores that variable although `occurs (Suc Zero) e1` is
+`True`. The new theorem does not apply to `e1` at that variable and
+claims no converse to its absence premise.
