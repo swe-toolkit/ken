@@ -55,9 +55,23 @@ export RetryGuidance, RetryAdvised, RetryUnsafeNonIdempotent, DoNotRetryPermanen
 
 data RetryGuidance = RetryAdvised | RetryUnsafeNonIdempotent | DoNotRetryPermanent
 
-export ProcessOperation, SpawnChild, TakePipe, ReadPipe, WritePipe, ClosePipe, WaitChild, SignalChild
+export ProcessOperation,
+  SpawnChild,
+  TakePipe,
+  ReadPipe,
+  WritePipe,
+  ClosePipe,
+  WaitChild,
+  SignalChild
 
-data ProcessOperation = SpawnChild | TakePipe | ReadPipe | WritePipe | ClosePipe | WaitChild | SignalChild
+data ProcessOperation =
+  SpawnChild
+  | TakePipe
+  | ReadPipe
+  | WritePipe
+  | ClosePipe
+  | WaitChild
+  | SignalChild
 
 export Operation, FilesystemOp, ProcessOp
 
