@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-TRACE
 title: "Spec 65 gives square Nat matrices an identity, transpose, sum and scaling but no trace, so a client cannot state the sum of a diagonal or its linearity. Rule from a checked D0 at zero trust a public trace on Vec (Vec Nat n) n with its additive, scaling, transpose and identity laws, and state them with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
