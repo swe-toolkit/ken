@@ -29,9 +29,9 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. The width operation and four checked laws,
-including `interval_width_mul` and `interval_width_inside`, use Rational's
-truncated subtraction, not a subtraction of intervals. The checked
+source; their operations follow. The width operation and five checked laws, including
+`interval_width_mul`, `interval_width_inside` and `interval_width_bounds_sub`,
+use Rational's truncated subtraction, not a subtraction of intervals. The checked
 inverted-emptiness and two ordered-endpoint membership laws make the endpoint
 boundary explicit.
 Enclosure uses both membership premises and the checked Rational monotonicity
@@ -385,6 +385,24 @@ pub theorem interval_width_mul
             ((proof sym for rational_equiv) (rational_add shares low) high shares_cancel)
       in
         rational_add_cancel_r product_width shares low same_after_low
+
+pub theorem interval_width_bounds_sub
+      (i : Interval) (x : Rational) (y : Rational)
+    : IsTrue (interval_contains i x)
+      → IsTrue (interval_contains i y)
+      → IsTrue (rational_leq (rational_sub y x) (interval_width i)) =
+  match i {
+    MkInterval lo hi ↦
+      λhx.
+        λhy.
+          rational_sub_mono
+            y
+            hi
+            x
+            lo
+            ((proof right for bool_and) (rational_leq lo y) (rational_leq y hi) hy)
+            ((proof left for bool_and) (rational_leq lo x) (rational_leq x hi) hx)
+  }
 
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
@@ -1754,7 +1772,10 @@ The two laws do not determine width on their own; the definition uses
 `rational_sub hi lo`, and a nonzero-width value checks that formula separately.
 `interval_width_inside` uses the two comparisons from endpoint inclusion
 as the premises of `rational_sub_mono`, including when the inner interval is
-inverted and its width truncates to zero.
+inverted and its width truncates to zero. `interval_width_bounds_sub` projects
+the upper comparison from y's containment and the lower comparison from x's
+containment, then applies `rational_sub_mono` once to bound their truncated
+difference by the interval's width.
 
 ## 5. Design notes
 
@@ -1794,9 +1815,9 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-six
-   checked interval laws, including `interval_width_mul` and
-   `interval_width_inside`, form the public
+   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-seven
+   checked interval laws, including `interval_width_mul`,
+   `interval_width_inside` and `interval_width_bounds_sub`, form the public
    contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -1831,7 +1852,7 @@ interval subtraction are not.
    inclusion comparisons as its only premises. Product width uses checked
    multiplication monotonicity and distributivity over addition, then public
    Rational right-add cancellation to remove the common `lo1·lo2`.
-4. **Trusted-base delta.** Zero: all fifty-six laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all fifty-seven laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1881,5 +1902,8 @@ interval subtraction are not.
    package test checks the open law, an independent product width and the
    public Rational cancellation import; it rejects the product-of-widths
    and both missing-order-premise claims after fresh same-form controls.
-   These package tests do not establish official conformance-runner execution,
+   The width-bound package test checks the open law and two closed bounds,
+   including a tight endpoint case. It accepts the same narrow interval and
+   x with y=2, then refuses the false y-containment proof for y=5. These
+   package tests do not establish official conformance-runner execution,
    CI, publication or landing.
