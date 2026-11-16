@@ -1499,3 +1499,71 @@ helper or new assumption. The separate conformance seed checks a
 generic public application, an ordered three-trace result at `[2,6)`,
 and each one-sided closed counterexample. Closed examples alone do
 not prove the generic theorem or establish publication.
+
+## 18. Merging appended batches of traces
+
+> **Section 18 status: DRAFT v0 (SPEC-TIME-MERGE-ALL-APPEND).**
+> Architect's scratch AC-0 on a catalog copy at `4c07ec73f` checked
+> the generic theorem and formatted declaration with rc 0 and no
+> added `Axiom`. The probe binary came from `44dc2b141`; its
+> single-source behavior on the later base rests on the Architect's
+> MSIS equivalence review, not a fresh build at `4c07ec73f`. The
+> accepted open application, closed interleaving values and isolated
+> false append claim were scratch checks. Removing `sym` from the
+> proof refused inside the new theorem, and the restored source
+> checked again. The public theorem count was 26 → 27. The trusted
+> `GlobalId` identity set was **not measured** in AC-0; the separate
+> package-test trust row must establish it. These observations do
+> not check this Spec child, the separate catalog or CV seed child,
+> an assembled candidate, official conformance, CI, publication,
+> landing or landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent checked law
+immediately after `trace_window_merge_all` and before the private
+`event_before_skip`. The public name, binder order and type are:
+
+```ken
+pub theorem trace_merge_all_append
+      (p : Type) (xs : List (List (Event p))) (ys : List (List (Event p)))
+    : Equal
+        (List (Event p))
+        (trace_merge_all p (list_append (List (Event p)) xs ys))
+        (trace_merge p (trace_merge_all p xs) (trace_merge_all p ys))
+```
+
+This is structural equality of event lists, with the concatenated
+**list of traces** on the left and the merge of the two partial
+merges on the right. It has no ordering or separation premise:
+`trace_merge_assoc` (§6) holds for unordered traces too. §17's
+window-over-merge law has an all-members ordering premise, but
+neither that premise nor windowing is used here. This law does not
+say that concatenating the two merged event lists has the same
+result. §13's `trace_merge_separated` identifies merge with event
+append only under its own event-separation premise.
+
+The checked proof inducts on `xs`, which occurs directly in both
+`list_append … xs ys` and `trace_merge_all p xs`. In the `Nil`
+case, `trace_merge` of the empty left event list reduces to its
+right argument; both goal sides reduce to the same *neutral*
+`trace_merge_all p ys`. Because `ys` is open, `Refl` closes the
+remaining reflexive equality, **not** `Proved`. In the `Cons t rest`
+case, `cong` lifts the induction hypothesis through `trace_merge p t`.
+Then `sym` of the public unconditional `trace_merge_assoc`, applied
+to `t`, the merged tail and the merged second batch, changes the
+right-nested merge into the left-nested one. `trans` composes the
+two equalities. No private helper, additional import, axiom, kernel
+or surface rule is needed; §§1–17 operations and law types remain
+unchanged.
+
+The CV-owned closed fixture puts events `[1T,3T]` in the sole trace
+of `xs` and `[2F]` in the sole trace of `ys`. The two partial
+merges are `[1T,3T]` and `[2F]`; batch merging yields
+`[1T,2F,3T]`, while **appending** those partial results yields
+`[1T,3T,2F]`. The CV seed's accepted clients must check the open
+application, closed equality, exact batch-merge value and closed
+law application. On a fresh accepted prefix, a same-form `Refl`
+claim with event-list append substituted for `trace_merge` must
+refuse at its own `Refl`: the D0 observed elaborator `TypeMismatch`,
+“Refl expects an `Eq`-shaped goal”, not a kernel rejection. The
+closed contrast does not replace the generic checked proof or
+official conformance.
