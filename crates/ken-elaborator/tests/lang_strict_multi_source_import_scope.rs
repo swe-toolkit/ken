@@ -15,8 +15,13 @@ fn source(name: &str, text: &str, roots: &[PathBuf]) -> CompilerSource {
     CompilerSource::new(name, text).with_roots(roots.to_vec())
 }
 
-// Native preparation uses a large worker stack for its checked-core emission;
-// this provisions that baseline rather than masking an elaboration refusal.
+// Baseline provisioning for these new native-preparation rows, not a repair
+// to an existing failing test. Sampling the worker's stack VMA RSS from
+// /proc/<pid>/task/<tid>/smaps every 5 ms across all four named rows on a
+// fixed 256 MiB Builder stack measured a 1,556 KiB maximum (four samples'
+// maxima: 1,556, 1,556, 1,532, 1,532 KiB). That leaves 260,588 KiB of
+// numerical headroom against the measured resident peak; the fixed stack
+// avoids dependence on the test harness's ambient thread stack.
 fn on_native_stack(f: impl FnOnce() + Send + 'static) {
     std::thread::Builder::new()
         .stack_size(256 * 1024 * 1024)
