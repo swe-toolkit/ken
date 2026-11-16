@@ -11,20 +11,30 @@ use ken_elaborator::{ElabEnv, ElabError};
 
 fn accepts(case: &str, source: &str) {
     let mut env = ElabEnv::new().expect("checked prelude");
-    env.set_catalog_roots_v1(&[
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
-    ])
-    .expect("checked catalog root");
+    if source
+        .lines()
+        .any(|line| line.trim_start().starts_with("import "))
+    {
+        env.set_catalog_roots_v1(&[
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+        ])
+        .expect("checked catalog root");
+    }
     env.elaborate_file(source)
         .unwrap_or_else(|error| panic!("{case}: expected accepted declaration: {error:?}"));
 }
 
 fn refuses_label(case: &str, source: &str, label: &str) {
     let mut env = ElabEnv::new().expect("checked prelude");
-    env.set_catalog_roots_v1(&[
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
-    ])
-    .expect("checked catalog root");
+    if source
+        .lines()
+        .any(|line| line.trim_start().starts_with("import "))
+    {
+        env.set_catalog_roots_v1(&[
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+        ])
+        .expect("checked catalog root");
+    }
     let error = match env.elaborate_file(source) {
         Ok(_) => panic!("{case}: label `{label}` was accepted"),
         Err(error) => error,
@@ -65,8 +75,7 @@ fn auth_index_b_two_caps_declared_host_tree_is_accepted() {
 fn auth_index_c_two_caps_declared_fs_tree_is_accepted() {
     accepts(
         "C declared FS",
-        "import Capability.Filesystem.Authority (FS)\n\
-         proc copy (src : Cap AFull) (dst : Cap APartial) : FS AFull Unit \
+        "proc copy (src : Cap AFull) (dst : Cap APartial) : FS AFull Unit \
          visits [FS] = ITree.Ret (FSOp AFull) (fs_resp AFull) Unit MkUnit",
     );
 }

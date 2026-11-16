@@ -202,7 +202,7 @@ fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
         "instant_nanoseconds",
         "replace_instant_nanoseconds",
     ] {
-        let id = env.globals[name];
+        let id = catalog_roots::selected_owner_id(&env, "Capability.Time.WallClock", name);
         assert!(
             !env.env.trusted_base().contains(&id),
             "{name} must be ordinary kernel-checked Ken"

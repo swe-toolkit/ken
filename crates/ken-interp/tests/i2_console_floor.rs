@@ -22,12 +22,8 @@ struct ConsoleEnv {
 fn setup() -> ConsoleEnv {
     let mut elab = ken_elaborator::ElabEnv::new().expect("prelude registers");
     catalog_roots::load_owner(&mut elab, CONSOLE_OWNER);
-    let get = |name: &str| -> GlobalId {
-        *elab
-            .globals
-            .get(name)
-            .unwrap_or_else(|| panic!("missing global {name}"))
-    };
+    let get =
+        |name: &str| -> GlobalId { catalog_roots::selected_owner_id(&elab, CONSOLE_OWNER, name) };
     let ids = ConsoleIds::from_elab(&elab.prelude_env).expect("complete Console ABI");
     ConsoleEnv {
         print_line: get("printLine"),
