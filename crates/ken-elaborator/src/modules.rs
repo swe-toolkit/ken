@@ -2240,19 +2240,28 @@ pub fn discover_source_path(path: &Path) -> std::io::Result<DiscoveredSourcePath
     let canonical = std::fs::canonicalize(path)?;
     let kind = match catalog_module_from_path(&canonical) {
         Some(unit) => SourcePathKind::CatalogUnit(unit),
-        None => SourcePathKind::Isolated(isolated_catalog_root(&canonical)),
+        None => SourcePathKind::Isolated(
+            canonical.parent().and_then(catalog_root_at_or_above),
+        ),
     };
     Ok(DiscoveredSourcePath { canonical, kind })
 }
 
-/// The nearest catalog root from an already-canonical isolated source path.
-/// Callers must enter through `discover_source_path` to fail closed.
-fn isolated_catalog_root(canonical: &Path) -> Option<PathBuf> {
-    canonical
-        .parent()?
+/// The nearest catalog root at or above an already-canonical directory.
+/// Every discovery entry shares this one ancestor rule.
+fn catalog_root_at_or_above(canonical_dir: &Path) -> Option<PathBuf> {
+    canonical_dir
         .ancestors()
         .map(|dir| dir.join("catalog").join("packages"))
         .find(|root| root.is_dir())
+}
+
+/// Catalog-root discovery for pathless callers such as the REPL. The
+/// directory is canonicalized first; a failure is returned, never replaced
+/// by lexical or rootless discovery.
+pub fn discover_directory_root(dir: &Path) -> std::io::Result<Option<PathBuf>> {
+    let canonical = std::fs::canonicalize(dir)?;
+    Ok(catalog_root_at_or_above(&canonical))
 }
 
 /// Invert the catalog-root path mapping used by [`source_path`].

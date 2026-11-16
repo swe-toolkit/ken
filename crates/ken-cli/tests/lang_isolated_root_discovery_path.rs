@@ -43,6 +43,44 @@ fn fixture_root() -> (tempfile::TempDir, PathBuf) {
     (dir, root)
 }
 
+/// Promise class: durable invariant. MEASURED: a pathless directory inside a
+/// catalog tree finds its canonical ancestor root, while the parent outside
+/// that tree stays rootless. CLAIMED: the REPL's directory route shares the
+/// isolated-file ancestor rule without treating a child root as an ancestor.
+/// THE GAP: this probes the discovery API, not a live REPL import; the I0
+/// REPL rows separately exercise rooted and rootless imports at the CLI.
+#[test]
+fn directory_root_uses_canonical_ancestors_and_preserves_rootless_parent() {
+    let dir = tempfile::Builder::new().tempdir_in("/tmp").unwrap();
+    let tree = dir.path().join("tree");
+    let root = tree.join("catalog/packages");
+    std::fs::create_dir_all(&root).unwrap();
+    let nested = tree.join("a/b");
+    std::fs::create_dir_all(&nested).unwrap();
+    assert_eq!(
+        ken_elaborator::modules::discover_directory_root(&nested).unwrap(),
+        Some(std::fs::canonicalize(root).unwrap())
+    );
+    assert_eq!(
+        ken_elaborator::modules::discover_directory_root(dir.path()).unwrap(),
+        None
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: a missing directory produces
+/// a NotFound error rather than a rootless success. CLAIMED: a pathless
+/// caller cannot silently downgrade failed canonicalization to no root.
+/// THE GAP: REPL startup refusal on an unresolvable cwd is not driven at the
+/// CLI, because a deleted cwd cannot be produced deterministically before
+/// the child resolves it.
+#[test]
+fn missing_directory_fails_closed_instead_of_defaulting_to_rootless() {
+    let dir = tempfile::Builder::new().tempdir_in("/tmp").unwrap();
+    let error = ken_elaborator::modules::discover_directory_root(&dir.path().join("missing"))
+        .expect_err("a nonexistent working directory must refuse discovery");
+    assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+}
+
 fn invoke(route: &str, source: &Path, dir: &Path, report: Option<&Path>) -> Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_ken"));
     cmd.arg(route);
