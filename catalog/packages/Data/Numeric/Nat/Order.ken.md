@@ -50,8 +50,8 @@ join proofs split structural inputs before binding the order premises.
 The paired-successor branches reuse those premises at smaller
 arguments; a positive bound against `Zero` contradicts its premise.
 `sub` is saturating natural-number subtraction; `compare` returns the
-three-way result `OrdResult` from `Core.Logic.OrdResult`. Strict `lt_nat` recurses on its right
-argument so the checked
+three-way result `OrdResult` from `Core.Logic.OrdResult`.
+Strict `lt_nat` recurses on its right argument so the checked
 successor-order bridge has the same reduction order:
 
 ```ken
