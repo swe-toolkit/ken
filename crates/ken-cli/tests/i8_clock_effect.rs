@@ -3,8 +3,8 @@
 use ken_cli::{run_program, ProgramOutcome, SourceFormat};
 use ken_interp::{CaptureHost, ClockTrace, HostHandler};
 
-const CLOCK_PACKAGE: &str =
-    include_str!("../../../catalog/packages/Capability/Time/WallClock.ken.md");
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
 
 const CLOCK_BODY: &str = r#"
   host_bind APartial Instant ExitCode
@@ -21,15 +21,49 @@ const CLOCK_BODY: &str = r#"
       })
 "#;
 
+// Both host replies must reach the Ken continuation unchanged. The distinct
+// failure statuses show which reply was corrupted, rather than trusting the
+// host-side trace recorded before response reification.
+const CLOCK_OBSERVE_BODY: &str = r#"
+  host_bind APartial Instant ExitCode
+    (host_clock APartial Instant wall_now)
+    (\first .
+      match first {
+        Instant.MkInstant firstNanoseconds |->
+          host_bind APartial Instant ExitCode
+            (host_clock APartial Instant wall_now)
+            (\second .
+              match second {
+                Instant.MkInstant secondNanoseconds |->
+                  match eq_int firstNanoseconds 1700000000000000456 {
+                    True |-> match eq_int secondNanoseconds 1700000000000000123 {
+                      True |-> host_pure APartial ExitCode ExitCode.Success;
+                      False |-> host_pure APartial ExitCode (ExitCode.Failure 13)
+                    };
+                    False |-> host_pure APartial ExitCode (ExitCode.Failure 12)
+                  }
+              })
+      })
+"#;
+
 const HOST_IMPORT: &str = "import Capability.Process.Exit (host_bind, host_pure, host_clock)\n";
 const WALL_IMPORT: &str = "import Capability.Time.WallClock (wall_now)\n";
 
-fn clock_program(visits: &str, host_import: &str, wall_import: &str) -> String {
+fn clock_program_with_body(
+    visits: &str,
+    host_import: &str,
+    wall_import: &str,
+    body: &str,
+) -> String {
     format!(
         "program capabilities FS APartial\n{host_import}{wall_import}\
          proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
-           : HostIO APartial ExitCode {visits} =\n{CLOCK_BODY}"
+           : HostIO APartial ExitCode {visits} =\n{body}"
     )
+}
+
+fn clock_program(visits: &str, host_import: &str, wall_import: &str) -> String {
+    clock_program_with_body(visits, host_import, wall_import, CLOCK_BODY)
 }
 
 /// Promise class: durable invariant. MEASURED: the actual two-read Clock
@@ -79,11 +113,14 @@ fn strict_clock_user_requires_homes_and_still_checks_the_clock_row() {
     }
 }
 
-fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
+fn run_with_clock_script(
+    samples: [i128; 2],
+    body: &str,
+) -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
     let mut host = CaptureHost::new(Vec::new());
-    host.set_clock_script([1_700_000_000_000_000_123, 1_700_000_000_000_000_456]);
+    host.set_clock_script(samples);
     let outcome = run_program(
-        &clock_program("visits [Clock]", HOST_IMPORT, WALL_IMPORT),
+        &clock_program_with_body("visits [Clock]", HOST_IMPORT, WALL_IMPORT, body),
         SourceFormat::Ken,
         &[std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")],
         &[],
@@ -95,6 +132,13 @@ fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
     let trace = host.clock_trace().to_vec();
     let snapshot = format!("{outcome:?}|{trace:?}").into_bytes();
     (outcome, trace, snapshot)
+}
+
+fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
+    run_with_clock_script(
+        [1_700_000_000_000_000_123, 1_700_000_000_000_000_456],
+        CLOCK_BODY,
+    )
 }
 
 #[test]
@@ -143,8 +187,12 @@ fn fixed_clock_repeats_one_value_and_traces_each_read() {
 #[test]
 fn undeclared_clock_row_is_a_named_effect_escape() {
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+    ])
+    .expect("checked catalog root");
     let error = env
-        .elaborate_file(&clock_program("", "", ""))
+        .elaborate_file(&clock_program("", HOST_IMPORT, WALL_IMPORT))
         .expect_err("calling wall_now without Clock in the row must reject");
     match error {
         ken_elaborator::ElabError::TypeMismatch { reason, .. } => {
@@ -158,33 +206,19 @@ fn undeclared_clock_row_is_a_named_effect_escape() {
     }
 }
 
+/// Promise class: durable invariant. MEASURED: loading the checked owner
+/// adds no trust, and a real imported wall-clock program observes a decreasing
+/// pair of host values in order, and the Ken continuation independently
+/// matches both delivered payloads. CLAIMED: this package cannot justify a
+/// monotonicity guarantee by adding trust or altering program-visible reads.
+/// THE GAP: the host trace is pre-reification; distinct Ken exit statuses for
+/// each wrong payload guard the response-delivery seam, while the separate
+/// Strict import-and-row test guards access to the checked home.
 #[test]
 fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
-    let extracted = ken_elaborator::literate::extract_ken_md(CLOCK_PACKAGE)
-        .expect("Capability.Time.WallClock package must extract");
-    for forbidden in [
-        "Axiom",
-        "postulate",
-        "primitive",
-        "opaque",
-        "monotonic",
-        "leq",
-        "≤",
-    ] {
-        assert!(
-            !extracted.source.contains(forbidden),
-            "checked Clock package must not declare {forbidden}"
-        );
-    }
-    assert!(
-        CLOCK_PACKAGE.contains("declares no ordering or monotonicity law"),
-        "the wall-clock absence of an ordering law must be stated explicitly"
-    );
-
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
     let before = env.env.trusted_base();
-    env.elaborate_ken_md_file(CLOCK_PACKAGE)
-        .expect("ordinary Capability.Time.WallClock package elaborates");
+    catalog_roots::load_owner(&mut env, "Capability.Time.WallClock");
     assert_eq!(before, env.env.trusted_base());
     for name in [
         "Instant",
@@ -196,10 +230,38 @@ fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
         "instant_nanoseconds",
         "replace_instant_nanoseconds",
     ] {
-        let id = env.globals[name];
+        let id = catalog_roots::selected_owner_id(&env, "Capability.Time.WallClock", name);
         assert!(
             !env.env.trusted_base().contains(&id),
             "{name} must be ordinary kernel-checked Ken"
         );
     }
+
+    let later = 1_700_000_000_000_000_456_i128;
+    let earlier = 1_700_000_000_000_000_123_i128;
+    assert!(later > earlier, "the host script must move backwards");
+    let (outcome, trace, _) = run_with_clock_script([later, earlier], CLOCK_OBSERVE_BODY);
+    assert_eq!(outcome, ProgramOutcome { exit_status: 0 });
+    assert_eq!(
+        run_with_clock_script([later + 1, earlier], CLOCK_OBSERVE_BODY).0,
+        ProgramOutcome { exit_status: 12 },
+        "the first Ken-visible timestamp must be checked"
+    );
+    assert_eq!(
+        run_with_clock_script([later, earlier + 1], CLOCK_OBSERVE_BODY).0,
+        ProgramOutcome { exit_status: 13 },
+        "the second Ken-visible timestamp must be checked"
+    );
+    assert_eq!(
+        trace,
+        vec![
+            ClockTrace::WallNow {
+                nanoseconds: later.into(),
+            },
+            ClockTrace::WallNow {
+                nanoseconds: earlier.into(),
+            },
+        ],
+        "a checked wall-clock client must see both reversed host samples"
+    );
 }

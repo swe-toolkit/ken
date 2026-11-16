@@ -53,12 +53,6 @@ fn catalog_roots() -> Vec<std::path::PathBuf> {
     vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
 }
 
-fn local_own_abi() -> String {
-    // This module-loader/Legacy example row uses its own catalog root only;
-    // isolated runner and native rows retain the explicit package import.
-    OWN_ABI.replacen("import Capability.Process.Exit (host_pure)\n", "", 1)
-}
-
 fn rooted_tempdir() -> TempDir {
     let parent = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp");
     fs::create_dir_all(&parent).expect("fixture parent under catalog root");
@@ -228,8 +222,15 @@ fn native_dependency_example_cannot_supply_missing_program_boundary() {
 fn roots_entry_checked_example_cannot_replace_entry_boundary() {
     let root = tempdir().expect("catalog-like module root");
     let path = root.path().join("Entry.ken.md");
+    let provider_dir = root.path().join("Capability/Process");
+    fs::create_dir_all(&provider_dir).expect("create checked provider module path");
+    fs::copy(
+        catalog_roots()[0].join("Capability/Process/Exit.ken.md"),
+        provider_dir.join("Exit.ken.md"),
+    )
+    .expect("copy the exact checked Exit provider into the one fixture root");
     for example in [None, Some(FULL_EXAMPLE)] {
-        fs::write(&path, literate(&local_own_abi(), example)).expect("write catalog-like entry");
+        fs::write(&path, literate(OWN_ABI, example)).expect("write catalog-like entry");
         let mut env = ElabEnv::new().expect("prelude");
         env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")
             .expect("entry with its own ANone program header");
@@ -270,11 +271,19 @@ fn headerless_example_keeps_ken_run_result_unchanged() {
 /// a single failing headed example would leave the header untouched anyway.
 #[test]
 fn failed_after_headed_example_restores_program_boundary() {
-    let mut source = literate(&local_own_abi(), Some(FULL_EXAMPLE));
+    let mut source = literate(OWN_ABI, Some(FULL_EXAMPLE));
+    let bad_start = source.len();
     source.push_str("```ken example\nconst zz_bad : Nat = zz_unbound\n```\n");
     let mut env = ElabEnv::new().expect("prelude");
-    env.elaborate_ken_md_file_v1(&source)
-        .expect_err("bad checked example must fail elaboration");
+    env.set_catalog_roots_v1(&catalog_roots())
+        .expect("checked catalog root");
+    match env.elaborate_ken_md_file_v1(&source) {
+        Err(ken_elaborator::ElabError::ParseError { span, .. }) => assert!(
+            span.start >= bad_start && span.end <= source.len(),
+            "the refusal must be the appended bad example fence, got {span:?}"
+        ),
+        other => panic!("expected the appended example fence to fail, got {other:?}"),
+    }
     let descriptor = admit_checked_main(&env).expect("retained program authority");
     assert_eq!(descriptor.authority_name, "ANone");
 }

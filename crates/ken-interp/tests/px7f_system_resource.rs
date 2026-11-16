@@ -12,8 +12,12 @@ fn repo_root() -> PathBuf {
 
 fn env() -> ken_elaborator::ElabEnv {
     let mut env = ken_elaborator::ElabEnv::empty().expect("PX7-F prelude");
+    env.set_catalog_roots_v1(&[repo_root().join("catalog/packages")])
+        .expect("checked catalog root");
     env.elaborate_file(
         r#"
+        import Capability.System.Resource (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr, ResourceBracketResult, ResourceBracketOk, ResourceBracketBodyError, ResourceBracketReleaseError, ResourceBracketBodyAndReleaseError, resourceMetadata, withResource, release)
+        import Capability.Process.Exit (host_pure, host_bind)
         fn px7f_escape_body (resource : Resource ResourceKind.FsHandle)
           : HostIO AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle)) =
           host_pure AFull (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
@@ -223,7 +227,12 @@ fn injected_release_failure(env: &ken_elaborator::ElabEnv, store: &mut EvalStore
         &env.env,
         store,
     );
-    apply_constructor_many(env, store, "ResourceError.ReleaseFailed", [kind, identity, io])
+    apply_constructor_many(
+        env,
+        store,
+        "ResourceError.ReleaseFailed",
+        [kind, identity, io],
+    )
 }
 
 fn injected_release_result(env: &ken_elaborator::ElabEnv, store: &mut EvalStore) -> EvalVal {
