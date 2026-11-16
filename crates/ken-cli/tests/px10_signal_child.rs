@@ -4,6 +4,20 @@
 
 #![cfg(all(target_os = "linux", target_env = "gnu"))]
 
+// Baseline provision for the three native signal differential tests below,
+// not a stack-depth assertion. On 7a37c3e3e, each fresh 16 MiB pthread
+// reached 2_375_400 bytes (2.265 MiB): a disposable canary painted its
+// unused stack below the entry SP minus 128 KiB, then located the deepest
+// overwritten byte after the checked interpreter/native case. Independent
+// page-residency measurements rounded each peak to 2_375_680 bytes.
+// The 16 MiB provision leaves 14_401_816 bytes (13.735 MiB) of measured
+// headroom, or 7.06 times the observed peak in total. QA's 2 MiB mutation
+// overflowed, so a stated 2 MiB provision is inadequate here.
+// Builder::stack_size fixes this test's thread stack independently of the
+// machine's ambient default or RUST_MIN_STACK. This local measurement is not
+// a claim that future builds cannot exceed the measured peak.
+const NATIVE_SIGNAL_STACK_BYTES: usize = 16 * 1024 * 1024;
+
 const TEMPLATE: &str = include_str!("fixtures/px10_signal_child.ken");
 const SIGNAL_BODY: &str = r#"
   host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
@@ -226,7 +240,7 @@ fn other_five_signal_constructors_map_to_exact_numbers_in_interpreter() {
 fn signal_terminate_then_wait_matches_interpreter_and_native() {
     std::thread::Builder::new()
         .name("px10-signal-terminate".to_owned())
-        .stack_size(16 * 1024 * 1024)
+        .stack_size(NATIVE_SIGNAL_STACK_BYTES)
         .spawn(|| {
             check_signal_case(
                 "terminate",
@@ -244,7 +258,7 @@ fn signal_terminate_then_wait_matches_interpreter_and_native() {
 fn signal_kill_then_wait_matches_interpreter_and_native() {
     std::thread::Builder::new()
         .name("px10-signal-kill".to_owned())
-        .stack_size(16 * 1024 * 1024)
+        .stack_size(NATIVE_SIGNAL_STACK_BYTES)
         .spawn(|| {
             check_signal_case(
                 "kill",
@@ -263,7 +277,7 @@ fn signal_kill_then_wait_matches_interpreter_and_native() {
 fn signal_after_wait_returns_esrch_on_both_executors() {
     std::thread::Builder::new()
         .name("px10-signal-after-wait".to_owned())
-        .stack_size(16 * 1024 * 1024)
+        .stack_size(NATIVE_SIGNAL_STACK_BYTES)
         .spawn(|| {
             check_signal_case(
                 "waited",
