@@ -272,12 +272,18 @@ fn headerless_example_keeps_ken_run_result_unchanged() {
 #[test]
 fn failed_after_headed_example_restores_program_boundary() {
     let mut source = literate(OWN_ABI, Some(FULL_EXAMPLE));
+    let bad_start = source.len();
     source.push_str("```ken example\nconst zz_bad : Nat = zz_unbound\n```\n");
     let mut env = ElabEnv::new().expect("prelude");
     env.set_catalog_roots_v1(&catalog_roots())
         .expect("checked catalog root");
-    env.elaborate_ken_md_file_v1(&source)
-        .expect_err("bad checked example must fail elaboration");
+    match env.elaborate_ken_md_file_v1(&source) {
+        Err(ken_elaborator::ElabError::ParseError { span, .. }) => assert!(
+            span.start >= bad_start && span.end <= source.len(),
+            "the refusal must be the appended bad example fence, got {span:?}"
+        ),
+        other => panic!("expected the appended example fence to fail, got {other:?}"),
+    }
     let descriptor = admit_checked_main(&env).expect("retained program authority");
     assert_eq!(descriptor.authority_name, "ANone");
 }

@@ -273,12 +273,18 @@ fn own_main_followed_by_unrelated_example_keeps_both_admissions() {
 #[test]
 fn failed_later_example_restores_absent_program_main() {
     let mut source = imported_example_only();
+    let bad_start = source.len();
     source.push_str("```ken example\nconst bad : Nat = unbound_name\n```\n");
     let mut env = ElabEnv::new().expect("prelude");
     env.set_catalog_roots_v1(&catalog_roots())
         .expect("checked catalog root");
-    env.elaborate_ken_md_file_v1(&source)
-        .expect_err("later checked fence must fail");
+    match env.elaborate_ken_md_file_v1(&source) {
+        Err(ken_elaborator::ElabError::ParseError { span, .. }) => assert!(
+            span.start >= bad_start && span.end <= source.len(),
+            "the refusal must be the appended bad example fence, got {span:?}"
+        ),
+        other => panic!("expected the appended example fence to fail, got {other:?}"),
+    }
     assert!(
         env.globals.get("main").is_none(),
         "example must not leave an entry binding"
