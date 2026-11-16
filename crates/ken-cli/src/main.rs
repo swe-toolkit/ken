@@ -278,7 +278,9 @@ fn native_build_file(
     let Some(path) = path else {
         emit_cli_error(CliError::NativeBuildMissingFile);
         eprintln!("Usage: ken native-build <file.ken> <output-dir> <resource-profile.json>");
-        if let Some(report) = &mut report { report.abort(); }
+        if let Some(report) = &mut report {
+            report.abort();
+        }
         std::process::exit(1);
     };
     let Some(output_dir) = output_dir else {
@@ -308,40 +310,92 @@ fn native_build_file(
             return 1;
         }
     };
-    let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
+    let discovered =
+        ken_elaborator::modules::discover_source_path(Path::new(path)).unwrap_or_else(|error| {
+            emit_cli_error(CliError::NativeBuildSourceRead(PathBuf::from(path), error));
+            if let Some(report) = &mut report {
+                report.abort();
+            }
+            std::process::exit(1);
+        });
+    let source = std::fs::read_to_string(&discovered.canonical).unwrap_or_else(|error| {
         emit_cli_error(CliError::NativeBuildSourceRead(PathBuf::from(path), error));
-        if let Some(report) = &mut report { report.abort(); }
+        if let Some(report) = &mut report {
+            report.abort();
+        }
         std::process::exit(1);
     });
-    let format = if path.to_string_lossy().ends_with(".ken.md") {
+    let format = if discovered.canonical.to_string_lossy().ends_with(".ken.md") {
         ken_cli::SourceFormat::LiterateKen
     } else {
         ken_cli::SourceFormat::Ken
     };
-    let roots = ken_elaborator::modules::isolated_catalog_root(Path::new(path))
-        .into_iter()
-        .collect::<Vec<_>>();
-    let output = if let Some(report) = &mut report {
-        let name = match format {
-            ken_cli::SourceFormat::Ken => "src/main.ken",
-            ken_cli::SourceFormat::LiterateKen => "src/main.ken.md",
-        };
-        let preparation =
-            ken_elaborator::compiler_driver::prepare_native_program_sources_with_resolution_report(
-                "native-program",
-                vec![ken_elaborator::compiler_driver::CompilerSource::new(name, &source)
-                    .with_roots(roots.clone())],
-            );
-        preparation.and_then(|preparation| {
-            report.write(preparation.resolution_report().expect("report requested"));
-            ken_elaborator::compiler_driver::complete_native_program_preparation(
-                preparation, PathBuf::from(output_dir), profile,
-            )
-        })
-    } else {
-        ken_cli::build_native_program_with_roots(
-            &source, format, &roots, "native-program", PathBuf::from(output_dir), profile,
-        )
+    let output = match &discovered.kind {
+        ken_elaborator::modules::SourcePathKind::CatalogUnit(unit) => {
+            use ken_elaborator::compiler_driver::{
+                self, CompilerDriverError, CompilerSource, ElaboratedNativeProgramV1,
+                NativeProgramBuildError,
+            };
+            (|| {
+                let mut env = ken_elaborator::ElabEnv::new()
+                    .map_err(CompilerDriverError::Elaboration)
+                    .map_err(NativeProgramBuildError::Driver)?;
+                env.elaborate_module_from_roots_strict_v1(&[unit.root.clone()], &unit.entry)
+                    .map_err(CompilerDriverError::Elaboration)
+                    .map_err(NativeProgramBuildError::Driver)?;
+                let name = match format {
+                    ken_cli::SourceFormat::Ken => "src/main.ken",
+                    ken_cli::SourceFormat::LiterateKen => "src/main.ken.md",
+                };
+                let source = CompilerSource::new(name, &source);
+                let carrier =
+                    ElaboratedNativeProgramV1::from_loaded_unit(env, source, &unit.entry)?;
+                let preparation = compiler_driver::prepare_native_program_from_loaded_unit_v1(
+                    "native-program",
+                    carrier,
+                    report.is_some(),
+                )?;
+                if let Some(report) = &mut report {
+                    report.write(preparation.resolution_report().expect("report requested"));
+                }
+                compiler_driver::complete_native_program_preparation(
+                    preparation,
+                    PathBuf::from(output_dir),
+                    profile,
+                )
+            })()
+        }
+        ken_elaborator::modules::SourcePathKind::Isolated(root) => {
+            let roots: Vec<_> = root.iter().cloned().collect();
+            if let Some(report) = &mut report {
+                let name = match format {
+                    ken_cli::SourceFormat::Ken => "src/main.ken",
+                    ken_cli::SourceFormat::LiterateKen => "src/main.ken.md",
+                };
+                let preparation = ken_elaborator::compiler_driver::prepare_native_program_sources_with_resolution_report(
+                    "native-program",
+                    vec![ken_elaborator::compiler_driver::CompilerSource::new(name, &source)
+                        .with_roots(roots.clone())],
+                );
+                preparation.and_then(|preparation| {
+                    report.write(preparation.resolution_report().expect("report requested"));
+                    ken_elaborator::compiler_driver::complete_native_program_preparation(
+                        preparation,
+                        PathBuf::from(output_dir),
+                        profile,
+                    )
+                })
+            } else {
+                ken_cli::build_native_program_with_roots(
+                    &source,
+                    format,
+                    &roots,
+                    "native-program",
+                    PathBuf::from(output_dir),
+                    profile,
+                )
+            }
+        }
     };
     match output {
         Ok(output) => {
@@ -481,25 +535,38 @@ fn os_bytes(value: &OsStr) -> Vec<u8> {
 fn elaborate_cli_file(
     path: Option<&OsStr>,
     mut report: Option<&mut resolution_report::ReportFile>,
-) -> (PathBuf, ken_elaborator::ElabEnv, Vec<ken_elaborator::ElabResult>) {
+) -> (
+    ken_elaborator::modules::SourcePathKind,
+    ken_elaborator::ElabEnv,
+    Vec<ken_elaborator::ElabResult>,
+) {
     let path = match path {
         Some(p) => p,
         None => {
             emit_cli_error(CliError::CheckMissingFile);
             eprintln!("Usage: ken check <file.ken>");
-            if let Some(report) = report.as_deref_mut() { report.abort(); }
+            if let Some(report) = report.as_deref_mut() {
+                report.abort();
+            }
             std::process::exit(1);
         }
     };
 
-    let src = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) => {
-            emit_cli_error(CliError::CheckSourceRead(PathBuf::from(path), e));
-            if let Some(report) = report.as_deref_mut() { report.abort(); }
+    let discovered =
+        ken_elaborator::modules::discover_source_path(Path::new(path)).unwrap_or_else(|error| {
+            emit_cli_error(CliError::CheckSourceRead(PathBuf::from(path), error));
+            if let Some(report) = report.as_deref_mut() {
+                report.abort();
+            }
             std::process::exit(1);
+        });
+    let src = std::fs::read_to_string(&discovered.canonical).unwrap_or_else(|error| {
+        emit_cli_error(CliError::CheckSourceRead(PathBuf::from(path), error));
+        if let Some(report) = report.as_deref_mut() {
+            report.abort();
         }
-    };
+        std::process::exit(1);
+    });
 
     let mut elab_env = match ken_elaborator::ElabEnv::new() {
         Ok(e) => e,
@@ -508,30 +575,30 @@ fn elaborate_cli_file(
                 e.code(),
                 format_args!("ken check: elaborator init failed: {e:?}"),
             );
-            if let Some(report) = report.as_deref_mut() { report.abort(); }
+            if let Some(report) = report.as_deref_mut() {
+                report.abort();
+            }
             std::process::exit(1);
         }
     };
 
-    let catalog_module = ken_elaborator::modules::catalog_module_from_path(Path::new(path));
-    let results_result = if let Some(catalog_module) = catalog_module {
-        let roots = [catalog_module.root];
-        elab_env
-            .elaborate_module_from_roots_strict_v1(&roots, &catalog_module.entry)
-            .and_then(|mut results| {
-                results.extend(
-                    elab_env.execute_loaded_entry_checked_fences_v1(&catalog_module.entry)?,
-                );
-                Ok(results)
-            })
-    } else {
-        let roots = ken_elaborator::modules::isolated_catalog_root(Path::new(path))
-            .into_iter()
-            .collect::<Vec<_>>();
-        if path.to_string_lossy().ends_with(".ken.md") {
-            elab_env.elaborate_isolated_ken_md_file_strict_v1(&roots, &src)
-        } else {
-            elab_env.elaborate_isolated_file_strict_v1(&roots, &src)
+    let results_result = match &discovered.kind {
+        ken_elaborator::modules::SourcePathKind::CatalogUnit(unit) => {
+            let roots = [unit.root.clone()];
+            elab_env
+                .elaborate_module_from_roots_strict_v1(&roots, &unit.entry)
+                .and_then(|mut results| {
+                    results.extend(elab_env.execute_loaded_entry_checked_fences_v1(&unit.entry)?);
+                    Ok(results)
+                })
+        }
+        ken_elaborator::modules::SourcePathKind::Isolated(root) => {
+            let roots: Vec<_> = root.iter().cloned().collect();
+            if discovered.canonical.to_string_lossy().ends_with(".ken.md") {
+                elab_env.elaborate_isolated_ken_md_file_strict_v1(&roots, &src)
+            } else {
+                elab_env.elaborate_isolated_file_strict_v1(&roots, &src)
+            }
         }
     };
 
@@ -545,12 +612,14 @@ fn elaborate_cli_file(
                     path.to_string_lossy()
                 ),
             );
-            if let Some(report) = report.as_deref_mut() { report.abort(); }
+            if let Some(report) = report.as_deref_mut() {
+                report.abort();
+            }
             std::process::exit(1);
         }
     };
 
-    (PathBuf::from(path), elab_env, results)
+    (discovered.kind, elab_env, results)
 }
 
 /// `ken check <file>` — FR-3 (`docs/program/wp/ds-1-findings-remediation.md`):
@@ -566,23 +635,34 @@ fn elaborate_cli_file(
 /// still how you run it) — `ken run` itself is unchanged, strict, and has no
 /// auto-detect fallthrough to this mode.
 fn check_file(path: Option<&OsStr>, mut report: Option<resolution_report::ReportFile>) {
-    let (path, env, results) = elaborate_cli_file(path, report.as_mut());
+    let (source_kind, env, results) = elaborate_cli_file(path, report.as_mut());
     if let Some(report) = &mut report {
-        let module = ken_elaborator::modules::catalog_module_from_path(&path);
-        let root_results = if let Some(module) = &module {
-            env.module_state.root_results_for_report(&module.entry).unwrap_or_else(|| {
-                let error = ken_elaborator::ElabError::Internal(
-                    format!("resolution report: missing checked root {}", module.entry));
-                emit_coded_error(error.code(), format_args!("ken check: {error:?}"));
-                report.abort();
-                std::process::exit(1);
-            })
+        let module = match &source_kind {
+            ken_elaborator::modules::SourcePathKind::CatalogUnit(unit) => Some(unit),
+            ken_elaborator::modules::SourcePathKind::Isolated(_) => None,
+        };
+        let root_results = if let Some(module) = module {
+            env.module_state
+                .root_results_for_report(&module.entry)
+                .unwrap_or_else(|| {
+                    let error = ken_elaborator::ElabError::Internal(format!(
+                        "resolution report: missing checked root {}",
+                        module.entry
+                    ));
+                    emit_coded_error(error.code(), format_args!("ken check: {error:?}"));
+                    report.abort();
+                    std::process::exit(1);
+                })
         } else {
             &results
         };
         let document = ken_elaborator::resolution_report::resolution_report(
-            &env, root_results, "check", module.as_ref().map(|m| m.entry.as_str()),
-        ).unwrap_or_else(|error| {
+            &env,
+            root_results,
+            "check",
+            module.as_ref().map(|m| m.entry.as_str()),
+        )
+        .unwrap_or_else(|error| {
             emit_coded_error(error.code(), format_args!("ken check: {error:?}"));
             report.abort();
             std::process::exit(1);
@@ -608,13 +688,27 @@ fn check_file(path: Option<&OsStr>, mut report: Option<resolution_report::Report
 /// name, supplies process input and capabilities, and drives its host tree.
 ///
 /// Console IDs are harvested from the elaboration environment (`ElabEnv::globals`).
-fn run_file(path: &OsStr, arguments: &[Vec<u8>], mut report: Option<resolution_report::ReportFile>) {
-    let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
+fn run_file(
+    path: &OsStr,
+    arguments: &[Vec<u8>],
+    mut report: Option<resolution_report::ReportFile>,
+) {
+    let discovered =
+        ken_elaborator::modules::discover_source_path(Path::new(path)).unwrap_or_else(|error| {
+            emit_cli_error(CliError::RunSourceRead(PathBuf::from(path), error));
+            if let Some(report) = &mut report {
+                report.abort();
+            }
+            std::process::exit(1);
+        });
+    let source = std::fs::read_to_string(&discovered.canonical).unwrap_or_else(|error| {
         emit_cli_error(CliError::RunSourceRead(PathBuf::from(path), error));
-        if let Some(report) = &mut report { report.abort(); }
+        if let Some(report) = &mut report {
+            report.abort();
+        }
         std::process::exit(1);
     });
-    let format = if path.to_string_lossy().ends_with(".ken.md") {
+    let format = if discovered.canonical.to_string_lossy().ends_with(".ken.md") {
         ken_cli::SourceFormat::LiterateKen
     } else {
         ken_cli::SourceFormat::Ken
@@ -624,36 +718,56 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>], mut report: Option<resolution_r
         .collect();
     let cwd = std::env::current_dir().unwrap_or_else(|error| {
         emit_cli_error(CliError::RunWorkingDirectoryRead(error));
-        if let Some(report) = &mut report { report.abort(); }
+        if let Some(report) = &mut report {
+            report.abort();
+        }
         std::process::exit(1);
     });
     let mut host = ken_interp::PosixHost::new();
-    let roots = ken_elaborator::modules::isolated_catalog_root(Path::new(path))
-        .into_iter()
-        .collect::<Vec<_>>();
-    match ken_cli::run_program_with_resolution_report(
-        &source,
-        format,
-        &roots,
-        arguments,
-        &environment,
-        &os_bytes(cwd.as_os_str()),
-        &mut host,
-        |reports| {
-            for report in reports {
-                eprintln!("{report}");
-            }
-        },
-        |env, results| {
+    let mut report_obligations = |reports: &[String]| {
+        for report in reports {
+            eprintln!("{report}");
+        }
+    };
+    let mut report_resolution =
+        |env: &ken_elaborator::ElabEnv, results: &[ken_elaborator::ElabResult]| {
             if let Some(report) = &mut report {
-                let document = ken_elaborator::resolution_report::resolution_report(
-                    env, results, "run", None,
-                ).map_err(ken_cli::RunError::Elaboration)?;
+                let document =
+                    ken_elaborator::resolution_report::resolution_report(env, results, "run", None)
+                        .map_err(ken_cli::RunError::Elaboration)?;
                 report.write(&document);
             }
             Ok(())
-        },
-    ) {
+        };
+    let cwd_bytes = os_bytes(cwd.as_os_str());
+    let result = match &discovered.kind {
+        ken_elaborator::modules::SourcePathKind::CatalogUnit(unit) => {
+            ken_cli::run_loaded_catalog_unit_with_resolution_report(
+                unit,
+                arguments,
+                &environment,
+                &cwd_bytes,
+                &mut host,
+                &mut report_obligations,
+                &mut report_resolution,
+            )
+        }
+        ken_elaborator::modules::SourcePathKind::Isolated(root) => {
+            let roots: Vec<_> = root.iter().cloned().collect();
+            ken_cli::run_program_with_resolution_report(
+                &source,
+                format,
+                &roots,
+                arguments,
+                &environment,
+                &cwd_bytes,
+                &mut host,
+                &mut report_obligations,
+                &mut report_resolution,
+            )
+        }
+    };
+    match result {
         Ok(outcome) => {
             if let Some(report) = &mut report {
                 report.abort();

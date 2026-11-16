@@ -84,14 +84,41 @@ fn checked_prelude_entry_abi(
     }
 }
 
-/// Admit the one process-shaped Program I entrypoint against the live
-/// elaboration environment that produced it.
+/// Select the source-owned entrypoint without creating a flat-global alias.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MainSelection<'a> {
+    Isolated,
+    LoadedUnit(&'a str),
+}
+
+/// Admit the isolated root's own `main` with its unchanged spelling lookup.
 pub fn admit_checked_main(env: &ElabEnv) -> Result<CheckedMainDescriptor, ProgramAdmissionError> {
-    let main = env
-        .globals
-        .get("main")
-        .copied()
-        .ok_or(ProgramAdmissionError::MissingMain)?;
+    admit_selected_main(env, MainSelection::Isolated)
+}
+
+/// Admit a selected entry's checked main against the environment that owns it.
+pub fn admit_selected_main(
+    env: &ElabEnv,
+    selection: MainSelection<'_>,
+) -> Result<CheckedMainDescriptor, ProgramAdmissionError> {
+    let (main, key) = match selection {
+        MainSelection::Isolated => (
+            env.globals
+                .get("main")
+                .copied()
+                .ok_or(ProgramAdmissionError::MissingMain)?,
+            "main".to_string(),
+        ),
+        MainSelection::LoadedUnit(entry) => {
+            let qualified = format!("{entry}.main");
+            let result = env
+                .module_state
+                .root_results_for_report(entry)
+                .and_then(|results| results.iter().find(|result| result.name == qualified))
+                .ok_or(ProgramAdmissionError::MissingMain)?;
+            (result.def_id, result.name.clone())
+        }
+    };
 
     let header = env
         .boundary_header()
@@ -128,7 +155,7 @@ pub fn admit_checked_main(env: &ElabEnv) -> Result<CheckedMainDescriptor, Progra
         .and_then(ken_host::FsRootSpec::parse_declared)
         .unwrap_or_default();
 
-    if let Some(row) = env.effect_rows.get("main") {
+    if let Some(row) = env.effect_rows.get(&key) {
         let mut granted = EffectRow::from_effects([
             "Console".to_string(),
             "Clock".to_string(),

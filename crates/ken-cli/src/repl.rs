@@ -35,15 +35,17 @@ struct Session {
 }
 
 impl Session {
-    fn new() -> Result<Self, ElabError> {
-        let mut env = ElabEnv::new()?;
-        // The REPL is pathless, so use the nearest catalog root of its
-        // working directory. Outside a catalog-bearing tree, imports keep
-        // their existing missing-provider refusal rather than guessing one.
-        if let Some(root) =
-            ken_elaborator::modules::isolated_catalog_root(Path::new(".ken-repl.ken"))
-        {
-            env.set_catalog_roots_v1(&[root])?;
+    fn new() -> Result<Self, String> {
+        let mut env = ElabEnv::new().map_err(|error| error.to_string())?;
+        // The REPL is pathless: use the nearest catalog root of its canonical
+        // working directory, by the same ancestor rule as source paths.
+        // Outside a catalog-bearing tree, imports keep their missing-provider
+        // refusal; an unresolvable working directory fails startup instead.
+        let root = ken_elaborator::modules::discover_directory_root(Path::new("."))
+            .map_err(|error| format!("cannot resolve the working directory: {error}"))?;
+        if let Some(root) = root {
+            env.set_catalog_roots_v1(&[root])
+                .map_err(|error| error.to_string())?;
         }
         // Shared with `run_file` (`crate::build_eval_store`) so a store field
         // wired in tests can't be forgotten in one production entry point but

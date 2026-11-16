@@ -57,7 +57,10 @@ fn repl_outside_catalog_tree_refuses_the_same_import() {
     // tempfile's configured default is under this repository, where an
     // ancestor has a real catalog. Put the negative in a rootless parent.
     let dir = tempfile::Builder::new().tempdir_in("/tmp").unwrap();
-    assert!(ken_elaborator::modules::isolated_catalog_root(&dir.path().join("repl.ken")).is_none());
+    assert_eq!(
+        ken_elaborator::modules::discover_directory_root(dir.path()).unwrap(),
+        None
+    );
     let output = repl(
         dir.path(),
         ":def import Capability.Process.Exit (host_pure)\n:quit\n",
