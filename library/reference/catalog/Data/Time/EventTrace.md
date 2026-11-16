@@ -9,7 +9,7 @@ Canonical source: [checked package](../../../../../catalog/packages/Data/Time/Ev
 | Fact class | Disposition | Result and grounding |
 |---|---|---|
 | Subject | `generated` | `catalog/packages/Data/Time/EventTrace.ken.md` — “Finite event traces,” from the [subject index](../../subjects.md). |
-| Declaration/type | `authored` | Declares finite timestamped events, time and payload projections, ordering and half-open window predicates, window filtering, and a left-biased merge of two event lists. |
+| Declaration/type | `authored` | Declares finite timestamped events, time and payload projections, ordering and half-open window predicates, window filtering, a left-biased merge of two event lists, and the public theorem `trace_window_merge_all`. |
 | Law | `authored` | `trace_window_ordered` preserves ordering for an ordered input. `trace_merge_ordered` and `trace_window_merge` require both inputs ordered. `trace_window_merge_all` requires every trace in its input list to be ordered. Window-membership and merge-count laws do not require ordered inputs. |
 | Effect/capability | `none-declared` | The canonical checked fences declare no effect row, `proc`, `visits`, or capability value for this package. |
 | Assurance | `authored` | The package consists of checked definitions and proofs; its source reports no added trusted-base assumptions. |
