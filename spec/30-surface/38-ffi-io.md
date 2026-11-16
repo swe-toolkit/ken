@@ -1020,17 +1020,21 @@ payloads, not bare `Exited` or `Signaled`. This does not make the
 separate `ChildStdio` family a floor admission.
 
 **Child-process package home (Increment 2b, extended in Increment 3a).**
-`Capability.Process.Child` is the explicit-import home for sixteen
+`Capability.Process.Child` is the explicit-import home for twenty-five
 checked pre-source names: `ChildStdio`, `ChildPipe`, `ChildNull`,
 `ChildInherit`, `SpawnPlan`, `spawn_plan`, `with_environment`,
 `with_stdin`, `with_stdout`, `with_stderr`, `withChild`, `wait_child`,
-`take_stdin`, `take_stdout`, `take_stderr` and `read_pipe`. The first
-twelve were homed in Increment 2b; Increment 3a adds `SpawnPlan`,
-`with_stderr`, `take_stdin` and `take_stderr` at their existing IDs.
+`take_stdin`, `take_stdout`, `take_stderr`, `read_pipe`, `ChildSignal`,
+`SignalHangup`, `SignalInterrupt`, `SignalQuit`, `SignalKill`,
+`SignalUser1`, `SignalUser2`, `SignalTerminate` and `signal_child`.
+The first twelve were homed in Increment 2b; Increment 3a added
+`SpawnPlan`, `with_stderr`, `take_stdin` and `take_stderr` at their
+existing IDs. The nine signal names are the §1.11.4 addition.
 The `ChildStdio` export carries its complete three-constructor public
-family; the `SpawnPlan` export exposes the type without its private
-constructor. `ChildExit` and its qualified cases remain in the scoped
-floor (§30 §4), not in this package. Other child and pipe operations
+family; `ChildSignal` carries the seven §1.11.4 constructors, and the
+`SpawnPlan` export exposes the type without its private constructor.
+`ChildExit` and its qualified cases remain in the scoped floor
+(§30 §4), not in this package. Other child and pipe operations
 described below retain their existing contract; this roster does not
 give them an unruled home. Each homed name requires an explicit import
 in Strict isolated source; this addition alters neither authority,
@@ -1173,9 +1177,9 @@ classification with `ProcessResource (Option Bytes)`. The public
 `ProcessOperation` constructors and the catalog-side lift are:
 
 ```ken
-export ProcessOperation, SpawnChild, TakePipe, ReadPipe, WritePipe, ClosePipe, WaitChild
+export ProcessOperation, SpawnChild, TakePipe, ReadPipe, WritePipe, ClosePipe, WaitChild, SignalChild
 
-data ProcessOperation = SpawnChild | TakePipe | ReadPipe | WritePipe | ClosePipe | WaitChild
+data ProcessOperation = SpawnChild | TakePipe | ReadPipe | WritePipe | ClosePipe | WaitChild | SignalChild
 
 pub fn process_error_to_system
     (operation : ProcessOperation) (program : Option Bytes) (cause : IOError)
@@ -1212,12 +1216,13 @@ No post-fork Ken callback or Ken code runs before exec. The public
 contract is the observed descriptor, signal, result and authority
 boundary, not a requirement to expose the host's spawn machinery.
 
-A launcher that ignores SIGCHLD may cause the OS to auto-reap the child.
-Then `wait_child` can return ECHILD as
+A SIGCHLD disposition of `SIG_IGN` or `SA_NOCLDWAIT`, whether set by
+the launcher or foreign code in the process, can cause the OS to
+auto-reap the child. Then `wait_child` can return ECHILD as
 `Err (ResourceHostIO (IOError.Other 10))` instead of a `ChildExit`;
-Ken does not reset SIGCHLD or promise a successful wait in that
-environment. This is a measured residual, not permission to change
-the inherited-disposition rule of §1.10.
+Ken does not reset SIGCHLD or promise a successful wait under that
+disposition. This residual does not permit changing §1.10's
+inherited-disposition rule.
 
 A child that can be held is identified by a process descriptor acquired
 immediately after spawn and retained through settlement; `wait_child`
@@ -1229,12 +1234,27 @@ has already auto-reaped the child, spawn still succeeds: the body
 runs, its pipes remain usable, `wait_child` returns
 `Err (ResourceHostIO (IOError.Other 10))`, and terminal settlement
 sends no signal. A narrow identity residual remains only under a
-launcher that auto-reaps via SIGCHLD `SIG_IGN` or `SA_NOCLDWAIT`: if
-the child exits and an unrelated process reuses its PID between
-spawn returning and descriptor acquisition, Ken could hold the
-unrelated process instead. This requires the kernel's cyclic PID
-allocator to wrap the whole PID space within that interval; Ken
-does not reset SIGCHLD to suppress it.
+SIGCHLD `SIG_IGN` or `SA_NOCLDWAIT` at any time from `posix_spawn`
+returning through descriptor acquisition or during mint-failure
+cleanup, whether established by the launcher or by foreign code:
+if the child exits and an unrelated process reuses its PID before
+identity acquisition, Ken could hold the unrelated process instead.
+This requires the kernel's cyclic PID allocator to wrap the entire
+PID space within that interval; Ken does not reset SIGCHLD to
+suppress it.
+
+If descriptor acquisition fails for any reason other than an
+already-reaped child (ESRCH), spawn returns
+`Err (ResourceHostIO (IOError.Other errno))` and sends SIGKILL to the
+new child by its process number. This mint-failure cleanup is the
+product's one raw-number signal. Spawn then waits for the child unless
+SIGCHLD auto-reaps, in which case the OS reaps it. The child may have
+begun executing; effects it has already performed are not undone.
+This is consistent with `SpawnChild` being `NonIdempotent`: retrying
+spawn may duplicate those effects. Under the SIGCHLD auto-reap
+precondition above, the raw-number signal shares descriptor
+acquisition's PID-reuse residual: if the child has been reaped and
+its number reused, the signal may reach an unrelated process.
 
 Outside that residual, the AC-1 observations include an
 argv/environment echo through a stdout
@@ -1249,9 +1269,67 @@ these are interpreter observations; native parity is an obligation of
 the successor slice.
 
 Native Process parity, cwd attachments, credentials, namespaces,
-cgroups, rlimits, PATH search, process groups, pidfd signalling and
-non-blocking wait are successor work, not implicit fields or behaviors
-of this first slice.
+cgroups, rlimits, PATH search, process groups and non-blocking wait
+are successor work, not implicit fields or behaviors of this first
+slice.
+
+#### 1.11.4 Signalling a held child (PX10 Increment 2)
+
+`Capability.Process.Child` exports one closed, seven-constructor
+`ChildSignal` family and the following effectful operation:
+
+```ken
+pub data ChildSignal = SignalHangup | SignalInterrupt | SignalQuit | SignalKill | SignalUser1 | SignalUser2 | SignalTerminate
+export SignalHangup, SignalInterrupt, SignalQuit, SignalKill, SignalUser1, SignalUser2, SignalTerminate
+
+proc signal_child (a : Auth) (child : Resource ResourceKind.ChildProcess) (sig : ChildSignal)
+  : HostIO a (Result ResourceError Unit) visits [Process]
+```
+
+In constructor order, the signal numbers are **1, 2, 3, 9, 10, 12
+and 15**, matching the numbers reported by `ChildExit.Signaled`.
+The family does not include STOP, TSTP, TTIN, TTOU or CONT: a
+stopped child is not a `wait_child` result, so a wait or normal
+settlement could block indefinitely. Signal zero probes liveness
+without a useful Ken PID meaning and is excluded. CHLD, PIPE,
+ALRM, WINCH, synchronous-fault and real-time signals have no ruled
+use and are excluded. Expanding this family requires a later ruling;
+it does not require a change to `signal_child`'s type.
+
+The **held `ChildProcess` resource**, not a process identifier or a
+second capability argument, supplies authority. Only `withChild`
+acquires one; that bracket already requires an explicitly declared
+Process grant and the EXECUTE right. No Ken source path can supply a
+raw PID. The host operation is `ProcessSignal` (ABI code `0x0606`),
+with **Target** resource admission and **no capability requirement**
+at the host leaf; the resource admission checks the originating
+grant's revocation before delivery. A revoked grant returns
+`Err (ResourceHostIO IOError.Revoked)` without sending a signal.
+Its Process effect row remains explicit despite the resource-based
+authority. Delivery uses the held process descriptor, never a
+raw-PID fallback or a signal to an unrelated process.
+
+For a live child, including one that has exited but has not yet
+been waited, signalling returns `Ok Unit`. An already-exited child's
+signal is discarded by the OS; `wait_child` still reports its actual
+exit, and a race between the signal and exit is decided by that
+wait result. A child whose successful wait result is cached instead
+returns `Err (ResourceHostIO (IOError.Other 3))` (ESRCH), decided
+from the cache without a host signalling syscall. An already
+auto-reaped child (`ReapedAtSpawn`, or later kernel ESRCH) returns
+the same `Other 3` error. Use after the bracket has settled returns
+`Closed`, not ESRCH. None of these arms grants authority to signal
+any other process.
+
+`Capability.System.Error` classifies the new
+`ProcessOperation.SignalChild` as `NonIdempotent` beside the
+`Idempotent` `WaitChild`: delivering a signal again can be observed,
+for example by a child counting `SignalUser1`. No new grant,
+capability kind, postulate or kernel rule is introduced. The
+interpreter and native parity of this operation belong to the
+separately reviewed Runtime half; the CV-owned conformance seed
+checks black-box signal-and-wait and cached-wait outcomes. Neither
+that seed nor the Runtime candidate is validated by this Spec child.
 
 ### 1.12 Strict isolated I/O vocabulary (Increment 3a)
 
