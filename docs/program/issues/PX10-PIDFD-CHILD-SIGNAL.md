@@ -1,7 +1,7 @@
 ---
 id: PX10-PIDFD-CHILD-SIGNAL
 title: "A PX10 child is held by its raw PID: wait_child uses waitpid and terminal settlement sends kill(pid, SIGKILL), so after an auto-reap (spec 38 §1.11.3's SIGCHLD residual) the kill can reach an unrelated process that reused the PID, and Ken has no way to signal a live child. Hold the child by a pidfd and add pidfd signalling, interpreter and native"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
