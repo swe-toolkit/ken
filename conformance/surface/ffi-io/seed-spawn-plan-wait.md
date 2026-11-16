@@ -380,7 +380,7 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 ### surface/ffi-io/process-errors-use-existing-identities
 
 - promise class: durable invariant.
-- spec: §1.11.2–§1.11.3.
+- spec: §1.8 and §1.11.2–§1.11.4.
 - given: separately induce ENOENT with a missing absolute path; EACCES or EPERM
   with a non-executable file and a valid executable control; ENOEXEC with an
   executable invalid image and a valid executable control; an empty-argv or
@@ -390,9 +390,12 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   ETXTBSY, compare an executable held open for writing with the same file
   after the writer closes. Also apply `process_error_to_system` to an
   exhaustive `ProcessOperation` match with one arm and no catch-all for each
-  of `SpawnChild`, `TakePipe`, `ReadPipe`, `WritePipe`, `ClosePipe`, and
-  `WaitChild`, with both a known program value and `None`, using
-  `IOError.Other errno` as one cause.
+  of `SpawnChild`, `TakePipe`, `ReadPipe`, `WritePipe`, `ClosePipe`,
+  `WaitChild`, and `SignalChild`, with both a known program value and `None`,
+  using `IOError.Other errno` as one cause. Query
+  `operation_idempotence (ProcessOp WaitChild)` and
+  `operation_idempotence (ProcessOp SignalChild)`, then pass both results to
+  `retry_guidance` with the same `Transient` input.
 - expect: host causes remain nested as `ResourceHostIO IOError`: ENOENT is
   `NotFound`, EACCES/EPERM is `PermissionDenied`, ENOEXEC is `Other` carrying
   that errno, malformed input is `InvalidInput`, missing EXECUTE is
@@ -405,10 +408,17 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   and `InvalidBounds` remain resource-discipline errors, not SystemError
   causes; the lift accepts only `IOError`. No new
   `SpawnError` or `Revoked` identity, raw pid, or fd is exposed.
+  `operation_idempotence (ProcessOp WaitChild) = Idempotent` and
+  `operation_idempotence (ProcessOp SignalChild) = NonIdempotent`. For the
+  shared `Transient` input, their retry guidance is respectively
+  `RetryAdvised` and `RetryUnsafeNonIdempotent`.
 - why: each cause has a controlled input; the valid-path and open-pipe cases
   above are accepted controls. The exact existing identities are pinned, not
-  message text. The public operation classification has one case for each
-  listed operation and no process-specific error family.
+  message text. The exhaustive operation match forces a new arm for any
+  added variant. `WaitChild` is the positive control for the idempotence pair:
+  a `SignalChild = Idempotent` misclassification would advise retry for both
+  operations on the shared `Transient` input, so the expected verdict split
+  would fail.
 
 ## AC-2: live-child descriptor and signal boundary
 

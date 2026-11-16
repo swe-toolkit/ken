@@ -17,6 +17,12 @@ disposition of `SIG_DFL` and that `SIGTERM` is unblocked in the spawning
 thread. The fixture's pidfd is only an external exit witness; it is not a Ken
 interface or an assertion about Ken's implementation.
 
+The six mapping cases also require default dispositions for `SIGHUP`, `SIGINT`,
+`SIGQUIT`, `SIGUSR1`, and `SIGUSR2`, and that each is unblocked in the spawning
+thread. The target installs no handlers for them. `SIGKILL` is uncatchable and
+unmaskable. The harness sets the target's core-size limit to zero for the
+`SIGQUIT` case.
+
 ## Fixture and common client
 
 The harness supplies the absolute-path executable `px10-child-exit-witness`.
@@ -107,7 +113,124 @@ target's exit state.
   pair distinguishes exited-but-unwaited `Ok Unit` from cached-waited
   `Other 3`.
 
-These rows cover only `SignalTerminate` at the live, exited-but-unwaited, and
-cached-waited lifecycle points. They do not cover descriptor-limit or SIGCHLD
-mint-failure repair, revocation, other signal constructors, auto-reap, or
-post-settlement use.
+### surface/ffi-io/process-signal-map-hangup
+
+- promise class: normative compatibility vector.
+- spec: §1.11.4.
+- given: Use a fresh common-fixture client. At `watcher-ready`, call
+  `signal_child ChildSignal.SignalHangup`; read `target-exited`, then call
+  `wait_child` before the body returns.
+- expect: `signal_child` returns `Ok Unit`; `wait_child` returns
+  `Ok (ChildExit.Signaled 1)`.
+- measured: the signal result, exit marker, and wait result.
+- claimed: `SignalHangup` maps to SIGHUP, signal 1.
+- gap: the pidfd marker witnesses target exit only; no syscall path is asserted.
+- why: a wrong mapping gives a different exit signal or no marker; a no-op
+  leaves the target blocked and fails the bounded run.
+
+### surface/ffi-io/process-signal-map-interrupt
+
+- promise class: normative compatibility vector.
+- spec: §1.11.4.
+- given: Use a fresh common-fixture client. At `watcher-ready`, call
+  `signal_child ChildSignal.SignalInterrupt`; read `target-exited`, then call
+  `wait_child` before the body returns.
+- expect: `signal_child` returns `Ok Unit`; `wait_child` returns
+  `Ok (ChildExit.Signaled 2)`.
+- measured: the signal result, exit marker, and wait result.
+- claimed: `SignalInterrupt` maps to SIGINT, signal 2.
+- gap: the pidfd marker witnesses target exit only; no syscall path is asserted.
+- why: a wrong mapping gives a different exit signal or no marker; a no-op
+  leaves the target blocked and fails the bounded run.
+
+### surface/ffi-io/process-signal-map-quit
+
+- promise class: normative compatibility vector.
+- spec: §1.11.4.
+- given: Use a fresh common-fixture client. At `watcher-ready`, call
+  `signal_child ChildSignal.SignalQuit`; read `target-exited`, then call
+  `wait_child` before the body returns.
+- expect: `signal_child` returns `Ok Unit`; `wait_child` returns
+  `Ok (ChildExit.Signaled 3)`.
+- measured: the signal result, exit marker, and wait result.
+- claimed: `SignalQuit` maps to SIGQUIT, signal 3.
+- gap: the pidfd marker witnesses target exit only; no syscall path is asserted.
+- why: a wrong mapping gives a different exit signal or no marker; a no-op
+  leaves the target blocked and fails the bounded run.
+
+### surface/ffi-io/process-signal-map-kill
+
+- promise class: normative compatibility vector.
+- spec: §1.11.4.
+- given: Use a fresh common-fixture client. At `watcher-ready`, call
+  `signal_child ChildSignal.SignalKill`; read `target-exited`, then call
+  `wait_child` before the body returns.
+- expect: `signal_child` returns `Ok Unit`; `wait_child` returns
+  `Ok (ChildExit.Signaled 9)`.
+- measured: the signal result, exit marker, and wait result.
+- claimed: `SignalKill` maps to SIGKILL, signal 9.
+- gap: the pidfd marker witnesses target exit only; no syscall path is asserted.
+- why: a wrong mapping gives a different exit signal or no marker; a no-op
+  leaves the target blocked and fails the bounded run.
+
+### surface/ffi-io/process-signal-map-user1
+
+- promise class: normative compatibility vector.
+- spec: §1.11.4.
+- given: Use a fresh common-fixture client. At `watcher-ready`, call
+  `signal_child ChildSignal.SignalUser1`; read `target-exited`, then call
+  `wait_child` before the body returns.
+- expect: `signal_child` returns `Ok Unit`; `wait_child` returns
+  `Ok (ChildExit.Signaled 10)`.
+- measured: the signal result, exit marker, and wait result.
+- claimed: `SignalUser1` maps to SIGUSR1, signal 10.
+- gap: the pidfd marker witnesses target exit only; no syscall path is asserted.
+- why: a wrong mapping gives a different exit signal or no marker; a no-op
+  leaves the target blocked and fails the bounded run.
+
+### surface/ffi-io/process-signal-map-user2
+
+- promise class: normative compatibility vector.
+- spec: §1.11.4.
+- given: Use a fresh common-fixture client. At `watcher-ready`, call
+  `signal_child ChildSignal.SignalUser2`; read `target-exited`, then call
+  `wait_child` before the body returns.
+- expect: `signal_child` returns `Ok Unit`; `wait_child` returns
+  `Ok (ChildExit.Signaled 12)`.
+- measured: the signal result, exit marker, and wait result.
+- claimed: `SignalUser2` maps to SIGUSR2, signal 12.
+- gap: the pidfd marker witnesses target exit only; no syscall path is asserted.
+- why: a wrong mapping gives a different exit signal or no marker; a no-op
+  leaves the target blocked and fails the bounded run.
+
+For repeatability, the harness supplies a separate absolute-path executable,
+`px10-child-signal-counter`. It installs a `SIGUSR1` handler and unblocks that
+signal before emitting `counter-ready`. Each handled delivery emits one marker,
+`signal-one` or `signal-two`; after the second marker it waits for stdin EOF,
+then exits 0. It writes no other stdout data.
+
+### surface/ffi-io/process-signal-delivery-is-repeat-observable
+
+- promise class: durable invariant.
+- spec: §1.11.4.
+- given: Use the counter fixture with the common pipe and buffer setup. Read
+  `counter-ready`; call `signal_child ChildSignal.SignalUser1`, read
+  `signal-one`, call it again, and read `signal-two`. Close stdin and call
+  `wait_child`, all before the body returns.
+- expect: both signal calls return `Ok Unit`; the markers arrive in order; the
+  wait returns `Ok (ChildExit.Exited 0)`.
+- measured: two public signal results, two fixture acknowledgments, and the
+  final wait result while the child resource remains held.
+- claimed: two `SignalUser1` deliveries are separately observable, so repeating
+  `SignalChild` can repeat an external effect.
+- gap: the markers are fixture behavior, not a syscall trace or assertion about
+  Ken's implementation.
+- why: the first marker is consumed before the second send, so signal
+  coalescing is not a confound. A suppressed or deduplicated second delivery
+  cannot produce `signal-two`.
+
+The first three rows cover `SignalTerminate` at the live, exited-but-unwaited,
+and cached-waited lifecycle points. The six mapping rows cover the other
+constructors, and the counter row observes repeated `SignalUser1` delivery.
+These cases do not cover descriptor-limit or SIGCHLD mint-failure repair,
+revocation, auto-reap, or post-settlement use.
