@@ -6,9 +6,6 @@ use ken_interp::{CaptureHost, ClockTrace, HostHandler};
 #[path = "support/catalog_roots.rs"]
 mod catalog_roots;
 
-const CLOCK_PACKAGE: &str =
-    include_str!("../../../catalog/packages/Capability/Time/WallClock.ken.md");
-
 const CLOCK_BODY: &str = r#"
   host_bind APartial Instant ExitCode
     (host_clock APartial Instant wall_now)
@@ -82,9 +79,9 @@ fn strict_clock_user_requires_homes_and_still_checks_the_clock_row() {
     }
 }
 
-fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
+fn run_with_clock_script(samples: [i128; 2]) -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
     let mut host = CaptureHost::new(Vec::new());
-    host.set_clock_script([1_700_000_000_000_000_123, 1_700_000_000_000_000_456]);
+    host.set_clock_script(samples);
     let outcome = run_program(
         &clock_program("visits [Clock]", HOST_IMPORT, WALL_IMPORT),
         SourceFormat::Ken,
@@ -98,6 +95,10 @@ fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
     let trace = host.clock_trace().to_vec();
     let snapshot = format!("{outcome:?}|{trace:?}").into_bytes();
     (outcome, trace, snapshot)
+}
+
+fn run_once() -> (ProgramOutcome, Vec<ClockTrace>, Vec<u8>) {
+    run_with_clock_script([1_700_000_000_000_000_123, 1_700_000_000_000_000_456])
 }
 
 #[test]
@@ -165,29 +166,14 @@ fn undeclared_clock_row_is_a_named_effect_escape() {
     }
 }
 
+/// Promise class: durable invariant. MEASURED: loading the checked owner
+/// adds no trust, and a real imported wall-clock program observes a decreasing
+/// pair of host values in order. CLAIMED: this package cannot justify a
+/// monotonicity guarantee by adding trust or by silently reordering reads.
+/// THE GAP: the scripted host is an observable counterexample, not a proof;
+/// the separate Strict import-and-row test guards access to the checked home.
 #[test]
 fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
-    let extracted = ken_elaborator::literate::extract_ken_md(CLOCK_PACKAGE)
-        .expect("Capability.Time.WallClock package must extract");
-    for forbidden in [
-        "Axiom",
-        "postulate",
-        "primitive",
-        "opaque",
-        "monotonic",
-        "leq",
-        "≤",
-    ] {
-        assert!(
-            !extracted.source.contains(forbidden),
-            "checked Clock package must not declare {forbidden}"
-        );
-    }
-    assert!(
-        CLOCK_PACKAGE.contains("declares no ordering or monotonicity law"),
-        "the wall-clock absence of an ordering law must be stated explicitly"
-    );
-
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
     let before = env.env.trusted_base();
     catalog_roots::load_owner(&mut env, "Capability.Time.WallClock");
@@ -208,4 +194,22 @@ fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
             "{name} must be ordinary kernel-checked Ken"
         );
     }
+
+    let later = 1_700_000_000_000_000_456_i128;
+    let earlier = 1_700_000_000_000_000_123_i128;
+    assert!(later > earlier, "the host script must move backwards");
+    let (outcome, trace, _) = run_with_clock_script([later, earlier]);
+    assert_eq!(outcome, ProgramOutcome { exit_status: 0 });
+    assert_eq!(
+        trace,
+        vec![
+            ClockTrace::WallNow {
+                nanoseconds: later.into(),
+            },
+            ClockTrace::WallNow {
+                nanoseconds: earlier.into(),
+            },
+        ],
+        "a checked wall-clock client must see both reversed host samples"
+    );
 }
