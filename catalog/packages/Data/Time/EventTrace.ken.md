@@ -36,7 +36,7 @@ window/merge distribution, composition and commutation laws, the three
 merge membership laws, merge associativity and adjacent-window split lead
 their private lemmas later in the source. The ordered, complete, and sound
 merge-all laws follow the associativity helper family. The count law follows
-them, then the window-distribution law.
+them, then the window-distribution law, then the append law.
 The separated-merge law follows the right empty-merge unit and leads its
 private head-comparison helper. The inverted-window law follows window
 append; its private decision lemma sits beside the split's bound lemmas.
@@ -2633,6 +2633,34 @@ pub theorem trace_window_merge_all
               rest_distributes)
   }
 
+pub theorem trace_merge_all_append
+      (p : Type) (xs : List (List (Event p))) (ys : List (List (Event p)))
+    : Equal
+        (List (Event p))
+        (trace_merge_all p (list_append (List (Event p)) xs ys))
+        (trace_merge p (trace_merge_all p xs) (trace_merge_all p ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons t rest ↦
+      trans
+        (List (Event p))
+        (trace_merge p t (trace_merge_all p (list_append (List (Event p)) rest ys)))
+        (trace_merge p t (trace_merge p (trace_merge_all p rest) (trace_merge_all p ys)))
+        (trace_merge p (trace_merge p t (trace_merge_all p rest)) (trace_merge_all p ys))
+        (cong
+          (List (Event p))
+          (List (Event p))
+          (trace_merge_all p (list_append (List (Event p)) rest ys))
+          (trace_merge p (trace_merge_all p rest) (trace_merge_all p ys))
+          (trace_merge p t)
+          (trace_merge_all_append p rest ys))
+        (sym
+          (List (Event p))
+          (trace_merge p (trace_merge p t (trace_merge_all p rest)) (trace_merge_all p ys))
+          (trace_merge p t (trace_merge p (trace_merge_all p rest) (trace_merge_all p ys)))
+          (trace_merge_assoc p t (trace_merge_all p rest) (trace_merge_all p ys)))
+  }
+
 theorem event_before_skip
       (p : Type)
       (x : Event p)
@@ -3452,10 +3480,12 @@ result to `list_concat`. It preserves duplicate occurrences without ordering
 or a new helper. The window-distribution law inducts on the trace list. Each
 step applies the two-way `trace_window_merge` with the head's ordering from
 the premise and the merged tail's ordering from `trace_merge_all_ordered`,
-then carries the induction hypothesis through `cong` and `trans`. Soundness
-excludes added events, but ordered and sound alone
-do not characterize this merge: a constant empty result satisfies both while
-violating completeness.
+then carries the induction hypothesis through `cong` and `trans`. The append
+law inducts on the left list of traces, lifts the tail hypothesis under the
+head merge with `cong`, then uses `sym` of unconditional `trace_merge_assoc`;
+it needs no ordering premise. Soundness excludes added events, but ordered
+and sound alone do not characterize this merge: a constant empty result
+satisfies both while violating completeness.
 
 When every left event is at or before every right event, merge equals
 append, even if the individual traces are unordered. The checked
@@ -3532,7 +3562,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, and the twenty-six laws form the
+   `trace_merge`, `trace_merge_all`, and the twenty-seven laws form the
    package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
@@ -3550,9 +3580,9 @@ merging, not window multiplicity.
    and Ω-valued `J` transport. The count proof composes checked
    `trace_merge_count` with public `list_append::count`. The window law
    reuses `trace_window_merge` and `trace_merge_all_ordered`, with `map`
-   as the sole new Derived import; these five merge-all proofs add no helper.
-   The one-way
-   window-of-merge consequence composes the two checked soundness
+   as the sole new Derived import; these six merge-all proofs add no helper.
+   The append proof also reuses public `trace_merge_assoc` without ordering.
+   The one-way window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
    `max`/`min` bounds and structurally fuses generic list filters. Window
    commutation reuses fusion in both orders and the public commutativity
@@ -3574,7 +3604,7 @@ merging, not window multiplicity.
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
    The no-member law reuses those same lemmas and `window_keep` to delete
    each missed head, without an additional helper or import.
-4. **Trusted-base delta.** Zero: all twenty-six exported laws have checked proof
+4. **Trusted-base delta.** Zero: all twenty-seven exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -3624,6 +3654,8 @@ merging, not window multiplicity.
    ordering premise. The `cat_time_window_merge_all` package test applies the
    open window law at zero added trust, checks a three-trace window both by
    value and by law, and refuses the same-form claim with an unordered head or
-   tail after each corresponding pair of closed value controls. These tests
-   are not official conformance-runner execution
-   or CI.
+   tail after each corresponding pair of closed value controls. The
+   `cat_time_merge_all_append` package test checks the generic batch law,
+   closed interleaving by value and by law, and the isolated false append
+   claim after a fresh accepted prefix. These tests are not official
+   conformance-runner execution or CI.
