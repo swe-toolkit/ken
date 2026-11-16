@@ -1428,7 +1428,7 @@ pub fn least_k (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) : List a =
 The list is the existing `List a`, and `take`, `sort`, `filter`,
 `eq_from_ord`, `is_sorted` and `list_elem` belong to the existing
 `Data.Collections.Derived` package. `take` already has the required
-recursive body on this base but is private; this contract publishes
+recursive body and is public on this base; this contract reuses
 that **same** operation rather than adding `list_take`. On `Zero`
 it returns `Nil a`; on a positive count and `Cons h t`, it retains
 `h` and takes the remaining count from `t`; on `Nil`, it returns
