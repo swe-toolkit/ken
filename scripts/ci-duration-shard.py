@@ -10,6 +10,7 @@ import sys
 import warnings
 
 import ci_workspace_timings
+from ci_formatter_corpus import FORMATTER_CORPUS_TESTS
 
 
 N = 7
@@ -94,12 +95,16 @@ def inventory_delta(live_ids, baseline_ids):
     }
 
 
-def filtered_projection(inventory, output):
-    value = json.load(open(inventory))
-    list(tests(value))
+def filtered_projection(inventory, output, skip_formatter=False):
+    with open(inventory, encoding="utf-8") as source:
+        value = json.load(source)
+    live = set(tests(value))
+    if skip_formatter and not FORMATTER_CORPUS_TESTS <= live:
+        raise SystemExit("formatter corpus exclusion missing from live inventory")
     for suite in value["rust-suites"].values():
-        if suite["binary-name"] in EXCLUDED_BINARIES:
-            for metadata in suite["testcases"].values():
+        for name, metadata in suite["testcases"].items():
+            if (suite["binary-name"] in EXCLUDED_BINARIES
+                    or (skip_formatter and (suite["binary-id"], name) in FORMATTER_CORPUS_TESTS)):
                 metadata["filter-match"]["status"] = "mismatch"
     with open(output, "w") as file:
         json.dump(value, file)
@@ -542,8 +547,10 @@ def validate_plan(assignment_path, shard, selected_path):
 
 
 def main():
-    if len(sys.argv) == 4 and sys.argv[1] == "project-filtered":
-        filtered_projection(sys.argv[2], sys.argv[3])
+    if len(sys.argv) in (4, 5) and sys.argv[1] == "project-filtered":
+        if len(sys.argv) == 5 and sys.argv[4] != "--skip-formatter-corpus":
+            raise SystemExit("unknown project-filtered option")
+        filtered_projection(sys.argv[2], sys.argv[3], len(sys.argv) == 5)
         return
     if len(sys.argv) == 4 and sys.argv[1] == "project-empty":
         empty_projection(sys.argv[2], sys.argv[3])

@@ -9,8 +9,9 @@ checked-out tree. Prints `false` only when every changed path is known not to
 be an input of that job; prints `true` otherwise, including on any error.
 The reason is logged to stderr as one `CI_Z3_RELEVANT` line.
 
-The job runs `cargo test -p ken-elaborator --features z3-process` (one
-integration test and the whole lib suite), so a path is relevant when it is:
+The job runs the Z3 adapter integration test and the feature-on lib tests
+via nextest (apart from four exact no-route exclusions), so a path is relevant
+when it is:
 
   - under the directory of a crate in ken-elaborator's build closure: its
     normal and build path dependencies, followed transitively, plus
@@ -39,7 +40,8 @@ ROOT_PACKAGE = "ken-elaborator"
 #   catalog/      modules.rs, r_layer_tests/*, seal2_tests/*, many tests/*
 #   conformance/  r_layer_tests/kenfmt_b3_layout.rs, tests/cat_*, ken-interp
 #   spec/, examples/rosetta/
-#                 r_layer_tests/kenfmt_b4_splicing.rs (lib test, whole corpus)
+#                 conservative corpus roots retained even though the two
+#                 formatter whole-corpus tests now run in workspace shards
 #   library/      tests/lang_mod_strict_resolution_d0.rs
 #   crates/ken-cli/tests/fixtures/
 #                 tests/rt_bracket_normalized_regions.rs,
@@ -62,6 +64,9 @@ RELEVANT_FILES = frozenset({
     "Dockerfile",
     ".github/workflows/ci.yml",
     "scripts/ci-z3-relevant.py",
+    "scripts/ci-changed-paths.py",
+    "scripts/ci-z3-lib-scope.py",
+    "scripts/test-ci-z3-lib-filter.py",
     "scripts/ci-doc-only.py",
     "scripts/ci-tested-merge.py",
     "scripts/ci-resource-monitor.py",

@@ -39,7 +39,7 @@ def listing(rows, matches):
 
 
 class Fixtures(unittest.TestCase):
-    def fixture(self, empty_index=None):
+    def fixture(self, empty_index=None, formatter_relevant=True):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name) / "realized-shards"
         ordinary = [
@@ -57,7 +57,8 @@ class Fixtures(unittest.TestCase):
             ("fixture::rt_parity_native", arm)
             for arm in sorted(REQUIRED_RT_PARITY_ARMS)
         ]
-        rows = ordinary + native
+        corpus = sorted(_checker.FORMATTER_CORPUS_TESTS)
+        rows = ordinary + native + corpus
         parity_rows = [
             ("fixture::rt_parity_native", f"parity_test_{index}")
             for index in range(1, RT_PARITY_SHARD_COUNT * 2 + 1)
@@ -74,12 +75,17 @@ class Fixtures(unittest.TestCase):
             ):
                 (artifact / filename).write_text(json.dumps(listing(parity_rows, matches)))
         assignments = list(ordinary)
+        eligible = set(ordinary + (corpus if formatter_relevant else []))
+        extra_assigned = False
         for index in range(1, SHARD_COUNT + 1):
             identity = None if index == empty_index else assignments.pop(0)
             artifact = root / f"realized-shard-{index}"
             artifact.mkdir(parents=True)
             selected = set() if identity is None else {identity}
-            for name, matches in (("unfiltered-inventory.json", set(rows)), ("inventory.json", set(ordinary)), (f"selected-{index}.json", selected)):
+            if selected and not extra_assigned and formatter_relevant:
+                selected.update(corpus)
+                extra_assigned = True
+            for name, matches in (("unfiltered-inventory.json", set(rows)), ("inventory.json", eligible), (f"selected-{index}.json", selected)):
                 value = listing(rows, matches)
                 value["rust-suites"]["empty"] = {"binary-id": "fixture::empty", "binary-name": "ordinary", "testcases": {}}
                 (artifact / name).write_text(json.dumps(value))
@@ -97,12 +103,38 @@ class Fixtures(unittest.TestCase):
             }))
         return temporary
 
-    def run_fixture(self, temporary):
+    def run_fixture(self, temporary, formatter_relevant=True):
         return subprocess.run(
             [sys.executable, str(SCRIPT)], cwd=temporary, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
-            env={**os.environ, "GITHUB_RUN_ID": "123"},
+            env={**os.environ, "GITHUB_RUN_ID": "123",
+                 "CI_FORMATTER_CORPUS_RELEVANT": "true" if formatter_relevant else "false"},
         )
+
+    def test_formatter_gate_only_exempts_two_exact_rows(self):
+        for relevant in (True, False):
+            with self.fixture(formatter_relevant=relevant) as temporary:
+                result = self.run_fixture(temporary, formatter_relevant=relevant)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        with self.fixture(formatter_relevant=False) as temporary:
+            root = Path(temporary) / "realized-shards"
+            # A different ordinary row lost from the selection must red, even
+            # when the two allowed corpus rows are omitted.
+            path = root / "realized-shard-2" / "selected-2.json"
+            value = json.loads(path.read_text())
+            value["rust-suites"]["suite-1"]["testcases"]["test_2"]["filter-match"]["status"] = "mismatch"
+            path.write_text(json.dumps(value))
+            self.refresh_timing(root, 2)
+            result = self.run_fixture(temporary, formatter_relevant=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("union differs", result.stderr)
+
+    def test_formatter_skip_cannot_be_claimed_in_gate_true_mode(self):
+        with self.fixture(formatter_relevant=False) as temporary:
+            result = self.run_fixture(temporary, formatter_relevant=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("filtered inventory differs", result.stderr)
 
     def refresh_timing(self, root, shard):
         selected_path = root / f"realized-shard-{shard}" / f"selected-{shard}.json"
