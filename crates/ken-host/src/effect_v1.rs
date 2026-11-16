@@ -867,6 +867,11 @@ impl CapabilityGrantV1 {
     pub fn revoke(&self, revocation: &mut crate::RevocationDomain) -> bool {
         revocation.revoke(self.revocation_node)
     }
+
+    #[cfg(test)]
+    pub(crate) fn provenance_for_test(&self) -> crate::revocation_v1::RevocationNodeId {
+        self.revocation_node
+    }
 }
 
 pub const RIGHT_READ_V1: u8 = crate::RightSet::READ.bits();
@@ -1491,6 +1496,26 @@ impl ResourceTableV1 {
             ResourceOwnerV1::Child(ChildOwnerV1 { process: child, taken_pipes: Vec::new() }),
             ResourceKindV1::ChildProcess, crate::RightSet::EXECUTE, Some(provenance),
         )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn insert_child_for_test(
+        &mut self,
+        child: crate::ChildProcessV1,
+        provenance: crate::revocation_v1::RevocationNodeId,
+    ) -> ResourceTokenV1 {
+        self.insert_child(child, provenance).0
+    }
+
+    #[cfg(test)]
+    pub(crate) fn child_for_test(&mut self, token: ResourceTokenV1) -> &mut crate::ChildProcessV1 {
+        let (ResourceOwnerV1::Child(child), _, _) = self
+            .typed_owner_mut(token, ResourceKindV1::ChildProcess)
+            .expect("test child remains live")
+        else {
+            unreachable!("validated child kind")
+        };
+        &mut child.process
     }
 
     fn insert_fs_handle(
