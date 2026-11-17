@@ -13,7 +13,13 @@
 > SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11;
 > SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE §13;
-> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE §14).**
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE §14;
+> SPEC-SYMBOLIC-ALGEBRA-NORMALIZE-CONGRUENCE §15;
+> SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER §16;
+> SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-MUL §17;
+> SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-CONGRUENCE §18;
+> SPEC-SYMBOLIC-ALGEBRA-EVAL-ABSENT-VARIABLE §19;
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE §20).**
 > The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
@@ -1569,3 +1575,84 @@ absence is **sufficient, not necessary** for semantic independence:
 so its value ignores that variable although `occurs (Suc Zero) e1` is
 `True`. The new theorem does not apply to `e1` at that variable and
 claims no converse to its absence premise.
+
+## 20. Substitution preserves an expression without the variable
+
+> **Section 20 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE).** Architect's
+> D0 at base `4d1cbe1ca` checked a scratch NatPolynomial package with
+> the generic theorem and a separate accepted client at rc 0 after
+> formatting. No `Axiom`, postulate, primitive or foreign declaration
+> was added; an altered `EVar` proof and an incorrect `EAdd` absence
+> projection both refused in the new proof before restoration. The
+> same-form false closed claim refused at its own `Refl` with elaborator
+> `TypeMismatch`. The scratch binary's source was not identified, and
+> the exact trusted `GlobalId` identity set was **not measured** in
+> D0; the Foundation package test owes that gate. These scratch
+> observations do not check this Spec child or the separate catalog
+> or CV seed children, an assembled candidate, official conformance,
+> CI, publication, landing or a measured landed-trust result.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent checked theorem directly after `eval_absent` and before
+`deriv_substitute`. Its exact name, binder order and public type are:
+
+```ken
+pub theorem substitute_absent
+      (v : Nat) (s : Nat → Expr) (e : Expr)
+    : Equal Bool (occurs v e) False
+      → ((w : Nat) → (Equal Nat v w → Bottom) → Equal Expr (s w) (EVar w))
+      → Equal Expr (substitute s e) e
+```
+
+The first premise is **syntactic non-occurrence** of the target
+variable `v` in the stored expression `e`. The second says that the
+substitution function is structurally the identity at every index
+`w` that can be proved different from `v`. It requires no equality
+at `v`; it is not a claim that `s` is pointwise identity everywhere.
+Together the two premises conclude structural `Equal Expr` of the
+substituted and original trees, not merely equality of their
+values under one environment. There is no ordering, normalization
+or evaluation premise. The binder order `(v, s, e)` matches the
+absence family at `v` and the operation's `substitute s e` order;
+the two premises follow `e`, so the proof can match on the written
+expression before introducing them.
+
+The generic proof is structural induction on `e`. At `EConst c`,
+substitution preserves the constructor and `Refl` closes. At
+`EVar w`, the `occurs` decision is `nat_same v w = False`.
+An assumed `Equal Nat v w` would give `nat_same v w = True` via
+private `nat_same_complete`; `sym` of the false decision followed
+by `trans` yields `Equal Bool False True`, hence `Bottom`.
+The off-`v` premise at `w` then gives `Equal Expr (s w) (EVar w)`.
+There is no dependent match on an unbound computed `nat_same`.
+At `EAdd a b` and `EMul a b`, private
+`bool_or_false_left` and `bool_or_false_right` project the false
+`occurs` decision to both children. The recursive equalities
+combine with the existing private `expr_add_cong` and
+`expr_mul_cong`, respectively. No new helper, import, `Axiom`,
+postulate, kernel rule or surface form is required, and no
+§§1–19 operation or law type changes. The package test must
+independently establish exact trusted-base identity-set equality,
+public Transparent ownership and the open-law application.
+
+In the CV-owned closed fixture, let `v = 1` and let `s1` send 1 to
+`EConst 7` while mapping all other variables to their original
+`EVar` constructors. Both `EAdd (EVar 0) (EConst 2)` and
+`EMul (EVar 0) (EVar 2)` satisfy the two premises and are unchanged
+as stored expressions by substitution. In contrast,
+`EAdd (EVar 1) (EConst 2)` contains `v` and substitutes to
+`EAdd (EConst 7) (EConst 2)`. The closed structural claim that
+this is the substitution result checks by `Refl`; the same-form
+claim that the present-variable expression is unchanged must
+refuse at its own false `Refl`, not at an import or type of `s1`.
+Closed `Equal Expr` goals here use `Refl`, not `Proved`, as checked
+by D0. These examples distinguish the two premises' boundary;
+they cannot prove the generic theorem or replace the CV seed.
+
+Syntactic absence is **sufficient, not necessary**, for this
+structural conclusion: a substitution that also maps `v` to
+`EVar v` can leave an expression containing `v` unchanged. This
+law asserts no converse and no structural result for an expression
+containing `v` under an arbitrary replacement; equal evaluations
+at one environment do not imply this structural conclusion.
