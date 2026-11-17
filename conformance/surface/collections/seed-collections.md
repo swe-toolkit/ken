@@ -272,8 +272,46 @@ are private (`41 §2`).
 
 `map` and `filter` are imported package functions from
 `Data.Collections.Derived`, not prelude `fn`s (`37 §4`). This seed makes no
-placement claim about `fold`/`reduce` or `zip`. The laws are
+placement claim about `fold`/`reduce`. The laws are
 `≡`-propositions discharged by the prover, adding **no kernel rule**.
+
+### surface/collections/derived-zip-home-and-pair-truncation
+
+- promise class: **durable invariant** — `zip` is an explicitly imported
+  `Data.Collections.Derived` function that pairs corresponding elements and
+  stops at the shorter input
+- spec: `37 §4`; `33 §3.3`; `30-taxonomy §4`
+- given: in fresh Strict roots, import only `zip` from
+  `Data.Collections.Derived` and compile:
+
+  ```ken
+  import Data.Collections.Derived (zip)
+
+  const zipped : List (Pair Int Bool) =
+    zip Int Bool
+      (Cons Int 1 (Cons Int 2 (Nil Int)))
+      (Cons Bool True (Nil Bool))
+  ```
+
+  Pair, `mk_pair`, `List`, `Cons` and `Nil` use their existing floor
+  identities. Pair this client with the same source minus only the `zip`
+  import.
+- measured: the imported client's result value and the omitted-import
+  client's resolution result
+- claimed: `zip` returns an ordered `Pair` for each corresponding input
+  position, truncating when the shorter list ends; Strict source must import
+  the package name
+- the gap: import acceptance alone does not establish pair order, result
+  length or truncation. The two-element/one-element input makes those
+  observations distinct
+- expect: the imported client accepts and `zipped` reduces to
+  `Cons (Pair Int Bool) (mk_pair Int Bool 1 True) (Nil (Pair Int Bool))`.
+  The omitted-import client rejects with `UnboundName` at `zip`.
+- controls: the imported client is the positive control for its omission
+  pair. The differing element types distinguish pair order, and unequal list
+  lengths distinguish truncation from preserving the longer input.
+- why: §37 §4 fixes both the explicit package home and the `Pair`-valued
+  shorter-list result.
 
 ### surface/collections/global-fallback-resolves-cross-decl-combinator
 - spec: `37 §4` (cross-declaration clause), `c3a3f1d`

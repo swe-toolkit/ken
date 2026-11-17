@@ -40,7 +40,7 @@ here would be bloat. None found (all four are genuine).
 
 | Built-in | Witness (why not Ken-definable) |
 |---|---|
-| **Primitive types + literals** — `Int`/`Int8..64`/`UInt8..64`/`Decimal`/`Float`/`Float32` (`numbers.rs reg_ty`), `String`/`Bytes` (`bytes.rs`) + literal syntax | parser-produced opaque type constants (`declare_primitive` OpaqueType, `14 §5`); nothing is more primitive. `Char` is the checked refinement in §B, not a primitive type. |
+| **Primitive types + literals** — `Int`/`Int8..64`/`UInt8..64`/`Float`/`Float32` (`numbers.rs reg_ty`), `String`/`Bytes` (`bytes.rs`) + literal syntax | parser-produced opaque type constants (`declare_primitive` OpaqueType, `14 §5`); `Decimal` is a checked transparent definition (`18a §5.6.1`), not a primitive. `Char` is the checked refinement in §B, not a primitive type. |
 | **Audited primitive ops** (`14 §5`) — `reg_binop` (`A→A→A` arith), `reg_cmpop` (`A→A→Bool`), the `String`/`Bytes` prims (`append`/`slice`/`byteLength`/`String↔List Char`) | Registered `PrimReduction::Op` describes interpreter dispatch, not by itself kernel conversion. Only registered `leq_int` on two WHNF `IntLit`s and checked-literal `string_to_list_char` have kernel-WHNF rules (`17 §1`); the other Ops are runtime-only/K3-deferred. Their machine semantics are not expressible as pure Ken. |
 | **The effect / FFI boundary** — `foreign` + the base `IO`/effect primitive (`[Console]`/`[FS]`; `print_line` foreign) | I/O is not pure Ken — the effect boundary is where the world enters. |
 | **Base elaborator syntax** — λ/app/`let`/`match`/annotation/`data`/`const`/`fn`/`proc`/`instance`, refinement types, the **operator-infix + fixity** affordance, `if`-sugar, minimal `module`/`import` | the language forms themselves; the parser/elaborator realizes them. (Note: `if` *desugars* to `match`, and operator *semantics* is package — but the **syntactic affordance** to write them is base. Syntax built-in; semantics derivable.) |
@@ -90,6 +90,7 @@ Neither arm is a catch-all (`64 §1`).
 | **`FileError`** | internal provision: public `readFile`/`writeFile` result carrier (`38 §1.3.1`) | native code produces exact `MkFileError`, fixing its parent; the complete constructor family is unscoped. |
 | **`IOError`** | internal provision: public file-error cause family, including `Revoked` (`38 §1.3.1`, §1.8) | native code produces all thirteen exact cause IDs; source uses scoped `IOError.C` paths. |
 | **`CreatePolicy`** | internal provision: public `writeFile` parameter (`38 §1.3.1`) | the interpreter reads the three exact policy constructor IDs; the native backend maps artifact constructor suffixes to tags; source uses scoped `CreatePolicy.C` paths. |
+| **`Decimal`** | internal provision: checked transparent compiler-bootstrap type identity required by decimal literals (`30-taxonomy §4`; `35 §2.3`) | canonical checked transparent alias; source-visible by its exact pre-source identity without an import, with no public constructor family. |
 | **`BufferSpan`** | internal provision: public bounded-transfer argument (`38 §1.7.1–2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
 | **`TransferCount`** | internal provision: public read/write progress carrier (`38 §1.7.2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
 | **`ResourceError`** | internal provision: public resource-operation result carrier (`38 §1.7.1–2`) | native code produces all twelve exact constructor IDs; source uses scoped `ResourceError.C` paths. |
@@ -115,8 +116,8 @@ Neither arm is a catch-all (`64 §1`).
 | **`Ω` (kernel-only)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
 The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
-ResourceKind, Result, Utf8Error}`**. The final 51-name target has these eight
-signature identities and 43 internally provisioned identities, including
+ResourceKind, Result, Utf8Error}`**. The current 52-name target has these eight
+signature identities and 44 internally provisioned identities, including
 operations and scoped families; the exact roster and membership witnesses are
 listed in the AC2 case below. The earlier 32-name table is a superseded
 snapshot, not a current measurement. Its milestones remain historical: the
@@ -169,7 +170,7 @@ possession.
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently record the
-  `GlobalId` and actual declaration kind for each name in the 51-name
+  `GlobalId` and actual declaration kind for each name in the 52-name
   floor-identity roster, keeping type-forming identities distinct from the
   `Top`/`Bottom` proposition constants, the `Proved : Top` proof binding, and
   the `eqChar` comparator operation. Record `eqChar`'s exact ID and checked
@@ -191,16 +192,16 @@ possession.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
   internal-provision set `{Bottom, BufferSpan, ChildExit, ConsoleOp,
-  ConsoleStream, Coproduct, CreatePolicy, DirEntry, Equal, ExitCode,
+  ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry, Equal, ExitCode,
   FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
   Instant, MappingProt, Nat, Pair, ProcessInput, Prod, ProgramCaps, Prop,
   Proved, ReadProgress, ReadResult, ResourceError, ResourceOpenMode,
   StateOp, Top, TransferCount, Unit, WriteProgress, console_resp, eqChar,
   itree_bind, resp_coproduct, resp_state, run_state, state_get, state_put}`
-  closes the exact 51-name floor roster. `ConsoleStream` is an inductive type;
-  `eqChar` is an operation.
-  neither is another primitive-signature type. `Proved` has type `Top` and is a
-  proof binding, not a type former.
+  closes the exact 52-name floor roster. `ConsoleStream` is an inductive
+  type; `eqChar` is an operation, and `Decimal` is a checked transparent
+  compiler-bootstrap type. None is a primitive-signature type. `Proved` has
+  type `Top` and is a proof binding, not a type former.
   The constructor set is the exact parent-derived closure, including the exact
   constructor dispositions: `MkFileError` remains bare; all
   thirteen `IOError` causes, the three `CreatePolicy` cases, and all twelve
@@ -234,7 +235,7 @@ possession.
   `ConsoleStream.Stderr`; each bare leaf is refused against its qualified
   control, and only the `ConsoleStream` type name enters the roster.
   Unqualified `SpawnPlan` remains the separate pure plan type, outside the
-  51-name floor roster and not a bare constructor. On the Legacy standalone
+  52-name floor roster and not a bare constructor. On the Legacy standalone
   §1.11 route it is accepted in type position, while its use as a
   `ResourceKind` value is refused; the qualified `ResourceKind.SpawnPlan`
   value is the accepted control. `eqChar` is the exact `Char → Char → Bool`
@@ -244,7 +245,7 @@ possession.
   parent qualifies. The separate companion set is exactly
   `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
   Pair id. Installing the floor changes neither the declaration count nor
-  allocator position. None of the 51 roster identities, constructor identities,
+  allocator position. None of the 52 roster identities, constructor identities,
   or Pair-companion identities enters `trusted_base()`.
 - controls: prove both equality directions with compile-preserving mutations.
   For under-inclusion, install a checked `Extra` type and a real test-only
@@ -260,7 +261,7 @@ possession.
   source-need witness; a selected `reg_*` grep omits primitive signatures
   registered by another helper, and spelling cannot establish constructor
   parentage.
-- **TARGET, not measured here:** the current floor is the exact 51-name set
+- **TARGET, not measured here:** the current floor is the exact 52-name set
   above with its complete parent-derived constructor closure. The Increment 3a
   source cases are authored in companion seeds; this artifact makes no local
   test or official conformance-runner claim for them.
@@ -390,13 +391,14 @@ ordinary data representation.
   shadowing case, now demoted and floored per `30-taxonomy §4`) **and**
   hidden-built-in (§C, none found; the floor named).
 - **AC2** (prelude closed by the two-arm rule): §B specifies the traversal of
-  every primitive type and the exact identity/origin witnesses. Its final
-  roster has eight signature identities and 43 internal-provision identities:
-  `{Nat, Pair}`, five proposition/equality names, five entrypoint-ABI names,
+  every primitive type and the exact identity/origin witnesses. Its current
+  roster has eight signature identities and 44 internal-provision identities:
+  `{Nat, Pair, Decimal}`, five proposition/equality names,
+  five entrypoint-ABI names,
   three effect/clock names, `ITree`, `ConsoleStream`, `eqChar`, six original
   FS/resource names, five earlier scoped families, three State operations,
   seven additional scoped families, and four checked operations. This is the
-  51-name target, including Pair's separate three companion bindings and the
+  52-name target, including Pair's separate three companion bindings and the
   full constructor closure. These are corpus expectations, not execution
   results for the Increment 3a additions; source-route controls are specified
   in `seed-modules.md` and `seed-strict-package-homes.md`. The `OrdResult`

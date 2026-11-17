@@ -1,6 +1,8 @@
 # Capability.Time.WallClock
 
-`wall_now` reads the ambient process wall clock as a structural `Instant`.
+`ClockIO` names the checked clock-action type without exposing its internal
+operation or response representation. `wall_now` reads the ambient process wall
+clock as a structural `Instant`.
 The `Int` payload is nanoseconds relative to the Unix epoch, so applications
 can inspect and persist the value without an opaque carrier or conversion
 primitive.
@@ -11,7 +13,7 @@ need that guarantee require the separate session-shaped monotonic-clock design;
 they must not assume it for `wall_now`.
 
 ```ken
-export wall_now
+export ClockIO, wall_now
 
 fn instant_nanoseconds (instant : Instant) : Int =
   match instant {

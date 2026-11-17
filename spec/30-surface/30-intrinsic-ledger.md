@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative fifty-one-identity prelude and its exact
+> normative fifty-two-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -26,7 +26,7 @@ an unused catalog census name proves a global is safe to remove.
 For unruled candidate names below, the keying column names a **native
 reader to check**, not proof that the reader set is complete. The
 admitted entrypoint-ABI, effect/clock, ITree, FS/resource,
-`ConsoleStream` and `eqChar` rows instead record ruled exact-ID keying
+`ConsoleStream`, `eqChar` and `Decimal` rows instead record ruled exact-ID keying
 and independent source need (`30 §4`'s conjunction). Both proven →
 reserved, always-present floor. Keyed but no independent source
 need → compiler-internal, not source-resolvable. Unkeyed but promised →
@@ -47,8 +47,8 @@ progress/acquisition/mapping/child-result families, the five
 Increment 3a scoped families (`ReadResult`, `FileMetadata`, `FileKind`,
 `DirEntry`, `FileOperation`), scoped `StateOp` and checked `resp_state`,
 the four direct-ITree floor identities (`ConsoleOp`, `console_resp`,
-`itree_bind`, `resp_coproduct`), `ConsoleStream`, `eqChar`, and the three
-earlier State operations below, the other names in this table are
+`itree_bind`, `resp_coproduct`), `ConsoleStream`, `eqChar`, `Decimal`,
+and the three earlier State operations below, the other names in this table are
 **observed spellings**, not names approved for permanent reservation.
 Before a later slice admits a newly witnessed name, Spec checks that
 its spelling closely encloses its meaning (`30 §4`). For the admitted
@@ -140,8 +140,8 @@ producer/reader and parent-ID probe on `fd2f57557` (Architect AC-0),
 paired with their independent `38` source need (Spec Leader AC-0).
 Other inventory citations retain their stated census base. Only
 marked witnessed entrypoint-ABI, effect/clock, ITree, FS/resource,
-progress/acquisition/mapping/child-result, `ConsoleStream`, `eqChar`
-and State-operation rows below join the floor; no other row
+progress/acquisition/mapping/child-result, `ConsoleStream`, `eqChar`,
+`Decimal` and State-operation rows below join the floor; no other row
 alone reserves a name.
 
 | Name | Possible keying mechanism and independent source obligation |
@@ -167,6 +167,7 @@ alone reserves a name.
 | `host_pure` (package) | Checked prelude HostIO return definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
 | `host_bind` (package) | Checked prelude HostIO sequencing definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
 | `eqChar` (floor operation) | `decimal_char.rs::set_eq_entry` captures its checked ID; the Char `==` plan and character literal patterns read that registration. The string-literal-pattern reader is rekeyed to the same exact ID instead of a mutable spelling lookup. §34 literal equality and §37 Char/string operations require the canonical comparator in source. It is a checked operation, not a type or constructor family. |
+| `Decimal` (floor, checked transparent definition) | The `d` literal reader types against the exact checked pre-source identity, and `+`, `-`, `*` and `==` dispatch to existing checked operations through that identity (`30-taxonomy §4`). §35 §2.3 requires source to name `Decimal` without an import. The representation is internal; no public constructor family is exposed. |
 | `StateOp` (floor, scoped) | The space desugarer constructs this exact checked operation carrier (`elab.rs:22321–22336`); §36 §4.2 requires source to name it for direct `run_state` trees. Its checked `Get`/`Put` leaves resolve as `StateOp.Get`/`StateOp.Put`. |
 | `resp_state` (floor operation) | The same desugarer constructs this exact checked response family; §36 §4.2's dependent State response requires it in a direct tree. `resp_state` is a checked definition, not a constructor or separate `State` type. |
 | `Get` (qualified floor constructor) | Exact State operation ID, source `StateOp.Get`, not bare. |
@@ -307,8 +308,9 @@ FS/resource, five scoped progress/acquisition/mapping/child-result,
 prior operations plus `StateOp` and `resp_state`), five Increment 3a
 result/FS scoped families, and `ConsoleOp`, `console_resp`, `itree_bind`
 and `resp_coproduct` marked floor above join B alongside the original
-fifteen: fifty-one counted identities. Their floor spellings are
-protected; scoped case leaves and bare `get`, `put` and `bind` do not
+fifteen; the checked transparent `Decimal` joins that earlier
+fifty-one, giving fifty-two counted identities. Their floor spellings
+are protected; scoped case leaves and bare `get`, `put` and `bind` do not
 enter B through the checked operations. The package-home roster's
 Increment 3a target has ninety-six rows: the eighty-one at its base,
 minus seventeen retired FileOperation family rows, plus thirty-two

@@ -1,7 +1,6 @@
-//! List combinator acceptance: `zip` lives in the prelude; structural
-//! `map`/`filter` are checked Derived exports; `length` is re-exported there
-//! from the trust-free `Data.Collections.List` provider.
-//! The four compose over the same List identities (`37 §4.1`, §9).
+//! List combinator acceptance: structural `map`, `filter`, and Pair-valued
+//! `zip` are checked Derived exports; `length` is re-exported there from the
+//! trust-free `Data.Collections.List` provider (`37 §4.1`, §9).
 
 use std::path::PathBuf;
 
@@ -74,24 +73,27 @@ fn prelude_registers_zip_without_a_list_fold() {
 }
 
 /// Promise class: durable checked integration.
-/// MEASURED: the bare prelude provides zip, Derived provides map/filter/length,
-/// and the one declaration composes all four with checked identities and
-/// evaluates to one for its singleton input. CLAIMED: clients can compose
-/// these structural List combinators after loading Derived. THE GAP: this
-/// fixture uses a checked selective import for the public names; the provider
-/// identity checks and concrete evaluation guard the imported operations.
+/// MEASURED: a Strict client imports Derived's Pair-valued zip with
+/// map/filter/length and evaluates their composition to one on singleton
+/// inputs. CLAIMED: clients can compose the public structural operations
+/// with an explicit provider. THE GAP: the observed singleton length is
+/// independent of the pre-source zip's distinct Prod-valued identity.
 #[test]
 fn list_combinators_compose_with_checked_derived_providers() {
-    let mut env = with_derived_combinators();
-    let id = env
-        .elaborate_decl(
-            "const uses_all_four_combinators : Nat = \
-         length Nat \
-           (filter Nat (\\n. match n { Zero |-> True ; Suc m |-> False }) \
-             (map (Prod Nat Nat) Nat (\\p. match p { MkProd x y |-> x }) \
-               (zip Nat Nat (Cons Nat Zero (Nil Nat)) (Cons Nat Zero (Nil Nat)))))",
+    let mut env = ElabEnv::new().expect("base env");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+    let checked = env
+        .elaborate_isolated_file_strict_v1(
+            &[root],
+            "import Data.Collections.Derived (map, filter, length, zip)\n\
+             const uses_all_four_combinators : Nat = \
+             length Nat \
+               (filter Nat (\\n. match n { Zero |-> True ; Suc m |-> False }) \
+                 (map (Pair Nat Nat) Nat (\\p. pair_fst Nat Nat p) \
+                   (zip Nat Nat (Cons Nat Zero (Nil Nat)) (Cons Nat Zero (Nil Nat)))))",
         )
-        .expect("zip from the prelude and map/filter/length from Derived must compose");
+        .expect("Strict imported Pair-valued zip composes with Derived operations");
+    let id = checked.last().expect("client declaration").def_id;
     let body = match env.env.lookup(id) {
         Some(Decl::Transparent { body, .. }) => body,
         other => panic!("composition must be checked and transparent: {other:?}"),

@@ -195,24 +195,37 @@ it is not a census of selected registration helpers. That inventory is exactly
 - the opaque primitive former `Cap : Auth → Type` names `Auth`, and
   `Resource : ResourceKind → Type` names `ResourceKind`.
 
-The internal-provision arm adds `{Nat, Pair}` and the five kernel-machinery-keyed
-proposition and equality members `{Equal, Prop, Proved, Top, Bottom}`. This is
-one general arm over internal origin, not a Pair-specific exception or third
-membership route. `Nat` is the kernel-origin member: the ordinary checked
-inductive `data Nat = Zero | Suc Nat` that source must use as the canonical
-natural/index carrier. `Pair` is the compiler-bootstrap member: one checked
-transparent type identity whose surface meaning is the non-dependent kernel
-Sigma (`34`). The five proposition/equality members are each keyed to the
-kernel's own machinery, so a source-defined equivalent fails to interoperate
-(`../10-kernel/16 §1`): `Top` and `Bottom` are the kernel's `Ω₀` truth and
-falsity prelude constants and `Proved : Top` their canonical proof; `Equal` is
-the surface-nameable definition whose body **is** the kernel's computing
+The internal-provision arm adds `{Nat, Pair, Decimal}` and the five
+kernel-machinery-keyed proposition and equality members
+`{Equal, Prop, Proved, Top, Bottom}`. This is one general arm over
+internal origin, not a Pair-specific exception or third membership
+route. `Nat` is the kernel-origin member: the ordinary checked
+inductive `data Nat = Zero | Suc Nat` that source must use as the
+canonical natural/index carrier. `Pair` is the compiler-bootstrap
+member: one checked transparent type identity whose surface meaning
+is the non-dependent kernel Sigma (`34`). The five proposition/equality
+members are each keyed to the kernel's own machinery, so a
+source-defined equivalent fails to interoperate (`../10-kernel/16 §1`):
+`Top` and `Bottom` are the kernel's `Ω₀` truth and falsity prelude
+constants and `Proved : Top` their canonical proof; `Equal` is the
+surface-nameable definition whose body **is** the kernel's computing
 observational equality `Eq` (a source `data Equal` forfeits `Eq`'s `J`/`refl`
 computation); `Prop` is the surface-nameable alias for the proposition sort
 `Ω₀` (its own kernel type is `Type (suc 0)`, its body is `Ω₀`), present only
 because the surface grammar has no `Ω` token and used only in type-annotation
 position. Each is a kernel constant or a re-checked definition — **out** of
 `trusted_base()` exactly as the original ten, adding no entry.
+
+`Decimal` is the compiler-bootstrap, checked transparent type identity
+required by §35 §2.3. The elaborator types `d` literals against the
+pre-source `Decimal` identity (or its unfolded internal type), and its
+`+`, `-`, `*` and `==` dispatch selects the existing pre-source
+operations through that unfolded type identity. A same-spelled source
+definition allocates a different identity and cannot replace either
+native reader. The checked alias has no public constructor family;
+its representation remains internal. Source needs `Decimal` without
+an import, so this exact checked identity joins the internal-provision
+floor, not a package home or a new primitive.
 
 The entrypoint-ABI contract (`33 §3.2.1`) adds five checked, pre-source
 identities under the same internal-provision arm: `ExitCode`,
@@ -324,10 +337,10 @@ These four admissions allocate no new checked identity and add no
 checked `host_bind` and related wrappers without admitting their
 `FSOp`, `AmbientOp`, `fs_resp` or `ambient_resp` internals.
 
-Thus the closed **floor-identity roster** has fifty-one names: the exact
+Thus the closed **floor-identity roster** has fifty-two names: the exact
 checked identities Strict source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
-ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, DirEntry, Equal,
+ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry, Equal,
 ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO,
 IOError, ITree, Instant, List, MappingProt, Nat, Option, Pair,
 ProcessInput, Prod, ProgramCaps, Prop, Proved, ReadProgress,
@@ -338,7 +351,7 @@ run_state, state_get, state_put}`**. The prior forty-seven identities,
 `ConsoleOp`, `console_resp`, `itree_bind` and `resp_coproduct` are
 re-checked; floor admission alone adds no postulate or `trusted_base()`
 entry. Their qualified constructors and the Pair companions are
-separate from this 51-name count. These identities are not all types:
+separate from this 52-name count. These identities are not all types:
 `Top` and `Bottom` are proposition constants, `Proved` is a proof
 binding, `HostIO` a type-level function, and `console_resp`, `eqChar`,
 `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -488,12 +501,13 @@ information, not submitted for per-name permission. No compiler-provided
 intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
-Until D0 proves both witness clauses for another candidate, the floor
-remains the fifty-one-identity set above and that candidate has no new
-ambient availability. `BufferWindow`, `ResourceBodyResult`,
-`ResourceBracketResult`, the `FS` source alias, `read_bytes` and `write_file`
-are source-promised but unkeyed: they remain outside B as package material,
-not internal-only identities. In particular, `BufferWindow` is unreserved;
+With `Decimal`'s two witnesses established, the floor is the
+fifty-two-identity set above. Until D0 proves both witness clauses for
+another candidate, that candidate has no new ambient availability.
+`BufferWindow`, `ResourceBodyResult`, `ResourceBracketResult`, the `FS`
+source alias, `read_bytes` and `write_file` are source-promised but
+unkeyed: they remain outside B as package material, not internal-only
+identities. In particular, `BufferWindow` is unreserved;
 a same-name source declaration is allowed in strict mode, while legacy
 resolution stays unchanged. `FS` as an effect/capability label does not
 make the distinct type alias keyed. A keyed identity without an independent
@@ -681,6 +695,24 @@ complete. Inc 3a changes vocabulary and source imports only, never
 the CLI route; 3b owns the route switch and its separate full-population
 acceptance.
 
+The later non-home-families node adds **fifty-six explicit-import
+homes**, all at existing checked pre-source identities: the 48
+`checked{Add,Sub,Mul}{T}` and `saturating{Add,Sub,Mul}{T}`
+arithmetic names for the eight widths in `Data.Numeric.FixedWidth`
+(§35 §5); `RangeError`, its public `MkRangeError` constructor and
+`intToUSize`, `intToISize`, `intToCInt` in that same home;
+`isScalar` and `inRangeBool` in `Core.Classes.LawfulClasses` beside
+Char's checked helpers; and the name-only `ClockIO` alias in
+`Capability.Time.WallClock`. The eight `intTo{T}` fixed-width
+narrowings were already homed in Increment 3a and are not part of
+this fifty-six-row delta. `ClockIO` appears in public checked
+signatures, so its name needs an import; its `ClockOp` and
+`clock_resp` body formers remain private representation, as do
+`FSOp` and `AmbientOp` beneath the already writable `HostIO`.
+The family of a public inductive is exported whole, not just its
+name: `RangeError.MkRangeError` resolves under its package import.
+None of these homes joins the ambient floor or allocates a new ID.
+
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
 and it has no internal-provision witness. It is therefore a standard-package
@@ -689,14 +721,15 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the
-fifty-one-identity floor and Pair's three checked companions as the
-Increment 3a target. The prior forty were delivered before this
-increment; `ReadResult`, `FileMetadata`, `FileKind`, `DirEntry`,
-`FileOperation`, `StateOp` and `ConsoleOp` require complete scoped
-constructor families and source-path migrations. The checked
-`resp_state`, `console_resp`, `itree_bind` and `resp_coproduct`
-operations must be admitted at their exact pre-source identities.
+**Implementation staging.** Increment 3a fixed the historical
+fifty-one-identity floor and Pair's three checked companions. This
+later node adds `Decimal` to the floor, yielding fifty-two identities.
+The prior forty were delivered before Increment 3a; `ReadResult`,
+`FileMetadata`, `FileKind`, `DirEntry`, `FileOperation`, `StateOp` and
+`ConsoleOp` require complete scoped constructor families and source-path
+migrations. The checked `resp_state`, `console_resp`, `itree_bind` and
+`resp_coproduct` operations must be admitted at their exact pre-source
+identities.
 All eleven additions to the prior forty are atomic in one assembled
 candidate. The earlier Spec
 child's code parent `1fc285c6` enumerated its then-current forty;

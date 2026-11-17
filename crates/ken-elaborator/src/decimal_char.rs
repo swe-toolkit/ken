@@ -199,6 +199,8 @@ pub fn register_decimal_char(elab: &mut ElabEnv) -> Result<DecimalCharEnv, ElabE
         .ok_or_else(|| ElabError::Internal("DecimalPair not registered".into()))?;
 
     let decimal_add_id = *elab.globals.get("decimalAdd").unwrap();
+    let decimal_sub_id = *elab.globals.get("decimalSub").unwrap();
+    let decimal_mul_id = *elab.globals.get("decimalMul").unwrap();
     let decimal_eq_id = *elab.globals.get("decimalEq").unwrap();
     // Keyed by `decimalpair_id`, not `decimal_id`: `whnf` fully unfolds the
     // transparent `Decimal := DecimalPair` alias, so `classify_add`/
@@ -215,6 +217,14 @@ pub fn register_decimal_char(elab: &mut ElabEnv) -> Result<DecimalCharEnv, ElabE
     );
     elab.numeric_env
         .set_eq_entry(decimalpair_id, EqEntry { op_id: decimal_eq_id });
+    elab.numeric_env.set_sub_entry(
+        decimalpair_id,
+        crate::numbers::BinOpEntry { op_id: decimal_sub_id, result_id: decimal_id },
+    );
+    elab.numeric_env.set_mul_entry(
+        decimalpair_id,
+        crate::numbers::BinOpEntry { op_id: decimal_mul_id, result_id: decimal_id },
+    );
     elab.numeric_env.decimal_id = decimal_id;
     elab.numeric_env.decimalpair_id = decimalpair_id;
 
