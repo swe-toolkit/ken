@@ -10815,6 +10815,8 @@ mod cat_numeric_interval_public_export_tests {
             "interval_hull_assoc_rev_inside",
             "interval_intersect_assoc_inside",
             "interval_intersect_assoc_rev_inside",
+            "interval_hull_idempotent",
+            "interval_intersect_idempotent",
             "interval_add_zero_l_inside",
             "interval_add_zero_l_rev_inside",
             "interval_mul_one_l_inside",
