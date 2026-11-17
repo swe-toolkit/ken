@@ -130,6 +130,17 @@ children lexical (Spec evt_318gqrbkefpmt), and the held
 `lang_membership_operator_surface` rows migrate in I4 with no fixture or
 assertion edit (Architect evt_4em1d5vqwab2p, evt_13ms2ywx4pta0).
 
+`LANG-ATTACHED-PROOF-CHECKED-SELECTION` has landed: a Strict inline child
+selects an enclosing attached proof by checked identity, so
+`es3_modules_acceptance.rs:344` migrates in I4 with no assertion edit
+(Architect evt_2qff80j4mc920).
+
+I4 also moves `px10_spawn_plan_wait.rs`'s rootless lifetime-template
+export callers (LIVE_CHILD and no-close, through
+`exported_process_resource_lifetime_obligation_for`) to the rooted
+route, as the RSW Increment 2 rows do (Architect evt_4gs6xzrn88hne,
+evt_8asgjmh2jhzn).
+
 Carried, framed at I4's landing: retire the pre-source `Perm` and
 `Perm_rel` registration (`prelude.rs` :1534-1762) with the rows whose
 subject is that definition (Architect evt_3agt8q8hbz7sb (3), five rows by

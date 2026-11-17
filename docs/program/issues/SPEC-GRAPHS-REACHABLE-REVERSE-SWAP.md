@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABLE-REVERSE-SWAP
 title: "Spec 62 §8 lets a client turn a supplied walk into reachability in the reversed graph, but no law states that the reachability decision itself is preserved, so a client holding only a Bool result cannot cross to the reversed graph. Rule from a checked D0 at zero trust that, for a decidable carrier, graph_reachable g s (d.eq t) equals graph_reachable (graph_reverse g) t (d.eq s), and state it with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
