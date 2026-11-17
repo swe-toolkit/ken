@@ -7,6 +7,7 @@ use super::*;
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Resolved {
     Word(String),
+    Int(RuntimeIntV1),
     Constructor(String, Vec<Self>),
 }
 
@@ -14,6 +15,7 @@ fn resolve(expr: &RuntimeExpr, env: &[Resolved]) -> Resolved {
     match expr {
         RuntimeExpr::Var(index) => env[*index as usize].clone(),
         RuntimeExpr::Value(RuntimeValue::String(word)) => Resolved::Word(word.clone()),
+        RuntimeExpr::Value(RuntimeValue::Int(value)) => Resolved::Int(value.clone()),
         RuntimeExpr::Construct { constructor, args } => Resolved::Constructor(
             constructor.clone(),
             args.iter().map(|arg| resolve(arg, env)).collect(),
@@ -57,8 +59,18 @@ fn chosen_operation(constructors: &[String], arguments: Vec<RuntimeExpr>) -> Run
     body
 }
 
-#[test]
-fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environments() {
+struct SelectedHostFixture {
+    semantic: checked_core::CheckedCoreSemanticInputs,
+    spine: CheckedHostSpineV1,
+    in_l: StableSymbol,
+    in_r: StableSymbol,
+    fs_op: StableSymbol,
+    console_op: StableSymbol,
+    clock_op: StableSymbol,
+    entropy_op: StableSymbol,
+}
+
+fn selected_host_fixture() -> SelectedHostFixture {
     let id = |name: &str| StableSymbol::declaration("selected-host-depth", &[], name);
     let coproduct = id("Coproduct");
     let in_l = StableSymbol::constructor(&coproduct, "InL");
@@ -185,6 +197,31 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
         bracket_finalizer_constructor: None,
         operations,
     };
+    SelectedHostFixture {
+        semantic,
+        spine,
+        in_l,
+        in_r,
+        fs_op,
+        console_op,
+        clock_op,
+        entropy_op,
+    }
+}
+
+#[test]
+fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environments() {
+    let SelectedHostFixture {
+        semantic,
+        spine,
+        in_l,
+        in_r,
+        fs_op,
+        console_op,
+        clock_op,
+        entropy_op,
+    } = selected_host_fixture();
+    let id = |name: &str| StableSymbol::declaration("selected-host-depth", &[], name);
     let word = |text: &str| RuntimeExpr::Value(RuntimeValue::String(text.into()));
     let outer = Resolved::Word("outer-variable".into());
     let neighbour = Resolved::Word("neighbour-variable".into());
@@ -240,5 +277,117 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
     assert!(
         wrong_tail_reads.is_empty(),
         "each tail leaf must resolve its outer Var instead of an intervening binder: {wrong_tail_reads:?}"
+    );
+}
+
+// Follow the selected constructor's actual Match binders before observing the
+// emitted Effect. Reading the raw Var indices alone would not establish that
+// the runtime-selected child operand survives those binders.
+fn selected_effect(expr: &RuntimeExpr, env: &[Resolved]) -> (ken_host::HostOpV1, Vec<Resolved>) {
+    match expr {
+        RuntimeExpr::Match {
+            scrutinee, cases, ..
+        } => {
+            let Resolved::Constructor(constructor, mut args) = resolve(scrutinee, env) else {
+                panic!("selected operation must resolve to a constructor")
+            };
+            let case = cases
+                .iter()
+                .find(|case| case.constructor == constructor)
+                .expect("selected constructor must have a checked case");
+            assert_eq!(args.len(), case.binders);
+            args.extend_from_slice(env);
+            selected_effect(&case.body, &args)
+        }
+        RuntimeExpr::Let { value, .. } => {
+            let RuntimeExpr::Effect {
+                operation, args, ..
+            } = value.as_ref()
+            else {
+                panic!("selected host case must produce an Effect")
+            };
+            (
+                *operation,
+                args.iter().map(|arg| resolve(arg, env)).collect(),
+            )
+        }
+        other => panic!("selected operation did not reach its Effect: {other:?}"),
+    }
+}
+
+/// Promise class: durable invariant. MEASURED: the production runtime-selected
+/// host dispatcher matches the checked stdin constructor, preserves the child
+/// through its case binders, and appends fd 0; the sibling read constructor
+/// preserves its independently supplied nonzero index instead of being zeroed.
+/// CLAIMED: both constructors sharing ProcessTakePipe use their canonical
+/// two-operand host request shape. THE GAP: this is a synthetic selected-host
+/// operation; the checked-source native fixture separately covers static take.
+#[test]
+fn runtime_selected_take_stdin_preserves_child_and_adds_fd_zero() {
+    let SelectedHostFixture {
+        mut semantic,
+        mut spine,
+        ..
+    } = selected_host_fixture();
+    let write = StableSymbol::constructor(&spine.fs_family, "PrivateProcessTakePipeWrite");
+    let read = StableSymbol::constructor(&spine.fs_family, "PrivateProcessTakePipeRead");
+    spine.process_take_pipe_write_constructor = write.clone();
+    let fs_metadata = semantic
+        .data_metadata
+        .get_mut(&spine.fs_family)
+        .expect("the checked FS family is in the selected-host fixture");
+    for (constructor, argument_count) in [(&write, 1), (&read, 2)] {
+        spine
+            .operations
+            .insert(constructor.clone(), ken_host::HostOpV1::ProcessTakePipe);
+        fs_metadata
+            .constructors
+            .push(checked_core::ConstructorMetadata {
+                symbol: constructor.clone(),
+                argument_count,
+                target_index_count: 0,
+                recursive_positions: Vec::new(),
+                lowerability: checked_core::LowerabilityStatus::Supported,
+            });
+    }
+    let word = |text: &str| RuntimeExpr::Value(RuntimeValue::String(text.into()));
+    let select = |constructor: &StableSymbol, arguments| {
+        let selected = lower_runtime_selected_host_operation(
+            chosen_operation(
+                &[spine.in_l.to_string(), constructor.to_string()],
+                arguments,
+            ),
+            RuntimeExpr::Value(RuntimeValue::String("continuation".into())),
+            &semantic,
+            &spine,
+            &StableSymbol::declaration("selected-host-depth", &[], "main"),
+        )
+        .expect("runtime-selected host producer must build both checked cases");
+        selected_effect(&selected, &[])
+    };
+    let (write_op, write_args) = select(&write, vec![word("stdin-child")]);
+    assert_eq!(write_op, ken_host::HostOpV1::ProcessTakePipe);
+    assert_eq!(
+        write_args,
+        [
+            Resolved::Word("stdin-child".into()),
+            Resolved::Int(0.into())
+        ]
+    );
+
+    let (read_op, read_args) = select(
+        &read,
+        vec![
+            word("stdout-child"),
+            RuntimeExpr::Value(RuntimeValue::Int(2.into())),
+        ],
+    );
+    assert_eq!(read_op, ken_host::HostOpV1::ProcessTakePipe);
+    assert_eq!(
+        read_args,
+        [
+            Resolved::Word("stdout-child".into()),
+            Resolved::Int(2.into())
+        ]
     );
 }
