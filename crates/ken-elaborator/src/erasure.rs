@@ -9712,7 +9712,8 @@ mod px7l_tests {
             px10_exit_symbols: ["Exited", "Signaled"]
                 .map(|name| StableSymbol::constructor(&family("ChildExit"), name)),
             process_take_pipe_write_constructor: StableSymbol::constructor(
-                &family("FSOp"), "PrivateProcessTakePipeWrite"
+                &family("FSOp"),
+                "PrivateProcessTakePipeWrite",
             ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),

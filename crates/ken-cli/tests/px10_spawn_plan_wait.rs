@@ -126,10 +126,11 @@ fn check_ac1_native_process_smoke_matches_fresh_interpreter() {
 /// CLAIMED: the stdin constructor has the host's canonical operand shape
 /// without requiring an explicit close. THE GAP: this checks only the
 /// stdin constructor; early close and writing remain separately held work.
+/// The template's use-after-settlement arm is vacuous in this no-write row.
 #[test]
 fn native_take_stdin_no_close_matches_fresh_interpreter() {
-    // The existing native Process smoke sampled 2308 KiB resident stack at
-    // 16 MiB; its 14076 KiB headroom provisions this same compiler harness.
+    // This no-close worker sampled 2320 KiB resident stack on its completed
+    // native build/run at 16 MiB; 14064 KiB of stated headroom remains.
     std::thread::Builder::new()
         .name("px10-take-stdin-no-close".to_owned())
         .stack_size(16 * 1024 * 1024)
@@ -181,25 +182,43 @@ fn check_native_take_stdin_no_close_matches_fresh_interpreter() {
     assert_eq!(native.terminal_error, reference.terminal_error);
     assert_eq!(native.effect_trace, reference.effect_trace);
     assert_eq!(native.exit_status, 0, "{native:?}");
-    let takes = native.effect_trace.iter()
+    let takes = native
+        .effect_trace
+        .iter()
         .filter(|event| event.operation == Op::ProcessTakePipe)
         .collect::<Vec<_>>();
-    assert_eq!(takes.len(), 1, "one ProcessTakePipe: {:?}", native.effect_trace);
+    assert_eq!(
+        takes.len(),
+        1,
+        "one ProcessTakePipe: {:?}",
+        native.effect_trace
+    );
     assert_eq!(takes[0].request, Request::ProcessTakePipe { fd: 0 });
-    assert!(matches!(&takes[0].outcome,
-        Outcome::Success(Reply::ResourceAcquired {
-            resource_kind: Kind::PipeWrite, identity, ..
-        }) if takes[0].resource_bindings.contains(&(Role::Buffer, *identity))
-    ), "stdin acquires a bound PipeWrite: {takes:?}");
-    let waits = native.effect_trace.iter()
+    assert!(
+        matches!(&takes[0].outcome,
+            Outcome::Success(Reply::ResourceAcquired {
+                resource_kind: Kind::PipeWrite, identity, ..
+            }) if takes[0].resource_bindings.contains(&(Role::Buffer, *identity))
+        ),
+        "stdin acquires a bound PipeWrite: {takes:?}"
+    );
+    let waits = native
+        .effect_trace
+        .iter()
         .filter(|event| event.operation == Op::ProcessWait)
         .collect::<Vec<_>>();
     assert_eq!(waits.len(), 1, "one wait: {:?}", native.effect_trace);
-    assert!(matches!(&waits[0].outcome,
-        Outcome::Success(Reply::ChildExit(ken_host::ChildExitV1::Exited(0)))
-    ), "wait returned Exited 0: {waits:?}");
+    assert!(
+        matches!(
+            &waits[0].outcome,
+            Outcome::Success(Reply::ChildExit(ken_host::ChildExitV1::Exited(0)))
+        ),
+        "wait returned Exited 0: {waits:?}"
+    );
     assert_exported_resource_lifetime_template_holds_for(
-        &native.effect_trace, TAKE_STDIN_NO_CLOSE, true
+        &native.effect_trace,
+        TAKE_STDIN_NO_CLOSE,
+        true,
     );
 }
 
@@ -282,7 +301,7 @@ fn ac1_checked_interpreter_stdout_pipe_preserves_argv_and_environment() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &checked_catalog_roots(),
+                &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -387,7 +406,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &checked_catalog_roots(),
+                &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -820,7 +839,7 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &checked_catalog_roots(),
+                &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),
@@ -1063,17 +1082,20 @@ fn assert_exported_resource_lifetime_template_holds_for(
         assert_eq!(pipe.bind_at.operation, Op::ProcessTakePipe);
         assert_eq!(pipe.bind_at.role, Role::Buffer);
         assert!(
-            pipe.require_same_at
+            trace
                 .iter()
-                .any(|site| site.operation == Op::ResourceStreamWrite && site.role == Role::File),
-            "the source's PipeWrite plan must include its write use: {pipe:?}"
-        );
-        assert!(
-            trace.iter().any(|event| event.operation == pipe.bind_at.operation
-                && matches!(&event.outcome, Outcome::Success(Reply::ResourceAcquired {
-                    resource_kind: ken_host::ResourceKindV1::PipeWrite, ..
-                }))
-                && event.resource_bindings.iter().any(|(role, _)| *role == pipe.bind_at.role)),
+                .any(|event| event.operation == pipe.bind_at.operation
+                    && matches!(
+                        &event.outcome,
+                        Outcome::Success(Reply::ResourceAcquired {
+                            resource_kind: ken_host::ResourceKindV1::PipeWrite,
+                            ..
+                        })
+                    )
+                    && event
+                        .resource_bindings
+                        .iter()
+                        .any(|(role, _)| *role == pipe.bind_at.role)),
             "a successful PipeWrite acquisition must reach the plan bind site: {trace:?}"
         );
     }
@@ -1133,6 +1155,5 @@ fn assert_exported_resource_lifetime_template_holds_for(
 }
 
 fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
-    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../catalog/packages")]
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
 }

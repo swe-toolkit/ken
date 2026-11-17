@@ -6,7 +6,11 @@ import Capability.Process.Child
 import Capability.Process.Exit (host_bind, host_pure)
 
 import Capability.System.Resource
-  (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult)
+  (ResourceBodyErr,
+    ResourceBodyOk,
+    ResourceBodyResult,
+    ResourceBracketOk,
+    ResourceBracketResult)
 
 const failed : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
@@ -28,14 +32,16 @@ proc child_body
       (child : Resource ResourceKind.ChildProcess)
     : HostIO AFull (ResourceBodyResult Unit Unit)
     visits [Process] =
-  host_bind AFull
+  host_bind
+    AFull
     (Result ResourceError (Resource ResourceKind.PipeWrite))
     (ResourceBodyResult Unit Unit)
     (take_stdin AFull child)
     (λtaken.
       match taken {
         Ok _ ↦
-          host_bind AFull
+          host_bind
+            AFull
             (Result ResourceError ChildExit)
             (ResourceBodyResult Unit Unit)
             (wait_child AFull child)
@@ -49,15 +55,24 @@ proc main
     visits [FS, Process] =
   match caps {
     ProgramCaps.MkProgramCaps cap ↦
-      host_bind AFull
+      host_bind
+        AFull
         (Result ResourceError (ResourceBracketResult Unit Unit))
         ExitCode
-        (withChild AFull Unit Unit cap
+        (withChild
+          AFull
+          Unit
+          Unit
+          cap
           (with_stdin
             (spawn_plan
               (bytes_encode "/bin/sh")
-              (Cons Bytes (bytes_encode "caller-zero")
-                (Cons Bytes (bytes_encode "-c")
+              (Cons
+                Bytes
+                (bytes_encode "caller-zero")
+                (Cons
+                  Bytes
+                  (bytes_encode "-c")
                   (Cons Bytes (bytes_encode "exit 0") (Nil Bytes)))))
             ChildPipe)
           child_body)
