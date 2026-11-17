@@ -4408,6 +4408,7 @@ fn checked_host_spine_v1(
             resolve_id(prelude.px10_exit_ids[0])?,
             resolve_id(prelude.px10_exit_ids[1])?,
         ],
+        process_take_pipe_write_constructor: resolve_id(prelude.px10_op_ids[3])?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
