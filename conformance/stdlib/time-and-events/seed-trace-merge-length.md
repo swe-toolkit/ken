@@ -163,11 +163,10 @@ theorem duplicate_one
 Architect's D0 on a scratch copy of `a0a4df8d3` checked the two
 generic proofs and an equivalent six-theorem accepted client, then
 refused the appended `duplicate_one` with `KernelRejected(TypeMismatch)`;
-its binary source was not identified. This seed is newly authored
-from the §19 contract and has **not** been run through the official
-conformance runner or checked as part of an assembled candidate.
-The D0 did not measure trusted `GlobalId` identity sets. The separate
-package test owes that measurement, ownership and transparency checks,
-generic-client checks and the doubled-`xs` proof mutation. Neither
-scratch D0 nor this seed establishes official conformance, CI,
-publication, landing or measured landed trust.
+its binary source was not identified. The D0 did not measure trusted
+`GlobalId` identity sets. Foundation QA's exact-tip review freshly checked
+the assembled candidate's package-test trust, ownership, transparency,
+generic-client and mutation gates. This seed has not been run through the
+official conformance runner. Neither the scratch D0 nor candidate-local
+package checks establish official conformance, CI, publication, landing
+or measured landed trust.
