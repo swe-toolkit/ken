@@ -1,7 +1,7 @@
 -- C7 intended non-respecting arm; this is not a valid post-P0 quotient input.
 -- It omits `e : IsEquiv DPair denoteEq`; see the C7 README.
 --
--- Run against the prelude + the K2 quotient fragment. Same Decimal quotient as
+-- Run against the prelude + the K2 quotient fragment. Same DecimalModel quotient as
 -- the sound arm; here we try to lift the first projection `coeff`, which does
 -- NOT respect denoteEq.
 
@@ -12,7 +12,7 @@ fn denoteEq (x : DPair) (y : DPair) : Prop =
     match y { MkDPair cy ey ↦
       Equal Bool (and_bool (eq_int (add_int ex 1) ey) (eq_int cx (mul_int cy 10))) True } }
 
-const Decimal : Type = DPair / denoteEq
+const DecimalModel : Type = DPair / denoteEq
 
 -- coeffPair does NOT respect denoteEq: MkDPair 10 (-1) and MkDPair 1 0 satisfy
 -- denoteEq (both denote 1) but coeffPair gives 10 vs 1.
@@ -24,7 +24,7 @@ fn coeffPair (p : DPair) : Int = match p { MkDPair c e ↦ c }
 fn coeffRespect (x : DPair) (y : DPair) (h : denoteEq x y)
   : Equal Int (coeffPair x) (coeffPair y) = Axiom   -- FALSE — no honest inhabitant
 
-fn coeffDecimal (d : Decimal) : Int =
+fn coeffDecimal (d : DecimalModel) : Int =
   elim_/ (λ _ . Int) coeffPair coeffRespect d
 
 -- Current status: no C7 respect verdict. The missing e prevents quotient
