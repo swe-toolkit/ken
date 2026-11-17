@@ -635,9 +635,17 @@ existing checked pre-source identities, not copied package definitions or
 new bare Strict names. A usable home requires the same Strict client to
 state a generic law in imported vocabulary and apply the checked proof;
 import acceptance and no-import `UnboundName` alone test nameability, not
-whether a law's statement is writable. The 21 other IO/Resource equations
-listed in the [ledger](30-intrinsic-ledger.md) stay checked but internal:
-no H row, helper export, or Resource law follows from them.
+whether a law's statement is writable. Under the current private
+`write_all_advance_span` definition, the open
+`write_all_advance_start_prop span count` also checks by `Refl`
+without importing the proof. That reduction is not the H-row promise
+or a required alternative client route. Citing the named checked
+`write_all_advance_start` proof preserves the package's public law
+boundary if the private step later ceases to reduce that way; neither
+home claims the proof is the only current route. The 21 other
+IO/Resource equations listed in the [ledger](30-intrinsic-ledger.md)
+stay checked but internal: no H row, helper export, or Resource law
+follows from them.
 
 The `And` quartet rewrites the four measured users by importing
 `Core.Logic.Conjunction`; its exported `And` is an alias for that
