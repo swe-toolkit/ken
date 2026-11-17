@@ -15,7 +15,10 @@
 > SPEC-TIME-MERGE-SEPARATED-APPEND §13;
 > SPEC-TIME-WINDOW-NONE-EMPTY §14;
 > SPEC-TIME-TRACE-MERGE-ALL §15;
-> SPEC-TIME-TRACE-MERGE-ALL-COUNT §16).** The §1–2 EventTrace
+> SPEC-TIME-TRACE-MERGE-ALL-COUNT §16;
+> SPEC-TIME-WINDOW-MERGE-ALL §17;
+> SPEC-TIME-MERGE-ALL-APPEND §18;
+> SPEC-TIME-MERGE-LENGTH §19).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -1567,3 +1570,108 @@ refuse at its own `Refl`: the D0 observed elaborator `TypeMismatch`,
 “Refl expects an `Eq`-shaped goal”, not a kernel rejection. The
 closed contrast does not replace the generic checked proof or
 official conformance.
+
+## 19. Merging preserves the number of events
+
+> **Section 19 status: DRAFT v0 (SPEC-TIME-MERGE-LENGTH).**
+> Architect's AC-0 D0 checked a scratch EventTrace development on
+> `a0a4df8d3` with `ken check` and `ken fmt --check` at rc 0, no
+> added `Axiom`, postulate, foreign or primitive declaration, and two
+> proof-breaking mutations rejected before restoration. A separate
+> client checked six accepted theorems and rejected a duplicate-length-
+> one claim at its own theorem with `KernelRejected(TypeMismatch)`.
+> That binary's source was not identified. The exact trusted-base
+> `GlobalId` identity set was **not measured** in D0; the separate
+> package test must measure it. These are scratch observations, not
+> checks of this Spec/seed child, the catalog half, the assembled
+> candidate, official conformance, CI, publication, landing or a
+> measured landed-trust result.
+
+`Data.Time.EventTrace` exports two premise-free public Transparent
+checked theorems. The first sits directly after `trace_merge_count`
+and before `trace_window_window`. Its exact name, binder order and
+public type are:
+
+```ken
+pub theorem trace_merge_length
+      (p : Type) (xs : List (Event p))
+    : (ys : List (Event p))
+      → Equal Nat
+        (length (Event p) (trace_merge p xs ys))
+        (add (length (Event p) xs) (length (Event p) ys))
+```
+
+The `ys` binder is to the right of the colon so induction can recur
+on `xs` and then abstract the second trace; clients apply the theorem
+as `trace_merge_length p xs ys`. It holds for arbitrary event payloads
+and arbitrary finite traces, including unordered inputs and two
+copies of the identical event. In particular, a merge is not a
+set union and does not remove duplicate occurrences. The law is
+about `Nat` lengths, not equality of event lists or their ordering.
+
+The proof recurses directly on `xs`, as the existing
+`trace_merge_count` does. At `Nil`, the left side reduces to the
+length of `ys`; `sym` of `(proof zero_l for add)` closes the
+open-`ys` goal. At `Cons x xt`, the private
+`trace_merge_into_length` proves the result for the recursive merge
+function `rest = trace_merge p xt`, supplied with the induction
+hypothesis for every `zs`. This helper recurses on `ys`: `Nil`
+closes by `Refl`; for `Cons y yt` it calls the private
+`trace_merge_into_length_cons`. The latter binds
+`decision : Bool` and an equality to `event_before p x y`, then
+uses `J` to transport the selected arm into the actual merge.
+When the decision is `True`, the merge emits `x`: apply the
+`rest_length` hypothesis to `Cons y yt`, use `cong` under `Suc`,
+and rearrange with `(proof suc_l for add)` by `trans` and `sym`.
+When it is `False`, the merge emits `y`: `cong` under `Suc` lifts
+the induction hypothesis for `yt`. The Boolean decision is bound
+before the case split: matching on an unbound computed comparison
+would not by itself refine the dependent motive. Both helpers are
+private, placed directly after `trace_merge_into_count` and before
+`trace_window_merge`.
+
+The second theorem is placed directly after `trace_merge_all_count`
+and before `trace_window_merge_all`. Its exact type is:
+
+```ken
+pub theorem trace_merge_all_length
+      (p : Type) (traces : List (List (Event p)))
+    : Equal Nat
+        (length (Event p) (trace_merge_all p traces))
+        (length (Event p) (list_concat (Event p) traces))
+```
+
+Induction on `traces` closes `Nil` by `Proved`. At `Cons t rest`,
+`trace_merge_length p t (trace_merge_all p rest)` turns the merged
+length into the sum of head and tail lengths. `cong` lifts the
+induction hypothesis for `rest` through addition of `length t`;
+`sym` of the existing public `list_append::length` applied to
+`(Event p)`, `t` and `list_concat (Event p) rest` identifies that
+sum with the length of the flattened input, using `trans` twice. This is a consequence
+of the two-trace theorem and the existing append-length proof,
+not a second induction through the merge implementation and not
+an assertion that merging preserves the order of concatenation.
+
+Neither law is derived here through `trace_merge_count` at an
+always-true classifier. That route requires a query `q : Event p`
+not supplied by the binders (both traces may be empty), and the
+existing count-to-length bridge and its classifier in
+`Data.Collections.Derived` are private. There is no new Derived
+export, premise, axiom, postulate, kernel or surface rule, and no
+change to any §§1–18 operation or law type. The catalog package
+test must independently establish unchanged trusted `GlobalId`
+identities and the Transparent ownership of both public laws.
+
+The separate AC-2 seed applies `trace_merge_length` to unordered
+singletons `[5T]` and `[3F]`, whose append is not time ordered,
+and to `[3T]` with itself as two distinct input occurrences. Both
+merged lengths reduce to two. The three-trace input `[5T]`, `[]`,
+`[3T]` applies `trace_merge_all_length` and reduces to length two.
+Each public law application has an independent closed `Proved`
+length check. A fresh copy of the accepted client appends a
+same-form claim that the duplicate merge has length one; it must
+refuse at that theorem, not at an import or law application. The
+accepted length-two claim on the same input controls the refusal.
+These finite observations distinguish multiplicity from
+set-like deduplication, but cannot replace the generic checked
+proofs or the separate official conformance and trust gates.

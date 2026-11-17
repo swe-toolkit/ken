@@ -2,9 +2,9 @@
 
 Finite events with natural-number times support half-open windows, a
 left-biased two-list merge, and a right-fold merge of multiple traces.
-Checked laws cover ordering, count, membership, window/merge distribution,
-window composition and commutation, and an adjacent-window split. Merge
-membership holds even for unordered inputs.
+Checked laws cover ordering, count and length, membership, window/merge
+distribution, window composition and commutation, and an adjacent-window
+split. Merge membership and length hold even for unordered inputs.
 
 ## Contents
 
@@ -31,12 +31,13 @@ ones. None of these operations reads a clock or sorts unordered input.
 
 The public carrier and operations lead the checked source; `trace_merge_all`
 follows `trace_merge` as a direct right fold. The first five generic laws
-follow, then their private recursive merge helper and proof lemmas. The
-window/merge distribution, composition and commutation laws, the three
+follow, then the two-trace length law and their private recursive merge
+helpers and proof lemmas. The window/merge distribution, composition and
+commutation laws, the three
 merge membership laws, merge associativity and adjacent-window split lead
 their private lemmas later in the source. The ordered, complete, and sound
-merge-all laws follow the associativity helper family. The count law follows
-them, then the window-distribution law, then the append law.
+merge-all laws follow the associativity helper family. The count and length
+laws follow them, then the window-distribution law, then the append law.
 The separated-merge law follows the right empty-merge unit and leads its
 private head-comparison helper. The inverted-window law follows window
 append; its private decision lemma sits beside the split's bound lemmas.
@@ -252,6 +253,25 @@ pub theorem trace_merge_count
           (trace_merge p xt)
           (λzs. trace_merge_count p eqf q xt zs)
           ys
+  }
+
+pub theorem trace_merge_length
+      (p : Type) (xs : List (Event p))
+    : (ys : List (Event p))
+      → Equal Nat
+        (length (Event p) (trace_merge p xs ys))
+        (add (length (Event p) xs) (length (Event p) ys)) =
+  match xs {
+    Nil ↦
+      λys.
+        sym
+          Nat
+          (add Zero (length (Event p) ys))
+          (length (Event p) ys)
+          ((proof zero_l for add) (length (Event p) ys));
+    Cons x xt ↦
+      λys.
+        trace_merge_into_length p x xt (trace_merge p xt) (λzs. trace_merge_length p xt zs) ys
   }
 
 pub theorem trace_window_window
@@ -809,6 +829,118 @@ theorem trace_merge_into_count
         y
         yt
         (trace_merge_into_count p eqf q x xt rest rest_count yt)
+        (event_before p x y)
+        Refl
+  }
+
+theorem trace_merge_into_length_cons
+      (p : Type)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_length : (zs : List (Event p))
+        → Equal
+        Nat
+        (length (Event p) (rest zs))
+        (add (length (Event p) xt) (length (Event p) zs)))
+      (y : Event p)
+      (yt : List (Event p))
+      (ih : Equal
+        Nat
+        (length (Event p) (trace_merge_into p x xt rest yt))
+        (add (length (Event p) (Cons (Event p) x xt)) (length (Event p) yt)))
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → Equal Nat
+        (length (Event p) (trace_merge_into p x xt rest (Cons (Event p) y yt)))
+        (add
+          (length (Event p) (Cons (Event p) x xt))
+          (length (Event p) (Cons (Event p) y yt))) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λchoice _.
+            Equal
+              Nat
+              (length
+                (Event p)
+                (match choice {
+                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+                }))
+              (add
+                (length (Event p) (Cons (Event p) x xt))
+                (length (Event p) (Cons (Event p) y yt))))
+          (cong
+            Nat
+            Nat
+            (length (Event p) (rest (Cons (Event p) y yt)))
+            (add (length (Event p) (Cons (Event p) x xt)) (length (Event p) yt))
+            Suc
+            (trans
+              Nat
+              (length (Event p) (rest (Cons (Event p) y yt)))
+              (add (length (Event p) xt) (length (Event p) (Cons (Event p) y yt)))
+              (add (length (Event p) (Cons (Event p) x xt)) (length (Event p) yt))
+              (rest_length (Cons (Event p) y yt))
+              (sym
+                Nat
+                (add (Suc (length (Event p) xt)) (length (Event p) yt))
+                (Suc (add (length (Event p) xt) (length (Event p) yt)))
+                ((proof suc_l for add) (length (Event p) xt) (length (Event p) yt)))))
+          (sym Bool (event_before p x y) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λchoice _.
+            Equal
+              Nat
+              (length
+                (Event p)
+                (match choice {
+                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+                }))
+              (add
+                (length (Event p) (Cons (Event p) x xt))
+                (length (Event p) (Cons (Event p) y yt))))
+          (cong
+            Nat
+            Nat
+            (length (Event p) (trace_merge_into p x xt rest yt))
+            (add (length (Event p) (Cons (Event p) x xt)) (length (Event p) yt))
+            Suc
+            ih)
+          (sym Bool (event_before p x y) False comparison)
+  }
+
+theorem trace_merge_into_length
+      (p : Type)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_length : (zs : List (Event p))
+        → Equal
+        Nat
+        (length (Event p) (rest zs))
+        (add (length (Event p) xt) (length (Event p) zs)))
+      (ys : List (Event p))
+    : Equal Nat
+        (length (Event p) (trace_merge_into p x xt rest ys))
+        (add (length (Event p) (Cons (Event p) x xt)) (length (Event p) ys)) =
+  match ys {
+    Nil ↦ Refl;
+    Cons y yt ↦
+      trace_merge_into_length_cons
+        p
+        x
+        xt
+        rest
+        rest_length
+        y
+        yt
+        (trace_merge_into_length p x xt rest rest_length yt)
         (event_before p x y)
         Refl
   }
@@ -2575,6 +2707,39 @@ pub theorem trace_merge_all_count
             (list_append::count (Event p) eqf q t (list_concat (Event p) rest))))
   }
 
+pub theorem trace_merge_all_length
+      (p : Type) (traces : List (List (Event p)))
+    : Equal Nat
+        (length (Event p) (trace_merge_all p traces))
+        (length (Event p) (list_concat (Event p) traces)) =
+  match traces {
+    Nil ↦ Proved;
+    Cons t rest ↦
+      trans
+        Nat
+        (length (Event p) (trace_merge p t (trace_merge_all p rest)))
+        (add (length (Event p) t) (length (Event p) (trace_merge_all p rest)))
+        (length (Event p) (list_append (Event p) t (list_concat (Event p) rest)))
+        (trace_merge_length p t (trace_merge_all p rest))
+        (trans
+          Nat
+          (add (length (Event p) t) (length (Event p) (trace_merge_all p rest)))
+          (add (length (Event p) t) (length (Event p) (list_concat (Event p) rest)))
+          (length (Event p) (list_append (Event p) t (list_concat (Event p) rest)))
+          (cong
+            Nat
+            Nat
+            (length (Event p) (trace_merge_all p rest))
+            (length (Event p) (list_concat (Event p) rest))
+            (λj. add (length (Event p) t) j)
+            (trace_merge_all_length p rest))
+          (sym
+            Nat
+            (length (Event p) (list_append (Event p) t (list_concat (Event p) rest)))
+            (add (length (Event p) t) (length (Event p) (list_concat (Event p) rest)))
+            (list_append::length (Event p) t (list_concat (Event p) rest))))
+  }
+
 pub theorem trace_window_merge_all
       (p : Type) (lo : Nat) (hi : Nat) (traces : List (List (Event p)))
     : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
@@ -3422,7 +3587,11 @@ head-comparison outcomes, using generic `count_cons` accounting. The private
 right-addition shuffle inducts on one addend using the checked successor law;
 the right-head count proof branches on the classifier and lifts its premise
 through `Suc`. The classifier is arbitrary: it may ignore its query and need
-not decide payload equality.
+not decide payload equality. The two-trace length law instead inducts on the
+left trace directly. Its private `trace_merge_into_length` helper recurses on
+the right trace; `trace_merge_into_length_cons` splits on `event_before` and
+transports through either head choice. No event witness or ordering premise
+is needed: length counts both copies when two input events coincide.
 
 Window/merge distribution inducts over the left trace and carries a
 right-trace induction in the private head-insertion case. Generic filtered
@@ -3477,7 +3646,10 @@ premise, or public existential. The count law inducts over the trace list:
 two-way `trace_merge_count` accounts for each head, the induction hypothesis
 accounts for the rest, and Derived's public `list_append::count` relates the
 result to `list_concat`. It preserves duplicate occurrences without ordering
-or a new helper. The window-distribution law inducts on the trace list. Each
+or a new helper. The merge-all length law follows from the two-trace length
+law and public `list_append::length`; its induction does not need a separate
+helper or an ordered-input premise. The window-distribution law inducts on
+the trace list. Each
 step applies the two-way `trace_window_merge` with the head's ordering from
 the premise and the merged tail's ordering from `trace_merge_all_ordered`,
 then carries the induction hypothesis through `cong` and `trans`. The append
@@ -3562,15 +3734,18 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, and the twenty-seven laws form the
+   `trace_merge`, `trace_merge_all`, and the twenty-nine laws form the
    package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
 3. **Derivation.** `Nat` and `List` are existing carriers; windowing uses the
    derived `filter`; merging is structurally recursive on two lists; count
-   preservation uses derived `count` and checked addition laws. Generic list
-   lemmas are owned by the collections provider, not copied into this package.
+   preservation uses derived `count` and checked addition laws. Length
+   preservation uses direct induction over trace merge and the collections
+   provider's public `list_append::length`, without requiring an event witness.
+   Generic list lemmas are owned by the collections provider, not copied
+   into this package.
    Window membership instantiates its two generic filter proofs and projects
    both half-open timestamp bounds. Window/merge distribution also uses
    the public filtered-head-order proof from the collections provider.
@@ -3578,9 +3753,12 @@ merging, not window multiplicity.
    merge-all reuses the two-way order and membership laws, Derived
    `list_elem_head`/`list_elem_later`, `list_concat`, append membership,
    and Ω-valued `J` transport. The count proof composes checked
-   `trace_merge_count` with public `list_append::count`. The window law
-   reuses `trace_window_merge` and `trace_merge_all_ordered`, with `map`
-   as the sole new Derived import; these six merge-all proofs add no helper.
+   `trace_merge_count` with public `list_append::count`. The length proof
+   composes checked `trace_merge_length` with public `list_append::length`;
+   the two-trace proof uses private `trace_merge_into_length` and
+   `trace_merge_into_length_cons`. The window law reuses
+   `trace_window_merge` and `trace_merge_all_ordered`, with `map` as the
+   sole new Derived import; these seven merge-all proofs add no helper.
    The append proof also reuses public `trace_merge_assoc` without ordering.
    The one-way window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
@@ -3604,8 +3782,8 @@ merging, not window multiplicity.
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
    The no-member law reuses those same lemmas and `window_keep` to delete
    each missed head, without an additional helper or import.
-4. **Trusted-base delta.** Zero: all twenty-seven exported laws have checked proof
-   bodies, and this package adds no `Axiom` or primitive. Imported logical,
+4. **Trusted-base delta.** Zero: all twenty-nine exported laws have checked
+   proof bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
    [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md),
@@ -3657,5 +3835,8 @@ merging, not window multiplicity.
    tail after each corresponding pair of closed value controls. The
    `cat_time_merge_all_append` package test checks the generic batch law,
    closed interleaving by value and by law, and the isolated false append
-   claim after a fresh accepted prefix. These tests are not official
-   conformance-runner execution or CI.
+   claim after a fresh accepted prefix. The merge-length seed distinguishes
+   unordered, duplicate and empty-containing batches. The
+   `cat_time_merge_length` package test checks both open length laws, these
+   closed values, and an isolated false one-occurrence claim for a duplicate
+   merge. These tests are not official conformance-runner execution or CI.
